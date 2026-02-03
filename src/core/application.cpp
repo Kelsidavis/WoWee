@@ -939,7 +939,7 @@ void Application::spawnPlayerCharacter() {
     // Spawn character at camera's ground position
     glm::vec3 spawnPos = camera->getPosition() - glm::vec3(0.0f, 0.0f, 5.0f);
     uint32_t instanceId = charRenderer->createInstance(1, spawnPos,
-        glm::vec3(0.0f), 2.0f);
+        glm::vec3(0.0f), 1.0f);  // Scale 1.0 = normal WoW character size
 
     if (instanceId > 0) {
         // Set up third-person follow
@@ -973,6 +973,11 @@ void Application::spawnPlayerCharacter() {
                 static_cast<int>(spawnPos.y), ", ",
                 static_cast<int>(spawnPos.z), ")");
         playerCharacterSpawned = true;
+
+        // Set up camera controller for first-person player hiding
+        if (renderer->getCameraController()) {
+            renderer->getCameraController()->setCharacterRenderer(charRenderer, instanceId);
+        }
 
         // Load equipped weapons (sword + shield)
         loadEquippedWeapons();

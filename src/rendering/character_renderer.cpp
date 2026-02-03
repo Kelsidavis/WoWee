@@ -978,6 +978,10 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
 
     for (const auto& pair : instances) {
         const auto& instance = pair.second;
+
+        // Skip invisible instances (e.g., player in first-person mode)
+        if (!instance.visible) continue;
+
         const auto& gpuModel = models[instance.modelId];
 
         // Set model matrix (use override for weapon instances)
@@ -1115,6 +1119,21 @@ void CharacterRenderer::setActiveGeosets(uint32_t instanceId, const std::unorder
     auto it = instances.find(instanceId);
     if (it != instances.end()) {
         it->second.activeGeosets = geosets;
+    }
+}
+
+void CharacterRenderer::setInstanceVisible(uint32_t instanceId, bool visible) {
+    auto it = instances.find(instanceId);
+    if (it != instances.end()) {
+        it->second.visible = visible;
+
+        // Also hide/show attached weapons (for first-person mode)
+        for (const auto& wa : it->second.weaponAttachments) {
+            auto weapIt = instances.find(wa.weaponInstanceId);
+            if (weapIt != instances.end()) {
+                weapIt->second.visible = visible;
+            }
+        }
     }
 }
 

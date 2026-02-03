@@ -725,6 +725,12 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
     glm::vec3 worldOrigin(glX, glY, glZ + 500.0f);
     glm::vec3 worldDir(0.0f, 0.0f, -1.0f);
 
+    // Debug: log when no instances
+    static int debugCounter = 0;
+    if (instances.empty() && (debugCounter++ % 300 == 0)) {
+        core::Logger::getInstance().warning("WMO getFloorHeight: no instances loaded!");
+    }
+
     for (const auto& instance : instances) {
         auto it = loadedModels.find(instance.modelId);
         if (it == loadedModels.end()) continue;
@@ -735,12 +741,17 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
         glm::vec3 localOrigin = glm::vec3(instance.invModelMatrix * glm::vec4(worldOrigin, 1.0f));
         glm::vec3 localDir = glm::normalize(glm::vec3(instance.invModelMatrix * glm::vec4(worldDir, 0.0f)));
 
+        int groupsChecked = 0;
+        int groupsSkipped = 0;
+        int trianglesHit = 0;
+
         for (const auto& group : model.groups) {
-            // Quick bounding box check: does the ray intersect this group's AABB?
-            // Use proper ray-AABB intersection (slab method) which handles rotated rays
+            // Quick bounding box check
             if (!rayIntersectsAABB(localOrigin, localDir, group.boundingBoxMin, group.boundingBoxMax)) {
+                groupsSkipped++;
                 continue;
             }
+            groupsChecked++;
 
             // Raycast against triangles
             const auto& verts = group.collisionVertices;
@@ -751,8 +762,15 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
                 const glm::vec3& v1 = verts[indices[i + 1]];
                 const glm::vec3& v2 = verts[indices[i + 2]];
 
+                // Try both winding orders (two-sided collision)
                 float t = rayTriangleIntersect(localOrigin, localDir, v0, v1, v2);
+                if (t <= 0.0f) {
+                    // Try reverse winding
+                    t = rayTriangleIntersect(localOrigin, localDir, v0, v2, v1);
+                }
+
                 if (t > 0.0f) {
+                    trianglesHit++;
                     // Hit point in local space -> world space
                     glm::vec3 hitLocal = localOrigin + localDir * t;
                     glm::vec3 hitWorld = glm::vec3(instance.modelMatrix * glm::vec4(hitLocal, 1.0f));
@@ -765,6 +783,14 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
                     }
                 }
             }
+        }
+
+        // Debug logging (every ~5 seconds at 60fps)
+        static int logCounter = 0;
+        if ((logCounter++ % 300 == 0) && (groupsChecked > 0 || groupsSkipped > 0)) {
+            core::Logger::getInstance().debug("Floor check: ", groupsChecked, " groups checked, ",
+                groupsSkipped, " skipped, ", trianglesHit, " hits, best=",
+                bestFloor ? std::to_string(*bestFloor) : "none");
         }
     }
 
@@ -779,8 +805,14 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
     float moveDistXY = glm::length(glm::vec2(moveDir.x, moveDir.y));
     if (moveDistXY < 0.001f) return false;
 
-    // Player collision radius (WoW character is about 0.5 yards wide)
-    const float PLAYER_RADIUS = 0.5f;
+    // Player collision parameters
+    const float PLAYER_RADIUS = 0.6f;       // Character collision radius
+    const float PLAYER_HEIGHT = 2.0f;       // Player height for wall checks
+
+    // Debug logging
+    static int wallDebugCounter = 0;
+    int groupsChecked = 0;
+    int wallsHit = 0;
 
     for (const auto& instance : instances) {
         auto it = loadedModels.find(instance.modelId);
@@ -790,15 +822,17 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
 
         // Transform positions into local space using cached inverse
         glm::vec3 localTo = glm::vec3(instance.invModelMatrix * glm::vec4(to, 1.0f));
+        float localFeetZ = localTo.z;
 
         for (const auto& group : model.groups) {
             // Quick bounding box check
-            float margin = PLAYER_RADIUS + 5.0f;
+            float margin = PLAYER_RADIUS + 2.0f;
             if (localTo.x < group.boundingBoxMin.x - margin || localTo.x > group.boundingBoxMax.x + margin ||
                 localTo.y < group.boundingBoxMin.y - margin || localTo.y > group.boundingBoxMax.y + margin ||
                 localTo.z < group.boundingBoxMin.z - margin || localTo.z > group.boundingBoxMax.z + margin) {
                 continue;
             }
+            groupsChecked++;
 
             const auto& verts = group.collisionVertices;
             const auto& indices = group.collisionIndices;
@@ -817,7 +851,16 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
                 normal /= normalLen;
 
                 // Skip mostly-horizontal triangles (floors/ceilings)
-                if (std::abs(normal.z) > 0.7f) continue;
+                // Only collide with walls (vertical surfaces)
+                if (std::abs(normal.z) > 0.5f) continue;
+
+                // Get triangle Z range
+                float triMinZ = std::min({v0.z, v1.z, v2.z});
+                float triMaxZ = std::max({v0.z, v1.z, v2.z});
+
+                // Only collide with walls in player's vertical range
+                if (triMaxZ < localFeetZ + 0.3f) continue;
+                if (triMinZ > localFeetZ + PLAYER_HEIGHT) continue;
 
                 // Signed distance from player to triangle plane
                 float planeDist = glm::dot(localTo - v0, normal);
@@ -827,27 +870,27 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
                 // Project point onto plane
                 glm::vec3 projected = localTo - normal * planeDist;
 
-                // Check if projected point is inside triangle using same-side test
-                // Use edge cross products and check they all point same direction as normal
+                // Check if projected point is inside triangle (or near edge)
                 float d0 = glm::dot(glm::cross(v1 - v0, projected - v0), normal);
                 float d1 = glm::dot(glm::cross(v2 - v1, projected - v1), normal);
                 float d2 = glm::dot(glm::cross(v0 - v2, projected - v2), normal);
 
-                // Also check nearby: if projected point is close to a triangle edge
-                bool insideTriangle = (d0 >= 0.0f && d1 >= 0.0f && d2 >= 0.0f);
+                // Allow small negative values for edge tolerance
+                const float edgeTolerance = -0.1f;
+                bool insideTriangle = (d0 >= edgeTolerance && d1 >= edgeTolerance && d2 >= edgeTolerance);
 
                 if (insideTriangle) {
-                    // Push player away from wall
+                    wallsHit++;
+                    // Push player away from wall (horizontal only)
                     float pushDist = PLAYER_RADIUS - absPlaneDist;
                     if (pushDist > 0.0f) {
-                        // Push in the direction the player is on (sign of planeDist)
                         float sign = planeDist > 0.0f ? 1.0f : -1.0f;
                         glm::vec3 pushLocal = normal * sign * pushDist;
 
-                        // Transform push vector back to world space (direction, not point)
+                        // Transform push vector back to world space
                         glm::vec3 pushWorld = glm::vec3(instance.modelMatrix * glm::vec4(pushLocal, 0.0f));
 
-                        // Only apply horizontal push (don't push vertically)
+                        // Only horizontal push
                         adjustedPos.x += pushWorld.x;
                         adjustedPos.y += pushWorld.y;
                         blocked = true;
@@ -855,6 +898,12 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
                 }
             }
         }
+    }
+
+    // Debug logging every ~5 seconds
+    if ((wallDebugCounter++ % 300 == 0) && !instances.empty()) {
+        core::Logger::getInstance().debug("Wall collision: ", instances.size(), " instances, ",
+            groupsChecked, " groups checked, ", wallsHit, " walls hit, blocked=", blocked);
     }
 
     return blocked;

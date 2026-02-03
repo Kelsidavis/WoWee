@@ -61,6 +61,7 @@ public:
     void setInstancePosition(uint32_t instanceId, const glm::vec3& position);
     void setInstanceRotation(uint32_t instanceId, const glm::vec3& rotation);
     void setActiveGeosets(uint32_t instanceId, const std::unordered_set<uint16_t>& geosets);
+    void setInstanceVisible(uint32_t instanceId, bool visible);
     void removeInstance(uint32_t instanceId);
 
     /** Attach a weapon model to a character instance at the given attachment point. */
@@ -95,6 +96,7 @@ private:
         glm::vec3 position;
         glm::vec3 rotation;
         float scale;
+        bool visible = true;  // For first-person camera hiding
 
         // Animation state
         uint32_t currentAnimationId = 0;

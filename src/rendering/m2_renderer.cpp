@@ -364,7 +364,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
     lastDrawCallCount = 0;
 
     // Distance-based culling threshold for M2 models
-    const float maxRenderDistance = 300.0f;  // Reduced for performance
+    const float maxRenderDistance = 400.0f;  // Balance between performance and visibility
     const float maxRenderDistanceSq = maxRenderDistance * maxRenderDistance;
     const glm::vec3 camPos = camera.getPosition();
 

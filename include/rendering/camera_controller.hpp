@@ -52,12 +52,20 @@ public:
     void setMovementCallback(MovementCallback cb) { movementCallback = std::move(cb); }
     void setUseWoWSpeed(bool use) { useWoWSpeed = use; }
 
+    // For first-person player hiding
+    void setCharacterRenderer(class CharacterRenderer* cr, uint32_t playerId) {
+        characterRenderer = cr;
+        playerInstanceId = playerId;
+    }
+
 private:
     Camera* camera;
     TerrainManager* terrainManager = nullptr;
     WMORenderer* wmoRenderer = nullptr;
     M2Renderer* m2Renderer = nullptr;
     WaterRenderer* waterRenderer = nullptr;
+    CharacterRenderer* characterRenderer = nullptr;
+    uint32_t playerInstanceId = 0;
 
     // Stored rotation (avoids lossy forward-vector round-trip)
     float yaw = 180.0f;
@@ -74,13 +82,22 @@ private:
     bool leftMouseDown = false;
     bool rightMouseDown = false;
 
-    // Third-person orbit camera
+    // Third-person orbit camera (WoW-style)
     bool thirdPerson = false;
-    float orbitDistance = 15.0f;
-    float minOrbitDistance = 3.0f;
-    float maxOrbitDistance = 50.0f;
-    float zoomSpeed = 2.0f;
+    float userTargetDistance = 10.0f;   // What the player wants (scroll wheel)
+    float currentDistance = 10.0f;      // Smoothed actual distance
+    float collisionDistance = 10.0f;    // Max allowed by collision
+    static constexpr float MIN_DISTANCE = 0.5f;     // Minimum zoom (first-person threshold)
+    static constexpr float MAX_DISTANCE = 50.0f;    // Maximum zoom out
+    static constexpr float ZOOM_SMOOTH_SPEED = 15.0f;  // How fast zoom eases
+    static constexpr float CAM_SMOOTH_SPEED = 20.0f;   // How fast camera position smooths
+    static constexpr float PIVOT_HEIGHT = 1.8f;     // Pivot at head height
+    static constexpr float CAM_SPHERE_RADIUS = 0.2f;   // Collision sphere radius
+    static constexpr float CAM_EPSILON = 0.05f;     // Offset from walls
+    static constexpr float MIN_PITCH = -88.0f;      // Look almost straight down
+    static constexpr float MAX_PITCH = 35.0f;       // Limited upward look
     glm::vec3* followTarget = nullptr;
+    glm::vec3 smoothedCamPos = glm::vec3(0.0f);     // For smooth camera movement
 
     // Gravity / grounding
     float verticalVelocity = 0.0f;
