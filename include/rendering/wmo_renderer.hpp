@@ -235,6 +235,7 @@ private:
         glm::mat4 invModelMatrix;  // Cached inverse for collision
         glm::vec3 worldBoundsMin;
         glm::vec3 worldBoundsMax;
+        std::vector<std::pair<glm::vec3, glm::vec3>> worldGroupBounds;
 
         void updateModelMatrix();
     };

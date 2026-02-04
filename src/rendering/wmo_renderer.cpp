@@ -316,6 +316,16 @@ uint32_t WMORenderer::createInstance(uint32_t modelId, const glm::vec3& position
     transformAABB(instance.modelMatrix, model.boundingBoxMin, model.boundingBoxMax,
                   instance.worldBoundsMin, instance.worldBoundsMax);
 
+    // Pre-compute world-space group bounds to avoid per-frame transformAABB
+    instance.worldGroupBounds.reserve(model.groups.size());
+    for (const auto& group : model.groups) {
+        glm::vec3 gMin, gMax;
+        transformAABB(instance.modelMatrix, group.boundingBoxMin, group.boundingBoxMax, gMin, gMax);
+        gMin -= glm::vec3(0.5f);
+        gMax += glm::vec3(0.5f);
+        instance.worldGroupBounds.emplace_back(gMin, gMax);
+    }
+
     instances.push_back(instance);
     size_t idx = instances.size() - 1;
     instanceIndexById[instance.id] = idx;
@@ -480,22 +490,16 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
         const ModelData& model = modelIt->second;
         shader->setUniform("uModel", instance.modelMatrix);
 
-        // Render all groups
-        for (const auto& group : model.groups) {
-            // Proper frustum culling using AABB test
-            if (frustumCulling) {
-                // Transform all AABB corners to avoid false culling on rotated groups.
-                glm::vec3 actualMin, actualMax;
-                transformAABB(instance.modelMatrix, group.boundingBoxMin, group.boundingBoxMax, actualMin, actualMax);
-                // Small pad reduces edge flicker from precision/camera jitter.
-                actualMin -= glm::vec3(0.5f);
-                actualMax += glm::vec3(0.5f);
-                if (!frustum.intersectsAABB(actualMin, actualMax)) {
+        // Render all groups using cached world-space bounds
+        for (size_t gi = 0; gi < model.groups.size(); ++gi) {
+            if (frustumCulling && gi < instance.worldGroupBounds.size()) {
+                const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
+                if (!frustum.intersectsAABB(gMin, gMax)) {
                     continue;
                 }
             }
 
-            renderGroup(group, model, instance.modelMatrix, view, projection);
+            renderGroup(model.groups[gi], model, instance.modelMatrix, view, projection);
         }
     }
 
@@ -991,8 +995,10 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
                     glm::vec3 hitLocal = localOrigin + localDir * t;
                     glm::vec3 hitWorld = glm::vec3(instance.modelMatrix * glm::vec4(hitLocal, 1.0f));
 
-                    // Only use floors below or near the query point
-                    if (hitWorld.z <= glZ + 2.0f) {
+                    // Only use floors below or near the query point.
+                    // Callers already elevate glZ by +5..+6; keep buffer small
+                    // to avoid selecting ceilings above the player.
+                    if (hitWorld.z <= glZ + 0.5f) {
                         if (!bestFloor || hitWorld.z > *bestFloor) {
                             bestFloor = hitWorld.z;
                         }

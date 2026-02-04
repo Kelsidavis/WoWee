@@ -936,9 +936,10 @@ std::optional<std::string> TerrainManager::getDominantTextureAt(float glX, float
             int alphaY = glm::clamp(static_cast<int>((fracY / 8.0f) * 63.0f), 0, 63);
             int alphaIndex = alphaY * 64 + alphaX;
 
-            std::vector<int> weights(chunk.layers.size(), 0);
+            int weights[4] = {0, 0, 0, 0};
+            size_t numLayers = std::min(chunk.layers.size(), static_cast<size_t>(4));
             int accum = 0;
-            for (size_t layerIdx = 1; layerIdx < chunk.layers.size(); layerIdx++) {
+            for (size_t layerIdx = 1; layerIdx < numLayers; layerIdx++) {
                 int alpha = 0;
                 if (decodeLayerAlpha(chunk, layerIdx, alphaScratch) && alphaIndex < static_cast<int>(alphaScratch.size())) {
                     alpha = alphaScratch[alphaIndex];
@@ -950,7 +951,7 @@ std::optional<std::string> TerrainManager::getDominantTextureAt(float glX, float
 
             size_t bestLayer = 0;
             int bestWeight = weights[0];
-            for (size_t i = 1; i < weights.size(); i++) {
+            for (size_t i = 1; i < numLayers; i++) {
                 if (weights[i] > bestWeight) {
                     bestWeight = weights[i];
                     bestLayer = i;

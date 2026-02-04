@@ -3,6 +3,7 @@
 #include "game/game_handler.hpp"
 #include "game/inventory.hpp"
 #include "ui/inventory_screen.hpp"
+#include "ui/spellbook_screen.hpp"
 #include <imgui.h>
 #include <string>
 
@@ -110,6 +111,7 @@ private:
      * Inventory screen
      */
     InventoryScreen inventoryScreen;
+    SpellbookScreen spellbookScreen;
 };
 
 }} // namespace wowee::ui

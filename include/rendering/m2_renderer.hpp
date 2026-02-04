@@ -48,6 +48,7 @@ struct M2ModelGPU {
     bool collisionSmallSolidProp = false;
     bool collisionNarrowVerticalProp = false;
     bool collisionNoBlock = false;
+    bool collisionStatue = false;
 
     std::string name;
 

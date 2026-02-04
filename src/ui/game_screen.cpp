@@ -8,8 +8,6 @@
 #include "pipeline/dbc_loader.hpp"
 #include "core/logger.hpp"
 #include <imgui.h>
-#include <iomanip>
-#include <sstream>
 #include <cmath>
 #include <unordered_set>
 
@@ -85,6 +83,9 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     renderLootWindow(gameHandler);
     renderGossipWindow(gameHandler);
     renderVendorWindow(gameHandler);
+
+    // Spellbook (P key toggle handled inside)
+    spellbookScreen.render(gameHandler, core::Application::getInstance().getAssetManager());
 
     // Inventory (B key toggle handled inside)
     inventoryScreen.render(gameHandler.getInventory());
@@ -200,9 +201,9 @@ void GameScreen::renderEntityList(game::GameHandler& gameHandler) {
 
                 // GUID
                 ImGui::TableSetColumnIndex(0);
-                std::stringstream guidStr;
-                guidStr << "0x" << std::hex << std::uppercase << std::setfill('0') << std::setw(16) << guid;
-                ImGui::Text("%s", guidStr.str().c_str());
+                char guidStr[24];
+                snprintf(guidStr, sizeof(guidStr), "0x%016llX", (unsigned long long)guid);
+                ImGui::Text("%s", guidStr);
 
                 // Type
                 ImGui::TableSetColumnIndex(1);
@@ -258,9 +259,16 @@ void GameScreen::renderEntityList(game::GameHandler& gameHandler) {
 }
 
 void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
-    ImGui::SetNextWindowSize(ImVec2(600, 300), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(520, 390), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Chat", nullptr, ImGuiWindowFlags_NoCollapse);
+    auto* window = core::Application::getInstance().getWindow();
+    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
+    float screenH = window ? static_cast<float>(window->getHeight()) : 720.0f;
+    float chatW = std::min(500.0f, screenW * 0.4f);
+    float chatH = 220.0f;
+    float chatX = 8.0f;
+    float chatY = screenH - chatH - 80.0f;  // Above action bar
+    ImGui::SetNextWindowSize(ImVec2(chatW, chatH), ImGuiCond_Always);
+    ImGui::SetNextWindowPos(ImVec2(chatX, chatY), ImGuiCond_Always);
+    ImGui::Begin("Chat", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
 
     // Chat history
     const auto& chatHistory = gameHandler.getChatHistory();
@@ -271,21 +279,13 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
         ImVec4 color = getChatTypeColor(msg.type);
         ImGui::PushStyleColor(ImGuiCol_Text, color);
 
-        std::stringstream ss;
-
         if (msg.type == game::ChatType::TEXT_EMOTE) {
-            ss << "You " << msg.message;
+            ImGui::TextWrapped("You %s", msg.message.c_str());
+        } else if (!msg.senderName.empty()) {
+            ImGui::TextWrapped("[%s] %s: %s", getChatTypeName(msg.type), msg.senderName.c_str(), msg.message.c_str());
         } else {
-            ss << "[" << getChatTypeName(msg.type) << "] ";
-
-            if (!msg.senderName.empty()) {
-                ss << msg.senderName << ": ";
-            }
-
-            ss << msg.message;
+            ImGui::TextWrapped("[%s] %s", getChatTypeName(msg.type), msg.message.c_str());
         }
-
-        ImGui::TextWrapped("%s", ss.str().c_str());
         ImGui::PopStyleColor();
     }
 
@@ -377,6 +377,18 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 }
             }
         }
+    }
+
+    // Slash key: focus chat input
+    if (!io.WantCaptureKeyboard && input.isKeyJustPressed(SDL_SCANCODE_SLASH)) {
+        refocusChatInput = true;
+        chatInputBuffer[0] = '/';
+        chatInputBuffer[1] = '\0';
+    }
+
+    // Enter key: focus chat input (empty)
+    if (!io.WantCaptureKeyboard && input.isKeyJustPressed(SDL_SCANCODE_RETURN)) {
+        refocusChatInput = true;
     }
 
     // Left-click targeting (when mouse not captured by UI)

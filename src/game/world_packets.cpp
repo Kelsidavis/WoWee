@@ -757,11 +757,10 @@ bool MessageChatParser::parse(network::Packet& packet, MessageChatData& data) {
             // Read sender name length + name
             uint32_t nameLen = packet.readUInt32();
             if (nameLen > 0 && nameLen < 256) {
-                std::vector<char> nameBuffer(nameLen);
+                data.senderName.resize(nameLen);
                 for (uint32_t i = 0; i < nameLen; ++i) {
-                    nameBuffer[i] = static_cast<char>(packet.readUInt8());
+                    data.senderName[i] = static_cast<char>(packet.readUInt8());
                 }
-                data.senderName = std::string(nameBuffer.begin(), nameBuffer.end());
             }
 
             // Read receiver GUID (usually 0 for monsters)
@@ -798,11 +797,10 @@ bool MessageChatParser::parse(network::Packet& packet, MessageChatData& data) {
 
     // Read message
     if (messageLen > 0 && messageLen < 8192) {
-        std::vector<char> msgBuffer(messageLen);
+        data.message.resize(messageLen);
         for (uint32_t i = 0; i < messageLen; ++i) {
-            msgBuffer[i] = static_cast<char>(packet.readUInt8());
+            data.message[i] = static_cast<char>(packet.readUInt8());
         }
-        data.message = std::string(msgBuffer.begin(), msgBuffer.end());
     }
 
     // Read chat tag

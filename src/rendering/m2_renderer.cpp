@@ -72,10 +72,12 @@ float getEffectiveCollisionTopLocal(const M2ModelGPU& model,
 
     float h = localMax.z - localMin.z;
     if (model.collisionSteppedFountain) {
-        if (r > 0.88f) return localMin.z + h * 0.20f;  // outer lip
-        if (r > 0.62f) return localMin.z + h * 0.42f;  // mid step
-        if (r > 0.36f) return localMin.z + h * 0.66f;  // inner step
-        return localMin.z + h * 0.90f;                 // center/top approach
+        if (r > 0.85f) return localMin.z + h * 0.18f;  // outer lip
+        if (r > 0.65f) return localMin.z + h * 0.36f;  // mid step
+        if (r > 0.45f) return localMin.z + h * 0.54f;  // inner step
+        if (r > 0.28f) return localMin.z + h * 0.70f;  // center platform / statue base
+        if (r > 0.14f) return localMin.z + h * 0.84f;  // statue body / sword
+        return localMin.z + h * 0.96f;                  // statue head / top
     }
 
     // Low square curb/planter profile:
@@ -239,6 +241,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
         uniform sampler2D uTexture;
         uniform bool uHasTexture;
         uniform bool uAlphaTest;
+        uniform float uFadeAlpha;
 
         out vec4 FragColor;
 
@@ -255,6 +258,12 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
                 discard;
             }
 
+            // Distance fade - discard nearly invisible fragments
+            float finalAlpha = texColor.a * uFadeAlpha;
+            if (finalAlpha < 0.02) {
+                discard;
+            }
+
             vec3 normal = normalize(Normal);
             vec3 lightDir = normalize(uLightDir);
 
@@ -265,7 +274,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
             vec3 diffuse = diff * texColor.rgb;
 
             vec3 result = ambient + diffuse;
-            FragColor = vec4(result, texColor.a);
+            FragColor = vec4(result, finalAlpha);
         }
     )";
 
@@ -364,7 +373,13 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
 
         bool isPlanter = (lowerName.find("planter") != std::string::npos);
         gpuModel.collisionPlanter = isPlanter;
+        bool statueName =
+            (lowerName.find("statue") != std::string::npos) ||
+            (lowerName.find("monument") != std::string::npos) ||
+            (lowerName.find("sculpture") != std::string::npos);
+        gpuModel.collisionStatue = statueName;
         bool smallSolidPropName =
+            statueName ||
             (lowerName.find("crate") != std::string::npos) ||
             (lowerName.find("box") != std::string::npos) ||
             (lowerName.find("chest") != std::string::npos) ||
@@ -402,7 +417,8 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             !gpuModel.collisionSteppedLowPlatform &&
             (narrowVerticalName || narrowVerticalShape);
         bool genericSolidPropShape =
-            (horiz > 0.6f && horiz < 6.0f && vert > 0.30f && vert < 4.0f && vert > horiz * 0.16f);
+            (horiz > 0.6f && horiz < 6.0f && vert > 0.30f && vert < 4.0f && vert > horiz * 0.16f) ||
+            statueName;
         bool curbLikeName =
             (lowerName.find("curb") != std::string::npos) ||
             (lowerName.find("planter") != std::string::npos) ||
@@ -619,11 +635,9 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
     // Set up GL state for M2 rendering
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
-    glDisable(GL_BLEND);       // No blend leaking from prior renderers
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_CULL_FACE);   // Some M2 geometry is single-sided
-
-    // Make models render with a bright color for debugging
-    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);  // Wireframe mode
 
     // Build frustum for culling
     Frustum frustum;
@@ -640,6 +654,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
     // Distance-based culling threshold for M2 models
     const float maxRenderDistance = 180.0f;  // Aggressive culling for city performance
     const float maxRenderDistanceSq = maxRenderDistance * maxRenderDistance;
+    const float fadeStartFraction = 0.75f;   // Start fading at 75% of max distance
     const glm::vec3 camPos = camera.getPosition();
 
     for (const auto& instance : instances) {
@@ -669,9 +684,25 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             continue;
         }
 
+        // Distance-based fade alpha for smooth pop-in
+        float fadeAlpha = 1.0f;
+        float fadeStartDistSq = effectiveMaxDistSq * fadeStartFraction * fadeStartFraction;
+        if (distSq > fadeStartDistSq) {
+            float dist = std::sqrt(distSq);
+            float effectiveMaxDist = std::sqrt(effectiveMaxDistSq);
+            float fadeStartDist = effectiveMaxDist * fadeStartFraction;
+            fadeAlpha = std::clamp((effectiveMaxDist - dist) / (effectiveMaxDist - fadeStartDist), 0.0f, 1.0f);
+        }
+
         shader->setUniform("uModel", instance.modelMatrix);
         shader->setUniform("uTime", instance.animTime);
         shader->setUniform("uAnimScale", 0.0f);  // Disabled - proper M2 animation needs bone/particle systems
+        shader->setUniform("uFadeAlpha", fadeAlpha);
+
+        // Disable depth writes for fading objects to avoid z-fighting
+        if (fadeAlpha < 1.0f) {
+            glDepthMask(GL_FALSE);
+        }
 
         glBindVertexArray(model.vao);
 
@@ -694,22 +725,15 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             lastDrawCallCount++;
         }
 
-        // Check for GL errors (only first draw)
-        static bool checkedOnce = false;
-        if (!checkedOnce) {
-            checkedOnce = true;
-            GLenum err = glGetError();
-            if (err != GL_NO_ERROR) {
-                LOG_ERROR("GL error after M2 draw: ", err);
-            } else {
-                LOG_INFO("M2 draw successful: ", model.indexCount, " indices");
-            }
-        }
-
         glBindVertexArray(0);
+
+        if (fadeAlpha < 1.0f) {
+            glDepthMask(GL_TRUE);
+        }
     }
 
-    // Restore cull face state
+    // Restore state
+    glDisable(GL_BLEND);
     glEnable(GL_CULL_FACE);
 }
 
@@ -942,8 +966,12 @@ std::optional<float> M2Renderer::getFloorHeight(float glX, float glY, float glZ)
 
         // Reachability filter: allow a bit more climb for stepped low platforms.
         float maxStepUp = 1.0f;
-        if (model.collisionSmallSolidProp) {
+        if (model.collisionStatue) {
+            maxStepUp = 2.5f;
+        } else if (model.collisionSmallSolidProp) {
             maxStepUp = 2.0f;
+        } else if (model.collisionSteppedFountain) {
+            maxStepUp = 2.5f;
         } else if (model.collisionSteppedLowPlatform) {
             maxStepUp = model.collisionPlanter ? 3.0f : 2.4f;
         }
@@ -1020,9 +1048,13 @@ bool M2Renderer::checkCollision(const glm::vec3& from, const glm::vec3& to,
         // Swept hard clamp for taller blockers only.
         // Low/stepable objects should be climbable and not "shove" the player off.
         float maxStepUp = 1.20f;
-        if (model.collisionSmallSolidProp) {
+        if (model.collisionStatue) {
+            maxStepUp = 2.5f;
+        } else if (model.collisionSmallSolidProp) {
             // Keep box/crate-class props hard-solid to prevent phase-through.
             maxStepUp = 0.75f;
+        } else if (model.collisionSteppedFountain) {
+            maxStepUp = 2.5f;
         } else if (model.collisionSteppedLowPlatform) {
             maxStepUp = model.collisionPlanter ? 2.8f : 2.4f;
         }
@@ -1070,7 +1102,7 @@ bool M2Renderer::checkCollision(const glm::vec3& from, const glm::vec3& to,
         if (allowEscapeRelax) {
             continue;
         }
-        if (model.collisionSteppedLowPlatform && stepableLowObject) {
+        if ((model.collisionSteppedLowPlatform || model.collisionSteppedFountain) && stepableLowObject) {
             // Already on/near top surface: don't apply lateral push that ejects
             // the player from the object when landing.
             continue;

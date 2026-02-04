@@ -336,9 +336,12 @@ void TerrainRenderer::render(const Camera& camera) {
         frustum.extractFromMatrix(viewProj);
     }
 
-    // Render each chunk
+    // Render each chunk — track last-bound textures to skip redundant binds
     renderedChunks = 0;
     culledChunks = 0;
+    GLuint lastBound[7] = {0, 0, 0, 0, 0, 0, 0};
+    int lastLayerConfig = -1; // track hasLayer1|hasLayer2|hasLayer3 bitmask
+
     for (const auto& chunk : chunks) {
         if (!chunk.isValid()) {
             continue;
@@ -350,48 +353,63 @@ void TerrainRenderer::render(const Camera& camera) {
             continue;
         }
 
-        // Bind textures
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, chunk.baseTexture);
-        shader->setUniform("uBaseTexture", 0);
+        // Bind base texture (slot 0) — skip if same as last chunk
+        if (chunk.baseTexture != lastBound[0]) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, chunk.baseTexture);
+            lastBound[0] = chunk.baseTexture;
+        }
 
-        // Bind layer textures and alphas
+        // Layer configuration
         bool hasLayer1 = chunk.layerTextures.size() > 0;
         bool hasLayer2 = chunk.layerTextures.size() > 1;
         bool hasLayer3 = chunk.layerTextures.size() > 2;
+        int layerConfig = (hasLayer1 ? 1 : 0) | (hasLayer2 ? 2 : 0) | (hasLayer3 ? 4 : 0);
 
-        shader->setUniform("uHasLayer1", hasLayer1 ? 1 : 0);
-        shader->setUniform("uHasLayer2", hasLayer2 ? 1 : 0);
-        shader->setUniform("uHasLayer3", hasLayer3 ? 1 : 0);
+        if (layerConfig != lastLayerConfig) {
+            shader->setUniform("uHasLayer1", hasLayer1 ? 1 : 0);
+            shader->setUniform("uHasLayer2", hasLayer2 ? 1 : 0);
+            shader->setUniform("uHasLayer3", hasLayer3 ? 1 : 0);
+            lastLayerConfig = layerConfig;
+        }
 
         if (hasLayer1) {
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, chunk.layerTextures[0]);
-            shader->setUniform("uLayer1Texture", 1);
-
-            glActiveTexture(GL_TEXTURE4);
-            glBindTexture(GL_TEXTURE_2D, chunk.alphaTextures[0]);
-            shader->setUniform("uLayer1Alpha", 4);
+            if (chunk.layerTextures[0] != lastBound[1]) {
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, chunk.layerTextures[0]);
+                lastBound[1] = chunk.layerTextures[0];
+            }
+            if (chunk.alphaTextures[0] != lastBound[4]) {
+                glActiveTexture(GL_TEXTURE4);
+                glBindTexture(GL_TEXTURE_2D, chunk.alphaTextures[0]);
+                lastBound[4] = chunk.alphaTextures[0];
+            }
         }
 
         if (hasLayer2) {
-            glActiveTexture(GL_TEXTURE2);
-            glBindTexture(GL_TEXTURE_2D, chunk.layerTextures[1]);
-            shader->setUniform("uLayer2Texture", 2);
-
-            glActiveTexture(GL_TEXTURE5);
-            glBindTexture(GL_TEXTURE_2D, chunk.alphaTextures[1]);
-            shader->setUniform("uLayer2Alpha", 5);
+            if (chunk.layerTextures[1] != lastBound[2]) {
+                glActiveTexture(GL_TEXTURE2);
+                glBindTexture(GL_TEXTURE_2D, chunk.layerTextures[1]);
+                lastBound[2] = chunk.layerTextures[1];
+            }
+            if (chunk.alphaTextures[1] != lastBound[5]) {
+                glActiveTexture(GL_TEXTURE5);
+                glBindTexture(GL_TEXTURE_2D, chunk.alphaTextures[1]);
+                lastBound[5] = chunk.alphaTextures[1];
+            }
         }
 
         if (hasLayer3) {
-            glActiveTexture(GL_TEXTURE3);
-            glBindTexture(GL_TEXTURE_2D, chunk.layerTextures[2]);
-            shader->setUniform("uLayer3Texture", 3);
-
-            glActiveTexture(GL_TEXTURE6);
-            glBindTexture(GL_TEXTURE_2D, chunk.alphaTextures[2]);
-            shader->setUniform("uLayer3Alpha", 6);
+            if (chunk.layerTextures[2] != lastBound[3]) {
+                glActiveTexture(GL_TEXTURE3);
+                glBindTexture(GL_TEXTURE_2D, chunk.layerTextures[2]);
+                lastBound[3] = chunk.layerTextures[2];
+            }
+            if (chunk.alphaTextures[2] != lastBound[6]) {
+                glActiveTexture(GL_TEXTURE6);
+                glBindTexture(GL_TEXTURE_2D, chunk.alphaTextures[2]);
+                lastBound[6] = chunk.alphaTextures[2];
+            }
         }
 
         // Draw chunk

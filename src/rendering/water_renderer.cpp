@@ -355,10 +355,7 @@ void WaterRenderer::render(const Camera& camera, float time) {
         return;
     }
 
-    GLboolean cullEnabled = glIsEnabled(GL_CULL_FACE);
-    if (cullEnabled) {
-        glDisable(GL_CULL_FACE);
-    }
+    glDisable(GL_CULL_FACE);
 
     // Enable alpha blending for transparent water
     glEnable(GL_BLEND);
@@ -395,10 +392,10 @@ void WaterRenderer::render(const Camera& camera, float time) {
         // City/canal liquid profile: clearer water + stronger ripples/sun shimmer.
         // Stormwind canals typically use LiquidType 5 in this data set.
         bool canalProfile = (surface.wmoId != 0) || (surface.liquidType == 5);
-        float waveAmp = canalProfile ? 0.07f : 0.038f;
-        float waveFreq = canalProfile ? 0.30f : 0.22f;
-        float waveSpeed = canalProfile ? 1.20f : 0.90f;
-        float shimmerStrength = canalProfile ? 0.95f : 0.35f;
+        float waveAmp = canalProfile ? 0.07f : 0.12f;
+        float waveFreq = canalProfile ? 0.30f : 0.18f;
+        float waveSpeed = canalProfile ? 1.20f : 1.60f;
+        float shimmerStrength = canalProfile ? 0.95f : 0.50f;
         float alphaScale = canalProfile ? 0.72f : 1.00f;
 
         waterShader->setUniform("waterColor", color);
@@ -418,9 +415,7 @@ void WaterRenderer::render(const Camera& camera, float time) {
     // Restore state
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
-    if (cullEnabled) {
-        glEnable(GL_CULL_FACE);
-    }
+    glEnable(GL_CULL_FACE);
 }
 
 void WaterRenderer::createWaterMesh(WaterSurface& surface) {
@@ -747,7 +742,7 @@ glm::vec4 WaterRenderer::getLiquidColor(uint16_t liquidType) const {
         case 0:  // Water
             return glm::vec4(0.2f, 0.4f, 0.6f, 1.0f);
         case 1:  // Ocean
-            return glm::vec4(0.14f, 0.36f, 0.58f, 1.0f);
+            return glm::vec4(0.06f, 0.18f, 0.34f, 1.0f);
         case 2:  // Magma
             return glm::vec4(0.9f, 0.3f, 0.05f, 1.0f);
         case 3:  // Slime
@@ -760,7 +755,7 @@ glm::vec4 WaterRenderer::getLiquidColor(uint16_t liquidType) const {
 float WaterRenderer::getLiquidAlpha(uint16_t liquidType) const {
     uint8_t basicType = (liquidType == 0) ? 0 : ((liquidType - 1) % 4);
     switch (basicType) {
-        case 1:  return 0.48f;  // Ocean
+        case 1:  return 0.68f;  // Ocean
         case 2:  return 0.72f;  // Magma
         case 3:  return 0.62f;  // Slime
         default: return 0.38f;  // Water

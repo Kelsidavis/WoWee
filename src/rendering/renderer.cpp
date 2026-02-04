@@ -974,17 +974,17 @@ void Renderer::renderWorld(game::World* world) {
         swimEffects->render(*camera);
     }
 
+    // Compute view/projection once for all sub-renderers
+    const glm::mat4& view = camera ? camera->getViewMatrix() : glm::mat4(1.0f);
+    const glm::mat4& projection = camera ? camera->getProjectionMatrix() : glm::mat4(1.0f);
+
     // Render characters (after weather)
     if (characterRenderer && camera) {
-        glm::mat4 view = camera->getViewMatrix();
-        glm::mat4 projection = camera->getProjectionMatrix();
         characterRenderer->render(*camera, view, projection);
     }
 
     // Render WMO buildings (after characters, before UI)
     if (wmoRenderer && camera) {
-        glm::mat4 view = camera->getViewMatrix();
-        glm::mat4 projection = camera->getProjectionMatrix();
         auto wmoStart = std::chrono::steady_clock::now();
         wmoRenderer->render(*camera, view, projection);
         auto wmoEnd = std::chrono::steady_clock::now();
@@ -993,8 +993,6 @@ void Renderer::renderWorld(game::World* world) {
 
     // Render M2 doodads (trees, rocks, etc.)
     if (m2Renderer && camera) {
-        glm::mat4 view = camera->getViewMatrix();
-        glm::mat4 projection = camera->getProjectionMatrix();
         auto m2Start = std::chrono::steady_clock::now();
         m2Renderer->render(*camera, view, projection);
         auto m2End = std::chrono::steady_clock::now();

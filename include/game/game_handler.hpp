@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <deque>
 #include <array>
 #include <functional>
 #include <cstdint>
@@ -151,7 +152,7 @@ public:
      * @param maxMessages Maximum number of messages to return (0 = all)
      * @return Vector of chat messages
      */
-    std::vector<MessageChatData> getChatHistory(size_t maxMessages = 50) const;
+    const std::deque<MessageChatData>& getChatHistory() const { return chatHistory; }
 
     /**
      * Add a locally-generated chat message (e.g., emote feedback)
@@ -401,7 +402,7 @@ private:
     EntityManager entityManager;             // Manages all entities in view
 
     // Chat
-    std::vector<MessageChatData> chatHistory;  // Recent chat messages
+    std::deque<MessageChatData> chatHistory;    // Recent chat messages
     size_t maxChatHistory = 100;             // Maximum chat messages to keep
 
     // Targeting

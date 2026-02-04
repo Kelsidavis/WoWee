@@ -13,6 +13,16 @@ namespace game {
 
 GameHandler::GameHandler() {
     LOG_DEBUG("GameHandler created");
+
+    // Default spells always available
+    knownSpells.push_back(6603);  // Attack
+    knownSpells.push_back(8690);  // Hearthstone
+
+    // Default action bar layout
+    actionBar[0].type = ActionBarSlot::SPELL;
+    actionBar[0].id = 6603;   // Attack in slot 1
+    actionBar[11].type = ActionBarSlot::SPELL;
+    actionBar[11].id = 8690;  // Hearthstone in slot 12
 }
 
 GameHandler::~GameHandler() {
@@ -780,19 +790,19 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                     }
                 }
 
-                // Extract health/mana/power from fields (Phase 2)
+                // Extract health/mana/power from fields (Phase 2) — single pass
                 if (block.objectType == ObjectType::UNIT || block.objectType == ObjectType::PLAYER) {
                     auto unit = std::static_pointer_cast<Unit>(entity);
-                    auto hpIt = block.fields.find(24); // UNIT_FIELD_HEALTH
-                    if (hpIt != block.fields.end()) unit->setHealth(hpIt->second);
-                    auto maxHpIt = block.fields.find(32); // UNIT_FIELD_MAXHEALTH
-                    if (maxHpIt != block.fields.end()) unit->setMaxHealth(maxHpIt->second);
-                    auto powerIt = block.fields.find(25); // UNIT_FIELD_POWER1
-                    if (powerIt != block.fields.end()) unit->setPower(powerIt->second);
-                    auto maxPowerIt = block.fields.find(33); // UNIT_FIELD_MAXPOWER1
-                    if (maxPowerIt != block.fields.end()) unit->setMaxPower(maxPowerIt->second);
-                    auto levelIt = block.fields.find(54); // UNIT_FIELD_LEVEL
-                    if (levelIt != block.fields.end()) unit->setLevel(levelIt->second);
+                    for (const auto& [key, val] : block.fields) {
+                        switch (key) {
+                            case 24: unit->setHealth(val); break;
+                            case 25: unit->setPower(val); break;
+                            case 32: unit->setMaxHealth(val); break;
+                            case 33: unit->setMaxPower(val); break;
+                            case 54: unit->setLevel(val); break;
+                            default: break;
+                        }
+                    }
                 }
                 break;
             }
@@ -805,19 +815,19 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                         entity->setField(field.first, field.second);
                     }
 
-                    // Update cached health/mana/power values (Phase 2)
+                    // Update cached health/mana/power values (Phase 2) — single pass
                     if (entity->getType() == ObjectType::UNIT || entity->getType() == ObjectType::PLAYER) {
                         auto unit = std::static_pointer_cast<Unit>(entity);
-                        auto hpIt = block.fields.find(24);
-                        if (hpIt != block.fields.end()) unit->setHealth(hpIt->second);
-                        auto maxHpIt = block.fields.find(32);
-                        if (maxHpIt != block.fields.end()) unit->setMaxHealth(maxHpIt->second);
-                        auto powerIt = block.fields.find(25);
-                        if (powerIt != block.fields.end()) unit->setPower(powerIt->second);
-                        auto maxPowerIt = block.fields.find(33);
-                        if (maxPowerIt != block.fields.end()) unit->setMaxPower(maxPowerIt->second);
-                        auto levelIt = block.fields.find(54);
-                        if (levelIt != block.fields.end()) unit->setLevel(levelIt->second);
+                        for (const auto& [key, val] : block.fields) {
+                            switch (key) {
+                                case 24: unit->setHealth(val); break;
+                                case 25: unit->setPower(val); break;
+                                case 32: unit->setMaxHealth(val); break;
+                                case 33: unit->setMaxPower(val); break;
+                                case 54: unit->setLevel(val); break;
+                                default: break;
+                            }
+                        }
                     }
 
                     LOG_DEBUG("Updated entity fields: 0x", std::hex, block.guid, std::dec);
@@ -1013,20 +1023,8 @@ void GameHandler::tabTarget(float playerX, float playerY, float playerZ) {
 void GameHandler::addLocalChatMessage(const MessageChatData& msg) {
     chatHistory.push_back(msg);
     if (chatHistory.size() > maxChatHistory) {
-        chatHistory.erase(chatHistory.begin());
+        chatHistory.pop_front();
     }
-}
-
-std::vector<MessageChatData> GameHandler::getChatHistory(size_t maxMessages) const {
-    if (maxMessages == 0 || maxMessages >= chatHistory.size()) {
-        return chatHistory;
-    }
-
-    // Return last N messages
-    return std::vector<MessageChatData>(
-        chatHistory.end() - maxMessages,
-        chatHistory.end()
-    );
 }
 
 // ============================================================
@@ -1207,6 +1205,20 @@ void GameHandler::handleSpellHealLog(network::Packet& packet) {
 
 void GameHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
     if (state != WorldState::IN_WORLD || !socket) return;
+
+    // Attack (6603) routes to auto-attack instead of cast
+    if (spellId == 6603) {
+        uint64_t target = targetGuid != 0 ? targetGuid : this->targetGuid;
+        if (target != 0) {
+            if (autoAttacking) {
+                stopAutoAttack();
+            } else {
+                startAutoAttack(target);
+            }
+        }
+        return;
+    }
+
     if (casting) return; // Already casting
 
     uint64_t target = targetGuid != 0 ? targetGuid : targetGuid;
@@ -1249,6 +1261,14 @@ void GameHandler::handleInitialSpells(network::Packet& packet) {
 
     knownSpells = data.spellIds;
 
+    // Ensure Attack (6603) and Hearthstone (8690) are always present
+    if (std::find(knownSpells.begin(), knownSpells.end(), 6603u) == knownSpells.end()) {
+        knownSpells.insert(knownSpells.begin(), 6603u);
+    }
+    if (std::find(knownSpells.begin(), knownSpells.end(), 8690u) == knownSpells.end()) {
+        knownSpells.push_back(8690u);
+    }
+
     // Set initial cooldowns
     for (const auto& cd : data.cooldowns) {
         if (cd.cooldownMs > 0) {
@@ -1256,10 +1276,17 @@ void GameHandler::handleInitialSpells(network::Packet& packet) {
         }
     }
 
-    // Auto-populate action bar with first 12 spells
-    for (int i = 0; i < ACTION_BAR_SLOTS && i < static_cast<int>(knownSpells.size()); ++i) {
-        actionBar[i].type = ActionBarSlot::SPELL;
-        actionBar[i].id = knownSpells[i];
+    // Auto-populate action bar: Attack in slot 1, Hearthstone in slot 12, rest filled with known spells
+    actionBar[0].type = ActionBarSlot::SPELL;
+    actionBar[0].id = 6603;  // Attack
+    actionBar[11].type = ActionBarSlot::SPELL;
+    actionBar[11].id = 8690;  // Hearthstone
+    int slot = 1;
+    for (int i = 0; i < static_cast<int>(knownSpells.size()) && slot < 11; ++i) {
+        if (knownSpells[i] == 6603 || knownSpells[i] == 8690) continue;
+        actionBar[slot].type = ActionBarSlot::SPELL;
+        actionBar[slot].id = knownSpells[i];
+        slot++;
     }
 
     LOG_INFO("Learned ", knownSpells.size(), " spells");
