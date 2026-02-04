@@ -158,6 +158,22 @@ private:
     uint32_t underwaterOverlayVAO = 0;
     uint32_t underwaterOverlayVBO = 0;
 
+    // Post-process FBO pipeline (HDR MSAA → resolve → tonemap)
+    uint32_t sceneFBO = 0;          // MSAA render target
+    uint32_t sceneColorRBO = 0;     // GL_RGBA16F multisampled renderbuffer
+    uint32_t sceneDepthRBO = 0;     // GL_DEPTH_COMPONENT24 multisampled renderbuffer
+    uint32_t resolveFBO = 0;        // Non-MSAA resolve target
+    uint32_t resolveColorTex = 0;   // GL_RGBA16F resolved texture (sampled by post-process)
+    uint32_t resolveDepthTex = 0;   // GL_DEPTH_COMPONENT24 resolved texture (for future SSAO)
+    uint32_t screenQuadVAO = 0;
+    uint32_t screenQuadVBO = 0;
+    std::unique_ptr<Shader> postProcessShader;
+    int fbWidth = 0, fbHeight = 0;
+
+    void initPostProcess(int w, int h);
+    void resizePostProcess(int w, int h);
+    void shutdownPostProcess();
+
     pipeline::AssetManager* cachedAssetManager = nullptr;
     uint32_t currentZoneId = 0;
     std::string currentZoneName;

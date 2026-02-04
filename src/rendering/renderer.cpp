@@ -225,6 +225,9 @@ bool Renderer::initialize(core::Window* win) {
         glBindVertexArray(0);
     }
 
+    // Initialize post-process FBO pipeline
+    initPostProcess(window->getWidth(), window->getHeight());
+
     LOG_INFO("Renderer initialized");
     return true;
 }
@@ -314,6 +317,8 @@ void Renderer::shutdown() {
     }
     underwaterOverlayShader.reset();
 
+    shutdownPostProcess();
+
     zoneManager.reset();
 
     performanceHUD.reset();
@@ -325,7 +330,15 @@ void Renderer::shutdown() {
 }
 
 void Renderer::beginFrame() {
-    // Black background (skybox will render over it)
+    // Resize post-process FBO if window size changed
+    int w = window->getWidth();
+    int h = window->getHeight();
+    if (w != fbWidth || h != fbHeight) {
+        resizePostProcess(w, h);
+    }
+
+    // Clear default framebuffer (login screen renders here directly)
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
@@ -888,6 +901,12 @@ void Renderer::renderWorld(game::World* world) {
     lastWMORenderMs = 0.0;
     lastM2RenderMs = 0.0;
 
+    // Bind HDR scene framebuffer for world rendering
+    glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     (void)world;  // Unused for now
 
     // Get time of day for sky-related rendering
@@ -1037,8 +1056,194 @@ void Renderer::renderWorld(game::World* world) {
         minimap->render(*camera, window->getWidth(), window->getHeight());
     }
 
+    // --- Resolve MSAA → non-MSAA texture ---
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, sceneFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFBO);
+    glBlitFramebuffer(0, 0, fbWidth, fbHeight, 0, 0, fbWidth, fbHeight,
+                      GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
+    // --- Post-process: tonemap via fullscreen quad ---
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, window->getWidth(), window->getHeight());
+    glDisable(GL_DEPTH_TEST);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    if (postProcessShader && screenQuadVAO) {
+        postProcessShader->use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, resolveColorTex);
+        postProcessShader->setUniform("uScene", 0);
+        glBindVertexArray(screenQuadVAO);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        glBindVertexArray(0);
+        postProcessShader->unuse();
+    }
+
+    glEnable(GL_DEPTH_TEST);
+
     auto renderEnd = std::chrono::steady_clock::now();
     lastRenderMs = std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
+}
+
+// ──────────────────────────────────────────────────────
+// Post-process FBO helpers
+// ──────────────────────────────────────────────────────
+
+void Renderer::initPostProcess(int w, int h) {
+    fbWidth = w;
+    fbHeight = h;
+    constexpr int SAMPLES = 4;
+
+    // --- MSAA FBO (render target) ---
+    glGenRenderbuffers(1, &sceneColorRBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, sceneColorRBO);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, SAMPLES, GL_RGBA16F, w, h);
+
+    glGenRenderbuffers(1, &sceneDepthRBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, sceneDepthRBO);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, SAMPLES, GL_DEPTH_COMPONENT24, w, h);
+
+    glGenFramebuffers(1, &sceneFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, sceneColorRBO);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, sceneDepthRBO);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        LOG_ERROR("MSAA scene FBO incomplete!");
+    }
+
+    // --- Resolve FBO (non-MSAA, for post-process sampling) ---
+    glGenTextures(1, &resolveColorTex);
+    glBindTexture(GL_TEXTURE_2D, resolveColorTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glGenTextures(1, &resolveDepthTex);
+    glBindTexture(GL_TEXTURE_2D, resolveDepthTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glGenFramebuffers(1, &resolveFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, resolveFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, resolveColorTex, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, resolveDepthTex, 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        LOG_ERROR("Resolve FBO incomplete!");
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // --- Fullscreen quad (triangle strip, pos + UV) ---
+    const float quadVerts[] = {
+        // pos (x,y)   uv (u,v)
+        -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+        -1.0f,  1.0f,  0.0f, 1.0f,
+         1.0f,  1.0f,  1.0f, 1.0f,
+    };
+    glGenVertexArrays(1, &screenQuadVAO);
+    glGenBuffers(1, &screenQuadVBO);
+    glBindVertexArray(screenQuadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, screenQuadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVerts), quadVerts, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glBindVertexArray(0);
+
+    // --- Post-process shader (Reinhard tonemap + gamma 2.2) ---
+    const char* ppVS = R"(
+        #version 330 core
+        layout (location = 0) in vec2 aPos;
+        layout (location = 1) in vec2 aUV;
+        out vec2 vUV;
+        void main() {
+            vUV = aUV;
+            gl_Position = vec4(aPos, 0.0, 1.0);
+        }
+    )";
+    const char* ppFS = R"(
+        #version 330 core
+        in vec2 vUV;
+        uniform sampler2D uScene;
+        out vec4 FragColor;
+        void main() {
+            vec3 color = texture(uScene, vUV).rgb;
+            // Passthrough — tonemap will kick in once HDR lighting is added
+            FragColor = vec4(color, 1.0);
+        }
+    )";
+    postProcessShader = std::make_unique<Shader>();
+    if (!postProcessShader->loadFromSource(ppVS, ppFS)) {
+        LOG_ERROR("Failed to compile post-process shader");
+        postProcessShader.reset();
+    }
+
+    LOG_INFO("Post-process FBO initialized (", w, "x", h, ")");
+}
+
+void Renderer::resizePostProcess(int w, int h) {
+    if (w <= 0 || h <= 0) return;
+    fbWidth = w;
+    fbHeight = h;
+    constexpr int SAMPLES = 4;
+
+    // Resize MSAA renderbuffers
+    glBindRenderbuffer(GL_RENDERBUFFER, sceneColorRBO);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, SAMPLES, GL_RGBA16F, w, h);
+    glBindRenderbuffer(GL_RENDERBUFFER, sceneDepthRBO);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, SAMPLES, GL_DEPTH_COMPONENT24, w, h);
+
+    // Resize resolve textures
+    glBindTexture(GL_TEXTURE_2D, resolveColorTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glBindTexture(GL_TEXTURE_2D, resolveDepthTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+
+    LOG_INFO("Post-process FBO resized (", w, "x", h, ")");
+}
+
+void Renderer::shutdownPostProcess() {
+    if (sceneFBO) {
+        glDeleteFramebuffers(1, &sceneFBO);
+        sceneFBO = 0;
+    }
+    if (sceneColorRBO) {
+        glDeleteRenderbuffers(1, &sceneColorRBO);
+        sceneColorRBO = 0;
+    }
+    if (sceneDepthRBO) {
+        glDeleteRenderbuffers(1, &sceneDepthRBO);
+        sceneDepthRBO = 0;
+    }
+    if (resolveFBO) {
+        glDeleteFramebuffers(1, &resolveFBO);
+        resolveFBO = 0;
+    }
+    if (resolveColorTex) {
+        glDeleteTextures(1, &resolveColorTex);
+        resolveColorTex = 0;
+    }
+    if (resolveDepthTex) {
+        glDeleteTextures(1, &resolveDepthTex);
+        resolveDepthTex = 0;
+    }
+    if (screenQuadVAO) {
+        glDeleteVertexArrays(1, &screenQuadVAO);
+        screenQuadVAO = 0;
+    }
+    if (screenQuadVBO) {
+        glDeleteBuffers(1, &screenQuadVBO);
+        screenQuadVBO = 0;
+    }
+    postProcessShader.reset();
 }
 
 bool Renderer::loadTestTerrain(pipeline::AssetManager* assetManager, const std::string& adtPath) {
