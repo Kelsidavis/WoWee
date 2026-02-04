@@ -124,3 +124,7 @@ This project does not include any Blizzard Entertainment proprietary data, asset
 - [TrinityCore](https://github.com/TrinityCore/TrinityCore) -- Server reference
 - [MaNGOS](https://github.com/cmangos/mangos-wotlk) -- Server reference
 - [StormLib](https://github.com/ladislav-zezula/StormLib) -- MPQ library
+
+## Known Issues
+
+- Stormwind Mage Quarter: around the Moonwell area, water is currently overflowing into nearby geometry and should be constrained to the proper liquid volume.

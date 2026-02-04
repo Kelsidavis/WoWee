@@ -108,6 +108,12 @@ bool WaterRenderer::initialize() {
             float brightness = 1.0 + WaveOffset * 0.1;
 
             vec3 result = (ambient + diffuse + specular) * brightness;
+            // Add a subtle sky tint and luminance floor so large ocean sheets
+            // never turn black at grazing angles.
+            float horizon = pow(1.0 - max(dot(norm, viewDir), 0.0), 1.6);
+            vec3 skyTint = vec3(0.22, 0.35, 0.48) * (0.25 + 0.55 * shimmerStrength) * horizon;
+            result += skyTint;
+            result = max(result, waterColor.rgb * 0.24);
 
             // Slight fresnel: more reflective/opaque at grazing angles.
             float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 3.0);
@@ -286,6 +292,19 @@ void WaterRenderer::loadFromWMO([[maybe_unused]] const pipeline::WMOLiquid& liqu
     surface.stepX = glm::vec3(modelMatrix * glm::vec4(localStepX, 0.0f));
     surface.stepY = glm::vec3(modelMatrix * glm::vec4(localStepY, 0.0f));
     surface.position = surface.origin;
+    // Guard against malformed transforms that produce giant/vertical sheets.
+    float stepXLen = glm::length(surface.stepX);
+    float stepYLen = glm::length(surface.stepY);
+    glm::vec3 planeN = glm::cross(surface.stepX, surface.stepY);
+    float nz = (glm::length(planeN) > 1e-4f) ? std::abs(glm::normalize(planeN).z) : 0.0f;
+    float spanX = stepXLen * static_cast<float>(surface.width);
+    float spanY = stepYLen * static_cast<float>(surface.height);
+    if (stepXLen < 0.2f || stepXLen > 12.0f ||
+        stepYLen < 0.2f || stepYLen > 12.0f ||
+        nz < 0.60f ||
+        spanX > 450.0f || spanY > 450.0f) {
+        return;
+    }
 
     const int gridWidth = static_cast<int>(surface.width) + 1;
     const int gridHeight = static_cast<int>(surface.height) + 1;
@@ -361,11 +380,6 @@ void WaterRenderer::render(const Camera& camera, float time) {
 
     // Render each water surface
     for (const auto& surface : surfaces) {
-        // WMO liquid parsing is still not reliable; render terrain water only
-        // to avoid large invalid sheets popping over city geometry.
-        if (surface.wmoId != 0) {
-            continue;
-        }
         if (surface.vao == 0) {
             continue;
         }
@@ -505,10 +519,26 @@ void WaterRenderer::createWaterMesh(WaterSurface& surface) {
         }
     }
 
-    if (indices.empty()) {
-        // No visible tiles
-        return;
+    if (indices.empty() && surface.wmoId == 0) {
+        // Terrain MH2O masks can be inconsistent in some tiles. If a terrain layer
+        // produces no visible tiles, fall back to its full local rect for rendering.
+        for (int y = 0; y < gridHeight - 1; y++) {
+            for (int x = 0; x < gridWidth - 1; x++) {
+                int topLeft = y * gridWidth + x;
+                int topRight = topLeft + 1;
+                int bottomLeft = (y + 1) * gridWidth + x;
+                int bottomRight = bottomLeft + 1;
+                indices.push_back(topLeft);
+                indices.push_back(bottomLeft);
+                indices.push_back(topRight);
+                indices.push_back(topRight);
+                indices.push_back(bottomLeft);
+                indices.push_back(bottomRight);
+            }
+        }
     }
+
+    if (indices.empty()) return;
 
     surface.indexCount = static_cast<int>(indices.size());
 
@@ -563,11 +593,6 @@ std::optional<float> WaterRenderer::getWaterHeightAt(float glX, float glY) const
 
     for (size_t si = 0; si < surfaces.size(); si++) {
         const auto& surface = surfaces[si];
-        // Use terrain/MH2O water for gameplay queries. WMO liquid extents are
-        // currently render-only and can overlap interiors.
-        if (surface.wmoId != 0) {
-            continue;
-        }
         glm::vec2 rel(glX - surface.origin.x, glY - surface.origin.y);
         glm::vec2 stepX(surface.stepX.x, surface.stepX.y);
         glm::vec2 stepY(surface.stepY.x, surface.stepY.y);
@@ -651,9 +676,6 @@ std::optional<uint16_t> WaterRenderer::getWaterTypeAt(float glX, float glY) cons
     std::optional<uint16_t> bestType;
 
     for (const auto& surface : surfaces) {
-        if (surface.wmoId != 0) {
-            continue;
-        }
         glm::vec2 rel(glX - surface.origin.x, glY - surface.origin.y);
         glm::vec2 stepX(surface.stepX.x, surface.stepX.y);
         glm::vec2 stepY(surface.stepY.x, surface.stepY.y);
@@ -677,11 +699,21 @@ std::optional<uint16_t> WaterRenderer::getWaterTypeAt(float glX, float glY) cons
         if (ix < 0 || iy < 0) continue;
 
         if (!surface.mask.empty()) {
-            int tileIndex = iy * surface.width + ix;
+            int tileIndex;
+            if (surface.wmoId == 0 && surface.mask.size() >= 8) {
+                int cx = static_cast<int>(surface.xOffset) + ix;
+                int cy = static_cast<int>(surface.yOffset) + iy;
+                tileIndex = cy * 8 + cx;
+            } else {
+                tileIndex = iy * surface.width + ix;
+            }
             int byteIndex = tileIndex / 8;
             int bitIndex = tileIndex % 8;
             if (byteIndex < static_cast<int>(surface.mask.size())) {
-                bool renderTile = (surface.mask[byteIndex] & (1 << bitIndex)) != 0;
+                uint8_t maskByte = surface.mask[byteIndex];
+                bool lsbOrder = (maskByte & (1 << bitIndex)) != 0;
+                bool msbOrder = (maskByte & (1 << (7 - bitIndex))) != 0;
+                bool renderTile = lsbOrder || msbOrder;
                 if (!renderTile) continue;
             }
         }
@@ -715,7 +747,7 @@ glm::vec4 WaterRenderer::getLiquidColor(uint16_t liquidType) const {
         case 0:  // Water
             return glm::vec4(0.2f, 0.4f, 0.6f, 1.0f);
         case 1:  // Ocean
-            return glm::vec4(0.1f, 0.3f, 0.5f, 1.0f);
+            return glm::vec4(0.14f, 0.36f, 0.58f, 1.0f);
         case 2:  // Magma
             return glm::vec4(0.9f, 0.3f, 0.05f, 1.0f);
         case 3:  // Slime
@@ -728,9 +760,10 @@ glm::vec4 WaterRenderer::getLiquidColor(uint16_t liquidType) const {
 float WaterRenderer::getLiquidAlpha(uint16_t liquidType) const {
     uint8_t basicType = (liquidType == 0) ? 0 : ((liquidType - 1) % 4);
     switch (basicType) {
+        case 1:  return 0.48f;  // Ocean
         case 2:  return 0.72f;  // Magma
         case 3:  return 0.62f;  // Slime
-        default: return 0.38f;  // Water/Ocean
+        default: return 0.38f;  // Water
     }
 }
 

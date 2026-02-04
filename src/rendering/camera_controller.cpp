@@ -496,11 +496,12 @@ void CameraController::update(float deltaTime) {
                 if (terrainManager) {
                     terrainH = terrainManager->getHeightAt(x, y);
                 }
+                float probeZ = std::max(targetPos.z, lastGroundZ) + 6.0f;
                 if (wmoRenderer) {
-                    wmoH = wmoRenderer->getFloorHeight(x, y, targetPos.z + eyeHeight);
+                    wmoH = wmoRenderer->getFloorHeight(x, y, probeZ);
                 }
                 if (m2Renderer) {
-                    m2H = m2Renderer->getFloorHeight(x, y, targetPos.z);
+                    m2H = m2Renderer->getFloorHeight(x, y, probeZ);
                 }
                 float stepUpBudget = grounded ? 1.6f : 1.2f;
                 auto base = selectReachableFloor(terrainH, wmoH, targetPos.z, stepUpBudget);
@@ -780,14 +781,16 @@ void CameraController::update(float deltaTime) {
                 if (terrainManager) {
                     terrainH = terrainManager->getHeightAt(x, y);
                 }
+                float feetZ = newPos.z - eyeHeight;
+                float probeZ = std::max(feetZ, lastGroundZ) + 6.0f;
                 if (wmoRenderer) {
-                    wmoH = wmoRenderer->getFloorHeight(x, y, newPos.z);
+                    wmoH = wmoRenderer->getFloorHeight(x, y, probeZ);
                 }
                 if (m2Renderer) {
-                    m2H = m2Renderer->getFloorHeight(x, y, newPos.z - eyeHeight);
+                    m2H = m2Renderer->getFloorHeight(x, y, probeZ);
                 }
-                auto base = selectReachableFloor(terrainH, wmoH, newPos.z - eyeHeight, 1.0f);
-                if (m2H && *m2H <= (newPos.z - eyeHeight) + 1.0f && (!base || *m2H > *base)) {
+                auto base = selectReachableFloor(terrainH, wmoH, feetZ, 1.0f);
+                if (m2H && *m2H <= feetZ + 1.0f && (!base || *m2H > *base)) {
                     base = m2H;
                 }
                 return base;
@@ -981,20 +984,32 @@ void CameraController::reset() {
 
     glm::vec3 spawnPos = defaultPosition;
 
-    // Snap spawn to terrain or WMO surface
-    std::optional<float> h;
+    // Snap spawn to a nearby valid floor, but reject outliers so we don't
+    // respawn under the city when collision data is noisy at this location.
+    std::optional<float> terrainH;
+    std::optional<float> wmoH;
+    std::optional<float> m2H;
     if (terrainManager) {
-        h = terrainManager->getHeightAt(spawnPos.x, spawnPos.y);
+        terrainH = terrainManager->getHeightAt(spawnPos.x, spawnPos.y);
     }
+    float floorProbeZ = terrainH.value_or(spawnPos.z);
     if (wmoRenderer) {
-        auto wh = wmoRenderer->getFloorHeight(spawnPos.x, spawnPos.y, spawnPos.z);
-        if (wh && (!h || *wh > *h)) {
-            h = wh;
-        }
+        wmoH = wmoRenderer->getFloorHeight(spawnPos.x, spawnPos.y, floorProbeZ + 2.0f);
     }
-    if (h) {
+    if (m2Renderer) {
+        m2H = m2Renderer->getFloorHeight(spawnPos.x, spawnPos.y, floorProbeZ + 2.0f);
+    }
+
+    std::optional<float> h = selectReachableFloor(terrainH, wmoH, spawnPos.z, 16.0f);
+    if (!h) {
+        h = selectHighestFloor(terrainH, wmoH, m2H);
+    }
+    // Allow large downward snaps (prevents sky-fall spawns), but don't snap up
+    // onto distant roofs when a bad hit appears above us.
+    constexpr float MAX_SPAWN_SNAP_UP = 16.0f;
+    if (h && *h <= spawnPos.z + MAX_SPAWN_SNAP_UP) {
         lastGroundZ = *h;
-        spawnPos.z = *h;
+        spawnPos.z = *h + 0.05f;
     }
 
     camera->setRotation(yaw, pitch);

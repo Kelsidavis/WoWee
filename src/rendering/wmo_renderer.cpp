@@ -1109,7 +1109,7 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
                 // Lower parts of ramps should be stepable from the side.
                 // Allow a larger step-up budget for ramp-like triangles.
                 // Allow running off/onto lower ramp side geometry without invisible wall blocks.
-                if (normal.z > 0.20f && triMaxZ <= localFeetZ + 1.60f) continue;
+                if (normal.z > 0.30f && triMaxZ <= localFeetZ + 0.95f) continue;
                 // Ignore short near-vertical side strips around ramps/edges.
                 // These commonly act like invisible side guard rails.
                 float triHeight = triMaxZ - triMinZ;
