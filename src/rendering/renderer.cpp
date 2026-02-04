@@ -34,6 +34,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <cctype>
 #include <cmath>
+#include <chrono>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -582,8 +583,17 @@ audio::FootstepSurface Renderer::resolveFootstepSurface() const {
 }
 
 void Renderer::update(float deltaTime) {
+    auto updateStart = std::chrono::steady_clock::now();
+    if (wmoRenderer) wmoRenderer->resetQueryStats();
+    if (m2Renderer) m2Renderer->resetQueryStats();
+
     if (cameraController) {
+        auto cameraStart = std::chrono::steady_clock::now();
         cameraController->update(deltaTime);
+        auto cameraEnd = std::chrono::steady_clock::now();
+        lastCameraUpdateMs = std::chrono::duration<double, std::milli>(cameraEnd - cameraStart).count();
+    } else {
+        lastCameraUpdateMs = 0.0;
     }
 
     // Sync character model position/rotation and animation with follow target
@@ -722,9 +732,17 @@ void Renderer::update(float deltaTime) {
     if (performanceHUD) {
         performanceHUD->update(deltaTime);
     }
+
+    auto updateEnd = std::chrono::steady_clock::now();
+    lastUpdateMs = std::chrono::duration<double, std::milli>(updateEnd - updateStart).count();
 }
 
 void Renderer::renderWorld(game::World* world) {
+    auto renderStart = std::chrono::steady_clock::now();
+    lastTerrainRenderMs = 0.0;
+    lastWMORenderMs = 0.0;
+    lastM2RenderMs = 0.0;
+
     (void)world;  // Unused for now
 
     // Get time of day for sky-related rendering
@@ -780,7 +798,10 @@ void Renderer::renderWorld(game::World* world) {
             terrainRenderer->setFog(fogColorArray, 400.0f, 1200.0f);
         }
 
+        auto terrainStart = std::chrono::steady_clock::now();
         terrainRenderer->render(*camera);
+        auto terrainEnd = std::chrono::steady_clock::now();
+        lastTerrainRenderMs = std::chrono::duration<double, std::milli>(terrainEnd - terrainStart).count();
 
         // Render water after terrain (transparency requires back-to-front rendering)
         if (waterRenderer) {
@@ -812,20 +833,29 @@ void Renderer::renderWorld(game::World* world) {
     if (wmoRenderer && camera) {
         glm::mat4 view = camera->getViewMatrix();
         glm::mat4 projection = camera->getProjectionMatrix();
+        auto wmoStart = std::chrono::steady_clock::now();
         wmoRenderer->render(*camera, view, projection);
+        auto wmoEnd = std::chrono::steady_clock::now();
+        lastWMORenderMs = std::chrono::duration<double, std::milli>(wmoEnd - wmoStart).count();
     }
 
     // Render M2 doodads (trees, rocks, etc.)
     if (m2Renderer && camera) {
         glm::mat4 view = camera->getViewMatrix();
         glm::mat4 projection = camera->getProjectionMatrix();
+        auto m2Start = std::chrono::steady_clock::now();
         m2Renderer->render(*camera, view, projection);
+        auto m2End = std::chrono::steady_clock::now();
+        lastM2RenderMs = std::chrono::duration<double, std::milli>(m2End - m2Start).count();
     }
 
     // Render minimap overlay
     if (minimap && camera && window) {
         minimap->render(*camera, window->getWidth(), window->getHeight());
     }
+
+    auto renderEnd = std::chrono::steady_clock::now();
+    lastRenderMs = std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
 }
 
 bool Renderer::loadTestTerrain(pipeline::AssetManager* assetManager, const std::string& adtPath) {

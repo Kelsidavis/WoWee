@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <string>
 #include <optional>
@@ -58,6 +59,8 @@ struct M2Instance {
     float scale;
     glm::mat4 modelMatrix;
     glm::mat4 invModelMatrix;
+    glm::vec3 worldBoundsMin;
+    glm::vec3 worldBoundsMax;
 
     // Animation state
     float animTime = 0.0f;       // Current animation time
@@ -163,6 +166,16 @@ public:
      */
     float raycastBoundingBoxes(const glm::vec3& origin, const glm::vec3& direction, float maxDistance) const;
 
+    /**
+     * Limit expensive collision/raycast queries to objects near a focus point.
+     */
+    void setCollisionFocus(const glm::vec3& worldPos, float radius);
+    void clearCollisionFocus();
+
+    void resetQueryStats();
+    double getQueryTimeMs() const { return queryTimeMs; }
+    uint32_t getQueryCallCount() const { return queryCallCount; }
+
     // Stats
     uint32_t getModelCount() const { return static_cast<uint32_t>(models.size()); }
     uint32_t getInstanceCount() const { return static_cast<uint32_t>(instances.size()); }
@@ -186,6 +199,42 @@ private:
     // Lighting uniforms
     glm::vec3 lightDir = glm::vec3(0.5f, 0.5f, 1.0f);
     glm::vec3 ambientColor = glm::vec3(0.4f, 0.4f, 0.45f);
+
+    // Optional query-space culling for collision/raycast hot paths.
+    bool collisionFocusEnabled = false;
+    glm::vec3 collisionFocusPos = glm::vec3(0.0f);
+    float collisionFocusRadius = 0.0f;
+    float collisionFocusRadiusSq = 0.0f;
+
+    struct GridCell {
+        int x;
+        int y;
+        int z;
+        bool operator==(const GridCell& other) const {
+            return x == other.x && y == other.y && z == other.z;
+        }
+    };
+    struct GridCellHash {
+        size_t operator()(const GridCell& c) const {
+            size_t h1 = std::hash<int>()(c.x);
+            size_t h2 = std::hash<int>()(c.y);
+            size_t h3 = std::hash<int>()(c.z);
+            return h1 ^ (h2 * 0x9e3779b9u) ^ (h3 * 0x85ebca6bu);
+        }
+    };
+    GridCell toCell(const glm::vec3& p) const;
+    void rebuildSpatialIndex();
+    void gatherCandidates(const glm::vec3& queryMin, const glm::vec3& queryMax, std::vector<size_t>& outIndices) const;
+
+    static constexpr float SPATIAL_CELL_SIZE = 64.0f;
+    std::unordered_map<GridCell, std::vector<uint32_t>, GridCellHash> spatialGrid;
+    std::unordered_map<uint32_t, size_t> instanceIndexById;
+    mutable std::vector<size_t> candidateScratch;
+    mutable std::unordered_set<uint32_t> candidateIdScratch;
+
+    // Collision query profiling (per frame).
+    mutable double queryTimeMs = 0.0;
+    mutable uint32_t queryCallCount = 0;
 };
 
 } // namespace rendering

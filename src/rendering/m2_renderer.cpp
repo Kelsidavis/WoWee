@@ -5,6 +5,7 @@
 #include "pipeline/asset_manager.hpp"
 #include "pipeline/blp_loader.hpp"
 #include "core/logger.hpp"
+#include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <unordered_set>
@@ -58,6 +59,53 @@ bool segmentIntersectsAABB(const glm::vec3& from, const glm::vec3& to,
     outEnterT = tEnter;
     return tExit >= 0.0f && tEnter <= 1.0f;
 }
+
+void transformAABB(const glm::mat4& modelMatrix,
+                   const glm::vec3& localMin,
+                   const glm::vec3& localMax,
+                   glm::vec3& outMin,
+                   glm::vec3& outMax) {
+    const glm::vec3 corners[8] = {
+        {localMin.x, localMin.y, localMin.z},
+        {localMin.x, localMin.y, localMax.z},
+        {localMin.x, localMax.y, localMin.z},
+        {localMin.x, localMax.y, localMax.z},
+        {localMax.x, localMin.y, localMin.z},
+        {localMax.x, localMin.y, localMax.z},
+        {localMax.x, localMax.y, localMin.z},
+        {localMax.x, localMax.y, localMax.z}
+    };
+
+    outMin = glm::vec3(std::numeric_limits<float>::max());
+    outMax = glm::vec3(-std::numeric_limits<float>::max());
+    for (const auto& c : corners) {
+        glm::vec3 wc = glm::vec3(modelMatrix * glm::vec4(c, 1.0f));
+        outMin = glm::min(outMin, wc);
+        outMax = glm::max(outMax, wc);
+    }
+}
+
+float pointAABBDistanceSq(const glm::vec3& p, const glm::vec3& bmin, const glm::vec3& bmax) {
+    glm::vec3 q = glm::clamp(p, bmin, bmax);
+    glm::vec3 d = p - q;
+    return glm::dot(d, d);
+}
+
+struct QueryTimer {
+    double* totalMs = nullptr;
+    uint32_t* callCount = nullptr;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    QueryTimer(double* total, uint32_t* calls) : totalMs(total), callCount(calls) {}
+    ~QueryTimer() {
+        if (callCount) {
+            (*callCount)++;
+        }
+        if (totalMs) {
+            auto end = std::chrono::steady_clock::now();
+            *totalMs += std::chrono::duration<double, std::milli>(end - start).count();
+        }
+    }
+};
 
 } // namespace
 
@@ -195,6 +243,8 @@ void M2Renderer::shutdown() {
     }
     models.clear();
     instances.clear();
+    spatialGrid.clear();
+    instanceIndexById.clear();
 
     // Delete cached textures
     for (auto& [path, texId] : textureCache) {
@@ -351,8 +401,22 @@ uint32_t M2Renderer::createInstance(uint32_t modelId, const glm::vec3& position,
     instance.rotation = rotation;
     instance.scale = scale;
     instance.updateModelMatrix();
+    glm::vec3 localMin, localMax;
+    getTightCollisionBounds(models[modelId], localMin, localMax);
+    transformAABB(instance.modelMatrix, localMin, localMax, instance.worldBoundsMin, instance.worldBoundsMax);
 
     instances.push_back(instance);
+    size_t idx = instances.size() - 1;
+    instanceIndexById[instance.id] = idx;
+    GridCell minCell = toCell(instance.worldBoundsMin);
+    GridCell maxCell = toCell(instance.worldBoundsMax);
+    for (int z = minCell.z; z <= maxCell.z; z++) {
+        for (int y = minCell.y; y <= maxCell.y; y++) {
+            for (int x = minCell.x; x <= maxCell.x; x++) {
+                spatialGrid[GridCell{x, y, z}].push_back(instance.id);
+            }
+        }
+    }
 
     return instance.id;
 }
@@ -372,9 +436,23 @@ uint32_t M2Renderer::createInstanceWithMatrix(uint32_t modelId, const glm::mat4&
     instance.scale = 1.0f;
     instance.modelMatrix = modelMatrix;
     instance.invModelMatrix = glm::inverse(modelMatrix);
+    glm::vec3 localMin, localMax;
+    getTightCollisionBounds(models[modelId], localMin, localMax);
+    transformAABB(instance.modelMatrix, localMin, localMax, instance.worldBoundsMin, instance.worldBoundsMax);
     instance.animTime = static_cast<float>(rand()) / RAND_MAX * 10.0f;  // Random start time
 
     instances.push_back(instance);
+    size_t idx = instances.size() - 1;
+    instanceIndexById[instance.id] = idx;
+    GridCell minCell = toCell(instance.worldBoundsMin);
+    GridCell maxCell = toCell(instance.worldBoundsMax);
+    for (int z = minCell.z; z <= maxCell.z; z++) {
+        for (int y = minCell.y; y <= maxCell.y; y++) {
+            for (int x = minCell.x; x <= maxCell.x; x++) {
+                spatialGrid[GridCell{x, y, z}].push_back(instance.id);
+            }
+        }
+    }
 
     return instance.id;
 }
@@ -496,6 +574,7 @@ void M2Renderer::removeInstance(uint32_t instanceId) {
     for (auto it = instances.begin(); it != instances.end(); ++it) {
         if (it->id == instanceId) {
             instances.erase(it);
+            rebuildSpatialIndex();
             return;
         }
     }
@@ -509,6 +588,86 @@ void M2Renderer::clear() {
     }
     models.clear();
     instances.clear();
+    spatialGrid.clear();
+    instanceIndexById.clear();
+}
+
+void M2Renderer::setCollisionFocus(const glm::vec3& worldPos, float radius) {
+    collisionFocusEnabled = (radius > 0.0f);
+    collisionFocusPos = worldPos;
+    collisionFocusRadius = std::max(0.0f, radius);
+    collisionFocusRadiusSq = collisionFocusRadius * collisionFocusRadius;
+}
+
+void M2Renderer::clearCollisionFocus() {
+    collisionFocusEnabled = false;
+}
+
+void M2Renderer::resetQueryStats() {
+    queryTimeMs = 0.0;
+    queryCallCount = 0;
+}
+
+M2Renderer::GridCell M2Renderer::toCell(const glm::vec3& p) const {
+    return GridCell{
+        static_cast<int>(std::floor(p.x / SPATIAL_CELL_SIZE)),
+        static_cast<int>(std::floor(p.y / SPATIAL_CELL_SIZE)),
+        static_cast<int>(std::floor(p.z / SPATIAL_CELL_SIZE))
+    };
+}
+
+void M2Renderer::rebuildSpatialIndex() {
+    spatialGrid.clear();
+    instanceIndexById.clear();
+    instanceIndexById.reserve(instances.size());
+
+    for (size_t i = 0; i < instances.size(); i++) {
+        const auto& inst = instances[i];
+        instanceIndexById[inst.id] = i;
+
+        GridCell minCell = toCell(inst.worldBoundsMin);
+        GridCell maxCell = toCell(inst.worldBoundsMax);
+        for (int z = minCell.z; z <= maxCell.z; z++) {
+            for (int y = minCell.y; y <= maxCell.y; y++) {
+                for (int x = minCell.x; x <= maxCell.x; x++) {
+                    spatialGrid[GridCell{x, y, z}].push_back(inst.id);
+                }
+            }
+        }
+    }
+}
+
+void M2Renderer::gatherCandidates(const glm::vec3& queryMin, const glm::vec3& queryMax,
+                                  std::vector<size_t>& outIndices) const {
+    outIndices.clear();
+    candidateIdScratch.clear();
+
+    GridCell minCell = toCell(queryMin);
+    GridCell maxCell = toCell(queryMax);
+    for (int z = minCell.z; z <= maxCell.z; z++) {
+        for (int y = minCell.y; y <= maxCell.y; y++) {
+            for (int x = minCell.x; x <= maxCell.x; x++) {
+                auto it = spatialGrid.find(GridCell{x, y, z});
+                if (it == spatialGrid.end()) continue;
+                for (uint32_t id : it->second) {
+                    if (!candidateIdScratch.insert(id).second) continue;
+                    auto idxIt = instanceIndexById.find(id);
+                    if (idxIt != instanceIndexById.end()) {
+                        outIndices.push_back(idxIt->second);
+                    }
+                }
+            }
+        }
+    }
+
+    // Safety fallback to preserve collision correctness if the spatial index
+    // misses candidates (e.g. during streaming churn).
+    if (outIndices.empty() && !instances.empty()) {
+        outIndices.reserve(instances.size());
+        for (size_t i = 0; i < instances.size(); i++) {
+            outIndices.push_back(i);
+        }
+    }
 }
 
 void M2Renderer::cleanupUnusedModels() {
@@ -591,9 +750,26 @@ uint32_t M2Renderer::getTotalTriangleCount() const {
 }
 
 std::optional<float> M2Renderer::getFloorHeight(float glX, float glY, float glZ) const {
+    QueryTimer timer(&queryTimeMs, &queryCallCount);
     std::optional<float> bestFloor;
 
-    for (const auto& instance : instances) {
+    glm::vec3 queryMin(glX - 2.0f, glY - 2.0f, glZ - 6.0f);
+    glm::vec3 queryMax(glX + 2.0f, glY + 2.0f, glZ + 8.0f);
+    gatherCandidates(queryMin, queryMax, candidateScratch);
+
+    for (size_t idx : candidateScratch) {
+        const auto& instance = instances[idx];
+        if (collisionFocusEnabled &&
+            pointAABBDistanceSq(collisionFocusPos, instance.worldBoundsMin, instance.worldBoundsMax) > collisionFocusRadiusSq) {
+            continue;
+        }
+
+        if (glX < instance.worldBoundsMin.x || glX > instance.worldBoundsMax.x ||
+            glY < instance.worldBoundsMin.y || glY > instance.worldBoundsMax.y ||
+            glZ < instance.worldBoundsMin.z - 2.0f || glZ > instance.worldBoundsMax.z + 2.0f) {
+            continue;
+        }
+
         auto it = models.find(instance.modelId);
         if (it == models.end()) continue;
         if (instance.scale <= 0.001f) continue;
@@ -627,11 +803,30 @@ std::optional<float> M2Renderer::getFloorHeight(float glX, float glY, float glZ)
 
 bool M2Renderer::checkCollision(const glm::vec3& from, const glm::vec3& to,
                                  glm::vec3& adjustedPos, float playerRadius) const {
+    QueryTimer timer(&queryTimeMs, &queryCallCount);
     adjustedPos = to;
     bool collided = false;
 
+    glm::vec3 queryMin = glm::min(from, to) - glm::vec3(7.0f, 7.0f, 5.0f);
+    glm::vec3 queryMax = glm::max(from, to) + glm::vec3(7.0f, 7.0f, 5.0f);
+    gatherCandidates(queryMin, queryMax, candidateScratch);
+
     // Check against all M2 instances in local space (rotation-aware).
-    for (const auto& instance : instances) {
+    for (size_t idx : candidateScratch) {
+        const auto& instance = instances[idx];
+        if (collisionFocusEnabled &&
+            pointAABBDistanceSq(collisionFocusPos, instance.worldBoundsMin, instance.worldBoundsMax) > collisionFocusRadiusSq) {
+            continue;
+        }
+
+        const float broadMargin = playerRadius + 1.0f;
+        if (from.x < instance.worldBoundsMin.x - broadMargin && adjustedPos.x < instance.worldBoundsMin.x - broadMargin) continue;
+        if (from.x > instance.worldBoundsMax.x + broadMargin && adjustedPos.x > instance.worldBoundsMax.x + broadMargin) continue;
+        if (from.y < instance.worldBoundsMin.y - broadMargin && adjustedPos.y < instance.worldBoundsMin.y - broadMargin) continue;
+        if (from.y > instance.worldBoundsMax.y + broadMargin && adjustedPos.y > instance.worldBoundsMax.y + broadMargin) continue;
+        if (from.z > instance.worldBoundsMax.z + 2.5f && adjustedPos.z > instance.worldBoundsMax.z + 2.5f) continue;
+        if (from.z + 2.5f < instance.worldBoundsMin.z && adjustedPos.z + 2.5f < instance.worldBoundsMin.z) continue;
+
         auto it = models.find(instance.modelId);
         if (it == models.end()) continue;
 
@@ -709,9 +904,29 @@ bool M2Renderer::checkCollision(const glm::vec3& from, const glm::vec3& to,
 }
 
 float M2Renderer::raycastBoundingBoxes(const glm::vec3& origin, const glm::vec3& direction, float maxDistance) const {
+    QueryTimer timer(&queryTimeMs, &queryCallCount);
     float closestHit = maxDistance;
 
-    for (const auto& instance : instances) {
+    glm::vec3 rayEnd = origin + direction * maxDistance;
+    glm::vec3 queryMin = glm::min(origin, rayEnd) - glm::vec3(1.0f);
+    glm::vec3 queryMax = glm::max(origin, rayEnd) + glm::vec3(1.0f);
+    gatherCandidates(queryMin, queryMax, candidateScratch);
+
+    for (size_t idx : candidateScratch) {
+        const auto& instance = instances[idx];
+        if (collisionFocusEnabled &&
+            pointAABBDistanceSq(collisionFocusPos, instance.worldBoundsMin, instance.worldBoundsMax) > collisionFocusRadiusSq) {
+            continue;
+        }
+
+        // Cheap world-space broad-phase.
+        float tEnter = 0.0f;
+        glm::vec3 worldMin = instance.worldBoundsMin - glm::vec3(0.35f);
+        glm::vec3 worldMax = instance.worldBoundsMax + glm::vec3(0.35f);
+        if (!segmentIntersectsAABB(origin, origin + direction * maxDistance, worldMin, worldMax, tEnter)) {
+            continue;
+        }
+
         auto it = models.find(instance.modelId);
         if (it == models.end()) continue;
 

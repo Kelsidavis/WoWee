@@ -9,6 +9,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <unordered_set>
@@ -155,6 +156,8 @@ void WMORenderer::shutdown() {
 
     loadedModels.clear();
     instances.clear();
+    spatialGrid.clear();
+    instanceIndexById.clear();
     shader.reset();
 }
 
@@ -309,8 +312,22 @@ uint32_t WMORenderer::createInstance(uint32_t modelId, const glm::vec3& position
     instance.rotation = rotation;
     instance.scale = scale;
     instance.updateModelMatrix();
+    const ModelData& model = loadedModels[modelId];
+    transformAABB(instance.modelMatrix, model.boundingBoxMin, model.boundingBoxMax,
+                  instance.worldBoundsMin, instance.worldBoundsMax);
 
     instances.push_back(instance);
+    size_t idx = instances.size() - 1;
+    instanceIndexById[instance.id] = idx;
+    GridCell minCell = toCell(instance.worldBoundsMin);
+    GridCell maxCell = toCell(instance.worldBoundsMax);
+    for (int z = minCell.z; z <= maxCell.z; z++) {
+        for (int y = minCell.y; y <= maxCell.y; y++) {
+            for (int x = minCell.x; x <= maxCell.x; x++) {
+                spatialGrid[GridCell{x, y, z}].push_back(instance.id);
+            }
+        }
+    }
     core::Logger::getInstance().info("Created WMO instance ", instance.id, " (model ", modelId, ")");
     return instance.id;
 }
@@ -320,13 +337,94 @@ void WMORenderer::removeInstance(uint32_t instanceId) {
                           [instanceId](const WMOInstance& inst) { return inst.id == instanceId; });
     if (it != instances.end()) {
         instances.erase(it);
+        rebuildSpatialIndex();
         core::Logger::getInstance().info("Removed WMO instance ", instanceId);
     }
 }
 
 void WMORenderer::clearInstances() {
     instances.clear();
+    spatialGrid.clear();
+    instanceIndexById.clear();
     core::Logger::getInstance().info("Cleared all WMO instances");
+}
+
+void WMORenderer::setCollisionFocus(const glm::vec3& worldPos, float radius) {
+    collisionFocusEnabled = (radius > 0.0f);
+    collisionFocusPos = worldPos;
+    collisionFocusRadius = std::max(0.0f, radius);
+    collisionFocusRadiusSq = collisionFocusRadius * collisionFocusRadius;
+}
+
+void WMORenderer::clearCollisionFocus() {
+    collisionFocusEnabled = false;
+}
+
+void WMORenderer::resetQueryStats() {
+    queryTimeMs = 0.0;
+    queryCallCount = 0;
+}
+
+WMORenderer::GridCell WMORenderer::toCell(const glm::vec3& p) const {
+    return GridCell{
+        static_cast<int>(std::floor(p.x / SPATIAL_CELL_SIZE)),
+        static_cast<int>(std::floor(p.y / SPATIAL_CELL_SIZE)),
+        static_cast<int>(std::floor(p.z / SPATIAL_CELL_SIZE))
+    };
+}
+
+void WMORenderer::rebuildSpatialIndex() {
+    spatialGrid.clear();
+    instanceIndexById.clear();
+    instanceIndexById.reserve(instances.size());
+
+    for (size_t i = 0; i < instances.size(); i++) {
+        const auto& inst = instances[i];
+        instanceIndexById[inst.id] = i;
+
+        GridCell minCell = toCell(inst.worldBoundsMin);
+        GridCell maxCell = toCell(inst.worldBoundsMax);
+        for (int z = minCell.z; z <= maxCell.z; z++) {
+            for (int y = minCell.y; y <= maxCell.y; y++) {
+                for (int x = minCell.x; x <= maxCell.x; x++) {
+                    spatialGrid[GridCell{x, y, z}].push_back(inst.id);
+                }
+            }
+        }
+    }
+}
+
+void WMORenderer::gatherCandidates(const glm::vec3& queryMin, const glm::vec3& queryMax,
+                                   std::vector<size_t>& outIndices) const {
+    outIndices.clear();
+    candidateIdScratch.clear();
+
+    GridCell minCell = toCell(queryMin);
+    GridCell maxCell = toCell(queryMax);
+    for (int z = minCell.z; z <= maxCell.z; z++) {
+        for (int y = minCell.y; y <= maxCell.y; y++) {
+            for (int x = minCell.x; x <= maxCell.x; x++) {
+                auto it = spatialGrid.find(GridCell{x, y, z});
+                if (it == spatialGrid.end()) continue;
+                for (uint32_t id : it->second) {
+                    if (!candidateIdScratch.insert(id).second) continue;
+                    auto idxIt = instanceIndexById.find(id);
+                    if (idxIt != instanceIndexById.end()) {
+                        outIndices.push_back(idxIt->second);
+                    }
+                }
+            }
+        }
+    }
+
+    // Safety fallback: if the grid misses due streaming/index drift, avoid
+    // tunneling by scanning all instances instead of returning no candidates.
+    if (outIndices.empty() && !instances.empty()) {
+        outIndices.reserve(instances.size());
+        for (size_t i = 0; i < instances.size(); i++) {
+            outIndices.push_back(i);
+        }
+    }
 }
 
 void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm::mat4& projection) {
@@ -376,6 +474,14 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
         auto modelIt = loadedModels.find(instance.modelId);
         if (modelIt == loadedModels.end()) {
             continue;
+        }
+
+        if (frustumCulling) {
+            glm::vec3 instMin = instance.worldBoundsMin - glm::vec3(0.5f);
+            glm::vec3 instMax = instance.worldBoundsMax + glm::vec3(0.5f);
+            if (!frustum.intersectsAABB(instMin, instMax)) {
+                continue;
+            }
         }
 
         const ModelData& model = modelIt->second;
@@ -727,6 +833,28 @@ static void transformAABB(const glm::mat4& modelMatrix,
     }
 }
 
+static float pointAABBDistanceSq(const glm::vec3& p, const glm::vec3& bmin, const glm::vec3& bmax) {
+    glm::vec3 q = glm::clamp(p, bmin, bmax);
+    glm::vec3 d = p - q;
+    return glm::dot(d, d);
+}
+
+struct QueryTimer {
+    double* totalMs = nullptr;
+    uint32_t* callCount = nullptr;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    QueryTimer(double* total, uint32_t* calls) : totalMs(total), callCount(calls) {}
+    ~QueryTimer() {
+        if (callCount) {
+            (*callCount)++;
+        }
+        if (totalMs) {
+            auto end = std::chrono::steady_clock::now();
+            *totalMs += std::chrono::duration<double, std::milli>(end - start).count();
+        }
+    }
+};
+
 // Möller–Trumbore ray-triangle intersection
 // Returns distance along ray if hit, or negative if miss
 static float rayTriangleIntersect(const glm::vec3& origin, const glm::vec3& dir,
@@ -796,6 +924,7 @@ static glm::vec3 closestPointOnTriangle(const glm::vec3& p, const glm::vec3& a,
 }
 
 std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ) const {
+    QueryTimer timer(&queryTimeMs, &queryCallCount);
     std::optional<float> bestFloor;
 
     // World-space ray: from high above, pointing straight down
@@ -808,7 +937,24 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
         core::Logger::getInstance().warning("WMO getFloorHeight: no instances loaded!");
     }
 
-    for (const auto& instance : instances) {
+    glm::vec3 queryMin(glX - 2.0f, glY - 2.0f, glZ - 8.0f);
+    glm::vec3 queryMax(glX + 2.0f, glY + 2.0f, glZ + 10.0f);
+    gatherCandidates(queryMin, queryMax, candidateScratch);
+
+    for (size_t idx : candidateScratch) {
+        const auto& instance = instances[idx];
+        if (collisionFocusEnabled &&
+            pointAABBDistanceSq(collisionFocusPos, instance.worldBoundsMin, instance.worldBoundsMax) > collisionFocusRadiusSq) {
+            continue;
+        }
+
+        // Broad-phase reject in world space to avoid expensive matrix transforms.
+        if (glX < instance.worldBoundsMin.x || glX > instance.worldBoundsMax.x ||
+            glY < instance.worldBoundsMin.y || glY > instance.worldBoundsMax.y ||
+            glZ < instance.worldBoundsMin.z - 2.0f || glZ > instance.worldBoundsMax.z + 4.0f) {
+            continue;
+        }
+
         auto it = loadedModels.find(instance.modelId);
         if (it == loadedModels.end()) continue;
 
@@ -875,6 +1021,7 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
 }
 
 bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to, glm::vec3& adjustedPos) const {
+    QueryTimer timer(&queryTimeMs, &queryCallCount);
     adjustedPos = to;
     bool blocked = false;
 
@@ -892,7 +1039,25 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
     int groupsChecked = 0;
     int wallsHit = 0;
 
-    for (const auto& instance : instances) {
+    glm::vec3 queryMin = glm::min(from, to) - glm::vec3(8.0f, 8.0f, 5.0f);
+    glm::vec3 queryMax = glm::max(from, to) + glm::vec3(8.0f, 8.0f, 5.0f);
+    gatherCandidates(queryMin, queryMax, candidateScratch);
+
+    for (size_t idx : candidateScratch) {
+        const auto& instance = instances[idx];
+        if (collisionFocusEnabled &&
+            pointAABBDistanceSq(collisionFocusPos, instance.worldBoundsMin, instance.worldBoundsMax) > collisionFocusRadiusSq) {
+            continue;
+        }
+
+        const float broadMargin = PLAYER_RADIUS + 1.5f;
+        if (from.x < instance.worldBoundsMin.x - broadMargin && to.x < instance.worldBoundsMin.x - broadMargin) continue;
+        if (from.x > instance.worldBoundsMax.x + broadMargin && to.x > instance.worldBoundsMax.x + broadMargin) continue;
+        if (from.y < instance.worldBoundsMin.y - broadMargin && to.y < instance.worldBoundsMin.y - broadMargin) continue;
+        if (from.y > instance.worldBoundsMax.y + broadMargin && to.y > instance.worldBoundsMax.y + broadMargin) continue;
+        if (from.z > instance.worldBoundsMax.z + PLAYER_HEIGHT && to.z > instance.worldBoundsMax.z + PLAYER_HEIGHT) continue;
+        if (from.z + PLAYER_HEIGHT < instance.worldBoundsMin.z && to.z + PLAYER_HEIGHT < instance.worldBoundsMin.z) continue;
+
         auto it = loadedModels.find(instance.modelId);
         if (it == loadedModels.end()) continue;
 
@@ -1012,7 +1177,24 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
 }
 
 bool WMORenderer::isInsideWMO(float glX, float glY, float glZ, uint32_t* outModelId) const {
-    for (const auto& instance : instances) {
+    QueryTimer timer(&queryTimeMs, &queryCallCount);
+    glm::vec3 queryMin(glX - 0.5f, glY - 0.5f, glZ - 0.5f);
+    glm::vec3 queryMax(glX + 0.5f, glY + 0.5f, glZ + 0.5f);
+    gatherCandidates(queryMin, queryMax, candidateScratch);
+
+    for (size_t idx : candidateScratch) {
+        const auto& instance = instances[idx];
+        if (collisionFocusEnabled &&
+            pointAABBDistanceSq(collisionFocusPos, instance.worldBoundsMin, instance.worldBoundsMax) > collisionFocusRadiusSq) {
+            continue;
+        }
+
+        if (glX < instance.worldBoundsMin.x || glX > instance.worldBoundsMax.x ||
+            glY < instance.worldBoundsMin.y || glY > instance.worldBoundsMax.y ||
+            glZ < instance.worldBoundsMin.z || glZ > instance.worldBoundsMax.z) {
+            continue;
+        }
+
         auto it = loadedModels.find(instance.modelId);
         if (it == loadedModels.end()) continue;
 
@@ -1033,6 +1215,7 @@ bool WMORenderer::isInsideWMO(float glX, float glY, float glZ, uint32_t* outMode
 }
 
 float WMORenderer::raycastBoundingBoxes(const glm::vec3& origin, const glm::vec3& direction, float maxDistance) const {
+    QueryTimer timer(&queryTimeMs, &queryCallCount);
     float closestHit = maxDistance;
     // Camera collision should primarily react to walls.
     // Treat near-horizontal triangles as floor/ceiling and ignore them here so
@@ -1042,7 +1225,30 @@ float WMORenderer::raycastBoundingBoxes(const glm::vec3& origin, const glm::vec3
     constexpr float MAX_HIT_ABOVE_ORIGIN = 0.80f;
     constexpr float MIN_SURFACE_ALIGNMENT = 0.25f;
 
-    for (const auto& instance : instances) {
+    glm::vec3 rayEnd = origin + direction * maxDistance;
+    glm::vec3 queryMin = glm::min(origin, rayEnd) - glm::vec3(1.0f);
+    glm::vec3 queryMax = glm::max(origin, rayEnd) + glm::vec3(1.0f);
+    gatherCandidates(queryMin, queryMax, candidateScratch);
+
+    for (size_t idx : candidateScratch) {
+        const auto& instance = instances[idx];
+        if (collisionFocusEnabled &&
+            pointAABBDistanceSq(collisionFocusPos, instance.worldBoundsMin, instance.worldBoundsMax) > collisionFocusRadiusSq) {
+            continue;
+        }
+
+        glm::vec3 center = (instance.worldBoundsMin + instance.worldBoundsMax) * 0.5f;
+        float radius = glm::length(instance.worldBoundsMax - center);
+        if (glm::length(center - origin) > (maxDistance + radius + 1.0f)) {
+            continue;
+        }
+
+        glm::vec3 worldMin = instance.worldBoundsMin - glm::vec3(0.5f);
+        glm::vec3 worldMax = instance.worldBoundsMax + glm::vec3(0.5f);
+        if (!rayIntersectsAABB(origin, direction, worldMin, worldMax)) {
+            continue;
+        }
+
         auto it = loadedModels.find(instance.modelId);
         if (it == loadedModels.end()) continue;
 

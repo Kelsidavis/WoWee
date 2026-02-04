@@ -11,6 +11,7 @@
 #include "rendering/weather.hpp"
 #include "rendering/character_renderer.hpp"
 #include "rendering/wmo_renderer.hpp"
+#include "rendering/m2_renderer.hpp"
 #include "rendering/camera.hpp"
 #include <imgui.h>
 #include <algorithm>
@@ -152,6 +153,28 @@ void PerformanceHUD::render(const Renderer* renderer, const Camera* camera) {
         ImGui::Text("Min: %.1f", minFPS);
         ImGui::Text("Max: %.1f", maxFPS);
         ImGui::Text("Frame: %.2f ms", frameTime * 1000.0f);
+
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.6f, 1.0f), "CPU TIMINGS (ms)");
+        ImGui::Text("Update: %.2f (Camera: %.2f)", renderer->getLastUpdateMs(), renderer->getLastCameraUpdateMs());
+        ImGui::Text("Render: %.2f (Terrain: %.2f, WMO: %.2f, M2: %.2f)",
+                    renderer->getLastRenderMs(),
+                    renderer->getLastTerrainRenderMs(),
+                    renderer->getLastWMORenderMs(),
+                    renderer->getLastM2RenderMs());
+        auto* wmoRenderer = renderer->getWMORenderer();
+        auto* m2Renderer = renderer->getM2Renderer();
+        if (wmoRenderer || m2Renderer) {
+            ImGui::Text("Collision queries:");
+            if (wmoRenderer) {
+                ImGui::Text("  WMO: %.2f ms (%u calls)",
+                            wmoRenderer->getQueryTimeMs(), wmoRenderer->getQueryCallCount());
+            }
+            if (m2Renderer) {
+                ImGui::Text("  M2:  %.2f ms (%u calls)",
+                            m2Renderer->getQueryTimeMs(), m2Renderer->getQueryCallCount());
+            }
+        }
 
         // Frame time graph
         if (!frameTimeHistory.empty()) {

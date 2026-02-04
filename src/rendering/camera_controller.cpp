@@ -165,6 +165,12 @@ void CameraController::update(float deltaTime) {
     if (thirdPerson && followTarget) {
         // Move the follow target (character position) instead of the camera
         glm::vec3 targetPos = *followTarget;
+        if (wmoRenderer) {
+            wmoRenderer->setCollisionFocus(targetPos, COLLISION_FOCUS_RADIUS_THIRD_PERSON);
+        }
+        if (m2Renderer) {
+            m2Renderer->setCollisionFocus(targetPos, COLLISION_FOCUS_RADIUS_THIRD_PERSON);
+        }
 
         // Check for water at current position
         std::optional<float> waterH;
@@ -227,8 +233,12 @@ void CameraController::update(float deltaTime) {
         {
             glm::vec3 startPos = *followTarget;
             glm::vec3 desiredPos = targetPos;
-            float moveDistXY = glm::length(glm::vec2(desiredPos.x - startPos.x, desiredPos.y - startPos.y));
-            int sweepSteps = std::max(1, std::min(6, static_cast<int>(std::ceil(moveDistXY / 0.4f))));
+            float moveDist = glm::length(desiredPos - startPos);
+            // Adaptive CCD: keep per-step movement short, especially on low FPS spikes.
+            int sweepSteps = std::max(1, std::min(24, static_cast<int>(std::ceil(moveDist / 0.18f))));
+            if (deltaTime > 0.04f) {
+                sweepSteps = std::min(28, std::max(sweepSteps, static_cast<int>(std::ceil(deltaTime / 0.016f)) * 3));
+            }
             glm::vec3 stepPos = startPos;
             glm::vec3 stepDelta = (desiredPos - startPos) / static_cast<float>(sweepSteps);
 
@@ -452,8 +462,8 @@ void CameraController::update(float deltaTime) {
 
         // Check floor collision along the camera path
         // Sample a few points to find where camera would go underground
-        for (int i = 1; i <= 4; i++) {
-            float testDist = collisionDistance * (float(i) / 4.0f);
+        for (int i = 1; i <= 2; i++) {
+            float testDist = collisionDistance * (float(i) / 2.0f);
             glm::vec3 testPos = pivot + camDir * testDist;
             auto floorH = getFloorAt(testPos.x, testPos.y, testPos.z);
 
@@ -490,8 +500,9 @@ void CameraController::update(float deltaTime) {
         constexpr float FLOOR_SAMPLE_R = 0.35f;
         std::optional<float> finalFloorH;
         const glm::vec2 floorOffsets[] = {
-            {0.0f, 0.0f}, {FLOOR_SAMPLE_R, 0.0f}, {-FLOOR_SAMPLE_R, 0.0f},
-            {0.0f, FLOOR_SAMPLE_R}, {0.0f, -FLOOR_SAMPLE_R}
+            {0.0f, 0.0f},
+            {FLOOR_SAMPLE_R * 0.7f, FLOOR_SAMPLE_R * 0.7f},
+            {-FLOOR_SAMPLE_R * 0.7f, -FLOOR_SAMPLE_R * 0.7f}
         };
         for (const auto& o : floorOffsets) {
             auto h = getFloorAt(smoothedCamPos.x + o.x, smoothedCamPos.y + o.y, smoothedCamPos.z);
@@ -517,6 +528,12 @@ void CameraController::update(float deltaTime) {
     } else {
         // Free-fly camera mode (original behavior)
         glm::vec3 newPos = camera->getPosition();
+        if (wmoRenderer) {
+            wmoRenderer->setCollisionFocus(newPos, COLLISION_FOCUS_RADIUS_FREE_FLY);
+        }
+        if (m2Renderer) {
+            m2Renderer->setCollisionFocus(newPos, COLLISION_FOCUS_RADIUS_FREE_FLY);
+        }
         float feetZ = newPos.z - eyeHeight;
 
         // Check for water at feet position
@@ -577,8 +594,11 @@ void CameraController::update(float deltaTime) {
         if (wmoRenderer) {
             glm::vec3 startFeet = camera->getPosition() - glm::vec3(0, 0, eyeHeight);
             glm::vec3 desiredFeet = newPos - glm::vec3(0, 0, eyeHeight);
-            float moveDistXY = glm::length(glm::vec2(desiredFeet.x - startFeet.x, desiredFeet.y - startFeet.y));
-            int sweepSteps = std::max(1, std::min(6, static_cast<int>(std::ceil(moveDistXY / 0.4f))));
+            float moveDist = glm::length(desiredFeet - startFeet);
+            int sweepSteps = std::max(1, std::min(24, static_cast<int>(std::ceil(moveDist / 0.18f))));
+            if (deltaTime > 0.04f) {
+                sweepSteps = std::min(28, std::max(sweepSteps, static_cast<int>(std::ceil(deltaTime / 0.016f)) * 3));
+            }
             glm::vec3 stepPos = startFeet;
             glm::vec3 stepDelta = (desiredFeet - startFeet) / static_cast<float>(sweepSteps);
 

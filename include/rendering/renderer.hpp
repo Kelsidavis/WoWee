@@ -121,6 +121,14 @@ public:
     void setTargetPosition(const glm::vec3* pos);
     bool isMoving() const;
 
+    // CPU timing stats (milliseconds, last frame).
+    double getLastUpdateMs() const { return lastUpdateMs; }
+    double getLastRenderMs() const { return lastRenderMs; }
+    double getLastCameraUpdateMs() const { return lastCameraUpdateMs; }
+    double getLastTerrainRenderMs() const { return lastTerrainRenderMs; }
+    double getLastWMORenderMs() const { return lastWMORenderMs; }
+    double getLastM2RenderMs() const { return lastM2RenderMs; }
+
 private:
     core::Window* window = nullptr;
     std::unique_ptr<Camera> camera;
@@ -177,6 +185,14 @@ private:
 
     bool terrainEnabled = true;
     bool terrainLoaded = false;
+
+    // CPU timing stats (last frame/update).
+    double lastUpdateMs = 0.0;
+    double lastRenderMs = 0.0;
+    double lastCameraUpdateMs = 0.0;
+    double lastTerrainRenderMs = 0.0;
+    double lastWMORenderMs = 0.0;
+    double lastM2RenderMs = 0.0;
 };
 
 } // namespace rendering
