@@ -32,6 +32,7 @@ constexpr uint32_t MOBA = 0x4D4F4241;  // Batches
 constexpr uint32_t MOCV = 0x4D4F4356;  // Vertex colors
 constexpr uint32_t MONR = 0x4D4F4E52;  // Normals
 constexpr uint32_t MOTV = 0x4D4F5456;  // Texture coords
+constexpr uint32_t MLIQ = 0x4D4C4951;  // Liquid
 
 // Read utilities
 template<typename T>
@@ -530,6 +531,60 @@ bool WMOLoader::loadGroup(const std::vector<uint8_t>& groupData,
                                 " count=", batch.indexCount, " verts=[", batch.startVertex, "-",
                                 batch.lastVertex, "] mat=", (int)batch.materialId, " flags=", (int)batch.flags);
                             batchLogCount++;
+                        }
+                    }
+                }
+                else if (subChunkId == MLIQ) { // MLIQ - WMO liquid data
+                    // Basic WotLK layout:
+                    // uint32 xVerts, yVerts, xTiles, yTiles
+                    // float  baseX, baseY, baseZ
+                    // uint16 materialId
+                    // (optional pad/unknown bytes)
+                    // followed by vertex/tile payload
+                    uint32_t parseOffset = mogpOffset;
+                    if (parseOffset + 30 <= subChunkEnd) {
+                        group.liquid.xVerts = read<uint32_t>(groupData, parseOffset);
+                        group.liquid.yVerts = read<uint32_t>(groupData, parseOffset);
+                        group.liquid.xTiles = read<uint32_t>(groupData, parseOffset);
+                        group.liquid.yTiles = read<uint32_t>(groupData, parseOffset);
+                        group.liquid.basePosition.x = read<float>(groupData, parseOffset);
+                        group.liquid.basePosition.y = read<float>(groupData, parseOffset);
+                        group.liquid.basePosition.z = read<float>(groupData, parseOffset);
+                        group.liquid.materialId = read<uint16_t>(groupData, parseOffset);
+                        if (parseOffset + sizeof(uint16_t) <= subChunkEnd) {
+                            // Reserved/flags in some WMO liquid variants.
+                            parseOffset += sizeof(uint16_t);
+                        }
+
+                        // Keep parser resilient across minor format variants:
+                        // prefer explicit per-vertex floats, otherwise fall back to flat.
+                        const size_t vertexCount =
+                            static_cast<size_t>(group.liquid.xVerts) * static_cast<size_t>(group.liquid.yVerts);
+                        const size_t tileCount =
+                            static_cast<size_t>(group.liquid.xTiles) * static_cast<size_t>(group.liquid.yTiles);
+                        const size_t bytesRemaining = (subChunkEnd > parseOffset) ? (subChunkEnd - parseOffset) : 0;
+
+                        group.liquid.heights.clear();
+                        group.liquid.flags.clear();
+
+                        if (vertexCount > 0 && bytesRemaining >= vertexCount * sizeof(float)) {
+                            group.liquid.heights.resize(vertexCount);
+                            for (size_t i = 0; i < vertexCount; i++) {
+                                group.liquid.heights[i] = read<float>(groupData, parseOffset);
+                            }
+                        } else if (vertexCount > 0) {
+                            group.liquid.heights.resize(vertexCount, group.liquid.basePosition.z);
+                        }
+
+                        if (tileCount > 0 && parseOffset + tileCount <= subChunkEnd) {
+                            group.liquid.flags.resize(tileCount);
+                            std::memcpy(group.liquid.flags.data(), &groupData[parseOffset], tileCount);
+                        } else if (tileCount > 0) {
+                            group.liquid.flags.resize(tileCount, 0);
+                        }
+
+                        if (group.liquid.materialId == 0) {
+                            group.liquid.materialId = static_cast<uint16_t>(group.liquidType);
                         }
                     }
                 }

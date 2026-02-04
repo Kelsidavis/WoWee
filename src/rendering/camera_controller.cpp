@@ -181,7 +181,9 @@ void CameraController::update(float deltaTime) {
         if (waterRenderer) {
             waterH = waterRenderer->getWaterHeightAt(targetPos.x, targetPos.y);
         }
-        bool inWater = waterH && targetPos.z < *waterH;
+        constexpr float MAX_SWIM_DEPTH_FROM_SURFACE = 12.0f;
+        bool inWater = waterH && targetPos.z < *waterH &&
+                       ((*waterH - targetPos.z) <= MAX_SWIM_DEPTH_FROM_SURFACE);
 
 
         if (inWater) {
@@ -189,6 +191,7 @@ void CameraController::update(float deltaTime) {
             // Swim movement follows look pitch (forward/back), while strafe stays
             // lateral for stable control.
             float swimSpeed = speed * SWIM_SPEED_FACTOR;
+            float waterSurfaceZ = waterH ? (*waterH - WATER_SURFACE_OFFSET) : targetPos.z;
 
             glm::vec3 swimForward = glm::normalize(forward3D);
             if (glm::length(swimForward) < 1e-4f) {
@@ -214,6 +217,7 @@ void CameraController::update(float deltaTime) {
             }
 
             // Spacebar = swim up (continuous, not a jump)
+            bool diveIntent = nowForward && (forward3D.z < -0.28f);
             if (nowJump) {
                 verticalVelocity = SWIM_BUOYANCY;
             } else {
@@ -221,6 +225,16 @@ void CameraController::update(float deltaTime) {
                 verticalVelocity += SWIM_GRAVITY * deltaTime;
                 if (verticalVelocity < SWIM_SINK_SPEED) {
                     verticalVelocity = SWIM_SINK_SPEED;
+                }
+                // Strong surface lock while idle/normal swim so buoyancy keeps
+                // you afloat unless you're intentionally diving.
+                if (!diveIntent) {
+                    float surfaceErr = (waterSurfaceZ - targetPos.z);
+                    verticalVelocity += surfaceErr * 7.0f * deltaTime;
+                    verticalVelocity *= std::max(0.0f, 1.0f - 3.2f * deltaTime);
+                    if (std::abs(surfaceErr) < 0.06f && std::abs(verticalVelocity) < 0.35f) {
+                        verticalVelocity = 0.0f;
+                    }
                 }
             }
 
@@ -636,12 +650,16 @@ void CameraController::update(float deltaTime) {
         if (waterRenderer) {
             waterH = waterRenderer->getWaterHeightAt(newPos.x, newPos.y);
         }
-        bool inWater = waterH && feetZ < *waterH;
+        constexpr float MAX_SWIM_DEPTH_FROM_SURFACE = 12.0f;
+        bool inWater = waterH && feetZ < *waterH &&
+                       ((*waterH - feetZ) <= MAX_SWIM_DEPTH_FROM_SURFACE);
 
 
         if (inWater) {
             swimming = true;
             float swimSpeed = speed * SWIM_SPEED_FACTOR;
+            float waterSurfaceCamZ = waterH ? (*waterH - WATER_SURFACE_OFFSET + eyeHeight) : newPos.z;
+            bool diveIntent = nowForward && (forward3D.z < -0.28f);
 
             if (glm::length(movement) > 0.001f) {
                 movement = glm::normalize(movement);
@@ -654,6 +672,14 @@ void CameraController::update(float deltaTime) {
                 verticalVelocity += SWIM_GRAVITY * deltaTime;
                 if (verticalVelocity < SWIM_SINK_SPEED) {
                     verticalVelocity = SWIM_SINK_SPEED;
+                }
+                if (!diveIntent) {
+                    float surfaceErr = (waterSurfaceCamZ - newPos.z);
+                    verticalVelocity += surfaceErr * 7.0f * deltaTime;
+                    verticalVelocity *= std::max(0.0f, 1.0f - 3.2f * deltaTime);
+                    if (std::abs(surfaceErr) < 0.06f && std::abs(verticalVelocity) < 0.35f) {
+                        verticalVelocity = 0.0f;
+                    }
                 }
             }
 

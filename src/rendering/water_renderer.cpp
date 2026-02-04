@@ -6,7 +6,9 @@
 #include "core/logger.hpp"
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace wowee {
 namespace rendering {
@@ -34,6 +36,9 @@ bool WaterRenderer::initialize() {
         uniform mat4 view;
         uniform mat4 projection;
         uniform float time;
+        uniform float waveAmp;
+        uniform float waveFreq;
+        uniform float waveSpeed;
 
         out vec3 FragPos;
         out vec3 Normal;
@@ -41,14 +46,18 @@ bool WaterRenderer::initialize() {
         out float WaveOffset;
 
         void main() {
-            // Simple pass-through for debugging (no wave animation)
             vec3 pos = aPos;
+            // Procedural ripple motion (tunable per water profile).
+            float w1 = sin((aPos.x + time * waveSpeed) * waveFreq) * waveAmp;
+            float w2 = cos((aPos.y - time * (waveSpeed * 0.78)) * (waveFreq * 0.82)) * (waveAmp * 0.72);
+            float wave = w1 + w2;
+            pos.z += wave;
 
             FragPos = vec3(model * vec4(pos, 1.0));
             // Use mat3(model) directly - avoids expensive inverse() per vertex
             Normal = mat3(model) * aNormal;
             TexCoord = aTexCoord;
-            WaveOffset = 0.0;
+            WaveOffset = wave;
 
             gl_Position = projection * view * vec4(FragPos, 1.0);
         }
@@ -66,6 +75,8 @@ bool WaterRenderer::initialize() {
         uniform vec4 waterColor;
         uniform float waterAlpha;
         uniform float time;
+        uniform float shimmerStrength;
+        uniform float alphaScale;
 
         out vec4 FragColor;
 
@@ -80,7 +91,9 @@ bool WaterRenderer::initialize() {
             // Specular highlights (shininess for water)
             vec3 viewDir = normalize(viewPos - FragPos);
             vec3 reflectDir = reflect(-lightDir, norm);
-            float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64.0);
+            float specBase = pow(max(dot(viewDir, reflectDir), 0.0), mix(64.0, 180.0, shimmerStrength));
+            float sparkle = 0.65 + 0.35 * sin((TexCoord.x + TexCoord.y + time * 0.4) * 80.0);
+            float spec = specBase * mix(1.0, sparkle, shimmerStrength);
 
             // Animated texture coordinates for flowing effect
             vec2 uv1 = TexCoord + vec2(time * 0.02, time * 0.01);
@@ -96,8 +109,10 @@ bool WaterRenderer::initialize() {
 
             vec3 result = (ambient + diffuse + specular) * brightness;
 
-            // Apply transparency
-            FragColor = vec4(result, waterAlpha);
+            // Slight fresnel: more reflective/opaque at grazing angles.
+            float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 3.0);
+            float alpha = clamp(waterAlpha * alphaScale * (0.68 + fresnel * 0.45), 0.12, 0.82);
+            FragColor = vec4(result, alpha);
         }
     )";
 
@@ -117,6 +132,8 @@ void WaterRenderer::shutdown() {
 
 void WaterRenderer::loadFromTerrain(const pipeline::ADTTerrain& terrain, bool append,
                                      int tileX, int tileY) {
+    constexpr float TILE_SIZE = 33.33333f / 8.0f;
+
     if (!append) {
         LOG_INFO("Loading water from terrain (replacing)");
         clear();
@@ -150,6 +167,13 @@ void WaterRenderer::loadFromTerrain(const pipeline::ADTTerrain& terrain, bool ap
                 terrainChunk.position[1],
                 layer.minHeight
             );
+            surface.origin = glm::vec3(
+                surface.position.x - (static_cast<float>(layer.y) * TILE_SIZE),
+                surface.position.y - (static_cast<float>(layer.x) * TILE_SIZE),
+                layer.minHeight
+            );
+            surface.stepX = glm::vec3(0.0f, -TILE_SIZE, 0.0f);
+            surface.stepY = glm::vec3(-TILE_SIZE, 0.0f, 0.0f);
 
             // Debug log first few water surfaces
             if (totalLayers < 5) {
@@ -170,17 +194,48 @@ void WaterRenderer::loadFromTerrain(const pipeline::ADTTerrain& terrain, bool ap
             surface.width = layer.width;
             surface.height = layer.height;
 
-            // Copy height data
-            if (!layer.heights.empty()) {
-                surface.heights = layer.heights;
-            } else {
-                // Flat water at minHeight if no height data
-                size_t numVertices = (layer.width + 1) * (layer.height + 1);
+            // Prefer per-vertex terrain water heights when sane; fall back to flat
+            // minHeight if data looks malformed (prevents sky-stretch artifacts).
+            size_t numVertices = (layer.width + 1) * (layer.height + 1);
+            bool useFlat = true;
+            if (layer.heights.size() == numVertices) {
+                bool sane = true;
+                for (float h : layer.heights) {
+                    if (!std::isfinite(h) || std::abs(h) > 50000.0f) {
+                        sane = false;
+                        break;
+                    }
+                    // Conservative acceptance window around MH2O min/max metadata.
+                    if (h < layer.minHeight - 8.0f || h > layer.maxHeight + 8.0f) {
+                        sane = false;
+                        break;
+                    }
+                }
+                if (sane) {
+                    useFlat = false;
+                    surface.heights = layer.heights;
+                }
+            }
+            if (useFlat) {
                 surface.heights.resize(numVertices, layer.minHeight);
             }
 
             // Copy render mask
             surface.mask = layer.mask;
+            if (!surface.mask.empty()) {
+                bool anyVisible = false;
+                for (uint8_t b : surface.mask) {
+                    if (b != 0) {
+                        anyVisible = true;
+                        break;
+                    }
+                }
+                // Some tiles appear to have malformed/unsupported MH2O masks.
+                // Fall back to full coverage so canal water is still visible.
+                if (!anyVisible) {
+                    std::fill(surface.mask.begin(), surface.mask.end(), 0xFF);
+                }
+            }
 
             surface.tileX = tileX;
             surface.tileY = tileY;
@@ -213,11 +268,74 @@ void WaterRenderer::removeTile(int tileX, int tileY) {
 void WaterRenderer::loadFromWMO([[maybe_unused]] const pipeline::WMOLiquid& liquid,
                                  [[maybe_unused]] const glm::mat4& modelMatrix,
                                  [[maybe_unused]] uint32_t wmoId) {
-    // WMO liquid rendering not yet implemented
+    if (!liquid.hasLiquid() || liquid.xTiles == 0 || liquid.yTiles == 0) {
+        return;
+    }
+    if (liquid.xVerts < 2 || liquid.yVerts < 2) {
+        return;
+    }
+    if (liquid.xTiles != liquid.xVerts - 1 || liquid.yTiles != liquid.yVerts - 1) {
+        return;
+    }
+    if (liquid.xTiles > 64 || liquid.yTiles > 64) {
+        return;
+    }
+
+    WaterSurface surface;
+    surface.tileX = -1;
+    surface.tileY = -1;
+    surface.wmoId = wmoId;
+    surface.liquidType = liquid.materialId;
+    surface.xOffset = 0;
+    surface.yOffset = 0;
+    surface.width = static_cast<uint8_t>(std::min<uint32_t>(255, liquid.xTiles));
+    surface.height = static_cast<uint8_t>(std::min<uint32_t>(255, liquid.yTiles));
+
+    constexpr float WMO_LIQUID_TILE_SIZE = 4.1666625f;
+    const glm::vec3 localBase(liquid.basePosition.x, liquid.basePosition.y, liquid.basePosition.z);
+    const glm::vec3 localStepX(WMO_LIQUID_TILE_SIZE, 0.0f, 0.0f);
+    const glm::vec3 localStepY(0.0f, WMO_LIQUID_TILE_SIZE, 0.0f);
+
+    surface.origin = glm::vec3(modelMatrix * glm::vec4(localBase, 1.0f));
+    surface.stepX = glm::vec3(modelMatrix * glm::vec4(localStepX, 0.0f));
+    surface.stepY = glm::vec3(modelMatrix * glm::vec4(localStepY, 0.0f));
+    surface.position = surface.origin;
+
+    const int gridWidth = static_cast<int>(surface.width) + 1;
+    const int gridHeight = static_cast<int>(surface.height) + 1;
+    const int vertexCount = gridWidth * gridHeight;
+    // Keep WMO liquid flat for stability; some files use variant payload layouts
+    // that can produce invalid per-vertex heights if interpreted generically.
+    surface.heights.assign(vertexCount, surface.origin.z);
+    surface.minHeight = surface.origin.z;
+    surface.maxHeight = surface.origin.z;
+
+    size_t tileCount = static_cast<size_t>(surface.width) * static_cast<size_t>(surface.height);
+    size_t maskBytes = (tileCount + 7) / 8;
+    // WMO liquid flags vary across files; for now treat all WMO liquid tiles as
+    // visible for rendering. Swim/gameplay queries already ignore WMO surfaces.
+    surface.mask.assign(maskBytes, 0xFF);
+
+    createWaterMesh(surface);
+    if (surface.indexCount > 0) {
+        surfaces.push_back(surface);
+    }
 }
 
-void WaterRenderer::removeWMO([[maybe_unused]] uint32_t wmoId) {
-    // WMO liquid rendering not yet implemented
+void WaterRenderer::removeWMO(uint32_t wmoId) {
+    if (wmoId == 0) {
+        return;
+    }
+
+    auto it = surfaces.begin();
+    while (it != surfaces.end()) {
+        if (it->wmoId == wmoId) {
+            destroyWaterMesh(*it);
+            it = surfaces.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void WaterRenderer::clear() {
@@ -230,6 +348,11 @@ void WaterRenderer::clear() {
 void WaterRenderer::render(const Camera& camera, float time) {
     if (!renderingEnabled || surfaces.empty() || !waterShader) {
         return;
+    }
+
+    GLboolean cullEnabled = glIsEnabled(GL_CULL_FACE);
+    if (cullEnabled) {
+        glDisable(GL_CULL_FACE);
     }
 
     // Enable alpha blending for transparent water
@@ -264,8 +387,22 @@ void WaterRenderer::render(const Camera& camera, float time) {
         glm::vec4 color = getLiquidColor(surface.liquidType);
         float alpha = getLiquidAlpha(surface.liquidType);
 
+        // City/canal liquid profile: clearer water + stronger ripples/sun shimmer.
+        // Stormwind canals typically use LiquidType 5 in this data set.
+        bool canalProfile = (surface.wmoId != 0) || (surface.liquidType == 5);
+        float waveAmp = canalProfile ? 0.07f : 0.038f;
+        float waveFreq = canalProfile ? 0.30f : 0.22f;
+        float waveSpeed = canalProfile ? 1.20f : 0.90f;
+        float shimmerStrength = canalProfile ? 0.95f : 0.35f;
+        float alphaScale = canalProfile ? 0.72f : 1.00f;
+
         waterShader->setUniform("waterColor", color);
         waterShader->setUniform("waterAlpha", alpha);
+        waterShader->setUniform("waveAmp", waveAmp);
+        waterShader->setUniform("waveFreq", waveFreq);
+        waterShader->setUniform("waveSpeed", waveSpeed);
+        waterShader->setUniform("shimmerStrength", shimmerStrength);
+        waterShader->setUniform("alphaScale", alphaScale);
 
         // Render
         glBindVertexArray(surface.vao);
@@ -276,19 +413,21 @@ void WaterRenderer::render(const Camera& camera, float time) {
     // Restore state
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
+    if (cullEnabled) {
+        glEnable(GL_CULL_FACE);
+    }
 }
 
 void WaterRenderer::createWaterMesh(WaterSurface& surface) {
     // Variable-size grid based on water layer dimensions
     const int gridWidth = surface.width + 1;   // Vertices = tiles + 1
     const int gridHeight = surface.height + 1;
-    const float TILE_SIZE = 33.33333f / 8.0f;  // Size of one tile (same as terrain unitSize)
+    constexpr float VISUAL_WATER_Z_BIAS = 0.06f;  // Prevent z-fighting against city/WMO geometry
 
     std::vector<float> vertices;
     std::vector<uint32_t> indices;
 
     // Generate vertices
-    // Match terrain coordinate transformation: pos[0] = baseX - (y * unitSize), pos[1] = baseY - (x * unitSize)
     for (int y = 0; y < gridHeight; y++) {
         for (int x = 0; x < gridWidth; x++) {
             int index = y * gridWidth + x;
@@ -301,23 +440,21 @@ void WaterRenderer::createWaterMesh(WaterSurface& surface) {
                 height = surface.minHeight;
             }
 
-            // Position - match terrain coordinate transformation (swap and negate)
-            // Terrain uses: X = baseX - (offsetY * unitSize), Y = baseY - (offsetX * unitSize)
-            // Also apply layer offset within chunk (xOffset, yOffset)
-            float posX = surface.position.x - ((surface.yOffset + y) * TILE_SIZE);
-            float posY = surface.position.y - ((surface.xOffset + x) * TILE_SIZE);
-            float posZ = height;
+            glm::vec3 pos = surface.origin +
+                            surface.stepX * static_cast<float>(x) +
+                            surface.stepY * static_cast<float>(y);
+            pos.z = height + VISUAL_WATER_Z_BIAS;
 
             // Debug first surface's corner vertices
             static int debugCount = 0;
             if (debugCount < 4 && (x == 0 || x == gridWidth-1) && (y == 0 || y == gridHeight-1)) {
-                LOG_DEBUG("Water vertex: (", posX, ", ", posY, ", ", posZ, ")");
+                LOG_DEBUG("Water vertex: (", pos.x, ", ", pos.y, ", ", pos.z, ")");
                 debugCount++;
             }
 
-            vertices.push_back(posX);
-            vertices.push_back(posY);
-            vertices.push_back(posZ);
+            vertices.push_back(pos.x);
+            vertices.push_back(pos.y);
+            vertices.push_back(pos.z);
 
             // Normal (pointing up for water surface)
             vertices.push_back(0.0f);
@@ -419,13 +556,20 @@ void WaterRenderer::destroyWaterMesh(WaterSurface& surface) {
 }
 
 std::optional<float> WaterRenderer::getWaterHeightAt(float glX, float glY) const {
-    const float TILE_SIZE = 33.33333f / 8.0f;
     std::optional<float> best;
 
     for (size_t si = 0; si < surfaces.size(); si++) {
         const auto& surface = surfaces[si];
-        float gy = (surface.position.x - glX) / TILE_SIZE - static_cast<float>(surface.yOffset);
-        float gx = (surface.position.y - glY) / TILE_SIZE - static_cast<float>(surface.xOffset);
+        glm::vec2 rel(glX - surface.origin.x, glY - surface.origin.y);
+        glm::vec2 stepX(surface.stepX.x, surface.stepX.y);
+        glm::vec2 stepY(surface.stepY.x, surface.stepY.y);
+        float lenSqX = glm::dot(stepX, stepX);
+        float lenSqY = glm::dot(stepY, stepY);
+        if (lenSqX < 1e-6f || lenSqY < 1e-6f) {
+            continue;
+        }
+        float gx = glm::dot(rel, stepX) / lenSqX;
+        float gy = glm::dot(rel, stepY) / lenSqY;
 
         if (gx < 0.0f || gx > static_cast<float>(surface.width) ||
             gy < 0.0f || gy > static_cast<float>(surface.height)) {
@@ -443,6 +587,22 @@ std::optional<float> WaterRenderer::getWaterHeightAt(float glX, float glY) const
         // Clamp to valid vertex range
         if (ix >= surface.width) { ix = surface.width - 1; fx = 1.0f; }
         if (iy >= surface.height) { iy = surface.height - 1; fy = 1.0f; }
+        if (ix < 0 || iy < 0) {
+            continue;
+        }
+
+        // Respect per-tile mask so holes/non-liquid tiles do not count as swimmable.
+        if (!surface.mask.empty()) {
+            int tileIndex = iy * surface.width + ix;
+            int byteIndex = tileIndex / 8;
+            int bitIndex = tileIndex % 8;
+            if (byteIndex < static_cast<int>(surface.mask.size())) {
+                bool renderTile = (surface.mask[byteIndex] & (1 << bitIndex)) != 0;
+                if (!renderTile) {
+                    continue;
+                }
+            }
+        }
 
         int idx00 = iy * gridWidth + ix;
         int idx10 = idx00 + 1;
@@ -468,7 +628,55 @@ std::optional<float> WaterRenderer::getWaterHeightAt(float glX, float glY) const
     return best;
 }
 
-glm::vec4 WaterRenderer::getLiquidColor(uint8_t liquidType) const {
+std::optional<uint16_t> WaterRenderer::getWaterTypeAt(float glX, float glY) const {
+    std::optional<float> bestHeight;
+    std::optional<uint16_t> bestType;
+
+    for (const auto& surface : surfaces) {
+        glm::vec2 rel(glX - surface.origin.x, glY - surface.origin.y);
+        glm::vec2 stepX(surface.stepX.x, surface.stepX.y);
+        glm::vec2 stepY(surface.stepY.x, surface.stepY.y);
+        float lenSqX = glm::dot(stepX, stepX);
+        float lenSqY = glm::dot(stepY, stepY);
+        if (lenSqX < 1e-6f || lenSqY < 1e-6f) {
+            continue;
+        }
+
+        float gx = glm::dot(rel, stepX) / lenSqX;
+        float gy = glm::dot(rel, stepY) / lenSqY;
+        if (gx < 0.0f || gx > static_cast<float>(surface.width) ||
+            gy < 0.0f || gy > static_cast<float>(surface.height)) {
+            continue;
+        }
+
+        int ix = static_cast<int>(gx);
+        int iy = static_cast<int>(gy);
+        if (ix >= surface.width) ix = surface.width - 1;
+        if (iy >= surface.height) iy = surface.height - 1;
+        if (ix < 0 || iy < 0) continue;
+
+        if (!surface.mask.empty()) {
+            int tileIndex = iy * surface.width + ix;
+            int byteIndex = tileIndex / 8;
+            int bitIndex = tileIndex % 8;
+            if (byteIndex < static_cast<int>(surface.mask.size())) {
+                bool renderTile = (surface.mask[byteIndex] & (1 << bitIndex)) != 0;
+                if (!renderTile) continue;
+            }
+        }
+
+        // Use minHeight as stable selector for "topmost surface at XY".
+        float h = surface.minHeight;
+        if (!bestHeight || h > *bestHeight) {
+            bestHeight = h;
+            bestType = surface.liquidType;
+        }
+    }
+
+    return bestType;
+}
+
+glm::vec4 WaterRenderer::getLiquidColor(uint16_t liquidType) const {
     // WoW 3.3.5a LiquidType.dbc IDs:
     // 1,5,9,13,17 = Water variants (still, slow, fast)
     // 2,6,10,14   = Ocean
@@ -496,12 +704,12 @@ glm::vec4 WaterRenderer::getLiquidColor(uint8_t liquidType) const {
     }
 }
 
-float WaterRenderer::getLiquidAlpha(uint8_t liquidType) const {
+float WaterRenderer::getLiquidAlpha(uint16_t liquidType) const {
     uint8_t basicType = (liquidType == 0) ? 0 : ((liquidType - 1) % 4);
     switch (basicType) {
-        case 2:  return 0.85f;  // Magma - mostly opaque
-        case 3:  return 0.75f;  // Slime - semi-opaque
-        default: return 0.55f;  // Water/Ocean - semi-transparent
+        case 2:  return 0.72f;  // Magma
+        case 3:  return 0.62f;  // Slime
+        default: return 0.38f;  // Water/Ocean
     }
 }
 

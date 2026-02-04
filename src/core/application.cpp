@@ -553,8 +553,8 @@ void Application::setState(AppState newState) {
                         gameHandler->sendMovement(static_cast<game::Opcode>(opcode));
                     }
                 });
-                // Use WoW-correct speeds when connected to a server
-                cc->setUseWoWSpeed(!singlePlayerMode);
+                // Keep player locomotion WoW-like in both single-player and online modes.
+                cc->setUseWoWSpeed(true);
             }
             break;
         case AppState::DISCONNECTED:

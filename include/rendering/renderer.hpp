@@ -31,6 +31,7 @@ class CharacterRenderer;
 class WMORenderer;
 class M2Renderer;
 class Minimap;
+class Shader;
 
 class Renderer {
 public:
@@ -153,6 +154,9 @@ private:
     std::unique_ptr<audio::FootstepManager> footstepManager;
     std::unique_ptr<audio::ActivitySoundManager> activitySoundManager;
     std::unique_ptr<game::ZoneManager> zoneManager;
+    std::unique_ptr<Shader> underwaterOverlayShader;
+    uint32_t underwaterOverlayVAO = 0;
+    uint32_t underwaterOverlayVBO = 0;
 
     pipeline::AssetManager* cachedAssetManager = nullptr;
     uint32_t currentZoneId = 0;

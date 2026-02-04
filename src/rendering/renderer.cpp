@@ -17,6 +17,7 @@
 #include "rendering/wmo_renderer.hpp"
 #include "rendering/m2_renderer.hpp"
 #include "rendering/minimap.hpp"
+#include "rendering/shader.hpp"
 #include "pipeline/asset_manager.hpp"
 #include "pipeline/m2_loader.hpp"
 #include "pipeline/wmo_loader.hpp"
@@ -193,6 +194,37 @@ bool Renderer::initialize(core::Window* win) {
     footstepManager = std::make_unique<audio::FootstepManager>();
     activitySoundManager = std::make_unique<audio::ActivitySoundManager>();
 
+    // Underwater full-screen tint overlay (applies to all world geometry).
+    underwaterOverlayShader = std::make_unique<Shader>();
+    const char* overlayVS = R"(
+        #version 330 core
+        layout (location = 0) in vec2 aPos;
+        void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
+    )";
+    const char* overlayFS = R"(
+        #version 330 core
+        uniform vec4 uTint;
+        out vec4 FragColor;
+        void main() { FragColor = uTint; }
+    )";
+    if (!underwaterOverlayShader->loadFromSource(overlayVS, overlayFS)) {
+        LOG_WARNING("Failed to initialize underwater overlay shader");
+        underwaterOverlayShader.reset();
+    } else {
+        const float quadVerts[] = {
+            -1.0f, -1.0f,  1.0f, -1.0f,
+            -1.0f,  1.0f,  1.0f,  1.0f
+        };
+        glGenVertexArrays(1, &underwaterOverlayVAO);
+        glGenBuffers(1, &underwaterOverlayVBO);
+        glBindVertexArray(underwaterOverlayVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, underwaterOverlayVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVerts), quadVerts, GL_STATIC_DRAW);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        glBindVertexArray(0);
+    }
+
     LOG_INFO("Renderer initialized");
     return true;
 }
@@ -272,6 +304,15 @@ void Renderer::shutdown() {
         activitySoundManager->shutdown();
         activitySoundManager.reset();
     }
+    if (underwaterOverlayVAO) {
+        glDeleteVertexArrays(1, &underwaterOverlayVAO);
+        underwaterOverlayVAO = 0;
+    }
+    if (underwaterOverlayVBO) {
+        glDeleteBuffers(1, &underwaterOverlayVBO);
+        underwaterOverlayVBO = 0;
+    }
+    underwaterOverlayShader.reset();
 
     zoneManager.reset();
 
@@ -851,6 +892,8 @@ void Renderer::renderWorld(game::World* world) {
 
     // Get time of day for sky-related rendering
     float timeOfDay = skybox ? skybox->getTimeOfDay() : 12.0f;
+    bool underwater = false;
+    bool canalUnderwater = false;
 
     // Render skybox first (furthest back)
     if (skybox && camera) {
@@ -880,20 +923,45 @@ void Renderer::renderWorld(game::World* world) {
 
     // Render terrain if loaded and enabled
     if (terrainEnabled && terrainLoaded && terrainRenderer && camera) {
-        // Check if camera is underwater for fog override
-        bool underwater = false;
-        if (waterRenderer && camera) {
+        // Check if camera/character is underwater for fog override
+        if (cameraController && cameraController->isSwimming() && waterRenderer && camera) {
             glm::vec3 camPos = camera->getPosition();
             auto waterH = waterRenderer->getWaterHeightAt(camPos.x, camPos.y);
-            if (waterH && camPos.z < *waterH) {
+            constexpr float MAX_UNDERWATER_DEPTH = 12.0f;
+            // Require camera to be meaningfully below the surface before
+            // underwater fog/tint kicks in (avoids "wrong plane" near surface).
+            constexpr float UNDERWATER_ENTER_EPS = 0.45f;
+            if (waterH &&
+                camPos.z < (*waterH - UNDERWATER_ENTER_EPS) &&
+                (*waterH - camPos.z) <= MAX_UNDERWATER_DEPTH) {
                 underwater = true;
             }
         }
 
         if (underwater) {
-            float fogColor[3] = {0.05f, 0.15f, 0.25f};
-            terrainRenderer->setFog(fogColor, 10.0f, 200.0f);
-            glClearColor(0.05f, 0.15f, 0.25f, 1.0f);
+            glm::vec3 camPos = camera->getPosition();
+            std::optional<uint16_t> liquidType = waterRenderer ? waterRenderer->getWaterTypeAt(camPos.x, camPos.y) : std::nullopt;
+            if (!liquidType && cameraController) {
+                const glm::vec3* followTarget = cameraController->getFollowTarget();
+                if (followTarget && waterRenderer) {
+                    liquidType = waterRenderer->getWaterTypeAt(followTarget->x, followTarget->y);
+                }
+            }
+            bool canalWater = liquidType && (*liquidType == 5 || *liquidType == 13 || *liquidType == 17);
+            canalUnderwater = canalWater;
+
+            float fogColor[3] = {0.04f, 0.12f, 0.22f};
+            float fogStart = 8.0f;
+            float fogEnd = 140.0f;
+            if (canalWater) {
+                fogColor[0] = 0.012f;
+                fogColor[1] = 0.055f;
+                fogColor[2] = 0.12f;
+                fogStart = 2.5f;
+                fogEnd = 55.0f;
+            }
+            terrainRenderer->setFog(fogColor, fogStart, fogEnd);
+            glClearColor(fogColor[0], fogColor[1], fogColor[2], 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);  // Re-clear with underwater color
         } else if (skybox) {
             // Update terrain fog based on time of day (match sky color)
@@ -907,13 +975,6 @@ void Renderer::renderWorld(game::World* world) {
         auto terrainEnd = std::chrono::steady_clock::now();
         lastTerrainRenderMs = std::chrono::duration<double, std::milli>(terrainEnd - terrainStart).count();
 
-        // Render water after terrain (transparency requires back-to-front rendering)
-        if (waterRenderer) {
-            // Use accumulated time for water animation
-            static float time = 0.0f;
-            time += 0.016f;  // Approximate frame time
-            waterRenderer->render(*camera, time);
-        }
     }
 
     // Render weather particles (after terrain/water, before characters)
@@ -951,6 +1012,31 @@ void Renderer::renderWorld(game::World* world) {
         m2Renderer->render(*camera, view, projection);
         auto m2End = std::chrono::steady_clock::now();
         lastM2RenderMs = std::chrono::duration<double, std::milli>(m2End - m2Start).count();
+    }
+
+    // Render water after opaque terrain/WMO/M2 so transparent surfaces remain visible.
+    if (waterRenderer && camera) {
+        static float time = 0.0f;
+        time += 0.016f;  // Approximate frame time
+        waterRenderer->render(*camera, time);
+    }
+
+    // Full-screen underwater tint so WMO/M2/characters also feel submerged.
+    if (underwater && underwaterOverlayShader && underwaterOverlayVAO) {
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        underwaterOverlayShader->use();
+        if (canalUnderwater) {
+            underwaterOverlayShader->setUniform("uTint", glm::vec4(0.01f, 0.05f, 0.11f, 0.50f));
+        } else {
+            underwaterOverlayShader->setUniform("uTint", glm::vec4(0.02f, 0.08f, 0.15f, 0.30f));
+        }
+        glBindVertexArray(underwaterOverlayVAO);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        glBindVertexArray(0);
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
     }
 
     // Render minimap overlay

@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <optional>
+#include <cstdint>
 #include <glm/glm.hpp>
 
 namespace wowee {
@@ -22,9 +23,12 @@ class Shader;
  */
 struct WaterSurface {
     glm::vec3 position;          // World position
+    glm::vec3 origin;            // Mesh origin (world)
+    glm::vec3 stepX;             // Mesh X step vector in world space
+    glm::vec3 stepY;             // Mesh Y step vector in world space
     float minHeight;             // Minimum water height
     float maxHeight;             // Maximum water height
-    uint8_t liquidType;          // 0=water, 1=ocean, 2=magma, 3=slime
+    uint16_t liquidType;         // LiquidType.dbc ID (WotLK)
 
     // Owning tile coordinates (for per-tile removal)
     int tileX = -1, tileY = -1;
@@ -119,6 +123,7 @@ public:
      * Returns the highest water surface height at that XY, or nullopt if no water.
      */
     std::optional<float> getWaterHeightAt(float glX, float glY) const;
+    std::optional<uint16_t> getWaterTypeAt(float glX, float glY) const;
 
     /**
      * Get water surface count
@@ -129,8 +134,8 @@ private:
     void createWaterMesh(WaterSurface& surface);
     void destroyWaterMesh(WaterSurface& surface);
 
-    glm::vec4 getLiquidColor(uint8_t liquidType) const;
-    float getLiquidAlpha(uint8_t liquidType) const;
+    glm::vec4 getLiquidColor(uint16_t liquidType) const;
+    float getLiquidAlpha(uint16_t liquidType) const;
 
     std::unique_ptr<Shader> waterShader;
     std::vector<WaterSurface> surfaces;

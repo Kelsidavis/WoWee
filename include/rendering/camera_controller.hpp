@@ -124,7 +124,7 @@ private:
     static constexpr float SWIM_GRAVITY = -5.0f;
     static constexpr float SWIM_BUOYANCY = 8.0f;
     static constexpr float SWIM_SINK_SPEED = -3.0f;
-    static constexpr float WATER_SURFACE_OFFSET = 1.5f;
+    static constexpr float WATER_SURFACE_OFFSET = 0.9f;
 
     // State
     bool enabled = true;
