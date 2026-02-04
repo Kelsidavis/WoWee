@@ -324,6 +324,7 @@ void TerrainRenderer::render(const Camera& camera) {
     // Set lighting
     shader->setUniform("uLightDir", glm::vec3(lightDir[0], lightDir[1], lightDir[2]));
     shader->setUniform("uLightColor", glm::vec3(lightColor[0], lightColor[1], lightColor[2]));
+    shader->setUniform("uSpecularIntensity", 0.5f);
     shader->setUniform("uAmbientColor", glm::vec3(ambientColor[0], ambientColor[1], ambientColor[2]));
 
     // Set camera position

@@ -253,6 +253,8 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
         in vec2 TexCoord;
 
         uniform vec3 uLightDir;
+        uniform vec3 uLightColor;
+        uniform float uSpecularIntensity;
         uniform vec3 uAmbientColor;
         uniform vec3 uViewPos;
         uniform sampler2D uTexture;
@@ -299,7 +301,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
             vec3 viewDir = normalize(uViewPos - FragPos);
             vec3 halfDir = normalize(lightDir + viewDir);
             float spec = pow(max(dot(normal, halfDir), 0.0), 32.0);
-            vec3 specular = spec * vec3(0.1);
+            vec3 specular = spec * uLightColor * uSpecularIntensity;
 
             // Shadow mapping
             float shadow = 1.0;
@@ -1117,6 +1119,8 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
     shader->setUniform("uView", view);
     shader->setUniform("uProjection", projection);
     shader->setUniform("uLightDir", lightDir);
+    shader->setUniform("uLightColor", glm::vec3(1.5f, 1.4f, 1.3f));
+    shader->setUniform("uSpecularIntensity", 0.5f);
     shader->setUniform("uAmbientColor", ambientColor);
     shader->setUniform("uViewPos", camera.getPosition());
     shader->setUniform("uFogColor", fogColor);

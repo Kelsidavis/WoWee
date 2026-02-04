@@ -1176,8 +1176,10 @@ void Renderer::initPostProcess(int w, int h) {
         out vec4 FragColor;
         void main() {
             vec3 color = texture(uScene, vUV).rgb;
-            // Passthrough — tonemap will kick in once HDR lighting is added
-            FragColor = vec4(color, 1.0);
+            float exposure = 1.8;
+            color *= exposure;
+            vec3 mapped = color / (color + vec3(1.0));
+            FragColor = vec4(mapped, 1.0);
         }
     )";
     postProcessShader = std::make_unique<Shader>();

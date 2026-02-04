@@ -90,6 +90,8 @@ bool CharacterRenderer::initialize() {
 
         uniform sampler2D uTexture0;
         uniform vec3 uLightDir;
+        uniform vec3 uLightColor;
+        uniform float uSpecularIntensity;
         uniform vec3 uViewPos;
 
         uniform vec3 uFogColor;
@@ -113,7 +115,7 @@ bool CharacterRenderer::initialize() {
             vec3 viewDir = normalize(uViewPos - FragPos);
             vec3 halfDir = normalize(lightDir + viewDir);
             float spec = pow(max(dot(normal, halfDir), 0.0), 32.0);
-            vec3 specular = spec * vec3(0.2);
+            vec3 specular = spec * uLightColor * uSpecularIntensity;
 
             // Shadow mapping
             float shadow = 1.0;
@@ -1016,6 +1018,8 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
     characterShader->setUniform("uView", view);
     characterShader->setUniform("uProjection", projection);
     characterShader->setUniform("uLightDir", glm::vec3(0.0f, -1.0f, 0.3f));
+    characterShader->setUniform("uLightColor", glm::vec3(1.5f, 1.4f, 1.3f));
+    characterShader->setUniform("uSpecularIntensity", 0.5f);
     characterShader->setUniform("uViewPos", camera.getPosition());
 
     // Fog

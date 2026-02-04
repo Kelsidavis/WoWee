@@ -32,6 +32,9 @@ uniform vec3 uAmbientColor;
 // Camera
 uniform vec3 uViewPos;
 
+// HDR specular
+uniform float uSpecularIntensity;
+
 // Fog
 uniform vec3 uFogColor;
 uniform float uFogStart;
@@ -79,7 +82,7 @@ void main() {
     vec3 viewDir = normalize(uViewPos - FragPos);
     vec3 halfwayDir = normalize(lightDir + viewDir);
     float spec = pow(max(dot(norm, halfwayDir), 0.0), 32.0);
-    vec3 specular = spec * uLightColor * 0.1;
+    vec3 specular = spec * uLightColor * uSpecularIntensity;
 
     // Combine lighting
     vec3 result = ambient + diffuse + specular;

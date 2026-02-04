@@ -74,6 +74,8 @@ bool WMORenderer::initialize(pipeline::AssetManager* assets) {
         in vec4 VertexColor;
 
         uniform vec3 uLightDir;
+        uniform vec3 uLightColor;
+        uniform float uSpecularIntensity;
         uniform vec3 uViewPos;
         uniform vec3 uAmbientColor;
         uniform sampler2D uTexture;
@@ -105,7 +107,7 @@ bool WMORenderer::initialize(pipeline::AssetManager* assets) {
             vec3 viewDir = normalize(uViewPos - FragPos);
             vec3 halfDir = normalize(lightDir + viewDir);
             float spec = pow(max(dot(normal, halfDir), 0.0), 32.0);
-            vec3 specular = spec * vec3(0.15);
+            vec3 specular = spec * uLightColor * uSpecularIntensity;
 
             // Sample texture or use vertex color
             vec4 texColor;
@@ -490,6 +492,8 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
     shader->setUniform("uProjection", projection);
     shader->setUniform("uViewPos", camera.getPosition());
     shader->setUniform("uLightDir", glm::vec3(-0.3f, -0.7f, -0.6f));  // Default sun direction
+    shader->setUniform("uLightColor", glm::vec3(1.5f, 1.4f, 1.3f));
+    shader->setUniform("uSpecularIntensity", 0.5f);
     shader->setUniform("uAmbientColor", glm::vec3(0.4f, 0.4f, 0.5f));
     shader->setUniform("uFogColor", fogColor);
     shader->setUniform("uFogStart", fogStart);
