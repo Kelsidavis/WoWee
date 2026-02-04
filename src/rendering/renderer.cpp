@@ -1176,9 +1176,9 @@ void Renderer::initPostProcess(int w, int h) {
         out vec4 FragColor;
         void main() {
             vec3 color = texture(uScene, vUV).rgb;
-            float exposure = 1.8;
-            color *= exposure;
-            vec3 mapped = color / (color + vec3(1.0));
+            // Shoulder tonemap: identity below 0.9, soft rolloff above
+            vec3 excess = max(color - 0.9, 0.0);
+            vec3 mapped = min(color, vec3(0.9)) + 0.1 * excess / (excess + 0.1);
             FragColor = vec4(mapped, 1.0);
         }
     )";

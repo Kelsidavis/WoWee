@@ -32,9 +32,6 @@ uniform vec3 uAmbientColor;
 // Camera
 uniform vec3 uViewPos;
 
-// HDR specular
-uniform float uSpecularIntensity;
-
 // Fog
 uniform vec3 uFogColor;
 uniform float uFogStart;
@@ -78,14 +75,8 @@ void main() {
     diff = max(diff, 0.2);  // Minimum light to prevent completely dark faces
     vec3 diffuse = diff * uLightColor * finalColor.rgb;
 
-    // Specular lighting (subtle for terrain)
-    vec3 viewDir = normalize(uViewPos - FragPos);
-    vec3 halfwayDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(norm, halfwayDir), 0.0), 32.0);
-    vec3 specular = spec * uLightColor * uSpecularIntensity;
-
-    // Combine lighting
-    vec3 result = ambient + diffuse + specular;
+    // Combine lighting (terrain is purely diffuse — no specular on ground)
+    vec3 result = ambient + diffuse;
 
     // Apply fog
     float distance = length(uViewPos - FragPos);
