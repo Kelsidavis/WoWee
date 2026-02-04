@@ -218,6 +218,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
         uniform mat4 uProjection;
         uniform bool uUseBones;
         uniform mat4 uBones[128];
+        uniform float uScrollSpeed;  // >0 for smoke UV scroll, 0 for normal
 
         out vec3 FragPos;
         out vec3 Normal;
@@ -240,7 +241,9 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
             vec4 worldPos = uModel * vec4(pos, 1.0);
             FragPos = worldPos.xyz;
             Normal = mat3(uModel) * norm;
-            TexCoord = aTexCoord;
+
+            // Scroll UV for rising smoke effect (scroll both axes for diagonal drift)
+            TexCoord = vec2(aTexCoord.x - uScrollSpeed, aTexCoord.y - uScrollSpeed * 0.3);
 
             gl_Position = uProjection * uView * worldPos;
         }
@@ -258,6 +261,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
         uniform bool uHasTexture;
         uniform bool uAlphaTest;
         uniform float uFadeAlpha;
+        uniform float uScrollSpeed;  // >0 for smoke
 
         out vec4 FragColor;
 
@@ -269,13 +273,19 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
                 texColor = vec4(0.6, 0.5, 0.4, 1.0);  // Fallback brownish
             }
 
-            // Alpha test for leaves, fences, etc.
-            if (uAlphaTest && texColor.a < 0.5) {
+            bool isSmoke = (uScrollSpeed > 0.0);
+
+            // Alpha test for leaves, fences, etc. (skip for smoke)
+            if (uAlphaTest && !isSmoke && texColor.a < 0.5) {
                 discard;
             }
 
             // Distance fade - discard nearly invisible fragments
             float finalAlpha = texColor.a * uFadeAlpha;
+            if (isSmoke) {
+                // Very soft alpha so the 4-sided box mesh blends into a smooth plume
+                finalAlpha *= 0.25;
+            }
             if (finalAlpha < 0.02) {
                 discard;
             }
@@ -290,6 +300,10 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
             vec3 diffuse = diff * texColor.rgb;
 
             vec3 result = ambient + diffuse;
+            if (isSmoke) {
+                // Lighten smoke color to look like wispy gray smoke
+                result = mix(result, vec3(0.7, 0.7, 0.72), 0.5);
+            }
             FragColor = vec4(result, finalAlpha);
         }
     )";
@@ -467,12 +481,21 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
     // Store bone/sequence data for animation
     gpuModel.bones = model.bones;
     gpuModel.sequences = model.sequences;
+    gpuModel.globalSequenceDurations = model.globalSequenceDurations;
     gpuModel.hasAnimation = false;
     for (const auto& bone : model.bones) {
         if (bone.translation.hasData() || bone.rotation.hasData() || bone.scale.hasData()) {
             gpuModel.hasAnimation = true;
             break;
         }
+    }
+
+    // Flag smoke models for UV scroll animation (particle emitters not implemented)
+    {
+        std::string smokeName = model.name;
+        std::transform(smokeName.begin(), smokeName.end(), smokeName.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        gpuModel.isSmoke = (smokeName.find("smoke") != std::string::npos);
     }
 
     // Identify idle variation sequences (animation ID 0 = Stand)
@@ -723,18 +746,38 @@ static int findKeyframeIndex(const std::vector<uint32_t>& timestamps, float time
     return static_cast<int>(timestamps.size() - 2);
 }
 
+// Resolve sequence index and time for a track, handling global sequences.
+static void resolveTrackTime(const pipeline::M2AnimationTrack& track,
+                              int seqIdx, float time,
+                              const std::vector<uint32_t>& globalSeqDurations,
+                              int& outSeqIdx, float& outTime) {
+    if (track.globalSequence >= 0 &&
+        static_cast<size_t>(track.globalSequence) < globalSeqDurations.size()) {
+        // Global sequence: always use sub-array 0, wrap time at global duration
+        outSeqIdx = 0;
+        float dur = static_cast<float>(globalSeqDurations[track.globalSequence]);
+        outTime = (dur > 0.0f) ? std::fmod(time, dur) : 0.0f;
+    } else {
+        outSeqIdx = seqIdx;
+        outTime = time;
+    }
+}
+
 static glm::vec3 interpVec3(const pipeline::M2AnimationTrack& track,
-                             int seqIdx, float time, const glm::vec3& def) {
+                             int seqIdx, float time, const glm::vec3& def,
+                             const std::vector<uint32_t>& globalSeqDurations) {
     if (!track.hasData()) return def;
-    if (seqIdx < 0 || seqIdx >= static_cast<int>(track.sequences.size())) return def;
-    const auto& keys = track.sequences[seqIdx];
+    int si; float t;
+    resolveTrackTime(track, seqIdx, time, globalSeqDurations, si, t);
+    if (si < 0 || si >= static_cast<int>(track.sequences.size())) return def;
+    const auto& keys = track.sequences[si];
     if (keys.timestamps.empty() || keys.vec3Values.empty()) return def;
     auto safe = [&](const glm::vec3& v) -> glm::vec3 {
         if (std::isnan(v.x) || std::isnan(v.y) || std::isnan(v.z)) return def;
         return v;
     };
     if (keys.vec3Values.size() == 1) return safe(keys.vec3Values[0]);
-    int idx = findKeyframeIndex(keys.timestamps, time);
+    int idx = findKeyframeIndex(keys.timestamps, t);
     if (idx < 0) return def;
     size_t i0 = static_cast<size_t>(idx);
     size_t i1 = std::min(i0 + 1, keys.vec3Values.size() - 1);
@@ -742,16 +785,19 @@ static glm::vec3 interpVec3(const pipeline::M2AnimationTrack& track,
     float t0 = static_cast<float>(keys.timestamps[i0]);
     float t1 = static_cast<float>(keys.timestamps[i1]);
     float dur = t1 - t0;
-    float t = (dur > 0.0f) ? glm::clamp((time - t0) / dur, 0.0f, 1.0f) : 0.0f;
-    return safe(glm::mix(keys.vec3Values[i0], keys.vec3Values[i1], t));
+    float frac = (dur > 0.0f) ? glm::clamp((t - t0) / dur, 0.0f, 1.0f) : 0.0f;
+    return safe(glm::mix(keys.vec3Values[i0], keys.vec3Values[i1], frac));
 }
 
 static glm::quat interpQuat(const pipeline::M2AnimationTrack& track,
-                              int seqIdx, float time) {
+                              int seqIdx, float time,
+                              const std::vector<uint32_t>& globalSeqDurations) {
     glm::quat identity(1.0f, 0.0f, 0.0f, 0.0f);
     if (!track.hasData()) return identity;
-    if (seqIdx < 0 || seqIdx >= static_cast<int>(track.sequences.size())) return identity;
-    const auto& keys = track.sequences[seqIdx];
+    int si; float t;
+    resolveTrackTime(track, seqIdx, time, globalSeqDurations, si, t);
+    if (si < 0 || si >= static_cast<int>(track.sequences.size())) return identity;
+    const auto& keys = track.sequences[si];
     if (keys.timestamps.empty() || keys.quatValues.empty()) return identity;
     auto safe = [&](const glm::quat& q) -> glm::quat {
         float len = glm::length(q);
@@ -759,7 +805,7 @@ static glm::quat interpQuat(const pipeline::M2AnimationTrack& track,
         return q;
     };
     if (keys.quatValues.size() == 1) return safe(keys.quatValues[0]);
-    int idx = findKeyframeIndex(keys.timestamps, time);
+    int idx = findKeyframeIndex(keys.timestamps, t);
     if (idx < 0) return identity;
     size_t i0 = static_cast<size_t>(idx);
     size_t i1 = std::min(i0 + 1, keys.quatValues.size() - 1);
@@ -767,20 +813,21 @@ static glm::quat interpQuat(const pipeline::M2AnimationTrack& track,
     float t0 = static_cast<float>(keys.timestamps[i0]);
     float t1 = static_cast<float>(keys.timestamps[i1]);
     float dur = t1 - t0;
-    float t = (dur > 0.0f) ? glm::clamp((time - t0) / dur, 0.0f, 1.0f) : 0.0f;
-    return glm::slerp(safe(keys.quatValues[i0]), safe(keys.quatValues[i1]), t);
+    float frac = (dur > 0.0f) ? glm::clamp((t - t0) / dur, 0.0f, 1.0f) : 0.0f;
+    return glm::slerp(safe(keys.quatValues[i0]), safe(keys.quatValues[i1]), frac);
 }
 
 static void computeBoneMatrices(const M2ModelGPU& model, M2Instance& instance) {
     size_t numBones = std::min(model.bones.size(), size_t(128));
     if (numBones == 0) return;
     instance.boneMatrices.resize(numBones);
+    const auto& gsd = model.globalSequenceDurations;
 
     for (size_t i = 0; i < numBones; i++) {
         const auto& bone = model.bones[i];
-        glm::vec3 trans = interpVec3(bone.translation, instance.currentSequenceIndex, instance.animTime, glm::vec3(0.0f));
-        glm::quat rot = interpQuat(bone.rotation, instance.currentSequenceIndex, instance.animTime);
-        glm::vec3 scl = interpVec3(bone.scale, instance.currentSequenceIndex, instance.animTime, glm::vec3(1.0f));
+        glm::vec3 trans = interpVec3(bone.translation, instance.currentSequenceIndex, instance.animTime, glm::vec3(0.0f), gsd);
+        glm::quat rot = interpQuat(bone.rotation, instance.currentSequenceIndex, instance.animTime, gsd);
+        glm::vec3 scl = interpVec3(bone.scale, instance.currentSequenceIndex, instance.animTime, glm::vec3(1.0f), gsd);
 
         // Sanity check scale to avoid degenerate matrices
         if (scl.x < 0.001f) scl.x = 1.0f;
@@ -941,6 +988,11 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
         shader->setUniform("uModel", instance.modelMatrix);
         shader->setUniform("uFadeAlpha", fadeAlpha);
 
+        // UV scroll for smoke models: pass pre-computed scroll offset
+        bool isSmoke = model.isSmoke;
+        float scrollSpeed = isSmoke ? (instance.animTime / 1000.0f * 0.15f) : 0.0f;
+        shader->setUniform("uScrollSpeed", scrollSpeed);
+
         // Upload bone matrices if model has skeletal animation
         bool useBones = model.hasAnimation && !instance.boneMatrices.empty();
         shader->setUniform("uUseBones", useBones);
@@ -949,9 +1001,14 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             shader->setUniformMatrixArray("uBones[0]", instance.boneMatrices.data(), numBones);
         }
 
-        // Disable depth writes for fading objects to avoid z-fighting
-        if (fadeAlpha < 1.0f) {
+        // Disable depth writes for fading objects and smoke to avoid z-fighting
+        if (fadeAlpha < 1.0f || isSmoke) {
             glDepthMask(GL_FALSE);
+        }
+
+        // Additive blending for smoke
+        if (isSmoke) {
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE);
         }
 
         glBindVertexArray(model.vao);
@@ -977,7 +1034,12 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
 
         glBindVertexArray(0);
 
-        if (fadeAlpha < 1.0f) {
+        // Restore blending mode after smoke
+        if (isSmoke) {
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        }
+
+        if (fadeAlpha < 1.0f || isSmoke) {
             glDepthMask(GL_TRUE);
         }
     }

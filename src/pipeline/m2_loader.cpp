@@ -422,6 +422,13 @@ M2Model M2Loader::load(const std::vector<uint8_t>& m2Data) {
         core::Logger::getInstance().debug("  Animation sequences: ", model.sequences.size());
     }
 
+    // Read global sequence durations (used by environmental animations: smoke, fire, etc.)
+    if (header.nGlobalSequences > 0 && header.ofsGlobalSequences > 0) {
+        model.globalSequenceDurations = readArray<uint32_t>(m2Data,
+            header.ofsGlobalSequences, header.nGlobalSequences);
+        core::Logger::getInstance().debug("  Global sequences: ", model.globalSequenceDurations.size());
+    }
+
     // Read bones with full animation track data
     if (header.nBones > 0 && header.ofsBones > 0) {
         // Verify we have enough data for the full bone structures

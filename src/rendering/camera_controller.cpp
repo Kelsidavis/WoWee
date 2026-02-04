@@ -269,7 +269,7 @@ void CameraController::update(float deltaTime) {
                 floorH = terrainManager->getHeightAt(targetPos.x, targetPos.y);
             }
             if (wmoRenderer) {
-                auto wh = wmoRenderer->getFloorHeight(targetPos.x, targetPos.y, targetPos.z + 5.0f);
+                auto wh = wmoRenderer->getFloorHeight(targetPos.x, targetPos.y, targetPos.z + 2.0f);
                 if (wh && (!floorH || *wh > *floorH)) floorH = wh;
             }
             if (m2Renderer) {
@@ -410,13 +410,13 @@ void CameraController::update(float deltaTime) {
                     if (terrainManager) {
                         terrainH = terrainManager->getHeightAt(x, y);
                     }
+                    float stepUpBudget = grounded ? 1.6f : 1.2f;
                     if (wmoRenderer) {
-                        wmoH = wmoRenderer->getFloorHeight(x, y, targetPos.z + 5.0f);
+                        wmoH = wmoRenderer->getFloorHeight(x, y, targetPos.z + stepUpBudget + 0.5f);
                     }
                     if (m2Renderer) {
                         m2H = m2Renderer->getFloorHeight(x, y, targetPos.z);
                     }
-                    float stepUpBudget = grounded ? 1.6f : 1.2f;
                     auto base = selectReachableFloor(terrainH, wmoH, targetPos.z, stepUpBudget);
                     bool fromM2 = false;
                     if (m2H && *m2H <= targetPos.z + stepUpBudget && (!base || *m2H > *base)) {
@@ -499,14 +499,17 @@ void CameraController::update(float deltaTime) {
                 if (terrainManager) {
                     terrainH = terrainManager->getHeightAt(x, y);
                 }
-                float probeZ = std::max(targetPos.z, lastGroundZ) + 6.0f;
+                float stepUpBudget = grounded ? 1.6f : 1.2f;
+                // WMO probe: keep tight so multi-story buildings return the
+                // current floor, not a ceiling/upper floor the player can't reach.
+                float wmoProbeZ = std::max(targetPos.z, lastGroundZ) + stepUpBudget + 0.5f;
+                float m2ProbeZ = std::max(targetPos.z, lastGroundZ) + 6.0f;
                 if (wmoRenderer) {
-                    wmoH = wmoRenderer->getFloorHeight(x, y, probeZ);
+                    wmoH = wmoRenderer->getFloorHeight(x, y, wmoProbeZ);
                 }
                 if (m2Renderer) {
-                    m2H = m2Renderer->getFloorHeight(x, y, probeZ);
+                    m2H = m2Renderer->getFloorHeight(x, y, m2ProbeZ);
                 }
-                float stepUpBudget = grounded ? 1.6f : 1.2f;
                 auto base = selectReachableFloor(terrainH, wmoH, targetPos.z, stepUpBudget);
                 if (m2H && *m2H <= targetPos.z + stepUpBudget && (!base || *m2H > *base)) {
                     base = m2H;
@@ -572,19 +575,19 @@ void CameraController::update(float deltaTime) {
         // Find max safe distance using raycast + sphere radius
         collisionDistance = currentDistance;
 
-        // Helper to get floor height
-        auto getFloorAt = [&](float x, float y, float z) -> std::optional<float> {
+        // Helper to get floor height for camera collision.
+        // Use the player's ground level as reference to avoid locking the camera
+        // to upper floors in multi-story buildings.
+        auto getFloorAt = [&](float x, float y, float /*z*/) -> std::optional<float> {
             std::optional<float> terrainH;
             std::optional<float> wmoH;
             if (terrainManager) {
                 terrainH = terrainManager->getHeightAt(x, y);
             }
             if (wmoRenderer) {
-                wmoH = wmoRenderer->getFloorHeight(x, y, z + 5.0f);
+                wmoH = wmoRenderer->getFloorHeight(x, y, lastGroundZ + 2.5f);
             }
-            // Camera floor clamp must allow larger step-up on ramps/stairs.
-            // Too-small limits let the camera slip below rising ground and see through floors.
-            return selectReachableFloor(terrainH, wmoH, z, 2.0f);
+            return selectReachableFloor(terrainH, wmoH, lastGroundZ, 2.0f);
         };
 
         // Raycast against WMO bounding boxes
@@ -697,7 +700,7 @@ void CameraController::update(float deltaTime) {
             std::optional<float> wmoH;
             std::optional<float> m2H;
             if (terrainManager) terrainH = terrainManager->getHeightAt(newPos.x, newPos.y);
-            if (wmoRenderer) wmoH = wmoRenderer->getFloorHeight(newPos.x, newPos.y, feetZ + 6.0f);
+            if (wmoRenderer) wmoH = wmoRenderer->getFloorHeight(newPos.x, newPos.y, feetZ + 2.0f);
             if (m2Renderer) m2H = m2Renderer->getFloorHeight(newPos.x, newPos.y, feetZ + 1.0f);
             auto floorH = selectHighestFloor(terrainH, wmoH, m2H);
             constexpr float MIN_SWIM_WATER_DEPTH = 1.8f;
@@ -804,12 +807,13 @@ void CameraController::update(float deltaTime) {
                     terrainH = terrainManager->getHeightAt(x, y);
                 }
                 float feetZ = newPos.z - eyeHeight;
-                float probeZ = std::max(feetZ, lastGroundZ) + 6.0f;
+                float wmoProbeZ = std::max(feetZ, lastGroundZ) + 1.5f;
+                float m2ProbeZ = std::max(feetZ, lastGroundZ) + 6.0f;
                 if (wmoRenderer) {
-                    wmoH = wmoRenderer->getFloorHeight(x, y, probeZ);
+                    wmoH = wmoRenderer->getFloorHeight(x, y, wmoProbeZ);
                 }
                 if (m2Renderer) {
-                    m2H = m2Renderer->getFloorHeight(x, y, probeZ);
+                    m2H = m2Renderer->getFloorHeight(x, y, m2ProbeZ);
                 }
                 auto base = selectReachableFloor(terrainH, wmoH, feetZ, 1.0f);
                 if (m2H && *m2H <= feetZ + 1.0f && (!base || *m2H > *base)) {

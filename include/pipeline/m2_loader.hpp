@@ -132,6 +132,7 @@ struct M2Model {
     // Skeletal animation
     std::vector<M2Bone> bones;
     std::vector<M2Sequence> sequences;
+    std::vector<uint32_t> globalSequenceDurations;  // Per-global-sequence loop durations (ms)
 
     // Rendering
     std::vector<M2Batch> batches;

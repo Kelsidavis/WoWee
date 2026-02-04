@@ -56,7 +56,9 @@ struct M2ModelGPU {
     // Skeletal animation data (kept from M2Model for bone computation)
     std::vector<pipeline::M2Bone> bones;
     std::vector<pipeline::M2Sequence> sequences;
+    std::vector<uint32_t> globalSequenceDurations;  // Loop durations for global sequence tracks
     bool hasAnimation = false;  // True if any bone has keyframes
+    bool isSmoke = false;       // True for smoke models (UV scroll animation)
     std::vector<int> idleVariationIndices;  // Sequence indices for idle variations (animId 0)
 
     bool isValid() const { return vao != 0 && indexCount > 0; }
