@@ -94,10 +94,15 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // Inventory (B key toggle handled inside)
     inventoryScreen.render(gameHandler.getInventory(), gameHandler.getMoneyCopper());
 
+    if (inventoryScreen.consumeInventoryDirty()) {
+        gameHandler.notifyInventoryChanged();
+    }
+
     if (inventoryScreen.consumeEquipmentDirty()) {
         updateCharacterGeosets(gameHandler.getInventory());
         updateCharacterTextures(gameHandler.getInventory());
         core::Application::getInstance().loadEquippedWeapons();
+        gameHandler.notifyEquipmentChanged();
     }
 
     // Update renderer face-target position

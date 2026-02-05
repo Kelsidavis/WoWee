@@ -15,11 +15,14 @@ public:
 
     /// Returns true if equipment changed since last call, and clears the flag.
     bool consumeEquipmentDirty() { bool d = equipmentDirty; equipmentDirty = false; return d; }
+    /// Returns true if any inventory slot changed since last call, and clears the flag.
+    bool consumeInventoryDirty() { bool d = inventoryDirty; inventoryDirty = false; return d; }
 
 private:
     bool open = false;
     bool bKeyWasDown = false;
     bool equipmentDirty = false;
+    bool inventoryDirty = false;
 
     // Drag-and-drop held item state
     bool holdingItem = false;

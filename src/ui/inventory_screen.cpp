@@ -72,6 +72,7 @@ void InventoryScreen::pickupFromBackpack(game::Inventory& inv, int index) {
     heldBackpackIndex = index;
     heldEquipSlot = game::EquipSlot::NUM_SLOTS;
     inv.clearBackpackSlot(index);
+    inventoryDirty = true;
 }
 
 void InventoryScreen::pickupFromEquipment(game::Inventory& inv, game::EquipSlot slot) {
@@ -84,6 +85,7 @@ void InventoryScreen::pickupFromEquipment(game::Inventory& inv, game::EquipSlot 
     heldEquipSlot = slot;
     inv.clearEquipSlot(slot);
     equipmentDirty = true;
+    inventoryDirty = true;
 }
 
 void InventoryScreen::placeInBackpack(game::Inventory& inv, int index) {
@@ -101,6 +103,7 @@ void InventoryScreen::placeInBackpack(game::Inventory& inv, int index) {
         heldSource = HeldSource::BACKPACK;
         heldBackpackIndex = index;
     }
+    inventoryDirty = true;
 }
 
 void InventoryScreen::placeInEquipment(game::Inventory& inv, game::EquipSlot slot) {
@@ -155,6 +158,7 @@ void InventoryScreen::placeInEquipment(game::Inventory& inv, game::EquipSlot slo
     }
 
     equipmentDirty = true;
+    inventoryDirty = true;
 }
 
 void InventoryScreen::cancelPickup(game::Inventory& inv) {
@@ -180,6 +184,7 @@ void InventoryScreen::cancelPickup(game::Inventory& inv) {
         inv.addItem(heldItem);
     }
     holdingItem = false;
+    inventoryDirty = true;
 }
 
 void InventoryScreen::renderHeldItem() {
@@ -529,6 +534,7 @@ void InventoryScreen::renderItemSlot(game::Inventory& inventory, const game::Ite
                     inventory.setBackpackSlot(freeSlot, item);
                     inventory.clearEquipSlot(equipSlot);
                     equipmentDirty = true;
+                    inventoryDirty = true;
                 }
             } else if (kind == SlotKind::BACKPACK && backpackIndex >= 0 && item.inventoryType > 0) {
                 // Auto-equip: find the right slot
@@ -561,6 +567,7 @@ void InventoryScreen::renderItemSlot(game::Inventory& inventory, const game::Ite
                         inventory.clearEquipSlot(game::EquipSlot::MAIN_HAND);
                     }
                     equipmentDirty = true;
+                    inventoryDirty = true;
                 }
             }
         }

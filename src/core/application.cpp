@@ -76,54 +76,7 @@ const char* Application::mapIdToName(uint32_t mapId) {
 }
 
 std::string Application::getPlayerModelPath() const {
-    auto pick = [&](game::Race race, game::Gender gender) -> std::string {
-        switch (race) {
-            case game::Race::HUMAN:
-                return gender == game::Gender::FEMALE
-                    ? "Character\\Human\\Female\\HumanFemale.m2"
-                    : "Character\\Human\\Male\\HumanMale.m2";
-            case game::Race::ORC:
-                return gender == game::Gender::FEMALE
-                    ? "Character\\Orc\\Female\\OrcFemale.m2"
-                    : "Character\\Orc\\Male\\OrcMale.m2";
-            case game::Race::DWARF:
-                return gender == game::Gender::FEMALE
-                    ? "Character\\Dwarf\\Female\\DwarfFemale.m2"
-                    : "Character\\Dwarf\\Male\\DwarfMale.m2";
-            case game::Race::NIGHT_ELF:
-                return gender == game::Gender::FEMALE
-                    ? "Character\\NightElf\\Female\\NightElfFemale.m2"
-                    : "Character\\NightElf\\Male\\NightElfMale.m2";
-            case game::Race::UNDEAD:
-                return gender == game::Gender::FEMALE
-                    ? "Character\\Scourge\\Female\\ScourgeFemale.m2"
-                    : "Character\\Scourge\\Male\\ScourgeMale.m2";
-            case game::Race::TAUREN:
-                return gender == game::Gender::FEMALE
-                    ? "Character\\Tauren\\Female\\TaurenFemale.m2"
-                    : "Character\\Tauren\\Male\\TaurenMale.m2";
-            case game::Race::GNOME:
-                return gender == game::Gender::FEMALE
-                    ? "Character\\Gnome\\Female\\GnomeFemale.m2"
-                    : "Character\\Gnome\\Male\\GnomeMale.m2";
-            case game::Race::TROLL:
-                return gender == game::Gender::FEMALE
-                    ? "Character\\Troll\\Female\\TrollFemale.m2"
-                    : "Character\\Troll\\Male\\TrollMale.m2";
-            case game::Race::BLOOD_ELF:
-                return gender == game::Gender::FEMALE
-                    ? "Character\\BloodElf\\Female\\BloodElfFemale.m2"
-                    : "Character\\BloodElf\\Male\\BloodElfMale.m2";
-            case game::Race::DRAENEI:
-                return gender == game::Gender::FEMALE
-                    ? "Character\\Draenei\\Female\\DraeneiFemale.m2"
-                    : "Character\\Draenei\\Male\\DraeneiMale.m2";
-            default:
-                return "Character\\Human\\Male\\HumanMale.m2";
-        }
-    };
-
-    return pick(spRace_, spGender_);
+    return game::getPlayerModelPath(spRace_, spGender_);
 }
 
 namespace {
@@ -412,6 +365,9 @@ void Application::update(float deltaTime) {
             if (gameHandler) {
                 gameHandler->update(deltaTime);
             }
+            if (uiManager) {
+                uiManager->getCharacterCreateScreen().update(deltaTime);
+            }
             break;
 
         case AppState::CHARACTER_SELECTION:
@@ -522,6 +478,7 @@ void Application::setupUICallbacks() {
             gameHandler->setSinglePlayerCharListReady();
         }
         uiManager->getCharacterCreateScreen().reset();
+        uiManager->getCharacterCreateScreen().initializePreview(assetManager.get());
         setState(AppState::CHARACTER_CREATION);
     });
 
@@ -596,6 +553,7 @@ void Application::setupUICallbacks() {
     // "Create Character" button on character screen
     uiManager->getCharacterScreen().setOnCreateCharacter([this]() {
         uiManager->getCharacterCreateScreen().reset();
+        uiManager->getCharacterCreateScreen().initializePreview(assetManager.get());
         setState(AppState::CHARACTER_CREATION);
     });
 }
@@ -1104,23 +1062,31 @@ void Application::startSinglePlayer() {
     spYawDeg_ = 0.0f;
     spPitchDeg_ = -5.0f;
 
-    game::GameHandler::SinglePlayerCreateInfo createInfo;
-    bool hasCreate = gameHandler && gameHandler->getSinglePlayerCreateInfo(activeChar->race, activeChar->characterClass, createInfo);
-    if (hasCreate) {
-        spMapId_ = createInfo.mapId;
-        spZoneId_ = createInfo.zoneId;
-        spSpawnCanonical_ = core::coords::serverToCanonical(glm::vec3(createInfo.x, createInfo.y, createInfo.z));
-        spYawDeg_ = glm::degrees(createInfo.orientation);
-        spPitchDeg_ = -5.0f;
-        spawnSnapToGround = true;
-    }
-
+    bool loadedState = false;
     if (gameHandler) {
         gameHandler->setPlayerGuid(activeChar->guid);
-        uint32_t level = std::max<uint32_t>(1, activeChar->level);
-        uint32_t maxHealth = 20 + level * 10;
-        gameHandler->initLocalPlayerStats(level, maxHealth, maxHealth);
-        gameHandler->applySinglePlayerStartData(activeChar->race, activeChar->characterClass);
+        loadedState = gameHandler->loadSinglePlayerCharacterState(activeChar->guid);
+        if (loadedState) {
+            const auto& movement = gameHandler->getMovementInfo();
+            spSpawnCanonical_ = glm::vec3(movement.x, movement.y, movement.z);
+            spYawDeg_ = glm::degrees(movement.orientation);
+            spawnSnapToGround = true;
+        } else {
+            game::GameHandler::SinglePlayerCreateInfo createInfo;
+            bool hasCreate = gameHandler->getSinglePlayerCreateInfo(activeChar->race, activeChar->characterClass, createInfo);
+            if (hasCreate) {
+                spMapId_ = createInfo.mapId;
+                spZoneId_ = createInfo.zoneId;
+                spSpawnCanonical_ = core::coords::serverToCanonical(glm::vec3(createInfo.x, createInfo.y, createInfo.z));
+                spYawDeg_ = glm::degrees(createInfo.orientation);
+                spPitchDeg_ = -5.0f;
+                spawnSnapToGround = true;
+            }
+            uint32_t level = std::max<uint32_t>(1, activeChar->level);
+            uint32_t maxHealth = 20 + level * 10;
+            gameHandler->initLocalPlayerStats(level, maxHealth, maxHealth);
+            gameHandler->applySinglePlayerStartData(activeChar->race, activeChar->characterClass);
+        }
     }
 
     // Load weapon models for equipped items (after inventory is populated)
@@ -1150,6 +1116,12 @@ void Application::startSinglePlayer() {
     glm::vec3 spawnRender = core::coords::canonicalToRender(spawnCanonical);
     if (renderer && renderer->getCameraController()) {
         renderer->getCameraController()->setDefaultSpawn(spawnRender, spawnYaw, spawnPitch);
+    }
+
+    if (gameHandler && !loadedState) {
+        gameHandler->setPosition(spawnCanonical.x, spawnCanonical.y, spawnCanonical.z);
+        gameHandler->setOrientation(glm::radians(spawnYaw - 90.0f));
+        gameHandler->flushSinglePlayerSave();
     }
     if (spawnPreset) {
         LOG_INFO("Single-player spawn preset: ", spawnPreset->label,

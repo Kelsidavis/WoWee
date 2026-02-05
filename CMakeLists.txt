@@ -20,6 +20,7 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
+find_package(SQLite3 REQUIRED)
 
 # GLM (header-only math library)
 find_package(glm QUIET)
@@ -131,6 +132,7 @@ set(WOWEE_SOURCES
     src/rendering/weather.cpp
     src/rendering/lightning.cpp
     src/rendering/character_renderer.cpp
+    src/rendering/character_preview.cpp
     src/rendering/wmo_renderer.cpp
     src/rendering/m2_renderer.cpp
     src/rendering/minimap.cpp
@@ -221,6 +223,7 @@ set(WOWEE_HEADERS
     include/rendering/swim_effects.hpp
     include/rendering/world_map.hpp
     include/rendering/character_renderer.hpp
+    include/rendering/character_preview.hpp
     include/rendering/wmo_renderer.hpp
     include/rendering/loading_screen.hpp
 
@@ -253,6 +256,14 @@ target_link_libraries(wowee PRIVATE
     OpenSSL::Crypto
     Threads::Threads
 )
+
+# SQLite
+if (TARGET SQLite::SQLite3)
+    target_link_libraries(wowee PRIVATE SQLite::SQLite3)
+else()
+    target_include_directories(wowee PRIVATE ${SQLite3_INCLUDE_DIRS})
+    target_link_libraries(wowee PRIVATE ${SQLite3_LIBRARIES})
+endif()
 
 # Platform-specific libraries
 if(WIN32)

@@ -224,6 +224,11 @@ public:
     bool isSinglePlayerMode() const { return singlePlayerMode_; }
     void simulateMotd(const std::vector<std::string>& lines);
     void applySinglePlayerStartData(Race race, Class cls);
+    bool loadSinglePlayerCharacterState(uint64_t guid);
+    void notifyInventoryChanged();
+    void notifyEquipmentChanged();
+    void notifyQuestStateChanged();
+    void flushSinglePlayerSave();
 
     // NPC death callback (single-player)
     using NpcDeathCallback = std::function<void(uint64_t guid)>;
@@ -581,6 +586,36 @@ private:
     void handleNpcDeath(uint64_t guid);
     void aggroNpc(uint64_t guid);
     bool isNpcAggroed(uint64_t guid) const;
+
+    // ---- Single-player persistence ----
+    enum SinglePlayerDirty : uint32_t {
+        SP_DIRTY_NONE       = 0,
+        SP_DIRTY_CHAR       = 1 << 0,
+        SP_DIRTY_INVENTORY  = 1 << 1,
+        SP_DIRTY_SPELLS     = 1 << 2,
+        SP_DIRTY_ACTIONBAR  = 1 << 3,
+        SP_DIRTY_AURAS      = 1 << 4,
+        SP_DIRTY_QUESTS     = 1 << 5,
+        SP_DIRTY_MONEY      = 1 << 6,
+        SP_DIRTY_XP         = 1 << 7,
+        SP_DIRTY_POSITION   = 1 << 8,
+        SP_DIRTY_STATS      = 1 << 9,
+        SP_DIRTY_ALL        = 0xFFFFFFFFu
+    };
+    void markSinglePlayerDirty(uint32_t flags, bool highPriority);
+    void loadSinglePlayerCharacters();
+    void saveSinglePlayerCharacterState(bool force);
+
+    uint32_t spDirtyFlags_ = SP_DIRTY_NONE;
+    bool spDirtyHighPriority_ = false;
+    float spDirtyTimer_ = 0.0f;
+    float spPeriodicTimer_ = 0.0f;
+    float spLastDirtyX_ = 0.0f;
+    float spLastDirtyY_ = 0.0f;
+    float spLastDirtyZ_ = 0.0f;
+    float spLastDirtyOrientation_ = 0.0f;
+    std::unordered_map<uint64_t, bool> spHasState_;
+    std::unordered_map<uint64_t, float> spSavedOrientation_;
 };
 
 } // namespace game
