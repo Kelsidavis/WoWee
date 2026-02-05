@@ -207,12 +207,16 @@ void Application::run() {
 void Application::shutdown() {
     LOG_INFO("Shutting down application");
 
+    // Stop renderer first: terrain streaming workers may still be reading via
+    // AssetManager during shutdown, so renderer/terrain teardown must complete
+    // before AssetManager is destroyed.
+    renderer.reset();
+
     world.reset();
     gameHandler.reset();
     authHandler.reset();
     assetManager.reset();
     uiManager.reset();
-    renderer.reset();
     window.reset();
 
     running = false;
