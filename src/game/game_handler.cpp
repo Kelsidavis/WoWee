@@ -54,6 +54,28 @@ struct SinglePlayerLootDb {
     std::unordered_map<uint32_t, ItemTemplateRow> itemTemplates;
 };
 
+struct SinglePlayerCreateDb {
+    bool loaded = false;
+    std::unordered_map<uint16_t, GameHandler::SinglePlayerCreateInfo> rows;
+};
+
+struct SinglePlayerStartDb {
+    bool loaded = false;
+    struct StartItemRow {
+        uint8_t race = 0;
+        uint8_t cls = 0;
+        uint32_t itemId = 0;
+        int32_t amount = 1;
+    };
+    struct StartSpellRow {
+        uint32_t raceMask = 0;
+        uint32_t classMask = 0;
+        uint32_t spellId = 0;
+    };
+    std::vector<StartItemRow> items;
+    std::vector<StartSpellRow> spells;
+};
+
 static std::string trimSql(const std::string& s) {
     size_t b = 0;
     while (b < s.size() && std::isspace(static_cast<unsigned char>(s[b]))) b++;
@@ -316,6 +338,129 @@ static SinglePlayerLootDb& getSinglePlayerLootDb() {
              ", loot=", db.creatureLoot.size(),
              ", reference=", db.referenceLoot.size(),
              ", items=", db.itemTemplates.size(), ")");
+    return db;
+}
+
+static SinglePlayerCreateDb& getSinglePlayerCreateDb() {
+    static SinglePlayerCreateDb db;
+    if (db.loaded) return db;
+
+    auto base = resolveDbBasePath();
+    if (base.empty()) {
+        db.loaded = true;
+        return db;
+    }
+
+    std::filesystem::path basePath = base;
+    std::filesystem::path createInfoPath = basePath / "playercreateinfo.sql";
+    if (!std::filesystem::exists(createInfoPath)) {
+        auto alt = basePath / "base";
+        if (std::filesystem::exists(alt / "playercreateinfo.sql")) {
+            basePath = alt;
+            createInfoPath = basePath / "playercreateinfo.sql";
+        }
+    }
+
+    if (!std::filesystem::exists(createInfoPath)) {
+        db.loaded = true;
+        return db;
+    }
+
+    auto cols = loadCreateTableColumns(createInfoPath);
+    int idxRace = columnIndex(cols, "race");
+    int idxClass = columnIndex(cols, "class");
+    int idxMap = columnIndex(cols, "map");
+    int idxZone = columnIndex(cols, "zone");
+    int idxX = columnIndex(cols, "position_x");
+    int idxY = columnIndex(cols, "position_y");
+    int idxZ = columnIndex(cols, "position_z");
+    int idxO = columnIndex(cols, "orientation");
+
+    std::ifstream in(createInfoPath);
+    processInsertStatements(in, [&](const std::vector<std::string>& row) {
+        if (idxRace < 0 || idxClass < 0 || idxMap < 0 || idxZone < 0 ||
+            idxX < 0 || idxY < 0 || idxZ < 0 || idxO < 0) {
+            return;
+        }
+        if (idxRace >= static_cast<int>(row.size()) || idxClass >= static_cast<int>(row.size())) return;
+        try {
+            uint32_t race = static_cast<uint32_t>(std::stoul(row[idxRace]));
+            uint32_t cls = static_cast<uint32_t>(std::stoul(row[idxClass]));
+            GameHandler::SinglePlayerCreateInfo info;
+            info.mapId = static_cast<uint32_t>(std::stoul(row[idxMap]));
+            info.zoneId = static_cast<uint32_t>(std::stoul(row[idxZone]));
+            info.x = std::stof(row[idxX]);
+            info.y = std::stof(row[idxY]);
+            info.z = std::stof(row[idxZ]);
+            info.orientation = std::stof(row[idxO]);
+            uint16_t key = static_cast<uint16_t>((race << 8) | cls);
+            db.rows[key] = info;
+        } catch (const std::exception&) {
+        }
+    });
+
+    db.loaded = true;
+    LOG_INFO("Single-player create DB loaded from ", createInfoPath.string(),
+             " (rows=", db.rows.size(), ")");
+    return db;
+}
+
+static SinglePlayerStartDb& getSinglePlayerStartDb() {
+    static SinglePlayerStartDb db;
+    if (db.loaded) return db;
+
+    auto base = resolveDbBasePath();
+    if (base.empty()) {
+        db.loaded = true;
+        return db;
+    }
+
+    std::filesystem::path basePath = base;
+    std::filesystem::path itemPath = basePath / "playercreateinfo_item.sql";
+    std::filesystem::path spellPath = basePath / "playercreateinfo_spell.sql";
+    if (!std::filesystem::exists(itemPath) || !std::filesystem::exists(spellPath)) {
+        auto alt = basePath / "base";
+        if (std::filesystem::exists(alt / "playercreateinfo_item.sql")) {
+            basePath = alt;
+            itemPath = basePath / "playercreateinfo_item.sql";
+            spellPath = basePath / "playercreateinfo_spell.sql";
+        }
+    }
+
+    if (std::filesystem::exists(itemPath)) {
+        std::ifstream in(itemPath);
+        processInsertStatements(in, [&](const std::vector<std::string>& row) {
+            if (row.size() < 4) return;
+            try {
+                SinglePlayerStartDb::StartItemRow r;
+                r.race = static_cast<uint8_t>(std::stoul(row[0]));
+                r.cls = static_cast<uint8_t>(std::stoul(row[1]));
+                r.itemId = static_cast<uint32_t>(std::stoul(row[2]));
+                r.amount = static_cast<int32_t>(std::stol(row[3]));
+                db.items.push_back(r);
+            } catch (const std::exception&) {
+            }
+        });
+    }
+
+    if (std::filesystem::exists(spellPath)) {
+        std::ifstream in(spellPath);
+        processInsertStatements(in, [&](const std::vector<std::string>& row) {
+            if (row.size() < 3) return;
+            try {
+                SinglePlayerStartDb::StartSpellRow r;
+                r.raceMask = static_cast<uint32_t>(std::stoul(row[0]));
+                r.classMask = static_cast<uint32_t>(std::stoul(row[1]));
+                r.spellId = static_cast<uint32_t>(std::stoul(row[2]));
+                db.spells.push_back(r);
+            } catch (const std::exception&) {
+            }
+        });
+    }
+
+    db.loaded = true;
+    LOG_INFO("Single-player start DB loaded (items=", db.items.size(),
+             ", spells=", db.spells.size(), ")");
     return db;
 }
 
@@ -849,15 +994,27 @@ void GameHandler::createCharacter(const CharCreateData& data) {
                              (static_cast<uint32_t>(data.hairStyle) << 16) |
                              (static_cast<uint32_t>(data.hairColor) << 24);
         ch.facialFeatures = data.facialHair;
-        ch.zoneId = 12;   // Elwynn Forest default
-        ch.mapId = 0;
-        ch.x = -8949.95f;
-        ch.y = -132.493f;
-        ch.z = 83.5312f;
+        SinglePlayerCreateInfo createInfo;
+        if (getSinglePlayerCreateInfo(data.race, data.characterClass, createInfo)) {
+            ch.zoneId = createInfo.zoneId;
+            ch.mapId = createInfo.mapId;
+            ch.x = createInfo.x;
+            ch.y = createInfo.y;
+            ch.z = createInfo.z;
+        } else {
+            ch.zoneId = 12;   // Elwynn Forest default
+            ch.mapId = 0;
+            ch.x = -8949.95f;
+            ch.y = -132.493f;
+            ch.z = 83.5312f;
+        }
         ch.guildId = 0;
         ch.flags = 0;
         ch.pet = {};
         characters.push_back(ch);
+        if (activeCharacterGuid_ == 0) {
+            activeCharacterGuid_ = ch.guid;
+        }
 
         LOG_INFO("Single-player character created: ", ch.name);
         // Defer callback to next update() so ImGui frame completes first
@@ -907,6 +1064,101 @@ void GameHandler::handleCharCreateResponse(network::Packet& packet) {
         if (charCreateCallback_) {
             charCreateCallback_(false, msg);
         }
+    }
+}
+
+const Character* GameHandler::getActiveCharacter() const {
+    if (activeCharacterGuid_ == 0) return nullptr;
+    for (const auto& ch : characters) {
+        if (ch.guid == activeCharacterGuid_) return &ch;
+    }
+    return nullptr;
+}
+
+const Character* GameHandler::getFirstCharacter() const {
+    if (characters.empty()) return nullptr;
+    return &characters.front();
+}
+
+void GameHandler::setSinglePlayerCharListReady() {
+    setState(WorldState::CHAR_LIST_RECEIVED);
+}
+
+bool GameHandler::getSinglePlayerCreateInfo(Race race, Class cls, SinglePlayerCreateInfo& out) const {
+    auto& db = getSinglePlayerCreateDb();
+    uint16_t key = static_cast<uint16_t>((static_cast<uint32_t>(race) << 8) |
+                                         static_cast<uint32_t>(cls));
+    auto it = db.rows.find(key);
+    if (it == db.rows.end()) return false;
+    out = it->second;
+    return true;
+}
+
+void GameHandler::applySinglePlayerStartData(Race race, Class cls) {
+    inventory = Inventory();
+    knownSpells.clear();
+    knownSpells.push_back(6603);  // Attack
+    knownSpells.push_back(8690);  // Hearthstone
+
+    for (auto& slot : actionBar) {
+        slot = ActionBarSlot{};
+    }
+    actionBar[0].type = ActionBarSlot::SPELL;
+    actionBar[0].id = 6603;
+    actionBar[11].type = ActionBarSlot::SPELL;
+    actionBar[11].id = 8690;
+
+    auto& startDb = getSinglePlayerStartDb();
+    auto& itemDb = getSinglePlayerLootDb().itemTemplates;
+
+    uint8_t raceVal = static_cast<uint8_t>(race);
+    uint8_t classVal = static_cast<uint8_t>(cls);
+
+    for (const auto& row : startDb.items) {
+        if (row.itemId == 0 || row.amount == 0) continue;
+        if (row.race != 0 && row.race != raceVal) continue;
+        if (row.cls != 0 && row.cls != classVal) continue;
+        if (row.amount < 0) continue;
+
+        ItemDef def;
+        def.itemId = row.itemId;
+        def.stackCount = static_cast<uint32_t>(row.amount);
+        def.maxStack = def.stackCount;
+
+        auto itTpl = itemDb.find(row.itemId);
+        if (itTpl != itemDb.end()) {
+            def.name = itTpl->second.name.empty()
+                ? ("Item " + std::to_string(row.itemId))
+                : itTpl->second.name;
+            def.quality = static_cast<ItemQuality>(itTpl->second.quality);
+            def.inventoryType = itTpl->second.inventoryType;
+            def.maxStack = std::max(def.maxStack, static_cast<uint32_t>(itTpl->second.maxStack));
+        } else {
+            def.name = "Item " + std::to_string(row.itemId);
+        }
+
+        inventory.addItem(def);
+    }
+
+    uint32_t raceMask = 1u << (raceVal > 0 ? (raceVal - 1) : 0);
+    uint32_t classMask = 1u << (classVal > 0 ? (classVal - 1) : 0);
+    for (const auto& row : startDb.spells) {
+        if (row.spellId == 0) continue;
+        if (row.raceMask != 0 && (row.raceMask & raceMask) == 0) continue;
+        if (row.classMask != 0 && (row.classMask & classMask) == 0) continue;
+        if (std::find(knownSpells.begin(), knownSpells.end(), row.spellId) == knownSpells.end()) {
+            knownSpells.push_back(row.spellId);
+        }
+    }
+
+    // Auto-populate action bar with known spells
+    int slot = 1;
+    for (uint32_t spellId : knownSpells) {
+        if (spellId == 6603 || spellId == 8690) continue;
+        if (slot >= 11) break;
+        actionBar[slot].type = ActionBarSlot::SPELL;
+        actionBar[slot].id = spellId;
+        slot++;
     }
 }
 

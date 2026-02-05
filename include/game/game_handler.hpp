@@ -112,6 +112,10 @@ public:
      * @param characterGuid GUID of character to log in with
      */
     void selectCharacter(uint64_t characterGuid);
+    void setActiveCharacterGuid(uint64_t guid) { activeCharacterGuid_ = guid; }
+    uint64_t getActiveCharacterGuid() const { return activeCharacterGuid_; }
+    const Character* getActiveCharacter() const;
+    const Character* getFirstCharacter() const;
 
     /**
      * Get current player movement info
@@ -167,6 +171,9 @@ public:
     // Money (copper)
     uint64_t getMoneyCopper() const { return playerMoneyCopper_; }
 
+    // Single-player: mark character list ready for selection UI
+    void setSinglePlayerCharListReady();
+
     // Inventory
     Inventory& getInventory() { return inventory; }
     const Inventory& getInventory() const { return inventory; }
@@ -216,6 +223,7 @@ public:
     void setSinglePlayerMode(bool sp) { singlePlayerMode_ = sp; }
     bool isSinglePlayerMode() const { return singlePlayerMode_; }
     void simulateMotd(const std::vector<std::string>& lines);
+    void applySinglePlayerStartData(Race race, Class cls);
 
     // NPC death callback (single-player)
     using NpcDeathCallback = std::function<void(uint64_t guid)>;
@@ -295,6 +303,16 @@ public:
      * @param deltaTime Time since last update in seconds
      */
     void update(float deltaTime);
+
+    struct SinglePlayerCreateInfo {
+        uint32_t mapId = 0;
+        uint32_t zoneId = 0;
+        float x = 0.0f;
+        float y = 0.0f;
+        float z = 0.0f;
+        float orientation = 0.0f;
+    };
+    bool getSinglePlayerCreateInfo(Race race, Class cls, SinglePlayerCreateInfo& out) const;
 
 private:
     /**
@@ -502,6 +520,8 @@ private:
     GroupListData partyData;
     bool pendingGroupInvite = false;
     std::string pendingInviterName;
+
+    uint64_t activeCharacterGuid_ = 0;
 
     // ---- Phase 5: Loot ----
     bool lootWindowOpen = false;

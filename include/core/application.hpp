@@ -2,6 +2,7 @@
 
 #include "core/window.hpp"
 #include "core/input.hpp"
+#include "game/character.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -76,6 +77,8 @@ private:
     void setupUICallbacks();
     void spawnPlayerCharacter();
     void spawnNpcs();
+    std::string getPlayerModelPath() const;
+    static const char* mapIdToName(uint32_t mapId);
 
     static Application* instance;
 
@@ -96,6 +99,14 @@ private:
     bool spawnSnapToGround = true;
     float lastFrameTime = 0.0f;
     float movementHeartbeatTimer = 0.0f;
+    game::Race spRace_ = game::Race::HUMAN;
+    game::Gender spGender_ = game::Gender::MALE;
+    game::Class spClass_ = game::Class::WARRIOR;
+    uint32_t spMapId_ = 0;
+    uint32_t spZoneId_ = 0;
+    glm::vec3 spSpawnCanonical_ = glm::vec3(62.0f, -9464.0f, 200.0f);
+    float spYawDeg_ = 0.0f;
+    float spPitchDeg_ = -5.0f;
 
     // Weapon model ID counter (starting high to avoid collision with character model IDs)
     uint32_t nextWeaponModelId_ = 1000;

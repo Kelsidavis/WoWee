@@ -63,6 +63,71 @@ const SpawnPreset* selectSpawnPreset(const char* envValue) {
     return &SPAWN_PRESETS[0];
 }
 
+} // namespace
+
+const char* Application::mapIdToName(uint32_t mapId) {
+    switch (mapId) {
+        case 0: return "Azeroth";
+        case 1: return "Kalimdor";
+        case 530: return "Outland";
+        case 571: return "Northrend";
+        default: return "Azeroth";
+    }
+}
+
+std::string Application::getPlayerModelPath() const {
+    auto pick = [&](game::Race race, game::Gender gender) -> std::string {
+        switch (race) {
+            case game::Race::HUMAN:
+                return gender == game::Gender::FEMALE
+                    ? "Character\\Human\\Female\\HumanFemale.m2"
+                    : "Character\\Human\\Male\\HumanMale.m2";
+            case game::Race::ORC:
+                return gender == game::Gender::FEMALE
+                    ? "Character\\Orc\\Female\\OrcFemale.m2"
+                    : "Character\\Orc\\Male\\OrcMale.m2";
+            case game::Race::DWARF:
+                return gender == game::Gender::FEMALE
+                    ? "Character\\Dwarf\\Female\\DwarfFemale.m2"
+                    : "Character\\Dwarf\\Male\\DwarfMale.m2";
+            case game::Race::NIGHT_ELF:
+                return gender == game::Gender::FEMALE
+                    ? "Character\\NightElf\\Female\\NightElfFemale.m2"
+                    : "Character\\NightElf\\Male\\NightElfMale.m2";
+            case game::Race::UNDEAD:
+                return gender == game::Gender::FEMALE
+                    ? "Character\\Scourge\\Female\\ScourgeFemale.m2"
+                    : "Character\\Scourge\\Male\\ScourgeMale.m2";
+            case game::Race::TAUREN:
+                return gender == game::Gender::FEMALE
+                    ? "Character\\Tauren\\Female\\TaurenFemale.m2"
+                    : "Character\\Tauren\\Male\\TaurenMale.m2";
+            case game::Race::GNOME:
+                return gender == game::Gender::FEMALE
+                    ? "Character\\Gnome\\Female\\GnomeFemale.m2"
+                    : "Character\\Gnome\\Male\\GnomeMale.m2";
+            case game::Race::TROLL:
+                return gender == game::Gender::FEMALE
+                    ? "Character\\Troll\\Female\\TrollFemale.m2"
+                    : "Character\\Troll\\Male\\TrollMale.m2";
+            case game::Race::BLOOD_ELF:
+                return gender == game::Gender::FEMALE
+                    ? "Character\\BloodElf\\Female\\BloodElfFemale.m2"
+                    : "Character\\BloodElf\\Male\\BloodElfMale.m2";
+            case game::Race::DRAENEI:
+                return gender == game::Gender::FEMALE
+                    ? "Character\\Draenei\\Female\\DraeneiFemale.m2"
+                    : "Character\\Draenei\\Male\\DraeneiMale.m2";
+            default:
+                return "Character\\Human\\Male\\HumanMale.m2";
+        }
+    };
+
+    return pick(spRace_, spGender_);
+}
+
+namespace {
+
 std::optional<glm::vec3> parseVec3Csv(const char* raw) {
     if (!raw || !*raw) return std::nullopt;
     std::stringstream ss(raw);
@@ -452,7 +517,10 @@ void Application::setupUICallbacks() {
     uiManager->getAuthScreen().setOnSinglePlayer([this]() {
         LOG_INFO("Single-player mode selected, opening character creation");
         singlePlayerMode = true;
-        gameHandler->setSinglePlayerMode(true);
+        if (gameHandler) {
+            gameHandler->setSinglePlayerMode(true);
+            gameHandler->setSinglePlayerCharListReady();
+        }
         uiManager->getCharacterCreateScreen().reset();
         setState(AppState::CHARACTER_CREATION);
     });
@@ -487,13 +555,8 @@ void Application::setupUICallbacks() {
     uiManager->getCharacterScreen().setOnCharacterSelected([this](uint64_t characterGuid) {
         LOG_INFO("Character selected: GUID=0x", std::hex, characterGuid, std::dec);
         if (singlePlayerMode) {
-            // Use created character's data for level/HP
-            for (const auto& ch : gameHandler->getCharacters()) {
-                if (ch.guid == characterGuid) {
-                    uint32_t maxHp = 20 + static_cast<uint32_t>(ch.level) * 10;
-                    gameHandler->initLocalPlayerStats(ch.level, maxHp, maxHp);
-                    break;
-                }
+            if (gameHandler) {
+                gameHandler->setActiveCharacterGuid(characterGuid);
             }
             startSinglePlayer();
         } else {
@@ -544,16 +607,31 @@ void Application::spawnPlayerCharacter() {
     auto* charRenderer = renderer->getCharacterRenderer();
     auto* camera = renderer->getCamera();
     bool loaded = false;
+    std::string m2Path = getPlayerModelPath();
+    std::string modelDir;
+    std::string baseName;
+    {
+        size_t slash = m2Path.rfind('\\');
+        if (slash != std::string::npos) {
+            modelDir = m2Path.substr(0, slash + 1);
+            baseName = m2Path.substr(slash + 1);
+        } else {
+            baseName = m2Path;
+        }
+        size_t dot = baseName.rfind('.');
+        if (dot != std::string::npos) {
+            baseName = baseName.substr(0, dot);
+        }
+    }
 
-    // Try loading real HumanMale M2 from MPQ
+    // Try loading selected character model from MPQ
     if (assetManager && assetManager->isInitialized()) {
-        std::string m2Path = "Character\\Human\\Male\\HumanMale.m2";
         auto m2Data = assetManager->readFile(m2Path);
         if (!m2Data.empty()) {
             auto model = pipeline::M2Loader::load(m2Data);
 
             // Load skin file for submesh/batch data
-            std::string skinPath = "Character\\Human\\Male\\HumanMale00.skin";
+            std::string skinPath = modelDir + baseName + "00.skin";
             auto skinData = assetManager->readFile(skinPath);
             if (!skinData.empty()) {
                 pipeline::M2Loader::loadSkin(skinData, model);
@@ -566,67 +644,77 @@ void Application::spawnPlayerCharacter() {
                     LOG_INFO("  Texture ", ti, ": type=", tex.type, " name='", tex.filename, "'");
                 }
 
-                // Look up underwear textures from CharSections.dbc
-                std::string bodySkinPath = "Character\\Human\\Male\\HumanMaleSkin00_00.blp";
+                // Look up underwear textures from CharSections.dbc (humans only for now)
+                bool useCharSections = (spRace_ == game::Race::HUMAN);
+                uint32_t targetRaceId = static_cast<uint32_t>(spRace_);
+                uint32_t targetSexId = (spGender_ == game::Gender::FEMALE) ? 1u : 0u;
+                std::string bodySkinPath = (spGender_ == game::Gender::FEMALE)
+                    ? "Character\\Human\\Female\\HumanFemaleSkin00_00.blp"
+                    : "Character\\Human\\Male\\HumanMaleSkin00_00.blp";
+                std::string pelvisPath = (spGender_ == game::Gender::FEMALE)
+                    ? "Character\\Human\\Female\\HumanFemaleNakedPelvisSkin00_00.blp"
+                    : "Character\\Human\\Male\\HumanMaleNakedPelvisSkin00_00.blp";
                 std::string faceLowerTexturePath;
                 std::vector<std::string> underwearPaths;
 
-                auto charSectionsDbc = assetManager->loadDBC("CharSections.dbc");
-                if (charSectionsDbc) {
-                    LOG_INFO("CharSections.dbc loaded: ", charSectionsDbc->getRecordCount(), " records");
-                    bool foundSkin = false;
-                    bool foundUnderwear = false;
-                    bool foundFaceLower = false;
-                    for (uint32_t r = 0; r < charSectionsDbc->getRecordCount(); r++) {
-                        uint32_t raceId = charSectionsDbc->getUInt32(r, 1);
-                        uint32_t sexId = charSectionsDbc->getUInt32(r, 2);
-                        uint32_t baseSection = charSectionsDbc->getUInt32(r, 3);
-                        uint32_t variationIndex = charSectionsDbc->getUInt32(r, 8);
-                        uint32_t colorIndex = charSectionsDbc->getUInt32(r, 9);
+                if (useCharSections) {
+                    auto charSectionsDbc = assetManager->loadDBC("CharSections.dbc");
+                    if (charSectionsDbc) {
+                        LOG_INFO("CharSections.dbc loaded: ", charSectionsDbc->getRecordCount(), " records");
+                        bool foundSkin = false;
+                        bool foundUnderwear = false;
+                        bool foundFaceLower = false;
+                        for (uint32_t r = 0; r < charSectionsDbc->getRecordCount(); r++) {
+                            uint32_t raceId = charSectionsDbc->getUInt32(r, 1);
+                            uint32_t sexId = charSectionsDbc->getUInt32(r, 2);
+                            uint32_t baseSection = charSectionsDbc->getUInt32(r, 3);
+                            uint32_t variationIndex = charSectionsDbc->getUInt32(r, 8);
+                            uint32_t colorIndex = charSectionsDbc->getUInt32(r, 9);
 
-                        if (raceId != 1 || sexId != 0) continue;
+                            if (raceId != targetRaceId || sexId != targetSexId) continue;
 
-                        if (baseSection == 0 && !foundSkin && variationIndex == 0 && colorIndex == 0) {
-                            std::string tex1 = charSectionsDbc->getString(r, 4);
-                            if (!tex1.empty()) {
-                                bodySkinPath = tex1;
-                                foundSkin = true;
-                                LOG_INFO("  DBC body skin: ", bodySkinPath);
-                            }
-                        } else if (baseSection == 3 && colorIndex == 0) {
-                            (void)variationIndex;
-                        } else if (baseSection == 1 && !foundFaceLower && variationIndex == 0 && colorIndex == 0) {
-                            std::string tex1 = charSectionsDbc->getString(r, 4);
-                            if (!tex1.empty()) {
-                                faceLowerTexturePath = tex1;
-                                foundFaceLower = true;
-                                LOG_INFO("  DBC face texture: ", faceLowerTexturePath);
-                            }
-                        } else if (baseSection == 4 && !foundUnderwear && variationIndex == 0 && colorIndex == 0) {
-                            for (int f = 4; f <= 6; f++) {
-                                std::string tex = charSectionsDbc->getString(r, f);
-                                if (!tex.empty()) {
-                                    underwearPaths.push_back(tex);
-                                    LOG_INFO("  DBC underwear texture: ", tex);
+                            if (baseSection == 0 && !foundSkin && variationIndex == 0 && colorIndex == 0) {
+                                std::string tex1 = charSectionsDbc->getString(r, 4);
+                                if (!tex1.empty()) {
+                                    bodySkinPath = tex1;
+                                    foundSkin = true;
+                                    LOG_INFO("  DBC body skin: ", bodySkinPath);
                                 }
+                            } else if (baseSection == 3 && colorIndex == 0) {
+                                (void)variationIndex;
+                            } else if (baseSection == 1 && !foundFaceLower && variationIndex == 0 && colorIndex == 0) {
+                                std::string tex1 = charSectionsDbc->getString(r, 4);
+                                if (!tex1.empty()) {
+                                    faceLowerTexturePath = tex1;
+                                    foundFaceLower = true;
+                                    LOG_INFO("  DBC face texture: ", faceLowerTexturePath);
+                                }
+                            } else if (baseSection == 4 && !foundUnderwear && variationIndex == 0 && colorIndex == 0) {
+                                for (int f = 4; f <= 6; f++) {
+                                    std::string tex = charSectionsDbc->getString(r, f);
+                                    if (!tex.empty()) {
+                                        underwearPaths.push_back(tex);
+                                        LOG_INFO("  DBC underwear texture: ", tex);
+                                    }
+                                }
+                                foundUnderwear = true;
                             }
-                            foundUnderwear = true;
                         }
+                    } else {
+                        LOG_WARNING("Failed to load CharSections.dbc, using hardcoded textures");
                     }
-                } else {
-                    LOG_WARNING("Failed to load CharSections.dbc, using hardcoded textures");
-                }
 
-                for (auto& tex : model.textures) {
-                    if (tex.type == 1 && tex.filename.empty()) {
-                        tex.filename = bodySkinPath;
-                    } else if (tex.type == 6 && tex.filename.empty()) {
-                        tex.filename = "Character\\Human\\Hair00_00.blp";
-                    } else if (tex.type == 8 && tex.filename.empty()) {
-                        if (!underwearPaths.empty()) {
-                            tex.filename = underwearPaths[0];
-                        } else {
-                            tex.filename = "Character\\Human\\Male\\HumanMaleNakedPelvisSkin00_00.blp";
+                    for (auto& tex : model.textures) {
+                        if (tex.type == 1 && tex.filename.empty()) {
+                            tex.filename = bodySkinPath;
+                        } else if (tex.type == 6 && tex.filename.empty()) {
+                            tex.filename = "Character\\Human\\Hair00_00.blp";
+                        } else if (tex.type == 8 && tex.filename.empty()) {
+                            if (!underwearPaths.empty()) {
+                                tex.filename = underwearPaths[0];
+                            } else {
+                                tex.filename = pelvisPath;
+                            }
                         }
                     }
                 }
@@ -640,8 +728,11 @@ void Application::spawnPlayerCharacter() {
                         // e.g. Character\Human\Male\HumanMale0097-00.anim
                         char animFileName[256];
                         snprintf(animFileName, sizeof(animFileName),
-                            "Character\\Human\\Male\\HumanMale%04u-%02u.anim",
-                            model.sequences[si].id, model.sequences[si].variationIndex);
+                            "%s%s%04u-%02u.anim",
+                            modelDir.c_str(),
+                            baseName.c_str(),
+                            model.sequences[si].id,
+                            model.sequences[si].variationIndex);
                         auto animFileData = assetManager->readFile(animFileName);
                         if (!animFileData.empty()) {
                             pipeline::M2Loader::loadAnimFile(m2Data, animFileData, si, model);
@@ -651,29 +742,33 @@ void Application::spawnPlayerCharacter() {
 
                 charRenderer->loadModel(model, 1);
 
-                // Save skin composite state for re-compositing on equipment changes
-                bodySkinPath_ = bodySkinPath;
-                underwearPaths_ = underwearPaths;
+                if (useCharSections) {
+                    // Save skin composite state for re-compositing on equipment changes
+                    bodySkinPath_ = bodySkinPath;
+                    underwearPaths_ = underwearPaths;
 
-
-                // Composite body skin + underwear overlays
-                if (!underwearPaths.empty()) {
-                    std::vector<std::string> layers;
-                    layers.push_back(bodySkinPath);
-                    for (const auto& up : underwearPaths) {
-                        layers.push_back(up);
-                    }
-                    GLuint compositeTex = charRenderer->compositeTextures(layers);
-                    if (compositeTex != 0) {
-                        for (size_t ti = 0; ti < model.textures.size(); ti++) {
-                            if (model.textures[ti].type == 1) {
-                                charRenderer->setModelTexture(1, static_cast<uint32_t>(ti), compositeTex);
-                                skinTextureSlotIndex_ = static_cast<uint32_t>(ti);
-                                LOG_INFO("Replaced type-1 texture slot ", ti, " with composited body+underwear");
-                                break;
+                    // Composite body skin + underwear overlays
+                    if (!underwearPaths.empty()) {
+                        std::vector<std::string> layers;
+                        layers.push_back(bodySkinPath);
+                        for (const auto& up : underwearPaths) {
+                            layers.push_back(up);
+                        }
+                        GLuint compositeTex = charRenderer->compositeTextures(layers);
+                        if (compositeTex != 0) {
+                            for (size_t ti = 0; ti < model.textures.size(); ti++) {
+                                if (model.textures[ti].type == 1) {
+                                    charRenderer->setModelTexture(1, static_cast<uint32_t>(ti), compositeTex);
+                                    skinTextureSlotIndex_ = static_cast<uint32_t>(ti);
+                                    LOG_INFO("Replaced type-1 texture slot ", ti, " with composited body+underwear");
+                                    break;
+                                }
                             }
                         }
                     }
+                } else {
+                    bodySkinPath_.clear();
+                    underwearPaths_.clear();
                 }
                 // Find cloak (type-2, Object Skin) texture slot index
                 for (size_t ti = 0; ti < model.textures.size(); ti++) {
@@ -685,7 +780,7 @@ void Application::spawnPlayerCharacter() {
                 }
 
                 loaded = true;
-                LOG_INFO("Loaded HumanMale M2: ", model.vertices.size(), " verts, ",
+                LOG_INFO("Loaded character model: ", m2Path, " (", model.vertices.size(), " verts, ",
                          model.bones.size(), " bones, ", model.sequences.size(), " anims, ",
                          model.indices.size(), " indices, ", model.batches.size(), " batches");
                 // Log all animation sequence IDs
@@ -980,12 +1075,6 @@ void Application::startSinglePlayer() {
     // Enable single-player combat mode on game handler
     if (gameHandler) {
         gameHandler->setSinglePlayerMode(true);
-        // Only init stats with defaults if not already set (e.g. via character creation)
-        if (gameHandler->getLocalPlayerMaxHealth() == 0) {
-            uint32_t level = 10;
-            uint32_t maxHealth = 20 + level * 10;
-            gameHandler->initLocalPlayerStats(level, maxHealth, maxHealth);
-        }
     }
 
     // Create world object for single-player
@@ -994,9 +1083,44 @@ void Application::startSinglePlayer() {
         LOG_INFO("Single-player world created");
     }
 
-    // Populate test inventory for single-player
+    const game::Character* activeChar = gameHandler ? gameHandler->getActiveCharacter() : nullptr;
+    if (!activeChar && gameHandler) {
+        activeChar = gameHandler->getFirstCharacter();
+        if (activeChar) {
+            gameHandler->setActiveCharacterGuid(activeChar->guid);
+        }
+    }
+    if (!activeChar) {
+        LOG_ERROR("Single-player start: no character selected");
+        return;
+    }
+
+    spRace_ = activeChar->race;
+    spGender_ = activeChar->gender;
+    spClass_ = activeChar->characterClass;
+    spMapId_ = activeChar->mapId;
+    spZoneId_ = activeChar->zoneId;
+    spSpawnCanonical_ = core::coords::serverToCanonical(glm::vec3(activeChar->x, activeChar->y, activeChar->z));
+    spYawDeg_ = 0.0f;
+    spPitchDeg_ = -5.0f;
+
+    game::GameHandler::SinglePlayerCreateInfo createInfo;
+    bool hasCreate = gameHandler && gameHandler->getSinglePlayerCreateInfo(activeChar->race, activeChar->characterClass, createInfo);
+    if (hasCreate) {
+        spMapId_ = createInfo.mapId;
+        spZoneId_ = createInfo.zoneId;
+        spSpawnCanonical_ = core::coords::serverToCanonical(glm::vec3(createInfo.x, createInfo.y, createInfo.z));
+        spYawDeg_ = glm::degrees(createInfo.orientation);
+        spPitchDeg_ = -5.0f;
+        spawnSnapToGround = true;
+    }
+
     if (gameHandler) {
-        gameHandler->getInventory().populateTestItems();
+        gameHandler->setPlayerGuid(activeChar->guid);
+        uint32_t level = std::max<uint32_t>(1, activeChar->level);
+        uint32_t maxHealth = 20 + level * 10;
+        gameHandler->initLocalPlayerStats(level, maxHealth, maxHealth);
+        gameHandler->applySinglePlayerStartData(activeChar->race, activeChar->characterClass);
     }
 
     // Load weapon models for equipped items (after inventory is populated)
@@ -1005,11 +1129,11 @@ void Application::startSinglePlayer() {
     // --- Loading screen: load terrain and wait for streaming before spawning ---
     const SpawnPreset* spawnPreset = selectSpawnPreset(std::getenv("WOW_SPAWN"));
     // Canonical WoW coords: +X=North, +Y=West, +Z=Up
-    glm::vec3 spawnCanonical = spawnPreset ? spawnPreset->spawnCanonical : glm::vec3(62.0f, -9464.0f, 200.0f);
-    std::string mapName = spawnPreset ? spawnPreset->mapName : "Azeroth";
-    float spawnYaw = spawnPreset ? spawnPreset->yawDeg : 0.0f;
-    float spawnPitch = spawnPreset ? spawnPreset->pitchDeg : -5.0f;
-    spawnSnapToGround = spawnPreset ? spawnPreset->snapToGround : true;
+    glm::vec3 spawnCanonical = spawnPreset ? spawnPreset->spawnCanonical : spSpawnCanonical_;
+    std::string mapName = spawnPreset ? spawnPreset->mapName : mapIdToName(spMapId_);
+    float spawnYaw = spawnPreset ? spawnPreset->yawDeg : spYawDeg_;
+    float spawnPitch = spawnPreset ? spawnPreset->pitchDeg : spPitchDeg_;
+    spawnSnapToGround = spawnPreset ? spawnPreset->snapToGround : spawnSnapToGround;
 
     if (auto envSpawnPos = parseVec3Csv(std::getenv("WOW_SPAWN_POS"))) {
         spawnCanonical = *envSpawnPos;
