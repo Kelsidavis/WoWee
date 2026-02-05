@@ -93,9 +93,12 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
         if (music) {
             music->update(ImGui::GetIO().DeltaTime);
             if (!music->isPlaying()) {
-                std::string path = "assets/20-taverns.mp3";
+                std::string path = "/home/k/Desktop/wowee/assets/20-taverns.mp3";
                 if (!std::filesystem::exists(path)) {
-                    path = (std::filesystem::current_path() / "assets/20-taverns.mp3").string();
+                    path = "assets/20-taverns.mp3";
+                    if (!std::filesystem::exists(path)) {
+                        path = (std::filesystem::current_path() / "assets/20-taverns.mp3").string();
+                    }
                 }
                 music->playFilePath(path, true);
                 musicPlaying = music->isPlaying();
