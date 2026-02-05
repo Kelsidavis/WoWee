@@ -2,6 +2,8 @@
 #include "network/tcp_socket.hpp"
 #include "network/packet.hpp"
 #include "core/logger.hpp"
+#include <sstream>
+#include <iomanip>
 
 namespace wowee {
 namespace auth {
@@ -114,6 +116,16 @@ void AuthHandler::handleLogonChallengeResponse(network::Packet& packet) {
         return;
     }
 
+    if (response.securityFlags != 0) {
+        LOG_WARNING("Server sent security flags: 0x", std::hex, (int)response.securityFlags, std::dec);
+        if (response.securityFlags & 0x01) LOG_WARNING("  PIN required (not supported)");
+        if (response.securityFlags & 0x02) LOG_WARNING("  Matrix card required (not supported)");
+        if (response.securityFlags & 0x04) LOG_WARNING("  Authenticator required (not supported)");
+    }
+
+    LOG_INFO("Challenge: N=", response.N.size(), "B g=", response.g.size(), "B salt=",
+             response.salt.size(), "B secFlags=0x", std::hex, (int)response.securityFlags, std::dec);
+
     // Feed SRP with server challenge data
     srp->feed(response.B, response.g, response.N, response.salt);
 
@@ -145,7 +157,9 @@ void AuthHandler::handleLogonProofResponse(network::Packet& packet) {
     }
 
     if (!response.isSuccess()) {
-        fail("Login failed - incorrect username or password");
+        std::string reason = "Login failed: ";
+        reason += getAuthResultString(static_cast<AuthResult>(response.status));
+        fail(reason);
         return;
     }
 
@@ -227,7 +241,16 @@ void AuthHandler::handlePacket(network::Packet& packet) {
 
     AuthOpcode opcode = static_cast<AuthOpcode>(opcodeValue);
 
-    LOG_DEBUG("Received auth packet, opcode: 0x", std::hex, (int)opcodeValue, std::dec);
+    // Hex dump first bytes for diagnostics
+    {
+        const auto& raw = packet.getData();
+        std::ostringstream hs;
+        for (size_t i = 0; i < std::min<size_t>(raw.size(), 40); ++i)
+            hs << std::hex << std::setfill('0') << std::setw(2) << (int)raw[i];
+        if (raw.size() > 40) hs << "...";
+        LOG_INFO("Auth pkt 0x", std::hex, (int)opcodeValue, std::dec,
+                 " (", raw.size(), "B): ", hs.str());
+    }
 
     switch (opcode) {
         case AuthOpcode::LOGON_CHALLENGE:

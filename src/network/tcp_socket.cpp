@@ -196,23 +196,28 @@ size_t TCPSocket::getExpectedPacketSize(uint8_t opcode) {
 
     switch (opcode) {
         case 0x00:  // LOGON_CHALLENGE response
-            // Need to read second byte to determine success/failure
+            // Need to read status byte to determine success/failure
             if (receiveBuffer.size() >= 3) {
                 uint8_t status = receiveBuffer[2];
                 if (status == 0x00) {
-                    // Success - need to calculate full size
-                    // Minimum: opcode(1) + unknown(1) + status(1) + B(32) + glen(1) + g(1) + Nlen(1) + N(32) + salt(32) + unk(16) + flags(1)
-                    // With typical values: 1 + 1 + 1 + 32 + 1 + 1 + 1 + 32 + 32 + 16 + 1 = 119 bytes minimum
-                    // But N is usually 256 bytes, so more like: 1 + 1 + 1 + 32 + 1 + 1 + 1 + 256 + 32 + 16 + 1 = 343 bytes
-
-                    // For safety, let's parse dynamically:
+                    // Success: opcode(1) + unk(1) + status(1) + B(32) + gLen(1) + g(gLen) +
+                    //          nLen(1) + N(nLen) + salt(32) + crcHash(16) + securityFlags(1)
+                    //          + optional security flag data
                     if (receiveBuffer.size() >= 36) {  // enough to read g_len
                         uint8_t gLen = receiveBuffer[35];
                         size_t minSize = 36 + gLen + 1;  // up to N_len
                         if (receiveBuffer.size() >= minSize) {
                             uint8_t nLen = receiveBuffer[36 + gLen];
-                            size_t totalSize = 36 + gLen + 1 + nLen + 32 + 16 + 1;
-                            return totalSize;
+                            size_t baseSize = 36 + gLen + 1 + nLen + 32 + 16 + 1;
+                            // Need to read securityFlags to account for extra data
+                            if (receiveBuffer.size() >= baseSize) {
+                                uint8_t secFlags = receiveBuffer[baseSize - 1];
+                                size_t extra = 0;
+                                if (secFlags & 0x01) extra += 20;  // PIN: seed(4) + salt(16)
+                                if (secFlags & 0x02) extra += 12;  // Matrix: w(1)+h(1)+digits(1)+challenges(1)+seed(8)
+                                if (secFlags & 0x04) extra += 1;   // Authenticator: required(1)
+                                return baseSize + extra;
+                            }
                         }
                     }
                     return 0;  // Need more data

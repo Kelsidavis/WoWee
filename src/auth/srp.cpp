@@ -3,6 +3,8 @@
 #include "core/logger.hpp"
 #include <algorithm>
 #include <cctype>
+#include <sstream>
+#include <iomanip>
 
 namespace wowee {
 namespace auth {
@@ -68,7 +70,20 @@ void SRP::feed(const std::vector<uint8_t>& B_bytes,
     // 5. Compute proofs (M1, M2)
     computeProofs(stored_username);
 
-    LOG_INFO("SRP authentication data ready!");
+    // Log key values for debugging auth issues
+    auto hexStr = [](const std::vector<uint8_t>& v, size_t maxBytes = 8) -> std::string {
+        std::ostringstream ss;
+        for (size_t i = 0; i < std::min(v.size(), maxBytes); ++i)
+            ss << std::hex << std::setfill('0') << std::setw(2) << (int)v[i];
+        if (v.size() > maxBytes) ss << "...";
+        return ss.str();
+    };
+    auto A_wire = A.toArray(true, 32);
+    auto s_dbg = s.toArray(true);
+    auto B_dbg = B.toArray(true);
+    LOG_INFO("SRP ready: A=", hexStr(A_wire), " M1=", hexStr(M1),
+             " s_nat=", s_dbg.size(), " A_nat=", A.toArray(true).size(),
+             " B_nat=", B_dbg.size());
 }
 
 std::vector<uint8_t> SRP::computeAuthHash(const std::string& username,
