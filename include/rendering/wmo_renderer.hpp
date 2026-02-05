@@ -137,9 +137,36 @@ public:
     bool isPortalCullingEnabled() const { return portalCulling; }
 
     /**
+     * Enable/disable distance-based group culling
+     */
+    void setDistanceCulling(bool enabled, float maxDistance = 500.0f) {
+        distanceCulling = enabled;
+        maxGroupDistance = maxDistance;
+        maxGroupDistanceSq = maxDistance * maxDistance;
+    }
+    bool isDistanceCullingEnabled() const { return distanceCulling; }
+    float getMaxGroupDistance() const { return maxGroupDistance; }
+
+    /**
      * Get number of groups culled by portals last frame
      */
     uint32_t getPortalCulledGroups() const { return lastPortalCulledGroups; }
+
+    /**
+     * Get number of groups culled by distance last frame
+     */
+    uint32_t getDistanceCulledGroups() const { return lastDistanceCulledGroups; }
+
+    /**
+     * Enable/disable GPU occlusion query culling
+     */
+    void setOcclusionCulling(bool enabled) { occlusionCulling = enabled; }
+    bool isOcclusionCullingEnabled() const { return occlusionCulling; }
+
+    /**
+     * Get number of groups culled by occlusion queries last frame
+     */
+    uint32_t getOcclusionCulledGroups() const { return lastOcclusionCulledGroups; }
 
     void setFog(const glm::vec3& color, float start, float end) {
         fogColor = color; fogStart = start; fogEnd = end;
@@ -340,6 +367,22 @@ private:
      */
     GLuint loadTexture(const std::string& path);
 
+    /**
+     * Initialize occlusion query resources (bbox VAO, shader)
+     */
+    void initOcclusionResources();
+
+    /**
+     * Run occlusion query pre-pass for an instance
+     */
+    void runOcclusionQueries(const WMOInstance& instance, const ModelData& model,
+                              const glm::mat4& view, const glm::mat4& projection);
+
+    /**
+     * Check if a group passed occlusion test (uses previous frame results)
+     */
+    bool isGroupOccluded(uint32_t instanceId, uint32_t groupIndex) const;
+
     struct GridCell {
         int x;
         int y;
@@ -384,8 +427,24 @@ private:
     bool wireframeMode = false;
     bool frustumCulling = true;
     bool portalCulling = false;  // Disabled by default - needs debugging
+    bool distanceCulling = false;  // Disabled - causes ground to disappear
+    bool occlusionCulling = true;  // GPU occlusion queries
+    float maxGroupDistance = 500.0f;
+    float maxGroupDistanceSq = 250000.0f;  // maxGroupDistance^2
     uint32_t lastDrawCalls = 0;
     mutable uint32_t lastPortalCulledGroups = 0;
+    mutable uint32_t lastDistanceCulledGroups = 0;
+    mutable uint32_t lastOcclusionCulledGroups = 0;
+
+    // Occlusion query resources
+    GLuint bboxVao = 0;
+    GLuint bboxVbo = 0;
+    std::unique_ptr<Shader> occlusionShader;
+    // Query objects per (instance, group) - reused each frame
+    // Key: (instanceId << 16) | groupIndex
+    mutable std::unordered_map<uint32_t, GLuint> occlusionQueries;
+    // Results from previous frame (1 frame latency to avoid GPU stalls)
+    mutable std::unordered_map<uint32_t, bool> occlusionResults;
 
     // Fog parameters
     glm::vec3 fogColor = glm::vec3(0.5f, 0.6f, 0.7f);

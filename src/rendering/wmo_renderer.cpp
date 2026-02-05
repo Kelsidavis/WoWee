@@ -170,6 +170,9 @@ bool WMORenderer::initialize(pipeline::AssetManager* assets) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
 
+    // Initialize occlusion query resources
+    initOcclusionResources();
+
     core::Logger::getInstance().info("WMO renderer initialized");
     return true;
 }
@@ -205,6 +208,16 @@ void WMORenderer::shutdown() {
     spatialGrid.clear();
     instanceIndexById.clear();
     shader.reset();
+
+    // Free occlusion query resources
+    for (auto& [key, query] : occlusionQueries) {
+        glDeleteQueries(1, &query);
+    }
+    occlusionQueries.clear();
+    occlusionResults.clear();
+    if (bboxVao != 0) { glDeleteVertexArrays(1, &bboxVao); bboxVao = 0; }
+    if (bboxVbo != 0) { glDeleteBuffers(1, &bboxVbo); bboxVbo = 0; }
+    occlusionShader.reset();
 }
 
 bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
@@ -565,6 +578,21 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
     frustum.extractFromMatrix(projection * view);
 
     lastPortalCulledGroups = 0;
+    lastDistanceCulledGroups = 0;
+    lastOcclusionCulledGroups = 0;
+
+    // Collect occlusion query results from previous frame (non-blocking)
+    if (occlusionCulling) {
+        for (auto& [queryKey, query] : occlusionQueries) {
+            GLuint available = 0;
+            glGetQueryObjectuiv(query, GL_QUERY_RESULT_AVAILABLE, &available);
+            if (available) {
+                GLuint result = 0;
+                glGetQueryObjectuiv(query, GL_QUERY_RESULT, &result);
+                occlusionResults[queryKey] = (result > 0);
+            }
+        }
+    }
 
     // Render all instances with instance-level culling
     for (const auto& instance : instances) {
@@ -586,6 +614,14 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
         }
 
         const ModelData& model = modelIt->second;
+
+        // Run occlusion queries for this instance (pre-pass)
+        if (occlusionCulling && occlusionShader && bboxVao != 0) {
+            runOcclusionQueries(instance, model, view, projection);
+            // Re-bind main shader after occlusion pass
+            shader->use();
+        }
+
         shader->setUniform("uModel", instance.modelMatrix);
 
         // Portal-based visibility culling
@@ -601,6 +637,7 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
         }
 
         // Render all groups using cached world-space bounds
+        glm::vec3 camPos = camera.getPosition();
         for (size_t gi = 0; gi < model.groups.size(); ++gi) {
             // Portal culling check
             if (usePortalCulling && portalVisibleGroups.find(static_cast<uint32_t>(gi)) == portalVisibleGroups.end()) {
@@ -608,9 +645,27 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
                 continue;
             }
 
-            if (frustumCulling && gi < instance.worldGroupBounds.size()) {
+            // Occlusion culling check (uses previous frame results)
+            if (occlusionCulling && isGroupOccluded(instance.id, static_cast<uint32_t>(gi))) {
+                lastOcclusionCulledGroups++;
+                continue;
+            }
+
+            if (gi < instance.worldGroupBounds.size()) {
                 const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
-                if (!frustum.intersectsAABB(gMin, gMax)) {
+
+                // Distance culling: skip groups whose center is too far
+                if (distanceCulling) {
+                    glm::vec3 groupCenter = (gMin + gMax) * 0.5f;
+                    float distSq = glm::dot(groupCenter - camPos, groupCenter - camPos);
+                    if (distSq > maxGroupDistanceSq) {
+                        lastDistanceCulledGroups++;
+                        continue;
+                    }
+                }
+
+                // Frustum culling
+                if (frustumCulling && !frustum.intersectsAABB(gMin, gMax)) {
                     continue;
                 }
             }
@@ -775,12 +830,9 @@ void WMORenderer::renderGroup(const GroupResources& group, const ModelData& mode
                               [[maybe_unused]] const glm::mat4& projection) {
     glBindVertexArray(group.vao);
 
-    static int debugLogCount = 0;
-
-    // Render each batch
+    // Render each batch in original order (sorting breaks depth/alpha)
     for (const auto& batch : group.batches) {
         // Bind texture for this batch's material
-        // materialId -> materialTextureIndices[materialId] -> textures[texIndex]
         GLuint texId = whiteTexture;
         bool hasTexture = false;
 
@@ -789,12 +841,6 @@ void WMORenderer::renderGroup(const GroupResources& group, const ModelData& mode
             if (texIndex < model.textures.size()) {
                 texId = model.textures[texIndex];
                 hasTexture = (texId != 0 && texId != whiteTexture);
-
-                if (debugLogCount < 10) {
-                    core::Logger::getInstance().debug("  Batch: materialId=", (int)batch.materialId,
-                        " -> texIndex=", texIndex, " -> texId=", texId, " hasTexture=", hasTexture);
-                    debugLogCount++;
-                }
             }
         }
 
@@ -1649,6 +1695,124 @@ float WMORenderer::raycastBoundingBoxes(const glm::vec3& origin, const glm::vec3
     }
 
     return closestHit;
+}
+
+void WMORenderer::initOcclusionResources() {
+    // Simple vertex shader for bounding box rendering
+    const char* occVertSrc = R"(
+        #version 330 core
+        layout(location = 0) in vec3 aPos;
+        uniform mat4 uMVP;
+        void main() {
+            gl_Position = uMVP * vec4(aPos, 1.0);
+        }
+    )";
+
+    // Fragment shader that writes nothing (depth-only)
+    const char* occFragSrc = R"(
+        #version 330 core
+        void main() {
+            // No color output - depth only
+        }
+    )";
+
+    occlusionShader = std::make_unique<Shader>();
+    if (!occlusionShader->loadFromSource(occVertSrc, occFragSrc)) {
+        core::Logger::getInstance().warning("Failed to create occlusion shader");
+        occlusionCulling = false;
+        return;
+    }
+
+    // Create unit cube vertices (will be scaled to group bounds)
+    float cubeVerts[] = {
+        // Front face
+        0,0,1, 1,0,1, 1,1,1, 0,0,1, 1,1,1, 0,1,1,
+        // Back face
+        1,0,0, 0,0,0, 0,1,0, 1,0,0, 0,1,0, 1,1,0,
+        // Left face
+        0,0,0, 0,0,1, 0,1,1, 0,0,0, 0,1,1, 0,1,0,
+        // Right face
+        1,0,1, 1,0,0, 1,1,0, 1,0,1, 1,1,0, 1,1,1,
+        // Top face
+        0,1,1, 1,1,1, 1,1,0, 0,1,1, 1,1,0, 0,1,0,
+        // Bottom face
+        0,0,0, 1,0,0, 1,0,1, 0,0,0, 1,0,1, 0,0,1,
+    };
+
+    glGenVertexArrays(1, &bboxVao);
+    glGenBuffers(1, &bboxVbo);
+
+    glBindVertexArray(bboxVao);
+    glBindBuffer(GL_ARRAY_BUFFER, bboxVbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVerts), cubeVerts, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+    glBindVertexArray(0);
+
+    core::Logger::getInstance().info("Occlusion query resources initialized");
+}
+
+void WMORenderer::runOcclusionQueries(const WMOInstance& instance, const ModelData& model,
+                                       const glm::mat4& view, const glm::mat4& projection) {
+    if (!occlusionShader || bboxVao == 0) return;
+
+    occlusionShader->use();
+    glBindVertexArray(bboxVao);
+
+    // Disable color writes, keep depth test
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+    glDepthMask(GL_FALSE);  // Don't write depth
+
+    for (size_t gi = 0; gi < model.groups.size(); ++gi) {
+        const auto& group = model.groups[gi];
+
+        // Create query key
+        uint32_t queryKey = (instance.id << 16) | static_cast<uint32_t>(gi);
+
+        // Get or create query object
+        GLuint query;
+        auto it = occlusionQueries.find(queryKey);
+        if (it == occlusionQueries.end()) {
+            glGenQueries(1, &query);
+            occlusionQueries[queryKey] = query;
+        } else {
+            query = it->second;
+        }
+
+        // Compute MVP for this group's bounding box
+        glm::vec3 bboxSize = group.boundingBoxMax - group.boundingBoxMin;
+        glm::mat4 bboxModel = instance.modelMatrix;
+        bboxModel = glm::translate(bboxModel, group.boundingBoxMin);
+        bboxModel = glm::scale(bboxModel, bboxSize);
+        glm::mat4 mvp = projection * view * bboxModel;
+
+        occlusionShader->setUniform("uMVP", mvp);
+
+        // Run occlusion query
+        glBeginQuery(GL_ANY_SAMPLES_PASSED, query);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glEndQuery(GL_ANY_SAMPLES_PASSED);
+    }
+
+    // Restore state
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glDepthMask(GL_TRUE);
+    glBindVertexArray(0);
+}
+
+bool WMORenderer::isGroupOccluded(uint32_t instanceId, uint32_t groupIndex) const {
+    uint32_t queryKey = (instanceId << 16) | groupIndex;
+
+    // Check previous frame's result
+    auto resultIt = occlusionResults.find(queryKey);
+    if (resultIt != occlusionResults.end()) {
+        return !resultIt->second;  // Return true if NOT visible
+    }
+
+    // No result yet - assume visible
+    return false;
 }
 
 } // namespace rendering
