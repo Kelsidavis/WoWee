@@ -938,6 +938,27 @@ void Application::startSinglePlayer() {
     // Load weapon models for equipped items (after inventory is populated)
     loadEquippedWeapons();
 
+    // Emulate server MOTD in single-player
+    if (gameHandler) {
+        std::vector<std::string> motdLines;
+        if (const char* motdEnv = std::getenv("WOW_SP_MOTD")) {
+            std::string raw = motdEnv;
+            size_t start = 0;
+            while (start <= raw.size()) {
+                size_t pos = raw.find('|', start);
+                if (pos == std::string::npos) pos = raw.size();
+                std::string line = raw.substr(start, pos - start);
+                if (!line.empty()) motdLines.push_back(line);
+                start = pos + 1;
+                if (pos == raw.size()) break;
+            }
+        }
+        if (motdLines.empty()) {
+            motdLines.push_back("Wowee Single Player");
+        }
+        gameHandler->simulateMotd(motdLines);
+    }
+
     // --- Loading screen: load terrain and wait for streaming before spawning ---
     const SpawnPreset* spawnPreset = selectSpawnPreset(std::getenv("WOW_SPAWN"));
     // Canonical WoW coords: +X=North, +Y=West, +Z=Up
