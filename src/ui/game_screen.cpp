@@ -4,6 +4,7 @@
 #include "core/spawn_presets.hpp"
 #include "core/input.hpp"
 #include "rendering/renderer.hpp"
+#include "rendering/minimap.hpp"
 #include "rendering/character_renderer.hpp"
 #include "rendering/camera.hpp"
 #include "pipeline/asset_manager.hpp"
@@ -79,6 +80,9 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     renderLootWindow(gameHandler);
     renderGossipWindow(gameHandler);
     renderVendorWindow(gameHandler);
+
+    // World map (M key toggle handled inside)
+    renderWorldMap(gameHandler);
 
     // Teleporter panel (T key toggle handled in Application event loop)
     renderTeleporterPanel();
@@ -962,6 +966,31 @@ void GameScreen::updateCharacterTextures(game::Inventory& inventory) {
             charRenderer->resetModelTexture(1, cloakSlot);
         }
     }
+}
+
+// ============================================================
+// World Map
+// ============================================================
+
+void GameScreen::renderWorldMap(game::GameHandler& /* gameHandler */) {
+    auto& app = core::Application::getInstance();
+    auto* renderer = app.getRenderer();
+    auto* assetMgr = app.getAssetManager();
+    if (!renderer || !assetMgr) return;
+
+    worldMap.initialize(assetMgr);
+
+    // Keep map name in sync with minimap's map name
+    auto* minimap = renderer->getMinimap();
+    if (minimap) {
+        worldMap.setMapName(minimap->getMapName());
+    }
+
+    glm::vec3 playerPos = renderer->getCharacterPosition();
+    auto* window = app.getWindow();
+    int screenW = window ? window->getWidth() : 1280;
+    int screenH = window ? window->getHeight() : 720;
+    worldMap.render(playerPos, screenW, screenH);
 }
 
 // ============================================================

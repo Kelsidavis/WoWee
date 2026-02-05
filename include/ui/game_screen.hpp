@@ -2,6 +2,7 @@
 
 #include "game/game_handler.hpp"
 #include "game/inventory.hpp"
+#include "rendering/world_map.hpp"
 #include "ui/inventory_screen.hpp"
 #include "ui/spellbook_screen.hpp"
 #include <imgui.h>
@@ -122,8 +123,11 @@ private:
     /**
      * Inventory screen
      */
+    void renderWorldMap(game::GameHandler& gameHandler);
+
     InventoryScreen inventoryScreen;
     SpellbookScreen spellbookScreen;
+    rendering::WorldMap worldMap;
 };
 
 }} // namespace wowee::ui

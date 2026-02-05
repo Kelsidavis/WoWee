@@ -134,6 +134,7 @@ set(WOWEE_SOURCES
     src/rendering/wmo_renderer.cpp
     src/rendering/m2_renderer.cpp
     src/rendering/minimap.cpp
+    src/rendering/world_map.cpp
     src/rendering/swim_effects.cpp
     src/rendering/loading_screen.cpp
 
@@ -217,6 +218,7 @@ set(WOWEE_HEADERS
     include/rendering/weather.hpp
     include/rendering/lightning.hpp
     include/rendering/swim_effects.hpp
+    include/rendering/world_map.hpp
     include/rendering/character_renderer.hpp
     include/rendering/wmo_renderer.hpp
     include/rendering/loading_screen.hpp

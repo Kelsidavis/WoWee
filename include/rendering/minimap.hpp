@@ -34,9 +34,14 @@ public:
 
     void setViewRadius(float radius) { viewRadius = radius; }
 
+    // Public accessors for WorldMap
+    GLuint getOrLoadTileTexture(int tileX, int tileY);
+    void ensureTRSParsed() { if (!trsParsed) parseTRS(); }
+    GLuint getTileQuadVAO() const { return tileQuadVAO; }
+    const std::string& getMapName() const { return mapName; }
+
 private:
     void parseTRS();
-    GLuint getOrLoadTileTexture(int tileX, int tileY);
     void compositeTilesToFBO(const glm::vec3& centerWorldPos);
     void renderQuad(const Camera& playerCamera, const glm::vec3& centerWorldPos,
                     int screenWidth, int screenHeight);
