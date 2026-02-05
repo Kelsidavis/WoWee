@@ -142,6 +142,7 @@ set(WOWEE_SOURCES
     src/ui/ui_manager.cpp
     src/ui/auth_screen.cpp
     src/ui/realm_screen.cpp
+    src/ui/character_create_screen.cpp
     src/ui/character_screen.cpp
     src/ui/game_screen.cpp
     src/ui/inventory_screen.cpp
@@ -226,6 +227,7 @@ set(WOWEE_HEADERS
     include/ui/ui_manager.hpp
     include/ui/auth_screen.hpp
     include/ui/realm_screen.hpp
+    include/ui/character_create_screen.hpp
     include/ui/character_screen.hpp
     include/ui/game_screen.hpp
     include/ui/inventory_screen.hpp

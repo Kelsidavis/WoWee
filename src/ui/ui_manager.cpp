@@ -15,6 +15,7 @@ UIManager::UIManager() {
     // Create screen instances
     authScreen = std::make_unique<AuthScreen>();
     realmScreen = std::make_unique<RealmScreen>();
+    characterCreateScreen = std::make_unique<CharacterCreateScreen>();
     characterScreen = std::make_unique<CharacterScreen>();
     gameScreen = std::make_unique<GameScreen>();
 }
@@ -98,6 +99,12 @@ void UIManager::render(core::AppState appState, auth::AuthHandler* authHandler, 
         case core::AppState::REALM_SELECTION:
             if (authHandler) {
                 realmScreen->render(*authHandler);
+            }
+            break;
+
+        case core::AppState::CHARACTER_CREATION:
+            if (gameHandler) {
+                characterCreateScreen->render(*gameHandler);
             }
             break;
 

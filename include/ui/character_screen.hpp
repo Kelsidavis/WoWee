@@ -30,6 +30,8 @@ public:
         onCharacterSelected = callback;
     }
 
+    void setOnCreateCharacter(std::function<void()> cb) { onCreateCharacter = std::move(cb); }
+
     /**
      * Check if a character has been selected
      */
@@ -51,6 +53,7 @@ private:
 
     // Callbacks
     std::function<void(uint64_t)> onCharacterSelected;
+    std::function<void()> onCreateCharacter;
 
     /**
      * Update status message

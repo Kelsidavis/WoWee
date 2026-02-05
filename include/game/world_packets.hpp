@@ -2,6 +2,7 @@
 
 #include "network/packet.hpp"
 #include "game/opcodes.hpp"
+#include "game/character.hpp"
 #include "game/entity.hpp"
 #include "game/spell_defines.hpp"
 #include "game/group_defines.hpp"
@@ -165,6 +166,47 @@ struct CharEnumResponse {
 class CharEnumParser {
 public:
     static bool parse(network::Packet& packet, CharEnumResponse& response);
+};
+
+// ============================================================
+// Character Creation
+// ============================================================
+
+enum class CharCreateResult : uint8_t {
+    SUCCESS              = 0x00,
+    ERROR                = 0x01,
+    FAILED               = 0x02,
+    NAME_IN_USE          = 0x03,
+    DISABLED             = 0x04,
+    PVP_TEAMS_VIOLATION  = 0x05,
+    SERVER_LIMIT         = 0x06,
+    ACCOUNT_LIMIT        = 0x07,
+};
+
+struct CharCreateData {
+    std::string name;
+    Race race;
+    Class characterClass;
+    Gender gender;
+    uint8_t skin = 0;
+    uint8_t face = 0;
+    uint8_t hairStyle = 0;
+    uint8_t hairColor = 0;
+    uint8_t facialHair = 0;
+};
+
+class CharCreatePacket {
+public:
+    static network::Packet build(const CharCreateData& data);
+};
+
+struct CharCreateResponseData {
+    CharCreateResult result;
+};
+
+class CharCreateResponseParser {
+public:
+    static bool parse(network::Packet& packet, CharCreateResponseData& data);
 };
 
 /**

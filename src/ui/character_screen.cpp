@@ -148,7 +148,10 @@ void CharacterScreen::render(game::GameHandler& gameHandler) {
                 ss << "Entering world with " << character.name << "...";
                 setStatus(ss.str());
 
-                gameHandler.selectCharacter(character.guid);
+                // Only send CMSG_PLAYER_LOGIN in online mode
+                if (!gameHandler.isSinglePlayerMode()) {
+                    gameHandler.selectCharacter(character.guid);
+                }
 
                 // Call callback
                 if (onCharacterSelected) {
@@ -169,12 +172,20 @@ void CharacterScreen::render(game::GameHandler& gameHandler) {
     ImGui::Separator();
     ImGui::Spacing();
 
-    // Back/Refresh buttons
+    // Back/Refresh/Create buttons
     if (ImGui::Button("Refresh", ImVec2(120, 0))) {
         if (gameHandler.getState() == game::WorldState::READY ||
             gameHandler.getState() == game::WorldState::CHAR_LIST_RECEIVED) {
             gameHandler.requestCharacterList();
             setStatus("Refreshing character list...");
+        }
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("Create Character", ImVec2(150, 0))) {
+        if (onCreateCharacter) {
+            onCreateCharacter();
         }
     }
 

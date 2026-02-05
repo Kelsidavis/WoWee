@@ -202,6 +202,35 @@ const char* getAuthResultString(AuthResult result) {
     }
 }
 
+// ============================================================
+// Character Creation
+// ============================================================
+
+network::Packet CharCreatePacket::build(const CharCreateData& data) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_CHAR_CREATE));
+
+    packet.writeString(data.name);  // null-terminated name
+    packet.writeUInt8(static_cast<uint8_t>(data.race));
+    packet.writeUInt8(static_cast<uint8_t>(data.characterClass));
+    packet.writeUInt8(static_cast<uint8_t>(data.gender));
+    packet.writeUInt8(data.skin);
+    packet.writeUInt8(data.face);
+    packet.writeUInt8(data.hairStyle);
+    packet.writeUInt8(data.hairColor);
+    packet.writeUInt8(data.facialHair);
+    packet.writeUInt8(0);  // outfitId, always 0
+
+    LOG_DEBUG("Built CMSG_CHAR_CREATE: name=", data.name);
+
+    return packet;
+}
+
+bool CharCreateResponseParser::parse(network::Packet& packet, CharCreateResponseData& data) {
+    data.result = static_cast<CharCreateResult>(packet.readUInt8());
+    LOG_INFO("SMSG_CHAR_CREATE result: ", static_cast<int>(data.result));
+    return true;
+}
+
 network::Packet CharEnumPacket::build() {
     // CMSG_CHAR_ENUM has no body - just the opcode
     network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_CHAR_ENUM));

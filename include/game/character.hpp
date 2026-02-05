@@ -110,6 +110,14 @@ struct Character {
     bool hasPet() const { return pet.exists(); }
 };
 
+// Race/class combo and appearance range validation (WoW 3.3.5a)
+bool isValidRaceClassCombo(Race race, Class cls);
+uint8_t getMaxSkin(Race race, Gender gender);
+uint8_t getMaxFace(Race race, Gender gender);
+uint8_t getMaxHairStyle(Race race, Gender gender);
+uint8_t getMaxHairColor(Race race, Gender gender);
+uint8_t getMaxFacialFeature(Race race, Gender gender);
+
 /**
  * Get human-readable race name
  */

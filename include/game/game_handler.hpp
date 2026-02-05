@@ -102,6 +102,11 @@ public:
      */
     const std::vector<Character>& getCharacters() const { return characters; }
 
+    void createCharacter(const CharCreateData& data);
+
+    using CharCreateCallback = std::function<void(bool success, const std::string& message)>;
+    void setCharCreateCallback(CharCreateCallback cb) { charCreateCallback_ = std::move(cb); }
+
     /**
      * Select and log in with a character
      * @param characterGuid GUID of character to log in with
@@ -210,6 +215,7 @@ public:
     // Single-player mode
     void setSinglePlayerMode(bool sp) { singlePlayerMode_ = sp; }
     bool isSinglePlayerMode() const { return singlePlayerMode_; }
+    void simulateMotd(const std::vector<std::string>& lines);
 
     // NPC death callback (single-player)
     using NpcDeathCallback = std::function<void(uint64_t guid)>;
@@ -375,6 +381,9 @@ private:
     void handleGroupUninvite(network::Packet& packet);
     void handlePartyCommandResult(network::Packet& packet);
 
+    // ---- Character creation handler ----
+    void handleCharCreateResponse(network::Packet& packet);
+
     // ---- XP handler ----
     void handleXpGain(network::Packet& packet);
 
@@ -515,6 +524,7 @@ private:
     // Callbacks
     WorldConnectSuccessCallback onSuccess;
     WorldConnectFailureCallback onFailure;
+    CharCreateCallback charCreateCallback_;
 
     // ---- XP tracking ----
     uint32_t playerXp_ = 0;

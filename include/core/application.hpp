@@ -20,6 +20,7 @@ namespace core {
 enum class AppState {
     AUTHENTICATION,
     REALM_SELECTION,
+    CHARACTER_CREATION,
     CHARACTER_SELECTION,
     IN_GAME,
     DISCONNECTED

@@ -501,6 +501,10 @@ void GameHandler::handlePacket(network::Packet& packet) {
             }
             break;
 
+        case Opcode::SMSG_CHAR_CREATE:
+            handleCharCreateResponse(packet);
+            break;
+
         case Opcode::SMSG_CHAR_ENUM:
             if (state == WorldState::CHAR_LIST_REQUESTED) {
                 handleCharEnum(packet);
@@ -820,6 +824,81 @@ void GameHandler::handleCharEnum(network::Packet& packet) {
     }
 
     LOG_INFO("Ready to select character");
+}
+
+void GameHandler::createCharacter(const CharCreateData& data) {
+    if (singlePlayerMode_) {
+        // Create character locally
+        Character ch;
+        ch.guid = 0x0000000100000001ULL + characters.size();
+        ch.name = data.name;
+        ch.race = data.race;
+        ch.characterClass = data.characterClass;
+        ch.gender = data.gender;
+        ch.level = 1;
+        ch.appearanceBytes = (static_cast<uint32_t>(data.skin)) |
+                             (static_cast<uint32_t>(data.face) << 8) |
+                             (static_cast<uint32_t>(data.hairStyle) << 16) |
+                             (static_cast<uint32_t>(data.hairColor) << 24);
+        ch.facialFeatures = data.facialHair;
+        ch.zoneId = 12;   // Elwynn Forest default
+        ch.mapId = 0;
+        ch.x = -8949.95f;
+        ch.y = -132.493f;
+        ch.z = 83.5312f;
+        ch.guildId = 0;
+        ch.flags = 0;
+        ch.pet = {};
+        characters.push_back(ch);
+
+        LOG_INFO("Single-player character created: ", ch.name);
+        if (charCreateCallback_) {
+            charCreateCallback_(true, "Character created!");
+        }
+        return;
+    }
+
+    // Online mode: send packet to server
+    if (!socket) {
+        LOG_WARNING("Cannot create character: not connected");
+        if (charCreateCallback_) {
+            charCreateCallback_(false, "Not connected to server");
+        }
+        return;
+    }
+
+    auto packet = CharCreatePacket::build(data);
+    socket->send(packet);
+    LOG_INFO("CMSG_CHAR_CREATE sent for: ", data.name);
+}
+
+void GameHandler::handleCharCreateResponse(network::Packet& packet) {
+    CharCreateResponseData data;
+    if (!CharCreateResponseParser::parse(packet, data)) {
+        LOG_ERROR("Failed to parse SMSG_CHAR_CREATE");
+        return;
+    }
+
+    if (data.result == CharCreateResult::SUCCESS) {
+        LOG_INFO("Character created successfully");
+        requestCharacterList();
+        if (charCreateCallback_) {
+            charCreateCallback_(true, "Character created!");
+        }
+    } else {
+        std::string msg;
+        switch (data.result) {
+            case CharCreateResult::NAME_IN_USE: msg = "Name already in use"; break;
+            case CharCreateResult::DISABLED: msg = "Character creation disabled"; break;
+            case CharCreateResult::SERVER_LIMIT: msg = "Server character limit reached"; break;
+            case CharCreateResult::ACCOUNT_LIMIT: msg = "Account character limit reached"; break;
+            default: msg = "Character creation failed"; break;
+        }
+        LOG_WARNING("Character creation failed: ", msg);
+        if (charCreateCallback_) {
+            charCreateCallback_(false, msg);
+        }
+    }
 }
 
 void GameHandler::selectCharacter(uint64_t characterGuid) {
@@ -2487,6 +2566,15 @@ void GameHandler::simulateXpGain(uint64_t victimGuid, uint32_t totalXp) {
     packet.writeFloat(0.0f);
     packet.writeUInt32(0); // group bonus
     handleXpGain(packet);
+}
+
+void GameHandler::simulateMotd(const std::vector<std::string>& lines) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::SMSG_MOTD));
+    packet.writeUInt32(static_cast<uint32_t>(lines.size()));
+    for (const auto& line : lines) {
+        packet.writeString(line);
+    }
+    handleMotd(packet);
 }
 
 void GameHandler::addMoneyCopper(uint32_t amount) {

@@ -12,6 +12,7 @@ enum class Opcode : uint16_t {
     // ---- Client to Server (Core) ----
     CMSG_PING                       = 0x1DC,
     CMSG_AUTH_SESSION                = 0x1ED,
+    CMSG_CHAR_CREATE                 = 0x036,
     CMSG_CHAR_ENUM                   = 0x037,
     CMSG_PLAYER_LOGIN                = 0x03D,
 
@@ -35,6 +36,7 @@ enum class Opcode : uint16_t {
     // ---- Server to Client (Core) ----
     SMSG_AUTH_CHALLENGE              = 0x1EC,
     SMSG_AUTH_RESPONSE               = 0x1EE,
+    SMSG_CHAR_CREATE                 = 0x03A,
     SMSG_CHAR_ENUM                   = 0x03B,
     SMSG_PONG                        = 0x1DD,
     SMSG_LOGIN_VERIFY_WORLD          = 0x236,

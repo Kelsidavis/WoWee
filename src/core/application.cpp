@@ -296,6 +296,9 @@ void Application::setState(AppState newState) {
         case AppState::REALM_SELECTION:
             // Show realm screen
             break;
+        case AppState::CHARACTER_CREATION:
+            // Show character create screen
+            break;
         case AppState::CHARACTER_SELECTION:
             // Show character screen
             break;
@@ -338,6 +341,10 @@ void Application::update(float deltaTime) {
             if (authHandler) {
                 authHandler->update(deltaTime);
             }
+            break;
+
+        case AppState::CHARACTER_CREATION:
+            // Character creation update
             break;
 
         case AppState::CHARACTER_SELECTION:
@@ -437,10 +444,13 @@ void Application::setupUICallbacks() {
         setState(AppState::REALM_SELECTION);
     });
 
-    // Single-player mode callback
+    // Single-player mode callback — go to character creation first
     uiManager->getAuthScreen().setOnSinglePlayer([this]() {
-        LOG_INFO("Single-player mode selected");
-        startSinglePlayer();
+        LOG_INFO("Single-player mode selected, opening character creation");
+        singlePlayerMode = true;
+        gameHandler->setSinglePlayerMode(true);
+        uiManager->getCharacterCreateScreen().reset();
+        setState(AppState::CHARACTER_CREATION);
     });
 
     // Realm selection callback
@@ -472,7 +482,54 @@ void Application::setupUICallbacks() {
     // Character selection callback
     uiManager->getCharacterScreen().setOnCharacterSelected([this](uint64_t characterGuid) {
         LOG_INFO("Character selected: GUID=0x", std::hex, characterGuid, std::dec);
-        setState(AppState::IN_GAME);
+        if (singlePlayerMode) {
+            // Use created character's data for level/HP
+            for (const auto& ch : gameHandler->getCharacters()) {
+                if (ch.guid == characterGuid) {
+                    uint32_t maxHp = 20 + static_cast<uint32_t>(ch.level) * 10;
+                    gameHandler->initLocalPlayerStats(ch.level, maxHp, maxHp);
+                    break;
+                }
+            }
+            startSinglePlayer();
+        } else {
+            setState(AppState::IN_GAME);
+        }
+    });
+
+    // Character create screen callbacks
+    uiManager->getCharacterCreateScreen().setOnCreate([this](const game::CharCreateData& data) {
+        gameHandler->createCharacter(data);
+    });
+
+    uiManager->getCharacterCreateScreen().setOnCancel([this]() {
+        if (singlePlayerMode) {
+            setState(AppState::AUTHENTICATION);
+            singlePlayerMode = false;
+            gameHandler->setSinglePlayerMode(false);
+        } else {
+            setState(AppState::CHARACTER_SELECTION);
+        }
+    });
+
+    // Character create result callback
+    gameHandler->setCharCreateCallback([this](bool success, const std::string& msg) {
+        if (success) {
+            if (singlePlayerMode) {
+                // In single-player, go straight to character selection showing the new character
+                setState(AppState::CHARACTER_SELECTION);
+            } else {
+                setState(AppState::CHARACTER_SELECTION);
+            }
+        } else {
+            uiManager->getCharacterCreateScreen().setStatus(msg, true);
+        }
+    });
+
+    // "Create Character" button on character screen
+    uiManager->getCharacterScreen().setOnCreateCharacter([this]() {
+        uiManager->getCharacterCreateScreen().reset();
+        setState(AppState::CHARACTER_CREATION);
     });
 }
 
@@ -919,9 +976,12 @@ void Application::startSinglePlayer() {
     // Enable single-player combat mode on game handler
     if (gameHandler) {
         gameHandler->setSinglePlayerMode(true);
-        uint32_t level = 10;
-        uint32_t maxHealth = 20 + level * 10;
-        gameHandler->initLocalPlayerStats(level, maxHealth, maxHealth);
+        // Only init stats with defaults if not already set (e.g. via character creation)
+        if (gameHandler->getLocalPlayerMaxHealth() == 0) {
+            uint32_t level = 10;
+            uint32_t maxHealth = 20 + level * 10;
+            gameHandler->initLocalPlayerStats(level, maxHealth, maxHealth);
+        }
     }
 
     // Create world object for single-player
@@ -937,27 +997,6 @@ void Application::startSinglePlayer() {
 
     // Load weapon models for equipped items (after inventory is populated)
     loadEquippedWeapons();
-
-    // Emulate server MOTD in single-player
-    if (gameHandler) {
-        std::vector<std::string> motdLines;
-        if (const char* motdEnv = std::getenv("WOW_SP_MOTD")) {
-            std::string raw = motdEnv;
-            size_t start = 0;
-            while (start <= raw.size()) {
-                size_t pos = raw.find('|', start);
-                if (pos == std::string::npos) pos = raw.size();
-                std::string line = raw.substr(start, pos - start);
-                if (!line.empty()) motdLines.push_back(line);
-                start = pos + 1;
-                if (pos == raw.size()) break;
-            }
-        }
-        if (motdLines.empty()) {
-            motdLines.push_back("Wowee Single Player");
-        }
-        gameHandler->simulateMotd(motdLines);
-    }
 
     // --- Loading screen: load terrain and wait for streaming before spawning ---
     const SpawnPreset* spawnPreset = selectSpawnPreset(std::getenv("WOW_SPAWN"));
@@ -1099,6 +1138,26 @@ void Application::startSinglePlayer() {
 
     // Go directly to game
     setState(AppState::IN_GAME);
+    // Emulate server MOTD in single-player (after entering game)
+    if (gameHandler) {
+        std::vector<std::string> motdLines;
+        if (const char* motdEnv = std::getenv("WOW_SP_MOTD")) {
+            std::string raw = motdEnv;
+            size_t start = 0;
+            while (start <= raw.size()) {
+                size_t pos = raw.find('|', start);
+                if (pos == std::string::npos) pos = raw.size();
+                std::string line = raw.substr(start, pos - start);
+                if (!line.empty()) motdLines.push_back(line);
+                start = pos + 1;
+                if (pos == raw.size()) break;
+            }
+        }
+        if (motdLines.empty()) {
+            motdLines.push_back("Wowee Single Player");
+        }
+        gameHandler->simulateMotd(motdLines);
+    }
     LOG_INFO("Single-player mode started - press F1 for performance HUD");
 }
 

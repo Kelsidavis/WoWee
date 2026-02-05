@@ -2,6 +2,7 @@
 
 #include "ui/auth_screen.hpp"
 #include "ui/realm_screen.hpp"
+#include "ui/character_create_screen.hpp"
 #include "ui/character_screen.hpp"
 #include "ui/game_screen.hpp"
 #include <memory>
@@ -64,6 +65,7 @@ public:
      */
     AuthScreen& getAuthScreen() { return *authScreen; }
     RealmScreen& getRealmScreen() { return *realmScreen; }
+    CharacterCreateScreen& getCharacterCreateScreen() { return *characterCreateScreen; }
     CharacterScreen& getCharacterScreen() { return *characterScreen; }
     GameScreen& getGameScreen() { return *gameScreen; }
 
@@ -73,6 +75,7 @@ private:
     // UI Screens
     std::unique_ptr<AuthScreen> authScreen;
     std::unique_ptr<RealmScreen> realmScreen;
+    std::unique_ptr<CharacterCreateScreen> characterCreateScreen;
     std::unique_ptr<CharacterScreen> characterScreen;
     std::unique_ptr<GameScreen> gameScreen;
 
