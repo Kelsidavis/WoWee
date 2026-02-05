@@ -30,6 +30,11 @@ public:
 
     GLuint getProgram() const { return program; }
 
+    // Adopt an externally-created program (no ownership of individual shaders)
+    void setProgram(GLuint prog) { program = prog; }
+    // Release ownership without deleting (caller retains the GL program)
+    void releaseProgram() { program = 0; vertexShader = 0; fragmentShader = 0; }
+
 private:
     bool compile(const std::string& vertexSource, const std::string& fragmentSource);
     GLint getUniformLocation(const std::string& name) const;

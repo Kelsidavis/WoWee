@@ -228,6 +228,9 @@ bool Renderer::initialize(core::Window* win) {
     // Initialize post-process FBO pipeline
     initPostProcess(window->getWidth(), window->getHeight());
 
+    // Initialize shadow map
+    initShadowMap();
+
     LOG_INFO("Renderer initialized");
     return true;
 }
@@ -316,6 +319,11 @@ void Renderer::shutdown() {
         underwaterOverlayVBO = 0;
     }
     underwaterOverlayShader.reset();
+
+    // Cleanup shadow map resources
+    if (shadowFBO) { glDeleteFramebuffers(1, &shadowFBO); shadowFBO = 0; }
+    if (shadowDepthTex) { glDeleteTextures(1, &shadowDepthTex); shadowDepthTex = 0; }
+    if (shadowShaderProgram) { glDeleteProgram(shadowShaderProgram); shadowShaderProgram = 0; }
 
     shutdownPostProcess();
 
@@ -901,6 +909,11 @@ void Renderer::renderWorld(game::World* world) {
     lastWMORenderMs = 0.0;
     lastM2RenderMs = 0.0;
 
+    // Shadow pass (before main scene)
+    if (shadowFBO && shadowShaderProgram && terrainLoaded) {
+        renderShadowPass();
+    }
+
     // Bind HDR scene framebuffer for world rendering
     glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
     glViewport(0, 0, fbWidth, fbHeight);
@@ -1460,6 +1473,214 @@ void Renderer::renderHUD() {
     if (performanceHUD && camera) {
         performanceHUD->render(this, camera.get());
     }
+}
+
+// ──────────────────────────────────────────────────────
+// Shadow mapping helpers
+// ──────────────────────────────────────────────────────
+
+void Renderer::initShadowMap() {
+    // Compile shadow shader
+    shadowShaderProgram = compileShadowShader();
+    if (!shadowShaderProgram) {
+        LOG_ERROR("Failed to compile shadow shader");
+        return;
+    }
+
+    // Create depth texture
+    glGenTextures(1, &shadowDepthTex);
+    glBindTexture(GL_TEXTURE_2D, shadowDepthTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24,
+                 SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0,
+                 GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Create depth-only FBO
+    glGenFramebuffers(1, &shadowFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowDepthTex, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        LOG_ERROR("Shadow FBO incomplete!");
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    LOG_INFO("Shadow map initialized (", SHADOW_MAP_SIZE, "x", SHADOW_MAP_SIZE, ")");
+}
+
+uint32_t Renderer::compileShadowShader() {
+    const char* vertSrc = R"(
+        #version 330 core
+        uniform mat4 uLightSpaceMatrix;
+        uniform mat4 uModel;
+        layout(location = 0) in vec3 aPos;
+        void main() {
+            gl_Position = uLightSpaceMatrix * uModel * vec4(aPos, 1.0);
+        }
+    )";
+    const char* fragSrc = R"(
+        #version 330 core
+        void main() { }
+    )";
+
+    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vs, 1, &vertSrc, nullptr);
+    glCompileShader(vs);
+    GLint success;
+    glGetShaderiv(vs, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char log[512];
+        glGetShaderInfoLog(vs, 512, nullptr, log);
+        LOG_ERROR("Shadow vertex shader error: ", log);
+        glDeleteShader(vs);
+        return 0;
+    }
+
+    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fs, 1, &fragSrc, nullptr);
+    glCompileShader(fs);
+    glGetShaderiv(fs, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char log[512];
+        glGetShaderInfoLog(fs, 512, nullptr, log);
+        LOG_ERROR("Shadow fragment shader error: ", log);
+        glDeleteShader(vs);
+        glDeleteShader(fs);
+        return 0;
+    }
+
+    GLuint program = glCreateProgram();
+    glAttachShader(program, vs);
+    glAttachShader(program, fs);
+    glLinkProgram(program);
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success) {
+        char log[512];
+        glGetProgramInfoLog(program, 512, nullptr, log);
+        LOG_ERROR("Shadow shader link error: ", log);
+        glDeleteProgram(program);
+        program = 0;
+    }
+
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    return program;
+}
+
+glm::mat4 Renderer::computeLightSpaceMatrix() {
+    // Sun direction matching WMO light dir
+    glm::vec3 sunDir = glm::normalize(glm::vec3(-0.3f, -0.7f, -0.6f));
+
+    // Center on character position
+    glm::vec3 center = characterPosition;
+
+    // Texel snapping: round center to shadow texel boundaries to prevent shimmer
+    float halfExtent = 120.0f;
+    float texelWorld = (2.0f * halfExtent) / static_cast<float>(SHADOW_MAP_SIZE);
+
+    // Build light view to get stable axes
+    glm::vec3 up(0.0f, 0.0f, 1.0f);
+    // If sunDir is nearly parallel to up, pick a different up vector
+    if (std::abs(glm::dot(sunDir, up)) > 0.99f) {
+        up = glm::vec3(0.0f, 1.0f, 0.0f);
+    }
+    glm::mat4 lightView = glm::lookAt(center - sunDir * 200.0f, center, up);
+
+    // Snap center in light space to texel grid
+    glm::vec4 centerLS = lightView * glm::vec4(center, 1.0f);
+    centerLS.x = std::floor(centerLS.x / texelWorld) * texelWorld;
+    centerLS.y = std::floor(centerLS.y / texelWorld) * texelWorld;
+    glm::vec4 snappedCenter = glm::inverse(lightView) * centerLS;
+    center = glm::vec3(snappedCenter);
+
+    // Rebuild with snapped center
+    lightView = glm::lookAt(center - sunDir * 200.0f, center, up);
+    glm::mat4 lightProj = glm::ortho(-halfExtent, halfExtent, -halfExtent, halfExtent, 1.0f, 400.0f);
+
+    return lightProj * lightView;
+}
+
+void Renderer::renderShadowPass() {
+    // Compute light space matrix
+    lightSpaceMatrix = computeLightSpaceMatrix();
+
+    // Bind shadow FBO
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+    glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    // Caster-side bias: front-face culling + polygon offset
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(2.0f, 4.0f);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
+
+    // Use shadow shader
+    glUseProgram(shadowShaderProgram);
+    GLint lsmLoc = glGetUniformLocation(shadowShaderProgram, "uLightSpaceMatrix");
+    glUniformMatrix4fv(lsmLoc, 1, GL_FALSE, &lightSpaceMatrix[0][0]);
+
+    // Render terrain into shadow map
+    if (terrainRenderer) {
+        terrainRenderer->renderShadow(shadowShaderProgram);
+    }
+
+    // Render WMO into shadow map
+    if (wmoRenderer) {
+        // WMO renderShadow takes separate view/proj matrices and a Shader ref.
+        // We need to decompose our lightSpaceMatrix or use the raw shader program.
+        // Since WMO::renderShadow sets uModel per instance, we use the shadow shader
+        // directly by calling renderShadow with the light view/proj split.
+        // For simplicity, compute the split:
+        glm::vec3 sunDir = glm::normalize(glm::vec3(-0.3f, -0.7f, -0.6f));
+        glm::vec3 center = characterPosition;
+        float halfExtent = 120.0f;
+        float texelWorld = (2.0f * halfExtent) / static_cast<float>(SHADOW_MAP_SIZE);
+        glm::vec3 up(0.0f, 0.0f, 1.0f);
+        if (std::abs(glm::dot(sunDir, up)) > 0.99f) up = glm::vec3(0.0f, 1.0f, 0.0f);
+        glm::mat4 lightView = glm::lookAt(center - sunDir * 200.0f, center, up);
+        glm::vec4 centerLS = lightView * glm::vec4(center, 1.0f);
+        centerLS.x = std::floor(centerLS.x / texelWorld) * texelWorld;
+        centerLS.y = std::floor(centerLS.y / texelWorld) * texelWorld;
+        glm::vec4 snappedCenter = glm::inverse(lightView) * centerLS;
+        center = glm::vec3(snappedCenter);
+        lightView = glm::lookAt(center - sunDir * 200.0f, center, up);
+        glm::mat4 lightProj = glm::ortho(-halfExtent, halfExtent, -halfExtent, halfExtent, 1.0f, 400.0f);
+
+        // WMO renderShadow needs a Shader reference — but it only uses setUniform("uModel", ...)
+        // We'll create a thin wrapper. Actually, WMO's renderShadow takes a Shader& and calls
+        // shadowShader.setUniform("uModel", ...). We need a Shader object wrapping our program.
+        // Instead, let's use the lower-level approach: WMO renderShadow uses the shader passed in.
+        // We need to temporarily wrap our GL program in a Shader object.
+        Shader shadowShaderWrapper;
+        shadowShaderWrapper.setProgram(shadowShaderProgram);
+        wmoRenderer->renderShadow(lightView, lightProj, shadowShaderWrapper);
+        shadowShaderWrapper.releaseProgram();  // Don't let wrapper delete our program
+    }
+
+    // Restore state
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    glCullFace(GL_BACK);
+
+    // Restore main viewport
+    glViewport(0, 0, fbWidth, fbHeight);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Distribute shadow map to all receivers
+    if (terrainRenderer) terrainRenderer->setShadowMap(shadowDepthTex, lightSpaceMatrix);
+    if (wmoRenderer) wmoRenderer->setShadowMap(shadowDepthTex, lightSpaceMatrix);
+    if (m2Renderer) m2Renderer->setShadowMap(shadowDepthTex, lightSpaceMatrix);
+    if (characterRenderer) characterRenderer->setShadowMap(shadowDepthTex, lightSpaceMatrix);
 }
 
 } // namespace rendering

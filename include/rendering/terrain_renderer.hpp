@@ -126,6 +126,19 @@ public:
     bool isFogEnabled() const { return fogEnabled; }
 
     /**
+     * Render terrain geometry into shadow depth map
+     */
+    void renderShadow(GLuint shaderProgram);
+
+    /**
+     * Set shadow map for receiving shadows
+     */
+    void setShadowMap(GLuint depthTex, const glm::mat4& lightSpaceMat) {
+        shadowDepthTex = depthTex; lightSpaceMatrix = lightSpaceMat; shadowEnabled = true;
+    }
+    void clearShadowMap() { shadowEnabled = false; }
+
+    /**
      * Get statistics
      */
     int getChunkCount() const { return static_cast<int>(chunks.size()); }
@@ -187,6 +200,11 @@ private:
 
     // Default white texture (fallback)
     GLuint whiteTexture = 0;
+
+    // Shadow mapping (receiving)
+    GLuint shadowDepthTex = 0;
+    glm::mat4 lightSpaceMatrix = glm::mat4(1.0f);
+    bool shadowEnabled = false;
 };
 
 } // namespace rendering

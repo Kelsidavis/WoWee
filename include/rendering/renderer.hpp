@@ -174,6 +174,18 @@ private:
     void resizePostProcess(int w, int h);
     void shutdownPostProcess();
 
+    // Shadow mapping
+    static constexpr int SHADOW_MAP_SIZE = 2048;
+    uint32_t shadowFBO = 0;
+    uint32_t shadowDepthTex = 0;
+    uint32_t shadowShaderProgram = 0;
+    glm::mat4 lightSpaceMatrix = glm::mat4(1.0f);
+
+    void initShadowMap();
+    void renderShadowPass();
+    uint32_t compileShadowShader();
+    glm::mat4 computeLightSpaceMatrix();
+
     pipeline::AssetManager* cachedAssetManager = nullptr;
     uint32_t currentZoneId = 0;
     std::string currentZoneName;

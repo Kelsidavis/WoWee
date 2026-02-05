@@ -279,6 +279,21 @@ GLuint TerrainRenderer::createAlphaTexture(const std::vector<uint8_t>& alphaData
     return textureID;
 }
 
+void TerrainRenderer::renderShadow(GLuint shaderProgram) {
+    if (chunks.empty()) return;
+
+    GLint modelLoc = glGetUniformLocation(shaderProgram, "uModel");
+    glm::mat4 identity(1.0f);
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &identity[0][0]);
+
+    for (const auto& chunk : chunks) {
+        if (!chunk.isValid()) continue;
+        glBindVertexArray(chunk.vao);
+        glDrawElements(GL_TRIANGLES, chunk.indexCount, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+    }
+}
+
 void TerrainRenderer::render(const Camera& camera) {
     if (chunks.empty() || !shader) {
         return;
@@ -338,6 +353,15 @@ void TerrainRenderer::render(const Camera& camera) {
     } else {
         shader->setUniform("uFogStart", 100000.0f);  // Very far
         shader->setUniform("uFogEnd", 100001.0f);    // Effectively disabled
+    }
+
+    // Shadow map
+    shader->setUniform("uShadowEnabled", shadowEnabled ? 1 : 0);
+    if (shadowEnabled) {
+        shader->setUniform("uLightSpaceMatrix", lightSpaceMatrix);
+        glActiveTexture(GL_TEXTURE7);
+        glBindTexture(GL_TEXTURE_2D, shadowDepthTex);
+        shader->setUniform("uShadowMap", 7);
     }
 
     // Extract frustum for culling

@@ -37,6 +37,28 @@ uniform vec3 uFogColor;
 uniform float uFogStart;
 uniform float uFogEnd;
 
+// Shadow mapping
+uniform sampler2DShadow uShadowMap;
+uniform mat4 uLightSpaceMatrix;
+uniform bool uShadowEnabled;
+
+float calcShadow() {
+    vec4 lsPos = uLightSpaceMatrix * vec4(FragPos, 1.0);
+    vec3 proj = lsPos.xyz / lsPos.w * 0.5 + 0.5;
+    if (proj.z > 1.0) return 1.0;
+    vec3 norm = normalize(Normal);
+    vec3 lightDir = normalize(-uLightDir);
+    float bias = max(0.005 * (1.0 - dot(norm, lightDir)), 0.001);
+    float shadow = 0.0;
+    vec2 texelSize = vec2(1.0 / 2048.0);
+    for (int x = -1; x <= 1; x++) {
+        for (int y = -1; y <= 1; y++) {
+            shadow += texture(uShadowMap, vec3(proj.xy + vec2(x, y) * texelSize, proj.z - bias));
+        }
+    }
+    return shadow / 9.0;
+}
+
 void main() {
     // Sample base texture
     vec4 baseColor = texture(uBaseTexture, TexCoord);
@@ -75,8 +97,11 @@ void main() {
     diff = max(diff, 0.2);  // Minimum light to prevent completely dark faces
     vec3 diffuse = diff * uLightColor * finalColor.rgb;
 
+    // Shadow
+    float shadow = uShadowEnabled ? calcShadow() : 1.0;
+
     // Combine lighting (terrain is purely diffuse — no specular on ground)
-    vec3 result = ambient + diffuse;
+    vec3 result = ambient + shadow * diffuse;
 
     // Apply fog
     float distance = length(uViewPos - FragPos);
