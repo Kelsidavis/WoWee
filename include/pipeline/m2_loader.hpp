@@ -104,10 +104,9 @@ struct M2Batch {
     uint32_t vertexStart;           // First vertex
     uint32_t vertexCount;           // Number of vertices
 
-    // Geoset info
-    uint16_t submeshId = 0;         // Submesh ID from skin file
+    // Geoset info (from submesh)
+    uint16_t submeshId = 0;         // Submesh/geoset ID (determines body part group)
     uint16_t submeshLevel = 0;      // Submesh level (0=base, 1+=LOD/alternate mesh)
-    uint16_t geosetId = 0;          // Geoset ID for filtering (0-18=body, 1xx=hair, etc.)
 };
 
 // Attachment point (bone-anchored position for weapons, effects, etc.)

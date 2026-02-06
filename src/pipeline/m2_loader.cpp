@@ -627,7 +627,6 @@ bool M2Loader::loadSkin(const std::vector<uint8_t>& skinData, M2Model& model) {
             batch.textureUnit = db.textureCoordIndex;
             batch.transparencyIndex = db.textureWeightIndex;
             batch.textureAnimIndex = db.textureTransformIndex;
-            batch.geosetId = db.geosetIndex;  // Geoset ID for filtering (from batch, not submesh)
 
             // Look up proper vertex/index ranges from submesh
             if (db.skinSectionIndex < submeshes.size()) {

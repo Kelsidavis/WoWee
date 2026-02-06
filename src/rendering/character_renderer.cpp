@@ -1179,7 +1179,7 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
                 int rendered = 0, skipped = 0;
                 for (const auto& b : gpuModel.data.batches) {
                     bool filtered = !instance.activeGeosets.empty() &&
-                        instance.activeGeosets.find(b.geosetId) == instance.activeGeosets.end();
+                        instance.activeGeosets.find(b.submeshId) == instance.activeGeosets.end();
 
                     GLuint resolvedTex = whiteTexture;
                     std::string texInfo = "white(fallback)";
@@ -1219,7 +1219,7 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
             for (const auto& batch : gpuModel.data.batches) {
                 // Filter by active geosets (if set)
                 if (!instance.activeGeosets.empty() &&
-                    instance.activeGeosets.find(batch.geosetId) == instance.activeGeosets.end()) {
+                    instance.activeGeosets.find(batch.submeshId) == instance.activeGeosets.end()) {
                     continue;
                 }
 
