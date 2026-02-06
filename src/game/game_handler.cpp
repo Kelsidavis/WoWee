@@ -2251,8 +2251,11 @@ void GameHandler::sendMovement(Opcode opcode) {
         return;
     }
 
-    // Update movement time
-    movementInfo.time = ++movementTime;
+    // Use real millisecond timestamp (server validates for anti-cheat)
+    static auto startTime = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    movementInfo.time = static_cast<uint32_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime).count());
 
     // Update movement flags based on opcode
     switch (opcode) {

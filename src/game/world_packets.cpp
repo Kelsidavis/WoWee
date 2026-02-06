@@ -564,23 +564,23 @@ network::Packet MovementPacket::build(Opcode opcode, const MovementInfo& info, u
         packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.pitch), sizeof(float));
     }
 
-    // Write fall time if falling
-    if (info.hasFlag(MovementFlags::FALLING)) {
-        packet.writeUInt32(info.fallTime);
-        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpVelocity), sizeof(float));
+    // Fall time is ALWAYS present in the packet (server reads it unconditionally).
+    // Jump velocity/angle data is only present when FALLING flag is set.
+    packet.writeUInt32(info.fallTime);
 
-        // Extended fall data if far falling
-        if (info.hasFlag(MovementFlags::FALLINGFAR)) {
-            packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpSinAngle), sizeof(float));
-            packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpCosAngle), sizeof(float));
-            packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpXYSpeed), sizeof(float));
-        }
+    if (info.hasFlag(MovementFlags::FALLING)) {
+        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpVelocity), sizeof(float));
+        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpSinAngle), sizeof(float));
+        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpCosAngle), sizeof(float));
+        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpXYSpeed), sizeof(float));
     }
 
-    LOG_DEBUG("Built movement packet: opcode=0x", std::hex, static_cast<uint16_t>(opcode), std::dec);
-    LOG_DEBUG("  Flags: 0x", std::hex, info.flags, std::dec);
-    LOG_DEBUG("  Position: (", info.x, ", ", info.y, ", ", info.z, ")");
-    LOG_DEBUG("  Orientation: ", info.orientation);
+    static int mvLog = 10;
+    if (mvLog-- > 0) {
+        LOG_INFO("Movement pkt: opcode=0x", std::hex, static_cast<uint16_t>(opcode), std::dec,
+                 " size=", packet.getSize(), " flags=0x", std::hex, info.flags, std::dec,
+                 " pos=(", info.x, ",", info.y, ",", info.z, ")");
+    }
 
     return packet;
 }
