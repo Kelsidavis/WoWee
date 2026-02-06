@@ -1655,6 +1655,10 @@ void Application::buildCreatureDisplayLookups() {
             extra.hairStyleId = static_cast<uint8_t>(cdie->getUInt32(i, 5));
             extra.hairColorId = static_cast<uint8_t>(cdie->getUInt32(i, 6));
             extra.facialHairId = static_cast<uint8_t>(cdie->getUInt32(i, 7));
+            // Equipment display IDs (columns 8-18)
+            for (int eq = 0; eq < 11; eq++) {
+                extra.equipDisplayId[eq] = cdie->getUInt32(i, 8 + eq);
+            }
             extra.bakeName = cdie->getString(i, 20);
             if (!extra.bakeName.empty()) withBakeName++;
             humanoidExtraMap_[cdie->getUInt32(i, 0)] = extra;
@@ -1891,18 +1895,103 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
             // Facial hair geoset: 200 + facialHairId + 1 (201 = none/style 0, 202 = style 1, etc.)
             activeGeosets.insert(static_cast<uint16_t>(201 + extra.facialHairId));
 
-            // Equipment groups: bare (no armor)
-            activeGeosets.insert(301);   // Gloves: bare hands
-            activeGeosets.insert(401);   // Boots: bare feet
-            activeGeosets.insert(501);   // Chest: bare
-            activeGeosets.insert(701);   // Ears: default
-            activeGeosets.insert(1301);  // Trousers: bare legs
-            activeGeosets.insert(1501);  // Back body (cloak=none)
-            // Note: Do NOT add 1703 (DK eye glow) for normal NPCs
+            // Default equipment geosets (bare/no armor)
+            uint16_t geosetGloves = 301;   // Bare hands
+            uint16_t geosetBoots = 401;    // Bare feet
+            uint16_t geosetChest = 501;    // Bare chest
+            uint16_t geosetPants = 1301;   // Bare legs
+            uint16_t geosetCape = 1501;    // No cape
+            uint16_t geosetTabard = 1201;  // No tabard
+            bool hideHair = false;
+
+            // Load equipment geosets from ItemDisplayInfo.dbc
+            auto itemDisplayDbc = assetManager->loadDBC("ItemDisplayInfo.dbc");
+            if (itemDisplayDbc) {
+                // Equipment slots: 0=helm, 1=shoulder, 2=shirt, 3=chest, 4=belt, 5=legs, 6=feet, 7=wrist, 8=hands, 9=tabard, 10=cape
+                // ItemDisplayInfo geoset columns: 5=GeosetGroup[0], 6=GeosetGroup[1], 7=GeosetGroup[2]
+
+                // Helm (slot 0) - may hide hair
+                if (extra.equipDisplayId[0] != 0) {
+                    int32_t idx = itemDisplayDbc->findRecordById(extra.equipDisplayId[0]);
+                    if (idx >= 0) {
+                        // Check helmet vis flags (col 12-13) or just hide hair if helm exists
+                        hideHair = true;
+                    }
+                }
+
+                // Chest (slot 3) - geoset group 5xx/8xx
+                if (extra.equipDisplayId[3] != 0) {
+                    int32_t idx = itemDisplayDbc->findRecordById(extra.equipDisplayId[3]);
+                    if (idx >= 0) {
+                        uint32_t geoGroup = itemDisplayDbc->getUInt32(static_cast<uint32_t>(idx), 5);
+                        if (geoGroup > 0) geosetChest = static_cast<uint16_t>(500 + geoGroup);
+                    }
+                }
+
+                // Legs (slot 5) - geoset group 13xx
+                if (extra.equipDisplayId[5] != 0) {
+                    int32_t idx = itemDisplayDbc->findRecordById(extra.equipDisplayId[5]);
+                    if (idx >= 0) {
+                        uint32_t geoGroup = itemDisplayDbc->getUInt32(static_cast<uint32_t>(idx), 5);
+                        if (geoGroup > 0) geosetPants = static_cast<uint16_t>(1300 + geoGroup);
+                    }
+                }
+
+                // Feet (slot 6) - geoset group 4xx
+                if (extra.equipDisplayId[6] != 0) {
+                    int32_t idx = itemDisplayDbc->findRecordById(extra.equipDisplayId[6]);
+                    if (idx >= 0) {
+                        uint32_t geoGroup = itemDisplayDbc->getUInt32(static_cast<uint32_t>(idx), 5);
+                        if (geoGroup > 0) geosetBoots = static_cast<uint16_t>(400 + geoGroup);
+                    }
+                }
+
+                // Hands (slot 8) - geoset group 3xx
+                if (extra.equipDisplayId[8] != 0) {
+                    int32_t idx = itemDisplayDbc->findRecordById(extra.equipDisplayId[8]);
+                    if (idx >= 0) {
+                        uint32_t geoGroup = itemDisplayDbc->getUInt32(static_cast<uint32_t>(idx), 5);
+                        if (geoGroup > 0) geosetGloves = static_cast<uint16_t>(300 + geoGroup);
+                    }
+                }
+
+                // Tabard (slot 9) - geoset group 12xx
+                if (extra.equipDisplayId[9] != 0) {
+                    int32_t idx = itemDisplayDbc->findRecordById(extra.equipDisplayId[9]);
+                    if (idx >= 0) {
+                        geosetTabard = 1202;  // Show tabard mesh
+                    }
+                }
+
+                // Cape (slot 10) - geoset group 15xx
+                if (extra.equipDisplayId[10] != 0) {
+                    int32_t idx = itemDisplayDbc->findRecordById(extra.equipDisplayId[10]);
+                    if (idx >= 0) {
+                        uint32_t geoGroup = itemDisplayDbc->getUInt32(static_cast<uint32_t>(idx), 5);
+                        if (geoGroup > 0) geosetCape = static_cast<uint16_t>(1500 + geoGroup);
+                    }
+                }
+            }
+
+            // Apply equipment geosets
+            activeGeosets.insert(geosetGloves);
+            activeGeosets.insert(geosetBoots);
+            activeGeosets.insert(geosetChest);
+            activeGeosets.insert(geosetPants);
+            activeGeosets.insert(geosetCape);
+            activeGeosets.insert(geosetTabard);
+            activeGeosets.insert(701);  // Ears: default
+
+            // Hide hair if wearing helm
+            if (hideHair) {
+                activeGeosets.erase(static_cast<uint16_t>(101 + extra.hairStyleId));
+            }
 
             charRenderer->setActiveGeosets(instanceId, activeGeosets);
-            LOG_DEBUG("Set humanoid geosets: hair=", 101 + extra.hairStyleId,
-                      " facial=", 201 + extra.facialHairId);
+            LOG_DEBUG("Set humanoid geosets: hair=", hideHair ? 0 : (101 + extra.hairStyleId),
+                      " facial=", 201 + extra.facialHairId,
+                      " chest=", geosetChest, " pants=", geosetPants,
+                      " boots=", geosetBoots, " gloves=", geosetGloves);
         }
     }
 

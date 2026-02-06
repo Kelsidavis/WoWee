@@ -139,6 +139,9 @@ private:
         uint8_t hairColorId = 0;
         uint8_t facialHairId = 0;
         std::string bakeName;  // Pre-baked texture path if available
+        // Equipment display IDs (from columns 8-18)
+        // 0=helm, 1=shoulder, 2=shirt, 3=chest, 4=belt, 5=legs, 6=feet, 7=wrist, 8=hands, 9=tabard, 10=cape
+        uint32_t equipDisplayId[11] = {0};
     };
     std::unordered_map<uint32_t, CreatureDisplayData> displayDataMap_;  // displayId → display data
     std::unordered_map<uint32_t, HumanoidDisplayExtra> humanoidExtraMap_;  // extraDisplayId → humanoid data
