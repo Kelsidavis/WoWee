@@ -219,6 +219,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
         uniform mat4 uProjection;
         uniform bool uUseBones;
         uniform mat4 uBones[128];
+        uniform vec2 uUVOffset;
         out vec3 FragPos;
         out vec3 Normal;
         out vec2 TexCoord;
@@ -240,7 +241,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
             vec4 worldPos = uModel * vec4(pos, 1.0);
             FragPos = worldPos.xyz;
             Normal = mat3(uModel) * norm;
-            TexCoord = aTexCoord;
+            TexCoord = aTexCoord + uUVOffset;
 
             gl_Position = uProjection * uView * worldPos;
         }
@@ -710,12 +711,23 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
         }
     }
 
+    // Copy texture transform data for UV animation
+    gpuModel.textureTransforms = model.textureTransforms;
+    gpuModel.textureTransformLookup = model.textureTransformLookup;
+    gpuModel.hasTextureAnimation = false;
+
     // Build per-batch GPU entries
     if (!model.batches.empty()) {
         for (const auto& batch : model.batches) {
             M2ModelGPU::BatchGPU bgpu;
             bgpu.indexStart = batch.indexStart;
             bgpu.indexCount = batch.indexCount;
+
+            // Store texture animation index from batch
+            bgpu.textureAnimIndex = batch.textureAnimIndex;
+            if (bgpu.textureAnimIndex != 0xFFFF) {
+                gpuModel.hasTextureAnimation = true;
+            }
 
             // Resolve texture: batch.textureIndex → textureLookup → allTextures
             GLuint tex = whiteTexture;
@@ -1223,6 +1235,23 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
 
         for (const auto& batch : model.batches) {
             if (batch.indexCount == 0) continue;
+
+            // Compute UV offset for texture animation
+            glm::vec2 uvOffset(0.0f, 0.0f);
+            if (batch.textureAnimIndex != 0xFFFF && model.hasTextureAnimation) {
+                uint16_t lookupIdx = batch.textureAnimIndex;
+                if (lookupIdx < model.textureTransformLookup.size()) {
+                    uint16_t transformIdx = model.textureTransformLookup[lookupIdx];
+                    if (transformIdx < model.textureTransforms.size()) {
+                        const auto& tt = model.textureTransforms[transformIdx];
+                        glm::vec3 trans = interpVec3(tt.translation,
+                            instance.currentSequenceIndex, instance.animTime,
+                            glm::vec3(0.0f), model.globalSequenceDurations);
+                        uvOffset = glm::vec2(trans.x, trans.y);
+                    }
+                }
+            }
+            shader->setUniform("uUVOffset", uvOffset);
 
             bool hasTexture = (batch.texture != 0);
             shader->setUniform("uHasTexture", hasTexture);

@@ -109,6 +109,13 @@ struct M2Batch {
     uint16_t submeshLevel = 0;      // Submesh level (0=base, 1+=LOD/alternate mesh)
 };
 
+// Texture transform (UV animation) data
+struct M2TextureTransform {
+    M2AnimationTrack translation;   // UV translation keyframes
+    M2AnimationTrack rotation;      // UV rotation keyframes (quat)
+    M2AnimationTrack scale;         // UV scale keyframes
+};
+
 // Attachment point (bone-anchored position for weapons, effects, etc.)
 struct M2Attachment {
     uint32_t id;        // 0=Head, 1=RightHand, 2=LeftHand, etc.
@@ -138,6 +145,10 @@ struct M2Model {
     std::vector<M2Batch> batches;
     std::vector<M2Texture> textures;
     std::vector<uint16_t> textureLookup;  // Batch texture index lookup
+
+    // Texture transforms (UV animation)
+    std::vector<M2TextureTransform> textureTransforms;
+    std::vector<uint16_t> textureTransformLookup;
 
     // Attachment points (for weapon/effect anchoring)
     std::vector<M2Attachment> attachments;

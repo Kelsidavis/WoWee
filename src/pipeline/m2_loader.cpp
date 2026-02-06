@@ -210,6 +210,13 @@ struct CompressedQuat {
     int16_t x, y, z, w;
 };
 
+// M2 texture transform (on-disk, 3 × M2TrackDisk = 60 bytes)
+struct M2TextureTransformDisk {
+    M2TrackDisk translation;    // 20
+    M2TrackDisk rotation;       // 20
+    M2TrackDisk scaling;        // 20
+};
+
 // M2 attachment point (on-disk)
 struct M2AttachmentDisk {
     uint32_t id;
@@ -509,6 +516,35 @@ M2Model M2Loader::load(const std::vector<uint8_t>& m2Data) {
     // Read texture lookup
     if (header.nTexLookup > 0 && header.ofsTexLookup > 0) {
         model.textureLookup = readArray<uint16_t>(m2Data, header.ofsTexLookup, header.nTexLookup);
+    }
+
+    // Read texture transforms (UV animation data)
+    if (header.nUVAnimation > 0 && header.ofsUVAnimation > 0) {
+        // Build per-sequence flags for skipping external .anim data
+        std::vector<uint32_t> seqFlags;
+        seqFlags.reserve(model.sequences.size());
+        for (const auto& seq : model.sequences) {
+            seqFlags.push_back(seq.flags);
+        }
+
+        model.textureTransforms.reserve(header.nUVAnimation);
+        for (uint32_t i = 0; i < header.nUVAnimation; i++) {
+            uint32_t ofs = header.ofsUVAnimation + i * sizeof(M2TextureTransformDisk);
+            if (ofs + sizeof(M2TextureTransformDisk) > m2Data.size()) break;
+
+            M2TextureTransformDisk dt = readValue<M2TextureTransformDisk>(m2Data, ofs);
+            M2TextureTransform tt;
+            parseAnimTrack(m2Data, dt.translation, tt.translation, TrackType::VEC3, seqFlags);
+            parseAnimTrack(m2Data, dt.rotation, tt.rotation, TrackType::QUAT_COMPRESSED, seqFlags);
+            parseAnimTrack(m2Data, dt.scaling, tt.scale, TrackType::VEC3, seqFlags);
+            model.textureTransforms.push_back(std::move(tt));
+        }
+        core::Logger::getInstance().debug("  Texture transforms: ", model.textureTransforms.size());
+    }
+
+    // Read texture transform lookup (nTransLookup)
+    if (header.nTransLookup > 0 && header.ofsTransLookup > 0) {
+        model.textureTransformLookup = readArray<uint16_t>(m2Data, header.ofsTransLookup, header.nTransLookup);
     }
 
     // Read attachment points

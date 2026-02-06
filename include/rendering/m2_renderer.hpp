@@ -31,6 +31,7 @@ struct M2ModelGPU {
         uint32_t indexStart = 0;   // offset in indices (not bytes)
         uint32_t indexCount = 0;
         bool hasAlpha = false;
+        uint16_t textureAnimIndex = 0xFFFF; // 0xFFFF = no texture animation
     };
 
     GLuint vao = 0;
@@ -61,6 +62,11 @@ struct M2ModelGPU {
     bool hasAnimation = false;  // True if any bone has keyframes
     bool isSmoke = false;       // True for smoke models (UV scroll animation)
     bool disableAnimation = false; // Keep foliage/tree doodads visually stable
+    bool hasTextureAnimation = false; // True if any batch has UV animation
+
+    // Texture transform data for UV animation
+    std::vector<pipeline::M2TextureTransform> textureTransforms;
+    std::vector<uint16_t> textureTransformLookup;
     std::vector<int> idleVariationIndices;  // Sequence indices for idle variations (animId 0)
 
     bool isValid() const { return vao != 0 && indexCount > 0; }
