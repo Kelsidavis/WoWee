@@ -104,7 +104,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         gameHandler.notifyInventoryChanged();
     }
 
-    if (inventoryScreen.consumeEquipmentDirty()) {
+    if (inventoryScreen.consumeEquipmentDirty() || gameHandler.consumeOnlineEquipmentDirty()) {
         updateCharacterGeosets(gameHandler.getInventory());
         updateCharacterTextures(gameHandler.getInventory());
         core::Application::getInstance().loadEquippedWeapons();

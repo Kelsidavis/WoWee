@@ -2936,6 +2936,8 @@ void GameHandler::rebuildOnlineInventory() {
         inventory.setBackpackSlot(i, def);
     }
 
+    onlineEquipDirty_ = true;
+
     LOG_DEBUG("Rebuilt online inventory: equip=", [&](){
         int c = 0; for (auto g : equipSlotGuids_) if (g) c++; return c;
     }(), " backpack=", [&](){

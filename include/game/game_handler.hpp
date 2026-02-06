@@ -190,6 +190,7 @@ public:
     // Inventory
     Inventory& getInventory() { return inventory; }
     const Inventory& getInventory() const { return inventory; }
+    bool consumeOnlineEquipmentDirty() { bool d = onlineEquipDirty_; onlineEquipDirty_ = false; return d; }
 
     // Targeting
     void setTarget(uint64_t guid);
@@ -548,6 +549,7 @@ private:
     std::unordered_set<uint32_t> pendingItemQueries_;
     std::array<uint64_t, 23> equipSlotGuids_{};
     std::array<uint64_t, 16> backpackSlotGuids_{};
+    bool onlineEquipDirty_ = false;
 
     // ---- Phase 2: Combat ----
     bool autoAttacking = false;
