@@ -276,6 +276,15 @@ public:
     using WorldEntryCallback = std::function<void(uint32_t mapId, float x, float y, float z)>;
     void setWorldEntryCallback(WorldEntryCallback cb) { worldEntryCallback_ = std::move(cb); }
 
+    // Creature spawn callback (online mode - triggered when creature enters view)
+    // Parameters: guid, displayId, x, y, z (canonical), orientation
+    using CreatureSpawnCallback = std::function<void(uint64_t guid, uint32_t displayId, float x, float y, float z, float orientation)>;
+    void setCreatureSpawnCallback(CreatureSpawnCallback cb) { creatureSpawnCallback_ = std::move(cb); }
+
+    // Creature despawn callback (online mode - triggered when creature leaves view)
+    using CreatureDespawnCallback = std::function<void(uint64_t guid)>;
+    void setCreatureDespawnCallback(CreatureDespawnCallback cb) { creatureDespawnCallback_ = std::move(cb); }
+
     // Cooldowns
     float getSpellCooldown(uint32_t spellId) const;
 
@@ -382,6 +391,11 @@ private:
      * Handle SMSG_UPDATE_OBJECT from server
      */
     void handleUpdateObject(network::Packet& packet);
+
+    /**
+     * Handle SMSG_COMPRESSED_UPDATE_OBJECT from server
+     */
+    void handleCompressedUpdateObject(network::Packet& packet);
 
     /**
      * Handle SMSG_DESTROY_OBJECT from server
@@ -529,6 +543,8 @@ private:
     // ---- Phase 3: Spells ----
     HearthstoneCallback hearthstoneCallback;
     WorldEntryCallback worldEntryCallback_;
+    CreatureSpawnCallback creatureSpawnCallback_;
+    CreatureDespawnCallback creatureDespawnCallback_;
     std::vector<uint32_t> knownSpells;
     std::unordered_map<uint32_t, float> spellCooldowns;    // spellId -> remaining seconds
     uint8_t castCount = 0;

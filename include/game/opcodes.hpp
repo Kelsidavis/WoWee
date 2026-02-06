@@ -46,6 +46,7 @@ enum class Opcode : uint16_t {
 
     // ---- Entity/Object updates ----
     SMSG_UPDATE_OBJECT               = 0x0A9,
+    SMSG_COMPRESSED_UPDATE_OBJECT    = 0x1F6,
     SMSG_DESTROY_OBJECT              = 0x0AA,
 
     // ---- Chat ----

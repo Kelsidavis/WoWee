@@ -589,28 +589,195 @@ uint64_t UpdateObjectParser::readPackedGuid(network::Packet& packet) {
 }
 
 bool UpdateObjectParser::parseMovementBlock(network::Packet& packet, UpdateBlock& block) {
-    // Skip movement flags and other movement data for now
-    // This is a simplified implementation
+    // WoW 3.3.5a UPDATE_OBJECT movement block structure:
+    // 1. UpdateFlags (1 byte, sometimes 2)
+    // 2. Movement data depends on update flags
 
-    // Read movement flags (not used yet)
-    /*uint32_t flags =*/ packet.readUInt32();
-    /*uint16_t flags2 =*/ packet.readUInt16();
+    // Update flags (3.3.5a uses 2 bytes for flags)
+    uint16_t updateFlags = packet.readUInt16();
 
-    // Read timestamp (not used yet)
-    /*uint32_t time =*/ packet.readUInt32();
+    LOG_DEBUG("  UpdateFlags: 0x", std::hex, updateFlags, std::dec);
 
-    // Read position
-    block.x = packet.readFloat();
-    block.y = packet.readFloat();
-    block.z = packet.readFloat();
-    block.orientation = packet.readFloat();
+    // UpdateFlags bit meanings:
+    // 0x0001 = UPDATEFLAG_SELF
+    // 0x0002 = UPDATEFLAG_TRANSPORT
+    // 0x0004 = UPDATEFLAG_HAS_TARGET
+    // 0x0008 = UPDATEFLAG_LOWGUID
+    // 0x0010 = UPDATEFLAG_HIGHGUID
+    // 0x0020 = UPDATEFLAG_LIVING
+    // 0x0040 = UPDATEFLAG_STATIONARY_POSITION
+    // 0x0080 = UPDATEFLAG_VEHICLE
+    // 0x0100 = UPDATEFLAG_POSITION (transport)
+    // 0x0200 = UPDATEFLAG_ROTATION
 
-    block.hasMovement = true;
+    const uint16_t UPDATEFLAG_LIVING = 0x0020;
+    const uint16_t UPDATEFLAG_STATIONARY_POSITION = 0x0040;
+    const uint16_t UPDATEFLAG_HAS_TARGET = 0x0004;
+    const uint16_t UPDATEFLAG_TRANSPORT = 0x0002;
+    const uint16_t UPDATEFLAG_POSITION = 0x0100;
+    const uint16_t UPDATEFLAG_VEHICLE = 0x0080;
+    const uint16_t UPDATEFLAG_ROTATION = 0x0200;
+    const uint16_t UPDATEFLAG_LOWGUID = 0x0008;
+    const uint16_t UPDATEFLAG_HIGHGUID = 0x0010;
 
-    LOG_DEBUG("  Movement: (", block.x, ", ", block.y, ", ", block.z, "), orientation=", block.orientation);
+    if (updateFlags & UPDATEFLAG_LIVING) {
+        // Full movement block for living units
+        uint32_t moveFlags = packet.readUInt32();
+        uint16_t moveFlags2 = packet.readUInt16();
+        /*uint32_t time =*/ packet.readUInt32();
 
-    // TODO: Parse additional movement fields based on flags
-    // For now, we'll skip them to keep this simple
+        // Position
+        block.x = packet.readFloat();
+        block.y = packet.readFloat();
+        block.z = packet.readFloat();
+        block.orientation = packet.readFloat();
+        block.hasMovement = true;
+
+        LOG_DEBUG("  LIVING movement: (", block.x, ", ", block.y, ", ", block.z,
+                  "), o=", block.orientation, " moveFlags=0x", std::hex, moveFlags, std::dec);
+
+        // Transport data (if on transport)
+        if (moveFlags & 0x00000200) { // MOVEMENTFLAG_ONTRANSPORT
+            /*uint64_t transportGuid =*/ readPackedGuid(packet);
+            /*float tX =*/ packet.readFloat();
+            /*float tY =*/ packet.readFloat();
+            /*float tZ =*/ packet.readFloat();
+            /*float tO =*/ packet.readFloat();
+            /*uint32_t tTime =*/ packet.readUInt32();
+            /*int8_t tSeat =*/ packet.readUInt8();
+
+            if (moveFlags2 & 0x0200) { // MOVEMENTFLAG2_INTERPOLATED_MOVEMENT
+                /*uint32_t tTime2 =*/ packet.readUInt32();
+            }
+        }
+
+        // Swimming/flying pitch
+        if ((moveFlags & 0x02000000) || (moveFlags2 & 0x0010)) { // MOVEMENTFLAG_SWIMMING or MOVEMENTFLAG2_ALWAYS_ALLOW_PITCHING
+            /*float pitch =*/ packet.readFloat();
+        }
+
+        // Fall time
+        /*uint32_t fallTime =*/ packet.readUInt32();
+
+        // Jumping
+        if (moveFlags & 0x00001000) { // MOVEMENTFLAG_FALLING
+            /*float jumpVelocity =*/ packet.readFloat();
+            /*float jumpSinAngle =*/ packet.readFloat();
+            /*float jumpCosAngle =*/ packet.readFloat();
+            /*float jumpXYSpeed =*/ packet.readFloat();
+        }
+
+        // Spline elevation
+        if (moveFlags & 0x04000000) { // MOVEMENTFLAG_SPLINE_ELEVATION
+            /*float splineElevation =*/ packet.readFloat();
+        }
+
+        // Speeds (7 speed values)
+        /*float walkSpeed =*/ packet.readFloat();
+        /*float runSpeed =*/ packet.readFloat();
+        /*float runBackSpeed =*/ packet.readFloat();
+        /*float swimSpeed =*/ packet.readFloat();
+        /*float swimBackSpeed =*/ packet.readFloat();
+        /*float flightSpeed =*/ packet.readFloat();
+        /*float flightBackSpeed =*/ packet.readFloat();
+        /*float turnRate =*/ packet.readFloat();
+        /*float pitchRate =*/ packet.readFloat();
+
+        // Spline data
+        if (moveFlags & 0x08000000) { // MOVEMENTFLAG_SPLINE_ENABLED
+            // Skip spline data for now - complex structure
+            uint32_t splineFlags = packet.readUInt32();
+
+            if (splineFlags & 0x00010000) { // has final point
+                /*float finalX =*/ packet.readFloat();
+                /*float finalY =*/ packet.readFloat();
+                /*float finalZ =*/ packet.readFloat();
+            } else if (splineFlags & 0x00020000) { // has final target
+                /*uint64_t finalTarget =*/ packet.readUInt64();
+            } else if (splineFlags & 0x00040000) { // has final angle
+                /*float finalAngle =*/ packet.readFloat();
+            }
+
+            /*uint32_t timePassed =*/ packet.readUInt32();
+            /*uint32_t duration =*/ packet.readUInt32();
+            /*uint32_t splineId =*/ packet.readUInt32();
+
+            /*float durationMod =*/ packet.readFloat();
+            /*float durationModNext =*/ packet.readFloat();
+
+            /*float verticalAccel =*/ packet.readFloat();
+
+            /*uint32_t effectStartTime =*/ packet.readUInt32();
+
+            uint32_t pointCount = packet.readUInt32();
+            for (uint32_t i = 0; i < pointCount; i++) {
+                /*float px =*/ packet.readFloat();
+                /*float py =*/ packet.readFloat();
+                /*float pz =*/ packet.readFloat();
+            }
+
+            /*uint8_t splineMode =*/ packet.readUInt8();
+            /*float endPointX =*/ packet.readFloat();
+            /*float endPointY =*/ packet.readFloat();
+            /*float endPointZ =*/ packet.readFloat();
+        }
+    }
+    else if (updateFlags & UPDATEFLAG_POSITION) {
+        // Transport position update
+        /*uint64_t transportGuid =*/ readPackedGuid(packet);
+        block.x = packet.readFloat();
+        block.y = packet.readFloat();
+        block.z = packet.readFloat();
+        /*float transportOffsetX =*/ packet.readFloat();
+        /*float transportOffsetY =*/ packet.readFloat();
+        /*float transportOffsetZ =*/ packet.readFloat();
+        block.orientation = packet.readFloat();
+        /*float corpseOrientation =*/ packet.readFloat();
+        block.hasMovement = true;
+
+        LOG_DEBUG("  POSITION: (", block.x, ", ", block.y, ", ", block.z, "), o=", block.orientation);
+    }
+    else if (updateFlags & UPDATEFLAG_STATIONARY_POSITION) {
+        // Simple stationary position (4 floats)
+        block.x = packet.readFloat();
+        block.y = packet.readFloat();
+        block.z = packet.readFloat();
+        block.orientation = packet.readFloat();
+        block.hasMovement = true;
+
+        LOG_DEBUG("  STATIONARY: (", block.x, ", ", block.y, ", ", block.z, "), o=", block.orientation);
+    }
+
+    // Target GUID (for units with target)
+    if (updateFlags & UPDATEFLAG_HAS_TARGET) {
+        /*uint64_t targetGuid =*/ readPackedGuid(packet);
+    }
+
+    // Transport time
+    if (updateFlags & UPDATEFLAG_TRANSPORT) {
+        /*uint32_t transportTime =*/ packet.readUInt32();
+    }
+
+    // Vehicle
+    if (updateFlags & UPDATEFLAG_VEHICLE) {
+        /*uint32_t vehicleId =*/ packet.readUInt32();
+        /*float vehicleOrientation =*/ packet.readFloat();
+    }
+
+    // Rotation (GameObjects)
+    if (updateFlags & UPDATEFLAG_ROTATION) {
+        /*int64_t rotation =*/ packet.readUInt64();
+    }
+
+    // Low GUID
+    if (updateFlags & UPDATEFLAG_LOWGUID) {
+        /*uint32_t lowGuid =*/ packet.readUInt32();
+    }
+
+    // High GUID
+    if (updateFlags & UPDATEFLAG_HIGHGUID) {
+        /*uint32_t highGuid =*/ packet.readUInt32();
+    }
 
     return true;
 }

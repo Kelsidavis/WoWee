@@ -16,6 +16,7 @@
 #include <functional>
 #include <cstdlib>
 #include <sqlite3.h>
+#include <zlib.h>
 
 namespace wowee {
 namespace game {
@@ -925,9 +926,18 @@ void GameHandler::handlePacket(network::Packet& packet) {
             break;
 
         case Opcode::SMSG_UPDATE_OBJECT:
+            LOG_INFO("Received SMSG_UPDATE_OBJECT, state=", static_cast<int>(state), " size=", packet.getSize());
             // Can be received after entering world
             if (state == WorldState::IN_WORLD) {
                 handleUpdateObject(packet);
+            }
+            break;
+
+        case Opcode::SMSG_COMPRESSED_UPDATE_OBJECT:
+            LOG_INFO("Received SMSG_COMPRESSED_UPDATE_OBJECT, state=", static_cast<int>(state), " size=", packet.getSize());
+            // Compressed version of UPDATE_OBJECT
+            if (state == WorldState::IN_WORLD) {
+                handleCompressedUpdateObject(packet);
             }
             break;
 
@@ -2288,6 +2298,10 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
     for (uint64_t guid : data.outOfRangeGuids) {
         if (entityManager.hasEntity(guid)) {
             LOG_INFO("Entity went out of range: 0x", std::hex, guid, std::dec);
+            // Trigger creature despawn callback before removing entity
+            if (creatureDespawnCallback_) {
+                creatureDespawnCallback_(guid);
+            }
             entityManager.removeEntity(guid);
         }
     }
@@ -2363,7 +2377,15 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                             case 32: unit->setMaxHealth(val); break;
                             case 33: unit->setMaxPower(val); break;
                             case 54: unit->setLevel(val); break;
+                            case 67: unit->setDisplayId(val); break;  // UNIT_FIELD_DISPLAYID
                             default: break;
+                        }
+                    }
+                    // Trigger creature spawn callback for units with displayId
+                    if (block.objectType == ObjectType::UNIT && unit->getDisplayId() != 0) {
+                        if (creatureSpawnCallback_) {
+                            creatureSpawnCallback_(block.guid, unit->getDisplayId(),
+                                unit->getX(), unit->getY(), unit->getZ(), unit->getOrientation());
                         }
                     }
                 }
@@ -2442,6 +2464,44 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
 
     tabCycleStale = true;
     LOG_INFO("Entity count: ", entityManager.getEntityCount());
+}
+
+void GameHandler::handleCompressedUpdateObject(network::Packet& packet) {
+    LOG_INFO("Handling SMSG_COMPRESSED_UPDATE_OBJECT, packet size: ", packet.getSize());
+
+    // First 4 bytes = decompressed size
+    if (packet.getSize() < 4) {
+        LOG_WARNING("SMSG_COMPRESSED_UPDATE_OBJECT too small");
+        return;
+    }
+
+    uint32_t decompressedSize = packet.readUInt32();
+    LOG_INFO("  Decompressed size: ", decompressedSize);
+
+    if (decompressedSize == 0 || decompressedSize > 1024 * 1024) {
+        LOG_WARNING("Invalid decompressed size: ", decompressedSize);
+        return;
+    }
+
+    // Remaining data is zlib compressed
+    size_t compressedSize = packet.getSize() - packet.getReadPos();
+    const uint8_t* compressedData = packet.getData().data() + packet.getReadPos();
+
+    // Decompress
+    std::vector<uint8_t> decompressed(decompressedSize);
+    uLongf destLen = decompressedSize;
+    int ret = uncompress(decompressed.data(), &destLen, compressedData, compressedSize);
+
+    if (ret != Z_OK) {
+        LOG_WARNING("Failed to decompress UPDATE_OBJECT: zlib error ", ret);
+        return;
+    }
+
+    LOG_DEBUG("  Decompressed ", compressedSize, " -> ", destLen, " bytes");
+
+    // Create packet from decompressed data and parse it
+    network::Packet decompressedPacket(static_cast<uint16_t>(Opcode::SMSG_UPDATE_OBJECT), decompressed);
+    handleUpdateObject(decompressedPacket);
 }
 
 void GameHandler::handleDestroyObject(network::Packet& packet) {

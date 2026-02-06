@@ -85,6 +85,10 @@ private:
     // Receive buffer
     std::vector<uint8_t> receiveBuffer;
 
+    // Track how many header bytes have been decrypted (0-4)
+    // This prevents re-decrypting the same header when waiting for more data
+    size_t headerBytesDecrypted = 0;
+
     // Packet callback
     std::function<void(const Packet&)> packetCallback;
 };

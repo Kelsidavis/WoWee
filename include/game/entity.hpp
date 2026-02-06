@@ -147,6 +147,10 @@ public:
     uint32_t getEntry() const { return entry; }
     void setEntry(uint32_t e) { entry = e; }
 
+    // Display ID (model display)
+    uint32_t getDisplayId() const { return displayId; }
+    void setDisplayId(uint32_t id) { displayId = id; }
+
 protected:
     std::string name;
     uint32_t health = 0;
@@ -156,6 +160,7 @@ protected:
     uint8_t powerType = 0;   // 0=mana, 1=rage, 2=focus, 3=energy
     uint32_t level = 1;
     uint32_t entry = 0;
+    uint32_t displayId = 0;
 };
 
 /**

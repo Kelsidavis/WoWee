@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 namespace wowee {
 
@@ -81,6 +82,10 @@ private:
     std::string getPlayerModelPath() const;
     static const char* mapIdToName(uint32_t mapId);
     void loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float z);
+    void spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x, float y, float z, float orientation);
+    void despawnOnlineCreature(uint64_t guid);
+    void buildCreatureDisplayLookups();
+    std::string getModelPathForDisplayId(uint32_t displayId) const;
 
     static Application* instance;
 
@@ -118,6 +123,14 @@ private:
     std::vector<std::string> underwearPaths_;
     uint32_t skinTextureSlotIndex_ = 0;
     uint32_t cloakTextureSlotIndex_ = 0;
+
+    // Online creature model spawning
+    std::unordered_map<uint32_t, uint32_t> displayToModelId_;   // displayId → modelId (from CreatureDisplayInfo.dbc)
+    std::unordered_map<uint32_t, std::string> modelIdToPath_;   // modelId → M2 path (from CreatureModelData.dbc)
+    std::unordered_map<uint64_t, uint32_t> creatureInstances_;  // guid → render instanceId
+    std::unordered_map<uint64_t, uint32_t> creatureModelIds_;   // guid → loaded modelId
+    uint32_t nextCreatureModelId_ = 5000;  // Model IDs for online creatures
+    bool creatureLookupsBuilt_ = false;
 };
 
 } // namespace core

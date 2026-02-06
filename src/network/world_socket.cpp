@@ -79,6 +79,7 @@ void WorldSocket::disconnect() {
     connected = false;
     encryptionEnabled = false;
     receiveBuffer.clear();
+    headerBytesDecrypted = 0;
     LOG_INFO("Disconnected from world server");
 }
 
@@ -197,31 +198,30 @@ void WorldSocket::update() {
 void WorldSocket::tryParsePackets() {
     // World server packets have 4-byte incoming header: size(2) + opcode(2)
     while (receiveBuffer.size() >= 4) {
-        // Copy header for decryption
-        uint8_t header[4];
-        memcpy(header, receiveBuffer.data(), 4);
-
-        // Decrypt header if encryption is enabled
-        if (encryptionEnabled) {
-            decryptCipher.process(header, 4);
+        // Decrypt header bytes in-place if encryption is enabled
+        // Only decrypt bytes we haven't already decrypted
+        if (encryptionEnabled && headerBytesDecrypted < 4) {
+            size_t toDecrypt = 4 - headerBytesDecrypted;
+            decryptCipher.process(receiveBuffer.data() + headerBytesDecrypted, toDecrypt);
+            headerBytesDecrypted = 4;
         }
 
-        // Parse header
+        // Parse header (now decrypted in-place)
         // Size: 2 bytes big-endian (includes opcode, so payload = size - 2)
-        uint16_t size = (header[0] << 8) | header[1];
+        uint16_t size = (receiveBuffer[0] << 8) | receiveBuffer[1];
         // Opcode: 2 bytes little-endian
-        uint16_t opcode = header[2] | (header[3] << 8);
+        uint16_t opcode = receiveBuffer[2] | (receiveBuffer[3] << 8);
 
         LOG_DEBUG("RECV encryptionEnabled=", encryptionEnabled,
-                  " header=[", std::hex, (int)header[0], " ", (int)header[1], " ",
-                  (int)header[2], " ", (int)header[3], std::dec, "]",
+                  " header=[", std::hex, (int)receiveBuffer[0], " ", (int)receiveBuffer[1], " ",
+                  (int)receiveBuffer[2], " ", (int)receiveBuffer[3], std::dec, "]",
                   " -> size=", size, " opcode=0x", std::hex, opcode, std::dec);
 
         // Total packet size: size field (2) + size value (which includes opcode + payload)
         size_t totalSize = 2 + size;
 
         if (receiveBuffer.size() < totalSize) {
-            // Not enough data yet
+            // Not enough data yet - header stays decrypted in buffer
             LOG_DEBUG("Waiting for more data: have ", receiveBuffer.size(),
                      " bytes, need ", totalSize);
             break;
@@ -249,8 +249,9 @@ void WorldSocket::tryParsePackets() {
         // Create packet with opcode and payload
         Packet packet(opcode, packetData);
 
-        // Remove parsed data from buffer
+        // Remove parsed data from buffer and reset header decryption counter
         receiveBuffer.erase(receiveBuffer.begin(), receiveBuffer.begin() + totalSize);
+        headerBytesDecrypted = 0;
 
         // Call callback if set
         if (packetCallback) {

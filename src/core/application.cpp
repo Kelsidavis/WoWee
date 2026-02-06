@@ -621,6 +621,16 @@ void Application::setupUICallbacks() {
         loadOnlineWorldTerrain(mapId, x, y, z);
     });
 
+    // Creature spawn callback (online mode) - spawn creature models
+    gameHandler->setCreatureSpawnCallback([this](uint64_t guid, uint32_t displayId, float x, float y, float z, float orientation) {
+        spawnOnlineCreature(guid, displayId, x, y, z, orientation);
+    });
+
+    // Creature despawn callback (online mode) - remove creature models
+    gameHandler->setCreatureDespawnCallback([this](uint64_t guid) {
+        despawnOnlineCreature(guid);
+    });
+
     // "Create Character" button on character screen
     uiManager->getCharacterScreen().setOnCreateCharacter([this]() {
         uiManager->getCharacterCreateScreen().reset();
@@ -1565,6 +1575,144 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
 
     // Set game state
     setState(AppState::IN_GAME);
+}
+
+void Application::buildCreatureDisplayLookups() {
+    if (creatureLookupsBuilt_ || !assetManager || !assetManager->isInitialized()) return;
+
+    LOG_INFO("Building creature display lookups from DBC files");
+
+    // CreatureDisplayInfo.dbc: displayId (col 0) → modelId (col 1)
+    if (auto cdi = assetManager->loadDBC("CreatureDisplayInfo.dbc"); cdi && cdi->isLoaded()) {
+        for (uint32_t i = 0; i < cdi->getRecordCount(); i++) {
+            displayToModelId_[cdi->getUInt32(i, 0)] = cdi->getUInt32(i, 1);
+        }
+        LOG_INFO("Loaded ", displayToModelId_.size(), " display→model mappings");
+    }
+
+    // CreatureModelData.dbc: modelId (col 0) → modelPath (col 2, .mdx → .m2)
+    if (auto cmd = assetManager->loadDBC("CreatureModelData.dbc"); cmd && cmd->isLoaded()) {
+        for (uint32_t i = 0; i < cmd->getRecordCount(); i++) {
+            std::string mdx = cmd->getString(i, 2);
+            if (mdx.empty()) continue;
+            // Convert .mdx to .m2
+            if (mdx.size() >= 4) {
+                mdx = mdx.substr(0, mdx.size() - 4) + ".m2";
+            }
+            modelIdToPath_[cmd->getUInt32(i, 0)] = mdx;
+        }
+        LOG_INFO("Loaded ", modelIdToPath_.size(), " model→path mappings");
+    }
+
+    creatureLookupsBuilt_ = true;
+}
+
+std::string Application::getModelPathForDisplayId(uint32_t displayId) const {
+    auto itModel = displayToModelId_.find(displayId);
+    if (itModel == displayToModelId_.end()) return "";
+
+    auto itPath = modelIdToPath_.find(itModel->second);
+    if (itPath == modelIdToPath_.end()) return "";
+
+    return itPath->second;
+}
+
+void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x, float y, float z, float orientation) {
+    if (!renderer || !renderer->getCharacterRenderer() || !assetManager) return;
+
+    // Build lookups on first creature spawn
+    if (!creatureLookupsBuilt_) {
+        buildCreatureDisplayLookups();
+    }
+
+    // Skip if already spawned
+    if (creatureInstances_.count(guid)) return;
+
+    // Get model path from displayId
+    std::string m2Path = getModelPathForDisplayId(displayId);
+    if (m2Path.empty()) {
+        LOG_WARNING("No model path for displayId ", displayId, " (guid 0x", std::hex, guid, std::dec, ")");
+        return;
+    }
+
+    auto* charRenderer = renderer->getCharacterRenderer();
+
+    // Load model if not already loaded for this displayId
+    uint32_t modelId = nextCreatureModelId_++;
+
+    auto m2Data = assetManager->readFile(m2Path);
+    if (m2Data.empty()) {
+        LOG_WARNING("Failed to read creature M2: ", m2Path);
+        return;
+    }
+
+    pipeline::M2Model model = pipeline::M2Loader::load(m2Data);
+    if (model.vertices.empty()) {
+        LOG_WARNING("Failed to parse creature M2: ", m2Path);
+        return;
+    }
+
+    // Load skin file
+    std::string skinPath = m2Path.substr(0, m2Path.size() - 3) + "00.skin";
+    auto skinData = assetManager->readFile(skinPath);
+    if (!skinData.empty()) {
+        pipeline::M2Loader::loadSkin(skinData, model);
+    }
+
+    // Load external .anim files for sequences without flag 0x20
+    std::string basePath = m2Path.substr(0, m2Path.size() - 3);
+    for (uint32_t si = 0; si < model.sequences.size(); si++) {
+        if (!(model.sequences[si].flags & 0x20)) {
+            char animFileName[256];
+            snprintf(animFileName, sizeof(animFileName), "%s%04u-%02u.anim",
+                basePath.c_str(), model.sequences[si].id, model.sequences[si].variationIndex);
+            auto animData = assetManager->readFile(animFileName);
+            if (!animData.empty()) {
+                pipeline::M2Loader::loadAnimFile(m2Data, animData, si, model);
+            }
+        }
+    }
+
+    if (!charRenderer->loadModel(model, modelId)) {
+        LOG_WARNING("Failed to load creature model: ", m2Path);
+        return;
+    }
+
+    // Convert canonical → render coordinates
+    glm::vec3 renderPos = core::coords::canonicalToRender(glm::vec3(x, y, z));
+
+    // Create instance
+    uint32_t instanceId = charRenderer->createInstance(modelId, renderPos,
+        glm::vec3(0.0f, 0.0f, orientation), 1.0f);
+
+    if (instanceId == 0) {
+        LOG_WARNING("Failed to create creature instance for guid 0x", std::hex, guid, std::dec);
+        return;
+    }
+
+    // Play idle animation
+    charRenderer->playAnimation(instanceId, 0, true);
+
+    // Track instance
+    creatureInstances_[guid] = instanceId;
+    creatureModelIds_[guid] = modelId;
+
+    LOG_INFO("Spawned creature: guid=0x", std::hex, guid, std::dec,
+             " displayId=", displayId, " at (", x, ", ", y, ", ", z, ")");
+}
+
+void Application::despawnOnlineCreature(uint64_t guid) {
+    auto it = creatureInstances_.find(guid);
+    if (it == creatureInstances_.end()) return;
+
+    if (renderer && renderer->getCharacterRenderer()) {
+        renderer->getCharacterRenderer()->removeInstance(it->second);
+    }
+
+    creatureInstances_.erase(it);
+    creatureModelIds_.erase(guid);
+
+    LOG_INFO("Despawned creature: guid=0x", std::hex, guid, std::dec);
 }
 
 } // namespace core
