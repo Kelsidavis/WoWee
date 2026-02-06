@@ -1682,6 +1682,38 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
         return;
     }
 
+    // --- Loading screen for online mode ---
+    rendering::LoadingScreen loadingScreen;
+    bool loadingScreenOk = loadingScreen.initialize();
+
+    auto showProgress = [&](const char* msg, float progress) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                window->setShouldClose(true);
+                loadingScreen.shutdown();
+                return;
+            }
+            if (event.type == SDL_WINDOWEVENT &&
+                event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                int w = event.window.data1;
+                int h = event.window.data2;
+                window->setSize(w, h);
+                glViewport(0, 0, w, h);
+                if (renderer && renderer->getCamera()) {
+                    renderer->getCamera()->setAspectRatio(static_cast<float>(w) / h);
+                }
+            }
+        }
+        if (!loadingScreenOk) return;
+        loadingScreen.setStatus(msg);
+        loadingScreen.setProgress(progress);
+        loadingScreen.render();
+        window->swapBuffers();
+    };
+
+    showProgress("Entering world...", 0.0f);
+
     std::string mapName = mapIdToName(mapId);
     LOG_INFO("Loading online world terrain for map '", mapName, "' (ID ", mapId, ")");
 
@@ -1707,6 +1739,30 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
         renderer->getTerrainManager()->setMapName(mapName);
     }
 
+    showProgress("Loading character model...", 0.05f);
+
+    // Spawn player model for online mode
+    if (gameHandler) {
+        const game::Character* activeChar = gameHandler->getActiveCharacter();
+        if (activeChar) {
+            spRace_ = activeChar->race;
+            spGender_ = activeChar->gender;
+            spClass_ = activeChar->characterClass;
+            spawnSnapToGround = false;
+            playerCharacterSpawned = false;
+            spawnPlayerCharacter();
+            renderer->getCharacterPosition() = spawnRender;
+            LOG_INFO("Spawned online player model: ", activeChar->name,
+                     " (race=", static_cast<int>(spRace_),
+                     ", gender=", static_cast<int>(spGender_),
+                     ") at render pos (", spawnRender.x, ", ", spawnRender.y, ", ", spawnRender.z, ")");
+        } else {
+            LOG_WARNING("No active character found for player model spawning");
+        }
+    }
+
+    showProgress("Loading terrain...", 0.20f);
+
     // Compute ADT tile from canonical coordinates
     auto [tileX, tileY] = core::coords::canonicalToTile(spawnCanonical.x, spawnCanonical.y);
     std::string adtPath = "World\\Maps\\" + mapName + "\\" + mapName + "_" +
@@ -1720,39 +1776,84 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
         LOG_WARNING("Could not load terrain for online world - atmospheric rendering only");
     } else {
         LOG_INFO("Online world terrain loading initiated");
+    }
 
-        // Trigger terrain streaming for surrounding tiles
-        if (renderer->getTerrainManager() && renderer->getCamera()) {
-            renderer->getTerrainManager()->update(*renderer->getCamera(), 1.0f);
+    showProgress("Streaming terrain tiles...", 0.35f);
+
+    // Wait for surrounding terrain tiles to stream in
+    if (terrainOk && renderer->getTerrainManager() && renderer->getCamera()) {
+        auto* terrainMgr = renderer->getTerrainManager();
+        auto* camera = renderer->getCamera();
+
+        terrainMgr->update(*camera, 1.0f);
+
+        auto startTime = std::chrono::high_resolution_clock::now();
+        const float maxWaitSeconds = 20.0f;
+        int initialPending = terrainMgr->getPendingTileCount();
+
+        while (terrainMgr->getPendingTileCount() > 0) {
+            SDL_Event event;
+            while (SDL_PollEvent(&event)) {
+                if (event.type == SDL_QUIT) {
+                    window->setShouldClose(true);
+                    loadingScreen.shutdown();
+                    return;
+                }
+                if (event.type == SDL_WINDOWEVENT &&
+                    event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    int w = event.window.data1;
+                    int h = event.window.data2;
+                    window->setSize(w, h);
+                    glViewport(0, 0, w, h);
+                    if (renderer->getCamera()) {
+                        renderer->getCamera()->setAspectRatio(static_cast<float>(w) / h);
+                    }
+                }
+            }
+
+            terrainMgr->update(*camera, 0.016f);
+
+            if (loadingScreenOk) {
+                int loaded = terrainMgr->getLoadedTileCount();
+                int pending = terrainMgr->getPendingTileCount();
+                float tileProgress = (initialPending > 0)
+                    ? static_cast<float>(initialPending - pending) / initialPending
+                    : 1.0f;
+                float progress = 0.35f + tileProgress * 0.50f;
+                char buf[128];
+                snprintf(buf, sizeof(buf), "Loading terrain... %d tiles loaded, %d remaining",
+                         loaded, pending);
+                loadingScreen.setStatus(buf);
+                loadingScreen.setProgress(progress);
+                loadingScreen.render();
+                window->swapBuffers();
+            }
+
+            auto elapsed = std::chrono::high_resolution_clock::now() - startTime;
+            if (std::chrono::duration<float>(elapsed).count() > maxWaitSeconds) {
+                LOG_WARNING("Online terrain streaming timeout after ", maxWaitSeconds, "s");
+                break;
+            }
+
+            SDL_Delay(16);
+        }
+
+        LOG_INFO("Online terrain streaming complete: ", terrainMgr->getLoadedTileCount(), " tiles loaded");
+
+        // Load/precompute collision cache
+        if (renderer->getWMORenderer()) {
+            showProgress("Building collision cache...", 0.88f);
+            renderer->getWMORenderer()->loadFloorCache();
+            if (renderer->getWMORenderer()->getFloorCacheSize() == 0) {
+                renderer->getWMORenderer()->precomputeFloorCache();
+            }
         }
     }
 
-    // Spawn player model for online mode
-    if (gameHandler) {
-        const game::Character* activeChar = gameHandler->getActiveCharacter();
-        if (activeChar) {
-            // Set race/gender for player model loading
-            spRace_ = activeChar->race;
-            spGender_ = activeChar->gender;
-            spClass_ = activeChar->characterClass;
+    showProgress("Entering world...", 1.0f);
 
-            // Don't snap to ground - server provides exact position
-            spawnSnapToGround = false;
-
-            // Reset spawn flag and spawn the player character model
-            playerCharacterSpawned = false;
-            spawnPlayerCharacter();
-
-            // Explicitly set character position to match server coordinates
-            renderer->getCharacterPosition() = spawnRender;
-
-            LOG_INFO("Spawned online player model: ", activeChar->name,
-                     " (race=", static_cast<int>(spRace_),
-                     ", gender=", static_cast<int>(spGender_),
-                     ") at render pos (", spawnRender.x, ", ", spawnRender.y, ", ", spawnRender.z, ")");
-        } else {
-            LOG_WARNING("No active character found for player model spawning");
-        }
+    if (loadingScreenOk) {
+        loadingScreen.shutdown();
     }
 
     // Set game state

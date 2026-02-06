@@ -1,6 +1,7 @@
 #include "rendering/loading_screen.hpp"
 #include "core/logger.hpp"
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_sdl2.h>
 #include <random>
@@ -352,6 +353,13 @@ void LoadingScreen::render() {
 
     // Draw status text and percentage with ImGui overlay
     {
+        // If a frame is already in progress (e.g. called from a UI callback),
+        // end it before starting our own
+        ImGuiContext* ctx = ImGui::GetCurrentContext();
+        if (ctx && ctx->FrameCount >= 0 && ctx->WithinFrameScope) {
+            ImGui::EndFrame();
+        }
+
         ImGuiIO& io = ImGui::GetIO();
         float screenW = io.DisplaySize.x;
         float screenH = io.DisplaySize.y;

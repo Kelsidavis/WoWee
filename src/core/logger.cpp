@@ -17,7 +17,7 @@ void Logger::ensureFile() {
     fileReady = true;
     std::error_code ec;
     std::filesystem::create_directories("logs", ec);
-    fileStream.open("logs/wowee.log", std::ios::out | std::ios::app);
+    fileStream.open("logs/wowee.log", std::ios::out | std::ios::trunc);
 }
 
 void Logger::log(LogLevel level, const std::string& message) {
