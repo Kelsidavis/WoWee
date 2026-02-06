@@ -1249,6 +1249,11 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
         for (const auto& batch : model.batches) {
             if (batch.indexCount == 0) continue;
 
+            // Skip additive/mod blend batches (glow halos, particle placeholders)
+            // These need a particle system to render properly; as raw geometry
+            // they appear as visible transparent discs.
+            if (batch.blendMode >= 3) continue;
+
             // Compute UV offset for texture animation
             glm::vec2 uvOffset(0.0f, 0.0f);
             if (batch.textureAnimIndex != 0xFFFF && model.hasTextureAnimation) {
@@ -1306,14 +1311,9 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
                 glDepthMask(GL_FALSE);
             }
 
-            // Disable depth testing entirely for additive/mod blends (glow, light halos)
-            bool disableDepth = (batch.blendMode >= 3);
-            if (disableDepth) {
-                glDisable(GL_DEPTH_TEST);
-            }
 
-            // Unlit: material flag 0x01 or additive/mod blend modes
-            bool unlit = (batch.materialFlags & 0x01) != 0 || batch.blendMode >= 3;
+            // Unlit: material flag 0x01
+            bool unlit = (batch.materialFlags & 0x01) != 0;
             shader->setUniform("uUnlit", unlit);
 
             bool hasTexture = (batch.texture != 0);
@@ -1329,10 +1329,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             glDrawElements(GL_TRIANGLES, batch.indexCount, GL_UNSIGNED_SHORT,
                            (void*)(batch.indexStart * sizeof(uint16_t)));
 
-            // Restore depth test, depth writes, and blend func after transparent batch
-            if (disableDepth) {
-                glEnable(GL_DEPTH_TEST);
-            }
+            // Restore depth writes and blend func after transparent batch
             if (batchTransparent && fadeAlpha >= 1.0f) {
                 glDepthMask(GL_TRUE);
             }
