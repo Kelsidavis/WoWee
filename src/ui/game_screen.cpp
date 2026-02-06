@@ -7,6 +7,7 @@
 #include "rendering/minimap.hpp"
 #include "rendering/character_renderer.hpp"
 #include "rendering/camera.hpp"
+#include "audio/music_manager.hpp"
 #include "pipeline/asset_manager.hpp"
 #include "pipeline/dbc_loader.hpp"
 #include "core/logger.hpp"
@@ -1757,6 +1758,12 @@ void GameScreen::renderEscapeMenu() {
             showEscapeSettingsNotice = false;
         }
         if (ImGui::Button("Quit", ImVec2(-1, 0))) {
+            auto* renderer = core::Application::getInstance().getRenderer();
+            if (renderer) {
+                if (auto* music = renderer->getMusicManager()) {
+                    music->stopMusic(0.0f);
+                }
+            }
             core::Application::getInstance().shutdown();
         }
         if (ImGui::Button("Settings", ImVec2(-1, 0))) {
