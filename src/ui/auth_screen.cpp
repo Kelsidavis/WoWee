@@ -45,7 +45,11 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
 
     if (!videoInitAttempted) {
         videoInitAttempted = true;
-        backgroundVideo.open("assets/startscreen.mp4");
+        std::string videoPath = "assets/startscreen.mp4";
+        if (!std::filesystem::exists(videoPath)) {
+            videoPath = (std::filesystem::current_path() / "assets/startscreen.mp4").string();
+        }
+        backgroundVideo.open(videoPath);
     }
     backgroundVideo.update(ImGui::GetIO().DeltaTime);
     if (backgroundVideo.isReady()) {
