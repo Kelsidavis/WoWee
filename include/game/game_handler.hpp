@@ -256,6 +256,10 @@ public:
     using MeleeSwingCallback = std::function<void()>;
     void setMeleeSwingCallback(MeleeSwingCallback cb) { meleeSwingCallback_ = std::move(cb); }
 
+    // NPC swing callback (single-player combat: plays attack animation on NPC)
+    using NpcSwingCallback = std::function<void(uint64_t guid)>;
+    void setNpcSwingCallback(NpcSwingCallback cb) { npcSwingCallback_ = std::move(cb); }
+
     // Local player stats (single-player)
     uint32_t getLocalPlayerHealth() const { return localPlayerHealth_; }
     uint32_t getLocalPlayerMaxHealth() const { return localPlayerMaxHealth_; }
@@ -625,6 +629,7 @@ private:
     static constexpr float SWING_SPEED = 2.0f;
     NpcDeathCallback npcDeathCallback_;
     MeleeSwingCallback meleeSwingCallback_;
+    NpcSwingCallback npcSwingCallback_;
     uint32_t localPlayerHealth_ = 0;
     uint32_t localPlayerMaxHealth_ = 0;
     uint32_t localPlayerLevel_ = 1;

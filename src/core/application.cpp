@@ -1135,6 +1135,12 @@ void Application::spawnNpcs() {
                 cr->playAnimation(instanceId, 1, false); // animation ID 1 = Death
             }
         });
+        gameHandler->setNpcSwingCallback([npcMgr, cr](uint64_t guid) {
+            uint32_t instanceId = npcMgr->findRenderInstanceId(guid);
+            if (instanceId != 0 && cr) {
+                cr->playAnimation(instanceId, 16, false); // animation ID 16 = Attack1
+            }
+        });
     }
 
     npcsSpawned = true;

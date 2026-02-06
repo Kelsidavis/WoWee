@@ -3747,6 +3747,10 @@ void GameHandler::performNpcSwing(uint64_t guid) {
     if (!entity || entity->getType() != ObjectType::UNIT) return;
     auto unit = std::static_pointer_cast<Unit>(entity);
 
+    if (npcSwingCallback_) {
+        npcSwingCallback_(guid);
+    }
+
     static std::mt19937 rng(std::random_device{}());
     std::uniform_real_distribution<float> roll(0.0f, 1.0f);
 

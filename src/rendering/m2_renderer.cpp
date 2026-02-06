@@ -1306,6 +1306,12 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
                 glDepthMask(GL_FALSE);
             }
 
+            // Disable depth testing entirely for additive/mod blends (glow, light halos)
+            bool disableDepth = (batch.blendMode >= 3);
+            if (disableDepth) {
+                glDisable(GL_DEPTH_TEST);
+            }
+
             // Unlit: material flag 0x01 or additive/mod blend modes
             bool unlit = (batch.materialFlags & 0x01) != 0 || batch.blendMode >= 3;
             shader->setUniform("uUnlit", unlit);
@@ -1323,7 +1329,10 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             glDrawElements(GL_TRIANGLES, batch.indexCount, GL_UNSIGNED_SHORT,
                            (void*)(batch.indexStart * sizeof(uint16_t)));
 
-            // Restore depth writes and blend func after transparent batch
+            // Restore depth test, depth writes, and blend func after transparent batch
+            if (disableDepth) {
+                glEnable(GL_DEPTH_TEST);
+            }
             if (batchTransparent && fadeAlpha >= 1.0f) {
                 glDepthMask(GL_TRUE);
             }
