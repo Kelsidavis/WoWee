@@ -1772,10 +1772,13 @@ void GameScreen::renderEscapeMenu() {
             settingsInit = false;
         }
 
-        if (showEscapeSettingsNotice) {
-            ImGui::Spacing();
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Settings not implemented yet.");
+        ImGui::Spacing();
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 10.0f));
+        if (ImGui::Button("Back to Game", ImVec2(-1, 0))) {
+            showEscapeMenu = false;
+            showEscapeSettingsNotice = false;
         }
+        ImGui::PopStyleVar();
     }
     ImGui::End();
 }
