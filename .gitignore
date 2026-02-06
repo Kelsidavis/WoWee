@@ -64,3 +64,6 @@ assets/textures/
 
 # Runtime cache (floor heights, etc.)
 cache/
+
+# Single-player saves
+saves/
