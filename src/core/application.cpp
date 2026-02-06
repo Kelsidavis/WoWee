@@ -1276,9 +1276,6 @@ void Application::startSinglePlayer() {
         }
     }
 
-    // Load weapon models for equipped items (after inventory is populated)
-    loadEquippedWeapons();
-
     if (gameHandler && renderer && window) {
         game::GameHandler::SinglePlayerSettings settings;
         bool hasSettings = gameHandler->getSinglePlayerSettings(settings);
@@ -1326,7 +1323,40 @@ void Application::startSinglePlayer() {
         }
     }
 
-    // --- Loading screen: load terrain and wait for streaming before spawning ---
+    // --- Loading screen ---
+    rendering::LoadingScreen loadingScreen;
+    bool loadingScreenOk = loadingScreen.initialize();
+
+    // Helper: poll events (resize/quit), update progress bar, swap buffers
+    auto showProgress = [&](const char* msg, float progress) {
+        // Poll SDL events so resizing and quit work during loading
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                window->setShouldClose(true);
+                loadingScreen.shutdown();
+                return;
+            }
+            if (event.type == SDL_WINDOWEVENT &&
+                event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                int w = event.window.data1;
+                int h = event.window.data2;
+                window->setSize(w, h);
+                glViewport(0, 0, w, h);
+                if (renderer && renderer->getCamera()) {
+                    renderer->getCamera()->setAspectRatio(static_cast<float>(w) / h);
+                }
+            }
+        }
+        if (!loadingScreenOk) return;
+        loadingScreen.setStatus(msg);
+        loadingScreen.setProgress(progress);
+        loadingScreen.render();
+        window->swapBuffers();
+    };
+
+    showProgress("Preparing world...", 0.0f);
+
     const SpawnPreset* spawnPreset = selectSpawnPreset(std::getenv("WOW_SPAWN"));
     // Canonical WoW coords: +X=North, +Y=West, +Z=Up
     glm::vec3 spawnCanonical = spawnPreset ? spawnPreset->spawnCanonical : spSpawnCanonical_;
@@ -1365,17 +1395,12 @@ void Application::startSinglePlayer() {
         LOG_INFO("Optional spawn overrides (canonical WoW X,Y,Z): WOW_SPAWN_POS=x,y,z WOW_SPAWN_ROT=yaw,pitch");
     }
 
-    rendering::LoadingScreen loadingScreen;
-    bool loadingScreenOk = loadingScreen.initialize();
+    showProgress("Loading character model...", 0.05f);
 
-    auto showStatus = [&](const char* msg) {
-        if (!loadingScreenOk) return;
-        loadingScreen.setStatus(msg);
-        loadingScreen.render();
-        window->swapBuffers();
-    };
+    // Spawn player character (loads M2 model, skin, textures, animations, weapons)
+    spawnPlayerCharacter();
 
-    showStatus("Loading terrain...");
+    showProgress("Loading terrain...", 0.25f);
 
     // Set map name for zone-specific floor cache
     if (renderer->getWMORenderer()) {
@@ -1396,6 +1421,8 @@ void Application::startSinglePlayer() {
         }
     }
 
+    showProgress("Streaming terrain tiles...", 0.40f);
+
     // Wait for surrounding terrain tiles to stream in
     if (terrainOk && renderer->getTerrainManager() && renderer->getCamera()) {
         auto* terrainMgr = renderer->getTerrainManager();
@@ -1407,6 +1434,8 @@ void Application::startSinglePlayer() {
         auto startTime = std::chrono::high_resolution_clock::now();
         const float maxWaitSeconds = 15.0f;
 
+        int initialPending = terrainMgr->getPendingTileCount();
+
         while (terrainMgr->getPendingTileCount() > 0) {
             // Poll events to keep window responsive
             SDL_Event event;
@@ -1416,19 +1445,34 @@ void Application::startSinglePlayer() {
                     loadingScreen.shutdown();
                     return;
                 }
+                if (event.type == SDL_WINDOWEVENT &&
+                    event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    int w = event.window.data1;
+                    int h = event.window.data2;
+                    window->setSize(w, h);
+                    glViewport(0, 0, w, h);
+                    if (renderer && renderer->getCamera()) {
+                        renderer->getCamera()->setAspectRatio(static_cast<float>(w) / h);
+                    }
+                }
             }
 
             // Process ready tiles from worker threads
             terrainMgr->update(*camera, 0.016f);
 
-            // Update loading screen with progress
+            // Update loading screen with tile progress (40% - 85% range)
             if (loadingScreenOk) {
                 int loaded = terrainMgr->getLoadedTileCount();
                 int pending = terrainMgr->getPendingTileCount();
+                float tileProgress = (initialPending > 0)
+                    ? static_cast<float>(initialPending - pending) / initialPending
+                    : 1.0f;
+                float progress = 0.40f + tileProgress * 0.45f;
                 char buf[128];
                 snprintf(buf, sizeof(buf), "Loading terrain... %d tiles loaded, %d remaining",
                          loaded, pending);
                 loadingScreen.setStatus(buf);
+                loadingScreen.setProgress(progress);
                 loadingScreen.render();
                 window->swapBuffers();
             }
@@ -1445,11 +1489,12 @@ void Application::startSinglePlayer() {
 
         LOG_INFO("Terrain streaming complete: ", terrainMgr->getLoadedTileCount(), " tiles loaded");
 
+        showProgress("Building collision cache...", 0.88f);
+
         // Load zone-specific floor cache, or precompute if none exists
         if (renderer->getWMORenderer()) {
             renderer->getWMORenderer()->loadFloorCache();
             if (renderer->getWMORenderer()->getFloorCacheSize() == 0) {
-                showStatus("Pre-computing collision cache...");
                 renderer->getWMORenderer()->precomputeFloorCache();
             }
         }
@@ -1461,10 +1506,7 @@ void Application::startSinglePlayer() {
         }
     }
 
-    showStatus("Spawning character...");
-
-    // Spawn player character on loaded terrain
-    spawnPlayerCharacter();
+    showProgress("Entering world...", 0.95f);
 
     // Final camera reset: now that follow target exists and terrain is loaded,
     // snap the third-person camera into the correct orbit position.
@@ -1472,6 +1514,8 @@ void Application::startSinglePlayer() {
         renderer->getCameraController()->reset();
         renderer->getCameraController()->startIntroPan(2.8f, 140.0f);
     }
+
+    showProgress("Entering world...", 1.0f);
 
     if (loadingScreenOk) {
         loadingScreen.shutdown();

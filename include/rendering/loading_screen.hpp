@@ -18,7 +18,7 @@ public:
     // Select a random loading screen image
     void selectRandomImage();
 
-    // Render the loading screen (call in a loop while loading)
+    // Render the loading screen with progress bar and status text
     void render();
 
     // Update loading progress (0.0 to 1.0)
@@ -30,11 +30,17 @@ public:
 private:
     bool loadImage(const std::string& path);
     void createQuad();
+    void createBarQuad();
 
     GLuint textureId = 0;
     GLuint vao = 0;
     GLuint vbo = 0;
     GLuint shaderId = 0;
+
+    // Progress bar GL objects
+    GLuint barVao = 0;
+    GLuint barVbo = 0;
+    GLuint barShaderId = 0;
 
     std::vector<std::string> imagePaths;
     int currentImageIndex = 0;
