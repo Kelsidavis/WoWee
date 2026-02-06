@@ -116,20 +116,21 @@ enum class Opcode : uint16_t {
     MSG_RAID_TARGET_UPDATE           = 0x321,
 
     // ---- Phase 5: Loot ----
+    CMSG_AUTOSTORE_LOOT_ITEM         = 0x108,
     CMSG_LOOT                        = 0x15D,
-    CMSG_LOOT_RELEASE                = 0x15E,
+    CMSG_LOOT_MONEY                  = 0x15E,
+    CMSG_LOOT_RELEASE                = 0x15F,
     SMSG_LOOT_RESPONSE               = 0x160,
     SMSG_LOOT_RELEASE_RESPONSE       = 0x161,
-    CMSG_AUTOSTORE_LOOT_ITEM         = 0x162,
-    SMSG_LOOT_REMOVED                = 0x163,
-    SMSG_LOOT_MONEY_NOTIFY           = 0x164,
+    SMSG_LOOT_REMOVED                = 0x162,
+    SMSG_LOOT_MONEY_NOTIFY           = 0x163,
     SMSG_LOOT_CLEAR_MONEY            = 0x165,
 
     // ---- Phase 5: NPC Gossip ----
-    CMSG_GOSSIP_HELLO                = 0x17C,
+    CMSG_GOSSIP_HELLO                = 0x17B,
+    CMSG_GOSSIP_SELECT_OPTION        = 0x17C,
     SMSG_GOSSIP_MESSAGE              = 0x17D,
-    CMSG_GOSSIP_SELECT_OPTION        = 0x17E,
-    SMSG_GOSSIP_COMPLETE             = 0x17F,
+    SMSG_GOSSIP_COMPLETE             = 0x17E,
     SMSG_NPC_TEXT_UPDATE             = 0x180,
 
     // ---- Phase 5: Vendor ----
