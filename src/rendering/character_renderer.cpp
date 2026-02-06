@@ -1216,25 +1216,8 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
             }
 
             // Draw batches (submeshes) with per-batch textures
+            // TODO: Geoset filtering disabled - need to determine actual submesh ID format
             for (const auto& batch : gpuModel.data.batches) {
-                // Filter by active geosets (if set)
-                // Geoset format: GroupID * 100 + VariationID
-                // Groups: 0=body, 1=hair, 2=facial, 3=gloves, 4=boots, 5=chest, 7=ears, 13=pants, 15=cape, 17=eyeglow
-                if (!instance.activeGeosets.empty()) {
-                    uint16_t group = batch.submeshId / 100;
-                    uint16_t variation = batch.submeshId % 100;
-
-                    // Always show body parts (group 0)
-                    if (group == 0) {
-                        // Body always renders
-                    } else {
-                        // For other groups, check if this specific geoset is enabled
-                        bool found = instance.activeGeosets.find(batch.submeshId) != instance.activeGeosets.end();
-                        if (!found) {
-                            continue;
-                        }
-                    }
-                }
 
                 // Resolve texture for this batch
                 GLuint texId = whiteTexture;
