@@ -1608,7 +1608,15 @@ void GameScreen::renderGossipWindow(game::GameHandler& gameHandler) {
             ImGui::Separator();
             ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.3f, 1.0f), "Quests:");
             for (const auto& quest : gossip.quests) {
-                ImGui::BulletText("[%d] %s", quest.questLevel, quest.title.c_str());
+                ImGui::PushID(static_cast<int>(quest.questId));
+                char qlabel[256];
+                snprintf(qlabel, sizeof(qlabel), "[%d] %s", quest.questLevel, quest.title.c_str());
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.3f, 1.0f));
+                if (ImGui::Selectable(qlabel)) {
+                    gameHandler.selectGossipQuest(quest.questId);
+                }
+                ImGui::PopStyleColor();
+                ImGui::PopID();
             }
         }
 

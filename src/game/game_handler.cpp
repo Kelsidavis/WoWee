@@ -1090,6 +1090,11 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_INVENTORY_CHANGE_FAILURE:
         case Opcode::SMSG_GAMEOBJECT_QUERY_RESPONSE:
         case Opcode::MSG_RAID_TARGET_UPDATE:
+        case Opcode::SMSG_QUESTGIVER_STATUS:
+        case Opcode::SMSG_QUESTGIVER_QUEST_DETAILS:
+        case Opcode::SMSG_QUESTGIVER_REQUEST_ITEMS:
+        case Opcode::SMSG_QUESTGIVER_OFFER_REWARD:
+        case Opcode::SMSG_QUESTGIVER_QUEST_COMPLETE:
         case Opcode::SMSG_GROUP_SET_LEADER:
             LOG_DEBUG("Ignoring known opcode: 0x", std::hex, opcode, std::dec);
             break;
@@ -3071,6 +3076,9 @@ void GameHandler::handleAttackerStateUpdate(network::Packet& packet) {
     if (isPlayerAttacker && meleeSwingCallback_) {
         meleeSwingCallback_();
     }
+    if (!isPlayerAttacker && npcSwingCallback_) {
+        npcSwingCallback_(data.attackerGuid);
+    }
 
     if (data.isMiss()) {
         addCombatText(CombatTextEntry::MISS, 0, 0, isPlayerAttacker);
@@ -3519,8 +3527,15 @@ void GameHandler::interactWithNpc(uint64_t guid) {
 
 void GameHandler::selectGossipOption(uint32_t optionId) {
     if (state != WorldState::IN_WORLD || !socket || !gossipWindowOpen) return;
-    auto packet = GossipSelectOptionPacket::build(currentGossip.npcGuid, optionId);
+    auto packet = GossipSelectOptionPacket::build(currentGossip.npcGuid, currentGossip.menuId, optionId);
     socket->send(packet);
+}
+
+void GameHandler::selectGossipQuest(uint32_t questId) {
+    if (state != WorldState::IN_WORLD || !socket || !gossipWindowOpen) return;
+    auto packet = QuestgiverQueryQuestPacket::build(currentGossip.npcGuid, questId);
+    socket->send(packet);
+    gossipWindowOpen = false;
 }
 
 void GameHandler::closeGossip() {

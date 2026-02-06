@@ -321,6 +321,7 @@ public:
     // NPC Gossip
     void interactWithNpc(uint64_t guid);
     void selectGossipOption(uint32_t optionId);
+    void selectGossipQuest(uint32_t questId);
     void closeGossip();
     bool isGossipWindowOpen() const { return gossipWindowOpen; }
     const GossipMessageData& getCurrentGossip() const { return currentGossip; }

@@ -1161,13 +1161,25 @@ public:
 /** CMSG_GOSSIP_SELECT_OPTION packet builder */
 class GossipSelectOptionPacket {
 public:
-    static network::Packet build(uint64_t npcGuid, uint32_t optionId, const std::string& code = "");
+    static network::Packet build(uint64_t npcGuid, uint32_t menuId, uint32_t optionId, const std::string& code = "");
 };
 
 /** SMSG_GOSSIP_MESSAGE parser */
 class GossipMessageParser {
 public:
     static bool parse(network::Packet& packet, GossipMessageData& data);
+};
+
+/** CMSG_QUESTGIVER_QUERY_QUEST packet builder */
+class QuestgiverQueryQuestPacket {
+public:
+    static network::Packet build(uint64_t npcGuid, uint32_t questId);
+};
+
+/** CMSG_QUESTGIVER_ACCEPT_QUEST packet builder */
+class QuestgiverAcceptQuestPacket {
+public:
+    static network::Packet build(uint64_t npcGuid, uint32_t questId);
 };
 
 // ============================================================

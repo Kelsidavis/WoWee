@@ -1808,13 +1808,30 @@ network::Packet GossipHelloPacket::build(uint64_t npcGuid) {
     return packet;
 }
 
-network::Packet GossipSelectOptionPacket::build(uint64_t npcGuid, uint32_t optionId, const std::string& code) {
+network::Packet GossipSelectOptionPacket::build(uint64_t npcGuid, uint32_t menuId, uint32_t optionId, const std::string& code) {
     network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_GOSSIP_SELECT_OPTION));
     packet.writeUInt64(npcGuid);
+    packet.writeUInt32(menuId);
     packet.writeUInt32(optionId);
     if (!code.empty()) {
         packet.writeString(code);
     }
+    return packet;
+}
+
+network::Packet QuestgiverQueryQuestPacket::build(uint64_t npcGuid, uint32_t questId) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_QUESTGIVER_QUERY_QUEST));
+    packet.writeUInt64(npcGuid);
+    packet.writeUInt32(questId);
+    packet.writeUInt8(1);  // isDialogContinued = 1 (from gossip)
+    return packet;
+}
+
+network::Packet QuestgiverAcceptQuestPacket::build(uint64_t npcGuid, uint32_t questId) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_QUESTGIVER_ACCEPT_QUEST));
+    packet.writeUInt64(npcGuid);
+    packet.writeUInt32(questId);
+    packet.writeUInt32(0);  // unused
     return packet;
 }
 

@@ -1125,18 +1125,27 @@ void Application::spawnNpcs() {
         gameHandler->setPosition(canonical.x, canonical.y, canonical.z);
     }
 
-    // Set NPC death callback for single-player combat
-    if (singlePlayerMode && gameHandler && npcManager) {
+    // Set NPC animation callbacks (works for both single-player and online creatures)
+    if (gameHandler && npcManager) {
         auto* npcMgr = npcManager.get();
         auto* cr = renderer->getCharacterRenderer();
-        gameHandler->setNpcDeathCallback([npcMgr, cr](uint64_t guid) {
+        auto* app = this;
+        gameHandler->setNpcDeathCallback([npcMgr, cr, app](uint64_t guid) {
             uint32_t instanceId = npcMgr->findRenderInstanceId(guid);
+            if (instanceId == 0) {
+                auto it = app->creatureInstances_.find(guid);
+                if (it != app->creatureInstances_.end()) instanceId = it->second;
+            }
             if (instanceId != 0 && cr) {
                 cr->playAnimation(instanceId, 1, false); // animation ID 1 = Death
             }
         });
-        gameHandler->setNpcSwingCallback([npcMgr, cr](uint64_t guid) {
+        gameHandler->setNpcSwingCallback([npcMgr, cr, app](uint64_t guid) {
             uint32_t instanceId = npcMgr->findRenderInstanceId(guid);
+            if (instanceId == 0) {
+                auto it = app->creatureInstances_.find(guid);
+                if (it != app->creatureInstances_.end()) instanceId = it->second;
+            }
             if (instanceId != 0 && cr) {
                 cr->playAnimation(instanceId, 16, false); // animation ID 16 = Attack1
             }
