@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstring>
+#include <zlib.h>
 
 namespace wowee {
 namespace game {
@@ -14,7 +15,8 @@ network::Packet AuthSessionPacket::build(uint32_t build,
                                           const std::string& accountName,
                                           uint32_t clientSeed,
                                           const std::vector<uint8_t>& sessionKey,
-                                          uint32_t serverSeed) {
+                                          uint32_t serverSeed,
+                                          uint32_t realmId) {
     if (sessionKey.size() != 40) {
         LOG_ERROR("Invalid session key size: ", sessionKey.size(), " (expected 40)");
     }
@@ -37,33 +39,79 @@ network::Packet AuthSessionPacket::build(uint32_t build,
     // Create packet (opcode will be added by WorldSocket)
     network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_AUTH_SESSION));
 
+    // AzerothCore 3.3.5a expects this exact field order:
+    // Build, LoginServerID, Account, LoginServerType, LocalChallenge,
+    // RegionID, BattlegroupID, RealmID, DosResponse, Digest, AddonInfo
+
     // Build number (uint32, little-endian)
     packet.writeUInt32(build);
 
-    // Unknown uint32 (always 0)
+    // Login server ID (uint32, always 0)
     packet.writeUInt32(0);
 
     // Account name (null-terminated string)
     packet.writeString(upperAccount);
 
-    // Unknown uint32 (always 0)
+    // Login server type (uint32, always 0)
     packet.writeUInt32(0);
 
-    // Client seed (uint32, little-endian)
+    // LocalChallenge / Client seed (uint32, little-endian)
     packet.writeUInt32(clientSeed);
 
-    // Unknown fields (5x uint32, all zeros)
-    for (int i = 0; i < 5; ++i) {
+    // Region ID (uint32)
+    packet.writeUInt32(0);
+
+    // Battlegroup ID (uint32)
+    packet.writeUInt32(0);
+
+    // Realm ID (uint32)
+    packet.writeUInt32(realmId);
+    LOG_DEBUG("  Realm ID: ", realmId);
+
+    // DOS response (uint64) - required for 3.x
+    packet.writeUInt32(0);
+    packet.writeUInt32(0);
+
+    // Authentication hash/digest (20 bytes)
+    packet.writeBytes(authHash.data(), authHash.size());
+
+    // Addon info - compressed block with 0 addons
+    // AzerothCore format: uint32 decompressedSize + zlib compressed data
+    // Decompressed format: uint32 addonCount + [addons...] + uint32 clientTime
+    uint8_t addonData[8] = {
+        0, 0, 0, 0,  // addon count = 0
+        0, 0, 0, 0   // client time = 0
+    };
+    uint32_t decompressedSize = 8;
+
+    // Compress with zlib
+    uLongf compressedSize = compressBound(decompressedSize);
+    std::vector<uint8_t> compressed(compressedSize);
+    int ret = compress(compressed.data(), &compressedSize, addonData, decompressedSize);
+    if (ret == Z_OK) {
+        compressed.resize(compressedSize);
+        // Write decompressedSize, then compressed bytes
+        packet.writeUInt32(decompressedSize);
+        packet.writeBytes(compressed.data(), compressed.size());
+        LOG_DEBUG("Addon info: decompressedSize=", decompressedSize,
+                  " compressedSize=", compressedSize);
+    } else {
+        LOG_ERROR("zlib compress failed with code: ", ret);
         packet.writeUInt32(0);
     }
 
-    // Authentication hash (20 bytes)
-    packet.writeBytes(authHash.data(), authHash.size());
-
-    // Addon CRC (uint32, can be 0)
-    packet.writeUInt32(0);
-
     LOG_INFO("CMSG_AUTH_SESSION packet built: ", packet.getSize(), " bytes");
+
+    // Dump full packet for protocol debugging
+    const auto& data = packet.getData();
+    std::string hexDump;
+    for (size_t i = 0; i < data.size(); ++i) {
+        char buf[4];
+        snprintf(buf, sizeof(buf), "%02x ", data[i]);
+        hexDump += buf;
+        if ((i + 1) % 16 == 0) hexDump += "\n";
+    }
+    LOG_DEBUG("CMSG_AUTH_SESSION full dump:\n", hexDump);
 
     return packet;
 }
@@ -220,7 +268,25 @@ network::Packet CharCreatePacket::build(const CharCreateData& data) {
     packet.writeUInt8(data.facialHair);
     packet.writeUInt8(0);  // outfitId, always 0
 
-    LOG_DEBUG("Built CMSG_CHAR_CREATE: name=", data.name);
+    LOG_DEBUG("Built CMSG_CHAR_CREATE: name=", data.name,
+              " race=", static_cast<int>(data.race),
+              " class=", static_cast<int>(data.characterClass),
+              " gender=", static_cast<int>(data.gender),
+              " skin=", static_cast<int>(data.skin),
+              " face=", static_cast<int>(data.face),
+              " hair=", static_cast<int>(data.hairStyle),
+              " hairColor=", static_cast<int>(data.hairColor),
+              " facial=", static_cast<int>(data.facialHair));
+
+    // Dump full packet for protocol debugging
+    const auto& pktData = packet.getData();
+    std::string hexDump;
+    for (size_t i = 0; i < pktData.size(); ++i) {
+        char buf[4];
+        snprintf(buf, sizeof(buf), "%02x ", pktData[i]);
+        hexDump += buf;
+    }
+    LOG_DEBUG("CMSG_CHAR_CREATE full dump: ", hexDump);
 
     return packet;
 }

@@ -1115,16 +1115,17 @@ void GameHandler::sendAuthSession() {
 
     LOG_DEBUG("CMSG_AUTH_SESSION packet size: ", packet.getSize(), " bytes");
 
-    // Send packet (NOT encrypted yet)
+    // Send packet (unencrypted - this is the last unencrypted packet)
     socket->send(packet);
 
-    // CRITICAL: Initialize encryption AFTER sending AUTH_SESSION
-    // but BEFORE receiving AUTH_RESPONSE
-    LOG_INFO("Initializing RC4 header encryption...");
+    // Enable encryption IMMEDIATELY after sending AUTH_SESSION
+    // AzerothCore enables encryption before sending AUTH_RESPONSE,
+    // so we need to be ready to decrypt the response
+    LOG_INFO("Enabling encryption immediately after AUTH_SESSION");
     socket->initEncryption(sessionKey);
 
     setState(WorldState::AUTH_SENT);
-    LOG_INFO("CMSG_AUTH_SESSION sent, encryption initialized, waiting for response...");
+    LOG_INFO("CMSG_AUTH_SESSION sent, encryption enabled, waiting for AUTH_RESPONSE...");
 }
 
 void GameHandler::handleAuthResponse(network::Packet& packet) {
@@ -1143,7 +1144,9 @@ void GameHandler::handleAuthResponse(network::Packet& packet) {
         return;
     }
 
-    // Authentication successful!
+    // Encryption was already enabled after sending AUTH_SESSION
+    LOG_INFO("AUTH_RESPONSE OK - world authentication successful");
+
     setState(WorldState::AUTHENTICATED);
 
     LOG_INFO("========================================");
@@ -1153,6 +1156,9 @@ void GameHandler::handleAuthResponse(network::Packet& packet) {
     LOG_INFO("Ready for character operations");
 
     setState(WorldState::READY);
+
+    // Request character list automatically
+    requestCharacterList();
 
     // Call success callback
     if (onSuccess) {
@@ -1166,7 +1172,8 @@ void GameHandler::requestCharacterList() {
         setState(WorldState::CHAR_LIST_RECEIVED);
         return;
     }
-    if (state != WorldState::READY && state != WorldState::AUTHENTICATED) {
+    if (state != WorldState::READY && state != WorldState::AUTHENTICATED &&
+        state != WorldState::CHAR_LIST_RECEIVED) {
         LOG_WARNING("Cannot request character list in state: ", (int)state);
         return;
     }
@@ -1335,13 +1342,37 @@ void GameHandler::handleCharCreateResponse(network::Packet& packet) {
     } else {
         std::string msg;
         switch (data.result) {
+            case CharCreateResult::ERROR: msg = "Server error"; break;
+            case CharCreateResult::FAILED: msg = "Creation failed"; break;
             case CharCreateResult::NAME_IN_USE: msg = "Name already in use"; break;
             case CharCreateResult::DISABLED: msg = "Character creation disabled"; break;
+            case CharCreateResult::PVP_TEAMS_VIOLATION: msg = "PvP faction violation"; break;
             case CharCreateResult::SERVER_LIMIT: msg = "Server character limit reached"; break;
             case CharCreateResult::ACCOUNT_LIMIT: msg = "Account character limit reached"; break;
-            default: msg = "Character creation failed"; break;
+            case CharCreateResult::SERVER_QUEUE: msg = "Server is queued"; break;
+            case CharCreateResult::ONLY_EXISTING: msg = "Only existing characters allowed"; break;
+            case CharCreateResult::EXPANSION: msg = "Expansion required"; break;
+            case CharCreateResult::EXPANSION_CLASS: msg = "Expansion required for this class"; break;
+            case CharCreateResult::LEVEL_REQUIREMENT: msg = "Level requirement not met"; break;
+            case CharCreateResult::UNIQUE_CLASS_LIMIT: msg = "Unique class limit reached"; break;
+            case CharCreateResult::RESTRICTED_RACECLASS: msg = "Race/class combination not allowed"; break;
+            // Name validation errors
+            case CharCreateResult::NAME_FAILURE: msg = "Invalid name"; break;
+            case CharCreateResult::NAME_NO_NAME: msg = "Please enter a name"; break;
+            case CharCreateResult::NAME_TOO_SHORT: msg = "Name is too short"; break;
+            case CharCreateResult::NAME_TOO_LONG: msg = "Name is too long"; break;
+            case CharCreateResult::NAME_INVALID_CHARACTER: msg = "Name contains invalid characters"; break;
+            case CharCreateResult::NAME_MIXED_LANGUAGES: msg = "Name mixes languages"; break;
+            case CharCreateResult::NAME_PROFANE: msg = "Name contains profanity"; break;
+            case CharCreateResult::NAME_RESERVED: msg = "Name is reserved"; break;
+            case CharCreateResult::NAME_INVALID_APOSTROPHE: msg = "Invalid apostrophe in name"; break;
+            case CharCreateResult::NAME_MULTIPLE_APOSTROPHES: msg = "Name has multiple apostrophes"; break;
+            case CharCreateResult::NAME_THREE_CONSECUTIVE: msg = "Name has 3+ consecutive same letters"; break;
+            case CharCreateResult::NAME_INVALID_SPACE: msg = "Invalid space in name"; break;
+            case CharCreateResult::NAME_CONSECUTIVE_SPACES: msg = "Name has consecutive spaces"; break;
+            default: msg = "Unknown error (code " + std::to_string(static_cast<int>(data.result)) + ")"; break;
         }
-        LOG_WARNING("Character creation failed: ", msg);
+        LOG_WARNING("Character creation failed: ", msg, " (code=", static_cast<int>(data.result), ")");
         if (charCreateCallback_) {
             charCreateCallback_(false, msg);
         }

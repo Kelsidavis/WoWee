@@ -50,7 +50,8 @@ public:
                                   const std::string& accountName,
                                   uint32_t clientSeed,
                                   const std::vector<uint8_t>& sessionKey,
-                                  uint32_t serverSeed);
+                                  uint32_t serverSeed,
+                                  uint32_t realmId = 1);
 
 private:
     /**
@@ -83,29 +84,30 @@ public:
  * SMSG_AUTH_RESPONSE result codes
  */
 enum class AuthResult : uint8_t {
-    OK = 0x00,                      // Success, proceed to character screen
-    FAILED = 0x01,                  // Generic failure
-    REJECT = 0x02,                  // Reject
-    BAD_SERVER_PROOF = 0x03,        // Bad server proof
-    UNAVAILABLE = 0x04,             // Unavailable
-    SYSTEM_ERROR = 0x05,            // System error
-    BILLING_ERROR = 0x06,           // Billing error
-    BILLING_EXPIRED = 0x07,         // Billing expired
-    VERSION_MISMATCH = 0x08,        // Version mismatch
-    UNKNOWN_ACCOUNT = 0x09,         // Unknown account
-    INCORRECT_PASSWORD = 0x0A,      // Incorrect password
-    SESSION_EXPIRED = 0x0B,         // Session expired
-    SERVER_SHUTTING_DOWN = 0x0C,    // Server shutting down
-    ALREADY_LOGGING_IN = 0x0D,      // Already logging in
-    LOGIN_SERVER_NOT_FOUND = 0x0E,  // Login server not found
-    WAIT_QUEUE = 0x0F,              // Wait queue
-    BANNED = 0x10,                  // Banned
-    ALREADY_ONLINE = 0x11,          // Already online
-    NO_TIME = 0x12,                 // No game time
-    DB_BUSY = 0x13,                 // DB busy
-    SUSPENDED = 0x14,               // Suspended
-    PARENTAL_CONTROL = 0x15,        // Parental control
-    LOCKED_ENFORCED = 0x16          // Account locked
+    // TrinityCore/AzerothCore auth response codes (3.3.5a)
+    OK = 0x0C,                      // Success, proceed to character screen
+    FAILED = 0x0D,                  // Generic failure
+    REJECT = 0x0E,                  // Reject
+    BAD_SERVER_PROOF = 0x0F,        // Bad server proof
+    UNAVAILABLE = 0x10,             // Unavailable
+    SYSTEM_ERROR = 0x11,            // System error
+    BILLING_ERROR = 0x12,           // Billing error
+    BILLING_EXPIRED = 0x13,         // Billing expired
+    VERSION_MISMATCH = 0x14,        // Version mismatch
+    UNKNOWN_ACCOUNT = 0x15,         // Unknown account
+    INCORRECT_PASSWORD = 0x16,      // Incorrect password
+    SESSION_EXPIRED = 0x17,         // Session expired
+    SERVER_SHUTTING_DOWN = 0x18,    // Server shutting down
+    ALREADY_LOGGING_IN = 0x19,      // Already logging in
+    LOGIN_SERVER_NOT_FOUND = 0x1A,  // Login server not found
+    WAIT_QUEUE = 0x1B,              // Wait queue
+    BANNED = 0x1C,                  // Banned
+    ALREADY_ONLINE = 0x1D,          // Already online
+    NO_TIME = 0x1E,                 // No game time
+    DB_BUSY = 0x1F,                 // DB busy
+    SUSPENDED = 0x20,               // Suspended
+    PARENTAL_CONTROL = 0x21,        // Parental control
+    LOCKED_ENFORCED = 0x22          // Account locked
 };
 
 /**
@@ -172,15 +174,54 @@ public:
 // Character Creation
 // ============================================================
 
+// WoW 3.3.5a ResponseCodes for character creation (from ResponseCodes enum)
 enum class CharCreateResult : uint8_t {
-    SUCCESS              = 0x00,
-    ERROR                = 0x01,
-    FAILED               = 0x02,
-    NAME_IN_USE          = 0x03,
-    DISABLED             = 0x04,
-    PVP_TEAMS_VIOLATION  = 0x05,
-    SERVER_LIMIT         = 0x06,
-    ACCOUNT_LIMIT        = 0x07,
+    // Success codes
+    SUCCESS              = 0x2F,  // CHAR_CREATE_SUCCESS
+
+    // CHAR_CREATE error codes
+    IN_PROGRESS          = 0x2E,  // CHAR_CREATE_IN_PROGRESS
+    ERROR                = 0x30,  // CHAR_CREATE_ERROR
+    FAILED               = 0x31,  // CHAR_CREATE_FAILED
+    NAME_IN_USE          = 0x32,  // CHAR_CREATE_NAME_IN_USE
+    DISABLED             = 0x33,  // CHAR_CREATE_DISABLED
+    PVP_TEAMS_VIOLATION  = 0x34,  // CHAR_CREATE_PVP_TEAMS_VIOLATION
+    SERVER_LIMIT         = 0x35,  // CHAR_CREATE_SERVER_LIMIT
+    ACCOUNT_LIMIT        = 0x36,  // CHAR_CREATE_ACCOUNT_LIMIT
+    SERVER_QUEUE         = 0x37,  // CHAR_CREATE_SERVER_QUEUE
+    ONLY_EXISTING        = 0x38,  // CHAR_CREATE_ONLY_EXISTING
+    EXPANSION            = 0x39,  // CHAR_CREATE_EXPANSION
+    EXPANSION_CLASS      = 0x3A,  // CHAR_CREATE_EXPANSION_CLASS
+    LEVEL_REQUIREMENT    = 0x3B,  // CHAR_CREATE_LEVEL_REQUIREMENT
+    UNIQUE_CLASS_LIMIT   = 0x3C,  // CHAR_CREATE_UNIQUE_CLASS_LIMIT
+    CHARACTER_IN_GUILD   = 0x3D,  // CHAR_CREATE_CHARACTER_IN_GUILD
+    RESTRICTED_RACECLASS = 0x3E,  // CHAR_CREATE_RESTRICTED_RACECLASS
+    CHARACTER_CHOOSE_RACE= 0x3F,  // CHAR_CREATE_CHARACTER_CHOOSE_RACE
+    CHARACTER_ARENA_LEADER=0x40,  // CHAR_CREATE_CHARACTER_ARENA_LEADER
+    CHARACTER_DELETE_MAIL= 0x41,  // CHAR_CREATE_CHARACTER_DELETE_MAIL
+    CHARACTER_SWAP_FACTION=0x42,  // CHAR_CREATE_CHARACTER_SWAP_FACTION
+    CHARACTER_RACE_ONLY  = 0x43,  // CHAR_CREATE_CHARACTER_RACE_ONLY
+    CHARACTER_GOLD_LIMIT = 0x44,  // CHAR_CREATE_CHARACTER_GOLD_LIMIT
+    FORCE_LOGIN          = 0x45,  // CHAR_CREATE_FORCE_LOGIN
+
+    // CHAR_NAME error codes (name validation failures)
+    NAME_SUCCESS         = 0x57,  // CHAR_NAME_SUCCESS
+    NAME_FAILURE         = 0x58,  // CHAR_NAME_FAILURE
+    NAME_NO_NAME         = 0x59,  // CHAR_NAME_NO_NAME
+    NAME_TOO_SHORT       = 0x5A,  // CHAR_NAME_TOO_SHORT
+    NAME_TOO_LONG        = 0x5B,  // CHAR_NAME_TOO_LONG
+    NAME_INVALID_CHARACTER = 0x5C,  // CHAR_NAME_INVALID_CHARACTER
+    NAME_MIXED_LANGUAGES = 0x5D,  // CHAR_NAME_MIXED_LANGUAGES
+    NAME_PROFANE         = 0x5E,  // CHAR_NAME_PROFANE
+    NAME_RESERVED        = 0x5F,  // CHAR_NAME_RESERVED
+    NAME_INVALID_APOSTROPHE = 0x60,  // CHAR_NAME_INVALID_APOSTROPHE
+    NAME_MULTIPLE_APOSTROPHES = 0x61,  // CHAR_NAME_MULTIPLE_APOSTROPHES
+    NAME_THREE_CONSECUTIVE = 0x62,  // CHAR_NAME_THREE_CONSECUTIVE (98 decimal)
+    NAME_INVALID_SPACE   = 0x63,  // CHAR_NAME_INVALID_SPACE
+    NAME_CONSECUTIVE_SPACES = 0x64,  // CHAR_NAME_CONSECUTIVE_SPACES
+    NAME_RUSSIAN_CONSECUTIVE_SILENT = 0x65,  // CHAR_NAME_RUSSIAN_CONSECUTIVE_SILENT_CHARACTERS
+    NAME_RUSSIAN_SILENT_AT_BEGIN_OR_END = 0x66,  // CHAR_NAME_RUSSIAN_SILENT_CHARACTER_AT_BEGINNING_OR_END
+    NAME_DECLENSION_DOESNT_MATCH = 0x67,  // CHAR_NAME_DECLENSION_DOESNT_MATCH_BASE_NAME
 };
 
 struct CharCreateData {
