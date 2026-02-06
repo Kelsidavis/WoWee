@@ -48,8 +48,9 @@ namespace core {
 namespace {
 
 const SpawnPreset* selectSpawnPreset(const char* envValue) {
+    // Return nullptr if no preset specified - use saved character position
     if (!envValue || !*envValue) {
-        return &SPAWN_PRESETS[0];
+        return nullptr;
     }
 
     std::string key = envValue;
