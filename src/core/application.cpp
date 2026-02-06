@@ -1790,17 +1790,17 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                           " hands=", extra.equipDisplayId[8], " tabard=", extra.equipDisplayId[9],
                           " cape=", extra.equipDisplayId[10]);
 
-                // Use baked texture directly (256x256 - equipment overlays not compatible)
-                // Baked NPC textures already include the complete body skin with face
+                // Use baked texture as-is (baked textures already include full NPC appearance)
+                // Equipment component textures are only for player characters with CharComponentTextureSections UV layout
                 if (!extra.bakeName.empty()) {
                     std::string bakePath = "Textures\\BakedNpcTextures\\" + extra.bakeName;
-                    GLuint bakeTex = charRenderer->loadTexture(bakePath);
-                    if (bakeTex != 0) {
-                        // Apply to type-1 texture slot (body skin)
+                    GLuint finalTex = charRenderer->loadTexture(bakePath);
+
+                    if (finalTex != 0) {
                         for (size_t ti = 0; ti < model.textures.size(); ti++) {
                             if (model.textures[ti].type == 1) {
-                                charRenderer->setModelTexture(modelId, static_cast<uint32_t>(ti), bakeTex);
-                                LOG_DEBUG("Applied baked NPC texture: ", bakePath, " to slot ", ti);
+                                charRenderer->setModelTexture(modelId, static_cast<uint32_t>(ti), finalTex);
+                                LOG_DEBUG("Applied baked NPC texture to slot ", ti, ": ", bakePath);
                                 hasHumanoidTexture = true;
                             }
                         }

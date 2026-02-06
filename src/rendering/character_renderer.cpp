@@ -580,9 +580,33 @@ GLuint CharacterRenderer::compositeWithRegions(const std::string& basePath,
         return whiteTexture;
     }
 
-    std::vector<uint8_t> composite = base.data;
+    std::vector<uint8_t> composite;
     int width = base.width;
     int height = base.height;
+
+    // If base texture is 256x256 (e.g., baked NPC texture), upscale to 512x512
+    // so equipment regions can be composited at correct coordinates
+    if (width == 256 && height == 256 && !regionLayers.empty()) {
+        width = 512;
+        height = 512;
+        composite.resize(width * height * 4);
+        // Simple 2x nearest-neighbor upscale
+        for (int y = 0; y < 512; y++) {
+            for (int x = 0; x < 512; x++) {
+                int srcX = x / 2;
+                int srcY = y / 2;
+                int srcIdx = (srcY * 256 + srcX) * 4;
+                int dstIdx = (y * 512 + x) * 4;
+                composite[dstIdx + 0] = base.data[srcIdx + 0];
+                composite[dstIdx + 1] = base.data[srcIdx + 1];
+                composite[dstIdx + 2] = base.data[srcIdx + 2];
+                composite[dstIdx + 3] = base.data[srcIdx + 3];
+            }
+        }
+        core::Logger::getInstance().info("compositeWithRegions: upscaled 256x256 to 512x512");
+    } else {
+        composite = base.data;
+    }
 
     // Blend underwear overlays (same logic as compositeTextures)
     for (const auto& ul : baseLayers) {
