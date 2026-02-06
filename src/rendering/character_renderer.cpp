@@ -1240,6 +1240,22 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
                     }
                 }
 
+                // For body parts with white/fallback texture, use first valid texture
+                // This handles humanoid models where some body parts use different texture slots
+                // that may not be set (e.g., baked NPC textures only set slot 0)
+                if (texId == whiteTexture) {
+                    uint16_t group = batch.submeshId / 100;
+                    if (group == 0) {
+                        // Find first non-white texture in the model
+                        for (GLuint tid : gpuModel.textureIds) {
+                            if (tid != whiteTexture && tid != 0) {
+                                texId = tid;
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, texId);
 
