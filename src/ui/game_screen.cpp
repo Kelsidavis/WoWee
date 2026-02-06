@@ -1802,6 +1802,23 @@ void GameScreen::renderSettingsWindow() {
         {3840, 2160},
     };
     static const int kResCount = sizeof(kResolutions) / sizeof(kResolutions[0]);
+    constexpr int kDefaultResW = 1920;
+    constexpr int kDefaultResH = 1080;
+    constexpr bool kDefaultFullscreen = false;
+    constexpr bool kDefaultVsync = true;
+    constexpr bool kDefaultShadows = true;
+    constexpr int kDefaultMusicVolume = 30;
+    constexpr int kDefaultSfxVolume = 100;
+    constexpr float kDefaultMouseSensitivity = 0.2f;
+    constexpr bool kDefaultInvertMouse = false;
+
+    int defaultResIndex = 0;
+    for (int i = 0; i < kResCount; i++) {
+        if (kResolutions[i][0] == kDefaultResW && kResolutions[i][1] == kDefaultResH) {
+            defaultResIndex = i;
+            break;
+        }
+    }
 
     if (!settingsInit) {
         pendingFullscreen = window->isFullscreen();
@@ -1822,6 +1839,10 @@ void GameScreen::renderSettingsWindow() {
                 if (pendingSfxVolume < 0) pendingSfxVolume = 0;
                 if (pendingSfxVolume > 100) pendingSfxVolume = 100;
             }
+            if (auto* cameraController = renderer->getCameraController()) {
+                pendingMouseSensitivity = cameraController->getMouseSensitivity();
+                pendingInvertMouse = cameraController->isInvertMouse();
+            }
         }
         pendingResIndex = 0;
         int curW = window->getWidth();
@@ -1832,13 +1853,34 @@ void GameScreen::renderSettingsWindow() {
                 break;
             }
         }
+        if (auto* gameHandler = core::Application::getInstance().getGameHandler()) {
+            if (gameHandler->isSinglePlayerMode()) {
+                game::GameHandler::SinglePlayerSettings spSettings;
+                if (gameHandler->getSinglePlayerSettings(spSettings)) {
+                    pendingFullscreen = spSettings.fullscreen;
+                    pendingVsync = spSettings.vsync;
+                    pendingShadows = spSettings.shadows;
+                    pendingMusicVolume = spSettings.musicVolume;
+                    pendingSfxVolume = spSettings.sfxVolume;
+                    pendingMouseSensitivity = spSettings.mouseSensitivity;
+                    pendingInvertMouse = spSettings.invertMouse;
+                    for (int i = 0; i < kResCount; i++) {
+                        if (kResolutions[i][0] == spSettings.resWidth &&
+                            kResolutions[i][1] == spSettings.resHeight) {
+                            pendingResIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         settingsInit = true;
     }
 
     ImGuiIO& io = ImGui::GetIO();
     float screenW = io.DisplaySize.x;
     float screenH = io.DisplaySize.y;
-    ImVec2 size(380.0f, 320.0f);
+    ImVec2 size(400.0f, 420.0f);
     ImVec2 pos((screenW - size.x) * 0.5f, (screenH - size.y) * 0.5f);
 
     ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
@@ -1863,6 +1905,12 @@ void GameScreen::renderSettingsWindow() {
             resItems[i] = resBuf[i];
         }
         ImGui::Combo(resLabel, &pendingResIndex, resItems, kResCount);
+        if (ImGui::Button("Restore Video Defaults", ImVec2(-1, 0))) {
+            pendingFullscreen = kDefaultFullscreen;
+            pendingVsync = kDefaultVsync;
+            pendingShadows = kDefaultShadows;
+            pendingResIndex = defaultResIndex;
+        }
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -1871,6 +1919,22 @@ void GameScreen::renderSettingsWindow() {
         ImGui::Text("Audio");
         ImGui::SliderInt("Music Volume", &pendingMusicVolume, 0, 100, "%d");
         ImGui::SliderInt("SFX Volume", &pendingSfxVolume, 0, 100, "%d");
+        if (ImGui::Button("Restore Audio Defaults", ImVec2(-1, 0))) {
+            pendingMusicVolume = kDefaultMusicVolume;
+            pendingSfxVolume = kDefaultSfxVolume;
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Text("Controls");
+        ImGui::SliderFloat("Mouse Sensitivity", &pendingMouseSensitivity, 0.05f, 1.0f, "%.2f");
+        ImGui::Checkbox("Invert Mouse", &pendingInvertMouse);
+        if (ImGui::Button("Restore Control Defaults", ImVec2(-1, 0))) {
+            pendingMouseSensitivity = kDefaultMouseSensitivity;
+            pendingInvertMouse = kDefaultInvertMouse;
+        }
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -1890,6 +1954,25 @@ void GameScreen::renderSettingsWindow() {
                 }
                 if (auto* activity = renderer->getActivitySoundManager()) {
                     activity->setVolumeScale(sfxScale);
+                }
+                if (auto* cameraController = renderer->getCameraController()) {
+                    cameraController->setMouseSensitivity(pendingMouseSensitivity);
+                    cameraController->setInvertMouse(pendingInvertMouse);
+                }
+            }
+            if (auto* gameHandler = core::Application::getInstance().getGameHandler()) {
+                if (gameHandler->isSinglePlayerMode()) {
+                    game::GameHandler::SinglePlayerSettings spSettings;
+                    spSettings.fullscreen = pendingFullscreen;
+                    spSettings.vsync = pendingVsync;
+                    spSettings.shadows = pendingShadows;
+                    spSettings.resWidth = kResolutions[pendingResIndex][0];
+                    spSettings.resHeight = kResolutions[pendingResIndex][1];
+                    spSettings.musicVolume = pendingMusicVolume;
+                    spSettings.sfxVolume = pendingSfxVolume;
+                    spSettings.mouseSensitivity = pendingMouseSensitivity;
+                    spSettings.invertMouse = pendingInvertMouse;
+                    gameHandler->setSinglePlayerSettings(spSettings);
                 }
             }
         }

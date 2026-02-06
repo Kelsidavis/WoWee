@@ -23,6 +23,9 @@ public:
 
     void setMovementSpeed(float speed) { movementSpeed = speed; }
     void setMouseSensitivity(float sensitivity) { mouseSensitivity = sensitivity; }
+    float getMouseSensitivity() const { return mouseSensitivity; }
+    void setInvertMouse(bool invert) { invertMouse = invert; }
+    bool isInvertMouse() const { return invertMouse; }
     void setEnabled(bool enabled) { this->enabled = enabled; }
     void setTerrainManager(TerrainManager* tm) { terrainManager = tm; }
     void setWMORenderer(WMORenderer* wmo) { wmoRenderer = wmo; }
@@ -90,6 +93,7 @@ private:
 
     // Mouse settings
     float mouseSensitivity = 0.2f;
+    bool invertMouse = false;
     bool mouseButtonDown = false;
     bool leftMouseDown = false;
     bool rightMouseDown = false;

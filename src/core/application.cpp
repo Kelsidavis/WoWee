@@ -1151,6 +1151,32 @@ void Application::startSinglePlayer() {
     // Load weapon models for equipped items (after inventory is populated)
     loadEquippedWeapons();
 
+    if (gameHandler && renderer && window) {
+        game::GameHandler::SinglePlayerSettings settings;
+        if (gameHandler->getSinglePlayerSettings(settings)) {
+            window->setVsync(settings.vsync);
+            window->setFullscreen(settings.fullscreen);
+            if (settings.resWidth > 0 && settings.resHeight > 0) {
+                window->applyResolution(settings.resWidth, settings.resHeight);
+            }
+            renderer->setShadowsEnabled(settings.shadows);
+            if (auto* music = renderer->getMusicManager()) {
+                music->setVolume(settings.musicVolume);
+            }
+            float sfxScale = static_cast<float>(settings.sfxVolume) / 100.0f;
+            if (auto* footstep = renderer->getFootstepManager()) {
+                footstep->setVolumeScale(sfxScale);
+            }
+            if (auto* activity = renderer->getActivitySoundManager()) {
+                activity->setVolumeScale(sfxScale);
+            }
+            if (auto* cameraController = renderer->getCameraController()) {
+                cameraController->setMouseSensitivity(settings.mouseSensitivity);
+                cameraController->setInvertMouse(settings.invertMouse);
+            }
+        }
+    }
+
     // --- Loading screen: load terrain and wait for streaming before spawning ---
     const SpawnPreset* spawnPreset = selectSpawnPreset(std::getenv("WOW_SPAWN"));
     // Canonical WoW coords: +X=North, +Y=West, +Z=Up

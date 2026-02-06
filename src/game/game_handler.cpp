@@ -193,6 +193,18 @@ struct SinglePlayerSqlite {
             " status INTEGER,"
             " progress INTEGER,"
             " PRIMARY KEY (guid, quest)"
+            ");"
+            "CREATE TABLE IF NOT EXISTS character_settings ("
+            " guid INTEGER PRIMARY KEY,"
+            " fullscreen INTEGER,"
+            " vsync INTEGER,"
+            " shadows INTEGER,"
+            " res_w INTEGER,"
+            " res_h INTEGER,"
+            " music_volume INTEGER,"
+            " sfx_volume INTEGER,"
+            " mouse_sensitivity REAL,"
+            " invert_mouse INTEGER"
             ");";
         return exec(kSchema);
     }
@@ -1354,6 +1366,19 @@ void GameHandler::setSinglePlayerCharListReady() {
     setState(WorldState::CHAR_LIST_RECEIVED);
 }
 
+bool GameHandler::getSinglePlayerSettings(SinglePlayerSettings& out) const {
+    if (!singlePlayerMode_ || !spSettingsLoaded_) return false;
+    out = spSettings_;
+    return true;
+}
+
+void GameHandler::setSinglePlayerSettings(const SinglePlayerSettings& settings) {
+    if (!singlePlayerMode_) return;
+    spSettings_ = settings;
+    spSettingsLoaded_ = true;
+    markSinglePlayerDirty(SP_DIRTY_SETTINGS, true);
+}
+
 bool GameHandler::getSinglePlayerCreateInfo(Race race, Class cls, SinglePlayerCreateInfo& out) const {
     auto& db = getSinglePlayerCreateDb();
     uint16_t key = static_cast<uint16_t>((static_cast<uint32_t>(race) << 8) |
@@ -1432,6 +1457,8 @@ bool GameHandler::loadSinglePlayerCharacterState(uint64_t guid) {
     if (!singlePlayerMode_) return false;
     auto& sp = getSinglePlayerSqlite();
     if (!sp.db) return false;
+
+    spSettingsLoaded_ = false;
 
     const char* sqlChar =
         "SELECT level, zone, map, position_x, position_y, position_z, orientation, money, xp, health, max_health, has_state "
@@ -1608,6 +1635,26 @@ bool GameHandler::loadSinglePlayerCharacterState(uint64_t guid) {
     spLastDirtyZ_ = movementInfo.z;
     spLastDirtyOrientation_ = movementInfo.orientation;
 
+    const char* sqlSettings =
+        "SELECT fullscreen, vsync, shadows, res_w, res_h, music_volume, sfx_volume, mouse_sensitivity, invert_mouse "
+        "FROM character_settings WHERE guid=?;";
+    if (sqlite3_prepare_v2(sp.db, sqlSettings, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(guid));
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            spSettings_.fullscreen = sqlite3_column_int(stmt, 0) != 0;
+            spSettings_.vsync = sqlite3_column_int(stmt, 1) != 0;
+            spSettings_.shadows = sqlite3_column_int(stmt, 2) != 0;
+            spSettings_.resWidth = sqlite3_column_int(stmt, 3);
+            spSettings_.resHeight = sqlite3_column_int(stmt, 4);
+            spSettings_.musicVolume = sqlite3_column_int(stmt, 5);
+            spSettings_.sfxVolume = sqlite3_column_int(stmt, 6);
+            spSettings_.mouseSensitivity = static_cast<float>(sqlite3_column_double(stmt, 7));
+            spSettings_.invertMouse = sqlite3_column_int(stmt, 8) != 0;
+            spSettingsLoaded_ = true;
+        }
+        sqlite3_finalize(stmt);
+    }
+
     return true;
 }
 
@@ -1759,6 +1806,32 @@ void GameHandler::saveSinglePlayerCharacterState(bool force) {
 
     spHasState_[activeCharacterGuid_] = true;
     spSavedOrientation_[activeCharacterGuid_] = movementInfo.orientation;
+
+    if (spSettingsLoaded_ && (force || (spDirtyFlags_ & SP_DIRTY_SETTINGS))) {
+        const char* upsertSettings =
+            "INSERT INTO character_settings "
+            "(guid, fullscreen, vsync, shadows, res_w, res_h, music_volume, sfx_volume, mouse_sensitivity, invert_mouse) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(guid) DO UPDATE SET "
+            "fullscreen=excluded.fullscreen, vsync=excluded.vsync, shadows=excluded.shadows, "
+            "res_w=excluded.res_w, res_h=excluded.res_h, music_volume=excluded.music_volume, "
+            "sfx_volume=excluded.sfx_volume, mouse_sensitivity=excluded.mouse_sensitivity, "
+            "invert_mouse=excluded.invert_mouse;";
+        if (sqlite3_prepare_v2(sp.db, upsertSettings, -1, &stmt, nullptr) == SQLITE_OK) {
+            sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(activeCharacterGuid_));
+            sqlite3_bind_int(stmt, 2, spSettings_.fullscreen ? 1 : 0);
+            sqlite3_bind_int(stmt, 3, spSettings_.vsync ? 1 : 0);
+            sqlite3_bind_int(stmt, 4, spSettings_.shadows ? 1 : 0);
+            sqlite3_bind_int(stmt, 5, spSettings_.resWidth);
+            sqlite3_bind_int(stmt, 6, spSettings_.resHeight);
+            sqlite3_bind_int(stmt, 7, spSettings_.musicVolume);
+            sqlite3_bind_int(stmt, 8, spSettings_.sfxVolume);
+            sqlite3_bind_double(stmt, 9, spSettings_.mouseSensitivity);
+            sqlite3_bind_int(stmt, 10, spSettings_.invertMouse ? 1 : 0);
+            sqlite3_step(stmt);
+            sqlite3_finalize(stmt);
+        }
+    }
 
     sqlite3_stmt* del = nullptr;
     const char* delInv = "DELETE FROM character_inventory WHERE guid=?;";

@@ -952,7 +952,8 @@ void CameraController::processMouseMotion(const SDL_MouseMotionEvent& event) {
 
     // Directly update stored yaw/pitch (no lossy forward-vector derivation)
     yaw -= event.xrel * mouseSensitivity;
-    pitch += event.yrel * mouseSensitivity;
+    float invert = invertMouse ? -1.0f : 1.0f;
+    pitch += event.yrel * mouseSensitivity * invert;
 
     // WoW-style pitch limits: can look almost straight down, limited upward
     pitch = glm::clamp(pitch, MIN_PITCH, MAX_PITCH);

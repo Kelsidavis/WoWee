@@ -173,6 +173,19 @@ public:
 
     // Single-player: mark character list ready for selection UI
     void setSinglePlayerCharListReady();
+    struct SinglePlayerSettings {
+        bool fullscreen = false;
+        bool vsync = true;
+        bool shadows = true;
+        int resWidth = 1920;
+        int resHeight = 1080;
+        int musicVolume = 30;
+        int sfxVolume = 100;
+        float mouseSensitivity = 0.2f;
+        bool invertMouse = false;
+    };
+    bool getSinglePlayerSettings(SinglePlayerSettings& out) const;
+    void setSinglePlayerSettings(const SinglePlayerSettings& settings);
 
     // Inventory
     Inventory& getInventory() { return inventory; }
@@ -600,6 +613,7 @@ private:
         SP_DIRTY_XP         = 1 << 7,
         SP_DIRTY_POSITION   = 1 << 8,
         SP_DIRTY_STATS      = 1 << 9,
+        SP_DIRTY_SETTINGS   = 1 << 10,
         SP_DIRTY_ALL        = 0xFFFFFFFFu
     };
     void markSinglePlayerDirty(uint32_t flags, bool highPriority);
@@ -616,6 +630,8 @@ private:
     float spLastDirtyOrientation_ = 0.0f;
     std::unordered_map<uint64_t, bool> spHasState_;
     std::unordered_map<uint64_t, float> spSavedOrientation_;
+    SinglePlayerSettings spSettings_{};
+    bool spSettingsLoaded_ = false;
 };
 
 } // namespace game
