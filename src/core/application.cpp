@@ -1783,7 +1783,15 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                 LOG_DEBUG("  Found humanoid extra: raceId=", (int)extra.raceId, " sexId=", (int)extra.sexId,
                           " hairStyle=", (int)extra.hairStyleId, " hairColor=", (int)extra.hairColorId,
                           " bakeName='", extra.bakeName, "'");
-                // Use baked texture if available (bakeName already includes .blp extension)
+                LOG_DEBUG("  Equipment: helm=", extra.equipDisplayId[0], " shoulder=", extra.equipDisplayId[1],
+                          " shirt=", extra.equipDisplayId[2], " chest=", extra.equipDisplayId[3],
+                          " belt=", extra.equipDisplayId[4], " legs=", extra.equipDisplayId[5],
+                          " feet=", extra.equipDisplayId[6], " wrist=", extra.equipDisplayId[7],
+                          " hands=", extra.equipDisplayId[8], " tabard=", extra.equipDisplayId[9],
+                          " cape=", extra.equipDisplayId[10]);
+
+                // Use baked texture directly (256x256 - equipment overlays not compatible)
+                // Baked NPC textures already include the complete body skin with face
                 if (!extra.bakeName.empty()) {
                     std::string bakePath = "Textures\\BakedNpcTextures\\" + extra.bakeName;
                     GLuint bakeTex = charRenderer->loadTexture(bakePath);
@@ -1992,6 +2000,56 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                       " facial=", 201 + extra.facialHairId,
                       " chest=", geosetChest, " pants=", geosetPants,
                       " boots=", geosetBoots, " gloves=", geosetGloves);
+
+            // Load and attach helmet model if equipped
+            if (extra.equipDisplayId[0] != 0 && itemDisplayDbc) {
+                int32_t helmIdx = itemDisplayDbc->findRecordById(extra.equipDisplayId[0]);
+                if (helmIdx >= 0) {
+                    // Get helmet model name from ItemDisplayInfo.dbc (col 1 = LeftModel)
+                    std::string helmModelName = itemDisplayDbc->getString(static_cast<uint32_t>(helmIdx), 1);
+                    if (!helmModelName.empty()) {
+                        // Convert .mdx to .m2
+                        size_t dotPos = helmModelName.rfind('.');
+                        if (dotPos != std::string::npos) {
+                            helmModelName = helmModelName.substr(0, dotPos) + ".m2";
+                        } else {
+                            helmModelName += ".m2";
+                        }
+
+                        // Try to load helmet from various paths
+                        std::string helmPath = "Item\\ObjectComponents\\Head\\" + helmModelName;
+                        auto helmData = assetManager->readFile(helmPath);
+                        if (helmData.empty()) {
+                            // Try alternate path
+                            helmPath = "Item\\ObjectComponents\\Helmet\\" + helmModelName;
+                            helmData = assetManager->readFile(helmPath);
+                        }
+
+                        if (!helmData.empty()) {
+                            auto helmModel = pipeline::M2Loader::load(helmData);
+                            // Load skin
+                            std::string skinPath = helmPath.substr(0, helmPath.size() - 3) + "00.skin";
+                            auto skinData = assetManager->readFile(skinPath);
+                            if (!skinData.empty()) {
+                                pipeline::M2Loader::loadSkin(skinData, helmModel);
+                            }
+
+                            if (helmModel.isValid()) {
+                                // Attachment point 11 = Head
+                                uint32_t helmModelId = nextCreatureModelId_++;
+                                // Get texture from ItemDisplayInfo (col 3 = LeftModelTexture)
+                                std::string helmTexName = itemDisplayDbc->getString(static_cast<uint32_t>(helmIdx), 3);
+                                std::string helmTexPath;
+                                if (!helmTexName.empty()) {
+                                    helmTexPath = "Item\\ObjectComponents\\Head\\" + helmTexName + ".blp";
+                                }
+                                charRenderer->attachWeapon(instanceId, 11, helmModel, helmModelId, helmTexPath);
+                                LOG_DEBUG("Attached helmet model: ", helmPath);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
