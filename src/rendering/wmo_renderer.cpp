@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <limits>
 #include <unordered_set>
 
@@ -309,6 +311,44 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
         return false;
     }
 
+    // Build pre-merged batches for each group (texture-sorted for efficient rendering)
+    for (auto& groupRes : modelData.groups) {
+        std::unordered_map<uint64_t, GroupResources::MergedBatch> batchMap;
+
+        for (const auto& batch : groupRes.batches) {
+            GLuint texId = whiteTexture;
+            bool hasTexture = false;
+
+            if (batch.materialId < modelData.materialTextureIndices.size()) {
+                uint32_t texIndex = modelData.materialTextureIndices[batch.materialId];
+                if (texIndex < modelData.textures.size()) {
+                    texId = modelData.textures[texIndex];
+                    hasTexture = (texId != 0 && texId != whiteTexture);
+                }
+            }
+
+            bool alphaTest = false;
+            if (batch.materialId < modelData.materialBlendModes.size()) {
+                alphaTest = (modelData.materialBlendModes[batch.materialId] == 1);
+            }
+
+            uint64_t key = (static_cast<uint64_t>(texId) << 1) | (alphaTest ? 1 : 0);
+            auto& mb = batchMap[key];
+            if (mb.counts.empty()) {
+                mb.texId = texId;
+                mb.hasTexture = hasTexture;
+                mb.alphaTest = alphaTest;
+            }
+            mb.counts.push_back(static_cast<GLsizei>(batch.indexCount));
+            mb.offsets.push_back(reinterpret_cast<const void*>(batch.startIndex * sizeof(uint16_t)));
+        }
+
+        groupRes.mergedBatches.reserve(batchMap.size());
+        for (auto& [key, mb] : batchMap) {
+            groupRes.mergedBatches.push_back(std::move(mb));
+        }
+    }
+
     // Copy portal data for visibility culling
     modelData.portalVertices = model.portalVertices;
     for (const auto& portal : model.portals) {
@@ -452,6 +492,7 @@ void WMORenderer::clearInstances() {
     instances.clear();
     spatialGrid.clear();
     instanceIndexById.clear();
+    precomputedFloorGrid.clear();  // Invalidate floor cache when instances change
     core::Logger::getInstance().info("Cleared all WMO instances");
 }
 
@@ -469,6 +510,76 @@ void WMORenderer::clearCollisionFocus() {
 void WMORenderer::resetQueryStats() {
     queryTimeMs = 0.0;
     queryCallCount = 0;
+    currentFrameId++;
+    // Note: precomputedFloorGrid is persistent and not cleared per-frame
+}
+
+bool WMORenderer::saveFloorCache(const std::string& filepath) const {
+    // Create directory if needed
+    std::filesystem::path path(filepath);
+    if (path.has_parent_path()) {
+        std::filesystem::create_directories(path.parent_path());
+    }
+
+    std::ofstream file(filepath, std::ios::binary);
+    if (!file) {
+        core::Logger::getInstance().error("Failed to open floor cache file for writing: ", filepath);
+        return false;
+    }
+
+    // Write header: magic + version + count
+    const uint32_t magic = 0x574D4F46;  // "WMOF"
+    const uint32_t version = 1;
+    const uint64_t count = precomputedFloorGrid.size();
+
+    file.write(reinterpret_cast<const char*>(&magic), sizeof(magic));
+    file.write(reinterpret_cast<const char*>(&version), sizeof(version));
+    file.write(reinterpret_cast<const char*>(&count), sizeof(count));
+
+    // Write each entry: key (uint64) + height (float)
+    for (const auto& [key, height] : precomputedFloorGrid) {
+        file.write(reinterpret_cast<const char*>(&key), sizeof(key));
+        file.write(reinterpret_cast<const char*>(&height), sizeof(height));
+    }
+
+    core::Logger::getInstance().info("Saved WMO floor cache: ", count, " entries to ", filepath);
+    return true;
+}
+
+bool WMORenderer::loadFloorCache(const std::string& filepath) {
+    std::ifstream file(filepath, std::ios::binary);
+    if (!file) {
+        core::Logger::getInstance().info("No existing floor cache file: ", filepath);
+        return false;
+    }
+
+    // Read and validate header
+    uint32_t magic = 0, version = 0;
+    uint64_t count = 0;
+
+    file.read(reinterpret_cast<char*>(&magic), sizeof(magic));
+    file.read(reinterpret_cast<char*>(&version), sizeof(version));
+    file.read(reinterpret_cast<char*>(&count), sizeof(count));
+
+    if (magic != 0x574D4F46 || version != 1) {
+        core::Logger::getInstance().warning("Invalid floor cache file format: ", filepath);
+        return false;
+    }
+
+    // Read entries
+    precomputedFloorGrid.clear();
+    precomputedFloorGrid.reserve(count);
+
+    for (uint64_t i = 0; i < count; i++) {
+        uint64_t key;
+        float height;
+        file.read(reinterpret_cast<char*>(&key), sizeof(key));
+        file.read(reinterpret_cast<char*>(&height), sizeof(height));
+        precomputedFloorGrid[key] = height;
+    }
+
+    core::Logger::getInstance().info("Loaded WMO floor cache: ", precomputedFloorGrid.size(), " entries from ", filepath);
+    return true;
 }
 
 WMORenderer::GridCell WMORenderer::toCell(const glm::vec3& p) const {
@@ -561,6 +672,10 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
         glBindTexture(GL_TEXTURE_2D, shadowDepthTex);
         shader->setUniform("uShadowMap", 7);
     }
+
+    // Set up texture unit 0 for diffuse textures (set once per frame)
+    glActiveTexture(GL_TEXTURE0);
+    shader->setUniform("uTexture", 0);
 
     // Enable wireframe if requested
     if (wireframeMode) {
@@ -657,7 +772,7 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
                 // Hard distance cutoff - skip groups entirely if closest point is too far
                 glm::vec3 closestPoint = glm::clamp(camPos, gMin, gMax);
                 float distSq = glm::dot(closestPoint - camPos, closestPoint - camPos);
-                if (distSq > 40000.0f) {  // Beyond 200 units - hard skip
+                if (distSq > 6400.0f) {  // Beyond 80 units - hard skip
                     lastDistanceCulledGroups++;
                     continue;
                 }
@@ -822,40 +937,34 @@ bool WMORenderer::createGroupResources(const pipeline::WMOGroup& group, GroupRes
     return true;
 }
 
-void WMORenderer::renderGroup(const GroupResources& group, const ModelData& model,
+void WMORenderer::renderGroup(const GroupResources& group, [[maybe_unused]] const ModelData& model,
                               [[maybe_unused]] const glm::mat4& modelMatrix,
                               [[maybe_unused]] const glm::mat4& view,
                               [[maybe_unused]] const glm::mat4& projection) {
     glBindVertexArray(group.vao);
 
-    // Render each batch in original order (sorting breaks depth/alpha)
-    for (const auto& batch : group.batches) {
-        // Bind texture for this batch's material
-        GLuint texId = whiteTexture;
-        bool hasTexture = false;
+    // Use pre-computed merged batches (built at load time)
+    // Track bound state to avoid redundant GL calls
+    static GLuint lastBoundTex = 0;
+    static bool lastHasTexture = false;
+    static bool lastAlphaTest = false;
 
-        if (batch.materialId < model.materialTextureIndices.size()) {
-            uint32_t texIndex = model.materialTextureIndices[batch.materialId];
-            if (texIndex < model.textures.size()) {
-                texId = model.textures[texIndex];
-                hasTexture = (texId != 0 && texId != whiteTexture);
-            }
+    for (const auto& mb : group.mergedBatches) {
+        if (mb.texId != lastBoundTex) {
+            glBindTexture(GL_TEXTURE_2D, mb.texId);
+            lastBoundTex = mb.texId;
+        }
+        if (mb.hasTexture != lastHasTexture) {
+            shader->setUniform("uHasTexture", mb.hasTexture);
+            lastHasTexture = mb.hasTexture;
+        }
+        if (mb.alphaTest != lastAlphaTest) {
+            shader->setUniform("uAlphaTest", mb.alphaTest);
+            lastAlphaTest = mb.alphaTest;
         }
 
-        // Determine if this material uses alpha-test cutout (blendMode 1)
-        bool alphaTest = false;
-        if (batch.materialId < model.materialBlendModes.size()) {
-            alphaTest = (model.materialBlendModes[batch.materialId] == 1);
-        }
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texId);
-        shader->setUniform("uTexture", 0);
-        shader->setUniform("uHasTexture", hasTexture);
-        shader->setUniform("uAlphaTest", alphaTest);
-
-        glDrawElements(GL_TRIANGLES, batch.indexCount, GL_UNSIGNED_SHORT,
-                      (void*)(batch.startIndex * sizeof(uint16_t)));
+        glMultiDrawElements(GL_TRIANGLES, mb.counts.data(), GL_UNSIGNED_SHORT,
+                            mb.offsets.data(), static_cast<GLsizei>(mb.counts.size()));
         lastDrawCalls++;
     }
 
@@ -1209,6 +1318,17 @@ static glm::vec3 closestPointOnTriangle(const glm::vec3& p, const glm::vec3& a,
 }
 
 std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ) const {
+    // Check persistent grid cache first (computed lazily, never expires)
+    uint64_t gridKey = floorGridKey(glX, glY);
+    auto gridIt = precomputedFloorGrid.find(gridKey);
+    if (gridIt != precomputedFloorGrid.end()) {
+        float cachedHeight = gridIt->second;
+        // Only use if cached height is below query point (not a ceiling)
+        if (cachedHeight <= glZ + 2.0f) {
+            return cachedHeight;
+        }
+    }
+
     QueryTimer timer(&queryTimeMs, &queryCallCount);
     std::optional<float> bestFloor;
 
@@ -1302,6 +1422,11 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
                 groupsSkipped, " skipped, ", trianglesHit, " hits, best=",
                 bestFloor ? std::to_string(*bestFloor) : "none");
         }
+    }
+
+    // Cache the result in persistent grid (never expires)
+    if (bestFloor) {
+        precomputedFloorGrid[gridKey] = *bestFloor;
     }
 
     return bestFloor;

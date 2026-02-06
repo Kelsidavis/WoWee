@@ -291,7 +291,7 @@ void CameraController::update(float deltaTime) {
                 glm::vec3 swimFrom = *followTarget;
                 glm::vec3 swimTo = targetPos;
                 float swimMoveDist = glm::length(swimTo - swimFrom);
-                int swimSteps = std::max(1, std::min(12, static_cast<int>(std::ceil(swimMoveDist / 0.22f))));
+                int swimSteps = std::max(1, std::min(4, static_cast<int>(std::ceil(swimMoveDist / 0.5f))));
                 glm::vec3 stepPos = swimFrom;
                 glm::vec3 stepDelta = (swimTo - swimFrom) / static_cast<float>(swimSteps);
 
@@ -357,9 +357,9 @@ void CameraController::update(float deltaTime) {
             glm::vec3 desiredPos = targetPos;
             float moveDist = glm::length(desiredPos - startPos);
             // Adaptive CCD: keep per-step movement short, especially on low FPS spikes.
-            int sweepSteps = std::max(1, std::min(14, static_cast<int>(std::ceil(moveDist / 0.24f))));
+            int sweepSteps = std::max(1, std::min(4, static_cast<int>(std::ceil(moveDist / 0.5f))));
             if (deltaTime > 0.04f) {
-                sweepSteps = std::min(16, std::max(sweepSteps, static_cast<int>(std::ceil(deltaTime / 0.016f)) * 2));
+                sweepSteps = std::min(6, std::max(sweepSteps, static_cast<int>(std::ceil(deltaTime / 0.016f))));
             }
             glm::vec3 stepPos = startPos;
             glm::vec3 stepDelta = (desiredPos - startPos) / static_cast<float>(sweepSteps);
@@ -779,9 +779,9 @@ void CameraController::update(float deltaTime) {
             glm::vec3 startFeet = camera->getPosition() - glm::vec3(0, 0, eyeHeight);
             glm::vec3 desiredFeet = newPos - glm::vec3(0, 0, eyeHeight);
             float moveDist = glm::length(desiredFeet - startFeet);
-            int sweepSteps = std::max(1, std::min(14, static_cast<int>(std::ceil(moveDist / 0.24f))));
+            int sweepSteps = std::max(1, std::min(4, static_cast<int>(std::ceil(moveDist / 0.5f))));
             if (deltaTime > 0.04f) {
-                sweepSteps = std::min(16, std::max(sweepSteps, static_cast<int>(std::ceil(deltaTime / 0.016f)) * 2));
+                sweepSteps = std::min(6, std::max(sweepSteps, static_cast<int>(std::ceil(deltaTime / 0.016f))));
             }
             glm::vec3 stepPos = startFeet;
             glm::vec3 stepDelta = (desiredFeet - startFeet) / static_cast<float>(sweepSteps);

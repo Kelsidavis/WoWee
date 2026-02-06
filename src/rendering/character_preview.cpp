@@ -241,7 +241,10 @@ bool CharacterPreview::loadCharacter(game::Race race, game::Gender gender,
         }
     }
 
-    charRenderer_->loadModel(model, PREVIEW_MODEL_ID);
+    if (!charRenderer_->loadModel(model, PREVIEW_MODEL_ID)) {
+        LOG_WARNING("CharacterPreview: failed to load model to GPU");
+        return false;
+    }
 
     // Composite body skin + face + underwear overlays
     if (!bodySkinPath.empty()) {
@@ -331,7 +334,9 @@ void CharacterPreview::update(float deltaTime) {
 }
 
 void CharacterPreview::render() {
-    if (!fbo_ || !charRenderer_ || !camera_ || !modelLoaded_) return;
+    if (!fbo_ || !charRenderer_ || !camera_ || !modelLoaded_) {
+        return;
+    }
 
     // Save current viewport
     GLint prevViewport[4];

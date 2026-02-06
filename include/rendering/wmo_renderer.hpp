@@ -222,6 +222,11 @@ public:
     double getQueryTimeMs() const { return queryTimeMs; }
     uint32_t getQueryCallCount() const { return queryCallCount; }
 
+    // Floor cache persistence
+    bool saveFloorCache(const std::string& filepath) const;
+    bool loadFloorCache(const std::string& filepath);
+    size_t getFloorCacheSize() const { return precomputedFloorGrid.size(); }
+
 private:
     /**
      * WMO group GPU resources
@@ -242,6 +247,16 @@ private:
             uint8_t materialId;    // Material/texture reference
         };
         std::vector<Batch> batches;
+
+        // Pre-merged batches for efficient rendering (computed at load time)
+        struct MergedBatch {
+            GLuint texId;
+            bool hasTexture;
+            bool alphaTest;
+            std::vector<GLsizei> counts;
+            std::vector<const void*> offsets;
+        };
+        std::vector<MergedBatch> mergedBatches;
 
         // Collision geometry (positions only, for floor raycasting)
         std::vector<glm::vec3> collisionVertices;
@@ -472,6 +487,22 @@ private:
     // Collision query profiling (per frame).
     mutable double queryTimeMs = 0.0;
     mutable uint32_t queryCallCount = 0;
+
+    // Floor height cache - persistent precomputed grid
+    static constexpr float FLOOR_GRID_CELL_SIZE = 2.0f;  // 2 unit grid cells
+    mutable std::unordered_map<uint64_t, float> precomputedFloorGrid;  // key -> floor height
+    mutable bool floorGridDirty = true;  // Rebuild when instances change
+    mutable uint32_t currentFrameId = 0;
+
+    uint64_t floorGridKey(float x, float y) const {
+        int32_t ix = static_cast<int32_t>(std::floor(x / FLOOR_GRID_CELL_SIZE));
+        int32_t iy = static_cast<int32_t>(std::floor(y / FLOOR_GRID_CELL_SIZE));
+        return (static_cast<uint64_t>(static_cast<uint32_t>(ix)) << 32) |
+               static_cast<uint64_t>(static_cast<uint32_t>(iy));
+    }
+
+    // Compute floor height for a single cell (expensive, done at load time)
+    std::optional<float> computeFloorHeightSlow(float x, float y, float refZ) const;
 };
 
 } // namespace rendering

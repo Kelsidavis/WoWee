@@ -106,8 +106,8 @@ private:
     static constexpr float PIVOT_HEIGHT = 1.8f;     // Pivot at head height
     static constexpr float CAM_SPHERE_RADIUS = 0.32f;  // Keep camera farther from geometry to avoid clipping-through surfaces
     static constexpr float CAM_EPSILON = 0.22f;        // Extra wall offset to avoid near-plane clipping artifacts
-    static constexpr float COLLISION_FOCUS_RADIUS_THIRD_PERSON = 42.0f;
-    static constexpr float COLLISION_FOCUS_RADIUS_FREE_FLY = 34.0f;
+    static constexpr float COLLISION_FOCUS_RADIUS_THIRD_PERSON = 20.0f;  // Reduced for performance
+    static constexpr float COLLISION_FOCUS_RADIUS_FREE_FLY = 20.0f;
     static constexpr float MIN_PITCH = -88.0f;      // Look almost straight down
     static constexpr float MAX_PITCH = 35.0f;       // Limited upward look
     glm::vec3* followTarget = nullptr;

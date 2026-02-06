@@ -146,6 +146,11 @@ bool Application::initialize() {
         return false;
     }
 
+    // Load cached floor heights for faster collision
+    if (renderer->getWMORenderer()) {
+        renderer->getWMORenderer()->loadFloorCache("cache/wmo_floor_cache.bin");
+    }
+
     // Create UI manager
     uiManager = std::make_unique<ui::UIManager>();
     if (!uiManager->initialize(window.get())) {
@@ -275,14 +280,33 @@ void Application::run() {
         // Update input
         Input::getInstance().update();
 
+        // Timing breakdown
+        static int frameCount = 0;
+        static double totalUpdateMs = 0, totalRenderMs = 0, totalSwapMs = 0;
+        auto t1 = std::chrono::steady_clock::now();
+
         // Update application state
         update(deltaTime);
+        auto t2 = std::chrono::steady_clock::now();
 
         // Render
         render();
+        auto t3 = std::chrono::steady_clock::now();
 
         // Swap buffers
         window->swapBuffers();
+        auto t4 = std::chrono::steady_clock::now();
+
+        totalUpdateMs += std::chrono::duration<double, std::milli>(t2 - t1).count();
+        totalRenderMs += std::chrono::duration<double, std::milli>(t3 - t2).count();
+        totalSwapMs += std::chrono::duration<double, std::milli>(t4 - t3).count();
+
+        if (++frameCount >= 60) {
+            printf("[Frame] Update: %.1f ms, Render: %.1f ms, Swap: %.1f ms\n",
+                   totalUpdateMs / 60.0, totalRenderMs / 60.0, totalSwapMs / 60.0);
+            frameCount = 0;
+            totalUpdateMs = totalRenderMs = totalSwapMs = 0;
+        }
     }
 
     LOG_INFO("Main loop ended");
@@ -290,6 +314,11 @@ void Application::run() {
 
 void Application::shutdown() {
     LOG_INFO("Shutting down application");
+
+    // Save floor cache before renderer is destroyed
+    if (renderer && renderer->getWMORenderer()) {
+        renderer->getWMORenderer()->saveFloorCache("cache/wmo_floor_cache.bin");
+    }
 
     // Stop renderer first: terrain streaming workers may still be reading via
     // AssetManager during shutdown, so renderer/terrain teardown must complete
