@@ -63,6 +63,8 @@ private:
     bool pendingShadows = true;
     int pendingMusicVolume = 30;
     int pendingSfxVolume = 100;
+    float pendingMouseSensitivity = 0.2f;
+    bool pendingInvertMouse = false;
 
     /**
      * Render player info window

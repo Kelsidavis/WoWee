@@ -1880,7 +1880,7 @@ void GameScreen::renderSettingsWindow() {
     ImGuiIO& io = ImGui::GetIO();
     float screenW = io.DisplaySize.x;
     float screenH = io.DisplaySize.y;
-    ImVec2 size(400.0f, 420.0f);
+    ImVec2 size(440.0f, 520.0f);
     ImVec2 pos((screenW - size.x) * 0.5f, (screenH - size.y) * 0.5f);
 
     ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
@@ -1939,6 +1939,7 @@ void GameScreen::renderSettingsWindow() {
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
+
         if (ImGui::Button("Apply", ImVec2(-1, 0))) {
             window->setVsync(pendingVsync);
             window->setFullscreen(pendingFullscreen);
