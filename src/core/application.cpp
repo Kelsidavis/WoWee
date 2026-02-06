@@ -2058,12 +2058,11 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
             activeGeosets.insert(geosetTabard);
             activeGeosets.insert(701);  // Ears: default
 
-            // Hide hair if wearing helm: remove group 0 scalp mesh and group 1 connector
+            // Helmet: keep scalp mesh visible (helmet model covers it),
+            // only remove group 1 hair connector to avoid clipping
             if (hideHair && hairScalpId > 0) {
-                activeGeosets.erase(hairScalpId);
                 activeGeosets.erase(static_cast<uint16_t>(100 + hairScalpId));
-                activeGeosets.insert(101);  // Show bald scalp instead
-                LOG_INFO("Hiding hair geoset ", hairScalpId, "/", (100 + hairScalpId),
+                LOG_INFO("Hiding hair connector ", (100 + hairScalpId),
                          " (helmDisplayId=", extra.equipDisplayId[0], ")");
             }
 
