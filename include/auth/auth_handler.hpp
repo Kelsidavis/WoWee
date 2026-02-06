@@ -52,6 +52,7 @@ public:
     // State
     AuthState getState() const { return state; }
     const std::vector<uint8_t>& getSessionKey() const { return sessionKey; }
+    const std::string& getUsername() const { return username; }
 
     // Callbacks
     void setOnSuccess(AuthSuccessCallback callback) { onSuccess = callback; }

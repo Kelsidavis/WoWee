@@ -559,7 +559,11 @@ void Application::setupUICallbacks() {
 
         // Connect to world server
         const auto& sessionKey = authHandler->getSessionKey();
-        const std::string accountName = "TESTACCOUNT";  // TODO: Store from auth
+        std::string accountName = authHandler->getUsername();
+        if (accountName.empty()) {
+            LOG_WARNING("Auth username missing; falling back to TESTACCOUNT");
+            accountName = "TESTACCOUNT";
+        }
 
         if (gameHandler->connect(host, port, sessionKey, accountName)) {
             LOG_INFO("Connected to world server, transitioning to character selection");
