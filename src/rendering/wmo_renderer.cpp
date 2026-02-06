@@ -841,7 +841,7 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
                 // Hard distance cutoff - skip groups entirely if closest point is too far
                 glm::vec3 closestPoint = glm::clamp(camPos, gMin, gMax);
                 float distSq = glm::dot(closestPoint - camPos, closestPoint - camPos);
-                if (distSq > 6400.0f) {  // Beyond 80 units - hard skip
+                if (distSq > 25600.0f) {  // Beyond 160 units - hard skip
                     lastDistanceCulledGroups++;
                     continue;
                 }
