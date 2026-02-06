@@ -1836,38 +1836,51 @@ network::Packet QuestgiverAcceptQuestPacket::build(uint64_t npcGuid, uint32_t qu
 }
 
 bool QuestDetailsParser::parse(network::Packet& packet, QuestDetailsData& data) {
-    if (packet.getSize() < 20) return false;
+    if (packet.getSize() < 28) return false;
     data.npcGuid = packet.readUInt64();
     /*informUnit*/ packet.readUInt64();
     data.questId = packet.readUInt32();
     data.title = packet.readString();
     data.details = packet.readString();
     data.objectives = packet.readString();
+
+    if (packet.getReadPos() + 10 > packet.getSize()) {
+        LOG_INFO("Quest details (short): id=", data.questId, " title='", data.title, "'");
+        return true;
+    }
+
     /*activateAccept*/ packet.readUInt8();
     /*flags*/ packet.readUInt32();
     data.suggestedPlayers = packet.readUInt32();
     /*isFinished*/ packet.readUInt8();
 
-    // Reward choice items
-    uint32_t choiceCount = packet.readUInt32();
-    for (uint32_t i = 0; i < choiceCount && i < 6; i++) {
-        packet.readUInt32(); // itemId
-        packet.readUInt32(); // count
-        packet.readUInt32(); // displayInfo
+    // Reward choice items: server always writes 6 entries (QUEST_REWARD_CHOICES_COUNT)
+    if (packet.getReadPos() + 4 <= packet.getSize()) {
+        /*choiceCount*/ packet.readUInt32();
+        for (int i = 0; i < 6; i++) {
+            if (packet.getReadPos() + 12 > packet.getSize()) break;
+            packet.readUInt32(); // itemId
+            packet.readUInt32(); // count
+            packet.readUInt32(); // displayInfo
+        }
     }
 
-    // Reward items
-    uint32_t rewardCount = packet.readUInt32();
-    for (uint32_t i = 0; i < rewardCount && i < 4; i++) {
-        packet.readUInt32(); // itemId
-        packet.readUInt32(); // count
-        packet.readUInt32(); // displayInfo
+    // Reward items: server always writes 4 entries (QUEST_REWARDS_COUNT)
+    if (packet.getReadPos() + 4 <= packet.getSize()) {
+        /*rewardCount*/ packet.readUInt32();
+        for (int i = 0; i < 4; i++) {
+            if (packet.getReadPos() + 12 > packet.getSize()) break;
+            packet.readUInt32(); // itemId
+            packet.readUInt32(); // count
+            packet.readUInt32(); // displayInfo
+        }
     }
 
-    data.rewardMoney = packet.readUInt32();
-    if (packet.getReadPos() < packet.getSize()) {
+    // Money and XP rewards
+    if (packet.getReadPos() + 4 <= packet.getSize())
+        data.rewardMoney = packet.readUInt32();
+    if (packet.getReadPos() + 4 <= packet.getSize())
         data.rewardXp = packet.readUInt32();
-    }
 
     LOG_INFO("Quest details: id=", data.questId, " title='", data.title, "'");
     return true;
