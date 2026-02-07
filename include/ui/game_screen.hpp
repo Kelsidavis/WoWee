@@ -37,6 +37,9 @@ public:
      */
     bool isChatInputActive() const { return chatInputActive; }
 
+    void saveSettings();
+    void loadSettings();
+
 private:
     // Chat state
     char chatInputBuffer[512] = "";
@@ -66,10 +69,10 @@ private:
     int pendingSfxVolume = 100;
     float pendingMouseSensitivity = 0.2f;
     bool pendingInvertMouse = false;
-    int pendingUiOpacity = 100;
+    int pendingUiOpacity = 65;
 
     // UI element transparency (0.0 = fully transparent, 1.0 = fully opaque)
-    float uiOpacity_ = 1.0f;
+    float uiOpacity_ = 0.65f;
 
     /**
      * Render player info window
@@ -152,6 +155,7 @@ private:
     void renderWorldMap(game::GameHandler& gameHandler);
 
     InventoryScreen inventoryScreen;
+    uint64_t inventoryScreenCharGuid_ = 0;  // GUID of character inventory screen was initialized for
     QuestLogScreen questLogScreen;
     SpellbookScreen spellbookScreen;
     TalentScreen talentScreen;
@@ -173,6 +177,8 @@ private:
     // Action bar drag state (-1 = not dragging)
     int actionBarDragSlot_ = -1;
     GLuint actionBarDragIcon_ = 0;
+
+    static std::string getSettingsPath();
 
     // Left-click targeting: distinguish click from camera drag
     glm::vec2 leftClickPressPos_ = glm::vec2(0.0f);

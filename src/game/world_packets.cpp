@@ -2530,12 +2530,12 @@ network::Packet ListInventoryPacket::build(uint64_t npcGuid) {
     return packet;
 }
 
-network::Packet BuyItemPacket::build(uint64_t vendorGuid, uint32_t itemId, uint32_t slot, uint8_t count) {
+network::Packet BuyItemPacket::build(uint64_t vendorGuid, uint32_t itemId, uint32_t slot, uint32_t count) {
     network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_BUY_ITEM));
     packet.writeUInt64(vendorGuid);
     packet.writeUInt32(itemId);
     packet.writeUInt32(slot);
-    packet.writeUInt8(count);
+    packet.writeUInt32(count);
     packet.writeUInt8(0);  // bag slot (0 = find any available bag slot)
     return packet;
 }

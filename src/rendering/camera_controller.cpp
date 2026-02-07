@@ -577,18 +577,23 @@ void CameraController::update(float deltaTime) {
                 return base;
             };
 
-            // Sample center + footprint to avoid slipping through narrow floor pieces.
+            // Sample center + movement-aligned offsets to avoid slipping through narrow floor pieces.
+            // Use 3 samples instead of 5 — center plus two movement-direction probes.
             std::optional<float> groundH;
-            constexpr float FOOTPRINT = 0.4f;  // Larger footprint for better floor detection
-            const glm::vec2 offsets[] = {
-                {0.0f, 0.0f},
-                {FOOTPRINT, 0.0f}, {-FOOTPRINT, 0.0f},
-                {0.0f, FOOTPRINT}, {0.0f, -FOOTPRINT}
-            };
-            for (const auto& o : offsets) {
-                auto h = sampleGround(targetPos.x + o.x, targetPos.y + o.y);
-                if (h && (!groundH || *h > *groundH)) {
-                    groundH = h;
+            groundH = sampleGround(targetPos.x, targetPos.y);
+            {
+                constexpr float FOOTPRINT = 0.4f;
+                glm::vec2 moveXY(targetPos.x - followTarget->x, targetPos.y - followTarget->y);
+                float moveLen = glm::length(moveXY);
+                if (moveLen > 0.01f) {
+                    glm::vec2 moveDir2 = moveXY / moveLen;
+                    glm::vec2 perpDir(-moveDir2.y, moveDir2.x);
+                    auto h1 = sampleGround(targetPos.x + moveDir2.x * FOOTPRINT,
+                                           targetPos.y + moveDir2.y * FOOTPRINT);
+                    if (h1 && (!groundH || *h1 > *groundH)) groundH = h1;
+                    auto h2 = sampleGround(targetPos.x + perpDir.x * FOOTPRINT,
+                                           targetPos.y + perpDir.y * FOOTPRINT);
+                    if (h2 && (!groundH || *h2 > *groundH)) groundH = h2;
                 }
             }
 

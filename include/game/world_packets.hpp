@@ -1637,7 +1637,7 @@ public:
 /** CMSG_BUY_ITEM packet builder */
 class BuyItemPacket {
 public:
-    static network::Packet build(uint64_t vendorGuid, uint32_t itemId, uint32_t slot, uint8_t count);
+    static network::Packet build(uint64_t vendorGuid, uint32_t itemId, uint32_t slot, uint32_t count);
 };
 
 /** CMSG_SELL_ITEM packet builder */

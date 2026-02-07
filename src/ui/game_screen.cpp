@@ -20,6 +20,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <unordered_set>
 
 namespace {
@@ -51,6 +54,7 @@ namespace {
 namespace wowee { namespace ui {
 
 GameScreen::GameScreen() {
+    loadSettings();
 }
 
 void GameScreen::render(game::GameHandler& gameHandler) {
@@ -114,10 +118,10 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // Talents (N key toggle handled inside)
     talentScreen.render(gameHandler);
 
-    // Set up inventory screen asset manager + player appearance (once)
+    // Set up inventory screen asset manager + player appearance (re-init on character switch)
     {
-        static bool inventoryScreenInit = false;
-        if (!inventoryScreenInit) {
+        uint64_t activeGuid = gameHandler.getActiveCharacterGuid();
+        if (activeGuid != 0 && activeGuid != inventoryScreenCharGuid_) {
             auto* am = core::Application::getInstance().getAssetManager();
             if (am) {
                 inventoryScreen.setAssetManager(am);
@@ -130,7 +134,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                     inventoryScreen.setPlayerAppearance(
                         ch->race, ch->gender, skin, face,
                         hairStyle, hairColor, ch->facialFeatures);
-                    inventoryScreenInit = true;
+                    inventoryScreenCharGuid_ = activeGuid;
                 }
             }
         }
@@ -395,6 +399,11 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
 
     if (!chatWindowLocked) {
         chatWindowPos_ = ImGui::GetWindowPos();
+    }
+
+    // Click anywhere in chat window → focus the input field
+    if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseClicked(0)) {
+        refocusChatInput = true;
     }
 
     // Chat history
@@ -3533,7 +3542,7 @@ void GameScreen::renderSettingsWindow() {
         ImGui::Text("Interface");
         ImGui::SliderInt("UI Opacity", &pendingUiOpacity, 20, 100, "%d%%");
         if (ImGui::Button("Restore Interface Defaults", ImVec2(-1, 0))) {
-            pendingUiOpacity = 100;
+            pendingUiOpacity = 65;
         }
 
         ImGui::Spacing();
@@ -3542,6 +3551,7 @@ void GameScreen::renderSettingsWindow() {
 
         if (ImGui::Button("Apply", ImVec2(-1, 0))) {
             uiOpacity_ = static_cast<float>(pendingUiOpacity) / 100.0f;
+            saveSettings();
             window->setVsync(pendingVsync);
             window->setFullscreen(pendingFullscreen);
             window->applyResolution(kResolutions[pendingResIndex][0], kResolutions[pendingResIndex][1]);
@@ -3740,6 +3750,59 @@ void GameScreen::renderMinimapMarkers(game::GameHandler& gameHandler) {
             ImVec2(sx - textSize.x * 0.5f, sy - textSize.y * 0.5f),
             IM_COL32(0, 0, 0, 255), marker);
     }
+}
+
+std::string GameScreen::getSettingsPath() {
+    std::string dir;
+#ifdef _WIN32
+    const char* appdata = std::getenv("APPDATA");
+    dir = appdata ? std::string(appdata) + "\\wowee" : ".";
+#else
+    const char* home = std::getenv("HOME");
+    dir = home ? std::string(home) + "/.wowee" : ".";
+#endif
+    return dir + "/settings.cfg";
+}
+
+void GameScreen::saveSettings() {
+    std::string path = getSettingsPath();
+    std::filesystem::path dir = std::filesystem::path(path).parent_path();
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+
+    std::ofstream out(path);
+    if (!out.is_open()) {
+        LOG_WARNING("Could not save settings to ", path);
+        return;
+    }
+
+    out << "ui_opacity=" << pendingUiOpacity << "\n";
+    LOG_INFO("Settings saved to ", path);
+}
+
+void GameScreen::loadSettings() {
+    std::string path = getSettingsPath();
+    std::ifstream in(path);
+    if (!in.is_open()) return;
+
+    std::string line;
+    while (std::getline(in, line)) {
+        size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        std::string key = line.substr(0, eq);
+        std::string val = line.substr(eq + 1);
+
+        if (key == "ui_opacity") {
+            try {
+                int v = std::stoi(val);
+                if (v >= 20 && v <= 100) {
+                    pendingUiOpacity = v;
+                    uiOpacity_ = static_cast<float>(v) / 100.0f;
+                }
+            } catch (...) {}
+        }
+    }
+    LOG_INFO("Settings loaded from ", path);
 }
 
 }} // namespace wowee::ui

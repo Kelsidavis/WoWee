@@ -903,6 +903,43 @@ void GameHandler::selectCharacter(uint64_t characterGuid) {
     // Store player GUID
     playerGuid = characterGuid;
 
+    // Reset per-character state so previous character data doesn't bleed through
+    inventory = Inventory();
+    onlineItems_.clear();
+    pendingItemQueries_.clear();
+    equipSlotGuids_ = {};
+    backpackSlotGuids_ = {};
+    invSlotBase_ = -1;
+    packSlotBase_ = -1;
+    lastPlayerFields_.clear();
+    onlineEquipDirty_ = false;
+    playerMoneyCopper_ = 0;
+    knownSpells.clear();
+    spellCooldowns.clear();
+    actionBar = {};
+    playerAuras.clear();
+    targetAuras.clear();
+    playerXp_ = 0;
+    playerNextLevelXp_ = 0;
+    serverPlayerLevel_ = 1;
+    playerSkills_.clear();
+    questLog_.clear();
+    npcQuestStatus_.clear();
+    hostileAttackers_.clear();
+    combatText.clear();
+    autoAttacking = false;
+    autoAttackTarget = 0;
+    casting = false;
+    currentCastSpellId = 0;
+    castTimeRemaining = 0.0f;
+    castTimeTotal = 0.0f;
+    playerDead_ = false;
+    targetGuid = 0;
+    focusGuid = 0;
+    lastTargetGuid = 0;
+    tabCycleStale = true;
+    entityManager = EntityManager();
+
     // Build CMSG_PLAYER_LOGIN packet
     auto packet = PlayerLoginPacket::build(characterGuid);
 
@@ -3058,6 +3095,7 @@ void GameHandler::setActionBarSlot(int slot, ActionBarSlot::Type type, uint32_t 
     if (slot < 0 || slot >= ACTION_BAR_SLOTS) return;
     actionBar[slot].type = type;
     actionBar[slot].id = id;
+    saveCharacterConfig();
 }
 
 float GameHandler::getSpellCooldown(uint32_t spellId) const {
@@ -3086,11 +3124,12 @@ void GameHandler::handleInitialSpells(network::Packet& packet) {
         }
     }
 
-    // Auto-populate action bar: Attack in slot 1, Hearthstone in slot 12
+    // Load saved action bar or use defaults (Attack slot 1, Hearthstone slot 12)
     actionBar[0].type = ActionBarSlot::SPELL;
     actionBar[0].id = 6603;  // Attack
     actionBar[11].type = ActionBarSlot::SPELL;
     actionBar[11].id = 8690;  // Hearthstone
+    loadCharacterConfig();
 
     LOG_INFO("Learned ", knownSpells.size(), " spells");
 }
@@ -3502,7 +3541,7 @@ void GameHandler::closeVendor() {
     currentVendorItems = ListInventoryData{};
 }
 
-void GameHandler::buyItem(uint64_t vendorGuid, uint32_t itemId, uint32_t slot, uint8_t count) {
+void GameHandler::buyItem(uint64_t vendorGuid, uint32_t itemId, uint32_t slot, uint32_t count) {
     if (state != WorldState::IN_WORLD || !socket) return;
     auto packet = BuyItemPacket::build(vendorGuid, itemId, slot, count);
     socket->send(packet);
@@ -4058,6 +4097,99 @@ void GameHandler::extractSkillFields(const std::map<uint16_t, uint32_t>& fields)
     }
 
     playerSkills_ = std::move(newSkills);
+}
+
+std::string GameHandler::getCharacterConfigDir() {
+    std::string dir;
+#ifdef _WIN32
+    const char* appdata = std::getenv("APPDATA");
+    dir = appdata ? std::string(appdata) + "\\wowee\\characters" : "characters";
+#else
+    const char* home = std::getenv("HOME");
+    dir = home ? std::string(home) + "/.wowee/characters" : "characters";
+#endif
+    return dir;
+}
+
+void GameHandler::saveCharacterConfig() {
+    const Character* ch = getActiveCharacter();
+    if (!ch || ch->name.empty()) return;
+
+    std::string dir = getCharacterConfigDir();
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+
+    std::string path = dir + "/" + ch->name + ".cfg";
+    std::ofstream out(path);
+    if (!out.is_open()) {
+        LOG_WARNING("Could not save character config to ", path);
+        return;
+    }
+
+    out << "character_guid=" << playerGuid << "\n";
+    for (int i = 0; i < ACTION_BAR_SLOTS; i++) {
+        out << "action_bar_" << i << "_type=" << static_cast<int>(actionBar[i].type) << "\n";
+        out << "action_bar_" << i << "_id=" << actionBar[i].id << "\n";
+    }
+    LOG_INFO("Character config saved to ", path);
+}
+
+void GameHandler::loadCharacterConfig() {
+    const Character* ch = getActiveCharacter();
+    if (!ch || ch->name.empty()) return;
+
+    std::string path = getCharacterConfigDir() + "/" + ch->name + ".cfg";
+    std::ifstream in(path);
+    if (!in.is_open()) return;
+
+    uint64_t savedGuid = 0;
+    std::array<int, ACTION_BAR_SLOTS> types{};
+    std::array<uint32_t, ACTION_BAR_SLOTS> ids{};
+    bool hasSlots = false;
+
+    std::string line;
+    while (std::getline(in, line)) {
+        size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        std::string key = line.substr(0, eq);
+        std::string val = line.substr(eq + 1);
+
+        if (key == "character_guid") {
+            try { savedGuid = std::stoull(val); } catch (...) {}
+        } else if (key.rfind("action_bar_", 0) == 0) {
+            // Parse action_bar_N_type or action_bar_N_id
+            size_t firstUnderscore = 11; // length of "action_bar_"
+            size_t secondUnderscore = key.find('_', firstUnderscore);
+            if (secondUnderscore == std::string::npos) continue;
+            int slot = -1;
+            try { slot = std::stoi(key.substr(firstUnderscore, secondUnderscore - firstUnderscore)); } catch (...) { continue; }
+            if (slot < 0 || slot >= ACTION_BAR_SLOTS) continue;
+            std::string suffix = key.substr(secondUnderscore + 1);
+            try {
+                if (suffix == "type") {
+                    types[slot] = std::stoi(val);
+                    hasSlots = true;
+                } else if (suffix == "id") {
+                    ids[slot] = static_cast<uint32_t>(std::stoul(val));
+                    hasSlots = true;
+                }
+            } catch (...) {}
+        }
+    }
+
+    // Validate guid matches current character
+    if (savedGuid != 0 && savedGuid != playerGuid) {
+        LOG_WARNING("Character config guid mismatch for ", ch->name, ", using defaults");
+        return;
+    }
+
+    if (hasSlots) {
+        for (int i = 0; i < ACTION_BAR_SLOTS; i++) {
+            actionBar[i].type = static_cast<ActionBarSlot::Type>(types[i]);
+            actionBar[i].id = ids[i];
+        }
+        LOG_INFO("Character config loaded from ", path);
+    }
 }
 
 } // namespace game

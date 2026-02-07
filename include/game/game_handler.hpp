@@ -324,6 +324,10 @@ public:
     const std::array<ActionBarSlot, ACTION_BAR_SLOTS>& getActionBar() const { return actionBar; }
     void setActionBarSlot(int slot, ActionBarSlot::Type type, uint32_t id);
 
+    void saveCharacterConfig();
+    void loadCharacterConfig();
+    static std::string getCharacterConfigDir();
+
     // Auras
     const std::vector<AuraSlot>& getPlayerAuras() const { return playerAuras; }
     const std::vector<AuraSlot>& getTargetAuras() const { return targetAuras; }
@@ -449,7 +453,7 @@ public:
     // Vendor
     void openVendor(uint64_t npcGuid);
     void closeVendor();
-    void buyItem(uint64_t vendorGuid, uint32_t itemId, uint32_t slot, uint8_t count);
+    void buyItem(uint64_t vendorGuid, uint32_t itemId, uint32_t slot, uint32_t count);
     void sellItem(uint64_t vendorGuid, uint64_t itemGuid, uint32_t count);
     void sellItemBySlot(int backpackIndex);
     void autoEquipItemBySlot(int backpackIndex);

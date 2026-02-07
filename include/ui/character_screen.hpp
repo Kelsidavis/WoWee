@@ -54,6 +54,7 @@ private:
     int selectedCharacterIndex = -1;
     bool characterSelected = false;
     uint64_t selectedCharacterGuid = 0;
+    bool restoredLastCharacter = false;
 
     // Status
     std::string statusMessage;
@@ -69,6 +70,13 @@ private:
      * Get faction color based on race
      */
     ImVec4 getFactionColor(game::Race race) const;
+
+    /**
+     * Persist / restore last selected character GUID
+     */
+    static std::string getConfigDir();
+    void saveLastCharacter(uint64_t guid);
+    uint64_t loadLastCharacter();
 };
 
 }} // namespace wowee::ui

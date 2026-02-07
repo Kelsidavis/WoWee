@@ -245,6 +245,8 @@ private:
         glm::vec3 boundingBoxMin;
         glm::vec3 boundingBoxMax;
 
+        uint32_t groupFlags = 0;
+
         // Material batches (start index, count, material ID)
         struct Batch {
             uint32_t startIndex;   // First index in EBO
@@ -258,6 +260,8 @@ private:
             GLuint texId;
             bool hasTexture;
             bool alphaTest;
+            bool unlit = false;
+            uint32_t blendMode = 0;
             std::vector<GLsizei> counts;
             std::vector<const void*> offsets;
         };
@@ -302,6 +306,9 @@ private:
         // Material blend modes (materialId -> blendMode; 1 = alpha-test cutout)
         std::vector<uint32_t> materialBlendModes;
 
+        // Material flags (materialId -> flags; 0x01 = unlit)
+        std::vector<uint32_t> materialFlags;
+
         // Portal visibility data
         std::vector<PortalData> portals;
         std::vector<glm::vec3> portalVertices;
@@ -339,7 +346,7 @@ private:
     /**
      * Create GPU resources for a WMO group
      */
-    bool createGroupResources(const pipeline::WMOGroup& group, GroupResources& resources);
+    bool createGroupResources(const pipeline::WMOGroup& group, GroupResources& resources, uint32_t groupFlags = 0);
 
     /**
      * Render a single group
@@ -491,6 +498,17 @@ private:
     std::unordered_map<uint32_t, size_t> instanceIndexById;
     mutable std::vector<size_t> candidateScratch;
     mutable std::unordered_set<uint32_t> candidateIdScratch;
+
+    // Parallel visibility culling
+    uint32_t numCullThreads_ = 1;
+
+    struct InstanceDrawList {
+        size_t instanceIndex;
+        std::vector<uint32_t> visibleGroups;  // group indices that passed culling
+        uint32_t portalCulled = 0;
+        uint32_t distanceCulled = 0;
+        uint32_t occlusionCulled = 0;
+    };
 
     // Collision query profiling (per frame).
     mutable double queryTimeMs = 0.0;

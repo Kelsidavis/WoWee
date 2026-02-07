@@ -14,7 +14,9 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <limits>
+#include <thread>
 #include <unordered_set>
 
 namespace wowee {
@@ -37,6 +39,8 @@ bool WMORenderer::initialize(pipeline::AssetManager* assets) {
     core::Logger::getInstance().info("Initializing WMO renderer...");
 
     assetManager = assets;
+
+    numCullThreads_ = std::min(4u, std::max(1u, std::thread::hardware_concurrency() - 1));
 
     // Create WMO shader with texture support
     const char* vertexSrc = R"(
@@ -83,6 +87,8 @@ bool WMORenderer::initialize(pipeline::AssetManager* assets) {
         uniform sampler2D uTexture;
         uniform bool uHasTexture;
         uniform bool uAlphaTest;
+        uniform bool uUnlit;
+        uniform bool uIsInterior;
 
         uniform vec3 uFogColor;
         uniform float uFogStart;
@@ -96,32 +102,54 @@ bool WMORenderer::initialize(pipeline::AssetManager* assets) {
         out vec4 FragColor;
 
         void main() {
+            // Sample texture or use vertex color
+            vec4 texColor;
+            float alpha = 1.0;
+            if (uHasTexture) {
+                texColor = texture(uTexture, TexCoord);
+                // Alpha test only for cutout materials (lattice, grating, etc.)
+                if (uAlphaTest && texColor.a < 0.5) discard;
+                // Multiply vertex color (MOCV baked lighting/AO) into texture
+                texColor.rgb *= VertexColor.rgb;
+                alpha = texColor.a;
+            } else {
+                // MOCV vertex color alpha is a lighting blend factor, not transparency
+                texColor = vec4(VertexColor.rgb, 1.0);
+            }
+
+            // Unlit materials (windows, lamps) — emit texture color directly
+            if (uUnlit) {
+                // Apply fog only
+                float fogDist = length(uViewPos - FragPos);
+                float fogFactor = clamp((uFogEnd - fogDist) / (uFogEnd - uFogStart), 0.0, 1.0);
+                vec3 result = mix(uFogColor, texColor.rgb, fogFactor);
+                FragColor = vec4(result, alpha);
+                return;
+            }
+
             vec3 normal = normalize(Normal);
             vec3 lightDir = normalize(uLightDir);
 
+            // Interior vs exterior lighting
+            vec3 ambient;
+            float dirScale;
+            if (uIsInterior) {
+                ambient = vec3(0.7, 0.7, 0.7);
+                dirScale = 0.3;
+            } else {
+                ambient = uAmbientColor;
+                dirScale = 1.0;
+            }
+
             // Diffuse lighting
             float diff = max(dot(normal, lightDir), 0.0);
-            vec3 diffuse = diff * vec3(1.0);
-
-            // Ambient
-            vec3 ambient = uAmbientColor;
+            vec3 diffuse = diff * vec3(1.0) * dirScale;
 
             // Blinn-Phong specular
             vec3 viewDir = normalize(uViewPos - FragPos);
             vec3 halfDir = normalize(lightDir + viewDir);
             float spec = pow(max(dot(normal, halfDir), 0.0), 32.0);
-            vec3 specular = spec * uLightColor * uSpecularIntensity;
-
-            // Sample texture or use vertex color
-            vec4 texColor;
-            if (uHasTexture) {
-                texColor = texture(uTexture, TexCoord);
-                // Alpha test only for cutout materials (lattice, grating, etc.)
-                if (uAlphaTest && texColor.a < 0.5) discard;
-            } else {
-                // MOCV vertex color alpha is a lighting blend factor, not transparency
-                texColor = vec4(VertexColor.rgb, 1.0);
-            }
+            vec3 specular = spec * uLightColor * uSpecularIntensity * dirScale;
 
             // Shadow mapping
             float shadow = 1.0;
@@ -153,7 +181,7 @@ bool WMORenderer::initialize(pipeline::AssetManager* assets) {
             float fogFactor = clamp((uFogEnd - fogDist) / (uFogEnd - uFogStart), 0.0, 1.0);
             result = mix(uFogColor, result, fogFactor);
 
-            FragColor = vec4(result, 1.0);
+            FragColor = vec4(result, alpha);
         }
     )";
 
@@ -289,6 +317,7 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
 
         modelData.materialTextureIndices.push_back(texIndex);
         modelData.materialBlendModes.push_back(mat.blendMode);
+        modelData.materialFlags.push_back(mat.flags);
     }
 
     // Create GPU resources for each group
@@ -300,7 +329,7 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
         }
 
         GroupResources resources;
-        if (createGroupResources(wmoGroup, resources)) {
+        if (createGroupResources(wmoGroup, resources, wmoGroup.flags)) {
             modelData.groups.push_back(resources);
             loadedGroups++;
         }
@@ -328,16 +357,28 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
             }
 
             bool alphaTest = false;
+            uint32_t blendMode = 0;
             if (batch.materialId < modelData.materialBlendModes.size()) {
-                alphaTest = (modelData.materialBlendModes[batch.materialId] == 1);
+                blendMode = modelData.materialBlendModes[batch.materialId];
+                alphaTest = (blendMode == 1);
             }
 
-            uint64_t key = (static_cast<uint64_t>(texId) << 1) | (alphaTest ? 1 : 0);
+            bool unlit = false;
+            if (batch.materialId < modelData.materialFlags.size()) {
+                unlit = (modelData.materialFlags[batch.materialId] & 0x01) != 0;
+            }
+
+            // Merge key: texture ID + alphaTest + unlit (unlit batches must not merge with lit)
+            uint64_t key = (static_cast<uint64_t>(texId) << 2)
+                         | (alphaTest ? 1ULL : 0ULL)
+                         | (unlit ? 2ULL : 0ULL);
             auto& mb = batchMap[key];
             if (mb.counts.empty()) {
                 mb.texId = texId;
                 mb.hasTexture = hasTexture;
                 mb.alphaTest = alphaTest;
+                mb.unlit = unlit;
+                mb.blendMode = blendMode;
             }
             mb.counts.push_back(static_cast<GLsizei>(batch.indexCount));
             mb.offsets.push_back(reinterpret_cast<const void*>(batch.startIndex * sizeof(uint16_t)));
@@ -746,6 +787,10 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
     glActiveTexture(GL_TEXTURE0);
     shader->setUniform("uTexture", 0);
 
+    // Initialize new uniforms to defaults
+    shader->setUniform("uUnlit", false);
+    shader->setUniform("uIsInterior", false);
+
     // Enable wireframe if requested
     if (wireframeMode) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -778,82 +823,139 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
         }
     }
 
-    // Render all instances with instance-level culling
-    for (const auto& instance : instances) {
-        // NOTE: Disabled hard instance-distance culling for WMOs.
-        // Large city WMOs can have instance origins far from local camera position,
-        // causing whole city sections to disappear unexpectedly.
-
-        auto modelIt = loadedModels.find(instance.modelId);
-        if (modelIt == loadedModels.end()) {
+    // ── Phase 1: Parallel visibility culling ──────────────────────────
+    // Build list of instances that pass the coarse instance-level frustum test.
+    std::vector<size_t> visibleInstances;
+    visibleInstances.reserve(instances.size());
+    for (size_t i = 0; i < instances.size(); ++i) {
+        const auto& instance = instances[i];
+        if (loadedModels.find(instance.modelId) == loadedModels.end())
             continue;
-        }
 
         if (frustumCulling) {
             glm::vec3 instMin = instance.worldBoundsMin - glm::vec3(0.5f);
             glm::vec3 instMax = instance.worldBoundsMax + glm::vec3(0.5f);
-            if (!frustum.intersectsAABB(instMin, instMax)) {
+            if (!frustum.intersectsAABB(instMin, instMax))
                 continue;
-            }
         }
+        visibleInstances.push_back(i);
+    }
 
-        const ModelData& model = modelIt->second;
+    // Per-instance cull lambda — produces an InstanceDrawList for one instance.
+    // Reads only const data; each invocation writes to its own output.
+    glm::vec3 camPos = camera.getPosition();
+    bool doPortalCull = portalCulling;
+    bool doOcclusionCull = occlusionCulling;
+    bool doFrustumCull = frustumCulling;
 
-        // Run occlusion queries for this instance (pre-pass)
-        if (occlusionCulling && occlusionShader && bboxVao != 0) {
-            runOcclusionQueries(instance, model, view, projection);
-            // Re-bind main shader after occlusion pass
-            shader->use();
-        }
+    auto cullInstance = [&](size_t instIdx) -> InstanceDrawList {
+        const auto& instance = instances[instIdx];
+        const ModelData& model = loadedModels.find(instance.modelId)->second;
 
-        shader->setUniform("uModel", instance.modelMatrix);
+        InstanceDrawList result;
+        result.instanceIndex = instIdx;
 
-        // Portal-based visibility culling
+        // Portal-based visibility
         std::unordered_set<uint32_t> portalVisibleGroups;
-        bool usePortalCulling = portalCulling && !model.portals.empty() && !model.portalRefs.empty();
-
+        bool usePortalCulling = doPortalCull && !model.portals.empty() && !model.portalRefs.empty();
         if (usePortalCulling) {
-            // Transform camera position to model's local space
-            glm::vec4 localCamPos = instance.invModelMatrix * glm::vec4(camera.getPosition(), 1.0f);
-            glm::vec3 cameraLocalPos(localCamPos);
-
-            getVisibleGroupsViaPortals(model, cameraLocalPos, frustum, instance.modelMatrix, portalVisibleGroups);
+            glm::vec4 localCamPos = instance.invModelMatrix * glm::vec4(camPos, 1.0f);
+            getVisibleGroupsViaPortals(model, glm::vec3(localCamPos), frustum,
+                                       instance.modelMatrix, portalVisibleGroups);
         }
 
-        // Render all groups using cached world-space bounds
-        glm::vec3 camPos = camera.getPosition();
         for (size_t gi = 0; gi < model.groups.size(); ++gi) {
-            // Portal culling check
-            if (usePortalCulling && portalVisibleGroups.find(static_cast<uint32_t>(gi)) == portalVisibleGroups.end()) {
-                lastPortalCulledGroups++;
+            // Portal culling
+            if (usePortalCulling &&
+                portalVisibleGroups.find(static_cast<uint32_t>(gi)) == portalVisibleGroups.end()) {
+                result.portalCulled++;
                 continue;
             }
 
-            // Occlusion culling check first (uses previous frame results)
-            if (occlusionCulling && isGroupOccluded(instance.id, static_cast<uint32_t>(gi))) {
-                lastOcclusionCulledGroups++;
+            // Occlusion culling (reads previous-frame results, read-only map)
+            if (doOcclusionCull && isGroupOccluded(instance.id, static_cast<uint32_t>(gi))) {
+                result.occlusionCulled++;
                 continue;
             }
 
             if (gi < instance.worldGroupBounds.size()) {
                 const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
 
-                // Hard distance cutoff - skip groups entirely if closest point is too far
+                // Hard distance cutoff
                 glm::vec3 closestPoint = glm::clamp(camPos, gMin, gMax);
                 float distSq = glm::dot(closestPoint - camPos, closestPoint - camPos);
-                if (distSq > 25600.0f) {  // Beyond 160 units - hard skip
-                    lastDistanceCulledGroups++;
+                if (distSq > 25600.0f) {
+                    result.distanceCulled++;
                     continue;
                 }
 
                 // Frustum culling
-                if (frustumCulling && !frustum.intersectsAABB(gMin, gMax)) {
+                if (doFrustumCull && !frustum.intersectsAABB(gMin, gMax))
                     continue;
-                }
             }
 
-            renderGroup(model.groups[gi], model, instance.modelMatrix, view, projection);
+            result.visibleGroups.push_back(static_cast<uint32_t>(gi));
         }
+        return result;
+    };
+
+    // Dispatch culling — parallel when enough instances, sequential otherwise.
+    std::vector<InstanceDrawList> drawLists;
+    drawLists.reserve(visibleInstances.size());
+
+    if (visibleInstances.size() >= 4 && numCullThreads_ > 1) {
+        const size_t numThreads = std::min(static_cast<size_t>(numCullThreads_),
+                                           visibleInstances.size());
+        const size_t chunkSize = visibleInstances.size() / numThreads;
+        const size_t remainder = visibleInstances.size() % numThreads;
+
+        // Each future returns a vector of InstanceDrawList for its chunk.
+        std::vector<std::future<std::vector<InstanceDrawList>>> futures;
+        futures.reserve(numThreads);
+
+        size_t start = 0;
+        for (size_t t = 0; t < numThreads; ++t) {
+            size_t end = start + chunkSize + (t < remainder ? 1 : 0);
+            futures.push_back(std::async(std::launch::async,
+                [&, start, end]() {
+                    std::vector<InstanceDrawList> chunk;
+                    chunk.reserve(end - start);
+                    for (size_t j = start; j < end; ++j)
+                        chunk.push_back(cullInstance(visibleInstances[j]));
+                    return chunk;
+                }));
+            start = end;
+        }
+
+        for (auto& f : futures) {
+            auto chunk = f.get();
+            for (auto& dl : chunk)
+                drawLists.push_back(std::move(dl));
+        }
+    } else {
+        for (size_t idx : visibleInstances)
+            drawLists.push_back(cullInstance(idx));
+    }
+
+    // ── Phase 2: Sequential GL draw ────────────────────────────────
+    for (const auto& dl : drawLists) {
+        const auto& instance = instances[dl.instanceIndex];
+        const ModelData& model = loadedModels.find(instance.modelId)->second;
+
+        // Occlusion query pre-pass (GL calls — must be main thread)
+        if (occlusionCulling && occlusionShader && bboxVao != 0) {
+            runOcclusionQueries(instance, model, view, projection);
+            shader->use();
+        }
+
+        shader->setUniform("uModel", instance.modelMatrix);
+
+        for (uint32_t gi : dl.visibleGroups)
+            renderGroup(model.groups[gi], model, instance.modelMatrix, view, projection);
+
+        lastPortalCulledGroups += dl.portalCulled;
+        lastDistanceCulledGroups += dl.distanceCulled;
+        lastOcclusionCulledGroups += dl.occlusionCulled;
     }
 
     // Restore polygon mode
@@ -898,10 +1000,12 @@ uint32_t WMORenderer::getTotalTriangleCount() const {
     return total;
 }
 
-bool WMORenderer::createGroupResources(const pipeline::WMOGroup& group, GroupResources& resources) {
+bool WMORenderer::createGroupResources(const pipeline::WMOGroup& group, GroupResources& resources, uint32_t groupFlags) {
     if (group.vertices.empty() || group.indices.empty()) {
         return false;
     }
+
+    resources.groupFlags = groupFlags;
 
     resources.vertexCount = group.vertices.size();
     resources.indexCount = group.indices.size();
@@ -1012,11 +1116,16 @@ void WMORenderer::renderGroup(const GroupResources& group, [[maybe_unused]] cons
                               [[maybe_unused]] const glm::mat4& projection) {
     glBindVertexArray(group.vao);
 
+    // Set interior flag once per group (0x2000 = interior)
+    bool isInterior = (group.groupFlags & 0x2000) != 0;
+    shader->setUniform("uIsInterior", isInterior);
+
     // Use pre-computed merged batches (built at load time)
     // Track bound state to avoid redundant GL calls
     static GLuint lastBoundTex = 0;
     static bool lastHasTexture = false;
     static bool lastAlphaTest = false;
+    static bool lastUnlit = false;
 
     for (const auto& mb : group.mergedBatches) {
         if (mb.texId != lastBoundTex) {
@@ -1031,10 +1140,25 @@ void WMORenderer::renderGroup(const GroupResources& group, [[maybe_unused]] cons
             shader->setUniform("uAlphaTest", mb.alphaTest);
             lastAlphaTest = mb.alphaTest;
         }
+        if (mb.unlit != lastUnlit) {
+            shader->setUniform("uUnlit", mb.unlit);
+            lastUnlit = mb.unlit;
+        }
+
+        // Enable alpha blending for translucent materials (blendMode >= 2)
+        bool needsBlend = (mb.blendMode >= 2);
+        if (needsBlend) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        }
 
         glMultiDrawElements(GL_TRIANGLES, mb.counts.data(), GL_UNSIGNED_SHORT,
                             mb.offsets.data(), static_cast<GLsizei>(mb.counts.size()));
         lastDrawCalls++;
+
+        if (needsBlend) {
+            glDisable(GL_BLEND);
+        }
     }
 
     glBindVertexArray(0);
@@ -1407,12 +1531,6 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
     glm::vec3 worldOrigin(glX, glY, glZ + 500.0f);
     glm::vec3 worldDir(0.0f, 0.0f, -1.0f);
 
-    // Debug: log when no instances
-    static int debugCounter = 0;
-    if (instances.empty() && (debugCounter++ % 300 == 0)) {
-        core::Logger::getInstance().warning("WMO getFloorHeight: no instances loaded!");
-    }
-
     glm::vec3 queryMin(glX - 2.0f, glY - 2.0f, glZ - 8.0f);
     glm::vec3 queryMax(glX + 2.0f, glY + 2.0f, glZ + 10.0f);
     gatherCandidates(queryMin, queryMax, candidateScratch);
@@ -1436,23 +1554,41 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
 
         const ModelData& model = it->second;
 
+        // World-space pre-pass: check which groups' world XY bounds contain
+        // the query point. For a vertical ray this eliminates most groups
+        // before any local-space math.
+        bool anyGroupOverlaps = false;
+        for (size_t gi = 0; gi < model.groups.size() && gi < instance.worldGroupBounds.size(); ++gi) {
+            const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
+            if (glX >= gMin.x && glX <= gMax.x &&
+                glY >= gMin.y && glY <= gMax.y &&
+                glZ - 4.0f <= gMax.z) {
+                anyGroupOverlaps = true;
+                break;
+            }
+        }
+        if (!anyGroupOverlaps) continue;
+
         // Use cached inverse matrix
         glm::vec3 localOrigin = glm::vec3(instance.invModelMatrix * glm::vec4(worldOrigin, 1.0f));
         glm::vec3 localDir = glm::normalize(glm::vec3(instance.invModelMatrix * glm::vec4(worldDir, 0.0f)));
 
-        int groupsChecked = 0;
-        int groupsSkipped = 0;
-        int trianglesHit = 0;
+        for (size_t gi = 0; gi < model.groups.size(); ++gi) {
+            // World-space group cull — vertical ray at (glX, glY)
+            if (gi < instance.worldGroupBounds.size()) {
+                const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
+                if (glX < gMin.x || glX > gMax.x ||
+                    glY < gMin.y || glY > gMax.y ||
+                    glZ - 4.0f > gMax.z) {
+                    continue;
+                }
+            }
 
-        for (const auto& group : model.groups) {
-            // Quick bounding box check
+            const auto& group = model.groups[gi];
             if (!rayIntersectsAABB(localOrigin, localDir, group.boundingBoxMin, group.boundingBoxMax)) {
-                groupsSkipped++;
                 continue;
             }
-            groupsChecked++;
 
-            // Raycast against triangles
             const auto& verts = group.collisionVertices;
             const auto& indices = group.collisionIndices;
 
@@ -1461,22 +1597,15 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
                 const glm::vec3& v1 = verts[indices[i + 1]];
                 const glm::vec3& v2 = verts[indices[i + 2]];
 
-                // Try both winding orders (two-sided collision)
                 float t = rayTriangleIntersect(localOrigin, localDir, v0, v1, v2);
                 if (t <= 0.0f) {
-                    // Try reverse winding
                     t = rayTriangleIntersect(localOrigin, localDir, v0, v2, v1);
                 }
 
                 if (t > 0.0f) {
-                    trianglesHit++;
-                    // Hit point in local space -> world space
                     glm::vec3 hitLocal = localOrigin + localDir * t;
                     glm::vec3 hitWorld = glm::vec3(instance.modelMatrix * glm::vec4(hitLocal, 1.0f));
 
-                    // Only use floors below or near the query point.
-                    // Callers already elevate glZ by +5..+6; keep buffer small
-                    // to avoid selecting ceilings above the player.
                     if (hitWorld.z <= glZ + 0.5f) {
                         if (!bestFloor || hitWorld.z > *bestFloor) {
                             bestFloor = hitWorld.z;
@@ -1484,14 +1613,6 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
                     }
                 }
             }
-        }
-
-        // Debug logging (every ~5 seconds at 60fps)
-        static int logCounter = 0;
-        if ((logCounter++ % 300 == 0) && (groupsChecked > 0 || groupsSkipped > 0)) {
-            core::Logger::getInstance().debug("Floor check: ", groupsChecked, " groups checked, ",
-                groupsSkipped, " skipped, ", trianglesHit, " hits, best=",
-                bestFloor ? std::to_string(*bestFloor) : "none");
         }
     }
 
@@ -1519,11 +1640,6 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
     const float PLAYER_HEIGHT = 2.0f;       // Player height for wall checks
     const float MAX_STEP_HEIGHT = 1.0f;     // Allow stepping up stairs
 
-    // Debug logging
-    static int wallDebugCounter = 0;
-    int groupsChecked = 0;
-    int wallsHit = 0;
-
     glm::vec3 queryMin = glm::min(from, to) - glm::vec3(8.0f, 8.0f, 5.0f);
     glm::vec3 queryMax = glm::max(from, to) + glm::vec3(8.0f, 8.0f, 5.0f);
     gatherCandidates(queryMin, queryMax, candidateScratch);
@@ -1548,19 +1664,43 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
 
         const ModelData& model = it->second;
 
+        // World-space pre-pass: skip instances where no groups are near the movement
+        const float wallMargin = PLAYER_RADIUS + 2.0f;
+        bool anyGroupNear = false;
+        for (size_t gi = 0; gi < model.groups.size() && gi < instance.worldGroupBounds.size(); ++gi) {
+            const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
+            if (to.x >= gMin.x - wallMargin && to.x <= gMax.x + wallMargin &&
+                to.y >= gMin.y - wallMargin && to.y <= gMax.y + wallMargin &&
+                to.z + PLAYER_HEIGHT >= gMin.z && to.z <= gMax.z + wallMargin) {
+                anyGroupNear = true;
+                break;
+            }
+        }
+        if (!anyGroupNear) continue;
+
         // Transform positions into local space using cached inverse
         glm::vec3 localFrom = glm::vec3(instance.invModelMatrix * glm::vec4(from, 1.0f));
         glm::vec3 localTo = glm::vec3(instance.invModelMatrix * glm::vec4(to, 1.0f));
         float localFeetZ = localTo.z;
-        for (const auto& group : model.groups) {
-            // Quick bounding box check
+        for (size_t gi = 0; gi < model.groups.size(); ++gi) {
+            // World-space group cull
+            if (gi < instance.worldGroupBounds.size()) {
+                const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
+                if (to.x < gMin.x - wallMargin || to.x > gMax.x + wallMargin ||
+                    to.y < gMin.y - wallMargin || to.y > gMax.y + wallMargin ||
+                    to.z > gMax.z + PLAYER_HEIGHT || to.z + PLAYER_HEIGHT < gMin.z) {
+                    continue;
+                }
+            }
+
+            const auto& group = model.groups[gi];
+            // Local-space AABB check
             float margin = PLAYER_RADIUS + 2.0f;
             if (localTo.x < group.boundingBoxMin.x - margin || localTo.x > group.boundingBoxMax.x + margin ||
                 localTo.y < group.boundingBoxMin.y - margin || localTo.y > group.boundingBoxMax.y + margin ||
                 localTo.z < group.boundingBoxMin.z - margin || localTo.z > group.boundingBoxMax.z + margin) {
                 continue;
             }
-            groupsChecked++;
 
             const auto& verts = group.collisionVertices;
             const auto& indices = group.collisionIndices;
@@ -1631,7 +1771,6 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
                 glm::vec3 delta = localTo - closest;
                 float horizDist = glm::length(glm::vec2(delta.x, delta.y));
                 if (horizDist <= PLAYER_RADIUS) {
-                    wallsHit++;
                     float pushDist = PLAYER_RADIUS - horizDist + 0.02f;
                     glm::vec2 pushDir2;
                     if (horizDist > 1e-4f) {
@@ -1643,22 +1782,14 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
                     }
                     glm::vec3 pushLocal(pushDir2.x * pushDist, pushDir2.y * pushDist, 0.0f);
 
-                    // Transform push vector back to world space
                     glm::vec3 pushWorld = glm::vec3(instance.modelMatrix * glm::vec4(pushLocal, 0.0f));
 
-                    // Only horizontal push
                     adjustedPos.x += pushWorld.x;
                     adjustedPos.y += pushWorld.y;
                     blocked = true;
                 }
             }
         }
-    }
-
-    // Debug logging every ~5 seconds
-    if ((wallDebugCounter++ % 300 == 0) && !instances.empty()) {
-        core::Logger::getInstance().debug("Wall collision: ", instances.size(), " instances, ",
-            groupsChecked, " groups checked, ", wallsHit, " walls hit, blocked=", blocked);
     }
 
     return blocked;
@@ -1687,9 +1818,21 @@ bool WMORenderer::isInsideWMO(float glX, float glY, float glZ, uint32_t* outMode
         if (it == loadedModels.end()) continue;
 
         const ModelData& model = it->second;
-        glm::vec3 localPos = glm::vec3(instance.invModelMatrix * glm::vec4(glX, glY, glZ, 1.0f));
 
-        // Check if inside any group's bounding box
+        // World-space pre-check: skip instance if no group's world bounds contain point
+        bool anyGroupContains = false;
+        for (size_t gi = 0; gi < model.groups.size() && gi < instance.worldGroupBounds.size(); ++gi) {
+            const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
+            if (glX >= gMin.x && glX <= gMax.x &&
+                glY >= gMin.y && glY <= gMax.y &&
+                glZ >= gMin.z && glZ <= gMax.z) {
+                anyGroupContains = true;
+                break;
+            }
+        }
+        if (!anyGroupContains) continue;
+
+        glm::vec3 localPos = glm::vec3(instance.invModelMatrix * glm::vec4(glX, glY, glZ, 1.0f));
         for (const auto& group : model.groups) {
             if (localPos.x >= group.boundingBoxMin.x && localPos.x <= group.boundingBoxMax.x &&
                 localPos.y >= group.boundingBoxMin.y && localPos.y <= group.boundingBoxMax.y &&
@@ -1746,8 +1889,17 @@ float WMORenderer::raycastBoundingBoxes(const glm::vec3& origin, const glm::vec3
         glm::vec3 localOrigin = glm::vec3(instance.invModelMatrix * glm::vec4(origin, 1.0f));
         glm::vec3 localDir = glm::normalize(glm::vec3(instance.invModelMatrix * glm::vec4(direction, 0.0f)));
 
-        for (const auto& group : model.groups) {
-            // Broad-phase cull with local AABB first.
+        for (size_t gi = 0; gi < model.groups.size(); ++gi) {
+            // World-space group cull — skip groups whose world AABB doesn't intersect the ray
+            if (gi < instance.worldGroupBounds.size()) {
+                const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
+                if (!rayIntersectsAABB(origin, direction, gMin, gMax)) {
+                    continue;
+                }
+            }
+
+            const auto& group = model.groups[gi];
+            // Local-space AABB cull
             if (!rayIntersectsAABB(localOrigin, localDir, group.boundingBoxMin, group.boundingBoxMax)) {
                 continue;
             }
