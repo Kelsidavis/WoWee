@@ -252,12 +252,16 @@ T readValue(const std::vector<uint8_t>& data, uint32_t offset) {
 template<typename T>
 std::vector<T> readArray(const std::vector<uint8_t>& data, uint32_t offset, uint32_t count) {
     std::vector<T> result;
-    if (count == 0 || offset + count * sizeof(T) > data.size()) {
-        return result;
-    }
+    if (count == 0) return result;
+    // Overflow-safe bounds check: avoid uint32 wrap on count * sizeof(T)
+    size_t totalBytes = static_cast<size_t>(count) * sizeof(T);
+    if (totalBytes / sizeof(T) != count) return result;  // multiplication overflowed
+    if (static_cast<size_t>(offset) + totalBytes > data.size()) return result;
+    // Sanity cap: refuse allocations > 64MB to prevent garbage counts from OOMing
+    if (totalBytes > 64 * 1024 * 1024) return result;
 
     result.resize(count);
-    std::memcpy(result.data(), &data[offset], count * sizeof(T));
+    std::memcpy(result.data(), &data[offset], totalBytes);
     return result;
 }
 
@@ -652,17 +656,61 @@ M2Model M2Loader::load(const std::vector<uint8_t>& m2Data) {
         model.attachmentLookup = readArray<uint16_t>(m2Data, header.ofsAttachmentLookup, header.nAttachmentLookup);
     }
 
-    // Particle emitter parsing disabled.
-    // The assumed EMITTER_STRUCT_SIZE (476 bytes) is incorrect for WotLK 3.3.5a M2 files.
-    // When iterating multiple emitters, each one after the first reads from a misaligned
-    // offset, producing garbage M2TrackDisk headers with huge nTimestamps/nKeys counts.
-    // parseAnimTrack then calls readArray which allocates vectors sized by those garbage
-    // counts — this caused RAM usage to explode from ~1 GB to 130+ GB, consuming all
-    // system memory and swap.
-    // TODO: determine the correct emitter struct size for build 12340 and add overflow
-    // guards to readArray (count * sizeof(T) can wrap uint32_t, bypassing bounds checks).
-    (void)header.nParticleEmitters;
-    (void)header.ofsParticleEmitters;
+    // Parse particle emitters (WotLK M2ParticleOld: 0x1F0 = 496 bytes per emitter)
+    static constexpr uint32_t EMITTER_STRUCT_SIZE = 0x1F0;
+    if (header.nParticleEmitters > 0 && header.ofsParticleEmitters > 0 &&
+        header.nParticleEmitters < 256 &&
+        static_cast<size_t>(header.ofsParticleEmitters) +
+            static_cast<size_t>(header.nParticleEmitters) * EMITTER_STRUCT_SIZE <= m2Data.size()) {
+
+        // Build sequence flags for parseAnimTrack
+        std::vector<uint32_t> emSeqFlags;
+        emSeqFlags.reserve(model.sequences.size());
+        for (const auto& seq : model.sequences) {
+            emSeqFlags.push_back(seq.flags);
+        }
+
+        for (uint32_t ei = 0; ei < header.nParticleEmitters; ei++) {
+            uint32_t base = header.ofsParticleEmitters + ei * EMITTER_STRUCT_SIZE;
+
+            M2ParticleEmitter em;
+            em.particleId = readValue<int32_t>(m2Data, base + 0x00);
+            em.flags      = readValue<uint32_t>(m2Data, base + 0x04);
+            em.position.x = readValue<float>(m2Data, base + 0x08);
+            em.position.y = readValue<float>(m2Data, base + 0x0C);
+            em.position.z = readValue<float>(m2Data, base + 0x10);
+            em.bone       = readValue<uint16_t>(m2Data, base + 0x14);
+            em.texture    = readValue<uint16_t>(m2Data, base + 0x16);
+            em.blendingType = readValue<uint8_t>(m2Data, base + 0x28);
+            em.emitterType  = readValue<uint8_t>(m2Data, base + 0x29);
+
+            // Parse animated tracks (M2TrackDisk at known offsets)
+            auto parseTrack = [&](uint32_t off, M2AnimationTrack& track) {
+                if (base + off + sizeof(M2TrackDisk) <= m2Data.size()) {
+                    M2TrackDisk disk = readValue<M2TrackDisk>(m2Data, base + off);
+                    parseAnimTrack(m2Data, disk, track, TrackType::FLOAT, emSeqFlags);
+                }
+            };
+            parseTrack(0x34, em.emissionSpeed);
+            parseTrack(0x48, em.speedVariation);
+            parseTrack(0x5C, em.verticalRange);
+            parseTrack(0x70, em.horizontalRange);
+            parseTrack(0x84, em.gravity);
+            parseTrack(0x98, em.lifespan);
+            parseTrack(0xB0, em.emissionRate);
+            parseTrack(0xC8, em.emissionAreaLength);
+            parseTrack(0xDC, em.emissionAreaWidth);
+            parseTrack(0xF0, em.deceleration);
+
+            // Parse FBlocks (color, alpha, scale)
+            parseFBlock(m2Data, base + 0x104, em.particleColor, 0);
+            parseFBlock(m2Data, base + 0x118, em.particleAlpha, 1);
+            parseFBlock(m2Data, base + 0x12C, em.particleScale, 2);
+
+            model.particleEmitters.push_back(std::move(em));
+        }
+        core::Logger::getInstance().debug("  Particle emitters: ", model.particleEmitters.size());
+    }
 
     static int m2LoadLogBudget = 200;
     if (m2LoadLogBudget-- > 0) {

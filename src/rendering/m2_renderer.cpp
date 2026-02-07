@@ -824,7 +824,15 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
         }
     }
 
-    // Particle emitter data copy disabled (parsing disabled for now)
+    // Copy particle emitter data and resolve textures
+    gpuModel.particleEmitters = model.particleEmitters;
+    gpuModel.particleTextures.resize(model.particleEmitters.size(), whiteTexture);
+    for (size_t ei = 0; ei < model.particleEmitters.size(); ei++) {
+        uint16_t texIdx = model.particleEmitters[ei].texture;
+        if (texIdx < allTextures.size() && allTextures[texIdx] != 0) {
+            gpuModel.particleTextures[ei] = allTextures[texIdx];
+        }
+    }
 
     // Copy texture transform data for UV animation
     gpuModel.textureTransforms = model.textureTransforms;
@@ -1261,11 +1269,11 @@ void M2Renderer::update(float deltaTime) {
 
         computeBoneMatrices(model, instance);
 
-        // M2 particle emitter update — disabled for now (too expensive with many instances)
-        // if (!model.particleEmitters.empty()) {
-        //     emitParticles(instance, model, deltaTime);
-        //     updateParticles(instance, deltaTime);
-        // }
+        // M2 particle emitter update
+        if (!model.particleEmitters.empty()) {
+            emitParticles(instance, model, deltaTime);
+            updateParticles(instance, deltaTime);
+        }
     }
 }
 
