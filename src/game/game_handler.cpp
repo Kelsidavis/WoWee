@@ -4147,6 +4147,17 @@ void GameHandler::useItemBySlot(int backpackIndex) {
     }
 }
 
+void GameHandler::useItemById(uint32_t itemId) {
+    if (itemId == 0) return;
+    for (int i = 0; i < inventory.getBackpackSize(); i++) {
+        const auto& slot = inventory.getBackpackSlot(i);
+        if (!slot.empty() && slot.item.itemId == itemId) {
+            useItemBySlot(i);
+            return;
+        }
+    }
+}
+
 void GameHandler::handleLootResponse(network::Packet& packet) {
     if (!LootResponseParser::parse(packet, currentLoot)) return;
     lootWindowOpen = true;

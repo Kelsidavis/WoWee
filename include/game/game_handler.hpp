@@ -368,6 +368,7 @@ public:
     void sellItemBySlot(int backpackIndex);
     void autoEquipItemBySlot(int backpackIndex);
     void useItemBySlot(int backpackIndex);
+    void useItemById(uint32_t itemId);
     bool isVendorWindowOpen() const { return vendorWindowOpen; }
     const ListInventoryData& getVendorItems() const { return currentVendorItems; }
     const ItemQueryResponseData* getItemInfo(uint32_t itemId) const {

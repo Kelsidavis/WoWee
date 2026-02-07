@@ -134,6 +134,13 @@ private:
 
 public:
     static ImVec4 getQualityColor(game::ItemQuality quality);
+
+    /// Returns true if the user is currently holding an item (pickup cursor).
+    bool isHoldingItem() const { return holdingItem; }
+    /// Returns the item being held (only valid when isHoldingItem() is true).
+    const game::ItemDef& getHeldItem() const { return heldItem; }
+    /// Cancel the pickup, returning the item to its original slot.
+    void returnHeldItem(game::Inventory& inv) { cancelPickup(inv); }
 };
 
 } // namespace ui

@@ -519,6 +519,8 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 if (bar[i].type == game::ActionBarSlot::SPELL && bar[i].isReady()) {
                     uint64_t target = gameHandler.hasTarget() ? gameHandler.getTargetGuid() : 0;
                     gameHandler.castSpell(bar[i].id, target);
+                } else if (bar[i].type == game::ActionBarSlot::ITEM && bar[i].id != 0) {
+                    gameHandler.useItemById(bar[i].id);
                 }
             }
         }
@@ -1435,8 +1437,22 @@ void GameScreen::renderActionBar(game::GameHandler& gameHandler) {
 
             // Try to get icon texture for this slot
             GLuint iconTex = 0;
+            const game::ItemDef* barItemDef = nullptr;
             if (slot.type == game::ActionBarSlot::SPELL && slot.id != 0) {
                 iconTex = getSpellIcon(slot.id, assetMgr);
+            } else if (slot.type == game::ActionBarSlot::ITEM && slot.id != 0) {
+                // Look up item in inventory for icon and name
+                auto& inv = gameHandler.getInventory();
+                for (int bi = 0; bi < inv.getBackpackSize(); bi++) {
+                    const auto& bs = inv.getBackpackSlot(bi);
+                    if (!bs.empty() && bs.item.itemId == slot.id) {
+                        barItemDef = &bs.item;
+                        break;
+                    }
+                }
+                if (barItemDef && barItemDef->displayInfoId != 0) {
+                    iconTex = inventoryScreen.getItemIcon(barItemDef->displayInfoId);
+                }
             }
 
             bool clicked = false;
@@ -1468,6 +1484,10 @@ void GameScreen::renderActionBar(game::GameHandler& gameHandler) {
                     std::string spellName = getSpellName(slot.id);
                     if (spellName.size() > 6) spellName = spellName.substr(0, 6);
                     snprintf(label, sizeof(label), "%s", spellName.c_str());
+                } else if (slot.type == game::ActionBarSlot::ITEM && barItemDef) {
+                    std::string itemName = barItemDef->name;
+                    if (itemName.size() > 6) itemName = itemName.substr(0, 6);
+                    snprintf(label, sizeof(label), "%s", itemName.c_str());
                 } else if (slot.type == game::ActionBarSlot::ITEM) {
                     snprintf(label, sizeof(label), "Item");
                 } else if (slot.type == game::ActionBarSlot::MACRO) {
@@ -1480,18 +1500,40 @@ void GameScreen::renderActionBar(game::GameHandler& gameHandler) {
                 ImGui::PopStyleColor();
             }
 
-            if (clicked) {
+            // Drop held item from inventory onto action bar
+            if (clicked && inventoryScreen.isHoldingItem()) {
+                const auto& held = inventoryScreen.getHeldItem();
+                gameHandler.setActionBarSlot(i, game::ActionBarSlot::ITEM, held.itemId);
+                inventoryScreen.returnHeldItem(gameHandler.getInventory());
+            } else if (clicked) {
                 if (slot.type == game::ActionBarSlot::SPELL && slot.isReady()) {
                     uint64_t target = gameHandler.hasTarget() ? gameHandler.getTargetGuid() : 0;
                     gameHandler.castSpell(slot.id, target);
+                } else if (slot.type == game::ActionBarSlot::ITEM && slot.id != 0) {
+                    gameHandler.useItemById(slot.id);
                 }
             }
 
+            // Right-click to clear slot
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && !slot.isEmpty()) {
+                gameHandler.setActionBarSlot(i, game::ActionBarSlot::EMPTY, 0);
+            }
+
+            // Tooltip
             if (ImGui::IsItemHovered() && slot.type == game::ActionBarSlot::SPELL && slot.id != 0) {
                 std::string fullName = getSpellName(slot.id);
                 ImGui::BeginTooltip();
                 ImGui::Text("%s", fullName.c_str());
                 ImGui::TextDisabled("Spell ID: %u", slot.id);
+                ImGui::EndTooltip();
+            } else if (ImGui::IsItemHovered() && slot.type == game::ActionBarSlot::ITEM && slot.id != 0) {
+                ImGui::BeginTooltip();
+                if (barItemDef) {
+                    ImGui::Text("%s", barItemDef->name.c_str());
+                } else {
+                    ImGui::Text("Item #%u", slot.id);
+                }
+                ImGui::TextDisabled("(Right-click to remove)");
                 ImGui::EndTooltip();
             }
 
