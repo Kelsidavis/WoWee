@@ -442,8 +442,8 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
     ImGui::Text("Type:");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100);
-    const char* chatTypes[] = { "SAY", "YELL", "PARTY", "GUILD", "WHISPER" };
-    ImGui::Combo("##ChatType", &selectedChatType, chatTypes, 5);
+    const char* chatTypes[] = { "SAY", "YELL", "PARTY", "GUILD", "WHISPER", "RAID", "OFFICER", "BATTLEGROUND", "RAID WARNING", "INSTANCE" };
+    ImGui::Combo("##ChatType", &selectedChatType, chatTypes, 10);
 
     // Auto-fill whisper target when switching to WHISPER mode
     if (selectedChatType == 4 && lastChatType != 4) {
@@ -1348,6 +1348,27 @@ void GameScreen::sendChatMessage(game::GameHandler& gameHandler) {
                 type = game::ChatType::GUILD;
                 message = (spacePos != std::string::npos) ? command.substr(spacePos + 1) : "";
                 isChannelCommand = true;
+            } else if (cmdLower == "raid" || cmdLower == "rsay" || cmdLower == "ra") {
+                type = game::ChatType::RAID;
+                message = (spacePos != std::string::npos) ? command.substr(spacePos + 1) : "";
+                isChannelCommand = true;
+            } else if (cmdLower == "raidwarning" || cmdLower == "rw") {
+                type = game::ChatType::RAID_WARNING;
+                message = (spacePos != std::string::npos) ? command.substr(spacePos + 1) : "";
+                isChannelCommand = true;
+            } else if (cmdLower == "officer" || cmdLower == "o" || cmdLower == "osay") {
+                type = game::ChatType::OFFICER;
+                message = (spacePos != std::string::npos) ? command.substr(spacePos + 1) : "";
+                isChannelCommand = true;
+            } else if (cmdLower == "battleground" || cmdLower == "bg") {
+                type = game::ChatType::BATTLEGROUND;
+                message = (spacePos != std::string::npos) ? command.substr(spacePos + 1) : "";
+                isChannelCommand = true;
+            } else if (cmdLower == "instance" || cmdLower == "i") {
+                // Instance chat uses PARTY chat type
+                type = game::ChatType::PARTY;
+                message = (spacePos != std::string::npos) ? command.substr(spacePos + 1) : "";
+                isChannelCommand = true;
             } else if (cmdLower == "w" || cmdLower == "whisper" || cmdLower == "tell" || cmdLower == "t") {
                 // Parse: /w [TargetName] message text
                 // If no target name, use current target
@@ -1451,6 +1472,11 @@ void GameScreen::sendChatMessage(game::GameHandler& gameHandler) {
                     case 2: type = game::ChatType::PARTY; break;
                     case 3: type = game::ChatType::GUILD; break;
                     case 4: type = game::ChatType::WHISPER; target = whisperTargetBuffer; break;
+                    case 5: type = game::ChatType::RAID; break;
+                    case 6: type = game::ChatType::OFFICER; break;
+                    case 7: type = game::ChatType::BATTLEGROUND; break;
+                    case 8: type = game::ChatType::RAID_WARNING; break;
+                    case 9: type = game::ChatType::PARTY; break; // INSTANCE uses PARTY
                     default: type = game::ChatType::SAY; break;
                 }
             }
@@ -1462,6 +1488,11 @@ void GameScreen::sendChatMessage(game::GameHandler& gameHandler) {
                 case 2: type = game::ChatType::PARTY; break;
                 case 3: type = game::ChatType::GUILD; break;
                 case 4: type = game::ChatType::WHISPER; target = whisperTargetBuffer; break;
+                case 5: type = game::ChatType::RAID; break;
+                case 6: type = game::ChatType::OFFICER; break;
+                case 7: type = game::ChatType::BATTLEGROUND; break;
+                case 8: type = game::ChatType::RAID_WARNING; break;
+                case 9: type = game::ChatType::PARTY; break; // INSTANCE uses PARTY
                 default: type = game::ChatType::SAY; break;
             }
         }
@@ -1499,6 +1530,8 @@ const char* GameScreen::getChatTypeName(game::ChatType type) const {
         case game::ChatType::RAID: return "RAID";
         case game::ChatType::RAID_LEADER: return "RAID LEADER";
         case game::ChatType::RAID_WARNING: return "RAID WARNING";
+        case game::ChatType::BATTLEGROUND: return "BATTLEGROUND";
+        case game::ChatType::BATTLEGROUND_LEADER: return "BG LEADER";
         case game::ChatType::WHISPER: return "WHISPER";
         case game::ChatType::WHISPER_INFORM: return "TO";
         case game::ChatType::SYSTEM: return "SYSTEM";
@@ -1525,6 +1558,14 @@ ImVec4 GameScreen::getChatTypeColor(game::ChatType type) const {
         case game::ChatType::OFFICER:
             return ImVec4(0.3f, 0.8f, 0.3f, 1.0f);  // Dark green
         case game::ChatType::RAID:
+            return ImVec4(1.0f, 0.5f, 0.0f, 1.0f);  // Orange
+        case game::ChatType::RAID_LEADER:
+            return ImVec4(1.0f, 0.4f, 0.0f, 1.0f);  // Darker orange
+        case game::ChatType::RAID_WARNING:
+            return ImVec4(1.0f, 0.0f, 0.0f, 1.0f);  // Red
+        case game::ChatType::BATTLEGROUND:
+            return ImVec4(1.0f, 0.6f, 0.0f, 1.0f);  // Orange-gold
+        case game::ChatType::BATTLEGROUND_LEADER:
             return ImVec4(1.0f, 0.5f, 0.0f, 1.0f);  // Orange
         case game::ChatType::WHISPER:
             return ImVec4(1.0f, 0.5f, 1.0f, 1.0f);  // Pink
