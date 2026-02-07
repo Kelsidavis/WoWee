@@ -872,12 +872,11 @@ void Renderer::update(float deltaTime) {
         // Movement-facing comes from camera controller and is decoupled from LMB orbit.
         if (cameraController->isMoving() || cameraController->isRightMouseHeld()) {
             characterYaw = cameraController->getFacingYaw();
-        } else if (targetPosition && !emoteActive && !cameraController->isMoving()) {
-            // Face target when idle
+        } else if (inCombat_ && targetPosition && !emoteActive) {
+            // Face target when in combat and idle
             glm::vec3 toTarget = *targetPosition - characterPosition;
             if (glm::length(glm::vec2(toTarget.x, toTarget.y)) > 0.1f) {
                 float targetYaw = glm::degrees(std::atan2(toTarget.y, toTarget.x));
-                // Smooth rotation toward target
                 float diff = targetYaw - characterYaw;
                 while (diff > 180.0f) diff -= 360.0f;
                 while (diff < -180.0f) diff += 360.0f;

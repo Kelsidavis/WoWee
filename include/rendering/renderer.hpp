@@ -120,6 +120,7 @@ public:
 
     // Targeting support
     void setTargetPosition(const glm::vec3* pos);
+    void setInCombat(bool combat) { inCombat_ = combat; }
     bool isMoving() const;
     void triggerMeleeSwing();
     void setEquippedWeaponType(uint32_t inventoryType) { equippedWeaponInvType_ = inventoryType; meleeAnimId = 0; }
@@ -228,6 +229,7 @@ private:
 
     // Target facing
     const glm::vec3* targetPosition = nullptr;
+    bool inCombat_ = false;
 
     // Selection circle rendering
     uint32_t selCircleVAO = 0;
