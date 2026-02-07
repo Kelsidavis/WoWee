@@ -1510,17 +1510,20 @@ void GameScreen::renderActionBar(game::GameHandler& gameHandler) {
             }
 
             bool rightClicked = ImGui::IsItemClicked(ImGuiMouseButton_Right);
+            bool hoveredOnRelease = ImGui::IsItemHovered() &&
+                                    ImGui::IsMouseReleased(ImGuiMouseButton_Left);
 
-            // Drop held item from inventory onto action bar
-            if (clicked && inventoryScreen.isHoldingItem()) {
-                const auto& held = inventoryScreen.getHeldItem();
-                gameHandler.setActionBarSlot(i, game::ActionBarSlot::ITEM, held.itemId);
-                inventoryScreen.returnHeldItem(gameHandler.getInventory());
-            } else if (clicked && spellbookScreen.isDraggingSpell()) {
-                // Drop dragged spell from spellbook onto this slot
+            // Drop dragged spell from spellbook onto this slot
+            // (mouse release over slot — button click won't fire since press was in spellbook)
+            if (hoveredOnRelease && spellbookScreen.isDraggingSpell()) {
                 gameHandler.setActionBarSlot(i, game::ActionBarSlot::SPELL,
                     spellbookScreen.getDragSpellId());
                 spellbookScreen.consumeDragSpell();
+            } else if (clicked && inventoryScreen.isHoldingItem()) {
+                // Drop held item from inventory onto action bar
+                const auto& held = inventoryScreen.getHeldItem();
+                gameHandler.setActionBarSlot(i, game::ActionBarSlot::ITEM, held.itemId);
+                inventoryScreen.returnHeldItem(gameHandler.getInventory());
             } else if (clicked && actionBarDragSlot_ >= 0) {
                 // Dropping a dragged action bar slot onto another slot - swap or place
                 if (i != actionBarDragSlot_) {
