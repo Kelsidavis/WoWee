@@ -1335,6 +1335,93 @@ network::Packet ShowingCloakPacket::build(bool show) {
 }
 
 // ============================================================
+// PvP
+// ============================================================
+
+network::Packet TogglePvpPacket::build() {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_TOGGLE_PVP));
+    LOG_DEBUG("Built CMSG_TOGGLE_PVP");
+    return packet;
+}
+
+// ============================================================
+// Guild Commands
+// ============================================================
+
+network::Packet GuildInfoPacket::build() {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_GUILD_INFO));
+    LOG_DEBUG("Built CMSG_GUILD_INFO");
+    return packet;
+}
+
+network::Packet GuildRosterPacket::build() {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_GUILD_GET_ROSTER));
+    LOG_DEBUG("Built CMSG_GUILD_GET_ROSTER");
+    return packet;
+}
+
+network::Packet GuildMotdPacket::build(const std::string& motd) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_GUILD_MOTD));
+    packet.writeString(motd);
+    LOG_DEBUG("Built CMSG_GUILD_MOTD: ", motd);
+    return packet;
+}
+
+network::Packet GuildPromotePacket::build(const std::string& playerName) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_GUILD_PROMOTE_MEMBER));
+    packet.writeString(playerName);
+    LOG_DEBUG("Built CMSG_GUILD_PROMOTE_MEMBER: ", playerName);
+    return packet;
+}
+
+network::Packet GuildDemotePacket::build(const std::string& playerName) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_GUILD_DEMOTE_MEMBER));
+    packet.writeString(playerName);
+    LOG_DEBUG("Built CMSG_GUILD_DEMOTE_MEMBER: ", playerName);
+    return packet;
+}
+
+network::Packet GuildLeavePacket::build() {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_GUILD_LEAVE));
+    LOG_DEBUG("Built CMSG_GUILD_LEAVE");
+    return packet;
+}
+
+network::Packet GuildInvitePacket::build(const std::string& playerName) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_GUILD_INVITE));
+    packet.writeString(playerName);
+    LOG_DEBUG("Built CMSG_GUILD_INVITE: ", playerName);
+    return packet;
+}
+
+// ============================================================
+// Ready Check
+// ============================================================
+
+network::Packet ReadyCheckPacket::build() {
+    network::Packet packet(static_cast<uint16_t>(Opcode::MSG_RAID_READY_CHECK));
+    LOG_DEBUG("Built MSG_RAID_READY_CHECK");
+    return packet;
+}
+
+network::Packet ReadyCheckConfirmPacket::build(bool ready) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::MSG_RAID_READY_CHECK_CONFIRM));
+    packet.writeUInt8(ready ? 1 : 0);
+    LOG_DEBUG("Built MSG_RAID_READY_CHECK_CONFIRM: ready=", ready);
+    return packet;
+}
+
+// ============================================================
+// Duel
+// ============================================================
+
+network::Packet DuelCancelPacket::build() {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_DUEL_CANCELLED));
+    LOG_DEBUG("Built CMSG_DUEL_CANCELLED");
+    return packet;
+}
+
+// ============================================================
 // Random Roll
 // ============================================================
 

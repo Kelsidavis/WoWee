@@ -1178,6 +1178,134 @@ void GameScreen::sendChatMessage(game::GameHandler& gameHandler) {
                 return;
             }
 
+            // /pvp command
+            if (cmdLower == "pvp") {
+                gameHandler.togglePvp();
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /ginfo command
+            if (cmdLower == "ginfo" || cmdLower == "guildinfo") {
+                gameHandler.requestGuildInfo();
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /groster command
+            if (cmdLower == "groster" || cmdLower == "guildroster") {
+                gameHandler.requestGuildRoster();
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /gmotd command
+            if (cmdLower == "gmotd" || cmdLower == "guildmotd") {
+                if (spacePos != std::string::npos) {
+                    std::string motd = command.substr(spacePos + 1);
+                    gameHandler.setGuildMotd(motd);
+                    chatInputBuffer[0] = '\0';
+                    return;
+                }
+
+                game::MessageChatData msg;
+                msg.type = game::ChatType::SYSTEM;
+                msg.language = game::ChatLanguage::UNIVERSAL;
+                msg.message = "Usage: /gmotd <message>";
+                gameHandler.addLocalChatMessage(msg);
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /gpromote command
+            if (cmdLower == "gpromote" || cmdLower == "guildpromote") {
+                if (spacePos != std::string::npos) {
+                    std::string playerName = command.substr(spacePos + 1);
+                    gameHandler.promoteGuildMember(playerName);
+                    chatInputBuffer[0] = '\0';
+                    return;
+                }
+
+                game::MessageChatData msg;
+                msg.type = game::ChatType::SYSTEM;
+                msg.language = game::ChatLanguage::UNIVERSAL;
+                msg.message = "Usage: /gpromote <player>";
+                gameHandler.addLocalChatMessage(msg);
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /gdemote command
+            if (cmdLower == "gdemote" || cmdLower == "guilddemote") {
+                if (spacePos != std::string::npos) {
+                    std::string playerName = command.substr(spacePos + 1);
+                    gameHandler.demoteGuildMember(playerName);
+                    chatInputBuffer[0] = '\0';
+                    return;
+                }
+
+                game::MessageChatData msg;
+                msg.type = game::ChatType::SYSTEM;
+                msg.language = game::ChatLanguage::UNIVERSAL;
+                msg.message = "Usage: /gdemote <player>";
+                gameHandler.addLocalChatMessage(msg);
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /gquit command
+            if (cmdLower == "gquit" || cmdLower == "guildquit" || cmdLower == "leaveguild") {
+                gameHandler.leaveGuild();
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /ginvite command
+            if (cmdLower == "ginvite" || cmdLower == "guildinvite") {
+                if (spacePos != std::string::npos) {
+                    std::string playerName = command.substr(spacePos + 1);
+                    gameHandler.inviteToGuild(playerName);
+                    chatInputBuffer[0] = '\0';
+                    return;
+                }
+
+                game::MessageChatData msg;
+                msg.type = game::ChatType::SYSTEM;
+                msg.language = game::ChatLanguage::UNIVERSAL;
+                msg.message = "Usage: /ginvite <player>";
+                gameHandler.addLocalChatMessage(msg);
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /readycheck command
+            if (cmdLower == "readycheck" || cmdLower == "rc") {
+                gameHandler.initiateReadyCheck();
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /ready command (respond yes to ready check)
+            if (cmdLower == "ready") {
+                gameHandler.respondToReadyCheck(true);
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /notready command (respond no to ready check)
+            if (cmdLower == "notready" || cmdLower == "nr") {
+                gameHandler.respondToReadyCheck(false);
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /yield or /forfeit command
+            if (cmdLower == "yield" || cmdLower == "forfeit" || cmdLower == "surrender") {
+                gameHandler.forfeitDuel();
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
             // Chat channel slash commands
             bool isChannelCommand = false;
             if (cmdLower == "s" || cmdLower == "say") {

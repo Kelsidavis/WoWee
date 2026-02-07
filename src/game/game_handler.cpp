@@ -1893,6 +1893,157 @@ void GameHandler::assistTarget() {
     LOG_INFO("Assisting ", targetName, ", now targeting GUID: 0x", std::hex, assistTargetGuid, std::dec);
 }
 
+void GameHandler::togglePvp() {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot toggle PvP: not in world or not connected");
+        return;
+    }
+
+    auto packet = TogglePvpPacket::build();
+    socket->send(packet);
+    addSystemChatMessage("PvP flag toggled.");
+    LOG_INFO("Toggled PvP flag");
+}
+
+void GameHandler::requestGuildInfo() {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot request guild info: not in world or not connected");
+        return;
+    }
+
+    auto packet = GuildInfoPacket::build();
+    socket->send(packet);
+    LOG_INFO("Requested guild info");
+}
+
+void GameHandler::requestGuildRoster() {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot request guild roster: not in world or not connected");
+        return;
+    }
+
+    auto packet = GuildRosterPacket::build();
+    socket->send(packet);
+    addSystemChatMessage("Requesting guild roster...");
+    LOG_INFO("Requested guild roster");
+}
+
+void GameHandler::setGuildMotd(const std::string& motd) {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot set guild MOTD: not in world or not connected");
+        return;
+    }
+
+    auto packet = GuildMotdPacket::build(motd);
+    socket->send(packet);
+    addSystemChatMessage("Guild MOTD updated.");
+    LOG_INFO("Set guild MOTD: ", motd);
+}
+
+void GameHandler::promoteGuildMember(const std::string& playerName) {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot promote guild member: not in world or not connected");
+        return;
+    }
+
+    if (playerName.empty()) {
+        addSystemChatMessage("You must specify a player name.");
+        return;
+    }
+
+    auto packet = GuildPromotePacket::build(playerName);
+    socket->send(packet);
+    addSystemChatMessage("Promoting " + playerName + "...");
+    LOG_INFO("Promoting guild member: ", playerName);
+}
+
+void GameHandler::demoteGuildMember(const std::string& playerName) {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot demote guild member: not in world or not connected");
+        return;
+    }
+
+    if (playerName.empty()) {
+        addSystemChatMessage("You must specify a player name.");
+        return;
+    }
+
+    auto packet = GuildDemotePacket::build(playerName);
+    socket->send(packet);
+    addSystemChatMessage("Demoting " + playerName + "...");
+    LOG_INFO("Demoting guild member: ", playerName);
+}
+
+void GameHandler::leaveGuild() {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot leave guild: not in world or not connected");
+        return;
+    }
+
+    auto packet = GuildLeavePacket::build();
+    socket->send(packet);
+    addSystemChatMessage("Leaving guild...");
+    LOG_INFO("Leaving guild");
+}
+
+void GameHandler::inviteToGuild(const std::string& playerName) {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot invite to guild: not in world or not connected");
+        return;
+    }
+
+    if (playerName.empty()) {
+        addSystemChatMessage("You must specify a player name.");
+        return;
+    }
+
+    auto packet = GuildInvitePacket::build(playerName);
+    socket->send(packet);
+    addSystemChatMessage("Inviting " + playerName + " to guild...");
+    LOG_INFO("Inviting to guild: ", playerName);
+}
+
+void GameHandler::initiateReadyCheck() {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot initiate ready check: not in world or not connected");
+        return;
+    }
+
+    if (!isInGroup()) {
+        addSystemChatMessage("You must be in a group to initiate a ready check.");
+        return;
+    }
+
+    auto packet = ReadyCheckPacket::build();
+    socket->send(packet);
+    addSystemChatMessage("Ready check initiated.");
+    LOG_INFO("Initiated ready check");
+}
+
+void GameHandler::respondToReadyCheck(bool ready) {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot respond to ready check: not in world or not connected");
+        return;
+    }
+
+    auto packet = ReadyCheckConfirmPacket::build(ready);
+    socket->send(packet);
+    addSystemChatMessage(ready ? "You are ready." : "You are not ready.");
+    LOG_INFO("Responded to ready check: ", ready ? "ready" : "not ready");
+}
+
+void GameHandler::forfeitDuel() {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot forfeit duel: not in world or not connected");
+        return;
+    }
+
+    auto packet = DuelCancelPacket::build();
+    socket->send(packet);
+    addSystemChatMessage("You have forfeited the duel.");
+    LOG_INFO("Forfeited duel");
+}
+
 void GameHandler::releaseSpirit() {
     if (!playerDead_) return;
     if (socket && state == WorldState::IN_WORLD) {

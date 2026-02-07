@@ -803,6 +803,88 @@ public:
 };
 
 // ============================================================
+// PvP
+// ============================================================
+
+/** CMSG_TOGGLE_PVP packet builder */
+class TogglePvpPacket {
+public:
+    static network::Packet build();
+};
+
+// ============================================================
+// Guild Commands
+// ============================================================
+
+/** CMSG_GUILD_INFO packet builder */
+class GuildInfoPacket {
+public:
+    static network::Packet build();
+};
+
+/** CMSG_GUILD_GET_ROSTER packet builder */
+class GuildRosterPacket {
+public:
+    static network::Packet build();
+};
+
+/** CMSG_GUILD_MOTD packet builder */
+class GuildMotdPacket {
+public:
+    static network::Packet build(const std::string& motd);
+};
+
+/** CMSG_GUILD_PROMOTE_MEMBER packet builder */
+class GuildPromotePacket {
+public:
+    static network::Packet build(const std::string& playerName);
+};
+
+/** CMSG_GUILD_DEMOTE_MEMBER packet builder */
+class GuildDemotePacket {
+public:
+    static network::Packet build(const std::string& playerName);
+};
+
+/** CMSG_GUILD_LEAVE packet builder */
+class GuildLeavePacket {
+public:
+    static network::Packet build();
+};
+
+/** CMSG_GUILD_INVITE packet builder */
+class GuildInvitePacket {
+public:
+    static network::Packet build(const std::string& playerName);
+};
+
+// ============================================================
+// Ready Check
+// ============================================================
+
+/** MSG_RAID_READY_CHECK packet builder */
+class ReadyCheckPacket {
+public:
+    static network::Packet build();
+};
+
+/** MSG_RAID_READY_CHECK_CONFIRM packet builder */
+class ReadyCheckConfirmPacket {
+public:
+    static network::Packet build(bool ready);
+};
+
+// ============================================================
+// Duel
+// ============================================================
+
+/** CMSG_DUEL_CANCELLED packet builder */
+class DuelCancelPacket {
+public:
+    static network::Packet build();
+};
+
+// ============================================================
 // Random Roll
 // ============================================================
 

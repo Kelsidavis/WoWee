@@ -235,6 +235,25 @@ public:
     void followTarget();
     void assistTarget();
 
+    // PvP
+    void togglePvp();
+
+    // Guild commands
+    void requestGuildInfo();
+    void requestGuildRoster();
+    void setGuildMotd(const std::string& motd);
+    void promoteGuildMember(const std::string& playerName);
+    void demoteGuildMember(const std::string& playerName);
+    void leaveGuild();
+    void inviteToGuild(const std::string& playerName);
+
+    // Ready check
+    void initiateReadyCheck();
+    void respondToReadyCheck(bool ready);
+
+    // Duel
+    void forfeitDuel();
+
     // ---- Phase 1: Name queries ----
     void queryPlayerName(uint64_t guid);
     void queryCreatureInfo(uint32_t entry, uint64_t guid);

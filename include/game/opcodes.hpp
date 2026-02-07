@@ -85,6 +85,31 @@ enum class Opcode : uint16_t {
     CMSG_SHOWING_HELM                = 0x2B9,
     CMSG_SHOWING_CLOAK               = 0x2BA,
 
+    // ---- PvP ----
+    CMSG_TOGGLE_PVP                  = 0x253,
+
+    // ---- Guild ----
+    CMSG_GUILD_INVITE                = 0x082,
+    CMSG_GUILD_ACCEPT                = 0x084,
+    CMSG_GUILD_DECLINE_INVITATION    = 0x085,
+    CMSG_GUILD_INFO                  = 0x087,
+    CMSG_GUILD_GET_ROSTER            = 0x089,
+    CMSG_GUILD_PROMOTE_MEMBER        = 0x08B,
+    CMSG_GUILD_DEMOTE_MEMBER         = 0x08C,
+    CMSG_GUILD_LEAVE                 = 0x08D,
+    CMSG_GUILD_MOTD                  = 0x091,
+    SMSG_GUILD_INFO                  = 0x088,
+    SMSG_GUILD_ROSTER                = 0x08A,
+
+    // ---- Ready Check ----
+    MSG_RAID_READY_CHECK             = 0x322,
+    MSG_RAID_READY_CHECK_CONFIRM     = 0x3AE,
+
+    // ---- Duel ----
+    CMSG_DUEL_ACCEPTED               = 0x16C,
+    CMSG_DUEL_CANCELLED              = 0x16D,
+    SMSG_DUEL_REQUESTED              = 0x167,
+
     // ---- Random Roll ----
     MSG_RANDOM_ROLL                  = 0x1FB,
 
