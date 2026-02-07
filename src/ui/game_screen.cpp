@@ -673,15 +673,8 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                     auto unit = std::static_pointer_cast<game::Unit>(target);
                     if (unit->getHealth() == 0 && unit->getMaxHealth() > 0) {
                         gameHandler.lootTarget(target->getGuid());
-                    } else if (gameHandler.isSinglePlayerMode()) {
-                        // Single-player: interact with friendly NPCs, otherwise attack
-                        if (!unit->isHostile() && unit->isInteractable()) {
-                            gameHandler.interactWithNpc(target->getGuid());
-                        } else {
-                            gameHandler.startAutoAttack(target->getGuid());
-                        }
                     } else {
-                        // Online mode: interact with friendly NPCs, otherwise attack
+                        // Interact with friendly NPCs, otherwise attack
                         if (!unit->isHostile() && unit->isInteractable()) {
                             gameHandler.interactWithNpc(target->getGuid());
                         } else {
@@ -759,12 +752,6 @@ void GameScreen::renderPlayerFrame(game::GameHandler& gameHandler) {
                 playerHp = unit->getHealth();
                 playerMaxHp = unit->getMaxHealth();
             }
-        }
-
-        // Override with local player stats in single-player mode
-        if (gameHandler.isSinglePlayerMode() && gameHandler.getLocalPlayerMaxHealth() > 0) {
-            playerHp = gameHandler.getLocalPlayerHealth();
-            playerMaxHp = gameHandler.getLocalPlayerMaxHealth();
         }
 
         // Health bar
@@ -2789,27 +2776,6 @@ void GameScreen::renderSettingsWindow() {
                 break;
             }
         }
-        if (auto* gameHandler = core::Application::getInstance().getGameHandler()) {
-            if (gameHandler->isSinglePlayerMode()) {
-                game::GameHandler::SinglePlayerSettings spSettings;
-                if (gameHandler->getSinglePlayerSettings(spSettings)) {
-                    pendingFullscreen = spSettings.fullscreen;
-                    pendingVsync = spSettings.vsync;
-                    pendingShadows = spSettings.shadows;
-                    pendingMusicVolume = spSettings.musicVolume;
-                    pendingSfxVolume = spSettings.sfxVolume;
-                    pendingMouseSensitivity = spSettings.mouseSensitivity;
-                    pendingInvertMouse = spSettings.invertMouse;
-                    for (int i = 0; i < kResCount; i++) {
-                        if (kResolutions[i][0] == spSettings.resWidth &&
-                            kResolutions[i][1] == spSettings.resHeight) {
-                            pendingResIndex = i;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
         pendingUiOpacity = static_cast<int>(uiOpacity_ * 100.0f + 0.5f);
         settingsInit = true;
     }
@@ -2907,21 +2873,6 @@ void GameScreen::renderSettingsWindow() {
                 if (auto* cameraController = renderer->getCameraController()) {
                     cameraController->setMouseSensitivity(pendingMouseSensitivity);
                     cameraController->setInvertMouse(pendingInvertMouse);
-                }
-            }
-            if (auto* gameHandler = core::Application::getInstance().getGameHandler()) {
-                if (gameHandler->isSinglePlayerMode()) {
-                    game::GameHandler::SinglePlayerSettings spSettings;
-                    spSettings.fullscreen = pendingFullscreen;
-                    spSettings.vsync = pendingVsync;
-                    spSettings.shadows = pendingShadows;
-                    spSettings.resWidth = kResolutions[pendingResIndex][0];
-                    spSettings.resHeight = kResolutions[pendingResIndex][1];
-                    spSettings.musicVolume = pendingMusicVolume;
-                    spSettings.sfxVolume = pendingSfxVolume;
-                    spSettings.mouseSensitivity = pendingMouseSensitivity;
-                    spSettings.invertMouse = pendingInvertMouse;
-                    gameHandler->setSinglePlayerSettings(spSettings);
                 }
             }
         }

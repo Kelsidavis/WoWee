@@ -15,11 +15,716 @@
 #include <unordered_map>
 #include <functional>
 #include <cstdlib>
+#include <sqlite3.h>
 #include <zlib.h>
 
 namespace wowee {
 namespace game {
 
+namespace {
+
+struct LootEntryRow {
+    uint32_t item = 0;
+    float chance = 0.0f;
+    uint16_t lootmode = 0;
+    uint8_t groupid = 0;
+    int32_t mincountOrRef = 0;
+    uint8_t maxcount = 1;
+};
+
+struct CreatureTemplateRow {
+    uint32_t lootId = 0;
+    uint32_t minGold = 0;
+    uint32_t maxGold = 0;
+};
+
+struct ItemTemplateRow {
+    uint32_t itemId = 0;
+    std::string name;
+    uint32_t displayId = 0;
+    uint8_t quality = 0;
+    uint8_t inventoryType = 0;
+    int32_t maxStack = 1;
+    uint32_t sellPrice = 0;
+    int32_t armor = 0;
+    int32_t stamina = 0;
+    int32_t strength = 0;
+    int32_t agility = 0;
+    int32_t intellect = 0;
+    int32_t spirit = 0;
+};
+
+struct SinglePlayerLootDb {
+    bool loaded = false;
+    std::string basePath;
+    std::unordered_map<uint32_t, CreatureTemplateRow> creatureTemplates;
+    std::unordered_map<uint32_t, std::vector<LootEntryRow>> creatureLoot;
+    std::unordered_map<uint32_t, std::vector<LootEntryRow>> referenceLoot;
+    std::unordered_map<uint32_t, ItemTemplateRow> itemTemplates;
+};
+
+struct SinglePlayerCreateDb {
+    bool loaded = false;
+    std::unordered_map<uint16_t, GameHandler::SinglePlayerCreateInfo> rows;
+};
+
+struct SinglePlayerStartDb {
+    bool loaded = false;
+    struct StartItemRow {
+        uint8_t race = 0;
+        uint8_t cls = 0;
+        uint32_t itemId = 0;
+        int32_t amount = 1;
+    };
+    struct StartSpellRow {
+        uint32_t raceMask = 0;
+        uint32_t classMask = 0;
+        uint32_t spellId = 0;
+    };
+    struct StartActionRow {
+        uint8_t race = 0;
+        uint8_t cls = 0;
+        uint16_t button = 0;
+        uint32_t action = 0;
+        uint16_t type = 0;
+    };
+    std::vector<StartItemRow> items;
+    std::vector<StartSpellRow> spells;
+    std::vector<StartActionRow> actions;
+};
+
+struct SinglePlayerSqlite {
+    sqlite3* db = nullptr;
+    std::filesystem::path path;
+
+    bool open() {
+        if (db) return true;
+        path = std::filesystem::path("saves");
+        std::error_code ec;
+        std::filesystem::create_directories(path, ec);
+        path /= "singleplayer.db";
+        if (sqlite3_open(path.string().c_str(), &db) != SQLITE_OK) {
+            db = nullptr;
+            return false;
+        }
+        sqlite3_exec(db, "PRAGMA journal_mode=WAL;", nullptr, nullptr, nullptr);
+        sqlite3_exec(db, "PRAGMA synchronous=NORMAL;", nullptr, nullptr, nullptr);
+        return true;
+    }
+
+    void close() {
+        if (db) {
+            sqlite3_close(db);
+            db = nullptr;
+        }
+    }
+
+    bool exec(const char* sql) const {
+        if (!db) return false;
+        char* err = nullptr;
+        int rc = sqlite3_exec(db, sql, nullptr, nullptr, &err);
+        if (err) sqlite3_free(err);
+        return rc == SQLITE_OK;
+    }
+
+    bool ensureSchema() const {
+        static const char* kSchema =
+            "CREATE TABLE IF NOT EXISTS characters ("
+            " guid INTEGER PRIMARY KEY,"
+            " name TEXT,"
+            " race INTEGER,"
+            " \"class\" INTEGER,"
+            " gender INTEGER,"
+            " level INTEGER,"
+            " appearance_bytes INTEGER,"
+            " facial_features INTEGER,"
+            " zone INTEGER,"
+            " map INTEGER,"
+            " position_x REAL,"
+            " position_y REAL,"
+            " position_z REAL,"
+            " orientation REAL,"
+            " money INTEGER,"
+            " xp INTEGER,"
+            " health INTEGER,"
+            " max_health INTEGER,"
+            " has_state INTEGER DEFAULT 0"
+            ");"
+            "CREATE TABLE IF NOT EXISTS character_inventory ("
+            " guid INTEGER,"
+            " location INTEGER,"
+            " slot INTEGER,"
+            " item_id INTEGER,"
+            " name TEXT,"
+            " quality INTEGER,"
+            " inventory_type INTEGER,"
+            " stack_count INTEGER,"
+            " max_stack INTEGER,"
+            " bag_slots INTEGER,"
+            " armor INTEGER,"
+            " stamina INTEGER,"
+            " strength INTEGER,"
+            " agility INTEGER,"
+            " intellect INTEGER,"
+            " spirit INTEGER,"
+            " display_info_id INTEGER,"
+            " subclass_name TEXT,"
+            " sell_price INTEGER DEFAULT 0,"
+            " PRIMARY KEY (guid, location, slot)"
+            ");"
+            "CREATE TABLE IF NOT EXISTS character_spell ("
+            " guid INTEGER,"
+            " spell INTEGER,"
+            " PRIMARY KEY (guid, spell)"
+            ");"
+            "CREATE TABLE IF NOT EXISTS character_action ("
+            " guid INTEGER,"
+            " slot INTEGER,"
+            " type INTEGER,"
+            " action INTEGER,"
+            " PRIMARY KEY (guid, slot)"
+            ");"
+            "CREATE TABLE IF NOT EXISTS character_aura ("
+            " guid INTEGER,"
+            " slot INTEGER,"
+            " spell INTEGER,"
+            " flags INTEGER,"
+            " level INTEGER,"
+            " charges INTEGER,"
+            " duration_ms INTEGER,"
+            " max_duration_ms INTEGER,"
+            " caster_guid INTEGER,"
+            " PRIMARY KEY (guid, slot)"
+            ");"
+            "CREATE TABLE IF NOT EXISTS character_queststatus ("
+            " guid INTEGER,"
+            " quest INTEGER,"
+            " status INTEGER,"
+            " progress INTEGER,"
+            " PRIMARY KEY (guid, quest)"
+            ");"
+            "CREATE TABLE IF NOT EXISTS character_settings ("
+            " guid INTEGER PRIMARY KEY,"
+            " fullscreen INTEGER,"
+            " vsync INTEGER,"
+            " shadows INTEGER,"
+            " res_w INTEGER,"
+            " res_h INTEGER,"
+            " music_volume INTEGER,"
+            " sfx_volume INTEGER,"
+            " mouse_sensitivity REAL,"
+            " invert_mouse INTEGER"
+            ");";
+        if (!exec(kSchema)) return false;
+        // Migration: add sell_price column to existing saves
+        exec("ALTER TABLE character_inventory ADD COLUMN sell_price INTEGER DEFAULT 0;");
+        return true;
+    }
+};
+
+static SinglePlayerSqlite& getSinglePlayerSqlite() {
+    static SinglePlayerSqlite sp;
+    if (!sp.db) {
+        if (sp.open()) {
+            sp.ensureSchema();
+        }
+    }
+    return sp;
+}
+
+static uint32_t removeItemsFromInventory(Inventory& inventory, uint32_t itemId, uint32_t amount) {
+    if (itemId == 0 || amount == 0) return 0;
+    uint32_t remaining = amount;
+
+    for (int i = 0; i < Inventory::BACKPACK_SLOTS && remaining > 0; i++) {
+        const ItemSlot& slot = inventory.getBackpackSlot(i);
+        if (slot.empty() || slot.item.itemId != itemId) continue;
+        if (slot.item.stackCount <= remaining) {
+            remaining -= slot.item.stackCount;
+            inventory.clearBackpackSlot(i);
+        } else {
+            ItemDef updated = slot.item;
+            updated.stackCount -= remaining;
+            inventory.setBackpackSlot(i, updated);
+            remaining = 0;
+        }
+    }
+
+    for (int i = 0; i < Inventory::NUM_EQUIP_SLOTS && remaining > 0; i++) {
+        EquipSlot slotId = static_cast<EquipSlot>(i);
+        const ItemSlot& slot = inventory.getEquipSlot(slotId);
+        if (slot.empty() || slot.item.itemId != itemId) continue;
+        if (slot.item.stackCount <= remaining) {
+            remaining -= slot.item.stackCount;
+            inventory.clearEquipSlot(slotId);
+        } else {
+            ItemDef updated = slot.item;
+            updated.stackCount -= remaining;
+            inventory.setEquipSlot(slotId, updated);
+            remaining = 0;
+        }
+    }
+
+    for (int bag = 0; bag < Inventory::NUM_BAG_SLOTS && remaining > 0; bag++) {
+        int bagSize = inventory.getBagSize(bag);
+        for (int slotIndex = 0; slotIndex < bagSize && remaining > 0; slotIndex++) {
+            const ItemSlot& slot = inventory.getBagSlot(bag, slotIndex);
+            if (slot.empty() || slot.item.itemId != itemId) continue;
+            if (slot.item.stackCount <= remaining) {
+                remaining -= slot.item.stackCount;
+                inventory.setBagSlot(bag, slotIndex, ItemDef{});
+            } else {
+                ItemDef updated = slot.item;
+                updated.stackCount -= remaining;
+                inventory.setBagSlot(bag, slotIndex, updated);
+                remaining = 0;
+            }
+        }
+    }
+
+    return amount - remaining;
+}
+
+static std::string trimSql(const std::string& s) {
+    size_t b = 0;
+    while (b < s.size() && std::isspace(static_cast<unsigned char>(s[b]))) b++;
+    size_t e = s.size();
+    while (e > b && std::isspace(static_cast<unsigned char>(s[e - 1]))) e--;
+    return s.substr(b, e - b);
+}
+
+static bool parseInsertTuples(const std::string& line, std::vector<std::string>& outTuples) {
+    outTuples.clear();
+    size_t valuesPos = line.find("VALUES");
+    if (valuesPos == std::string::npos) valuesPos = line.find("values");
+    if (valuesPos == std::string::npos) return false;
+
+    bool inQuote = false;
+    int depth = 0;
+    size_t tupleStart = std::string::npos;
+    for (size_t i = valuesPos; i < line.size(); i++) {
+        char c = line[i];
+        if (c == '\'' && (i == 0 || line[i - 1] != '\\')) inQuote = !inQuote;
+        if (inQuote) continue;
+        if (c == '(') {
+            if (depth == 0) tupleStart = i + 1;
+            depth++;
+        } else if (c == ')') {
+            depth--;
+            if (depth == 0 && tupleStart != std::string::npos && i > tupleStart) {
+                outTuples.push_back(line.substr(tupleStart, i - tupleStart));
+                tupleStart = std::string::npos;
+            }
+        }
+    }
+    return !outTuples.empty();
+}
+
+static std::vector<std::string> splitCsvTuple(const std::string& tuple) {
+    std::vector<std::string> cols;
+    std::string cur;
+    bool inQuote = false;
+    for (size_t i = 0; i < tuple.size(); i++) {
+        char c = tuple[i];
+        if (c == '\'' && (i == 0 || tuple[i - 1] != '\\')) {
+            inQuote = !inQuote;
+            cur.push_back(c);
+            continue;
+        }
+        if (c == ',' && !inQuote) {
+            cols.push_back(trimSql(cur));
+            cur.clear();
+            continue;
+        }
+        cur.push_back(c);
+    }
+    if (!cur.empty()) cols.push_back(trimSql(cur));
+    return cols;
+}
+
+static std::string unquoteSqlString(const std::string& s) {
+    if (s.size() >= 2 && s.front() == '\'' && s.back() == '\'') {
+        return s.substr(1, s.size() - 2);
+    }
+    return s;
+}
+
+static std::vector<std::string> loadCreateTableColumns(const std::filesystem::path& path) {
+    std::vector<std::string> columns;
+    std::ifstream in(path);
+    if (!in) return columns;
+    std::string line;
+    bool inCreate = false;
+    while (std::getline(in, line)) {
+        if (!inCreate) {
+            if (line.find("CREATE TABLE") != std::string::npos ||
+                line.find("create table") != std::string::npos) {
+                inCreate = true;
+            }
+            continue;
+        }
+        auto trimmed = trimSql(line);
+        if (trimmed.empty()) continue;
+        if (trimmed[0] == ')') break;
+        size_t b = trimmed.find('`');
+        if (b == std::string::npos) continue;
+        size_t e = trimmed.find('`', b + 1);
+        if (e == std::string::npos) continue;
+        columns.push_back(trimmed.substr(b + 1, e - b - 1));
+    }
+    return columns;
+}
+
+static int columnIndex(const std::vector<std::string>& cols, const std::string& name) {
+    for (size_t i = 0; i < cols.size(); i++) {
+        if (cols[i] == name) return static_cast<int>(i);
+    }
+    return -1;
+}
+
+static std::filesystem::path resolveDbBasePath() {
+    if (const char* dbBase = std::getenv("WOW_DB_BASE_PATH")) {
+        std::filesystem::path base(dbBase);
+        if (std::filesystem::exists(base)) return base;
+    }
+    if (std::filesystem::exists("assets/sql")) {
+        return std::filesystem::path("assets/sql");
+    }
+    return {};
+}
+
+static void processInsertStatements(
+    std::ifstream& in,
+    const std::function<void(const std::vector<std::string>&)>& onTuple) {
+    std::string line;
+    std::string stmt;
+    std::vector<std::string> tuples;
+    while (std::getline(in, line)) {
+        if (stmt.empty()) {
+            if (line.find("INSERT INTO") == std::string::npos &&
+                line.find("insert into") == std::string::npos) {
+                continue;
+            }
+        }
+        if (!stmt.empty()) stmt.push_back('\n');
+        stmt += line;
+        if (line.find(';') == std::string::npos) continue;
+
+        if (parseInsertTuples(stmt, tuples)) {
+            for (const auto& t : tuples) {
+                onTuple(splitCsvTuple(t));
+            }
+        }
+        stmt.clear();
+    }
+}
+
+static SinglePlayerLootDb& getSinglePlayerLootDb() {
+    static SinglePlayerLootDb db;
+    if (db.loaded) return db;
+
+    auto base = resolveDbBasePath();
+    if (base.empty()) {
+        db.loaded = true;
+        return db;
+    }
+
+    std::filesystem::path basePath = base;
+    std::filesystem::path creatureTemplatePath = basePath / "creature_template.sql";
+    std::filesystem::path creatureLootPath = basePath / "creature_loot_template.sql";
+    std::filesystem::path referenceLootPath = basePath / "reference_loot_template.sql";
+    std::filesystem::path itemTemplatePath = basePath / "item_template.sql";
+
+    if (!std::filesystem::exists(creatureTemplatePath)) {
+        auto alt = basePath / "base";
+        if (std::filesystem::exists(alt / "creature_template.sql")) {
+            basePath = alt;
+            creatureTemplatePath = basePath / "creature_template.sql";
+            creatureLootPath = basePath / "creature_loot_template.sql";
+            referenceLootPath = basePath / "reference_loot_template.sql";
+            itemTemplatePath = basePath / "item_template.sql";
+        }
+    }
+
+    db.basePath = basePath.string();
+
+    // creature_template: entry, lootid, mingold, maxgold
+    {
+        auto cols = loadCreateTableColumns(creatureTemplatePath);
+        int idxEntry = columnIndex(cols, "entry");
+        int idxLoot = columnIndex(cols, "lootid");
+        int idxMinGold = columnIndex(cols, "mingold");
+        int idxMaxGold = columnIndex(cols, "maxgold");
+        if (idxEntry >= 0 && std::filesystem::exists(creatureTemplatePath)) {
+            std::ifstream in(creatureTemplatePath);
+            processInsertStatements(in, [&](const std::vector<std::string>& row) {
+                if (idxEntry >= static_cast<int>(row.size())) return;
+                try {
+                    uint32_t entry = static_cast<uint32_t>(std::stoul(row[idxEntry]));
+                    CreatureTemplateRow tr;
+                    if (idxLoot >= 0 && idxLoot < static_cast<int>(row.size())) {
+                        tr.lootId = static_cast<uint32_t>(std::stoul(row[idxLoot]));
+                    }
+                    if (idxMinGold >= 0 && idxMinGold < static_cast<int>(row.size())) {
+                        tr.minGold = static_cast<uint32_t>(std::stoul(row[idxMinGold]));
+                    }
+                    if (idxMaxGold >= 0 && idxMaxGold < static_cast<int>(row.size())) {
+                        tr.maxGold = static_cast<uint32_t>(std::stoul(row[idxMaxGold]));
+                    }
+                    db.creatureTemplates[entry] = tr;
+                } catch (const std::exception&) {
+                }
+            });
+        }
+    }
+
+    auto loadLootTable = [&](const std::filesystem::path& path,
+                             std::unordered_map<uint32_t, std::vector<LootEntryRow>>& out) {
+        if (!std::filesystem::exists(path)) return;
+        std::ifstream in(path);
+        processInsertStatements(in, [&](const std::vector<std::string>& row) {
+            if (row.size() < 7) return;
+            try {
+                uint32_t entry = static_cast<uint32_t>(std::stoul(row[0]));
+                LootEntryRow lr;
+                lr.item = static_cast<uint32_t>(std::stoul(row[1]));
+                lr.chance = std::stof(row[2]);
+                lr.lootmode = static_cast<uint16_t>(std::stoul(row[3]));
+                lr.groupid = static_cast<uint8_t>(std::stoul(row[4]));
+                lr.mincountOrRef = static_cast<int32_t>(std::stol(row[5]));
+                lr.maxcount = static_cast<uint8_t>(std::stoul(row[6]));
+                out[entry].push_back(lr);
+            } catch (const std::exception&) {
+            }
+        });
+    };
+
+    loadLootTable(creatureLootPath, db.creatureLoot);
+    loadLootTable(referenceLootPath, db.referenceLoot);
+
+    // item_template
+    {
+        auto cols = loadCreateTableColumns(itemTemplatePath);
+        int idxEntry = columnIndex(cols, "entry");
+        int idxName = columnIndex(cols, "name");
+        int idxDisplay = columnIndex(cols, "displayid");
+        int idxQuality = columnIndex(cols, "Quality");
+        int idxInvType = columnIndex(cols, "InventoryType");
+        int idxStack = columnIndex(cols, "stackable");
+        int idxSellPrice = columnIndex(cols, "SellPrice");
+        int idxArmor = columnIndex(cols, "armor");
+        // stat_type/stat_value pairs (up to 10)
+        int idxStatType[10], idxStatVal[10];
+        for (int si = 0; si < 10; si++) {
+            idxStatType[si] = columnIndex(cols, "stat_type" + std::to_string(si + 1));
+            idxStatVal[si] = columnIndex(cols, "stat_value" + std::to_string(si + 1));
+        }
+        if (idxEntry >= 0 && std::filesystem::exists(itemTemplatePath)) {
+            std::ifstream in(itemTemplatePath);
+            processInsertStatements(in, [&](const std::vector<std::string>& row) {
+                if (idxEntry >= static_cast<int>(row.size())) return;
+                try {
+                    ItemTemplateRow ir;
+                    ir.itemId = static_cast<uint32_t>(std::stoul(row[idxEntry]));
+                    if (idxName >= 0 && idxName < static_cast<int>(row.size())) {
+                        ir.name = unquoteSqlString(row[idxName]);
+                    }
+                    if (idxDisplay >= 0 && idxDisplay < static_cast<int>(row.size())) {
+                        ir.displayId = static_cast<uint32_t>(std::stoul(row[idxDisplay]));
+                    }
+                    if (idxQuality >= 0 && idxQuality < static_cast<int>(row.size())) {
+                        ir.quality = static_cast<uint8_t>(std::stoul(row[idxQuality]));
+                    }
+                    if (idxInvType >= 0 && idxInvType < static_cast<int>(row.size())) {
+                        ir.inventoryType = static_cast<uint8_t>(std::stoul(row[idxInvType]));
+                    }
+                    if (idxStack >= 0 && idxStack < static_cast<int>(row.size())) {
+                        ir.maxStack = static_cast<int32_t>(std::stol(row[idxStack]));
+                        if (ir.maxStack <= 0) ir.maxStack = 1;
+                    }
+                    if (idxSellPrice >= 0 && idxSellPrice < static_cast<int>(row.size())) {
+                        ir.sellPrice = static_cast<uint32_t>(std::stoul(row[idxSellPrice]));
+                    }
+                    if (idxArmor >= 0 && idxArmor < static_cast<int>(row.size())) {
+                        ir.armor = static_cast<int32_t>(std::stol(row[idxArmor]));
+                    }
+                    // Parse stat_type/stat_value pairs (protected from parse errors)
+                    for (int si = 0; si < 10; si++) {
+                        try {
+                            if (idxStatType[si] < 0 || idxStatVal[si] < 0) continue;
+                            if (idxStatType[si] >= static_cast<int>(row.size())) continue;
+                            if (idxStatVal[si] >= static_cast<int>(row.size())) continue;
+                            int stype = std::stoi(row[idxStatType[si]]);
+                            int sval = std::stoi(row[idxStatVal[si]]);
+                            if (sval == 0) continue;
+                            switch (stype) {
+                                case 3: ir.agility += sval; break;
+                                case 4: ir.strength += sval; break;
+                                case 5: ir.intellect += sval; break;
+                                case 6: ir.spirit += sval; break;
+                                case 7: ir.stamina += sval; break;
+                            }
+                        } catch (...) {}
+                    }
+                    db.itemTemplates[ir.itemId] = std::move(ir);
+                } catch (const std::exception&) {
+                }
+            });
+        }
+    }
+
+    db.loaded = true;
+    LOG_INFO("Single-player loot DB loaded from ", db.basePath,
+             " (creatures=", db.creatureTemplates.size(),
+             ", loot=", db.creatureLoot.size(),
+             ", reference=", db.referenceLoot.size(),
+             ", items=", db.itemTemplates.size(), ")");
+    return db;
+}
+
+static SinglePlayerCreateDb& getSinglePlayerCreateDb() {
+    static SinglePlayerCreateDb db;
+    if (db.loaded) return db;
+
+    auto base = resolveDbBasePath();
+    if (base.empty()) {
+        db.loaded = true;
+        return db;
+    }
+
+    std::filesystem::path basePath = base;
+    std::filesystem::path createInfoPath = basePath / "playercreateinfo.sql";
+    if (!std::filesystem::exists(createInfoPath)) {
+        auto alt = basePath / "base";
+        if (std::filesystem::exists(alt / "playercreateinfo.sql")) {
+            basePath = alt;
+            createInfoPath = basePath / "playercreateinfo.sql";
+        }
+    }
+
+    if (!std::filesystem::exists(createInfoPath)) {
+        db.loaded = true;
+        return db;
+    }
+
+    auto cols = loadCreateTableColumns(createInfoPath);
+    int idxRace = columnIndex(cols, "race");
+    int idxClass = columnIndex(cols, "class");
+    int idxMap = columnIndex(cols, "map");
+    int idxZone = columnIndex(cols, "zone");
+    int idxX = columnIndex(cols, "position_x");
+    int idxY = columnIndex(cols, "position_y");
+    int idxZ = columnIndex(cols, "position_z");
+    int idxO = columnIndex(cols, "orientation");
+
+    std::ifstream in(createInfoPath);
+    processInsertStatements(in, [&](const std::vector<std::string>& row) {
+        if (idxRace < 0 || idxClass < 0 || idxMap < 0 || idxZone < 0 ||
+            idxX < 0 || idxY < 0 || idxZ < 0 || idxO < 0) {
+            return;
+        }
+        if (idxRace >= static_cast<int>(row.size()) || idxClass >= static_cast<int>(row.size())) return;
+        try {
+            uint32_t race = static_cast<uint32_t>(std::stoul(row[idxRace]));
+            uint32_t cls = static_cast<uint32_t>(std::stoul(row[idxClass]));
+            GameHandler::SinglePlayerCreateInfo info;
+            info.mapId = static_cast<uint32_t>(std::stoul(row[idxMap]));
+            info.zoneId = static_cast<uint32_t>(std::stoul(row[idxZone]));
+            info.x = std::stof(row[idxX]);
+            info.y = std::stof(row[idxY]);
+            info.z = std::stof(row[idxZ]);
+            info.orientation = std::stof(row[idxO]);
+            uint16_t key = static_cast<uint16_t>((race << 8) | cls);
+            db.rows[key] = info;
+        } catch (const std::exception&) {
+        }
+    });
+
+    db.loaded = true;
+    LOG_INFO("Single-player create DB loaded from ", createInfoPath.string(),
+             " (rows=", db.rows.size(), ")");
+    return db;
+}
+
+static SinglePlayerStartDb& getSinglePlayerStartDb() {
+    static SinglePlayerStartDb db;
+    if (db.loaded) return db;
+
+    auto base = resolveDbBasePath();
+    if (base.empty()) {
+        db.loaded = true;
+        return db;
+    }
+
+    std::filesystem::path basePath = base;
+    std::filesystem::path itemPath = basePath / "playercreateinfo_item.sql";
+    std::filesystem::path spellPath = basePath / "playercreateinfo_spell.sql";
+    std::filesystem::path actionPath = basePath / "playercreateinfo_action.sql";
+    if (!std::filesystem::exists(itemPath) || !std::filesystem::exists(spellPath) || !std::filesystem::exists(actionPath)) {
+        auto alt = basePath / "base";
+        if (std::filesystem::exists(alt / "playercreateinfo_item.sql")) {
+            basePath = alt;
+            itemPath = basePath / "playercreateinfo_item.sql";
+            spellPath = basePath / "playercreateinfo_spell.sql";
+            actionPath = basePath / "playercreateinfo_action.sql";
+        }
+    }
+
+    if (std::filesystem::exists(itemPath)) {
+        std::ifstream in(itemPath);
+        processInsertStatements(in, [&](const std::vector<std::string>& row) {
+            if (row.size() < 4) return;
+            try {
+                SinglePlayerStartDb::StartItemRow r;
+                r.race = static_cast<uint8_t>(std::stoul(row[0]));
+                r.cls = static_cast<uint8_t>(std::stoul(row[1]));
+                r.itemId = static_cast<uint32_t>(std::stoul(row[2]));
+                r.amount = static_cast<int32_t>(std::stol(row[3]));
+                db.items.push_back(r);
+            } catch (const std::exception&) {
+            }
+        });
+    }
+
+    if (std::filesystem::exists(spellPath)) {
+        std::ifstream in(spellPath);
+        processInsertStatements(in, [&](const std::vector<std::string>& row) {
+            if (row.size() < 3) return;
+            try {
+                SinglePlayerStartDb::StartSpellRow r;
+                r.raceMask = static_cast<uint32_t>(std::stoul(row[0]));
+                r.classMask = static_cast<uint32_t>(std::stoul(row[1]));
+                r.spellId = static_cast<uint32_t>(std::stoul(row[2]));
+                db.spells.push_back(r);
+            } catch (const std::exception&) {
+            }
+        });
+    }
+
+    if (std::filesystem::exists(actionPath)) {
+        std::ifstream in(actionPath);
+        processInsertStatements(in, [&](const std::vector<std::string>& row) {
+            if (row.size() < 5) return;
+            try {
+                SinglePlayerStartDb::StartActionRow r;
+                r.race = static_cast<uint8_t>(std::stoul(row[0]));
+                r.cls = static_cast<uint8_t>(std::stoul(row[1]));
+                r.button = static_cast<uint16_t>(std::stoul(row[2]));
+                r.action = static_cast<uint32_t>(std::stoul(row[3]));
+                r.type = static_cast<uint16_t>(std::stoul(row[4]));
+                db.actions.push_back(r);
+            } catch (const std::exception&) {
+            }
+        });
+    }
+
+    db.loaded = true;
+    LOG_INFO("Single-player start DB loaded (items=", db.items.size(),
+             ", spells=", db.spells.size(), ", actions=", db.actions.size(), ")");
+    return db;
+}
+
+} // namespace
 
 GameHandler::GameHandler() {
     LOG_DEBUG("GameHandler created");
@@ -93,6 +798,9 @@ bool GameHandler::connect(const std::string& host,
 }
 
 void GameHandler::disconnect() {
+    if (singlePlayerMode_) {
+        flushSinglePlayerSave();
+    }
     if (socket) {
         socket->disconnect();
         socket.reset();
@@ -117,7 +825,7 @@ void GameHandler::update(float deltaTime) {
         }
     }
 
-    if (!socket) {
+    if (!socket && !singlePlayerMode_) {
         return;
     }
 
@@ -132,7 +840,7 @@ void GameHandler::update(float deltaTime) {
     }
 
     // Send periodic heartbeat if in world
-    if (state == WorldState::IN_WORLD) {
+    if (state == WorldState::IN_WORLD || singlePlayerMode_) {
         timeSinceLastPing += deltaTime;
 
         if (timeSinceLastPing >= pingInterval) {
@@ -177,6 +885,65 @@ void GameHandler::update(float deltaTime) {
         for (auto& [guid, entity] : entityManager.getEntities()) {
             entity->updateMovement(deltaTime);
         }
+
+        // Single-player local combat
+        if (singlePlayerMode_) {
+            updateLocalCombat(deltaTime);
+            updateNpcAggro(deltaTime);
+        }
+
+        // Online mode: maintain auto-attack by periodically re-sending CMSG_ATTACKSWING
+        if (!singlePlayerMode_ && autoAttacking && autoAttackTarget != 0 && socket) {
+            auto target = entityManager.getEntity(autoAttackTarget);
+            if (!target) {
+                // Target gone
+                stopAutoAttack();
+            } else if (target->getType() == ObjectType::UNIT) {
+                auto unit = std::static_pointer_cast<Unit>(target);
+                if (unit->getHealth() == 0) {
+                    stopAutoAttack();
+                } else {
+                    // Out-of-range notice (melee)
+                    constexpr float MELEE_RANGE = 5.0f;
+                    float dx = target->getX() - movementInfo.x;
+                    float dy = target->getY() - movementInfo.y;
+                    float dz = target->getZ() - movementInfo.z;
+                    float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+                    bool outOfRange = dist > MELEE_RANGE;
+                    if (outOfRange && !autoAttackOutOfRange_) {
+                        addSystemChatMessage("Target is out of range.");
+                        autoAttackOutOfRange_ = true;
+                    } else if (!outOfRange && autoAttackOutOfRange_) {
+                        autoAttackOutOfRange_ = false;
+                    }
+
+                    // Re-send attack swing every 2 seconds to keep server combat alive
+                    swingTimer_ += deltaTime;
+                    if (swingTimer_ >= 2.0f) {
+                        auto pkt = AttackSwingPacket::build(autoAttackTarget);
+                        socket->send(pkt);
+                        swingTimer_ = 0.0f;
+                    }
+                }
+            }
+        }
+    }
+
+    if (singlePlayerMode_) {
+        if (spDirtyFlags_ != SP_DIRTY_NONE) {
+            spDirtyTimer_ += deltaTime;
+            spPeriodicTimer_ += deltaTime;
+            bool due = false;
+            if (spDirtyHighPriority_ && spDirtyTimer_ >= 0.5f) {
+                due = true;
+            } else if (spPeriodicTimer_ >= 30.0f) {
+                due = true;
+            }
+            if (due) {
+                saveSinglePlayerCharacterState(false);
+            }
+        }
+    }
 }
 
 void GameHandler::handlePacket(network::Packet& packet) {
@@ -623,6 +1390,11 @@ void GameHandler::handleAuthResponse(network::Packet& packet) {
 }
 
 void GameHandler::requestCharacterList() {
+    if (singlePlayerMode_) {
+        loadSinglePlayerCharacters();
+        setState(WorldState::CHAR_LIST_RECEIVED);
+        return;
+    }
     if (state != WorldState::READY && state != WorldState::AUTHENTICATED &&
         state != WorldState::CHAR_LIST_RECEIVED) {
         LOG_WARNING("Cannot request character list in state: ", (int)state);
@@ -678,6 +1450,90 @@ void GameHandler::handleCharEnum(network::Packet& packet) {
 }
 
 void GameHandler::createCharacter(const CharCreateData& data) {
+    if (singlePlayerMode_) {
+        // Create character locally
+        Character ch;
+        uint64_t nextGuid = 0x0000000100000001ULL;
+        for (const auto& existing : characters) {
+            nextGuid = std::max(nextGuid, existing.guid + 1);
+        }
+        ch.guid = nextGuid;
+        ch.name = data.name;
+        ch.race = data.race;
+        ch.characterClass = data.characterClass;
+        ch.gender = data.gender;
+        ch.level = 1;
+        ch.appearanceBytes = (static_cast<uint32_t>(data.skin)) |
+                             (static_cast<uint32_t>(data.face) << 8) |
+                             (static_cast<uint32_t>(data.hairStyle) << 16) |
+                             (static_cast<uint32_t>(data.hairColor) << 24);
+        ch.facialFeatures = data.facialHair;
+        SinglePlayerCreateInfo createInfo;
+        if (getSinglePlayerCreateInfo(data.race, data.characterClass, createInfo)) {
+            ch.zoneId = createInfo.zoneId;
+            ch.mapId = createInfo.mapId;
+            ch.x = createInfo.x;
+            ch.y = createInfo.y;
+            ch.z = createInfo.z;
+        } else {
+            ch.zoneId = 12;   // Elwynn Forest default
+            ch.mapId = 0;
+            ch.x = -8949.95f;
+            ch.y = -132.493f;
+            ch.z = 83.5312f;
+        }
+        ch.guildId = 0;
+        ch.flags = 0;
+        ch.pet = {};
+        characters.push_back(ch);
+        spHasState_[ch.guid] = false;
+        spSavedOrientation_[ch.guid] = 0.0f;
+
+        // Persist to single-player DB
+        auto& sp = getSinglePlayerSqlite();
+        if (sp.db) {
+            const char* sql =
+                "INSERT OR REPLACE INTO characters "
+                "(guid, name, race, \"class\", gender, level, appearance_bytes, facial_features, zone, map, "
+                "position_x, position_y, position_z, orientation, money, xp, health, max_health, has_state) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+            sqlite3_stmt* stmt = nullptr;
+            if (sqlite3_prepare_v2(sp.db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+                sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(ch.guid));
+                sqlite3_bind_text(stmt, 2, ch.name.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_bind_int(stmt, 3, static_cast<int>(ch.race));
+                sqlite3_bind_int(stmt, 4, static_cast<int>(ch.characterClass));
+                sqlite3_bind_int(stmt, 5, static_cast<int>(ch.gender));
+                sqlite3_bind_int(stmt, 6, static_cast<int>(ch.level));
+                sqlite3_bind_int(stmt, 7, static_cast<int>(ch.appearanceBytes));
+                sqlite3_bind_int(stmt, 8, static_cast<int>(ch.facialFeatures));
+                sqlite3_bind_int(stmt, 9, static_cast<int>(ch.zoneId));
+                sqlite3_bind_int(stmt, 10, static_cast<int>(ch.mapId));
+                sqlite3_bind_double(stmt, 11, ch.x);
+                sqlite3_bind_double(stmt, 12, ch.y);
+                sqlite3_bind_double(stmt, 13, ch.z);
+                sqlite3_bind_double(stmt, 14, 0.0);
+                sqlite3_bind_int64(stmt, 15, 0);
+                sqlite3_bind_int(stmt, 16, 0);
+                sqlite3_bind_int(stmt, 17, 0);
+                sqlite3_bind_int(stmt, 18, 0);
+                sqlite3_bind_int(stmt, 19, 0);
+                sqlite3_step(stmt);
+                sqlite3_finalize(stmt);
+            }
+        }
+
+        if (activeCharacterGuid_ == 0) {
+            activeCharacterGuid_ = ch.guid;
+        }
+
+        LOG_INFO("Single-player character created: ", ch.name);
+        // Defer callback to next update() so ImGui frame completes first
+        pendingCharCreateResult_ = true;
+        pendingCharCreateSuccess_ = true;
+        pendingCharCreateMsg_ = "Character created!";
+        return;
+    }
 
     // Online mode: send packet to server
     if (!socket) {
@@ -747,6 +1603,33 @@ void GameHandler::handleCharCreateResponse(network::Packet& packet) {
 }
 
 void GameHandler::deleteCharacter(uint64_t characterGuid) {
+    if (singlePlayerMode_) {
+        // Remove from local list
+        characters.erase(
+            std::remove_if(characters.begin(), characters.end(),
+                           [characterGuid](const Character& c) { return c.guid == characterGuid; }),
+            characters.end());
+        // Remove from database
+        auto& sp = getSinglePlayerSqlite();
+        if (sp.db) {
+            const char* sql = "DELETE FROM characters WHERE guid=?";
+            sqlite3_stmt* stmt = nullptr;
+            if (sqlite3_prepare_v2(sp.db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+                sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(characterGuid));
+                sqlite3_step(stmt);
+                sqlite3_finalize(stmt);
+            }
+            const char* sql2 = "DELETE FROM character_inventory WHERE guid=?";
+            if (sqlite3_prepare_v2(sp.db, sql2, -1, &stmt, nullptr) == SQLITE_OK) {
+                sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(characterGuid));
+                sqlite3_step(stmt);
+                sqlite3_finalize(stmt);
+            }
+        }
+        if (charDeleteCallback_) charDeleteCallback_(true);
+        return;
+    }
+
     if (!socket) {
         if (charDeleteCallback_) charDeleteCallback_(false);
         return;
@@ -771,18 +1654,664 @@ const Character* GameHandler::getFirstCharacter() const {
     return &characters.front();
 }
 
+void GameHandler::setSinglePlayerCharListReady() {
+    loadSinglePlayerCharacters();
+    setState(WorldState::CHAR_LIST_RECEIVED);
+}
 
+bool GameHandler::getSinglePlayerSettings(SinglePlayerSettings& out) const {
+    if (!singlePlayerMode_ || !spSettingsLoaded_) return false;
+    out = spSettings_;
+    return true;
+}
 
+void GameHandler::setSinglePlayerSettings(const SinglePlayerSettings& settings) {
+    if (!singlePlayerMode_) return;
+    spSettings_ = settings;
+    spSettingsLoaded_ = true;
+    markSinglePlayerDirty(SP_DIRTY_SETTINGS, true);
+}
 
+bool GameHandler::getSinglePlayerCreateInfo(Race race, Class cls, SinglePlayerCreateInfo& out) const {
+    auto& db = getSinglePlayerCreateDb();
+    uint16_t key = static_cast<uint16_t>((static_cast<uint32_t>(race) << 8) |
+                                         static_cast<uint32_t>(cls));
+    auto it = db.rows.find(key);
+    if (it == db.rows.end()) return false;
+    out = it->second;
+    return true;
+}
 
+void GameHandler::notifyInventoryChanged() {
+    markSinglePlayerDirty(SP_DIRTY_INVENTORY, true);
+}
 
+void GameHandler::notifyEquipmentChanged() {
+    markSinglePlayerDirty(SP_DIRTY_INVENTORY, true);
+    markSinglePlayerDirty(SP_DIRTY_STATS, true);
+}
 
+void GameHandler::notifyQuestStateChanged() {
+    markSinglePlayerDirty(SP_DIRTY_QUESTS, true);
+}
 
+void GameHandler::markSinglePlayerDirty(uint32_t flags, bool highPriority) {
+    if (!singlePlayerMode_) return;
+    spDirtyFlags_ |= flags;
+    if (highPriority) {
+        spDirtyHighPriority_ = true;
+        spDirtyTimer_ = 0.0f;
+    }
+}
 
+void GameHandler::loadSinglePlayerCharacters() {
+    if (!singlePlayerMode_) return;
+    auto& sp = getSinglePlayerSqlite();
+    if (!sp.db) return;
 
+    characters.clear();
+    spHasState_.clear();
+    spSavedOrientation_.clear();
 
+    const char* sql =
+        "SELECT guid, name, race, \"class\", gender, level, appearance_bytes, facial_features, "
+        "zone, map, position_x, position_y, position_z, orientation, has_state "
+        "FROM characters ORDER BY guid;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(sp.db, sql, -1, &stmt, nullptr) != SQLITE_OK) return;
 
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        Character ch;
+        ch.guid = static_cast<uint64_t>(sqlite3_column_int64(stmt, 0));
+        const unsigned char* nameText = sqlite3_column_text(stmt, 1);
+        ch.name = nameText ? reinterpret_cast<const char*>(nameText) : "";
+        ch.race = static_cast<Race>(sqlite3_column_int(stmt, 2));
+        ch.characterClass = static_cast<Class>(sqlite3_column_int(stmt, 3));
+        ch.gender = static_cast<Gender>(sqlite3_column_int(stmt, 4));
+        ch.level = static_cast<uint8_t>(sqlite3_column_int(stmt, 5));
+        ch.appearanceBytes = static_cast<uint32_t>(sqlite3_column_int(stmt, 6));
+        ch.facialFeatures = static_cast<uint8_t>(sqlite3_column_int(stmt, 7));
+        ch.zoneId = static_cast<uint32_t>(sqlite3_column_int(stmt, 8));
+        ch.mapId = static_cast<uint32_t>(sqlite3_column_int(stmt, 9));
+        ch.x = static_cast<float>(sqlite3_column_double(stmt, 10));
+        ch.y = static_cast<float>(sqlite3_column_double(stmt, 11));
+        ch.z = static_cast<float>(sqlite3_column_double(stmt, 12));
+        float orientation = static_cast<float>(sqlite3_column_double(stmt, 13));
+        int hasState = sqlite3_column_int(stmt, 14);
 
+        characters.push_back(ch);
+        spHasState_[ch.guid] = (hasState != 0);
+        spSavedOrientation_[ch.guid] = orientation;
+    }
+    sqlite3_finalize(stmt);
+}
+
+bool GameHandler::loadSinglePlayerCharacterState(uint64_t guid) {
+    if (!singlePlayerMode_) return false;
+    auto& sp = getSinglePlayerSqlite();
+    if (!sp.db) return false;
+
+    spSettingsLoaded_ = false;
+
+    const char* sqlChar =
+        "SELECT level, zone, map, position_x, position_y, position_z, orientation, money, xp, health, max_health, has_state "
+        "FROM characters WHERE guid=?;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(sp.db, sqlChar, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(guid));
+    if (sqlite3_step(stmt) != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        return false;
+    }
+
+    uint32_t level = static_cast<uint32_t>(sqlite3_column_int(stmt, 0));
+    uint32_t zone = static_cast<uint32_t>(sqlite3_column_int(stmt, 1));
+    uint32_t map = static_cast<uint32_t>(sqlite3_column_int(stmt, 2));
+    float posX = static_cast<float>(sqlite3_column_double(stmt, 3));
+    float posY = static_cast<float>(sqlite3_column_double(stmt, 4));
+    float posZ = static_cast<float>(sqlite3_column_double(stmt, 5));
+    float orientation = static_cast<float>(sqlite3_column_double(stmt, 6));
+    uint64_t money = static_cast<uint64_t>(sqlite3_column_int64(stmt, 7));
+    uint32_t xp = static_cast<uint32_t>(sqlite3_column_int(stmt, 8));
+    uint32_t health = static_cast<uint32_t>(sqlite3_column_int(stmt, 9));
+    uint32_t maxHealth = static_cast<uint32_t>(sqlite3_column_int(stmt, 10));
+    bool hasState = sqlite3_column_int(stmt, 11) != 0;
+    sqlite3_finalize(stmt);
+
+    spHasState_[guid] = hasState;
+    spSavedOrientation_[guid] = orientation;
+    if (!hasState) return false;
+
+    // Update movementInfo so startSinglePlayer can use it for spawning
+    movementInfo.x = posX;
+    movementInfo.y = posY;
+    movementInfo.z = posZ;
+    movementInfo.orientation = orientation;
+
+    // Update character list entry
+    for (auto& ch : characters) {
+        if (ch.guid == guid) {
+            ch.level = static_cast<uint8_t>(std::max<uint32_t>(1, level));
+            ch.zoneId = zone;
+            ch.mapId = map;
+            ch.x = posX;
+            ch.y = posY;
+            ch.z = posZ;
+            break;
+        }
+    }
+
+    // Load inventory
+    inventory = Inventory();
+    const char* sqlInv =
+        "SELECT location, slot, item_id, name, quality, inventory_type, stack_count, max_stack, bag_slots, "
+        "armor, stamina, strength, agility, intellect, spirit, display_info_id, subclass_name, "
+        "COALESCE(sell_price, 0) "
+        "FROM character_inventory WHERE guid=?;";
+    if (sqlite3_prepare_v2(sp.db, sqlInv, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(guid));
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int location = sqlite3_column_int(stmt, 0);
+            int slot = sqlite3_column_int(stmt, 1);
+            ItemDef def;
+            def.itemId = static_cast<uint32_t>(sqlite3_column_int(stmt, 2));
+            const unsigned char* nameText = sqlite3_column_text(stmt, 3);
+            def.name = nameText ? reinterpret_cast<const char*>(nameText) : "";
+            def.quality = static_cast<ItemQuality>(sqlite3_column_int(stmt, 4));
+            def.inventoryType = static_cast<uint8_t>(sqlite3_column_int(stmt, 5));
+            def.stackCount = static_cast<uint32_t>(sqlite3_column_int(stmt, 6));
+            def.maxStack = static_cast<uint32_t>(sqlite3_column_int(stmt, 7));
+            def.bagSlots = static_cast<uint32_t>(sqlite3_column_int(stmt, 8));
+            def.armor = static_cast<int32_t>(sqlite3_column_int(stmt, 9));
+            def.stamina = static_cast<int32_t>(sqlite3_column_int(stmt, 10));
+            def.strength = static_cast<int32_t>(sqlite3_column_int(stmt, 11));
+            def.agility = static_cast<int32_t>(sqlite3_column_int(stmt, 12));
+            def.intellect = static_cast<int32_t>(sqlite3_column_int(stmt, 13));
+            def.spirit = static_cast<int32_t>(sqlite3_column_int(stmt, 14));
+            def.displayInfoId = static_cast<uint32_t>(sqlite3_column_int(stmt, 15));
+            const unsigned char* subclassText = sqlite3_column_text(stmt, 16);
+            def.subclassName = subclassText ? reinterpret_cast<const char*>(subclassText) : "";
+            def.sellPrice = static_cast<uint32_t>(sqlite3_column_int(stmt, 17));
+
+            // Fill missing data from item template DB (for old saves)
+            if (def.itemId != 0) {
+                auto& itemDb = getSinglePlayerLootDb().itemTemplates;
+                auto itTpl = itemDb.find(def.itemId);
+                if (itTpl != itemDb.end()) {
+                    if (def.sellPrice == 0) def.sellPrice = itTpl->second.sellPrice;
+                    if (def.displayInfoId == 0) def.displayInfoId = itTpl->second.displayId;
+                    if (def.armor == 0) def.armor = itTpl->second.armor;
+                    if (def.stamina == 0) def.stamina = itTpl->second.stamina;
+                    if (def.strength == 0) def.strength = itTpl->second.strength;
+                    if (def.agility == 0) def.agility = itTpl->second.agility;
+                    if (def.intellect == 0) def.intellect = itTpl->second.intellect;
+                    if (def.spirit == 0) def.spirit = itTpl->second.spirit;
+                }
+            }
+
+            if (location == 0) {
+                inventory.setBackpackSlot(slot, def);
+            } else if (location == 1) {
+                inventory.setEquipSlot(static_cast<EquipSlot>(slot), def);
+            } else if (location == 2) {
+                int bagIndex = slot / Inventory::MAX_BAG_SIZE;
+                int bagSlot = slot % Inventory::MAX_BAG_SIZE;
+                inventory.setBagSlot(bagIndex, bagSlot, def);
+            }
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    // Load spells
+    knownSpells.clear();
+    const char* sqlSpell = "SELECT spell FROM character_spell WHERE guid=?;";
+    if (sqlite3_prepare_v2(sp.db, sqlSpell, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(guid));
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            uint32_t spellId = static_cast<uint32_t>(sqlite3_column_int(stmt, 0));
+            if (spellId != 0) knownSpells.push_back(spellId);
+        }
+        sqlite3_finalize(stmt);
+    }
+    if (std::find(knownSpells.begin(), knownSpells.end(), 6603) == knownSpells.end()) {
+        knownSpells.push_back(6603);
+    }
+    if (std::find(knownSpells.begin(), knownSpells.end(), 8690) == knownSpells.end()) {
+        knownSpells.push_back(8690);
+    }
+
+    // Load action bar
+    for (auto& slot : actionBar) slot = ActionBarSlot{};
+    bool hasActionRows = false;
+    const char* sqlAction = "SELECT slot, type, action FROM character_action WHERE guid=?;";
+    if (sqlite3_prepare_v2(sp.db, sqlAction, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(guid));
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int slot = sqlite3_column_int(stmt, 0);
+            if (slot < 0 || slot >= static_cast<int>(actionBar.size())) continue;
+            actionBar[slot].type = static_cast<ActionBarSlot::Type>(sqlite3_column_int(stmt, 1));
+            actionBar[slot].id = static_cast<uint32_t>(sqlite3_column_int(stmt, 2));
+            hasActionRows = true;
+        }
+        sqlite3_finalize(stmt);
+    }
+    if (!hasActionRows) {
+        actionBar[0].type = ActionBarSlot::SPELL;
+        actionBar[0].id = 6603;
+        actionBar[11].type = ActionBarSlot::SPELL;
+        actionBar[11].id = 8690;
+        int slot = 1;
+        for (uint32_t spellId : knownSpells) {
+            if (spellId == 6603 || spellId == 8690) continue;
+            if (slot >= 11) break;
+            actionBar[slot].type = ActionBarSlot::SPELL;
+            actionBar[slot].id = spellId;
+            slot++;
+        }
+    }
+
+    // Load auras
+    playerAuras.clear();
+    const char* sqlAura =
+        "SELECT slot, spell, flags, level, charges, duration_ms, max_duration_ms, caster_guid "
+        "FROM character_aura WHERE guid=?;";
+    if (sqlite3_prepare_v2(sp.db, sqlAura, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(guid));
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            uint8_t slot = static_cast<uint8_t>(sqlite3_column_int(stmt, 0));
+            AuraSlot aura;
+            aura.spellId = static_cast<uint32_t>(sqlite3_column_int(stmt, 1));
+            aura.flags = static_cast<uint8_t>(sqlite3_column_int(stmt, 2));
+            aura.level = static_cast<uint8_t>(sqlite3_column_int(stmt, 3));
+            aura.charges = static_cast<uint8_t>(sqlite3_column_int(stmt, 4));
+            aura.durationMs = static_cast<int32_t>(sqlite3_column_int(stmt, 5));
+            aura.maxDurationMs = static_cast<int32_t>(sqlite3_column_int(stmt, 6));
+            aura.casterGuid = static_cast<uint64_t>(sqlite3_column_int64(stmt, 7));
+            while (playerAuras.size() <= slot) playerAuras.push_back(AuraSlot{});
+            playerAuras[slot] = aura;
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    // Apply money, xp, stats
+    playerMoneyCopper_ = money;
+    playerXp_ = xp;
+    localPlayerLevel_ = std::max<uint32_t>(1, level);
+    localPlayerHealth_ = std::max<uint32_t>(1, health);
+    localPlayerMaxHealth_ = std::max<uint32_t>(localPlayerHealth_, maxHealth);
+    playerNextLevelXp_ = xpForLevel(localPlayerLevel_);
+
+    // Seed movement info for spawn (canonical coords in DB)
+    movementInfo.x = posX;
+    movementInfo.y = posY;
+    movementInfo.z = posZ;
+    movementInfo.orientation = orientation;
+
+    spLastDirtyX_ = movementInfo.x;
+    spLastDirtyY_ = movementInfo.y;
+    spLastDirtyZ_ = movementInfo.z;
+    spLastDirtyOrientation_ = movementInfo.orientation;
+
+    const char* sqlSettings =
+        "SELECT fullscreen, vsync, shadows, res_w, res_h, music_volume, sfx_volume, mouse_sensitivity, invert_mouse "
+        "FROM character_settings WHERE guid=?;";
+    if (sqlite3_prepare_v2(sp.db, sqlSettings, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(guid));
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            spSettings_.fullscreen = sqlite3_column_int(stmt, 0) != 0;
+            spSettings_.vsync = sqlite3_column_int(stmt, 1) != 0;
+            spSettings_.shadows = sqlite3_column_int(stmt, 2) != 0;
+            spSettings_.resWidth = sqlite3_column_int(stmt, 3);
+            spSettings_.resHeight = sqlite3_column_int(stmt, 4);
+            spSettings_.musicVolume = sqlite3_column_int(stmt, 5);
+            spSettings_.sfxVolume = sqlite3_column_int(stmt, 6);
+            spSettings_.mouseSensitivity = static_cast<float>(sqlite3_column_double(stmt, 7));
+            spSettings_.invertMouse = sqlite3_column_int(stmt, 8) != 0;
+            spSettingsLoaded_ = true;
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    return true;
+}
+
+void GameHandler::applySinglePlayerStartData(Race race, Class cls) {
+    inventory = Inventory();
+    knownSpells.clear();
+    knownSpells.push_back(6603);  // Attack
+    knownSpells.push_back(8690);  // Hearthstone
+
+    for (auto& slot : actionBar) {
+        slot = ActionBarSlot{};
+    }
+    actionBar[0].type = ActionBarSlot::SPELL;
+    actionBar[0].id = 6603;
+    actionBar[11].type = ActionBarSlot::SPELL;
+    actionBar[11].id = 8690;
+
+    auto& startDb = getSinglePlayerStartDb();
+    auto& itemDb = getSinglePlayerLootDb().itemTemplates;
+
+    uint8_t raceVal = static_cast<uint8_t>(race);
+    uint8_t classVal = static_cast<uint8_t>(cls);
+    bool addedItem = false;
+
+    for (const auto& row : startDb.items) {
+        if (row.itemId == 0 || row.amount == 0) continue;
+        if (row.race != 0 && row.race != raceVal) continue;
+        if (row.cls != 0 && row.cls != classVal) continue;
+        if (row.amount < 0) continue;
+
+        ItemDef def;
+        def.itemId = row.itemId;
+        def.stackCount = static_cast<uint32_t>(row.amount);
+        def.maxStack = def.stackCount;
+
+        auto itTpl = itemDb.find(row.itemId);
+        if (itTpl != itemDb.end()) {
+            def.name = itTpl->second.name.empty()
+                ? ("Item " + std::to_string(row.itemId))
+                : itTpl->second.name;
+            def.quality = static_cast<ItemQuality>(itTpl->second.quality);
+            def.inventoryType = itTpl->second.inventoryType;
+            def.maxStack = std::max(def.maxStack, static_cast<uint32_t>(itTpl->second.maxStack));
+            def.sellPrice = itTpl->second.sellPrice;
+            def.displayInfoId = itTpl->second.displayId;
+            def.armor = itTpl->second.armor;
+            def.stamina = itTpl->second.stamina;
+            def.strength = itTpl->second.strength;
+            def.agility = itTpl->second.agility;
+            def.intellect = itTpl->second.intellect;
+            def.spirit = itTpl->second.spirit;
+        } else {
+            def.name = "Item " + std::to_string(row.itemId);
+        }
+
+        if (inventory.addItem(def)) {
+            addedItem = true;
+        }
+    }
+
+    for (const auto& row : startDb.items) {
+        if (row.itemId == 0 || row.amount >= 0) continue;
+        if (row.race != 0 && row.race != raceVal) continue;
+        if (row.cls != 0 && row.cls != classVal) continue;
+        removeItemsFromInventory(inventory, row.itemId, static_cast<uint32_t>(-row.amount));
+    }
+
+    if (!addedItem && startDb.items.empty()) {
+        addSystemChatMessage("No starting items found in playercreateinfo_item.sql.");
+    }
+
+    uint32_t raceMask = 1u << (raceVal > 0 ? (raceVal - 1) : 0);
+    uint32_t classMask = 1u << (classVal > 0 ? (classVal - 1) : 0);
+    for (const auto& row : startDb.spells) {
+        if (row.spellId == 0) continue;
+        if (row.raceMask != 0 && (row.raceMask & raceMask) == 0) continue;
+        if (row.classMask != 0 && (row.classMask & classMask) == 0) continue;
+        if (std::find(knownSpells.begin(), knownSpells.end(), row.spellId) == knownSpells.end()) {
+            knownSpells.push_back(row.spellId);
+        }
+    }
+
+    bool hasActionRows = false;
+    for (const auto& row : startDb.actions) {
+        if (row.button >= actionBar.size()) continue;
+        if (row.race != 0 && row.race != raceVal) continue;
+        if (row.cls != 0 && row.cls != classVal) continue;
+
+        ActionBarSlot::Type type = ActionBarSlot::EMPTY;
+        switch (row.type) {
+            case 0: type = ActionBarSlot::SPELL; break;
+            case 1: type = ActionBarSlot::ITEM; break;
+            case 2: type = ActionBarSlot::MACRO; break;
+            default: break;
+        }
+        if (type == ActionBarSlot::EMPTY || row.action == 0) continue;
+
+        actionBar[row.button].type = type;
+        actionBar[row.button].id = row.action;
+        hasActionRows = true;
+
+        if (type == ActionBarSlot::SPELL &&
+            std::find(knownSpells.begin(), knownSpells.end(), row.action) == knownSpells.end()) {
+            knownSpells.push_back(row.action);
+        }
+    }
+
+    if (!hasActionRows) {
+        // Leave slots 1-10 empty; player assigns from spellbook
+    }
+
+    markSinglePlayerDirty(SP_DIRTY_INVENTORY | SP_DIRTY_SPELLS | SP_DIRTY_ACTIONBAR |
+                          SP_DIRTY_STATS | SP_DIRTY_XP | SP_DIRTY_MONEY, true);
+}
+
+void GameHandler::saveSinglePlayerCharacterState(bool force) {
+    if (!singlePlayerMode_) return;
+    if (activeCharacterGuid_ == 0) return;
+    if (!force && spDirtyFlags_ == SP_DIRTY_NONE) return;
+
+    auto& sp = getSinglePlayerSqlite();
+    if (!sp.db) return;
+
+    const Character* active = getActiveCharacter();
+    if (!active) return;
+
+    sqlite3_exec(sp.db, "BEGIN TRANSACTION;", nullptr, nullptr, nullptr);
+
+    const char* updateCharSql =
+        "UPDATE characters SET level=?, zone=?, map=?, position_x=?, position_y=?, position_z=?, orientation=?, "
+        "money=?, xp=?, health=?, max_health=?, has_state=1 WHERE guid=?;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(sp.db, updateCharSql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, static_cast<int>(localPlayerLevel_));
+        sqlite3_bind_int(stmt, 2, static_cast<int>(active->zoneId));
+        sqlite3_bind_int(stmt, 3, static_cast<int>(active->mapId));
+        sqlite3_bind_double(stmt, 4, movementInfo.x);
+        sqlite3_bind_double(stmt, 5, movementInfo.y);
+        sqlite3_bind_double(stmt, 6, movementInfo.z);
+        sqlite3_bind_double(stmt, 7, movementInfo.orientation);
+        sqlite3_bind_int64(stmt, 8, static_cast<sqlite3_int64>(playerMoneyCopper_));
+        sqlite3_bind_int(stmt, 9, static_cast<int>(playerXp_));
+        sqlite3_bind_int(stmt, 10, static_cast<int>(localPlayerHealth_));
+        sqlite3_bind_int(stmt, 11, static_cast<int>(localPlayerMaxHealth_));
+        sqlite3_bind_int64(stmt, 12, static_cast<sqlite3_int64>(activeCharacterGuid_));
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    spHasState_[activeCharacterGuid_] = true;
+    spSavedOrientation_[activeCharacterGuid_] = movementInfo.orientation;
+
+    if (spSettingsLoaded_ && (force || (spDirtyFlags_ & SP_DIRTY_SETTINGS))) {
+        const char* upsertSettings =
+            "INSERT INTO character_settings "
+            "(guid, fullscreen, vsync, shadows, res_w, res_h, music_volume, sfx_volume, mouse_sensitivity, invert_mouse) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(guid) DO UPDATE SET "
+            "fullscreen=excluded.fullscreen, vsync=excluded.vsync, shadows=excluded.shadows, "
+            "res_w=excluded.res_w, res_h=excluded.res_h, music_volume=excluded.music_volume, "
+            "sfx_volume=excluded.sfx_volume, mouse_sensitivity=excluded.mouse_sensitivity, "
+            "invert_mouse=excluded.invert_mouse;";
+        if (sqlite3_prepare_v2(sp.db, upsertSettings, -1, &stmt, nullptr) == SQLITE_OK) {
+            sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(activeCharacterGuid_));
+            sqlite3_bind_int(stmt, 2, spSettings_.fullscreen ? 1 : 0);
+            sqlite3_bind_int(stmt, 3, spSettings_.vsync ? 1 : 0);
+            sqlite3_bind_int(stmt, 4, spSettings_.shadows ? 1 : 0);
+            sqlite3_bind_int(stmt, 5, spSettings_.resWidth);
+            sqlite3_bind_int(stmt, 6, spSettings_.resHeight);
+            sqlite3_bind_int(stmt, 7, spSettings_.musicVolume);
+            sqlite3_bind_int(stmt, 8, spSettings_.sfxVolume);
+            sqlite3_bind_double(stmt, 9, spSettings_.mouseSensitivity);
+            sqlite3_bind_int(stmt, 10, spSettings_.invertMouse ? 1 : 0);
+            sqlite3_step(stmt);
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    sqlite3_stmt* del = nullptr;
+    const char* delInv = "DELETE FROM character_inventory WHERE guid=?;";
+    if (sqlite3_prepare_v2(sp.db, delInv, -1, &del, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(del, 1, static_cast<sqlite3_int64>(activeCharacterGuid_));
+        sqlite3_step(del);
+        sqlite3_finalize(del);
+    }
+    const char* delSpell = "DELETE FROM character_spell WHERE guid=?;";
+    if (sqlite3_prepare_v2(sp.db, delSpell, -1, &del, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(del, 1, static_cast<sqlite3_int64>(activeCharacterGuid_));
+        sqlite3_step(del);
+        sqlite3_finalize(del);
+    }
+    const char* delAction = "DELETE FROM character_action WHERE guid=?;";
+    if (sqlite3_prepare_v2(sp.db, delAction, -1, &del, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(del, 1, static_cast<sqlite3_int64>(activeCharacterGuid_));
+        sqlite3_step(del);
+        sqlite3_finalize(del);
+    }
+    const char* delAura = "DELETE FROM character_aura WHERE guid=?;";
+    if (sqlite3_prepare_v2(sp.db, delAura, -1, &del, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(del, 1, static_cast<sqlite3_int64>(activeCharacterGuid_));
+        sqlite3_step(del);
+        sqlite3_finalize(del);
+    }
+    const char* delQuest = "DELETE FROM character_queststatus WHERE guid=?;";
+    if (sqlite3_prepare_v2(sp.db, delQuest, -1, &del, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(del, 1, static_cast<sqlite3_int64>(activeCharacterGuid_));
+        sqlite3_step(del);
+        sqlite3_finalize(del);
+    }
+
+    const char* insInv =
+        "INSERT INTO character_inventory "
+        "(guid, location, slot, item_id, name, quality, inventory_type, stack_count, max_stack, bag_slots, "
+        "armor, stamina, strength, agility, intellect, spirit, display_info_id, subclass_name, sell_price) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+    if (sqlite3_prepare_v2(sp.db, insInv, -1, &stmt, nullptr) == SQLITE_OK) {
+        for (int i = 0; i < Inventory::BACKPACK_SLOTS; i++) {
+            const ItemSlot& slot = inventory.getBackpackSlot(i);
+            if (slot.empty()) continue;
+            sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(activeCharacterGuid_));
+            sqlite3_bind_int(stmt, 2, 0);
+            sqlite3_bind_int(stmt, 3, i);
+            sqlite3_bind_int(stmt, 4, static_cast<int>(slot.item.itemId));
+            sqlite3_bind_text(stmt, 5, slot.item.name.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int(stmt, 6, static_cast<int>(slot.item.quality));
+            sqlite3_bind_int(stmt, 7, static_cast<int>(slot.item.inventoryType));
+            sqlite3_bind_int(stmt, 8, static_cast<int>(slot.item.stackCount));
+            sqlite3_bind_int(stmt, 9, static_cast<int>(slot.item.maxStack));
+            sqlite3_bind_int(stmt, 10, static_cast<int>(slot.item.bagSlots));
+            sqlite3_bind_int(stmt, 11, static_cast<int>(slot.item.armor));
+            sqlite3_bind_int(stmt, 12, static_cast<int>(slot.item.stamina));
+            sqlite3_bind_int(stmt, 13, static_cast<int>(slot.item.strength));
+            sqlite3_bind_int(stmt, 14, static_cast<int>(slot.item.agility));
+            sqlite3_bind_int(stmt, 15, static_cast<int>(slot.item.intellect));
+            sqlite3_bind_int(stmt, 16, static_cast<int>(slot.item.spirit));
+            sqlite3_bind_int(stmt, 17, static_cast<int>(slot.item.displayInfoId));
+            sqlite3_bind_text(stmt, 18, slot.item.subclassName.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int(stmt, 19, static_cast<int>(slot.item.sellPrice));
+            sqlite3_step(stmt);
+            sqlite3_reset(stmt);
+        }
+        for (int i = 0; i < Inventory::NUM_EQUIP_SLOTS; i++) {
+            EquipSlot eq = static_cast<EquipSlot>(i);
+            const ItemSlot& slot = inventory.getEquipSlot(eq);
+            if (slot.empty()) continue;
+            sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(activeCharacterGuid_));
+            sqlite3_bind_int(stmt, 2, 1);
+            sqlite3_bind_int(stmt, 3, i);
+            sqlite3_bind_int(stmt, 4, static_cast<int>(slot.item.itemId));
+            sqlite3_bind_text(stmt, 5, slot.item.name.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int(stmt, 6, static_cast<int>(slot.item.quality));
+            sqlite3_bind_int(stmt, 7, static_cast<int>(slot.item.inventoryType));
+            sqlite3_bind_int(stmt, 8, static_cast<int>(slot.item.stackCount));
+            sqlite3_bind_int(stmt, 9, static_cast<int>(slot.item.maxStack));
+            sqlite3_bind_int(stmt, 10, static_cast<int>(slot.item.bagSlots));
+            sqlite3_bind_int(stmt, 11, static_cast<int>(slot.item.armor));
+            sqlite3_bind_int(stmt, 12, static_cast<int>(slot.item.stamina));
+            sqlite3_bind_int(stmt, 13, static_cast<int>(slot.item.strength));
+            sqlite3_bind_int(stmt, 14, static_cast<int>(slot.item.agility));
+            sqlite3_bind_int(stmt, 15, static_cast<int>(slot.item.intellect));
+            sqlite3_bind_int(stmt, 16, static_cast<int>(slot.item.spirit));
+            sqlite3_bind_int(stmt, 17, static_cast<int>(slot.item.displayInfoId));
+            sqlite3_bind_text(stmt, 18, slot.item.subclassName.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int(stmt, 19, static_cast<int>(slot.item.sellPrice));
+            sqlite3_step(stmt);
+            sqlite3_reset(stmt);
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    const char* insSpell = "INSERT INTO character_spell (guid, spell) VALUES (?,?);";
+    if (sqlite3_prepare_v2(sp.db, insSpell, -1, &stmt, nullptr) == SQLITE_OK) {
+        for (uint32_t spellId : knownSpells) {
+            sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(activeCharacterGuid_));
+            sqlite3_bind_int(stmt, 2, static_cast<int>(spellId));
+            sqlite3_step(stmt);
+            sqlite3_reset(stmt);
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    const char* insAction = "INSERT INTO character_action (guid, slot, type, action) VALUES (?,?,?,?);";
+    if (sqlite3_prepare_v2(sp.db, insAction, -1, &stmt, nullptr) == SQLITE_OK) {
+        for (int i = 0; i < static_cast<int>(actionBar.size()); i++) {
+            const auto& slot = actionBar[i];
+            if (slot.type == ActionBarSlot::EMPTY || slot.id == 0) continue;
+            sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(activeCharacterGuid_));
+            sqlite3_bind_int(stmt, 2, i);
+            sqlite3_bind_int(stmt, 3, static_cast<int>(slot.type));
+            sqlite3_bind_int(stmt, 4, static_cast<int>(slot.id));
+            sqlite3_step(stmt);
+            sqlite3_reset(stmt);
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    const char* insAura =
+        "INSERT INTO character_aura (guid, slot, spell, flags, level, charges, duration_ms, max_duration_ms, caster_guid) "
+        "VALUES (?,?,?,?,?,?,?,?,?);";
+    if (sqlite3_prepare_v2(sp.db, insAura, -1, &stmt, nullptr) == SQLITE_OK) {
+        for (size_t i = 0; i < playerAuras.size(); i++) {
+            const auto& aura = playerAuras[i];
+            if (aura.spellId == 0) continue;
+            sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(activeCharacterGuid_));
+            sqlite3_bind_int(stmt, 2, static_cast<int>(i));
+            sqlite3_bind_int(stmt, 3, static_cast<int>(aura.spellId));
+            sqlite3_bind_int(stmt, 4, static_cast<int>(aura.flags));
+            sqlite3_bind_int(stmt, 5, static_cast<int>(aura.level));
+            sqlite3_bind_int(stmt, 6, static_cast<int>(aura.charges));
+            sqlite3_bind_int(stmt, 7, static_cast<int>(aura.durationMs));
+            sqlite3_bind_int(stmt, 8, static_cast<int>(aura.maxDurationMs));
+            sqlite3_bind_int64(stmt, 9, static_cast<sqlite3_int64>(aura.casterGuid));
+            sqlite3_step(stmt);
+            sqlite3_reset(stmt);
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    sqlite3_exec(sp.db, "COMMIT;", nullptr, nullptr, nullptr);
+
+    spDirtyFlags_ = SP_DIRTY_NONE;
+    spDirtyHighPriority_ = false;
+    spDirtyTimer_ = 0.0f;
+    spPeriodicTimer_ = 0.0f;
+
+    // Update cached character list position/level for UI.
+    for (auto& ch : characters) {
+        if (ch.guid == activeCharacterGuid_) {
+            ch.level = static_cast<uint8_t>(localPlayerLevel_);
+            ch.x = movementInfo.x;
+            ch.y = movementInfo.y;
+            ch.z = movementInfo.z;
+            break;
+        }
+    }
+}
+
+void GameHandler::flushSinglePlayerSave() {
+    saveSinglePlayerCharacterState(true);
+}
 
 void GameHandler::selectCharacter(uint64_t characterGuid) {
     if (state != WorldState::CHAR_LIST_RECEIVED) {
@@ -1012,10 +2541,29 @@ void GameHandler::setPosition(float x, float y, float z) {
     movementInfo.x = x;
     movementInfo.y = y;
     movementInfo.z = z;
+    if (singlePlayerMode_) {
+        float dx = x - spLastDirtyX_;
+        float dy = y - spLastDirtyY_;
+        float dz = z - spLastDirtyZ_;
+        float distSq = dx * dx + dy * dy + dz * dz;
+        if (distSq >= 1.0f) {
+            spLastDirtyX_ = x;
+            spLastDirtyY_ = y;
+            spLastDirtyZ_ = z;
+            markSinglePlayerDirty(SP_DIRTY_POSITION, false);
+        }
+    }
 }
 
 void GameHandler::setOrientation(float orientation) {
     movementInfo.orientation = orientation;
+    if (singlePlayerMode_) {
+        float diff = std::fabs(orientation - spLastDirtyOrientation_);
+        if (diff >= 0.1f) {
+            spLastDirtyOrientation_ = orientation;
+            markSinglePlayerDirty(SP_DIRTY_POSITION, false);
+        }
+    }
 }
 
 void GameHandler::handleUpdateObject(network::Packet& packet) {
@@ -1778,6 +3326,7 @@ bool GameHandler::applyInventoryFields(const std::map<uint16_t, uint32_t>& field
 }
 
 void GameHandler::rebuildOnlineInventory() {
+    if (singlePlayerMode_) return;
 
     inventory = Inventory();
 
@@ -1811,6 +3360,31 @@ void GameHandler::rebuildOnlineInventory() {
         } else {
             def.name = "Item " + std::to_string(def.itemId);
             queryItemInfo(def.itemId, guid);
+        }
+        if (def.itemId != 0) {
+            auto& db = getSinglePlayerLootDb();
+            auto itTpl = db.itemTemplates.find(def.itemId);
+            if (itTpl != db.itemTemplates.end()) {
+                if (def.name.empty() || def.name.rfind("Item ", 0) == 0) def.name = itTpl->second.name;
+                if (def.quality == ItemQuality::COMMON && itTpl->second.quality != 0) {
+                    def.quality = static_cast<ItemQuality>(itTpl->second.quality);
+                }
+                if (def.inventoryType == 0 && itTpl->second.inventoryType != 0) {
+                    def.inventoryType = itTpl->second.inventoryType;
+                }
+                if (def.maxStack <= 1 && itTpl->second.maxStack > 1) {
+                    def.maxStack = static_cast<uint32_t>(itTpl->second.maxStack);
+                }
+                if (def.displayInfoId == 0 && itTpl->second.displayId != 0) {
+                    def.displayInfoId = itTpl->second.displayId;
+                }
+                if (def.armor == 0 && itTpl->second.armor > 0) def.armor = itTpl->second.armor;
+                if (def.stamina == 0 && itTpl->second.stamina > 0) def.stamina = itTpl->second.stamina;
+                if (def.strength == 0 && itTpl->second.strength > 0) def.strength = itTpl->second.strength;
+                if (def.agility == 0 && itTpl->second.agility > 0) def.agility = itTpl->second.agility;
+                if (def.intellect == 0 && itTpl->second.intellect > 0) def.intellect = itTpl->second.intellect;
+                if (def.spirit == 0 && itTpl->second.spirit > 0) def.spirit = itTpl->second.spirit;
+            }
         }
 
         inventory.setEquipSlot(static_cast<EquipSlot>(i), def);
@@ -1846,6 +3420,31 @@ void GameHandler::rebuildOnlineInventory() {
         } else {
             def.name = "Item " + std::to_string(def.itemId);
             queryItemInfo(def.itemId, guid);
+        }
+        if (def.itemId != 0) {
+            auto& db = getSinglePlayerLootDb();
+            auto itTpl = db.itemTemplates.find(def.itemId);
+            if (itTpl != db.itemTemplates.end()) {
+                if (def.name.empty() || def.name.rfind("Item ", 0) == 0) def.name = itTpl->second.name;
+                if (def.quality == ItemQuality::COMMON && itTpl->second.quality != 0) {
+                    def.quality = static_cast<ItemQuality>(itTpl->second.quality);
+                }
+                if (def.inventoryType == 0 && itTpl->second.inventoryType != 0) {
+                    def.inventoryType = itTpl->second.inventoryType;
+                }
+                if (def.maxStack <= 1 && itTpl->second.maxStack > 1) {
+                    def.maxStack = static_cast<uint32_t>(itTpl->second.maxStack);
+                }
+                if (def.displayInfoId == 0 && itTpl->second.displayId != 0) {
+                    def.displayInfoId = itTpl->second.displayId;
+                }
+                if (def.armor == 0 && itTpl->second.armor > 0) def.armor = itTpl->second.armor;
+                if (def.stamina == 0 && itTpl->second.stamina > 0) def.stamina = itTpl->second.stamina;
+                if (def.strength == 0 && itTpl->second.strength > 0) def.strength = itTpl->second.strength;
+                if (def.agility == 0 && itTpl->second.agility > 0) def.agility = itTpl->second.agility;
+                if (def.intellect == 0 && itTpl->second.intellect > 0) def.intellect = itTpl->second.intellect;
+                if (def.spirit == 0 && itTpl->second.spirit > 0) def.spirit = itTpl->second.spirit;
+            }
         }
 
         inventory.setBackpackSlot(i, def);
@@ -2102,6 +3701,7 @@ void GameHandler::setActionBarSlot(int slot, ActionBarSlot::Type type, uint32_t 
     if (slot < 0 || slot >= ACTION_BAR_SLOTS) return;
     actionBar[slot].type = type;
     actionBar[slot].id = id;
+    markSinglePlayerDirty(SP_DIRTY_ACTIONBAR, true);
 }
 
 float GameHandler::getSpellCooldown(uint32_t spellId) const {
@@ -2234,11 +3834,15 @@ void GameHandler::handleAuraUpdate(network::Packet& packet, bool isAll) {
             (*auraList)[slot] = aura;
         }
     }
+    if (singlePlayerMode_ && data.guid == playerGuid) {
+        markSinglePlayerDirty(SP_DIRTY_AURAS, true);
+    }
 }
 
 void GameHandler::handleLearnedSpell(network::Packet& packet) {
     uint32_t spellId = packet.readUInt32();
     knownSpells.push_back(spellId);
+    markSinglePlayerDirty(SP_DIRTY_SPELLS, true);
     LOG_INFO("Learned spell: ", spellId);
 }
 
@@ -2247,6 +3851,7 @@ void GameHandler::handleRemovedSpell(network::Packet& packet) {
     knownSpells.erase(
         std::remove(knownSpells.begin(), knownSpells.end(), spellId),
         knownSpells.end());
+    markSinglePlayerDirty(SP_DIRTY_SPELLS, true);
     LOG_INFO("Removed spell: ", spellId);
 }
 
@@ -2351,12 +3956,84 @@ void GameHandler::handlePartyCommandResult(network::Packet& packet) {
 // ============================================================
 
 void GameHandler::lootTarget(uint64_t guid) {
+    if (singlePlayerMode_) {
+        auto entity = entityManager.getEntity(guid);
+        if (!entity || entity->getType() != ObjectType::UNIT) return;
+        auto unit = std::static_pointer_cast<Unit>(entity);
+        if (unit->getHealth() != 0) return;
+
+        auto it = localLootState_.find(guid);
+        if (it == localLootState_.end()) {
+            LocalLootState state;
+            state.data = generateLocalLoot(guid);
+            it = localLootState_.emplace(guid, std::move(state)).first;
+        }
+        if (it->second.data.items.empty() && it->second.data.gold == 0) {
+            addSystemChatMessage("No loot.");
+            return;
+        }
+        simulateLootResponse(it->second.data);
+        return;
+    }
+
     if (state != WorldState::IN_WORLD || !socket) return;
     auto packet = LootPacket::build(guid);
     socket->send(packet);
 }
 
 void GameHandler::lootItem(uint8_t slotIndex) {
+    if (singlePlayerMode_) {
+        if (!lootWindowOpen) return;
+        auto it = std::find_if(currentLoot.items.begin(), currentLoot.items.end(),
+                               [slotIndex](const LootItem& item) { return item.slotIndex == slotIndex; });
+        if (it == currentLoot.items.end()) return;
+
+        auto& db = getSinglePlayerLootDb();
+        ItemDef def;
+        def.itemId = it->itemId;
+        def.stackCount = it->count;
+        def.maxStack = it->count;
+
+        auto itTpl = db.itemTemplates.find(it->itemId);
+        if (itTpl != db.itemTemplates.end()) {
+            def.name = itTpl->second.name.empty()
+                ? ("Item " + std::to_string(it->itemId))
+                : itTpl->second.name;
+            def.quality = static_cast<ItemQuality>(itTpl->second.quality);
+            def.inventoryType = itTpl->second.inventoryType;
+            def.maxStack = std::max(def.maxStack, static_cast<uint32_t>(itTpl->second.maxStack));
+            def.sellPrice = itTpl->second.sellPrice;
+            def.displayInfoId = itTpl->second.displayId;
+            def.armor = itTpl->second.armor;
+            def.stamina = itTpl->second.stamina;
+            def.strength = itTpl->second.strength;
+            def.agility = itTpl->second.agility;
+            def.intellect = itTpl->second.intellect;
+            def.spirit = itTpl->second.spirit;
+        } else {
+            def.name = "Item " + std::to_string(it->itemId);
+        }
+
+        if (inventory.addItem(def)) {
+            simulateLootRemove(slotIndex);
+            addSystemChatMessage("You receive item: " + def.name + " x" + std::to_string(def.stackCount) + ".");
+            markSinglePlayerDirty(SP_DIRTY_INVENTORY, true);
+            if (currentLoot.lootGuid != 0) {
+                auto st = localLootState_.find(currentLoot.lootGuid);
+                if (st != localLootState_.end()) {
+                    auto& items = st->second.data.items;
+                    items.erase(std::remove_if(items.begin(), items.end(),
+                                               [slotIndex](const LootItem& item) {
+                                                   return item.slotIndex == slotIndex;
+                                               }),
+                                items.end());
+                }
+            }
+        } else {
+            addSystemChatMessage("Inventory is full.");
+        }
+        return;
+    }
     if (state != WorldState::IN_WORLD || !socket) return;
     auto packet = AutostoreLootItemPacket::build(slotIndex);
     socket->send(packet);
@@ -2367,6 +4044,19 @@ void GameHandler::closeLoot() {
     lootWindowOpen = false;
     if (currentLoot.lootGuid != 0 && targetGuid == currentLoot.lootGuid) {
         clearTarget();
+    }
+    if (singlePlayerMode_ && currentLoot.lootGuid != 0) {
+        auto st = localLootState_.find(currentLoot.lootGuid);
+        if (st != localLootState_.end()) {
+            if (!st->second.moneyTaken && st->second.data.gold > 0) {
+                addMoneyCopper(st->second.data.gold);
+                st->second.moneyTaken = true;
+                st->second.data.gold = 0;
+            }
+        }
+        currentLoot.gold = 0;
+        simulateLootRelease();
+        return;
     }
     if (state == WorldState::IN_WORLD && socket) {
         auto packet = LootReleasePacket::build(currentLoot.lootGuid);
@@ -2563,21 +4253,34 @@ void GameHandler::sellItemBySlot(int backpackIndex) {
     const auto& slot = inventory.getBackpackSlot(backpackIndex);
     if (slot.empty()) return;
 
-    uint64_t itemGuid = backpackSlotGuids_[backpackIndex];
-    if (itemGuid == 0) {
-        itemGuid = resolveOnlineItemGuid(slot.item.itemId);
-    }
-    LOG_DEBUG("sellItemBySlot: slot=", backpackIndex,
-              " item=", slot.item.name,
-              " itemGuid=0x", std::hex, itemGuid, std::dec,
-              " vendorGuid=0x", std::hex, currentVendorItems.vendorGuid, std::dec);
-    if (itemGuid != 0 && currentVendorItems.vendorGuid != 0) {
-        sellItem(currentVendorItems.vendorGuid, itemGuid, 1);
-    } else if (itemGuid == 0) {
-        addSystemChatMessage("Cannot sell: item not found in inventory.");
-        LOG_WARNING("Sell failed: missing item GUID for slot ", backpackIndex);
+    if (singlePlayerMode_) {
+        if (slot.item.sellPrice > 0) {
+            addMoneyCopper(slot.item.sellPrice);
+            std::string msg = "You sold " + slot.item.name + ".";
+            addSystemChatMessage(msg);
+        } else {
+            addSystemChatMessage("You can't sell " + slot.item.name + ".");
+            return;
+        }
+        inventory.clearBackpackSlot(backpackIndex);
+        notifyInventoryChanged();
     } else {
-        addSystemChatMessage("Cannot sell: no vendor.");
+        uint64_t itemGuid = backpackSlotGuids_[backpackIndex];
+        if (itemGuid == 0) {
+            itemGuid = resolveOnlineItemGuid(slot.item.itemId);
+        }
+        LOG_DEBUG("sellItemBySlot: slot=", backpackIndex,
+                  " item=", slot.item.name,
+                  " itemGuid=0x", std::hex, itemGuid, std::dec,
+                  " vendorGuid=0x", std::hex, currentVendorItems.vendorGuid, std::dec);
+        if (itemGuid != 0 && currentVendorItems.vendorGuid != 0) {
+            sellItem(currentVendorItems.vendorGuid, itemGuid, 1);
+        } else if (itemGuid == 0) {
+            addSystemChatMessage("Cannot sell: item not found in inventory.");
+            LOG_WARNING("Sell failed: missing item GUID for slot ", backpackIndex);
+        } else {
+            addSystemChatMessage("Cannot sell: no vendor.");
+        }
     }
 }
 
@@ -2585,6 +4288,11 @@ void GameHandler::autoEquipItemBySlot(int backpackIndex) {
     if (backpackIndex < 0 || backpackIndex >= inventory.getBackpackSize()) return;
     const auto& slot = inventory.getBackpackSlot(backpackIndex);
     if (slot.empty()) return;
+
+    if (singlePlayerMode_) {
+        // Fall back to local equip logic (UI already handles this).
+        return;
+    }
 
     if (state == WorldState::IN_WORLD && socket) {
         // WoW inventory: equipment 0-18, bags 19-22, backpack 23-38
@@ -2597,6 +4305,11 @@ void GameHandler::useItemBySlot(int backpackIndex) {
     if (backpackIndex < 0 || backpackIndex >= inventory.getBackpackSize()) return;
     const auto& slot = inventory.getBackpackSlot(backpackIndex);
     if (slot.empty()) return;
+
+    if (singlePlayerMode_) {
+        // Single-player consumable use not implemented yet.
+        return;
+    }
 
     uint64_t itemGuid = backpackSlotGuids_[backpackIndex];
     if (itemGuid == 0) {
@@ -2626,7 +4339,10 @@ void GameHandler::handleLootResponse(network::Packet& packet) {
     if (!LootResponseParser::parse(packet, currentLoot)) return;
     lootWindowOpen = true;
     if (currentLoot.gold > 0) {
-        if (state == WorldState::IN_WORLD && socket) {
+        if (singlePlayerMode_) {
+            addMoneyCopper(currentLoot.gold);
+            currentLoot.gold = 0;
+        } else if (state == WorldState::IN_WORLD && socket) {
             // Auto-loot gold by sending CMSG_LOOT_MONEY (server handles the rest)
             auto pkt = LootMoneyPacket::build();
             socket->send(pkt);
@@ -2679,12 +4395,197 @@ void GameHandler::handleListInventory(network::Packet& packet) {
 // Single-player local combat
 // ============================================================
 
+void GameHandler::updateLocalCombat(float deltaTime) {
+    if (!autoAttacking || autoAttackTarget == 0) return;
 
+    auto entity = entityManager.getEntity(autoAttackTarget);
+    if (!entity || entity->getType() != ObjectType::UNIT) {
+        stopAutoAttack();
+        return;
+    }
+    auto unit = std::static_pointer_cast<Unit>(entity);
+    if (unit->getHealth() == 0) {
+        stopAutoAttack();
+        return;
+    }
 
+    // Check melee range (~8 units squared distance)
+    float dx = unit->getX() - movementInfo.x;
+    float dy = unit->getY() - movementInfo.y;
+    float dz = unit->getZ() - movementInfo.z;
+    float distSq = dx * dx + dy * dy + dz * dz;
+    if (distSq > 64.0f) return; // 8^2 = 64
 
+    swingTimer_ += deltaTime;
+    while (swingTimer_ >= SWING_SPEED) {
+        swingTimer_ -= SWING_SPEED;
+        performPlayerSwing();
+    }
+}
 
+void GameHandler::performPlayerSwing() {
+    if (autoAttackTarget == 0) return;
+    auto entity = entityManager.getEntity(autoAttackTarget);
+    if (!entity || entity->getType() != ObjectType::UNIT) return;
+    auto unit = std::static_pointer_cast<Unit>(entity);
+    if (unit->getHealth() == 0) return;
 
+    if (meleeSwingCallback_) {
+        meleeSwingCallback_();
+    }
 
+    // Aggro the target
+    aggroNpc(autoAttackTarget);
+
+    // 5% miss chance
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_real_distribution<float> roll(0.0f, 1.0f);
+    if (roll(rng) < 0.05f) {
+        addCombatText(CombatTextEntry::MISS, 0, 0, true);
+        return;
+    }
+
+    // Damage calculation
+    int32_t baseDamage = 5 + static_cast<int32_t>(localPlayerLevel_) * 3;
+    std::uniform_real_distribution<float> dmgRange(0.8f, 1.2f);
+    int32_t damage = static_cast<int32_t>(baseDamage * dmgRange(rng));
+
+    // 10% crit chance (2x damage)
+    bool crit = roll(rng) < 0.10f;
+    if (crit) damage *= 2;
+
+    // Apply damage
+    uint32_t hp = unit->getHealth();
+    if (static_cast<uint32_t>(damage) >= hp) {
+        unit->setHealth(0);
+        handleNpcDeath(autoAttackTarget);
+    } else {
+        unit->setHealth(hp - static_cast<uint32_t>(damage));
+    }
+
+    addCombatText(crit ? CombatTextEntry::CRIT_DAMAGE : CombatTextEntry::MELEE_DAMAGE,
+                  damage, 0, true);
+}
+
+void GameHandler::handleNpcDeath(uint64_t guid) {
+    // Award XP from kill
+    auto entity = entityManager.getEntity(guid);
+    if (entity && entity->getType() == ObjectType::UNIT) {
+        auto unit = std::static_pointer_cast<Unit>(entity);
+        awardLocalXp(guid, unit->getLevel());
+    }
+
+    // Remove from aggro list
+    aggroList_.erase(
+        std::remove_if(aggroList_.begin(), aggroList_.end(),
+                       [guid](const NpcAggroEntry& e) { return e.guid == guid; }),
+        aggroList_.end());
+
+    // Stop auto-attack if target was this NPC
+    if (autoAttackTarget == guid) {
+        stopAutoAttack();
+    }
+
+    // Notify death callback (plays death animation)
+    if (npcDeathCallback_) {
+        npcDeathCallback_(guid);
+    }
+}
+
+void GameHandler::aggroNpc(uint64_t guid) {
+    if (!isNpcAggroed(guid)) {
+        aggroList_.push_back({guid, 0.0f});
+    }
+}
+
+bool GameHandler::isNpcAggroed(uint64_t guid) const {
+    for (const auto& e : aggroList_) {
+        if (e.guid == guid) return true;
+    }
+    return false;
+}
+
+void GameHandler::updateNpcAggro(float deltaTime) {
+    // Remove dead/missing NPCs and NPCs out of leash range
+    for (auto it = aggroList_.begin(); it != aggroList_.end(); ) {
+        auto entity = entityManager.getEntity(it->guid);
+        if (!entity || entity->getType() != ObjectType::UNIT) {
+            it = aggroList_.erase(it);
+            continue;
+        }
+        auto unit = std::static_pointer_cast<Unit>(entity);
+        if (unit->getHealth() == 0) {
+            it = aggroList_.erase(it);
+            continue;
+        }
+
+        // Leash range: 40 units
+        float dx = unit->getX() - movementInfo.x;
+        float dy = unit->getY() - movementInfo.y;
+        float distSq = dx * dx + dy * dy;
+        if (distSq > 1600.0f) { // 40^2
+            it = aggroList_.erase(it);
+            continue;
+        }
+
+        // Melee range: 8 units — NPC attacks player
+        float dz = unit->getZ() - movementInfo.z;
+        float fullDistSq = distSq + dz * dz;
+        if (fullDistSq <= 64.0f) { // 8^2
+            it->swingTimer += deltaTime;
+            if (it->swingTimer >= SWING_SPEED) {
+                it->swingTimer -= SWING_SPEED;
+                performNpcSwing(it->guid);
+            }
+        }
+        ++it;
+    }
+}
+
+void GameHandler::performNpcSwing(uint64_t guid) {
+    if (localPlayerHealth_ == 0) return;
+
+    auto entity = entityManager.getEntity(guid);
+    if (!entity || entity->getType() != ObjectType::UNIT) return;
+    auto unit = std::static_pointer_cast<Unit>(entity);
+
+    // Auto-target the attacker if player has no current target
+    if (targetGuid == 0) {
+        setTarget(guid);
+    }
+
+    if (npcSwingCallback_) {
+        npcSwingCallback_(guid);
+    }
+
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_real_distribution<float> roll(0.0f, 1.0f);
+
+    // 5% miss
+    if (roll(rng) < 0.05f) {
+        addCombatText(CombatTextEntry::MISS, 0, 0, false);
+        return;
+    }
+
+    // Damage: 3 + npcLevel * 2
+    int32_t baseDamage = 3 + static_cast<int32_t>(unit->getLevel()) * 2;
+    std::uniform_real_distribution<float> dmgRange(0.8f, 1.2f);
+    int32_t damage = static_cast<int32_t>(baseDamage * dmgRange(rng));
+
+    // 5% crit (2x)
+    bool crit = roll(rng) < 0.05f;
+    if (crit) damage *= 2;
+
+    // Apply to local player health
+    if (static_cast<uint32_t>(damage) >= localPlayerHealth_) {
+        localPlayerHealth_ = 0;
+    } else {
+        localPlayerHealth_ -= static_cast<uint32_t>(damage);
+    }
+
+    addCombatText(crit ? CombatTextEntry::CRIT_DAMAGE : CombatTextEntry::MELEE_DAMAGE,
+                  damage, 0, false);
+}
 
 // ============================================================
 // XP tracking
@@ -2733,7 +4634,48 @@ uint32_t GameHandler::killXp(uint32_t playerLevel, uint32_t victimLevel) {
     return static_cast<uint32_t>(baseXp * multiplier);
 }
 
+void GameHandler::awardLocalXp(uint64_t victimGuid, uint32_t victimLevel) {
+    if (localPlayerLevel_ >= 80) return; // Level cap
 
+    uint32_t xp = killXp(localPlayerLevel_, victimLevel);
+    if (xp == 0) return;
+
+    playerXp_ += xp;
+    markSinglePlayerDirty(SP_DIRTY_XP, true);
+
+    // Show XP gain in combat text as a heal-type (gold text)
+    addCombatText(CombatTextEntry::HEAL, static_cast<int32_t>(xp), 0, true);
+    simulateXpGain(victimGuid, xp);
+
+    LOG_INFO("XP gained: +", xp, " (total: ", playerXp_, "/", playerNextLevelXp_, ")");
+
+    // Check for level-up
+    while (playerXp_ >= playerNextLevelXp_ && localPlayerLevel_ < 80) {
+        playerXp_ -= playerNextLevelXp_;
+        levelUp();
+    }
+}
+
+void GameHandler::levelUp() {
+    localPlayerLevel_++;
+    playerNextLevelXp_ = xpForLevel(localPlayerLevel_);
+
+    // Scale HP with level
+    uint32_t newMaxHp = 20 + localPlayerLevel_ * 10;
+    localPlayerMaxHealth_ = newMaxHp;
+    localPlayerHealth_ = newMaxHp; // Full heal on level-up
+    markSinglePlayerDirty(SP_DIRTY_STATS | SP_DIRTY_XP, true);
+
+    LOG_INFO("LEVEL UP! Now level ", localPlayerLevel_,
+             " (HP: ", newMaxHp, ", next level: ", playerNextLevelXp_, " XP)");
+
+    // Announce in chat
+    MessageChatData msg;
+    msg.type = ChatType::SYSTEM;
+    msg.language = ChatLanguage::UNIVERSAL;
+    msg.message = "You have reached level " + std::to_string(localPlayerLevel_) + "!";
+    addLocalChatMessage(msg);
+}
 
 void GameHandler::handleXpGain(network::Packet& packet) {
     XpGainData data;
@@ -2750,10 +4692,174 @@ void GameHandler::handleXpGain(network::Packet& packet) {
     addSystemChatMessage(msg);
 }
 
+LootResponseData GameHandler::generateLocalLoot(uint64_t guid) {
+    LootResponseData data;
+    data.lootGuid = guid;
+    data.lootType = 0;
+    auto entity = entityManager.getEntity(guid);
+    if (!entity || entity->getType() != ObjectType::UNIT) return data;
+    auto unit = std::static_pointer_cast<Unit>(entity);
+    uint32_t entry = unit->getEntry();
+    if (entry == 0) return data;
+
+    auto& db = getSinglePlayerLootDb();
+
+    uint32_t lootId = entry;
+    auto itTemplate = db.creatureTemplates.find(entry);
+    if (itTemplate != db.creatureTemplates.end()) {
+        if (itTemplate->second.lootId != 0) lootId = itTemplate->second.lootId;
+        if (itTemplate->second.maxGold > 0) {
+            std::uniform_int_distribution<uint32_t> goldDist(
+                itTemplate->second.minGold, itTemplate->second.maxGold);
+            static std::mt19937 rng(std::random_device{}());
+            data.gold = goldDist(rng);
+        }
+    }
+
+    auto itLoot = db.creatureLoot.find(lootId);
+    if (itLoot == db.creatureLoot.end() && lootId != entry) {
+        itLoot = db.creatureLoot.find(entry);
+    }
+    if (itLoot == db.creatureLoot.end()) return data;
+
+    std::unordered_map<uint8_t, std::vector<LootEntryRow>> groups;
+    std::vector<LootEntryRow> ungroupped;
+    for (const auto& row : itLoot->second) {
+        if (row.groupid == 0) {
+            ungroupped.push_back(row);
+        } else {
+            groups[row.groupid].push_back(row);
+        }
+    }
+
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_real_distribution<float> roll(0.0f, 100.0f);
+
+    auto addItem = [&](uint32_t itemId, uint32_t count) {
+        LootItem li;
+        li.slotIndex = static_cast<uint8_t>(data.items.size());
+        li.itemId = itemId;
+        li.count = count;
+        auto itItem = db.itemTemplates.find(itemId);
+        if (itItem != db.itemTemplates.end()) {
+            li.displayInfoId = itItem->second.displayId;
+        }
+        data.items.push_back(li);
+    };
+
+    std::function<void(const std::vector<LootEntryRow>&, bool)> processLootTable;
+    processLootTable = [&](const std::vector<LootEntryRow>& rows, bool grouped) {
+        if (rows.empty()) return;
+        if (grouped) {
+            float total = 0.0f;
+            for (const auto& r : rows) total += std::abs(r.chance);
+            if (total <= 0.0f) return;
+            float r = roll(rng);
+            if (total < 100.0f && r > total) return;
+            float pick = (total < 100.0f)
+                ? r
+                : std::uniform_real_distribution<float>(0.0f, total)(rng);
+            float acc = 0.0f;
+            for (const auto& row : rows) {
+                acc += std::abs(row.chance);
+                if (pick <= acc) {
+                    if (row.mincountOrRef < 0) {
+                        auto refIt = db.referenceLoot.find(static_cast<uint32_t>(-row.mincountOrRef));
+                        if (refIt != db.referenceLoot.end()) {
+                            processLootTable(refIt->second, false);
+                        }
+                    } else {
+                        uint32_t minc = static_cast<uint32_t>(std::max(1, row.mincountOrRef));
+                        uint32_t maxc = std::max(minc, static_cast<uint32_t>(row.maxcount));
+                        std::uniform_int_distribution<uint32_t> cnt(minc, maxc);
+                        addItem(row.item, cnt(rng));
+                    }
+                    break;
+                }
+            }
+            return;
+        }
+
+        for (const auto& row : rows) {
+            float chance = std::abs(row.chance);
+            if (chance <= 0.0f) continue;
+            if (roll(rng) > chance) continue;
+            if (row.mincountOrRef < 0) {
+                auto refIt = db.referenceLoot.find(static_cast<uint32_t>(-row.mincountOrRef));
+                if (refIt != db.referenceLoot.end()) {
+                    processLootTable(refIt->second, false);
+                }
+                continue;
+            }
+            uint32_t minc = static_cast<uint32_t>(std::max(1, row.mincountOrRef));
+            uint32_t maxc = std::max(minc, static_cast<uint32_t>(row.maxcount));
+            std::uniform_int_distribution<uint32_t> cnt(minc, maxc);
+            addItem(row.item, cnt(rng));
+        }
+    };
+
+    processLootTable(ungroupped, false);
+    for (const auto& [gid, rows] : groups) {
+        processLootTable(rows, true);
+    }
+
+    return data;
+}
+
+void GameHandler::simulateLootResponse(const LootResponseData& data) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::SMSG_LOOT_RESPONSE));
+    packet.writeUInt64(data.lootGuid);
+    packet.writeUInt8(data.lootType);
+    packet.writeUInt32(data.gold);
+    packet.writeUInt8(static_cast<uint8_t>(data.items.size()));
+    for (const auto& item : data.items) {
+        packet.writeUInt8(item.slotIndex);
+        packet.writeUInt32(item.itemId);
+        packet.writeUInt32(item.count);
+        packet.writeUInt32(item.displayInfoId);
+        packet.writeUInt32(item.randomSuffix);
+        packet.writeUInt32(item.randomPropertyId);
+        packet.writeUInt8(item.lootSlotType);
+    }
+    handleLootResponse(packet);
+}
+
+void GameHandler::simulateLootRelease() {
+    network::Packet packet(static_cast<uint16_t>(Opcode::SMSG_LOOT_RELEASE_RESPONSE));
+    handleLootReleaseResponse(packet);
+    currentLoot = LootResponseData{};
+}
+
+void GameHandler::simulateLootRemove(uint8_t slotIndex) {
+    if (!lootWindowOpen) return;
+    network::Packet packet(static_cast<uint16_t>(Opcode::SMSG_LOOT_REMOVED));
+    packet.writeUInt8(slotIndex);
+    handleLootRemoved(packet);
+}
+
+void GameHandler::simulateXpGain(uint64_t victimGuid, uint32_t totalXp) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::SMSG_LOG_XPGAIN));
+    packet.writeUInt64(victimGuid);
+    packet.writeUInt32(totalXp);
+    packet.writeUInt8(0); // kill XP
+    packet.writeFloat(1.0f); // group rate (1.0 = solo, no bonus)
+    packet.writeUInt8(0);    // RAF flag
+    handleXpGain(packet);
+}
+
+void GameHandler::simulateMotd(const std::vector<std::string>& lines) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::SMSG_MOTD));
+    packet.writeUInt32(static_cast<uint32_t>(lines.size()));
+    for (const auto& line : lines) {
+        packet.writeString(line);
+    }
+    handleMotd(packet);
+}
 
 void GameHandler::addMoneyCopper(uint32_t amount) {
     if (amount == 0) return;
     playerMoneyCopper_ += amount;
+    markSinglePlayerDirty(SP_DIRTY_MONEY, true);
     uint32_t gold = amount / 10000;
     uint32_t silver = (amount / 100) % 100;
     uint32_t copper = amount % 100;
@@ -2797,6 +4903,19 @@ void GameHandler::fail(const std::string& reason) {
     }
 }
 
+std::string GameHandler::getItemTemplateName(uint32_t itemId) const {
+    auto& db = getSinglePlayerLootDb();
+    auto it = db.itemTemplates.find(itemId);
+    if (it != db.itemTemplates.end()) return it->second.name;
+    return {};
+}
+
+ItemQuality GameHandler::getItemTemplateQuality(uint32_t itemId) const {
+    auto& db = getSinglePlayerLootDb();
+    auto it = db.itemTemplates.find(itemId);
+    if (it != db.itemTemplates.end()) return static_cast<ItemQuality>(it->second.quality);
+    return ItemQuality::COMMON;
+}
 
 } // namespace game
 } // namespace wowee

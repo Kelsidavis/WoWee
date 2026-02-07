@@ -39,13 +39,6 @@ A native C++ client for World of Warcraft 3.3.5a (Wrath of the Lich King) with a
 - **Party** -- Group invites, party list
 - **UI** -- Loading screens with progress bar, settings window with opacity slider
 
-### Single-Player Mode
-- Offline play without server connection
-- Local character persistence (SQLite)
-- Simulated XP and combat
-- Local item management
-- Settings persistence
-
 ## Building
 
 ### Prerequisites
@@ -161,7 +154,7 @@ make -j$(nproc)
 - **Graphics**: OpenGL 3.3 Core, GLSL 330, forward rendering with post-processing
 - **Performance**: 60 FPS (vsync), ~50k triangles/frame, ~30 draw calls, <10% GPU
 - **Platform**: Linux (primary), C++17, CMake 3.15+
-- **Dependencies**: SDL2, OpenGL/GLEW, GLM, OpenSSL, StormLib, ImGui, SQLite3, FFmpeg
+- **Dependencies**: SDL2, OpenGL/GLEW, GLM, OpenSSL, StormLib, ImGui, FFmpeg
 - **Architecture**: Modular design with clear separation (core, rendering, networking, game logic, asset pipeline, UI, audio)
 - **Networking**: Non-blocking TCP, SRP6a authentication, RC4 encryption, WoW 3.3.5a protocol
 - **Asset Loading**: Async terrain streaming, lazy loading, MPQ archive support

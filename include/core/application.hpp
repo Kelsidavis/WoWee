@@ -56,16 +56,11 @@ public:
     // Singleton access
     static Application& getInstance() { return *instance; }
 
-    // Single-player mode
-    void startSinglePlayer();
-    bool isSinglePlayer() const { return singlePlayerMode; }
-    void logoutToLogin();
-
     // Weapon loading (called at spawn and on equipment change)
     void loadEquippedWeapons();
 
-    // Teleport to a spawn preset location (single-player only)
-    void teleportTo(int presetIndex);
+    // Logout to login screen
+    void logoutToLogin();
 
     // Render bounds lookup (for click targeting / selection)
     bool getRenderBoundsForGuid(uint64_t guid, glm::vec3& outCenter, float& outRadius) const;
@@ -104,20 +99,11 @@ private:
 
     AppState state = AppState::AUTHENTICATION;
     bool running = false;
-    bool singlePlayerMode = false;
     bool playerCharacterSpawned = false;
     bool npcsSpawned = false;
     bool spawnSnapToGround = true;
     float lastFrameTime = 0.0f;
     float movementHeartbeatTimer = 0.0f;
-    game::Race spRace_ = game::Race::HUMAN;
-    game::Gender spGender_ = game::Gender::MALE;
-    game::Class spClass_ = game::Class::WARRIOR;
-    uint32_t spMapId_ = 0;
-    uint32_t spZoneId_ = 0;
-    glm::vec3 spSpawnCanonical_ = glm::vec3(62.0f, -9464.0f, 200.0f);
-    float spYawDeg_ = 0.0f;
-    float spPitchDeg_ = -5.0f;
 
     // Weapon model ID counter (starting high to avoid collision with character model IDs)
     uint32_t nextWeaponModelId_ = 1000;

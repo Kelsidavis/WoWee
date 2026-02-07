@@ -190,9 +190,6 @@ bool Application::initialize() {
 void Application::run() {
     LOG_INFO("Starting main loop");
 
-    // Terrain and character are loaded via startSinglePlayer() when the user
-    // picks single-player mode, so nothing is preloaded here.
-
     auto lastTime = std::chrono::high_resolution_clock::now();
 
     while (running && !window->shouldClose()) {
@@ -368,7 +365,7 @@ void Application::setState(AppState newState) {
             if (renderer && renderer->getCameraController()) {
                 auto* cc = renderer->getCameraController();
                 cc->setMovementCallback([this](uint32_t opcode) {
-                    if (gameHandler && !singlePlayerMode) {
+                    if (gameHandler) {
                         gameHandler->sendMovement(static_cast<game::Opcode>(opcode));
                     }
                 });
@@ -393,9 +390,7 @@ void Application::logoutToLogin() {
     LOG_INFO("Logout requested");
     if (gameHandler) {
         gameHandler->disconnect();
-        gameHandler->setSinglePlayerMode(false);
     }
-    singlePlayerMode = false;
     npcsSpawned = false;
     playerCharacterSpawned = false;
     world.reset();
@@ -448,10 +443,6 @@ void Application::update(float deltaTime) {
             if (world) {
                 world->update(deltaTime);
             }
-            // Spawn/update local single-player NPCs.
-            if (!npcsSpawned && singlePlayerMode) {
-                spawnNpcs();
-            }
             // Process deferred online creature spawns (throttled)
             processCreatureSpawnQueue();
             if (npcManager && renderer && renderer->getCharacterRenderer()) {
@@ -471,7 +462,7 @@ void Application::update(float deltaTime) {
             }
 
             // Send movement heartbeat every 500ms (keeps server position in sync)
-            if (gameHandler && renderer && !singlePlayerMode) {
+            if (gameHandler && renderer) {
                 movementHeartbeatTimer += deltaTime;
                 if (movementHeartbeatTimer >= 0.5f) {
                     movementHeartbeatTimer = 0.0f;
@@ -534,24 +525,6 @@ void Application::setupUICallbacks() {
         setState(AppState::REALM_SELECTION);
     });
 
-    // Single-player mode callback — go to character creation first
-    uiManager->getAuthScreen().setOnSinglePlayer([this]() {
-        LOG_INFO("Single-player mode selected, opening character creation");
-        singlePlayerMode = true;
-        if (gameHandler) {
-            gameHandler->setSinglePlayerMode(true);
-            gameHandler->setSinglePlayerCharListReady();
-        }
-        // If characters exist, go to selection; otherwise go to creation
-        if (gameHandler && !gameHandler->getCharacters().empty()) {
-            setState(AppState::CHARACTER_SELECTION);
-        } else {
-            uiManager->getCharacterCreateScreen().reset();
-            uiManager->getCharacterCreateScreen().initializePreview(assetManager.get());
-            setState(AppState::CHARACTER_CREATION);
-        }
-    });
-
     // Realm selection callback
     uiManager->getRealmScreen().setOnRealmSelected([this](const std::string& realmName, const std::string& realmAddress) {
         LOG_INFO("Realm selected: ", realmName, " (", realmAddress, ")");
@@ -589,12 +562,8 @@ void Application::setupUICallbacks() {
         if (gameHandler) {
             gameHandler->setActiveCharacterGuid(characterGuid);
         }
-        if (singlePlayerMode) {
-            startSinglePlayer();
-        } else {
-            // Online mode - login will be handled by world entry callback
-            setState(AppState::IN_GAME);
-        }
+        // Online mode - login will be handled by world entry callback
+        setState(AppState::IN_GAME);
     });
 
     // Character create screen callbacks
@@ -603,24 +572,13 @@ void Application::setupUICallbacks() {
     });
 
     uiManager->getCharacterCreateScreen().setOnCancel([this]() {
-        if (singlePlayerMode) {
-            setState(AppState::AUTHENTICATION);
-            singlePlayerMode = false;
-            gameHandler->setSinglePlayerMode(false);
-        } else {
-            setState(AppState::CHARACTER_SELECTION);
-        }
+        setState(AppState::CHARACTER_SELECTION);
     });
 
     // Character create result callback
     gameHandler->setCharCreateCallback([this](bool success, const std::string& msg) {
         if (success) {
-            if (singlePlayerMode) {
-                // In single-player, go straight to character selection showing the new character
-                setState(AppState::CHARACTER_SELECTION);
-            } else {
-                setState(AppState::CHARACTER_SELECTION);
-            }
+            setState(AppState::CHARACTER_SELECTION);
         } else {
             uiManager->getCharacterCreateScreen().setStatus(msg, true);
         }
@@ -688,13 +646,7 @@ void Application::setupUICallbacks() {
 
     // "Back" button on character screen
     uiManager->getCharacterScreen().setOnBack([this]() {
-        if (singlePlayerMode) {
-            setState(AppState::AUTHENTICATION);
-            singlePlayerMode = false;
-            gameHandler->setSinglePlayerMode(false);
-        } else {
-            setState(AppState::REALM_SELECTION);
-        }
+        setState(AppState::REALM_SELECTION);
     });
 
     // "Delete Character" button on character screen
@@ -709,11 +661,7 @@ void Application::setupUICallbacks() {
         if (success) {
             uiManager->getCharacterScreen().setStatus("Character deleted.");
             // Refresh character list
-            if (singlePlayerMode) {
-                gameHandler->setSinglePlayerCharListReady();
-            } else {
-                gameHandler->requestCharacterList();
-            }
+            gameHandler->requestCharacterList();
         } else {
             uint8_t code = gameHandler ? gameHandler->getLastCharDeleteResult() : 0xFF;
             uiManager->getCharacterScreen().setStatus(
@@ -1282,472 +1230,6 @@ void Application::spawnNpcs() {
     LOG_INFO("NPCs spawned for in-game session");
 }
 
-void Application::startSinglePlayer() {
-    LOG_INFO("Starting single-player mode...");
-
-    // Set single-player flag
-    singlePlayerMode = true;
-
-    // Enable single-player combat mode on game handler
-    if (gameHandler) {
-        gameHandler->setSinglePlayerMode(true);
-    }
-
-    // Create world object for single-player
-    if (!world) {
-        world = std::make_unique<game::World>();
-        LOG_INFO("Single-player world created");
-    }
-
-    const game::Character* activeChar = gameHandler ? gameHandler->getActiveCharacter() : nullptr;
-    if (!activeChar && gameHandler) {
-        activeChar = gameHandler->getFirstCharacter();
-        if (activeChar) {
-            gameHandler->setActiveCharacterGuid(activeChar->guid);
-        }
-    }
-    if (!activeChar) {
-        LOG_ERROR("Single-player start: no character selected");
-        return;
-    }
-
-    spRace_ = activeChar->race;
-    spGender_ = activeChar->gender;
-    spClass_ = activeChar->characterClass;
-    spMapId_ = activeChar->mapId;
-    spZoneId_ = activeChar->zoneId;
-    spSpawnCanonical_ = glm::vec3(activeChar->x, activeChar->y, activeChar->z);
-    spYawDeg_ = 0.0f;
-    spPitchDeg_ = -5.0f;
-
-    bool loadedState = false;
-    if (gameHandler) {
-        gameHandler->setPlayerGuid(activeChar->guid);
-        loadedState = gameHandler->loadSinglePlayerCharacterState(activeChar->guid);
-        if (loadedState) {
-            const auto& movement = gameHandler->getMovementInfo();
-            spSpawnCanonical_ = glm::vec3(movement.x, movement.y, movement.z);
-            spYawDeg_ = glm::degrees(movement.orientation);
-            spawnSnapToGround = true;
-        } else {
-            game::GameHandler::SinglePlayerCreateInfo createInfo;
-            bool hasCreate = gameHandler->getSinglePlayerCreateInfo(activeChar->race, activeChar->characterClass, createInfo);
-            if (hasCreate) {
-                spMapId_ = createInfo.mapId;
-                spZoneId_ = createInfo.zoneId;
-                spSpawnCanonical_ = glm::vec3(createInfo.x, createInfo.y, createInfo.z);
-                spYawDeg_ = glm::degrees(createInfo.orientation);
-                spPitchDeg_ = -5.0f;
-                spawnSnapToGround = true;
-            }
-            uint32_t level = std::max<uint32_t>(1, activeChar->level);
-            uint32_t maxHealth = 20 + level * 10;
-            gameHandler->initLocalPlayerStats(level, maxHealth, maxHealth);
-            gameHandler->applySinglePlayerStartData(activeChar->race, activeChar->characterClass);
-        }
-    }
-
-    if (gameHandler && renderer && window) {
-        game::GameHandler::SinglePlayerSettings settings;
-        bool hasSettings = gameHandler->getSinglePlayerSettings(settings);
-        if (!hasSettings) {
-            settings.fullscreen = window->isFullscreen();
-            settings.vsync = window->isVsyncEnabled();
-            settings.shadows = renderer->areShadowsEnabled();
-            settings.resWidth = window->getWidth();
-            settings.resHeight = window->getHeight();
-            if (auto* music = renderer->getMusicManager()) {
-                settings.musicVolume = music->getVolume();
-            }
-            if (auto* footstep = renderer->getFootstepManager()) {
-                settings.sfxVolume = static_cast<int>(footstep->getVolumeScale() * 100.0f + 0.5f);
-            }
-            if (auto* cameraController = renderer->getCameraController()) {
-                settings.mouseSensitivity = cameraController->getMouseSensitivity();
-                settings.invertMouse = cameraController->isInvertMouse();
-            }
-            gameHandler->setSinglePlayerSettings(settings);
-            hasSettings = true;
-        }
-        if (hasSettings) {
-            window->setVsync(settings.vsync);
-            window->setFullscreen(settings.fullscreen);
-            if (settings.resWidth > 0 && settings.resHeight > 0) {
-                window->applyResolution(settings.resWidth, settings.resHeight);
-            }
-            renderer->setShadowsEnabled(settings.shadows);
-            if (auto* music = renderer->getMusicManager()) {
-                music->setVolume(settings.musicVolume);
-            }
-            float sfxScale = static_cast<float>(settings.sfxVolume) / 100.0f;
-            if (auto* footstep = renderer->getFootstepManager()) {
-                footstep->setVolumeScale(sfxScale);
-            }
-            if (auto* activity = renderer->getActivitySoundManager()) {
-                activity->setVolumeScale(sfxScale);
-            }
-            if (auto* cameraController = renderer->getCameraController()) {
-                cameraController->setMouseSensitivity(settings.mouseSensitivity);
-                cameraController->setInvertMouse(settings.invertMouse);
-                cameraController->startIntroPan(2.8f, 140.0f);
-            }
-        }
-    }
-
-    // --- Loading screen ---
-    rendering::LoadingScreen loadingScreen;
-    bool loadingScreenOk = loadingScreen.initialize();
-
-    // Helper: poll events (resize/quit), update progress bar, swap buffers
-    auto showProgress = [&](const char* msg, float progress) {
-        // Poll SDL events so resizing and quit work during loading
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                window->setShouldClose(true);
-                loadingScreen.shutdown();
-                return;
-            }
-            if (event.type == SDL_WINDOWEVENT &&
-                event.window.event == SDL_WINDOWEVENT_RESIZED) {
-                int w = event.window.data1;
-                int h = event.window.data2;
-                window->setSize(w, h);
-                glViewport(0, 0, w, h);
-                if (renderer && renderer->getCamera()) {
-                    renderer->getCamera()->setAspectRatio(static_cast<float>(w) / h);
-                }
-            }
-        }
-        if (!loadingScreenOk) return;
-        loadingScreen.setStatus(msg);
-        loadingScreen.setProgress(progress);
-        loadingScreen.render();
-        window->swapBuffers();
-    };
-
-    showProgress("Preparing world...", 0.0f);
-
-    const SpawnPreset* spawnPreset = selectSpawnPreset(std::getenv("WOW_SPAWN"));
-    // Canonical WoW coords: +X=North, +Y=West, +Z=Up
-    glm::vec3 spawnCanonical = spawnPreset ? spawnPreset->spawnCanonical : spSpawnCanonical_;
-    std::string mapName = spawnPreset ? spawnPreset->mapName : mapIdToName(spMapId_);
-    float spawnYaw = spawnPreset ? spawnPreset->yawDeg : spYawDeg_;
-    float spawnPitch = spawnPreset ? spawnPreset->pitchDeg : spPitchDeg_;
-    spawnSnapToGround = spawnPreset ? spawnPreset->snapToGround : spawnSnapToGround;
-
-    if (auto envSpawnPos = parseVec3Csv(std::getenv("WOW_SPAWN_POS"))) {
-        spawnCanonical = *envSpawnPos;
-        LOG_INFO("Using WOW_SPAWN_POS override (canonical WoW X,Y,Z): (",
-                 spawnCanonical.x, ", ", spawnCanonical.y, ", ", spawnCanonical.z, ")");
-    }
-    if (auto envSpawnRot = parseYawPitchCsv(std::getenv("WOW_SPAWN_ROT"))) {
-        spawnYaw = envSpawnRot->first;
-        spawnPitch = envSpawnRot->second;
-        LOG_INFO("Using WOW_SPAWN_ROT override: yaw=", spawnYaw, " pitch=", spawnPitch);
-    }
-
-    // Convert canonical WoW → engine rendering coordinates (swap X/Y)
-    glm::vec3 spawnRender = core::coords::canonicalToRender(spawnCanonical);
-    if (renderer && renderer->getCameraController()) {
-        renderer->getCameraController()->setDefaultSpawn(spawnRender, spawnYaw, spawnPitch);
-    }
-
-    if (gameHandler && !loadedState) {
-        gameHandler->setPosition(spawnCanonical.x, spawnCanonical.y, spawnCanonical.z);
-        gameHandler->setOrientation(glm::radians(spawnYaw - 90.0f));
-        gameHandler->flushSinglePlayerSave();
-    }
-    if (spawnPreset) {
-        LOG_INFO("Single-player spawn preset: ", spawnPreset->label,
-                 " canonical=(",
-                 spawnCanonical.x, ", ", spawnCanonical.y, ", ", spawnCanonical.z,
-                 ") (set WOW_SPAWN to change)");
-        LOG_INFO("Optional spawn overrides (canonical WoW X,Y,Z): WOW_SPAWN_POS=x,y,z WOW_SPAWN_ROT=yaw,pitch");
-    }
-
-    showProgress("Loading character model...", 0.05f);
-
-    // Spawn player character (loads M2 model, skin, textures, animations, weapons)
-    spawnPlayerCharacter();
-
-    showProgress("Loading terrain...", 0.25f);
-
-    // Set map name for zone-specific floor cache
-    if (renderer->getWMORenderer()) {
-        renderer->getWMORenderer()->setMapName(mapName);
-    }
-
-    // Try to load test terrain if WOW_DATA_PATH is set
-    bool terrainOk = false;
-    if (renderer && assetManager && assetManager->isInitialized()) {
-        // Compute ADT path from canonical spawn coordinates
-        auto [tileX, tileY] = core::coords::canonicalToTile(spawnCanonical.x, spawnCanonical.y);
-        std::string adtPath = "World\\Maps\\" + mapName + "\\" + mapName + "_" +
-                              std::to_string(tileX) + "_" + std::to_string(tileY) + ".adt";
-        LOG_INFO("Initial ADT tile [", tileX, ",", tileY, "] from canonical position");
-        terrainOk = renderer->loadTestTerrain(assetManager.get(), adtPath);
-        if (!terrainOk) {
-            LOG_WARNING("Could not load test terrain - atmospheric rendering only");
-        }
-    }
-
-    showProgress("Streaming terrain tiles...", 0.40f);
-
-    // Wait for surrounding terrain tiles to stream in
-    if (terrainOk && renderer->getTerrainManager() && renderer->getCamera()) {
-        auto* terrainMgr = renderer->getTerrainManager();
-        auto* camera = renderer->getCamera();
-
-        // First update with large dt to trigger streamTiles() immediately
-        terrainMgr->update(*camera, 1.0f);
-
-        auto startTime = std::chrono::high_resolution_clock::now();
-        const float maxWaitSeconds = 15.0f;
-
-        int initialRemaining = terrainMgr->getRemainingTileCount();
-
-        while (terrainMgr->getRemainingTileCount() > 0) {
-            // Poll events to keep window responsive
-            SDL_Event event;
-            while (SDL_PollEvent(&event)) {
-                if (event.type == SDL_QUIT) {
-                    window->setShouldClose(true);
-                    loadingScreen.shutdown();
-                    return;
-                }
-                if (event.type == SDL_WINDOWEVENT &&
-                    event.window.event == SDL_WINDOWEVENT_RESIZED) {
-                    int w = event.window.data1;
-                    int h = event.window.data2;
-                    window->setSize(w, h);
-                    glViewport(0, 0, w, h);
-                    if (renderer && renderer->getCamera()) {
-                        renderer->getCamera()->setAspectRatio(static_cast<float>(w) / h);
-                    }
-                }
-            }
-
-            // Process ready tiles from worker threads
-            terrainMgr->update(*camera, 0.016f);
-            terrainMgr->processAllReadyTiles();
-
-            // Update loading screen with tile progress (40% - 85% range)
-            if (loadingScreenOk) {
-                int loaded = terrainMgr->getLoadedTileCount();
-                int remaining = terrainMgr->getRemainingTileCount();
-                float tileProgress = (initialRemaining > 0)
-                    ? static_cast<float>(initialRemaining - remaining) / initialRemaining
-                    : 1.0f;
-                float progress = 0.40f + tileProgress * 0.45f;
-                char buf[128];
-                snprintf(buf, sizeof(buf), "Loading terrain... %d tiles loaded, %d remaining",
-                         loaded, remaining);
-                loadingScreen.setStatus(buf);
-                loadingScreen.setProgress(progress);
-                loadingScreen.render();
-                window->swapBuffers();
-            }
-
-            // Timeout safety
-            auto elapsed = std::chrono::high_resolution_clock::now() - startTime;
-            if (std::chrono::duration<float>(elapsed).count() > maxWaitSeconds) {
-                LOG_WARNING("Terrain streaming timeout after ", maxWaitSeconds, "s");
-                break;
-            }
-
-            SDL_Delay(16);  // ~60fps cap for loading screen
-        }
-
-        LOG_INFO("Terrain streaming complete: ", terrainMgr->getLoadedTileCount(), " tiles loaded");
-
-        showProgress("Building collision cache...", 0.88f);
-
-        // Load zone-specific floor cache, or precompute if none exists
-        if (renderer->getWMORenderer()) {
-            renderer->getWMORenderer()->loadFloorCache();
-            if (renderer->getWMORenderer()->getFloorCacheSize() == 0) {
-                renderer->getWMORenderer()->precomputeFloorCache();
-            }
-        }
-
-        // Re-snap camera to ground now that all surrounding tiles are loaded
-        // (the initial reset inside loadTestTerrain only had 1 tile).
-        if (spawnSnapToGround && renderer->getCameraController()) {
-            renderer->getCameraController()->reset();
-        }
-    }
-
-    showProgress("Entering world...", 0.95f);
-
-    // Final camera reset: now that follow target exists and terrain is loaded,
-    // snap the third-person camera into the correct orbit position.
-    if (spawnSnapToGround && renderer && renderer->getCameraController()) {
-        renderer->getCameraController()->reset();
-        renderer->getCameraController()->startIntroPan(2.8f, 140.0f);
-    }
-
-    showProgress("Entering world...", 1.0f);
-
-    if (loadingScreenOk) {
-        loadingScreen.shutdown();
-    }
-
-    // Wire hearthstone to camera reset (teleport home) in single-player
-    if (gameHandler && renderer && renderer->getCameraController()) {
-        auto* camCtrl = renderer->getCameraController();
-        gameHandler->setHearthstoneCallback([camCtrl]() {
-            camCtrl->reset();
-            camCtrl->startIntroPan(2.8f, 140.0f);
-        });
-    }
-
-    // Go directly to game
-    setState(AppState::IN_GAME);
-    // Emulate server MOTD in single-player (after entering game)
-    if (gameHandler) {
-        std::vector<std::string> motdLines;
-        if (const char* motdEnv = std::getenv("WOW_SP_MOTD")) {
-            std::string raw = motdEnv;
-            size_t start = 0;
-            while (start <= raw.size()) {
-                size_t pos = raw.find('|', start);
-                if (pos == std::string::npos) pos = raw.size();
-                std::string line = raw.substr(start, pos - start);
-                if (!line.empty()) motdLines.push_back(line);
-                start = pos + 1;
-                if (pos == raw.size()) break;
-            }
-        }
-        if (motdLines.empty()) {
-            motdLines.push_back("Wowee Single Player");
-        }
-        gameHandler->simulateMotd(motdLines);
-    }
-    LOG_INFO("Single-player mode started - press F1 for performance HUD");
-}
-
-void Application::teleportTo(int presetIndex) {
-    // Guard: only in single-player + IN_GAME state
-    if (!singlePlayerMode || state != AppState::IN_GAME) return;
-    if (presetIndex < 0 || presetIndex >= SPAWN_PRESET_COUNT) return;
-
-    const auto& preset = SPAWN_PRESETS[presetIndex];
-    LOG_INFO("Teleporting to: ", preset.label);
-    spawnSnapToGround = preset.snapToGround;
-
-    // Convert canonical WoW → engine rendering coordinates (swap X/Y)
-    glm::vec3 spawnRender = core::coords::canonicalToRender(preset.spawnCanonical);
-
-    // Update camera default spawn
-    if (renderer && renderer->getCameraController()) {
-        renderer->getCameraController()->setDefaultSpawn(spawnRender, preset.yawDeg, preset.pitchDeg);
-    }
-
-    // Save current map's floor cache before unloading
-    if (renderer && renderer->getWMORenderer()) {
-        auto* wmo = renderer->getWMORenderer();
-        if (wmo->getFloorCacheSize() > 0) {
-            wmo->saveFloorCache();
-        }
-    }
-
-    // Unload all current terrain
-    if (renderer && renderer->getTerrainManager()) {
-        renderer->getTerrainManager()->unloadAll();
-    }
-
-    // Compute ADT path from canonical spawn coordinates
-    auto [tileX, tileY] = core::coords::canonicalToTile(preset.spawnCanonical.x, preset.spawnCanonical.y);
-    std::string mapName = preset.mapName;
-    std::string adtPath = "World\\Maps\\" + mapName + "\\" + mapName + "_" +
-                          std::to_string(tileX) + "_" + std::to_string(tileY) + ".adt";
-    LOG_INFO("Teleport ADT tile [", tileX, ",", tileY, "]");
-
-    // Set map name on terrain manager and WMO renderer
-    if (renderer && renderer->getTerrainManager()) {
-        renderer->getTerrainManager()->setMapName(mapName);
-    }
-    if (renderer && renderer->getWMORenderer()) {
-        renderer->getWMORenderer()->setMapName(mapName);
-    }
-
-    // Load the initial tile
-    bool terrainOk = false;
-    if (renderer && assetManager && assetManager->isInitialized()) {
-        terrainOk = renderer->loadTestTerrain(assetManager.get(), adtPath);
-    }
-
-    // Stream surrounding tiles
-    if (terrainOk && renderer->getTerrainManager() && renderer->getCamera()) {
-        auto* terrainMgr = renderer->getTerrainManager();
-        auto* camera = renderer->getCamera();
-
-        terrainMgr->update(*camera, 1.0f);
-
-        auto startTime = std::chrono::high_resolution_clock::now();
-        const float maxWaitSeconds = 8.0f;
-
-        while (terrainMgr->getRemainingTileCount() > 0) {
-            SDL_Event event;
-            while (SDL_PollEvent(&event)) {
-                if (event.type == SDL_QUIT) {
-                    window->setShouldClose(true);
-                    return;
-                }
-            }
-
-            terrainMgr->update(*camera, 0.016f);
-            terrainMgr->processAllReadyTiles();
-
-            auto elapsed = std::chrono::high_resolution_clock::now() - startTime;
-            if (std::chrono::duration<float>(elapsed).count() > maxWaitSeconds) {
-                LOG_WARNING("Teleport terrain streaming timeout after ", maxWaitSeconds, "s");
-                break;
-            }
-
-            SDL_Delay(16);
-        }
-
-        LOG_INFO("Teleport terrain streaming complete: ", terrainMgr->getLoadedTileCount(), " tiles loaded");
-
-        // Load zone-specific floor cache, or precompute if none exists
-        if (renderer->getWMORenderer()) {
-            renderer->getWMORenderer()->loadFloorCache();
-            if (renderer->getWMORenderer()->getFloorCacheSize() == 0) {
-                renderer->getWMORenderer()->precomputeFloorCache();
-            }
-        }
-    }
-
-    // Floor-snapping presets use camera reset. WMO-floor presets keep explicit Z.
-    if (spawnSnapToGround && renderer && renderer->getCameraController()) {
-        renderer->getCameraController()->reset();
-        renderer->getCameraController()->startIntroPan(2.8f, 140.0f);
-    }
-
-    if (!spawnSnapToGround && renderer) {
-        renderer->getCharacterPosition() = spawnRender;
-    }
-
-    // Sync final character position to game handler
-    if (renderer && gameHandler) {
-        glm::vec3 finalRender = renderer->getCharacterPosition();
-        glm::vec3 finalCanonical = core::coords::renderToCanonical(finalRender);
-        gameHandler->setPosition(finalCanonical.x, finalCanonical.y, finalCanonical.z);
-    }
-
-    // Rebuild nearby NPC set for the new location.
-    if (singlePlayerMode && gameHandler && renderer && renderer->getCharacterRenderer()) {
-        if (npcManager) {
-            npcManager->clear(renderer->getCharacterRenderer(), &gameHandler->getEntityManager());
-        }
-        npcsSpawned = false;
-        spawnNpcs();
-    }
-
-    LOG_INFO("Teleport to ", preset.label, " complete");
-}
 
 void Application::buildFactionHostilityMap(uint8_t playerRace) {
     if (!assetManager || !assetManager->isInitialized() || !gameHandler) return;

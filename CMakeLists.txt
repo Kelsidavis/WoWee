@@ -20,7 +20,6 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
-find_package(SQLite3 REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(FFMPEG REQUIRED libavformat libavcodec libswscale libavutil)
@@ -266,14 +265,6 @@ target_link_libraries(wowee PRIVATE
     Threads::Threads
     ZLIB::ZLIB
 )
-
-# SQLite
-if (TARGET SQLite::SQLite3)
-    target_link_libraries(wowee PRIVATE SQLite::SQLite3)
-else()
-    target_include_directories(wowee PRIVATE ${SQLite3_INCLUDE_DIRS})
-    target_link_libraries(wowee PRIVATE ${SQLite3_LIBRARIES})
-endif()
 
 target_link_libraries(wowee PRIVATE ${FFMPEG_LIBRARIES})
 if (FFMPEG_LIBRARY_DIRS)

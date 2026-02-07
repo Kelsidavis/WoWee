@@ -371,8 +371,7 @@ void InventoryScreen::pickupFromEquipment(game::Inventory& inv, game::EquipSlot 
 
 void InventoryScreen::placeInBackpack(game::Inventory& inv, int index) {
     if (!holdingItem) return;
-    if (gameHandler_ && !gameHandler_->isSinglePlayerMode() &&
-        heldSource == HeldSource::EQUIPMENT) {
+    if (gameHandler_ && heldSource == HeldSource::EQUIPMENT) {
         // Online mode: avoid client-side unequip; wait for server update.
         cancelPickup(inv);
         return;
@@ -394,7 +393,7 @@ void InventoryScreen::placeInBackpack(game::Inventory& inv, int index) {
 
 void InventoryScreen::placeInEquipment(game::Inventory& inv, game::EquipSlot slot) {
     if (!holdingItem) return;
-    if (gameHandler_ && !gameHandler_->isSinglePlayerMode()) {
+    if (gameHandler_) {
         if (heldSource == HeldSource::BACKPACK && heldBackpackIndex >= 0) {
             // Online mode: request server auto-equip and keep local state intact.
             gameHandler_->autoEquipItemBySlot(heldBackpackIndex);
@@ -1101,43 +1100,13 @@ void InventoryScreen::renderItemSlot(game::Inventory& inventory, const game::Ite
                     inventoryDirty = true;
                 }
             } else if (kind == SlotKind::BACKPACK && backpackIndex >= 0) {
-                if (gameHandler_ && !gameHandler_->isSinglePlayerMode()) {
+                if (gameHandler_) {
                     if (item.inventoryType > 0) {
                         // Auto-equip (online)
                         gameHandler_->autoEquipItemBySlot(backpackIndex);
                     } else {
                         // Use consumable (online)
                         gameHandler_->useItemBySlot(backpackIndex);
-                    }
-                } else if (item.inventoryType > 0 || item.armor > 0 ||
-                           !item.subclassName.empty()) {
-                    // Auto-equip (single-player)
-                    uint8_t equippingType = item.inventoryType;
-                    game::EquipSlot targetSlot = getEquipSlotForType(equippingType, inventory);
-                    if (targetSlot != game::EquipSlot::NUM_SLOTS) {
-                        const auto& eqSlot = inventory.getEquipSlot(targetSlot);
-                        if (eqSlot.empty()) {
-                            inventory.setEquipSlot(targetSlot, item);
-                            inventory.clearBackpackSlot(backpackIndex);
-                        } else {
-                            game::ItemDef equippedItem = eqSlot.item;
-                            inventory.setEquipSlot(targetSlot, item);
-                            inventory.setBackpackSlot(backpackIndex, equippedItem);
-                        }
-                        if (targetSlot == game::EquipSlot::MAIN_HAND && equippingType == 17) {
-                            const auto& offHand = inventory.getEquipSlot(game::EquipSlot::OFF_HAND);
-                            if (!offHand.empty()) {
-                                inventory.addItem(offHand.item);
-                                inventory.clearEquipSlot(game::EquipSlot::OFF_HAND);
-                            }
-                        }
-                        if (targetSlot == game::EquipSlot::OFF_HAND &&
-                            inventory.getEquipSlot(game::EquipSlot::MAIN_HAND).item.inventoryType == 17) {
-                            inventory.addItem(inventory.getEquipSlot(game::EquipSlot::MAIN_HAND).item);
-                            inventory.clearEquipSlot(game::EquipSlot::MAIN_HAND);
-                        }
-                        equipmentDirty = true;
-                        inventoryDirty = true;
                     }
                 }
             }

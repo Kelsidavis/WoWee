@@ -214,21 +214,6 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
     ImGui::Separator();
     ImGui::Spacing();
 
-    // Single-player mode button
-    ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Single-Player Mode");
-    ImGui::TextWrapped("Skip server connection and play offline with local rendering.");
-
-    if (ImGui::Button("Start Single Player", ImVec2(240, 30))) {
-        // Call single-player callback
-        if (onSinglePlayer) {
-            onSinglePlayer();
-        }
-    }
-
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
     // Info text
     ImGui::TextWrapped("Enter your account credentials to connect to the authentication server.");
     ImGui::TextWrapped("Default port is 3724.");

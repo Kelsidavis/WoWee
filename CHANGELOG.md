@@ -4,6 +4,9 @@ All notable changes to the Wowee project are documented here.
 
 ## Recent Development (2024-2026)
 
+### Architecture Changes
+- **Removed single-player mode**: Removed offline/single-player functionality to focus exclusively on multiplayer. This includes removal of SQLite persistence, local combat simulation, and all single-player UI elements.
+
 ### Quest System
 - **Quest markers**: Added ! (quest available) and ? (quest complete) markers above NPCs
 - **Minimap integration**: Quest markers now appear on minimap for easy navigation

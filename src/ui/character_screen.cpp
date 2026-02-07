@@ -154,10 +154,8 @@ void CharacterScreen::render(game::GameHandler& gameHandler) {
                 ss << "Entering world with " << character.name << "...";
                 setStatus(ss.str());
 
-                // Only send CMSG_PLAYER_LOGIN in online mode
-                if (!gameHandler.isSinglePlayerMode()) {
-                    gameHandler.selectCharacter(character.guid);
-                }
+                // Send CMSG_PLAYER_LOGIN to server
+                gameHandler.selectCharacter(character.guid);
 
                 // Call callback
                 if (onCharacterSelected) {

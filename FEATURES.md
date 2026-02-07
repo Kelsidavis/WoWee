@@ -9,7 +9,6 @@ A comprehensive overview of all implemented features in Wowee, the native C++ Wo
 - [Network & Authentication](#network--authentication)
 - [Asset Pipeline](#asset-pipeline)
 - [Audio Features](#audio-features)
-- [Single-Player Mode](#single-player-mode)
 - [Developer Tools](#developer-tools)
 
 ---
@@ -233,7 +232,6 @@ A comprehensive overview of all implemented features in Wowee, the native C++ Wo
 - ✅ Password input field (masked)
 - ✅ Server address input
 - ✅ Login button
-- ✅ Single Player button (offline mode)
 - ✅ Connection status display
 - ✅ Error message display
 
@@ -516,32 +514,6 @@ A comprehensive overview of all implemented features in Wowee, the native C++ Wo
 - ✅ Multiple audio channels
 - ✅ Volume control (TODO - settings screen)
 - ✅ 3D positional audio (TODO)
-
----
-
-## Single-Player Mode
-
-### Offline Gameplay
-- ✅ Play without server connection
-- ✅ Local character creation
-- ✅ Local character selection
-- ✅ Character persistence (SQLite)
-- ✅ Settings persistence
-
-### Simulated Systems
-- ✅ Simulated combat
-- ✅ Simulated XP gain
-- ✅ Local inventory management
-- ✅ Local spell casting
-- ✅ Simulated loot (TODO)
-- ✅ Simulated quests (TODO)
-
-### Local Storage
-- ✅ SQLite database for character data
-- ✅ Character appearance and stats
-- ✅ Inventory and equipment
-- ✅ Known spells
-- ✅ Settings and preferences
 
 ---
 

@@ -27,10 +27,6 @@ public:
      */
     void setOnSuccess(std::function<void()> callback) { onSuccess = callback; }
 
-    /**
-     * Set callback for single-player mode
-     */
-    void setOnSinglePlayer(std::function<void()> callback) { onSinglePlayer = callback; }
 
     /**
      * Check if authentication is in progress
@@ -67,7 +63,6 @@ private:
 
     // Callbacks
     std::function<void()> onSuccess;
-    std::function<void()> onSinglePlayer;
 
     /**
      * Attempt authentication

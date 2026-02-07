@@ -189,22 +189,6 @@ public:
     // Money (copper)
     uint64_t getMoneyCopper() const { return playerMoneyCopper_; }
 
-    // Single-player: mark character list ready for selection UI
-    void setSinglePlayerCharListReady();
-    struct SinglePlayerSettings {
-        bool fullscreen = false;
-        bool vsync = true;
-        bool shadows = true;
-        int resWidth = 1920;
-        int resHeight = 1080;
-        int musicVolume = 30;
-        int sfxVolume = 100;
-        float mouseSensitivity = 0.2f;
-        bool invertMouse = false;
-    };
-    bool getSinglePlayerSettings(SinglePlayerSettings& out) const;
-    void setSinglePlayerSettings(const SinglePlayerSettings& settings);
-
     // Inventory
     Inventory& getInventory() { return inventory; }
     const Inventory& getInventory() const { return inventory; }
@@ -252,53 +236,17 @@ public:
     const std::vector<AuraSlot>& getPlayerAuras() const { return playerAuras; }
     const std::vector<AuraSlot>& getTargetAuras() const { return targetAuras; }
 
-    // Single-player mode
-    void setSinglePlayerMode(bool sp) { singlePlayerMode_ = sp; }
-    bool isSinglePlayerMode() const { return singlePlayerMode_; }
-    void simulateMotd(const std::vector<std::string>& lines);
-    void applySinglePlayerStartData(Race race, Class cls);
-    bool loadSinglePlayerCharacterState(uint64_t guid);
-    void notifyInventoryChanged();
-    void notifyEquipmentChanged();
-    void notifyQuestStateChanged();
-    void flushSinglePlayerSave();
-
-    // NPC death callback (single-player)
-    using NpcDeathCallback = std::function<void(uint64_t guid)>;
-    void setNpcDeathCallback(NpcDeathCallback cb) { npcDeathCallback_ = std::move(cb); }
-
-    // NPC respawn callback (health 0 → >0, resets animation to idle)
-    using NpcRespawnCallback = std::function<void(uint64_t guid)>;
-    void setNpcRespawnCallback(NpcRespawnCallback cb) { npcRespawnCallback_ = std::move(cb); }
-
     // Melee swing callback (for driving animation/SFX)
     using MeleeSwingCallback = std::function<void()>;
     void setMeleeSwingCallback(MeleeSwingCallback cb) { meleeSwingCallback_ = std::move(cb); }
-
-    // NPC swing callback (single-player combat: plays attack animation on NPC)
-    using NpcSwingCallback = std::function<void(uint64_t guid)>;
-    void setNpcSwingCallback(NpcSwingCallback cb) { npcSwingCallback_ = std::move(cb); }
-
-    // Local player stats (single-player)
-    uint32_t getLocalPlayerHealth() const { return localPlayerHealth_; }
-    uint32_t getLocalPlayerMaxHealth() const { return localPlayerMaxHealth_; }
-    void initLocalPlayerStats(uint32_t level, uint32_t hp, uint32_t maxHp) {
-        localPlayerLevel_ = level;
-        localPlayerHealth_ = hp;
-        localPlayerMaxHealth_ = maxHp;
-        playerNextLevelXp_ = xpForLevel(level);
         playerXp_ = 0;
     }
 
     // XP tracking (works in both single-player and server modes)
     uint32_t getPlayerXp() const { return playerXp_; }
     uint32_t getPlayerNextLevelXp() const { return playerNextLevelXp_; }
-    uint32_t getPlayerLevel() const { return singlePlayerMode_ ? localPlayerLevel_ : serverPlayerLevel_; }
+    uint32_t getPlayerLevel() const { return serverPlayerLevel_; }
     static uint32_t killXp(uint32_t playerLevel, uint32_t victimLevel);
-
-    // Hearthstone callback (single-player teleport)
-    using HearthstoneCallback = std::function<void()>;
-    void setHearthstoneCallback(HearthstoneCallback cb) { hearthstoneCallback = std::move(cb); }
 
     // World entry callback (online mode - triggered when entering world)
     // Parameters: mapId, x, y, z (canonical WoW coordinates)
@@ -406,8 +354,6 @@ public:
         auto it = itemInfoCache_.find(itemId);
         return (it != itemInfoCache_.end()) ? &it->second : nullptr;
     }
-    std::string getItemTemplateName(uint32_t itemId) const;
-    ItemQuality getItemTemplateQuality(uint32_t itemId) const;
     uint64_t getBackpackItemGuid(int index) const {
         if (index < 0 || index >= static_cast<int>(backpackSlotGuids_.size())) return 0;
         return backpackSlotGuids_[index];
@@ -426,16 +372,6 @@ public:
      * @param deltaTime Time since last update in seconds
      */
     void update(float deltaTime);
-
-    struct SinglePlayerCreateInfo {
-        uint32_t mapId = 0;
-        uint32_t zoneId = 0;
-        float x = 0.0f;
-        float y = 0.0f;
-        float z = 0.0f;
-        float orientation = 0.0f;
-    };
-    bool getSinglePlayerCreateInfo(Race race, Class cls, SinglePlayerCreateInfo& out) const;
 
 private:
     /**
@@ -552,11 +488,6 @@ private:
     void handleQuestRequestItems(network::Packet& packet);
     void handleQuestOfferReward(network::Packet& packet);
     void handleListInventory(network::Packet& packet);
-    LootResponseData generateLocalLoot(uint64_t guid);
-    void simulateLootResponse(const LootResponseData& data);
-    void simulateLootRelease();
-    void simulateLootRemove(uint8_t slotIndex);
-    void simulateXpGain(uint64_t victimGuid, uint32_t totalXp);
     void addMoneyCopper(uint32_t amount);
 
     void addCombatText(CombatTextEntry::Type type, int32_t amount, uint32_t spellId, bool isPlayerSource);
@@ -661,7 +592,6 @@ private:
     std::vector<CombatTextEntry> combatText;
 
     // ---- Phase 3: Spells ----
-    HearthstoneCallback hearthstoneCallback;
     WorldEntryCallback worldEntryCallback_;
     CreatureSpawnCallback creatureSpawnCallback_;
     CreatureDespawnCallback creatureDespawnCallback_;
@@ -739,69 +669,10 @@ private:
     uint32_t playerXp_ = 0;
     uint32_t playerNextLevelXp_ = 0;
     uint32_t serverPlayerLevel_ = 1;
-    void awardLocalXp(uint64_t victimGuid, uint32_t victimLevel);
-    void levelUp();
     static uint32_t xpForLevel(uint32_t level);
 
-    // ---- Single-player combat ----
-    bool singlePlayerMode_ = false;
-    float swingTimer_ = 0.0f;
-    static constexpr float SWING_SPEED = 2.0f;
-    NpcDeathCallback npcDeathCallback_;
-    NpcRespawnCallback npcRespawnCallback_;
     MeleeSwingCallback meleeSwingCallback_;
-    NpcSwingCallback npcSwingCallback_;
-    uint32_t localPlayerHealth_ = 0;
-    uint32_t localPlayerMaxHealth_ = 0;
-    uint32_t localPlayerLevel_ = 1;
     bool playerDead_ = false;
-
-    struct NpcAggroEntry {
-        uint64_t guid;
-        float swingTimer;
-    };
-    std::vector<NpcAggroEntry> aggroList_;
-
-    void updateLocalCombat(float deltaTime);
-    void updateNpcAggro(float deltaTime);
-    void performPlayerSwing();
-    void performNpcSwing(uint64_t guid);
-    void handleNpcDeath(uint64_t guid);
-    void aggroNpc(uint64_t guid);
-    bool isNpcAggroed(uint64_t guid) const;
-
-    // ---- Single-player persistence ----
-    enum SinglePlayerDirty : uint32_t {
-        SP_DIRTY_NONE       = 0,
-        SP_DIRTY_CHAR       = 1 << 0,
-        SP_DIRTY_INVENTORY  = 1 << 1,
-        SP_DIRTY_SPELLS     = 1 << 2,
-        SP_DIRTY_ACTIONBAR  = 1 << 3,
-        SP_DIRTY_AURAS      = 1 << 4,
-        SP_DIRTY_QUESTS     = 1 << 5,
-        SP_DIRTY_MONEY      = 1 << 6,
-        SP_DIRTY_XP         = 1 << 7,
-        SP_DIRTY_POSITION   = 1 << 8,
-        SP_DIRTY_STATS      = 1 << 9,
-        SP_DIRTY_SETTINGS   = 1 << 10,
-        SP_DIRTY_ALL        = 0xFFFFFFFFu
-    };
-    void markSinglePlayerDirty(uint32_t flags, bool highPriority);
-    void loadSinglePlayerCharacters();
-    void saveSinglePlayerCharacterState(bool force);
-
-    uint32_t spDirtyFlags_ = SP_DIRTY_NONE;
-    bool spDirtyHighPriority_ = false;
-    float spDirtyTimer_ = 0.0f;
-    float spPeriodicTimer_ = 0.0f;
-    float spLastDirtyX_ = 0.0f;
-    float spLastDirtyY_ = 0.0f;
-    float spLastDirtyZ_ = 0.0f;
-    float spLastDirtyOrientation_ = 0.0f;
-    std::unordered_map<uint64_t, bool> spHasState_;
-    std::unordered_map<uint64_t, float> spSavedOrientation_;
-    SinglePlayerSettings spSettings_{};
-    bool spSettingsLoaded_ = false;
 };
 
 } // namespace game
