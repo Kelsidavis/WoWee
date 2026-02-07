@@ -1928,6 +1928,11 @@ network::Packet AutoEquipItemPacket::build(uint8_t srcBag, uint8_t srcSlot) {
     return packet;
 }
 
+network::Packet LootMoneyPacket::build() {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_LOOT_MONEY));
+    return packet;
+}
+
 network::Packet LootReleasePacket::build(uint64_t lootGuid) {
     network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_LOOT_RELEASE));
     packet.writeUInt64(lootGuid);

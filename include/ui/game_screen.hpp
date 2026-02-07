@@ -171,6 +171,10 @@ private:
     std::unordered_map<uint32_t, uint32_t> spellIconIds_;
     bool spellIconDbLoaded_ = false;
     GLuint getSpellIcon(uint32_t spellId, pipeline::AssetManager* am);
+
+    // Action bar drag state (-1 = not dragging)
+    int actionBarDragSlot_ = -1;
+    GLuint actionBarDragIcon_ = 0;
 };
 
 } // namespace ui

@@ -1137,6 +1137,12 @@ public:
     static network::Packet build(uint8_t srcBag, uint8_t srcSlot);
 };
 
+/** CMSG_LOOT_MONEY packet builder (empty body) */
+class LootMoneyPacket {
+public:
+    static network::Packet build();
+};
+
 /** CMSG_LOOT_RELEASE packet builder */
 class LootReleasePacket {
 public:

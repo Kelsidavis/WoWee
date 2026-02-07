@@ -4164,13 +4164,13 @@ void GameHandler::handleLootResponse(network::Packet& packet) {
     if (currentLoot.gold > 0) {
         if (singlePlayerMode_) {
             addMoneyCopper(currentLoot.gold);
+            currentLoot.gold = 0;
+        } else if (state == WorldState::IN_WORLD && socket) {
+            // Auto-loot gold by sending CMSG_LOOT_MONEY (server handles the rest)
+            auto pkt = LootMoneyPacket::build();
+            socket->send(pkt);
+            currentLoot.gold = 0;
         }
-        std::string msg = "You loot ";
-        msg += std::to_string(currentLoot.getGold()) + "g ";
-        msg += std::to_string(currentLoot.getSilver()) + "s ";
-        msg += std::to_string(currentLoot.getCopper()) + "c.";
-        addSystemChatMessage(msg);
-        currentLoot.gold = 0;  // Clear gold from loot window after collecting
     }
 }
 

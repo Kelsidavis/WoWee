@@ -1505,6 +1505,22 @@ void GameScreen::renderActionBar(game::GameHandler& gameHandler) {
                 const auto& held = inventoryScreen.getHeldItem();
                 gameHandler.setActionBarSlot(i, game::ActionBarSlot::ITEM, held.itemId);
                 inventoryScreen.returnHeldItem(gameHandler.getInventory());
+            } else if (clicked && actionBarDragSlot_ >= 0) {
+                // Dropping a dragged action bar slot onto another slot - swap or place
+                if (i != actionBarDragSlot_) {
+                    // Swap the two slots
+                    const auto& dragSrc = bar[actionBarDragSlot_];
+                    auto srcType = dragSrc.type;
+                    auto srcId = dragSrc.id;
+                    gameHandler.setActionBarSlot(actionBarDragSlot_, slot.type, slot.id);
+                    gameHandler.setActionBarSlot(i, srcType, srcId);
+                }
+                actionBarDragSlot_ = -1;
+                actionBarDragIcon_ = 0;
+            } else if (clicked && !slot.isEmpty()) {
+                // Pick up this action bar slot for dragging
+                actionBarDragSlot_ = i;
+                actionBarDragIcon_ = iconTex;
             } else if (clicked) {
                 if (slot.type == game::ActionBarSlot::SPELL && slot.isReady()) {
                     uint64_t target = gameHandler.hasTarget() ? gameHandler.getTargetGuid() : 0;
@@ -1512,11 +1528,6 @@ void GameScreen::renderActionBar(game::GameHandler& gameHandler) {
                 } else if (slot.type == game::ActionBarSlot::ITEM && slot.id != 0) {
                     gameHandler.useItemById(slot.id);
                 }
-            }
-
-            // Right-click to clear slot
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && !slot.isEmpty()) {
-                gameHandler.setActionBarSlot(i, game::ActionBarSlot::EMPTY, 0);
             }
 
             // Tooltip
@@ -1533,7 +1544,6 @@ void GameScreen::renderActionBar(game::GameHandler& gameHandler) {
                 } else {
                     ImGui::Text("Item #%u", slot.id);
                 }
-                ImGui::TextDisabled("(Right-click to remove)");
                 ImGui::EndTooltip();
             }
 
@@ -1567,6 +1577,36 @@ void GameScreen::renderActionBar(game::GameHandler& gameHandler) {
 
     ImGui::PopStyleColor();
     ImGui::PopStyleVar();
+
+    // Handle action bar drag: render icon at cursor and detect drop outside
+    if (actionBarDragSlot_ >= 0) {
+        ImVec2 mousePos = ImGui::GetMousePos();
+
+        // Draw dragged icon at cursor
+        if (actionBarDragIcon_) {
+            ImGui::GetForegroundDrawList()->AddImage(
+                (ImTextureID)(uintptr_t)actionBarDragIcon_,
+                ImVec2(mousePos.x - 20, mousePos.y - 20),
+                ImVec2(mousePos.x + 20, mousePos.y + 20));
+        } else {
+            ImGui::GetForegroundDrawList()->AddRectFilled(
+                ImVec2(mousePos.x - 20, mousePos.y - 20),
+                ImVec2(mousePos.x + 20, mousePos.y + 20),
+                IM_COL32(80, 80, 120, 180));
+        }
+
+        // On mouse release, check if outside the action bar area
+        if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+            bool insideBar = (mousePos.x >= barX && mousePos.x <= barX + barW &&
+                              mousePos.y >= barY && mousePos.y <= barY + barH);
+            if (!insideBar) {
+                // Dropped outside - clear the slot
+                gameHandler.setActionBarSlot(actionBarDragSlot_, game::ActionBarSlot::EMPTY, 0);
+            }
+            actionBarDragSlot_ = -1;
+            actionBarDragIcon_ = 0;
+        }
+    }
 }
 
 // ============================================================
