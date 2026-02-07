@@ -628,9 +628,6 @@ void InventoryScreen::render(game::Inventory& inventory, uint64_t moneyCopper) {
             heldItem = game::ItemDef{};
             heldSource = HeldSource::NONE;
             inventoryDirty = true;
-            if (gameHandler_) {
-                gameHandler_->notifyInventoryChanged();
-            }
             dropItemName_.clear();
             ImGui::CloseCurrentPopup();
         }

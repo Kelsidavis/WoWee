@@ -2051,14 +2051,7 @@ void GameHandler::handleSpellHealLog(network::Packet& packet) {
 // ============================================================
 
 void GameHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
-    // Hearthstone (8690) — handle locally when no server connection (single-player)
-    if (spellId == 8690 && hearthstoneCallback) {
-        LOG_INFO("Hearthstone: teleporting home");
-        hearthstoneCallback();
-        return;
-    }
-
-    // Attack (6603) routes to auto-attack instead of cast (works without server)
+    // Attack (6603) routes to auto-attack instead of cast
     if (spellId == 6603) {
         uint64_t target = targetGuid != 0 ? targetGuid : this->targetGuid;
         if (target != 0) {

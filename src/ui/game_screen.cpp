@@ -154,15 +154,10 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // Character screen (C key toggle handled inside render())
     inventoryScreen.renderCharacterScreen(gameHandler);
 
-    if (inventoryScreen.consumeInventoryDirty()) {
-        gameHandler.notifyInventoryChanged();
-    }
-
     if (inventoryScreen.consumeEquipmentDirty() || gameHandler.consumeOnlineEquipmentDirty()) {
         updateCharacterGeosets(gameHandler.getInventory());
         updateCharacterTextures(gameHandler.getInventory());
         core::Application::getInstance().loadEquippedWeapons();
-        gameHandler.notifyEquipmentChanged();
         inventoryScreen.markPreviewDirty();
         // Update renderer weapon type for animation selection
         auto* r = core::Application::getInstance().getRenderer();
@@ -2017,14 +2012,7 @@ void GameScreen::renderLootWindow(game::GameHandler& gameHandler) {
                 itemName = info->name;
                 quality = static_cast<game::ItemQuality>(info->quality);
             } else {
-                // Fallback: look up name from item template DB (single-player)
-                auto tplName = gameHandler.getItemTemplateName(item.itemId);
-                if (!tplName.empty()) {
-                    itemName = tplName;
-                    quality = gameHandler.getItemTemplateQuality(item.itemId);
-                } else {
-                    itemName = "Item #" + std::to_string(item.itemId);
-                }
+                itemName = "Item #" + std::to_string(item.itemId);
             }
             ImVec4 qColor = InventoryScreen::getQualityColor(quality);
 

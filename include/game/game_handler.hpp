@@ -236,13 +236,23 @@ public:
     const std::vector<AuraSlot>& getPlayerAuras() const { return playerAuras; }
     const std::vector<AuraSlot>& getTargetAuras() const { return targetAuras; }
 
+    // NPC death callback (for animations)
+    using NpcDeathCallback = std::function<void(uint64_t guid)>;
+    void setNpcDeathCallback(NpcDeathCallback cb) { npcDeathCallback_ = std::move(cb); }
+
+    // NPC respawn callback (health 0 → >0, resets animation to idle)
+    using NpcRespawnCallback = std::function<void(uint64_t guid)>;
+    void setNpcRespawnCallback(NpcRespawnCallback cb) { npcRespawnCallback_ = std::move(cb); }
+
     // Melee swing callback (for driving animation/SFX)
     using MeleeSwingCallback = std::function<void()>;
     void setMeleeSwingCallback(MeleeSwingCallback cb) { meleeSwingCallback_ = std::move(cb); }
-        playerXp_ = 0;
-    }
 
-    // XP tracking (works in both single-player and server modes)
+    // NPC swing callback (plays attack animation on NPC)
+    using NpcSwingCallback = std::function<void(uint64_t guid)>;
+    void setNpcSwingCallback(NpcSwingCallback cb) { npcSwingCallback_ = std::move(cb); }
+
+    // XP tracking
     uint32_t getPlayerXp() const { return playerXp_; }
     uint32_t getPlayerNextLevelXp() const { return playerNextLevelXp_; }
     uint32_t getPlayerLevel() const { return serverPlayerLevel_; }
@@ -671,7 +681,10 @@ private:
     uint32_t serverPlayerLevel_ = 1;
     static uint32_t xpForLevel(uint32_t level);
 
+    NpcDeathCallback npcDeathCallback_;
+    NpcRespawnCallback npcRespawnCallback_;
     MeleeSwingCallback meleeSwingCallback_;
+    NpcSwingCallback npcSwingCallback_;
     bool playerDead_ = false;
 };
 
