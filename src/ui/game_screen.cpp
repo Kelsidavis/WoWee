@@ -1150,6 +1150,34 @@ void GameScreen::sendChatMessage(game::GameHandler& gameHandler) {
                 return;
             }
 
+            // /helm command
+            if (cmdLower == "helm" || cmdLower == "helmet" || cmdLower == "showhelm") {
+                gameHandler.toggleHelm();
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /cloak command
+            if (cmdLower == "cloak" || cmdLower == "showcloak") {
+                gameHandler.toggleCloak();
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /follow command
+            if (cmdLower == "follow" || cmdLower == "f") {
+                gameHandler.followTarget();
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /assist command
+            if (cmdLower == "assist") {
+                gameHandler.assistTarget();
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
             // Chat channel slash commands
             bool isChannelCommand = false;
             if (cmdLower == "s" || cmdLower == "say") {

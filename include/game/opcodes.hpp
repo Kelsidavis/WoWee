@@ -81,6 +81,10 @@ enum class Opcode : uint16_t {
     // ---- Stand State ----
     CMSG_STAND_STATE_CHANGE          = 0x101,
 
+    // ---- Display Toggles ----
+    CMSG_SHOWING_HELM                = 0x2B9,
+    CMSG_SHOWING_CLOAK               = 0x2BA,
+
     // ---- Random Roll ----
     MSG_RANDOM_ROLL                  = 0x1FB,
 

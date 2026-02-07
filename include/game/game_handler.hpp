@@ -227,6 +227,14 @@ public:
     // Stand state
     void setStandState(uint8_t state);  // 0=stand, 1=sit, 2=sit_chair, 3=sleep, 4=sit_low_chair, 5=sit_medium_chair, 6=sit_high_chair, 7=dead, 8=kneel, 9=submerged
 
+    // Display toggles
+    void toggleHelm();
+    void toggleCloak();
+
+    // Follow/Assist
+    void followTarget();
+    void assistTarget();
+
     // ---- Phase 1: Name queries ----
     void queryPlayerName(uint64_t guid);
     void queryCreatureInfo(uint32_t entry, uint64_t guid);
@@ -625,6 +633,13 @@ private:
 
     // ---- Logout state ----
     bool loggingOut_ = false;
+
+    // ---- Display state ----
+    bool helmVisible_ = true;
+    bool cloakVisible_ = true;
+
+    // ---- Follow state ----
+    uint64_t followTargetGuid_ = 0;
 
     // ---- Online item tracking ----
     struct OnlineItemInfo {

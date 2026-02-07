@@ -787,6 +787,22 @@ public:
 };
 
 // ============================================================
+// Display Toggles
+// ============================================================
+
+/** CMSG_SHOWING_HELM packet builder */
+class ShowingHelmPacket {
+public:
+    static network::Packet build(bool show);
+};
+
+/** CMSG_SHOWING_CLOAK packet builder */
+class ShowingCloakPacket {
+public:
+    static network::Packet build(bool show);
+};
+
+// ============================================================
 // Random Roll
 // ============================================================
 

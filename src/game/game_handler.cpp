@@ -1776,6 +1776,123 @@ void GameHandler::setStandState(uint8_t standState) {
     LOG_INFO("Changed stand state to: ", (int)standState);
 }
 
+void GameHandler::toggleHelm() {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot toggle helm: not in world or not connected");
+        return;
+    }
+
+    helmVisible_ = !helmVisible_;
+    auto packet = ShowingHelmPacket::build(helmVisible_);
+    socket->send(packet);
+    addSystemChatMessage(helmVisible_ ? "Helm is now visible." : "Helm is now hidden.");
+    LOG_INFO("Helm visibility toggled: ", helmVisible_);
+}
+
+void GameHandler::toggleCloak() {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot toggle cloak: not in world or not connected");
+        return;
+    }
+
+    cloakVisible_ = !cloakVisible_;
+    auto packet = ShowingCloakPacket::build(cloakVisible_);
+    socket->send(packet);
+    addSystemChatMessage(cloakVisible_ ? "Cloak is now visible." : "Cloak is now hidden.");
+    LOG_INFO("Cloak visibility toggled: ", cloakVisible_);
+}
+
+void GameHandler::followTarget() {
+    if (state != WorldState::IN_WORLD) {
+        LOG_WARNING("Cannot follow: not in world");
+        return;
+    }
+
+    if (targetGuid == 0) {
+        addSystemChatMessage("You must target someone to follow.");
+        return;
+    }
+
+    auto target = getTarget();
+    if (!target) {
+        addSystemChatMessage("Invalid target.");
+        return;
+    }
+
+    // Set follow target
+    followTargetGuid_ = targetGuid;
+
+    // Get target name
+    std::string targetName = "Target";
+    if (target->getType() == ObjectType::PLAYER) {
+        auto player = std::static_pointer_cast<Player>(target);
+        if (!player->getName().empty()) {
+            targetName = player->getName();
+        }
+    } else if (target->getType() == ObjectType::UNIT) {
+        auto unit = std::static_pointer_cast<Unit>(target);
+        targetName = unit->getName();
+    }
+
+    addSystemChatMessage("Now following " + targetName + ".");
+    LOG_INFO("Following target: ", targetName, " (GUID: 0x", std::hex, targetGuid, std::dec, ")");
+}
+
+void GameHandler::assistTarget() {
+    if (state != WorldState::IN_WORLD) {
+        LOG_WARNING("Cannot assist: not in world");
+        return;
+    }
+
+    if (targetGuid == 0) {
+        addSystemChatMessage("You must target someone to assist.");
+        return;
+    }
+
+    auto target = getTarget();
+    if (!target) {
+        addSystemChatMessage("Invalid target.");
+        return;
+    }
+
+    // Get target name
+    std::string targetName = "Target";
+    if (target->getType() == ObjectType::PLAYER) {
+        auto player = std::static_pointer_cast<Player>(target);
+        if (!player->getName().empty()) {
+            targetName = player->getName();
+        }
+    } else if (target->getType() == ObjectType::UNIT) {
+        auto unit = std::static_pointer_cast<Unit>(target);
+        targetName = unit->getName();
+    }
+
+    // Try to read target GUID from update fields (UNIT_FIELD_TARGET)
+    // Field offset 6 is typically UNIT_FIELD_TARGET in 3.3.5a
+    uint64_t assistTargetGuid = 0;
+    const auto& fields = target->getFields();
+    auto it = fields.find(6);
+    if (it != fields.end()) {
+        // Low 32 bits
+        assistTargetGuid = it->second;
+        // Try to get high 32 bits from next field
+        auto it2 = fields.find(7);
+        if (it2 != fields.end()) {
+            assistTargetGuid |= (static_cast<uint64_t>(it2->second) << 32);
+        }
+    }
+
+    if (assistTargetGuid == 0) {
+        addSystemChatMessage(targetName + " has no target.");
+        LOG_INFO("Assist: ", targetName, " has no target");
+        return;
+    }
+
+    // Set our target to their target
+    setTarget(assistTargetGuid);
+    LOG_INFO("Assisting ", targetName, ", now targeting GUID: 0x", std::hex, assistTargetGuid, std::dec);
+}
+
 void GameHandler::releaseSpirit() {
     if (!playerDead_) return;
     if (socket && state == WorldState::IN_WORLD) {

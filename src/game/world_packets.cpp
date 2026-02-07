@@ -1317,6 +1317,24 @@ network::Packet StandStateChangePacket::build(uint8_t state) {
 }
 
 // ============================================================
+// Display Toggles
+// ============================================================
+
+network::Packet ShowingHelmPacket::build(bool show) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_SHOWING_HELM));
+    packet.writeUInt8(show ? 1 : 0);
+    LOG_DEBUG("Built CMSG_SHOWING_HELM: show=", show);
+    return packet;
+}
+
+network::Packet ShowingCloakPacket::build(bool show) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_SHOWING_CLOAK));
+    packet.writeUInt8(show ? 1 : 0);
+    LOG_DEBUG("Built CMSG_SHOWING_CLOAK: show=", show);
+    return packet;
+}
+
+// ============================================================
 // Random Roll
 // ============================================================
 
