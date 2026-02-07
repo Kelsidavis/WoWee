@@ -875,10 +875,12 @@ void Application::spawnPlayerCharacter() {
                     for (auto& tex : model.textures) {
                         if (tex.type == 1 && tex.filename.empty()) {
                             tex.filename = bodySkinPath;
-                        } else if (tex.type == 6 && tex.filename.empty()) {
-                            tex.filename = hairTexturePath.empty()
-                                ? "Character\\Human\\Hair00_00.blp"
-                                : hairTexturePath;
+                        } else if (tex.type == 6) {
+                            if (!hairTexturePath.empty()) {
+                                tex.filename = hairTexturePath;
+                            } else if (tex.filename.empty()) {
+                                tex.filename = "Character\\Human\\Hair00_00.blp";
+                            }
                         } else if (tex.type == 8 && tex.filename.empty()) {
                             if (!underwearPaths.empty()) {
                                 tex.filename = underwearPaths[0];

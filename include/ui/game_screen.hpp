@@ -7,6 +7,7 @@
 #include "ui/inventory_screen.hpp"
 #include "ui/quest_log_screen.hpp"
 #include "ui/spellbook_screen.hpp"
+#include "ui/talent_screen.hpp"
 #include <GL/glew.h>
 #include <imgui.h>
 #include <string>
@@ -150,6 +151,7 @@ private:
     InventoryScreen inventoryScreen;
     QuestLogScreen questLogScreen;
     SpellbookScreen spellbookScreen;
+    TalentScreen talentScreen;
     rendering::WorldMap worldMap;
 
     bool actionSpellDbAttempted = false;

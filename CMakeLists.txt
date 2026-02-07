@@ -154,6 +154,7 @@ set(WOWEE_SOURCES
     src/ui/inventory_screen.cpp
     src/ui/quest_log_screen.cpp
     src/ui/spellbook_screen.cpp
+    src/ui/talent_screen.cpp
 
     # Main
     src/main.cpp
@@ -241,6 +242,7 @@ set(WOWEE_HEADERS
     include/ui/game_screen.hpp
     include/ui/inventory_screen.hpp
     include/ui/spellbook_screen.hpp
+    include/ui/talent_screen.hpp
 )
 
 # Create executable

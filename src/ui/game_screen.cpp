@@ -103,6 +103,9 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // Spellbook (P key toggle handled inside)
     spellbookScreen.render(gameHandler, core::Application::getInstance().getAssetManager());
 
+    // Talents (N key toggle handled inside)
+    talentScreen.render(gameHandler);
+
     // Set up inventory screen asset manager + player appearance (once)
     {
         static bool inventoryScreenInit = false;

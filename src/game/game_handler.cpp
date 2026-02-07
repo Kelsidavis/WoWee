@@ -45,6 +45,7 @@ struct ItemTemplateRow {
     uint8_t quality = 0;
     uint8_t inventoryType = 0;
     int32_t maxStack = 1;
+    uint32_t sellPrice = 0;
 };
 
 struct SinglePlayerLootDb {
@@ -500,6 +501,7 @@ static SinglePlayerLootDb& getSinglePlayerLootDb() {
         int idxQuality = columnIndex(cols, "Quality");
         int idxInvType = columnIndex(cols, "InventoryType");
         int idxStack = columnIndex(cols, "stackable");
+        int idxSellPrice = columnIndex(cols, "SellPrice");
         if (idxEntry >= 0 && std::filesystem::exists(itemTemplatePath)) {
             std::ifstream in(itemTemplatePath);
             processInsertStatements(in, [&](const std::vector<std::string>& row) {
@@ -522,6 +524,9 @@ static SinglePlayerLootDb& getSinglePlayerLootDb() {
                     if (idxStack >= 0 && idxStack < static_cast<int>(row.size())) {
                         ir.maxStack = static_cast<int32_t>(std::stol(row[idxStack]));
                         if (ir.maxStack <= 0) ir.maxStack = 1;
+                    }
+                    if (idxSellPrice >= 0 && idxSellPrice < static_cast<int>(row.size())) {
+                        ir.sellPrice = static_cast<uint32_t>(std::stoul(row[idxSellPrice]));
                     }
                     db.itemTemplates[ir.itemId] = std::move(ir);
                 } catch (const std::exception&) {
@@ -1858,6 +1863,7 @@ void GameHandler::applySinglePlayerStartData(Race race, Class cls) {
             def.quality = static_cast<ItemQuality>(itTpl->second.quality);
             def.inventoryType = itTpl->second.inventoryType;
             def.maxStack = std::max(def.maxStack, static_cast<uint32_t>(itTpl->second.maxStack));
+            def.sellPrice = itTpl->second.sellPrice;
         } else {
             def.name = "Item " + std::to_string(row.itemId);
         }
@@ -1915,15 +1921,7 @@ void GameHandler::applySinglePlayerStartData(Race race, Class cls) {
     }
 
     if (!hasActionRows) {
-        // Auto-populate action bar with known spells
-        int slot = 1;
-        for (uint32_t spellId : knownSpells) {
-            if (spellId == 6603 || spellId == 8690) continue;
-            if (slot >= 11) break;
-            actionBar[slot].type = ActionBarSlot::SPELL;
-            actionBar[slot].id = spellId;
-            slot++;
-        }
+        // Leave slots 1-10 empty; player assigns from spellbook
     }
 
     markSinglePlayerDirty(SP_DIRTY_INVENTORY | SP_DIRTY_SPELLS | SP_DIRTY_ACTIONBAR |
@@ -3365,18 +3363,11 @@ void GameHandler::handleInitialSpells(network::Packet& packet) {
         }
     }
 
-    // Auto-populate action bar: Attack in slot 1, Hearthstone in slot 12, rest filled with known spells
+    // Auto-populate action bar: Attack in slot 1, Hearthstone in slot 12
     actionBar[0].type = ActionBarSlot::SPELL;
     actionBar[0].id = 6603;  // Attack
     actionBar[11].type = ActionBarSlot::SPELL;
     actionBar[11].id = 8690;  // Hearthstone
-    int slot = 1;
-    for (int i = 0; i < static_cast<int>(knownSpells.size()) && slot < 11; ++i) {
-        if (knownSpells[i] == 6603 || knownSpells[i] == 8690) continue;
-        actionBar[slot].type = ActionBarSlot::SPELL;
-        actionBar[slot].id = knownSpells[i];
-        slot++;
-    }
 
     LOG_INFO("Learned ", knownSpells.size(), " spells");
 }
@@ -3610,6 +3601,10 @@ void GameHandler::lootTarget(uint64_t guid) {
             state.data = generateLocalLoot(guid);
             it = localLootState_.emplace(guid, std::move(state)).first;
         }
+        if (it->second.data.items.empty() && it->second.data.gold == 0) {
+            addSystemChatMessage("No loot.");
+            return;
+        }
         simulateLootResponse(it->second.data);
         return;
     }
@@ -3640,6 +3635,7 @@ void GameHandler::lootItem(uint8_t slotIndex) {
             def.quality = static_cast<ItemQuality>(itTpl->second.quality);
             def.inventoryType = itTpl->second.inventoryType;
             def.maxStack = std::max(def.maxStack, static_cast<uint32_t>(itTpl->second.maxStack));
+            def.sellPrice = itTpl->second.sellPrice;
         } else {
             def.name = "Item " + std::to_string(it->itemId);
         }
@@ -3801,11 +3797,13 @@ void GameHandler::sellItemBySlot(int backpackIndex) {
     if (slot.empty()) return;
 
     if (singlePlayerMode_) {
-        auto it = itemInfoCache_.find(slot.item.itemId);
-        if (it != itemInfoCache_.end() && it->second.sellPrice > 0) {
-            addMoneyCopper(it->second.sellPrice);
+        if (slot.item.sellPrice > 0) {
+            addMoneyCopper(slot.item.sellPrice);
             std::string msg = "You sold " + slot.item.name + ".";
             addSystemChatMessage(msg);
+        } else {
+            addSystemChatMessage("You can't sell " + slot.item.name + ".");
+            return;
         }
         inventory.clearBackpackSlot(backpackIndex);
         notifyInventoryChanged();

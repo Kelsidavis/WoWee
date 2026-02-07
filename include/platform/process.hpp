@@ -122,7 +122,18 @@ inline void killProcess(ProcessHandle& handle) {
     kill(-handle, SIGTERM);  // kill process group
     kill(handle, SIGTERM);
     int status = 0;
-    waitpid(handle, &status, 0);
+    // Non-blocking wait with SIGKILL fallback after ~200ms
+    for (int i = 0; i < 20; ++i) {
+        pid_t ret = waitpid(handle, &status, WNOHANG);
+        if (ret != 0) break;  // exited or error
+        usleep(10000);         // 10ms
+    }
+    // If still alive, force kill
+    if (waitpid(handle, &status, WNOHANG) == 0) {
+        kill(-handle, SIGKILL);
+        kill(handle, SIGKILL);
+        waitpid(handle, &status, 0);
+    }
 #endif
 
     handle = INVALID_PROCESS;

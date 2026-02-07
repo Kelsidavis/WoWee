@@ -126,6 +126,7 @@ private:
     game::EquipSlot getEquipSlotForType(uint8_t inventoryType, game::Inventory& inv);
     void renderHeldItem();
 
+public:
     static ImVec4 getQualityColor(game::ItemQuality quality);
 };
 
