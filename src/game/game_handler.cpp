@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cctype>
+#include <ctime>
 #include <random>
 #include <chrono>
 #include <filesystem>
@@ -283,6 +284,24 @@ void GameHandler::handlePacket(network::Packet& packet) {
             // Can be received after entering world
             if (state == WorldState::IN_WORLD) {
                 handleMessageChat(packet);
+            }
+            break;
+
+        case Opcode::SMSG_QUERY_TIME_RESPONSE:
+            if (state == WorldState::IN_WORLD) {
+                handleQueryTimeResponse(packet);
+            }
+            break;
+
+        case Opcode::SMSG_PLAYED_TIME:
+            if (state == WorldState::IN_WORLD) {
+                handlePlayedTime(packet);
+            }
+            break;
+
+        case Opcode::SMSG_WHO:
+            if (state == WorldState::IN_WORLD) {
+                handleWho(packet);
             }
             break;
 
@@ -1528,6 +1547,39 @@ void GameHandler::inspectTarget() {
     std::string name = player->getName().empty() ? "Target" : player->getName();
     addSystemChatMessage("Inspecting " + name + "...");
     LOG_INFO("Sent inspect request for player: ", name, " (GUID: 0x", std::hex, targetGuid, std::dec, ")");
+}
+
+void GameHandler::queryServerTime() {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot query time: not in world or not connected");
+        return;
+    }
+
+    auto packet = QueryTimePacket::build();
+    socket->send(packet);
+    LOG_INFO("Requested server time");
+}
+
+void GameHandler::requestPlayedTime() {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot request played time: not in world or not connected");
+        return;
+    }
+
+    auto packet = RequestPlayedTimePacket::build(true);
+    socket->send(packet);
+    LOG_INFO("Requested played time");
+}
+
+void GameHandler::queryWho(const std::string& playerName) {
+    if (state != WorldState::IN_WORLD || !socket) {
+        LOG_WARNING("Cannot query who: not in world or not connected");
+        return;
+    }
+
+    auto packet = WhoPacket::build(0, 0, playerName);
+    socket->send(packet);
+    LOG_INFO("Sent WHO query", playerName.empty() ? "" : " for: " + playerName);
 }
 
 void GameHandler::releaseSpirit() {
@@ -2790,6 +2842,97 @@ void GameHandler::addSystemChatMessage(const std::string& message) {
     msg.language = ChatLanguage::UNIVERSAL;
     msg.message = message;
     addLocalChatMessage(msg);
+}
+
+// ============================================================
+// Server Info Command Handlers
+// ============================================================
+
+void GameHandler::handleQueryTimeResponse(network::Packet& packet) {
+    QueryTimeResponseData data;
+    if (!QueryTimeResponseParser::parse(packet, data)) {
+        LOG_WARNING("Failed to parse SMSG_QUERY_TIME_RESPONSE");
+        return;
+    }
+
+    // Convert Unix timestamp to readable format
+    time_t serverTime = static_cast<time_t>(data.serverTime);
+    struct tm* timeInfo = localtime(&serverTime);
+    char timeStr[64];
+    strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", timeInfo);
+
+    std::string msg = "Server time: " + std::string(timeStr);
+    addSystemChatMessage(msg);
+    LOG_INFO("Server time: ", data.serverTime, " (", timeStr, ")");
+}
+
+void GameHandler::handlePlayedTime(network::Packet& packet) {
+    PlayedTimeData data;
+    if (!PlayedTimeParser::parse(packet, data)) {
+        LOG_WARNING("Failed to parse SMSG_PLAYED_TIME");
+        return;
+    }
+
+    if (data.triggerMessage) {
+        // Format total time played
+        uint32_t totalDays = data.totalTimePlayed / 86400;
+        uint32_t totalHours = (data.totalTimePlayed % 86400) / 3600;
+        uint32_t totalMinutes = (data.totalTimePlayed % 3600) / 60;
+
+        // Format level time played
+        uint32_t levelDays = data.levelTimePlayed / 86400;
+        uint32_t levelHours = (data.levelTimePlayed % 86400) / 3600;
+        uint32_t levelMinutes = (data.levelTimePlayed % 3600) / 60;
+
+        std::string totalMsg = "Total time played: ";
+        if (totalDays > 0) totalMsg += std::to_string(totalDays) + " days, ";
+        if (totalHours > 0 || totalDays > 0) totalMsg += std::to_string(totalHours) + " hours, ";
+        totalMsg += std::to_string(totalMinutes) + " minutes";
+
+        std::string levelMsg = "Time played this level: ";
+        if (levelDays > 0) levelMsg += std::to_string(levelDays) + " days, ";
+        if (levelHours > 0 || levelDays > 0) levelMsg += std::to_string(levelHours) + " hours, ";
+        levelMsg += std::to_string(levelMinutes) + " minutes";
+
+        addSystemChatMessage(totalMsg);
+        addSystemChatMessage(levelMsg);
+    }
+
+    LOG_INFO("Played time: total=", data.totalTimePlayed, "s, level=", data.levelTimePlayed, "s");
+}
+
+void GameHandler::handleWho(network::Packet& packet) {
+    // Parse WHO response
+    uint32_t displayCount = packet.readUInt32();
+    uint32_t onlineCount = packet.readUInt32();
+
+    LOG_INFO("WHO response: ", displayCount, " players displayed, ", onlineCount, " total online");
+
+    if (displayCount == 0) {
+        addSystemChatMessage("No players found.");
+        return;
+    }
+
+    addSystemChatMessage(std::to_string(onlineCount) + " player(s) online:");
+
+    for (uint32_t i = 0; i < displayCount; ++i) {
+        std::string playerName = packet.readString();
+        std::string guildName = packet.readString();
+        uint32_t level = packet.readUInt32();
+        uint32_t classId = packet.readUInt32();
+        uint32_t raceId = packet.readUInt32();
+        packet.readUInt8();   // gender (unused)
+        packet.readUInt32();  // zoneId (unused)
+
+        std::string msg = "  " + playerName;
+        if (!guildName.empty()) {
+            msg += " <" + guildName + ">";
+        }
+        msg += " - Level " + std::to_string(level);
+
+        addSystemChatMessage(msg);
+        LOG_INFO("  ", playerName, " (", guildName, ") Lv", level, " Class:", classId, " Race:", raceId);
+    }
 }
 
 uint32_t GameHandler::generateClientSeed() {

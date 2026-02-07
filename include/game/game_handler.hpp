@@ -205,6 +205,11 @@ public:
     // Inspection
     void inspectTarget();
 
+    // Server info commands
+    void queryServerTime();
+    void requestPlayedTime();
+    void queryWho(const std::string& playerName = "");
+
     // ---- Phase 1: Name queries ----
     void queryPlayerName(uint64_t guid);
     void queryCreatureInfo(uint32_t entry, uint64_t guid);
@@ -502,6 +507,11 @@ private:
     void handleQuestOfferReward(network::Packet& packet);
     void handleListInventory(network::Packet& packet);
     void addMoneyCopper(uint32_t amount);
+
+    // ---- Server info handlers ----
+    void handleQueryTimeResponse(network::Packet& packet);
+    void handlePlayedTime(network::Packet& packet);
+    void handleWho(network::Packet& packet);
 
     void addCombatText(CombatTextEntry::Type type, int32_t amount, uint32_t spellId, bool isPlayerSource);
     void addSystemChatMessage(const std::string& message);

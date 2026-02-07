@@ -55,6 +55,14 @@ enum class Opcode : uint16_t {
     CMSG_MESSAGECHAT                 = 0x095,
     SMSG_MESSAGECHAT                 = 0x096,
 
+    // ---- Server Info Commands ----
+    CMSG_WHO                         = 0x062,
+    SMSG_WHO                         = 0x063,
+    CMSG_REQUEST_PLAYED_TIME         = 0x1CC,
+    SMSG_PLAYED_TIME                 = 0x1CD,
+    CMSG_QUERY_TIME                  = 0x1CE,
+    SMSG_QUERY_TIME_RESPONSE         = 0x1CF,
+
     // ---- Phase 1: Foundation (Targeting, Queries) ----
     CMSG_SET_SELECTION               = 0x13D,
     CMSG_NAME_QUERY                  = 0x050,

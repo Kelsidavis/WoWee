@@ -963,6 +963,31 @@ void GameScreen::sendChatMessage(game::GameHandler& gameHandler) {
                 return;
             }
 
+            // /time command
+            if (cmdLower == "time") {
+                gameHandler.queryServerTime();
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /played command
+            if (cmdLower == "played") {
+                gameHandler.requestPlayedTime();
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /who command
+            if (cmdLower == "who") {
+                std::string playerName;
+                if (spacePos != std::string::npos) {
+                    playerName = command.substr(spacePos + 1);
+                }
+                gameHandler.queryWho(playerName);
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
             // Chat channel slash commands
             bool isChannelCommand = false;
             if (cmdLower == "s" || cmdLower == "say") {

@@ -649,6 +649,58 @@ public:
 const char* getChatTypeString(ChatType type);
 
 // ============================================================
+// Server Info Commands
+// ============================================================
+
+/** CMSG_QUERY_TIME packet builder */
+class QueryTimePacket {
+public:
+    static network::Packet build();
+};
+
+/** SMSG_QUERY_TIME_RESPONSE data */
+struct QueryTimeResponseData {
+    uint32_t serverTime = 0;  // Unix timestamp
+    uint32_t timeOffset = 0;  // Time until next daily reset
+};
+
+/** SMSG_QUERY_TIME_RESPONSE parser */
+class QueryTimeResponseParser {
+public:
+    static bool parse(network::Packet& packet, QueryTimeResponseData& data);
+};
+
+/** CMSG_REQUEST_PLAYED_TIME packet builder */
+class RequestPlayedTimePacket {
+public:
+    static network::Packet build(bool sendToChat = true);
+};
+
+/** SMSG_PLAYED_TIME data */
+struct PlayedTimeData {
+    uint32_t totalTimePlayed = 0;  // Total seconds played
+    uint32_t levelTimePlayed = 0;  // Seconds played at current level
+    bool triggerMessage = false;   // Whether to show in chat
+};
+
+/** SMSG_PLAYED_TIME parser */
+class PlayedTimeParser {
+public:
+    static bool parse(network::Packet& packet, PlayedTimeData& data);
+};
+
+/** CMSG_WHO packet builder */
+class WhoPacket {
+public:
+    static network::Packet build(uint32_t minLevel = 0, uint32_t maxLevel = 0,
+                                 const std::string& playerName = "",
+                                 const std::string& guildName = "",
+                                 uint32_t raceMask = 0xFFFFFFFF,
+                                 uint32_t classMask = 0xFFFFFFFF,
+                                 uint32_t zones = 0);
+};
+
+// ============================================================
 // Phase 1: Foundation — Targeting, Name Queries
 // ============================================================
 

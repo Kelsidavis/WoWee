@@ -1181,6 +1181,55 @@ network::Packet InspectPacket::build(uint64_t targetGuid) {
     return packet;
 }
 
+// ============================================================
+// Server Info Commands
+// ============================================================
+
+network::Packet QueryTimePacket::build() {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_QUERY_TIME));
+    LOG_DEBUG("Built CMSG_QUERY_TIME");
+    return packet;
+}
+
+bool QueryTimeResponseParser::parse(network::Packet& packet, QueryTimeResponseData& data) {
+    data.serverTime = packet.readUInt32();
+    data.timeOffset = packet.readUInt32();
+    LOG_DEBUG("Parsed SMSG_QUERY_TIME_RESPONSE: time=", data.serverTime, " offset=", data.timeOffset);
+    return true;
+}
+
+network::Packet RequestPlayedTimePacket::build(bool sendToChat) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_REQUEST_PLAYED_TIME));
+    packet.writeUInt8(sendToChat ? 1 : 0);
+    LOG_DEBUG("Built CMSG_REQUEST_PLAYED_TIME: sendToChat=", sendToChat);
+    return packet;
+}
+
+bool PlayedTimeParser::parse(network::Packet& packet, PlayedTimeData& data) {
+    data.totalTimePlayed = packet.readUInt32();
+    data.levelTimePlayed = packet.readUInt32();
+    data.triggerMessage = packet.readUInt8() != 0;
+    LOG_DEBUG("Parsed SMSG_PLAYED_TIME: total=", data.totalTimePlayed, " level=", data.levelTimePlayed);
+    return true;
+}
+
+network::Packet WhoPacket::build(uint32_t minLevel, uint32_t maxLevel,
+                                 const std::string& playerName,
+                                 const std::string& guildName,
+                                 uint32_t raceMask, uint32_t classMask,
+                                 uint32_t zones) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_WHO));
+    packet.writeUInt32(minLevel);
+    packet.writeUInt32(maxLevel);
+    packet.writeString(playerName);
+    packet.writeString(guildName);
+    packet.writeUInt32(raceMask);
+    packet.writeUInt32(classMask);
+    packet.writeUInt32(zones);  // Number of zones
+    LOG_DEBUG("Built CMSG_WHO: player=", playerName);
+    return packet;
+}
+
 network::Packet NameQueryPacket::build(uint64_t playerGuid) {
     network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_NAME_QUERY));
     packet.writeUInt64(playerGuid);
