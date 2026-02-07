@@ -139,6 +139,7 @@ enum class Opcode : uint16_t {
     // ---- Phase 5: Quests ----
     CMSG_QUESTGIVER_STATUS_QUERY     = 0x182,
     SMSG_QUESTGIVER_STATUS           = 0x183,
+    SMSG_QUESTGIVER_STATUS_MULTIPLE  = 0x198,
     CMSG_QUESTGIVER_HELLO            = 0x184,
     CMSG_QUESTGIVER_QUERY_QUEST      = 0x186,
     SMSG_QUESTGIVER_QUEST_DETAILS    = 0x188,

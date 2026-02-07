@@ -21,6 +21,19 @@ namespace network { class WorldSocket; class Packet; }
 namespace game {
 
 /**
+ * Quest giver status values (WoW 3.3.5a)
+ */
+enum class QuestGiverStatus : uint8_t {
+    NONE = 0,
+    UNAVAILABLE = 1,
+    INCOMPLETE = 5,    // ? (gray)
+    REWARD_REP = 6,
+    AVAILABLE_LOW = 7, // ! (gray, low-level)
+    AVAILABLE = 8,     // ! (yellow)
+    REWARD = 10        // ? (yellow)
+};
+
+/**
  * World connection state
  */
 enum class WorldState {
@@ -360,6 +373,13 @@ public:
     const std::vector<QuestLogEntry>& getQuestLog() const { return questLog_; }
     void abandonQuest(uint32_t questId);
 
+    // Quest giver status (! and ? markers)
+    QuestGiverStatus getQuestGiverStatus(uint64_t guid) const {
+        auto it = npcQuestStatus_.find(guid);
+        return (it != npcQuestStatus_.end()) ? it->second : QuestGiverStatus::NONE;
+    }
+    const std::unordered_map<uint64_t, QuestGiverStatus>& getNpcQuestStatuses() const { return npcQuestStatus_; }
+
     // Vendor
     void openVendor(uint64_t npcGuid);
     void closeVendor();
@@ -671,6 +691,9 @@ private:
 
     // Quest log
     std::vector<QuestLogEntry> questLog_;
+
+    // Quest giver status per NPC
+    std::unordered_map<uint64_t, QuestGiverStatus> npcQuestStatus_;
 
     // Faction hostility lookup (populated from FactionTemplate.dbc)
     std::unordered_map<uint32_t, bool> factionHostileMap_;

@@ -90,6 +90,8 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     renderGossipWindow(gameHandler);
     renderQuestDetailsWindow(gameHandler);
     renderVendorWindow(gameHandler);
+    renderQuestMarkers(gameHandler);
+    renderMinimapMarkers(gameHandler);
     renderDeathScreen(gameHandler);
     renderEscapeMenu();
     renderSettingsWindow();
@@ -2721,6 +2723,175 @@ void GameScreen::renderSettingsWindow() {
         ImGui::PopStyleVar();
     }
     ImGui::End();
+}
+
+void GameScreen::renderQuestMarkers(game::GameHandler& gameHandler) {
+    const auto& statuses = gameHandler.getNpcQuestStatuses();
+    if (statuses.empty()) return;
+
+    auto* renderer = core::Application::getInstance().getRenderer();
+    auto* camera = renderer ? renderer->getCamera() : nullptr;
+    auto* window = core::Application::getInstance().getWindow();
+    if (!camera || !window) return;
+
+    float screenW = static_cast<float>(window->getWidth());
+    float screenH = static_cast<float>(window->getHeight());
+    glm::mat4 viewProj = camera->getViewProjectionMatrix();
+    auto* drawList = ImGui::GetForegroundDrawList();
+
+    for (const auto& [guid, status] : statuses) {
+        // Only show markers for available (!) and reward/completable (?)
+        const char* marker = nullptr;
+        ImU32 color = IM_COL32(255, 210, 0, 255); // yellow
+        if (status == game::QuestGiverStatus::AVAILABLE) {
+            marker = "!";
+        } else if (status == game::QuestGiverStatus::AVAILABLE_LOW) {
+            marker = "!";
+            color = IM_COL32(160, 160, 160, 255); // gray
+        } else if (status == game::QuestGiverStatus::REWARD) {
+            marker = "?";
+        } else if (status == game::QuestGiverStatus::INCOMPLETE) {
+            marker = "?";
+            color = IM_COL32(160, 160, 160, 255); // gray
+        } else {
+            continue;
+        }
+
+        // Get entity position (canonical coords)
+        auto entity = gameHandler.getEntityManager().getEntity(guid);
+        if (!entity) continue;
+
+        glm::vec3 canonical(entity->getX(), entity->getY(), entity->getZ());
+        glm::vec3 renderPos = core::coords::canonicalToRender(canonical);
+
+        // Get model height for offset
+        float heightOffset = 3.0f;
+        glm::vec3 boundsCenter;
+        float boundsRadius = 0.0f;
+        if (core::Application::getInstance().getRenderBoundsForGuid(guid, boundsCenter, boundsRadius)) {
+            heightOffset = boundsRadius * 2.0f + 1.0f;
+        }
+        renderPos.z += heightOffset;
+
+        // Project to screen
+        glm::vec4 clipPos = viewProj * glm::vec4(renderPos, 1.0f);
+        if (clipPos.w <= 0.0f) continue;
+
+        glm::vec2 ndc(clipPos.x / clipPos.w, clipPos.y / clipPos.w);
+        float sx = (ndc.x + 1.0f) * 0.5f * screenW;
+        float sy = (1.0f - ndc.y) * 0.5f * screenH;
+
+        // Skip if off-screen
+        if (sx < -50 || sx > screenW + 50 || sy < -50 || sy > screenH + 50) continue;
+
+        // Scale text size based on distance
+        float dist = clipPos.w;
+        float fontSize = std::clamp(800.0f / dist, 14.0f, 48.0f);
+
+        // Draw outlined text: 4 shadow copies then main text
+        ImFont* font = ImGui::GetFont();
+        ImU32 outlineColor = IM_COL32(0, 0, 0, 220);
+        float off = std::max(1.0f, fontSize * 0.06f);
+        ImVec2 textSize = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, marker);
+        float tx = sx - textSize.x * 0.5f;
+        float ty = sy - textSize.y * 0.5f;
+
+        drawList->AddText(font, fontSize, ImVec2(tx - off, ty), outlineColor, marker);
+        drawList->AddText(font, fontSize, ImVec2(tx + off, ty), outlineColor, marker);
+        drawList->AddText(font, fontSize, ImVec2(tx, ty - off), outlineColor, marker);
+        drawList->AddText(font, fontSize, ImVec2(tx, ty + off), outlineColor, marker);
+        drawList->AddText(font, fontSize, ImVec2(tx, ty), color, marker);
+    }
+}
+
+void GameScreen::renderMinimapMarkers(game::GameHandler& gameHandler) {
+    const auto& statuses = gameHandler.getNpcQuestStatuses();
+    if (statuses.empty()) return;
+
+    auto* renderer = core::Application::getInstance().getRenderer();
+    auto* camera = renderer ? renderer->getCamera() : nullptr;
+    auto* minimap = renderer ? renderer->getMinimap() : nullptr;
+    auto* window = core::Application::getInstance().getWindow();
+    if (!camera || !minimap || !window) return;
+
+    float screenW = static_cast<float>(window->getWidth());
+
+    // Minimap parameters (matching minimap.cpp)
+    float mapSize = 200.0f;
+    float margin = 10.0f;
+    float mapRadius = mapSize * 0.5f;
+    float centerX = screenW - margin - mapRadius;
+    float centerY = margin + mapRadius;
+    float viewRadius = 400.0f;
+
+    // Player position in render coords
+    auto& mi = gameHandler.getMovementInfo();
+    glm::vec3 playerRender = core::coords::canonicalToRender(glm::vec3(mi.x, mi.y, mi.z));
+
+    // Camera bearing for minimap rotation
+    glm::vec3 fwd = camera->getForward();
+    float bearing = std::atan2(-fwd.x, fwd.y);
+    float cosB = std::cos(bearing);
+    float sinB = std::sin(bearing);
+
+    auto* drawList = ImGui::GetForegroundDrawList();
+
+    for (const auto& [guid, status] : statuses) {
+        ImU32 dotColor;
+        const char* marker = nullptr;
+        if (status == game::QuestGiverStatus::AVAILABLE) {
+            dotColor = IM_COL32(255, 210, 0, 255);
+            marker = "!";
+        } else if (status == game::QuestGiverStatus::AVAILABLE_LOW) {
+            dotColor = IM_COL32(160, 160, 160, 255);
+            marker = "!";
+        } else if (status == game::QuestGiverStatus::REWARD) {
+            dotColor = IM_COL32(255, 210, 0, 255);
+            marker = "?";
+        } else if (status == game::QuestGiverStatus::INCOMPLETE) {
+            dotColor = IM_COL32(160, 160, 160, 255);
+            marker = "?";
+        } else {
+            continue;
+        }
+
+        auto entity = gameHandler.getEntityManager().getEntity(guid);
+        if (!entity) continue;
+
+        glm::vec3 canonical(entity->getX(), entity->getY(), entity->getZ());
+        glm::vec3 npcRender = core::coords::canonicalToRender(canonical);
+
+        // Offset from player in render coords
+        float dx = npcRender.x - playerRender.x;
+        float dy = npcRender.y - playerRender.y;
+
+        // Rotate by camera bearing (minimap north-up rotation)
+        float rx = dx * cosB - dy * sinB;
+        float ry = dx * sinB + dy * cosB;
+
+        // Scale to minimap pixels
+        float px = rx / viewRadius * mapRadius;
+        float py = -ry / viewRadius * mapRadius; // screen Y is inverted
+
+        // Clamp to circle
+        float distFromCenter = std::sqrt(px * px + py * py);
+        if (distFromCenter > mapRadius - 4.0f) {
+            float scale = (mapRadius - 4.0f) / distFromCenter;
+            px *= scale;
+            py *= scale;
+        }
+
+        float sx = centerX + px;
+        float sy = centerY + py;
+
+        // Draw dot with marker text
+        drawList->AddCircleFilled(ImVec2(sx, sy), 5.0f, dotColor);
+        ImFont* font = ImGui::GetFont();
+        ImVec2 textSize = font->CalcTextSizeA(11.0f, FLT_MAX, 0.0f, marker);
+        drawList->AddText(font, 11.0f,
+            ImVec2(sx - textSize.x * 0.5f, sy - textSize.y * 0.5f),
+            IM_COL32(0, 0, 0, 255), marker);
+    }
 }
 
 }} // namespace wowee::ui

@@ -1228,9 +1228,31 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_BUY_FAILED:
         case Opcode::SMSG_GAMEOBJECT_QUERY_RESPONSE:
         case Opcode::MSG_RAID_TARGET_UPDATE:
-        case Opcode::SMSG_QUESTGIVER_STATUS:
-            LOG_DEBUG("Ignoring SMSG_QUESTGIVER_STATUS");
             break;
+        case Opcode::SMSG_QUESTGIVER_STATUS: {
+            // uint64 npcGuid + uint8 status
+            if (packet.getSize() - packet.getReadPos() >= 9) {
+                uint64_t npcGuid = packet.readUInt64();
+                uint8_t status = packet.readUInt8();
+                npcQuestStatus_[npcGuid] = static_cast<QuestGiverStatus>(status);
+                LOG_DEBUG("SMSG_QUESTGIVER_STATUS: guid=0x", std::hex, npcGuid, std::dec, " status=", (int)status);
+            }
+            break;
+        }
+        case Opcode::SMSG_QUESTGIVER_STATUS_MULTIPLE: {
+            // uint32 count, then count * (uint64 guid + uint8 status)
+            if (packet.getSize() - packet.getReadPos() >= 4) {
+                uint32_t count = packet.readUInt32();
+                for (uint32_t i = 0; i < count; ++i) {
+                    if (packet.getSize() - packet.getReadPos() < 9) break;
+                    uint64_t npcGuid = packet.readUInt64();
+                    uint8_t status = packet.readUInt8();
+                    npcQuestStatus_[npcGuid] = static_cast<QuestGiverStatus>(status);
+                }
+                LOG_DEBUG("SMSG_QUESTGIVER_STATUS_MULTIPLE: ", count, " entries");
+            }
+            break;
+        }
         case Opcode::SMSG_QUESTGIVER_QUEST_DETAILS:
             handleQuestDetails(packet);
             break;
@@ -2896,6 +2918,9 @@ void GameHandler::handleDestroyObject(network::Packet& packet) {
     if (onlineItems_.erase(data.guid)) {
         rebuildOnlineInventory();
     }
+
+    // Clean up quest giver status
+    npcQuestStatus_.erase(data.guid);
 
     tabCycleStale = true;
     LOG_INFO("Entity count: ", entityManager.getEntityCount());
