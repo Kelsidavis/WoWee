@@ -395,7 +395,9 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
         ImGui::SetNextWindowPos(chatWindowPos_, ImGuiCond_FirstUseEver);
     }
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize;
-    if (chatWindowLocked) flags |= ImGuiWindowFlags_NoMove;
+    if (chatWindowLocked) {
+        flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar;
+    }
     ImGui::Begin("Chat", nullptr, flags);
 
     if (!chatWindowLocked) {
@@ -406,6 +408,7 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
     const auto& chatHistory = gameHandler.getChatHistory();
 
     ImGui::BeginChild("ChatHistory", ImVec2(0, -70), true, ImGuiWindowFlags_HorizontalScrollbar);
+    bool chatHistoryHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 
     for (const auto& msg : chatHistory) {
         ImVec4 color = getChatTypeColor(msg.type);
@@ -435,14 +438,10 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
 
     ImGui::EndChild();
 
-    // Click on chat history area → focus the input field
-    if (ImGui::IsItemClicked()) {
-        refocusChatInput = true;
-    }
-
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
+    float controlsTopY = ImGui::GetCursorScreenPos().y;
 
     // Lock toggle
     ImGui::Checkbox("Lock", &chatWindowLocked);
@@ -514,18 +513,10 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
         chatInputActive = false;
     }
 
-    // Click on empty chat window area (receive panel/background) → focus input
-    // Ignore title bar (move) and interactive items like Lock.
+    // Click in chat history area (received messages) → focus input.
     {
-        ImGuiIO& io = ImGui::GetIO();
-        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
-            io.MouseClicked[0] &&
-            !ImGui::IsAnyItemHovered()) {
-            ImVec2 winPos = ImGui::GetWindowPos();
-            float titleBarH = ImGui::GetFrameHeight();
-            if (io.MousePos.y > winPos.y + titleBarH) {
-                refocusChatInput = true;
-            }
+        if (chatHistoryHovered && ImGui::IsMouseClicked(0)) {
+            refocusChatInput = true;
         }
     }
 

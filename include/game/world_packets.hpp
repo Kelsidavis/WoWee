@@ -1507,6 +1507,12 @@ public:
     static network::Packet build(uint64_t npcGuid);
 };
 
+/** CMSG_QUESTGIVER_HELLO packet builder */
+class QuestgiverHelloPacket {
+public:
+    static network::Packet build(uint64_t npcGuid);
+};
+
 /** CMSG_GOSSIP_SELECT_OPTION packet builder */
 class GossipSelectOptionPacket {
 public:

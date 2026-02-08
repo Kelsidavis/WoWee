@@ -507,6 +507,20 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_GOSSIP_COMPLETE:
             handleGossipComplete(packet);
             break;
+        case Opcode::SMSG_SPIRIT_HEALER_CONFIRM: {
+            if (packet.getSize() - packet.getReadPos() < 8) {
+                LOG_WARNING("SMSG_SPIRIT_HEALER_CONFIRM too short");
+                break;
+            }
+            uint64_t healerGuid = packet.readUInt64();
+            LOG_INFO("Spirit healer confirm from 0x", std::hex, healerGuid, std::dec);
+            if (playerDead_ && socket && state == WorldState::IN_WORLD) {
+                auto activate = SpiritHealerActivatePacket::build(healerGuid);
+                socket->send(activate);
+                LOG_INFO("Confirmed spirit healer activation");
+            }
+            break;
+        }
         case Opcode::SMSG_LIST_INVENTORY:
             handleListInventory(packet);
             break;
@@ -2667,11 +2681,14 @@ void GameHandler::releaseSpirit() {
 }
 
 void GameHandler::activateSpiritHealer(uint64_t npcGuid) {
-    if (!playerDead_) return;
     if (state != WorldState::IN_WORLD || !socket) return;
+    auto gossipPacket = GossipHelloPacket::build(npcGuid);
+    socket->send(gossipPacket);
+    auto questHelloPacket = QuestgiverHelloPacket::build(npcGuid);
+    socket->send(questHelloPacket);
     auto packet = SpiritHealerActivatePacket::build(npcGuid);
     socket->send(packet);
-    LOG_INFO("Sent CMSG_SPIRIT_HEALER_ACTIVATE to 0x", std::hex, npcGuid, std::dec);
+    LOG_INFO("Sent spirit healer activation sequence to 0x", std::hex, npcGuid, std::dec);
 }
 
 void GameHandler::tabTarget(float playerX, float playerY, float playerZ) {

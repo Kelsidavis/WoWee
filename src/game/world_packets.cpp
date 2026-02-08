@@ -2289,6 +2289,12 @@ network::Packet GossipHelloPacket::build(uint64_t npcGuid) {
     return packet;
 }
 
+network::Packet QuestgiverHelloPacket::build(uint64_t npcGuid) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_QUESTGIVER_HELLO));
+    packet.writeUInt64(npcGuid);
+    return packet;
+}
+
 network::Packet GossipSelectOptionPacket::build(uint64_t npcGuid, uint32_t menuId, uint32_t optionId, const std::string& code) {
     network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_GOSSIP_SELECT_OPTION));
     packet.writeUInt64(npcGuid);

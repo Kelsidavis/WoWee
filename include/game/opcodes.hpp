@@ -242,6 +242,7 @@ enum class Opcode : uint16_t {
     // ---- Death/Respawn ----
     CMSG_REPOP_REQUEST               = 0x015A,
     CMSG_SPIRIT_HEALER_ACTIVATE      = 0x0176,
+    SMSG_SPIRIT_HEALER_CONFIRM       = 0x0222,
 
     // ---- Teleport / Transfer ----
     MSG_MOVE_TELEPORT_ACK            = 0x0C7,
