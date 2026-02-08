@@ -671,7 +671,7 @@ void CameraController::update(float deltaTime) {
 
         // Limit max zoom when inside a WMO (building interior)
         // Throttle: only recheck every 10 frames or when position changes >2 units.
-        static constexpr float WMO_MAX_DISTANCE = 5.0f;
+        static constexpr float WMO_MAX_DISTANCE = 3.5f;
         if (wmoRenderer) {
             float distFromLastCheck = glm::length(targetPos - lastInsideWMOCheckPos);
             if (++insideWMOCheckCounter >= 10 || distFromLastCheck > 2.0f) {
