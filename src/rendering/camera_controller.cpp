@@ -453,8 +453,19 @@ void CameraController::update(float deltaTime) {
                     if (wmoRenderer) {
                         glm::vec3 adjusted;
                         if (wmoRenderer->checkWallCollision(stepPos, candidate, adjusted)) {
-                            candidate.x = adjusted.x;
-                            candidate.y = adjusted.y;
+                            // Before blocking, check if there's a floor at the
+                            // destination above current feet (stair step-up).
+                            float feetZ = stepPos.z;
+                            float probeZ = feetZ + 2.5f;
+                            auto floorH = wmoRenderer->getFloorHeight(
+                                candidate.x, candidate.y, probeZ);
+                            bool isStair = floorH &&
+                                           *floorH > feetZ + 0.1f &&
+                                           *floorH <= feetZ + 1.6f;
+                            if (!isStair) {
+                                candidate.x = adjusted.x;
+                                candidate.y = adjusted.y;
+                            }
                         }
                     }
 
@@ -992,12 +1003,8 @@ void CameraController::update(float deltaTime) {
     wasJumping = nowJump;
     wasFalling = !grounded && verticalVelocity <= 0.0f;
 
-    // Reset camera/character (R key, edge-triggered)
-    bool rDown = !uiWantsKeyboard && input.isKeyPressed(SDL_SCANCODE_R);
-    if (rDown && !rKeyWasDown) {
-        reset();
-    }
-    rKeyWasDown = rDown;
+    // R key disabled — was camera reset, conflicts with chat reply
+    rKeyWasDown = false;
 }
 
 void CameraController::processMouseMotion(const SDL_MouseMotionEvent& event) {
