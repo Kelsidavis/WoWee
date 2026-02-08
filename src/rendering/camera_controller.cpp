@@ -1259,26 +1259,7 @@ bool CameraController::isMoving() const {
     if (!enabled || !camera) {
         return false;
     }
-
-    if (ImGui::GetIO().WantCaptureKeyboard) {
-        return false;
-    }
-
-    auto& input = core::Input::getInstance();
-    bool keyW = input.isKeyPressed(SDL_SCANCODE_W);
-    bool keyS = input.isKeyPressed(SDL_SCANCODE_S);
-    bool keyA = input.isKeyPressed(SDL_SCANCODE_A);
-    bool keyD = input.isKeyPressed(SDL_SCANCODE_D);
-    bool keyQ = input.isKeyPressed(SDL_SCANCODE_Q);
-    bool keyE = input.isKeyPressed(SDL_SCANCODE_E);
-
-    // In third-person without RMB, A/D are turn keys (not movement).
-    if (thirdPerson && !rightMouseDown) {
-        return keyW || keyS || keyQ || keyE || autoRunning;
-    }
-
-    bool mouseAutorun = leftMouseDown && rightMouseDown;
-    return keyW || keyS || keyA || keyD || keyQ || keyE || mouseAutorun || autoRunning;
+    return moveForwardActive || moveBackwardActive || strafeLeftActive || strafeRightActive || autoRunning;
 }
 
 bool CameraController::isSprinting() const {

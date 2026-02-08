@@ -1305,6 +1305,9 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                     glm::vec3 pos = core::coords::serverToCanonical(glm::vec3(block.x, block.y, block.z));
                     entity->setPosition(pos.x, pos.y, pos.z, block.orientation);
                     LOG_DEBUG("  Position: (", pos.x, ", ", pos.y, ", ", pos.z, ")");
+                    if (block.guid == playerGuid && block.runSpeed > 0.1f && block.runSpeed < 100.0f) {
+                        serverRunSpeed_ = block.runSpeed;
+                    }
                 }
 
                 // Set fields
@@ -1358,6 +1361,16 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                 if (block.guid == playerGuid) {
                                     uint32_t old = currentMountDisplayId_;
                                     currentMountDisplayId_ = val;
+                                    if (old == 0 && val != 0) {
+                                        preMountRunSpeed_ = serverRunSpeed_;
+                                    } else if (old != 0 && val == 0) {
+                                        if (preMountRunSpeed_ > 0.1f && preMountRunSpeed_ < 100.0f) {
+                                            serverRunSpeed_ = preMountRunSpeed_;
+                                        } else {
+                                            serverRunSpeed_ = 7.0f;
+                                        }
+                                        preMountRunSpeed_ = 0.0f;
+                                    }
                                     if (val != old && mountCallback_) mountCallback_(val);
                                 }
                                 unit->setMountDisplayId(val);
@@ -1490,6 +1503,16 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                     if (block.guid == playerGuid) {
                                         uint32_t old = currentMountDisplayId_;
                                         currentMountDisplayId_ = val;
+                                        if (old == 0 && val != 0) {
+                                            preMountRunSpeed_ = serverRunSpeed_;
+                                        } else if (old != 0 && val == 0) {
+                                            if (preMountRunSpeed_ > 0.1f && preMountRunSpeed_ < 100.0f) {
+                                                serverRunSpeed_ = preMountRunSpeed_;
+                                            } else {
+                                                serverRunSpeed_ = 7.0f;
+                                            }
+                                            preMountRunSpeed_ = 0.0f;
+                                        }
                                         if (val != old && mountCallback_) mountCallback_(val);
                                     }
                                     unit->setMountDisplayId(val);
@@ -1501,6 +1524,9 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                     }
                     // Update XP / inventory slot / skill fields for player entity
                     if (block.guid == playerGuid) {
+                        if (block.hasMovement && block.runSpeed > 0.1f && block.runSpeed < 100.0f) {
+                            serverRunSpeed_ = block.runSpeed;
+                        }
                         for (const auto& [key, val] : block.fields) {
                             lastPlayerFields_[key] = val;
                         }
@@ -3569,6 +3595,9 @@ void GameHandler::interactWithGameObject(uint64_t guid) {
     if (state != WorldState::IN_WORLD || !socket) return;
     auto packet = GameObjectUsePacket::build(guid);
     socket->send(packet);
+    // Many lootable chests require a loot request after use.
+    auto loot = LootPacket::build(guid);
+    socket->send(loot);
 }
 
 void GameHandler::selectGossipOption(uint32_t optionId) {

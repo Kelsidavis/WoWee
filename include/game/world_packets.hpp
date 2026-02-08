@@ -449,6 +449,7 @@ struct UpdateBlock {
     // Movement data (for MOVEMENT updates)
     bool hasMovement = false;
     float x = 0.0f, y = 0.0f, z = 0.0f, orientation = 0.0f;
+    float runSpeed = 0.0f;
 
     // Field data (for VALUES and CREATE updates)
     std::map<uint16_t, uint32_t> fields;

@@ -218,9 +218,12 @@ std::vector<TerrainVertex> TerrainMeshGenerator::generateVertices(const MapChunk
         vertex.texCoord[0] = offsetX / 8.0f;
         vertex.texCoord[1] = offsetY / 8.0f;
 
-        // Layer UV for alpha map sampling (0-1 range per chunk)
-        vertex.layerUV[0] = offsetX / 8.0f;
-        vertex.layerUV[1] = offsetY / 8.0f;
+        // Layer UV for alpha map sampling (0-1 range per chunk).
+        // Sample at texel centers of the 64x64 alpha map to avoid edge seams.
+        constexpr float alphaTexels = 64.0f;
+        constexpr float alphaStep = (alphaTexels - 1.0f) / 8.0f; // 63 texels across 8 quads
+        vertex.layerUV[0] = (offsetX * alphaStep + 0.5f) / alphaTexels;
+        vertex.layerUV[1] = (offsetY * alphaStep + 0.5f) / alphaTexels;
 
         vertices.push_back(vertex);
     }

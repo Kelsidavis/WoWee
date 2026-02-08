@@ -703,7 +703,7 @@ bool UpdateObjectParser::parseMovementBlock(network::Packet& packet, UpdateBlock
 
         // Speeds (7 speed values)
         /*float walkSpeed =*/ packet.readFloat();
-        /*float runSpeed =*/ packet.readFloat();
+        float runSpeed = packet.readFloat();
         /*float runBackSpeed =*/ packet.readFloat();
         /*float swimSpeed =*/ packet.readFloat();
         /*float swimBackSpeed =*/ packet.readFloat();
@@ -711,6 +711,8 @@ bool UpdateObjectParser::parseMovementBlock(network::Packet& packet, UpdateBlock
         /*float flightBackSpeed =*/ packet.readFloat();
         /*float turnRate =*/ packet.readFloat();
         /*float pitchRate =*/ packet.readFloat();
+
+        block.runSpeed = runSpeed;
 
         // Spline data
         if (moveFlags & 0x08000000) { // MOVEMENTFLAG_SPLINE_ENABLED

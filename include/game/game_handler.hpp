@@ -906,6 +906,7 @@ private:
     NpcSwingCallback npcSwingCallback_;
     MountCallback mountCallback_;
     uint32_t currentMountDisplayId_ = 0;
+    float preMountRunSpeed_ = 0.0f;
     float serverRunSpeed_ = 7.0f;
     bool playerDead_ = false;
 };

@@ -647,6 +647,7 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
         tightMax = glm::max(tightMax, v.position);
     }
     bool foliageOrTreeLike = false;
+    bool chestName = false;
     {
         std::string lowerName = model.name;
         std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
@@ -684,9 +685,16 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             (lowerName.find("box") != std::string::npos) ||
             (lowerName.find("chest") != std::string::npos) ||
             (lowerName.find("barrel") != std::string::npos);
+        chestName = (lowerName.find("chest") != std::string::npos);
         bool foliageName =
             (lowerName.find("bush") != std::string::npos) ||
             (lowerName.find("grass") != std::string::npos) ||
+            (lowerName.find("drygrass") != std::string::npos) ||
+            (lowerName.find("dry_grass") != std::string::npos) ||
+            (lowerName.find("dry-grass") != std::string::npos) ||
+            (lowerName.find("deadgrass") != std::string::npos) ||
+            (lowerName.find("dead_grass") != std::string::npos) ||
+            (lowerName.find("dead-grass") != std::string::npos) ||
             ((lowerName.find("plant") != std::string::npos) && !isPlanter) ||
             (lowerName.find("flower") != std::string::npos) ||
             (lowerName.find("shrub") != std::string::npos) ||
@@ -694,6 +702,10 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             (lowerName.find("vine") != std::string::npos) ||
             (lowerName.find("lily") != std::string::npos) ||
             (lowerName.find("weed") != std::string::npos) ||
+            (lowerName.find("pumpkin") != std::string::npos) ||
+            (lowerName.find("firefly") != std::string::npos) ||
+            (lowerName.find("fireflies") != std::string::npos) ||
+            (lowerName.find("fireflys") != std::string::npos) ||
             (lowerName.find("mushroom") != std::string::npos) ||
             (lowerName.find("fungus") != std::string::npos) ||
             (lowerName.find("toadstool") != std::string::npos);
@@ -763,7 +775,7 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             break;
         }
     }
-    gpuModel.disableAnimation = foliageOrTreeLike;
+    gpuModel.disableAnimation = foliageOrTreeLike || chestName;
 
     // Flag smoke models for UV scroll animation (particle emitters not implemented)
     {

@@ -662,7 +662,27 @@ void Renderer::updateCharacterAnimation() {
             characterRenderer->setInstanceRotation(mountInstanceId_, glm::vec3(0.0f, 0.0f, yawRad));
 
             // Drive mount model animation: idle when still, run when moving
-            uint32_t mountAnimId = moving ? ANIM_RUN : ANIM_STAND;
+            auto pickMountAnim = [&](std::initializer_list<uint32_t> candidates, uint32_t fallback) -> uint32_t {
+                for (uint32_t id : candidates) {
+                    if (characterRenderer->hasAnimation(mountInstanceId_, id)) {
+                        return id;
+                    }
+                }
+                return fallback;
+            };
+
+            uint32_t mountAnimId = ANIM_STAND;
+            if (moving) {
+                if (anyStrafeLeft) {
+                    mountAnimId = pickMountAnim({ANIM_STRAFE_RUN_LEFT, ANIM_STRAFE_WALK_LEFT, ANIM_RUN}, ANIM_RUN);
+                } else if (anyStrafeRight) {
+                    mountAnimId = pickMountAnim({ANIM_STRAFE_RUN_RIGHT, ANIM_STRAFE_WALK_RIGHT, ANIM_RUN}, ANIM_RUN);
+                } else if (movingBackward) {
+                    mountAnimId = pickMountAnim({ANIM_BACKPEDAL}, ANIM_RUN);
+                } else {
+                    mountAnimId = ANIM_RUN;
+                }
+            }
             uint32_t curMountAnim = 0;
             float curMountTime = 0, curMountDur = 0;
             bool haveMountState = characterRenderer->getAnimationState(mountInstanceId_, curMountAnim, curMountTime, curMountDur);
@@ -827,7 +847,24 @@ void Renderer::updateCharacterAnimation() {
             break;
 
         case CharAnimState::MOUNT:
-            break;  // Handled by early return above
+            // If we got here, the mount state was cleared externally but the
+            // animation state hasn't been reset yet. Fall back to normal logic.
+            if (swim) {
+                newState = moving ? CharAnimState::SWIM : CharAnimState::SWIM_IDLE;
+            } else if (sitting && grounded) {
+                newState = CharAnimState::SIT_DOWN;
+            } else if (!grounded && jumping) {
+                newState = CharAnimState::JUMP_START;
+            } else if (!grounded) {
+                newState = CharAnimState::JUMP_MID;
+            } else if (moving && sprinting) {
+                newState = CharAnimState::RUN;
+            } else if (moving) {
+                newState = CharAnimState::WALK;
+            } else {
+                newState = CharAnimState::IDLE;
+            }
+            break;
     }
 
     if (forceMelee) {
