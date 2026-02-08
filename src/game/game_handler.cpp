@@ -4201,8 +4201,62 @@ void GameHandler::activateTaxi(uint32_t destNodeId) {
     uint32_t startNode = currentTaxiData_.nearestNode;
     if (startNode == 0 || destNodeId == 0 || startNode == destNodeId) return;
 
-    auto pkt = ActivateTaxiPacket::build(taxiNpcGuid_, startNode, destNodeId);
+    // BFS to find path from startNode to destNodeId
+    std::unordered_map<uint32_t, std::vector<uint32_t>> adj;
+    for (const auto& edge : taxiPathEdges_) {
+        adj[edge.fromNode].push_back(edge.toNode);
+    }
+
+    std::unordered_map<uint32_t, uint32_t> parent;
+    std::deque<uint32_t> queue;
+    queue.push_back(startNode);
+    parent[startNode] = startNode;
+
+    bool found = false;
+    while (!queue.empty()) {
+        uint32_t cur = queue.front();
+        queue.pop_front();
+        if (cur == destNodeId) { found = true; break; }
+        for (uint32_t next : adj[cur]) {
+            if (parent.find(next) == parent.end()) {
+                parent[next] = cur;
+                queue.push_back(next);
+            }
+        }
+    }
+
+    if (!found) {
+        LOG_WARNING("No taxi path found from node ", startNode, " to ", destNodeId);
+        addSystemChatMessage("No flight path available to that destination.");
+        return;
+    }
+
+    std::vector<uint32_t> path;
+    for (uint32_t n = destNodeId; n != startNode; n = parent[n]) {
+        path.push_back(n);
+    }
+    path.push_back(startNode);
+    std::reverse(path.begin(), path.end());
+
+    LOG_INFO("Taxi path: ", path.size(), " nodes, from ", startNode, " to ", destNodeId);
+
+    LOG_INFO("Taxi activate: npc=0x", std::hex, taxiNpcGuid_, std::dec,
+             " start=", startNode, " dest=", destNodeId, " pathLen=", path.size());
+    if (!path.empty()) {
+        std::string pathStr;
+        for (size_t i = 0; i < path.size(); i++) {
+            pathStr += std::to_string(path[i]);
+            if (i + 1 < path.size()) pathStr += "->";
+        }
+        LOG_INFO("Taxi path nodes: ", pathStr);
+    }
+
+    auto pkt = ActivateTaxiExpressPacket::build(taxiNpcGuid_, path);
     socket->send(pkt);
+
+    // Fallback: some servers expect basic CMSG_ACTIVATETAXI.
+    auto basicPkt = ActivateTaxiPacket::build(taxiNpcGuid_, startNode, destNodeId);
+    socket->send(basicPkt);
 }
 
 // ============================================================
