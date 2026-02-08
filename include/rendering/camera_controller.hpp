@@ -50,6 +50,7 @@ public:
     const glm::vec3& getDefaultPosition() const { return defaultPosition; }
     bool isMoving() const;
     float getYaw() const { return yaw; }
+    float getPitch() const { return pitch; }
     float getFacingYaw() const { return facingYaw; }
     bool isThirdPerson() const { return thirdPerson; }
     bool isGrounded() const { return grounded; }

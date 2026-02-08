@@ -530,36 +530,15 @@ void Application::setupUICallbacks() {
         loadOnlineWorldTerrain(mapId, x, y, z);
     });
 
-    // Unstuck callback — snap player Z to WMO/terrain floor height
+    // Unstuck callback — re-run spawn search at current XY to find valid floor
     gameHandler->setUnstuckCallback([this]() {
         if (!renderer || !renderer->getCameraController()) return;
         auto* cc = renderer->getCameraController();
         auto* ft = cc->getFollowTargetMutable();
         if (!ft) return;
-        // Probe floor at current XY from high up to find WMO floors above
-        auto* wmo = renderer->getWMORenderer();
-        auto* terrain = renderer->getTerrainManager();
-        float bestZ = ft->z;
-        bool found = false;
-        // Probe from well above to catch WMO floors like Stormwind
-        float probeZ = ft->z + 200.0f;
-        if (wmo) {
-            auto wmoH = wmo->getFloorHeight(ft->x, ft->y, probeZ);
-            if (wmoH) {
-                bestZ = *wmoH;
-                found = true;
-            }
-        }
-        if (terrain) {
-            auto terrH = terrain->getHeightAt(ft->x, ft->y);
-            if (terrH && (!found || *terrH > bestZ)) {
-                bestZ = *terrH;
-                found = true;
-            }
-        }
-        if (found) {
-            ft->z = bestZ;
-        }
+        // Use reset() which does a full multi-radius WMO/terrain floor search
+        cc->setDefaultSpawn(*ft, cc->getYaw(), cc->getPitch());
+        cc->reset();
     });
 
     // Faction hostility map is built in buildFactionHostilityMap() when character enters world
