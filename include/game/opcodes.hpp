@@ -243,6 +243,7 @@ enum class Opcode : uint16_t {
 
     // ---- Speed Changes ----
     SMSG_FORCE_RUN_SPEED_CHANGE      = 0x00E2,
+    CMSG_FORCE_RUN_SPEED_CHANGE_ACK  = 0x00E3,
 
     // ---- Mount ----
     CMSG_CANCEL_MOUNT_AURA           = 0x0375,

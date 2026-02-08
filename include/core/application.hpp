@@ -154,6 +154,8 @@ private:
     // Mount model tracking
     uint32_t mountInstanceId_ = 0;
     uint32_t mountModelId_ = 0;
+    uint32_t pendingMountDisplayId_ = 0;  // Deferred mount load (0 = none pending)
+    void processPendingMount();
     bool creatureLookupsBuilt_ = false;
 
     // Deferred creature spawn queue (throttles spawning to avoid hangs)

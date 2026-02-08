@@ -189,6 +189,34 @@ void GameHandler::update(float deltaTime) {
             }
         }
 
+        // Leave combat if auto-attack target is too far away (leash range)
+        if (autoAttacking && autoAttackTarget != 0) {
+            auto targetEntity = entityManager.getEntity(autoAttackTarget);
+            if (targetEntity) {
+                float dx = movementInfo.x - targetEntity->getX();
+                float dy = movementInfo.y - targetEntity->getY();
+                float dist = std::sqrt(dx * dx + dy * dy);
+                if (dist > 40.0f) {
+                    stopAutoAttack();
+                    LOG_INFO("Left combat: target too far (", dist, " yards)");
+                }
+            }
+        }
+
+        // Close vendor/gossip window if player walks too far from NPC
+        if (vendorWindowOpen && currentVendorItems.vendorGuid != 0) {
+            auto npc = entityManager.getEntity(currentVendorItems.vendorGuid);
+            if (npc) {
+                float dx = movementInfo.x - npc->getX();
+                float dy = movementInfo.y - npc->getY();
+                float dist = std::sqrt(dx * dx + dy * dy);
+                if (dist > 15.0f) {
+                    closeVendor();
+                    LOG_INFO("Vendor closed: walked too far from NPC");
+                }
+            }
+        }
+
         // Update entity movement interpolation (keeps targeting in sync with visuals)
         for (auto& [guid, entity] : entityManager.getEntities()) {
             entity->updateMovement(deltaTime);
@@ -2924,6 +2952,13 @@ void GameHandler::rebuildOnlineInventory() {
 // ============================================================
 
 void GameHandler::startAutoAttack(uint64_t targetGuid) {
+    // Can't attack yourself
+    if (targetGuid == playerGuid) return;
+
+    // Dismount when entering combat
+    if (isMounted()) {
+        dismount();
+    }
     autoAttacking = true;
     autoAttackTarget = targetGuid;
     autoAttackOutOfRange_ = false;
@@ -3001,15 +3036,43 @@ void GameHandler::dismount() {
 void GameHandler::handleForceRunSpeedChange(network::Packet& packet) {
     // Packed GUID
     uint64_t guid = UpdateObjectParser::readPackedGuid(packet);
-    // uint32 counter (ack counter, we ignore)
+    // uint32 counter
+    uint32_t counter = packet.readUInt32();
+    // uint32 unknown (TrinityCore/AzerothCore adds this for run speed)
     packet.readUInt32();
     // float newSpeed
     float newSpeed = packet.readFloat();
 
-    if (guid == playerGuid) {
-        serverRunSpeed_ = newSpeed;
-        LOG_INFO("Server run speed changed to ", newSpeed);
+    LOG_INFO("SMSG_FORCE_RUN_SPEED_CHANGE: guid=0x", std::hex, guid, std::dec,
+             " counter=", counter, " speed=", newSpeed);
+
+    if (guid != playerGuid) return;
+
+    // Always ACK the speed change to prevent server stall
+    if (socket) {
+        network::Packet ack(static_cast<uint16_t>(Opcode::CMSG_FORCE_RUN_SPEED_CHANGE_ACK));
+        ack.writeUInt64(playerGuid);
+        ack.writeUInt32(counter);
+        // MovementInfo (minimal — no flags set means no optional fields)
+        ack.writeUInt32(0);  // moveFlags
+        ack.writeUInt16(0);  // moveFlags2
+        ack.writeUInt32(movementTime);
+        ack.writeFloat(movementInfo.x);
+        ack.writeFloat(movementInfo.y);
+        ack.writeFloat(movementInfo.z);
+        ack.writeFloat(movementInfo.orientation);
+        ack.writeUInt32(0);  // fallTime
+        ack.writeFloat(newSpeed);
+        socket->send(ack);
     }
+
+    // Validate speed - reject garbage/NaN values but still ACK
+    if (std::isnan(newSpeed) || newSpeed < 0.1f || newSpeed > 100.0f) {
+        LOG_WARNING("Ignoring invalid run speed: ", newSpeed);
+        return;
+    }
+
+    serverRunSpeed_ = newSpeed;
 }
 
 void GameHandler::handleMonsterMove(network::Packet& packet) {
@@ -3144,6 +3207,12 @@ void GameHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
     }
 
     if (state != WorldState::IN_WORLD || !socket) return;
+
+    // Casting any spell while mounted → dismount instead
+    if (isMounted()) {
+        dismount();
+        return;
+    }
 
     if (casting) return; // Already casting
 

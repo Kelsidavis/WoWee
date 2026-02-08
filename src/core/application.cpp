@@ -385,6 +385,7 @@ void Application::update(float deltaTime) {
             }
             // Process deferred online creature spawns (throttled)
             processCreatureSpawnQueue();
+            processPendingMount();
             if (npcManager && renderer && renderer->getCharacterRenderer()) {
                 npcManager->update(deltaTime, renderer->getCharacterRenderer());
             }
@@ -559,148 +560,22 @@ void Application::setupUICallbacks() {
         despawnOnlineCreature(guid);
     });
 
-    // Mount callback (online mode) - load/destroy mount model
+    // Mount callback (online mode) - defer heavy model load to next frame
     gameHandler->setMountCallback([this](uint32_t mountDisplayId) {
-        if (!renderer || !renderer->getCharacterRenderer() || !assetManager) return;
-        auto* charRenderer = renderer->getCharacterRenderer();
-
         if (mountDisplayId == 0) {
-            // Dismount: remove mount instance and model
-            if (mountInstanceId_ != 0) {
-                charRenderer->removeInstance(mountInstanceId_);
+            // Dismount is instant (no loading needed)
+            if (renderer && renderer->getCharacterRenderer() && mountInstanceId_ != 0) {
+                renderer->getCharacterRenderer()->removeInstance(mountInstanceId_);
                 mountInstanceId_ = 0;
             }
             mountModelId_ = 0;
-            renderer->clearMount();
+            pendingMountDisplayId_ = 0;
+            if (renderer) renderer->clearMount();
             LOG_INFO("Dismounted");
             return;
         }
-
-        // Mount: load mount model
-        std::string m2Path = getModelPathForDisplayId(mountDisplayId);
-        if (m2Path.empty()) {
-            LOG_WARNING("No model path for mount displayId ", mountDisplayId);
-            return;
-        }
-
-        // Check model cache
-        uint32_t modelId = 0;
-        bool modelCached = false;
-        auto cacheIt = displayIdModelCache_.find(mountDisplayId);
-        if (cacheIt != displayIdModelCache_.end()) {
-            modelId = cacheIt->second;
-            modelCached = true;
-        } else {
-            modelId = nextCreatureModelId_++;
-
-            auto m2Data = assetManager->readFile(m2Path);
-            if (m2Data.empty()) {
-                LOG_WARNING("Failed to read mount M2: ", m2Path);
-                return;
-            }
-
-            pipeline::M2Model model = pipeline::M2Loader::load(m2Data);
-            if (model.vertices.empty()) {
-                LOG_WARNING("Failed to parse mount M2: ", m2Path);
-                return;
-            }
-
-            // Load skin file
-            std::string skinPath = m2Path.substr(0, m2Path.size() - 3) + "00.skin";
-            auto skinData = assetManager->readFile(skinPath);
-            if (!skinData.empty()) {
-                pipeline::M2Loader::loadSkin(skinData, model);
-            }
-
-            // Load external .anim files
-            std::string basePath = m2Path.substr(0, m2Path.size() - 3);
-            for (uint32_t si = 0; si < model.sequences.size(); si++) {
-                if (!(model.sequences[si].flags & 0x20)) {
-                    char animFileName[256];
-                    snprintf(animFileName, sizeof(animFileName), "%s%04u-%02u.anim",
-                        basePath.c_str(), model.sequences[si].id, model.sequences[si].variationIndex);
-                    auto animData = assetManager->readFile(animFileName);
-                    if (!animData.empty()) {
-                        pipeline::M2Loader::loadAnimFile(m2Data, animData, si, model);
-                    }
-                }
-            }
-
-            if (!charRenderer->loadModel(model, modelId)) {
-                LOG_WARNING("Failed to load mount model: ", m2Path);
-                return;
-            }
-
-            displayIdModelCache_[mountDisplayId] = modelId;
-        }
-
-        // Apply creature skin textures from CreatureDisplayInfo.dbc
-        if (!modelCached) {
-            auto itDisplayData = displayDataMap_.find(mountDisplayId);
-            if (itDisplayData != displayDataMap_.end()) {
-                const auto& dispData = itDisplayData->second;
-                const auto* modelData = charRenderer->getModelData(modelId);
-                if (modelData) {
-                    std::string modelDir;
-                    size_t lastSlash = m2Path.find_last_of("\\/");
-                    if (lastSlash != std::string::npos) {
-                        modelDir = m2Path.substr(0, lastSlash + 1);
-                    }
-                    for (size_t ti = 0; ti < modelData->textures.size(); ti++) {
-                        const auto& tex = modelData->textures[ti];
-                        std::string texPath;
-                        if (tex.type == 11 && !dispData.skin1.empty()) {
-                            texPath = modelDir + dispData.skin1 + ".blp";
-                        } else if (tex.type == 12 && !dispData.skin2.empty()) {
-                            texPath = modelDir + dispData.skin2 + ".blp";
-                        } else if (tex.type == 13 && !dispData.skin3.empty()) {
-                            texPath = modelDir + dispData.skin3 + ".blp";
-                        }
-                        if (!texPath.empty()) {
-                            GLuint skinTex = charRenderer->loadTexture(texPath);
-                            if (skinTex != 0) {
-                                charRenderer->setModelTexture(modelId, static_cast<uint32_t>(ti), skinTex);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        mountModelId_ = modelId;
-
-        // Create mount instance at player position
-        glm::vec3 mountPos = renderer->getCharacterPosition();
-        float yawRad = glm::radians(renderer->getCharacterYaw());
-        uint32_t instanceId = charRenderer->createInstance(modelId, mountPos,
-            glm::vec3(0.0f, 0.0f, yawRad), 1.0f);
-
-        if (instanceId == 0) {
-            LOG_WARNING("Failed to create mount instance");
-            return;
-        }
-
-        mountInstanceId_ = instanceId;
-
-        // Compute height offset — place player above mount's back
-        const auto* modelData = charRenderer->getModelData(modelId);
-        float heightOffset = 1.2f;  // Default fallback
-        if (modelData) {
-            // No coord swizzle in character renderer, so Z is up in model space too.
-            // Use the top of the bounding box as the saddle height.
-            float topZ = modelData->boundMax.z;
-            if (topZ > 0.1f) {
-                heightOffset = topZ * 0.85f;
-            }
-            LOG_INFO("Mount bounds: min=(", modelData->boundMin.x, ",", modelData->boundMin.y, ",", modelData->boundMin.z,
-                     ") max=(", modelData->boundMax.x, ",", modelData->boundMax.y, ",", modelData->boundMax.z,
-                     ") radius=", modelData->boundRadius, " → heightOffset=", heightOffset);
-        }
-
-        renderer->setMounted(instanceId, heightOffset);
-        charRenderer->playAnimation(instanceId, 0, true);  // Idle animation
-
-        LOG_INFO("Mounted: displayId=", mountDisplayId, " model=", m2Path, " heightOffset=", heightOffset);
+        // Queue the mount for processing in the next update() frame
+        pendingMountDisplayId_ = mountDisplayId;
     });
 
     // Creature move callback (online mode) - update creature positions
@@ -2277,6 +2152,150 @@ void Application::processCreatureSpawnQueue() {
         pendingCreatureSpawns_.erase(pendingCreatureSpawns_.begin());
         spawned++;
     }
+}
+
+void Application::processPendingMount() {
+    if (pendingMountDisplayId_ == 0) return;
+    uint32_t mountDisplayId = pendingMountDisplayId_;
+    pendingMountDisplayId_ = 0;
+    LOG_INFO("processPendingMount: loading displayId ", mountDisplayId);
+
+    if (!renderer || !renderer->getCharacterRenderer() || !assetManager) return;
+    auto* charRenderer = renderer->getCharacterRenderer();
+
+    std::string m2Path = getModelPathForDisplayId(mountDisplayId);
+    if (m2Path.empty()) {
+        LOG_WARNING("No model path for mount displayId ", mountDisplayId);
+        return;
+    }
+
+    // Check model cache
+    uint32_t modelId = 0;
+    bool modelCached = false;
+    auto cacheIt = displayIdModelCache_.find(mountDisplayId);
+    if (cacheIt != displayIdModelCache_.end()) {
+        modelId = cacheIt->second;
+        modelCached = true;
+    } else {
+        modelId = nextCreatureModelId_++;
+
+        auto m2Data = assetManager->readFile(m2Path);
+        if (m2Data.empty()) {
+            LOG_WARNING("Failed to read mount M2: ", m2Path);
+            return;
+        }
+
+        pipeline::M2Model model = pipeline::M2Loader::load(m2Data);
+        if (model.vertices.empty()) {
+            LOG_WARNING("Failed to parse mount M2: ", m2Path);
+            return;
+        }
+
+        // Load skin file
+        std::string skinPath = m2Path.substr(0, m2Path.size() - 3) + "00.skin";
+        auto skinData = assetManager->readFile(skinPath);
+        if (!skinData.empty()) {
+            pipeline::M2Loader::loadSkin(skinData, model);
+        }
+
+        // Load external .anim files (only idle + run needed for mounts)
+        std::string basePath = m2Path.substr(0, m2Path.size() - 3);
+        for (uint32_t si = 0; si < model.sequences.size(); si++) {
+            if (!(model.sequences[si].flags & 0x20)) {
+                uint32_t animId = model.sequences[si].id;
+                // Only load stand(0), walk(4), run(5) anims to avoid hang
+                if (animId != 0 && animId != 4 && animId != 5) continue;
+                char animFileName[256];
+                snprintf(animFileName, sizeof(animFileName), "%s%04u-%02u.anim",
+                    basePath.c_str(), animId, model.sequences[si].variationIndex);
+                auto animData = assetManager->readFile(animFileName);
+                if (!animData.empty()) {
+                    pipeline::M2Loader::loadAnimFile(m2Data, animData, si, model);
+                }
+            }
+        }
+
+        if (!charRenderer->loadModel(model, modelId)) {
+            LOG_WARNING("Failed to load mount model: ", m2Path);
+            return;
+        }
+
+        displayIdModelCache_[mountDisplayId] = modelId;
+    }
+
+    // Apply creature skin textures from CreatureDisplayInfo.dbc
+    if (!modelCached) {
+        auto itDisplayData = displayDataMap_.find(mountDisplayId);
+        if (itDisplayData != displayDataMap_.end()) {
+            const auto& dispData = itDisplayData->second;
+            const auto* md = charRenderer->getModelData(modelId);
+            if (md) {
+                std::string modelDir;
+                size_t lastSlash = m2Path.find_last_of("\\/");
+                if (lastSlash != std::string::npos) {
+                    modelDir = m2Path.substr(0, lastSlash + 1);
+                }
+                for (size_t ti = 0; ti < md->textures.size(); ti++) {
+                    const auto& tex = md->textures[ti];
+                    std::string texPath;
+                    if (tex.type == 11 && !dispData.skin1.empty()) {
+                        texPath = modelDir + dispData.skin1 + ".blp";
+                    } else if (tex.type == 12 && !dispData.skin2.empty()) {
+                        texPath = modelDir + dispData.skin2 + ".blp";
+                    } else if (tex.type == 13 && !dispData.skin3.empty()) {
+                        texPath = modelDir + dispData.skin3 + ".blp";
+                    }
+                    if (!texPath.empty()) {
+                        GLuint skinTex = charRenderer->loadTexture(texPath);
+                        if (skinTex != 0) {
+                            charRenderer->setModelTexture(modelId, static_cast<uint32_t>(ti), skinTex);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    mountModelId_ = modelId;
+
+    // Create mount instance at player position
+    glm::vec3 mountPos = renderer->getCharacterPosition();
+    float yawRad = glm::radians(renderer->getCharacterYaw());
+    uint32_t instanceId = charRenderer->createInstance(modelId, mountPos,
+        glm::vec3(0.0f, 0.0f, yawRad), 1.0f);
+
+    if (instanceId == 0) {
+        LOG_WARNING("Failed to create mount instance");
+        return;
+    }
+
+    mountInstanceId_ = instanceId;
+
+    // Compute height offset — place player above mount's back
+    // Use tight bounds from actual vertices (M2 header bounds can be inaccurate)
+    const auto* modelData = charRenderer->getModelData(modelId);
+    float heightOffset = 1.8f;
+    if (modelData && !modelData->vertices.empty()) {
+        float minZ =  std::numeric_limits<float>::max();
+        float maxZ = -std::numeric_limits<float>::max();
+        for (const auto& v : modelData->vertices) {
+            if (v.position.z < minZ) minZ = v.position.z;
+            if (v.position.z > maxZ) maxZ = v.position.z;
+        }
+        float extentZ = maxZ - minZ;
+        LOG_INFO("Mount tight bounds: minZ=", minZ, " maxZ=", maxZ, " extentZ=", extentZ);
+        if (extentZ > 0.5f) {
+            // Saddle point is roughly 75% up the model, measured from model origin
+            heightOffset = maxZ * 0.8f;
+            if (heightOffset < 1.0f) heightOffset = extentZ * 0.75f;
+            if (heightOffset < 1.0f) heightOffset = 1.8f;
+        }
+    }
+
+    renderer->setMounted(instanceId, heightOffset);
+    charRenderer->playAnimation(instanceId, 0, true);
+
+    LOG_INFO("processPendingMount: DONE displayId=", mountDisplayId, " model=", m2Path, " heightOffset=", heightOffset);
 }
 
 void Application::despawnOnlineCreature(uint64_t guid) {

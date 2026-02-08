@@ -190,8 +190,10 @@ void CameraController::update(float deltaTime) {
             speed = WOW_BACK_SPEED;
         } else if (ctrlDown) {
             speed = WOW_WALK_SPEED;
+        } else if (runSpeedOverride_ > 0.0f && runSpeedOverride_ < 100.0f && !std::isnan(runSpeedOverride_)) {
+            speed = runSpeedOverride_;
         } else {
-            speed = (runSpeedOverride_ > 0.0f) ? runSpeedOverride_ : WOW_RUN_SPEED;
+            speed = WOW_RUN_SPEED;
         }
     } else {
         // Exploration mode (original behavior)

@@ -5,14 +5,15 @@
 #include <SDL2/SDL.h>
 #include <X11/Xlib.h>
 
+// Keep a persistent X11 connection for emergency mouse release in signal handlers.
+// XOpenDisplay inside a signal handler is unreliable, so we open it once at startup.
+static Display* g_emergencyDisplay = nullptr;
+
 static void releaseMouseGrab() {
-    // Bypass SDL — talk to X11 directly (signal-safe enough for our purposes)
-    Display* dpy = XOpenDisplay(nullptr);
-    if (dpy) {
-        XUngrabPointer(dpy, CurrentTime);
-        XUngrabKeyboard(dpy, CurrentTime);
-        XFlush(dpy);
-        XCloseDisplay(dpy);
+    if (g_emergencyDisplay) {
+        XUngrabPointer(g_emergencyDisplay, CurrentTime);
+        XUngrabKeyboard(g_emergencyDisplay, CurrentTime);
+        XFlush(g_emergencyDisplay);
     }
 }
 
@@ -23,6 +24,7 @@ static void crashHandler(int sig) {
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
+    g_emergencyDisplay = XOpenDisplay(nullptr);
     std::signal(SIGSEGV, crashHandler);
     std::signal(SIGABRT, crashHandler);
     std::signal(SIGFPE,  crashHandler);
@@ -44,6 +46,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         app.shutdown();
 
         LOG_INFO("Application exited successfully");
+        if (g_emergencyDisplay) { XCloseDisplay(g_emergencyDisplay); g_emergencyDisplay = nullptr; }
         return 0;
     }
     catch (const std::exception& e) {
