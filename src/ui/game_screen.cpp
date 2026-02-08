@@ -402,11 +402,6 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
         chatWindowPos_ = ImGui::GetWindowPos();
     }
 
-    // Click anywhere in chat window → focus the input field
-    if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseClicked(0)) {
-        refocusChatInput = true;
-    }
-
     // Chat history
     const auto& chatHistory = gameHandler.getChatHistory();
 
@@ -439,6 +434,11 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
     }
 
     ImGui::EndChild();
+
+    // Click on chat history area → focus the input field
+    if (ImGui::IsItemClicked()) {
+        refocusChatInput = true;
+    }
 
     ImGui::Spacing();
     ImGui::Separator();
