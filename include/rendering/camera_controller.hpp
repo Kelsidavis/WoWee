@@ -64,6 +64,7 @@ public:
     bool isRightMouseHeld() const { return rightMouseDown; }
     bool isSitting() const { return sitting; }
     bool isSwimming() const { return swimming; }
+    bool isInsideWMO() const { return cachedInsideWMO; }
     const glm::vec3* getFollowTarget() const { return followTarget; }
     glm::vec3* getFollowTargetMutable() { return followTarget; }
 

@@ -185,9 +185,6 @@ bool Renderer::initialize(core::Window* win) {
 
     // Create M2 renderer (for doodads)
     m2Renderer = std::make_unique<M2Renderer>();
-    if (wmoRenderer) {
-        m2Renderer->setWMORenderer(wmoRenderer.get());
-    }
     // Note: M2 renderer needs asset manager, will be initialized when terrain loads
 
     // Create zone manager
@@ -1301,6 +1298,10 @@ void Renderer::renderWorld(game::World* world) {
 
     // Render M2 doodads (trees, rocks, etc.)
     if (m2Renderer && camera) {
+        // Dim M2 lighting when player is inside a WMO
+        if (cameraController) {
+            m2Renderer->setInsideInterior(cameraController->isInsideWMO());
+        }
         auto m2Start = std::chrono::steady_clock::now();
         m2Renderer->render(*camera, view, projection);
         m2Renderer->renderSmokeParticles(*camera, view, projection);

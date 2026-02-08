@@ -1,5 +1,4 @@
 #include "rendering/m2_renderer.hpp"
-#include "rendering/wmo_renderer.hpp"
 #include "rendering/texture.hpp"
 #include "rendering/shader.hpp"
 #include "rendering/camera.hpp"
@@ -1495,14 +1494,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
 
         shader->setUniform("uModel", instance.modelMatrix);
         shader->setUniform("uFadeAlpha", fadeAlpha);
-
-        // Dim M2 objects inside WMO interiors
-        bool interior = false;
-        if (wmoRenderer && entry.distSq < 200.0f * 200.0f) {
-            interior = wmoRenderer->isInsideInteriorWMO(
-                instance.position.x, instance.position.y, instance.position.z);
-        }
-        shader->setUniform("uInteriorDarken", interior);
+        shader->setUniform("uInteriorDarken", insideInterior);
 
         // Upload bone matrices if model has skeletal animation
         bool useBones = model.hasAnimation && !model.disableAnimation && !instance.boneMatrices.empty();
@@ -2406,9 +2398,9 @@ bool M2Renderer::checkCollision(const glm::vec3& from, const glm::vec3& to,
         if (allowEscapeRelax) {
             continue;
         }
-        if ((model.collisionSteppedLowPlatform || model.collisionSteppedFountain) && stepableLowObject) {
+        if (stepableLowObject && nearTop) {
             // Already on/near top surface: don't apply lateral push that ejects
-            // the player from the object when landing.
+            // the player from the object (carpets, platforms, etc).
             continue;
         }
         // Gentle fallback push for overlapping cases.
