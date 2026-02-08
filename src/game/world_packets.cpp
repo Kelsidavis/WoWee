@@ -2589,13 +2589,20 @@ bool ListInventoryParser::parse(network::Packet& packet, ListInventoryData& data
 
 network::Packet RepopRequestPacket::build() {
     network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_REPOP_REQUEST));
-    packet.writeUInt8(0);  // auto-release flag (0 = manual)
+    packet.writeUInt8(1);  // request release (1 = manual)
     return packet;
 }
 
 network::Packet SpiritHealerActivatePacket::build(uint64_t npcGuid) {
     network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_SPIRIT_HEALER_ACTIVATE));
     packet.writeUInt64(npcGuid);
+    return packet;
+}
+
+network::Packet ResurrectResponsePacket::build(uint64_t casterGuid, bool accept) {
+    network::Packet packet(static_cast<uint16_t>(Opcode::CMSG_RESURRECT_RESPONSE));
+    packet.writeUInt64(casterGuid);
+    packet.writeUInt8(accept ? 1 : 0);
     return packet;
 }
 

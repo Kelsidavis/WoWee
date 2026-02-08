@@ -507,18 +507,60 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_GOSSIP_COMPLETE:
             handleGossipComplete(packet);
             break;
-        case Opcode::SMSG_SPIRIT_HEALER_CONFIRM: {
+        case Opcode::SMSG_RESURRECT_REQUEST: {
             if (packet.getSize() - packet.getReadPos() < 8) {
-                LOG_WARNING("SMSG_SPIRIT_HEALER_CONFIRM too short");
+                LOG_WARNING("SMSG_RESURRECT_REQUEST too short");
                 break;
             }
-            uint64_t healerGuid = packet.readUInt64();
-            LOG_INFO("Spirit healer confirm from 0x", std::hex, healerGuid, std::dec);
-            if (playerDead_ && socket && state == WorldState::IN_WORLD) {
-                auto activate = SpiritHealerActivatePacket::build(healerGuid);
-                socket->send(activate);
-                LOG_INFO("Confirmed spirit healer activation");
+            uint64_t casterGuid = packet.readUInt64();
+            LOG_INFO("Resurrect request from 0x", std::hex, casterGuid, std::dec);
+            if (!playerDead_) {
+                playerDead_ = true;
+                LOG_INFO("Marked player dead due to resurrect request");
             }
+            if (socket && state == WorldState::IN_WORLD) {
+                uint64_t useGuid = casterGuid ? casterGuid : pendingSpiritHealerGuid_;
+                if (useGuid == 0) {
+                    LOG_WARNING("Resurrect request received without a valid guid");
+                    break;
+                }
+                if (!playerDead_) {
+                    LOG_WARNING("Resurrect request while playerDead_ is false; proceeding anyway");
+                }
+                auto response = ResurrectResponsePacket::build(useGuid, true);
+                socket->send(response);
+                LOG_INFO("Sent resurrect response for 0x", std::hex, useGuid, std::dec);
+                resurrectPending_ = true;
+                pendingSpiritHealerGuid_ = 0;
+            }
+            break;
+        }
+        case Opcode::SMSG_RESURRECT_RESULT: {
+            if (packet.getSize() - packet.getReadPos() < 1) {
+                LOG_WARNING("SMSG_RESURRECT_RESULT too short");
+                break;
+            }
+            uint8_t result = packet.readUInt8();
+            LOG_INFO("Resurrect result: ", static_cast<int>(result));
+            if (result == 0) {
+                playerDead_ = false;
+                LOG_INFO("Player resurrected (result)");
+            }
+            resurrectPending_ = false;
+            if (!playerDead_) {
+                repopPending_ = false;
+            }
+            break;
+        }
+        case Opcode::SMSG_RESURRECT_CANCEL: {
+            if (packet.getSize() - packet.getReadPos() < 4) {
+                LOG_WARNING("SMSG_RESURRECT_CANCEL too short");
+                break;
+            }
+            uint32_t reason = packet.readUInt32();
+            LOG_INFO("Resurrect cancel reason: ", reason);
+            playerDead_ = true;
+            resurrectPending_ = false;
             break;
         }
         case Opcode::SMSG_LIST_INVENTORY:
@@ -1179,6 +1221,7 @@ void GameHandler::sendMovement(Opcode opcode) {
 
     // Block movement during taxi flight
     if (onTaxiFlight_) return;
+    if (resurrectPending_) return;
 
     // Use real millisecond timestamp (server validates for anti-cheat)
     static auto startTime = std::chrono::steady_clock::now();
@@ -1354,6 +1397,7 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                 // Extract health/mana/power from fields (Phase 2) — single pass
                 if (block.objectType == ObjectType::UNIT || block.objectType == ObjectType::PLAYER) {
                     auto unit = std::static_pointer_cast<Unit>(entity);
+                    constexpr uint32_t UNIT_DYNFLAG_DEAD = 0x0008;
                     for (const auto& [key, val] : block.fields) {
                         switch (key) {
                             case 24:
@@ -1369,6 +1413,7 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                             case 33: unit->setMaxPower(val); break;
                             case 55: unit->setFactionTemplate(val); break; // UNIT_FIELD_FACTIONTEMPLATE
                             case 59: unit->setUnitFlags(val); break;   // UNIT_FIELD_FLAGS
+                            case 147: unit->setDynamicFlags(val); break; // UNIT_DYNAMIC_FLAGS
                             case 54: unit->setLevel(val); break;
                             case 67: unit->setDisplayId(val); break;  // UNIT_FIELD_DISPLAYID
                             case 69: // UNIT_FIELD_MOUNTDISPLAYID
@@ -1392,6 +1437,11 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                             case 82: unit->setNpcFlags(val); break;   // UNIT_NPC_FLAGS
                             default: break;
                         }
+                    }
+                    if (block.guid == playerGuid &&
+                        (unit->getDynamicFlags() & UNIT_DYNFLAG_DEAD) != 0) {
+                        playerDead_ = true;
+                        LOG_INFO("Player logged in dead (dynamic flags)");
                     }
                     // Determine hostility from faction template for online creatures
                     if (unit->getFactionTemplate() != 0) {
@@ -1470,6 +1520,7 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                     // Update cached health/mana/power values (Phase 2) — single pass
                     if (entity->getType() == ObjectType::UNIT || entity->getType() == ObjectType::PLAYER) {
                         auto unit = std::static_pointer_cast<Unit>(entity);
+                        constexpr uint32_t UNIT_DYNFLAG_DEAD = 0x0008;
                         for (const auto& [key, val] : block.fields) {
                             switch (key) {
                                 case 24: {
@@ -1507,6 +1558,22 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                 case 32: unit->setMaxHealth(val); break;
                                 case 33: unit->setMaxPower(val); break;
                                 case 59: unit->setUnitFlags(val); break;   // UNIT_FIELD_FLAGS
+                                case 147: {
+                                    uint32_t oldDyn = unit->getDynamicFlags();
+                                    unit->setDynamicFlags(val);
+                                    if (block.guid == playerGuid) {
+                                        bool wasDead = (oldDyn & UNIT_DYNFLAG_DEAD) != 0;
+                                        bool nowDead = (val & UNIT_DYNFLAG_DEAD) != 0;
+                                        if (!wasDead && nowDead) {
+                                            playerDead_ = true;
+                                            LOG_INFO("Player died (dynamic flags)");
+                                        } else if (wasDead && !nowDead) {
+                                            playerDead_ = false;
+                                            LOG_INFO("Player resurrected (dynamic flags)");
+                                        }
+                                    }
+                                    break;
+                                }
                                 case 54: unit->setLevel(val); break;
                                 case 55:  // UNIT_FIELD_FACTIONTEMPLATE
                                     unit->setFactionTemplate(val);
@@ -2672,23 +2739,33 @@ void GameHandler::stopCasting() {
 }
 
 void GameHandler::releaseSpirit() {
-    if (!playerDead_) return;
     if (socket && state == WorldState::IN_WORLD) {
+        auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (repopPending_ && now - static_cast<int64_t>(lastRepopRequestMs_) < 1000) {
+            return;
+        }
+        playerDead_ = true;
         auto packet = RepopRequestPacket::build();
         socket->send(packet);
+        repopPending_ = true;
+        lastRepopRequestMs_ = static_cast<uint64_t>(now);
         LOG_INFO("Sent CMSG_REPOP_REQUEST (Release Spirit)");
     }
 }
 
 void GameHandler::activateSpiritHealer(uint64_t npcGuid) {
     if (state != WorldState::IN_WORLD || !socket) return;
-    auto gossipPacket = GossipHelloPacket::build(npcGuid);
-    socket->send(gossipPacket);
-    auto questHelloPacket = QuestgiverHelloPacket::build(npcGuid);
-    socket->send(questHelloPacket);
-    auto packet = SpiritHealerActivatePacket::build(npcGuid);
-    socket->send(packet);
-    LOG_INFO("Sent spirit healer activation sequence to 0x", std::hex, npcGuid, std::dec);
+    pendingSpiritHealerGuid_ = npcGuid;
+    if (!gossipWindowOpen) {
+        auto gossipPacket = GossipHelloPacket::build(npcGuid);
+        socket->send(gossipPacket);
+        auto questHelloPacket = QuestgiverHelloPacket::build(npcGuid);
+        socket->send(questHelloPacket);
+        LOG_INFO("Requested spirit healer confirm from 0x", std::hex, npcGuid, std::dec);
+    } else {
+        LOG_INFO("Queued spirit healer confirm for 0x", std::hex, npcGuid, std::dec);
+    }
 }
 
 void GameHandler::tabTarget(float playerX, float playerY, float playerZ) {

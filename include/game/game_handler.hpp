@@ -912,6 +912,10 @@ private:
     float preMountRunSpeed_ = 0.0f;
     float serverRunSpeed_ = 7.0f;
     bool playerDead_ = false;
+    uint64_t pendingSpiritHealerGuid_ = 0;
+    bool resurrectPending_ = false;
+    bool repopPending_ = false;
+    uint64_t lastRepopRequestMs_ = 0;
 };
 
 } // namespace game

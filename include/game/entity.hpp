@@ -197,6 +197,10 @@ public:
     uint32_t getUnitFlags() const { return unitFlags; }
     void setUnitFlags(uint32_t f) { unitFlags = f; }
 
+    // Dynamic flags (UNIT_DYNAMIC_FLAGS, index 147)
+    uint32_t getDynamicFlags() const { return dynamicFlags; }
+    void setDynamicFlags(uint32_t f) { dynamicFlags = f; }
+
     // NPC flags (UNIT_NPC_FLAGS, index 82)
     uint32_t getNpcFlags() const { return npcFlags; }
     void setNpcFlags(uint32_t f) { npcFlags = f; }
@@ -222,6 +226,7 @@ protected:
     uint32_t displayId = 0;
     uint32_t mountDisplayId = 0;
     uint32_t unitFlags = 0;
+    uint32_t dynamicFlags = 0;
     uint32_t npcFlags = 0;
     uint32_t factionTemplate = 0;
     bool hostile = false;

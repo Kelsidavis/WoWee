@@ -441,8 +441,6 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
-    float controlsTopY = ImGui::GetCursorScreenPos().y;
-
     // Lock toggle
     ImGui::Checkbox("Lock", &chatWindowLocked);
     ImGui::SameLine();

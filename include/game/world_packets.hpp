@@ -1727,5 +1727,11 @@ public:
     static network::Packet build(uint64_t npcGuid);
 };
 
+/** CMSG_RESURRECT_RESPONSE packet builder */
+class ResurrectResponsePacket {
+public:
+    static network::Packet build(uint64_t casterGuid, bool accept);
+};
+
 } // namespace game
 } // namespace wowee
