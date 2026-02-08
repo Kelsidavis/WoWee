@@ -715,7 +715,16 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             (lowerName.find("fireflys") != std::string::npos) ||
             (lowerName.find("mushroom") != std::string::npos) ||
             (lowerName.find("fungus") != std::string::npos) ||
-            (lowerName.find("toadstool") != std::string::npos);
+            (lowerName.find("toadstool") != std::string::npos) ||
+            (lowerName.find("root") != std::string::npos) ||
+            (lowerName.find("branch") != std::string::npos) ||
+            (lowerName.find("thorn") != std::string::npos) ||
+            (lowerName.find("moss") != std::string::npos) ||
+            (lowerName.find("ivy") != std::string::npos) ||
+            (lowerName.find("seaweed") != std::string::npos) ||
+            (lowerName.find("kelp") != std::string::npos) ||
+            (lowerName.find("cattail") != std::string::npos) ||
+            (lowerName.find("reed") != std::string::npos);
         bool treeLike = (lowerName.find("tree") != std::string::npos);
         foliageOrTreeLike = (foliageName || treeLike);
         bool hardTreePart =

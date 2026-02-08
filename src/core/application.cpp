@@ -1,6 +1,7 @@
 #include "core/application.hpp"
 #include "core/coordinates.hpp"
 #include <unordered_set>
+#include <cmath>
 #include "core/spawn_presets.hpp"
 #include "core/logger.hpp"
 #include "rendering/renderer.hpp"
@@ -539,14 +540,18 @@ void Application::setupUICallbacks() {
         loadOnlineWorldTerrain(mapId, x, y, z);
     });
 
-    // Unstuck callback — re-run spawn search at current XY to find valid floor
+    // Unstuck callback — move 5 units forward (based on facing) and re-snap to floor
     gameHandler->setUnstuckCallback([this]() {
         if (!renderer || !renderer->getCameraController()) return;
         auto* cc = renderer->getCameraController();
         auto* ft = cc->getFollowTargetMutable();
         if (!ft) return;
-        // Use reset() which does a full multi-radius WMO/terrain floor search
-        cc->setDefaultSpawn(*ft, cc->getYaw(), cc->getPitch());
+        // Move 5 units in the direction the player is facing
+        float yaw = cc->getYaw();
+        ft->x += 5.0f * std::sin(yaw);
+        ft->y += 5.0f * std::cos(yaw);
+        // Re-snap to floor at the new position
+        cc->setDefaultSpawn(*ft, yaw, cc->getPitch());
         cc->reset();
     });
 

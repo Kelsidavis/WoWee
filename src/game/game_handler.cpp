@@ -4014,7 +4014,7 @@ void GameHandler::useItemById(uint32_t itemId) {
 void GameHandler::unstuck() {
     if (unstuckCallback_) {
         unstuckCallback_();
-        addSystemChatMessage("Unstuck: position reset to floor.");
+        addSystemChatMessage("Unstuck: moved 5 units forward.");
     }
 }
 
