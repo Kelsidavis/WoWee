@@ -4016,7 +4016,7 @@ void GameHandler::loadTaxiDbc() {
     auto* am = core::Application::getInstance().getAssetManager();
     if (!am || !am->isInitialized()) return;
 
-    // Load TaxiNodes.dbc: 0=ID, 1=mapId, 2=x, 3=y, 4=z, 6=name
+    // Load TaxiNodes.dbc: 0=ID, 1=mapId, 2=x, 3=y, 4=z, 5=name(enUS locale)
     auto nodesDbc = am->loadDBC("TaxiNodes.dbc");
     if (nodesDbc && nodesDbc->isLoaded()) {
         for (uint32_t i = 0; i < nodesDbc->getRecordCount(); i++) {
@@ -4026,7 +4026,7 @@ void GameHandler::loadTaxiDbc() {
             node.x = nodesDbc->getFloat(i, 2);
             node.y = nodesDbc->getFloat(i, 3);
             node.z = nodesDbc->getFloat(i, 4);
-            node.name = nodesDbc->getString(i, 6);
+            node.name = nodesDbc->getString(i, 5);
             if (node.id > 0) {
                 taxiNodes_[node.id] = std::move(node);
             }
@@ -4089,6 +4089,7 @@ void GameHandler::handleShowTaxiNodes(network::Packet& packet) {
     taxiNpcGuid_ = data.npcGuid;
     taxiWindowOpen_ = true;
     gossipWindowOpen = false;
+    buildTaxiCostMap();
     LOG_INFO("Taxi window opened, nearest node=", data.nearestNode);
 }
 
@@ -4111,6 +4112,42 @@ void GameHandler::handleActivateTaxiReply(network::Packet& packet) {
 
 void GameHandler::closeTaxi() {
     taxiWindowOpen_ = false;
+}
+
+void GameHandler::buildTaxiCostMap() {
+    taxiCostMap_.clear();
+    uint32_t startNode = currentTaxiData_.nearestNode;
+    if (startNode == 0) return;
+
+    // Build adjacency list with costs from known edges
+    struct AdjEntry { uint32_t node; uint32_t cost; };
+    std::unordered_map<uint32_t, std::vector<AdjEntry>> adj;
+    for (const auto& edge : taxiPathEdges_) {
+        if (currentTaxiData_.isNodeKnown(edge.fromNode) && currentTaxiData_.isNodeKnown(edge.toNode)) {
+            adj[edge.fromNode].push_back({edge.toNode, edge.cost});
+        }
+    }
+
+    // BFS from startNode, accumulating costs along the path
+    std::deque<uint32_t> queue;
+    queue.push_back(startNode);
+    taxiCostMap_[startNode] = 0;
+
+    while (!queue.empty()) {
+        uint32_t cur = queue.front();
+        queue.pop_front();
+        for (const auto& next : adj[cur]) {
+            if (taxiCostMap_.find(next.node) == taxiCostMap_.end()) {
+                taxiCostMap_[next.node] = taxiCostMap_[cur] + next.cost;
+                queue.push_back(next.node);
+            }
+        }
+    }
+}
+
+uint32_t GameHandler::getTaxiCostTo(uint32_t destNodeId) const {
+    auto it = taxiCostMap_.find(destNodeId);
+    return (it != taxiCostMap_.end()) ? it->second : 0;
 }
 
 void GameHandler::activateTaxi(uint32_t destNodeId) {

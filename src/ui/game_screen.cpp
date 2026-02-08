@@ -3393,8 +3393,21 @@ void GameScreen::renderTaxiWindow(game::GameHandler& gameHandler) {
             if (node.mapId != currentMapId) continue;
             if (!taxiData.isNodeKnown(nodeId)) continue;
 
+            uint32_t costCopper = gameHandler.getTaxiCostTo(nodeId);
+            uint32_t gold = costCopper / 10000;
+            uint32_t silver = (costCopper / 100) % 100;
+            uint32_t copper = costCopper % 100;
+
             ImGui::PushID(static_cast<int>(nodeId));
             ImGui::Text("%s", node.name.c_str());
+            ImGui::SameLine();
+            if (gold > 0) {
+                ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.3f, 1.0f), "(%ug %us %uc)", gold, silver, copper);
+            } else if (silver > 0) {
+                ImGui::TextColored(ImVec4(0.75f, 0.75f, 0.75f, 1.0f), "(%us %uc)", silver, copper);
+            } else {
+                ImGui::TextColored(ImVec4(0.72f, 0.45f, 0.2f, 1.0f), "(%uc)", copper);
+            }
             ImGui::SameLine(ImGui::GetWindowWidth() - 60);
             if (ImGui::SmallButton("Fly")) {
                 gameHandler.activateTaxi(nodeId);

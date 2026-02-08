@@ -482,6 +482,7 @@ public:
         uint32_t cost = 0;
     };
     const std::unordered_map<uint32_t, TaxiNode>& getTaxiNodes() const { return taxiNodes_; }
+    uint32_t getTaxiCostTo(uint32_t destNodeId) const;
 
     // Vendor
     void openVendor(uint64_t npcGuid);
@@ -856,6 +857,8 @@ private:
     bool onTaxiFlight_ = false;
     uint32_t knownTaxiMask_[12] = {};  // Track previously known nodes for discovery alerts
     bool taxiMaskInitialized_ = false; // First SMSG_SHOWTAXINODES seeds mask without alerts
+    std::unordered_map<uint32_t, uint32_t> taxiCostMap_; // destNodeId -> total cost in copper
+    void buildTaxiCostMap();
 
     // Vendor
     bool vendorWindowOpen = false;
