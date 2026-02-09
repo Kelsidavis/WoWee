@@ -23,12 +23,12 @@ bool NpcVoiceManager::initialize(pipeline::AssetManager* assets) {
     // Probe for actual sound file paths (NPC sounds are in Sound\Creature\)
     LOG_INFO("=== Probing for NPC voice files ===");
     std::vector<std::string> testPaths = {
-        "Sound\\Creature\\humanfemalestandardnpc\\humanfemalestandardnpcgreeting01.ogg",
-        "Sound\\Creature\\humanfemalestandardnpc\\humanfemalestandardnpcgreeting02.ogg",
-        "Sound\\Creature\\humanmalestandardnpc\\humanmalestandardnpcgreeting01.ogg",
-        "Sound\\Creature\\humanmalestandardnpc\\humanmalestandardnpcgreeting02.ogg",
-        "Sound\\Creature\\NPCGhoul\\NPCGhoulVendor01.ogg",
-        "Sound\\Creature\\NPCGhoul\\NPCGhoulVendor02.ogg",
+        "Sound\\Creature\\HumanMaleStandardNPC\\HumanMaleStandardNPCGreetings01.ogg",
+        "Sound\\Creature\\HumanFemaleStandardNPC\\HumanFemaleStandardNPCGreeting01.ogg",
+        "Sound\\Creature\\DwarfMaleStandardNPC\\DwarfMaleStandardNPCGreeting01.ogg",
+        "Sound\\Creature\\NightElfMaleStandardNPC\\NightElfMaleStandardNPCGreeting01.ogg",
+        "Sound\\Creature\\OrcMaleStandardNPC\\OrcMaleStandardNPCGreeting01.ogg",
+        "Sound\\Creature\\TaurenFemaleStandardNPC\\TaurenFemaleStandardNPCGreeting01.ogg",
     };
     for (const auto& path : testPaths) {
         bool exists = assetManager_->fileExists(path);
@@ -65,55 +65,142 @@ void NpcVoiceManager::shutdown() {
 void NpcVoiceManager::loadVoiceSounds() {
     if (!assetManager_) return;
 
-    // Generic NPC greetings (using standard NPC creature sounds in .ogg format)
-    // These are the actual NPC vendor/innkeeper greetings from Sound/Creature/
-    std::vector<std::string> genericPaths = {
-        "Sound\\Creature\\humanfemalestandardnpc\\humanfemalestandardnpcgreeting01.ogg",
-        "Sound\\Creature\\humanfemalestandardnpc\\humanfemalestandardnpcgreeting02.ogg",
-        "Sound\\Creature\\humanfemalestandardnpc\\humanfemalestandardnpcgreeting03.ogg",
-        "Sound\\Creature\\humanmalestandardnpc\\humanmalestandardnpcgreeting01.ogg",
-        "Sound\\Creature\\humanmalestandardnpc\\humanmalestandardnpcgreeting02.ogg",
-        "Sound\\Creature\\humanmalestandardnpc\\humanmalestandardnpcgreeting03.ogg",
-    };
+    // Load all standard NPC greetings from Wowhead database
+    // Note: Human male uses "Greetings" (plural), others use "Greeting" (singular)
 
+    // Generic - mix of all races for variety
     auto& genericVoices = voiceLibrary_[VoiceType::GENERIC];
-    for (const auto& path : genericPaths) {
+    for (const auto& path : {
+        "Sound\\Creature\\HumanMaleStandardNPC\\HumanMaleStandardNPCGreetings01.ogg",
+        "Sound\\Creature\\HumanFemaleStandardNPC\\HumanFemaleStandardNPCGreeting01.ogg",
+        "Sound\\Creature\\DwarfMaleStandardNPC\\DwarfMaleStandardNPCGreeting01.ogg",
+        "Sound\\Creature\\GnomeMaleStandardNPC\\GnomeMaleStandardNPCGreeting01.ogg",
+        "Sound\\Creature\\NightElfMaleStandardNPC\\NightElfMaleStandardNPCGreeting01.ogg",
+        "Sound\\Creature\\OrcMaleStandardNPC\\OrcMaleStandardNPCGreeting01.ogg",
+    }) {
         VoiceSample sample;
-        if (loadSound(path, sample)) {
-            genericVoices.push_back(std::move(sample));
-        }
+        if (loadSound(path, sample)) genericVoices.push_back(std::move(sample));
     }
 
-    // Human male NPCs
-    std::vector<std::string> humanMalePaths = {
-        "Sound\\Creature\\humanmalestandardnpc\\humanmalestandardnpcgreeting01.ogg",
-        "Sound\\Creature\\humanmalestandardnpc\\humanmalestandardnpcgreeting02.ogg",
-        "Sound\\Creature\\humanmalestandardnpc\\humanmalestandardnpcgreeting03.ogg",
-    };
+    // Human Male
     auto& humanMale = voiceLibrary_[VoiceType::HUMAN_MALE];
-    for (const auto& path : humanMalePaths) {
+    for (int i = 1; i <= 6; ++i) {
+        std::string path = "Sound\\Creature\\HumanMaleStandardNPC\\HumanMaleStandardNPCGreetings0" + std::to_string(i) + ".ogg";
         VoiceSample sample;
-        if (loadSound(path, sample)) {
-            humanMale.push_back(std::move(sample));
-        }
+        if (loadSound(path, sample)) humanMale.push_back(std::move(sample));
     }
 
-    // Human female NPCs
-    std::vector<std::string> humanFemalePaths = {
-        "Sound\\Creature\\humanfemalestandardnpc\\humanfemalestandardnpcgreeting01.ogg",
-        "Sound\\Creature\\humanfemalestandardnpc\\humanfemalestandardnpcgreeting02.ogg",
-        "Sound\\Creature\\humanfemalestandardnpc\\humanfemalestandardnpcgreeting03.ogg",
-    };
+    // Human Female
     auto& humanFemale = voiceLibrary_[VoiceType::HUMAN_FEMALE];
-    for (const auto& path : humanFemalePaths) {
+    for (int i = 1; i <= 5; ++i) {
+        std::string path = "Sound\\Creature\\HumanFemaleStandardNPC\\HumanFemaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
         VoiceSample sample;
-        if (loadSound(path, sample)) {
-            humanFemale.push_back(std::move(sample));
-        }
+        if (loadSound(path, sample)) humanFemale.push_back(std::move(sample));
     }
 
-    // TODO: Add other race-specific NPC greetings when needed
-    // For now, all NPCs will use human standard greetings as fallback
+    // Dwarf Male
+    auto& dwarfMale = voiceLibrary_[VoiceType::DWARF_MALE];
+    for (int i = 1; i <= 6; ++i) {
+        std::string path = "Sound\\Creature\\DwarfMaleStandardNPC\\DwarfMaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) dwarfMale.push_back(std::move(sample));
+    }
+
+    // Gnome Male
+    auto& gnomeMale = voiceLibrary_[VoiceType::GNOME_MALE];
+    for (int i = 1; i <= 6; ++i) {
+        std::string path = "Sound\\Creature\\GnomeMaleStandardNPC\\GnomeMaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) gnomeMale.push_back(std::move(sample));
+    }
+
+    // Gnome Female
+    auto& gnomeFemale = voiceLibrary_[VoiceType::GNOME_FEMALE];
+    for (int i = 1; i <= 6; ++i) {
+        std::string path = "Sound\\Creature\\GnomeFemaleStandardNPC\\GnomeFemaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) gnomeFemale.push_back(std::move(sample));
+    }
+
+    // Night Elf Male
+    auto& nelfMale = voiceLibrary_[VoiceType::NIGHTELF_MALE];
+    for (int i = 1; i <= 8; ++i) {
+        std::string path = "Sound\\Creature\\NightElfMaleStandardNPC\\NightElfMaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) nelfMale.push_back(std::move(sample));
+    }
+
+    // Night Elf Female
+    auto& nelfFemale = voiceLibrary_[VoiceType::NIGHTELF_FEMALE];
+    for (int i = 1; i <= 6; ++i) {
+        std::string path = "Sound\\Creature\\NightElfFemaleStandardNPC\\NightElfFemaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) nelfFemale.push_back(std::move(sample));
+    }
+
+    // Orc Male
+    auto& orcMale = voiceLibrary_[VoiceType::ORC_MALE];
+    for (int i = 1; i <= 5; ++i) {
+        std::string path = "Sound\\Creature\\OrcMaleStandardNPC\\OrcMaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) orcMale.push_back(std::move(sample));
+    }
+
+    // Orc Female
+    auto& orcFemale = voiceLibrary_[VoiceType::ORC_FEMALE];
+    for (int i = 1; i <= 6; ++i) {
+        std::string path = "Sound\\Creature\\OrcFemaleStandardNPC\\OrcFemaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) orcFemale.push_back(std::move(sample));
+    }
+
+    // Tauren Male
+    auto& taurenMale = voiceLibrary_[VoiceType::TAUREN_MALE];
+    for (int i = 1; i <= 5; ++i) {
+        std::string path = "Sound\\Creature\\TaurenMaleStandardNPC\\TaurenMaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) taurenMale.push_back(std::move(sample));
+    }
+
+    // Tauren Female
+    auto& taurenFemale = voiceLibrary_[VoiceType::TAUREN_FEMALE];
+    for (int i = 1; i <= 5; ++i) {
+        std::string path = "Sound\\Creature\\TaurenFemaleStandardNPC\\TaurenFemaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) taurenFemale.push_back(std::move(sample));
+    }
+
+    // Troll Male
+    auto& trollMale = voiceLibrary_[VoiceType::TROLL_MALE];
+    for (int i = 1; i <= 6; ++i) {
+        std::string path = "Sound\\Creature\\TrollMaleStandardNPC\\TrollMaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) trollMale.push_back(std::move(sample));
+    }
+
+    // Troll Female
+    auto& trollFemale = voiceLibrary_[VoiceType::TROLL_FEMALE];
+    for (int i = 1; i <= 5; ++i) {
+        std::string path = "Sound\\Creature\\TrollFemaleStandardNPC\\TrollFemaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) trollFemale.push_back(std::move(sample));
+    }
+
+    // Undead Male
+    auto& undeadMale = voiceLibrary_[VoiceType::UNDEAD_MALE];
+    for (int i = 1; i <= 6; ++i) {
+        std::string path = "Sound\\Creature\\UndeadMaleStandardNPC\\UndeadMaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) undeadMale.push_back(std::move(sample));
+    }
+
+    // Undead Female
+    auto& undeadFemale = voiceLibrary_[VoiceType::UNDEAD_FEMALE];
+    for (int i = 1; i <= 6; ++i) {
+        std::string path = "Sound\\Creature\\UndeadFemaleStandardNPC\\UndeadFemaleStandardNPCGreeting0" + std::to_string(i) + ".ogg";
+        VoiceSample sample;
+        if (loadSound(path, sample)) undeadFemale.push_back(std::move(sample));
+    }
 
     // Log loaded voice types
     int totalLoaded = 0;
