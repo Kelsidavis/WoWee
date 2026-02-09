@@ -1737,6 +1737,18 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
         for (const auto& batch : model.batches) {
             if (batch.indexCount == 0) continue;
 
+            // LOD selection based on distance (WoW retail behavior)
+            // submeshLevel: 0=base detail, 1=LOD1, 2=LOD2, 3=LOD3
+            float dist = std::sqrt(entry.distSq);
+            uint16_t desiredLOD = 0;
+            if (dist > 150.0f) desiredLOD = 3;       // Far: LOD3 (lowest detail)
+            else if (dist > 80.0f) desiredLOD = 2;   // Medium-far: LOD2
+            else if (dist > 40.0f) desiredLOD = 1;   // Medium: LOD1
+            // else desiredLOD = 0 (close: base detail)
+
+            // Skip batches that don't match desired LOD level
+            if (batch.submeshLevel != desiredLOD) continue;
+
             // Additive/mod batches (glow halos, light effects): collect as glow sprites
             // instead of rendering the mesh geometry which appears as flat orange disks.
             if (batch.blendMode >= 3) {
