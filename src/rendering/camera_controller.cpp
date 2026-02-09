@@ -617,6 +617,21 @@ void CameraController::update(float deltaTime) {
             if (cachedInsideWMO && currentDistance > WMO_MAX_DISTANCE) {
                 currentDistance = WMO_MAX_DISTANCE;
             }
+
+            // Constrain zoom if there's a ceiling/upper floor above player
+            // Raycast upward from player to find ceiling, limit camera distance
+            glm::vec3 upRayOrigin = targetPos;
+            glm::vec3 upRayDir(0.0f, 0.0f, 1.0f);
+            float ceilingDist = wmoRenderer->raycast(upRayOrigin, upRayDir, 15.0f);
+            if (ceilingDist < 15.0f) {
+                // Found ceiling above — limit zoom to prevent camera from going through it
+                // Camera is behind player by currentDistance, at an angle
+                // Approximate: if ceiling is N units above, limit zoom to ~N units
+                float maxZoomForCeiling = std::max(1.5f, ceilingDist * 0.7f);
+                if (currentDistance > maxZoomForCeiling) {
+                    currentDistance = maxZoomForCeiling;
+                }
+            }
         }
 
         // ===== Camera collision (sphere sweep approximation) =====
@@ -672,7 +687,7 @@ void CameraController::update(float deltaTime) {
                 }
             }
             auto camFloorH = selectReachableFloor(
-                camTerrainH, camWmoH, smoothedCamPos.z, 3.0f);
+                camTerrainH, camWmoH, smoothedCamPos.z, 0.5f);
             if (camFloorH && smoothedCamPos.z < *camFloorH + MIN_FLOOR_CLEARANCE) {
                 smoothedCamPos.z = *camFloorH + MIN_FLOOR_CLEARANCE;
             }
