@@ -1607,7 +1607,7 @@ void WMORenderer::GroupResources::buildCollisionGrid() {
         glm::vec3 normal = glm::cross(edge1, edge2);
         float normalLen = glm::length(normal);
         float absNz = (normalLen > 0.001f) ? std::abs(normal.z / normalLen) : 0.0f;
-        bool isFloor = (absNz >= 0.45f);
+        bool isFloor = (absNz >= 0.40f);  // ~66° max slope (relaxed for steep stairs)
         bool isWall = (absNz < 0.65f);  // Matches walkable slope threshold
 
         int cellMinX = std::max(0, static_cast<int>((triMinX - gridOrigin.x) * invCellW));
@@ -1750,7 +1750,7 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
         float cachedHeight = gridIt->second;
         // Only trust cache if it's basically at foot level.
         // Prevent ledges/shoulder ramps from being treated as "floor".
-        constexpr float CACHE_ABOVE = 0.35f;   // tune: 0.25–0.60
+        constexpr float CACHE_ABOVE = 0.50f;   // tune: 0.25–0.60 (increased to catch borderline floors)
         constexpr float CACHE_BELOW = 4.0f;    // keep generous below
             if (cachedHeight <= glZ + CACHE_ABOVE && cachedHeight >= glZ - CACHE_BELOW) {
             // Persistent cache doesn't store normal — report as flat
@@ -2066,7 +2066,7 @@ bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to,
                 if (horizDist <= PLAYER_RADIUS) {
                     // Skip floor-like surfaces — grounding handles them, not wall collision
                     float absNz = std::abs(normal.z);
-                    if (absNz >= 0.45f) continue;
+                    if (absNz >= 0.40f) continue;
 
                     const float SKIN = 0.005f;        // small separation so we don't re-collide immediately
                     // Stronger push when inside WMO for more responsive indoor collision

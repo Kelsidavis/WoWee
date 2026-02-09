@@ -718,7 +718,7 @@ void M2ModelGPU::CollisionMesh::build() {
         glm::vec3 normal = glm::cross(v1 - v0, v2 - v0);
         float normalLen = glm::length(normal);
         float absNz = (normalLen > 0.001f) ? std::abs(normal.z / normalLen) : 0.0f;
-        bool isFloor = (absNz >= 0.45f);
+        bool isFloor = (absNz >= 0.40f);  // ~66° max slope (relaxed for steep stairs)
         bool isWall  = (absNz < 0.65f);
 
         float triMinX = std::min({v0.x, v1.x, v2.x});
@@ -2573,7 +2573,7 @@ std::optional<float> M2Renderer::getFloorHeight(float glX, float glY, float glZ)
                     if (localN.z < 0.0f) localN = -localN;
                     glm::vec3 worldN = glm::normalize(
                         glm::vec3(instance.modelMatrix * glm::vec4(localN, 0.0f)));
-                    if (std::abs(worldN.z) < 0.45f) continue; // too steep
+                    if (std::abs(worldN.z) < 0.40f) continue; // too steep (~66° max slope)
                 }
 
                 if (hitZ <= localPos.z + 3.0f && hitZ > bestHitZ) {
