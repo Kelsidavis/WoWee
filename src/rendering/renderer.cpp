@@ -702,10 +702,28 @@ void Renderer::updateCharacterAnimation() {
             }
         }
 
-        // Offset player Z above mount + bob
-        glm::vec3 playerPos = characterPosition;
-        playerPos.z += mountHeightOffset_ + mountBob;
+        // Character follows mount's full rotation (pitch, roll, yaw)
+        // This keeps the character "glued" to the mount during banking/climbing
+        float yawRad = glm::radians(characterYaw);
+
+        // Create rotation matrix from mount's orientation
+        glm::mat4 mountRotation = glm::mat4(1.0f);
+        mountRotation = glm::rotate(mountRotation, yawRad, glm::vec3(0.0f, 0.0f, 1.0f));       // Yaw (Z)
+        mountRotation = glm::rotate(mountRotation, mountRoll_, glm::vec3(1.0f, 0.0f, 0.0f));   // Roll (X)
+        mountRotation = glm::rotate(mountRotation, mountPitch_, glm::vec3(0.0f, 1.0f, 0.0f));  // Pitch (Y)
+
+        // Offset in mount's local space (rider sits above mount)
+        glm::vec3 localOffset(0.0f, 0.0f, mountHeightOffset_ + mountBob);
+
+        // Transform offset through mount's rotation to get world-space offset
+        glm::vec3 worldOffset = glm::vec3(mountRotation * glm::vec4(localOffset, 0.0f));
+
+        // Character position = mount position + rotated offset
+        glm::vec3 playerPos = characterPosition + worldOffset;
         characterRenderer->setInstancePosition(characterInstanceId, playerPos);
+
+        // Character rotates with mount (same pitch, roll, yaw)
+        characterRenderer->setInstanceRotation(characterInstanceId, glm::vec3(mountPitch_, mountRoll_, yawRad));
         return;
     }
 
