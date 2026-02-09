@@ -964,8 +964,8 @@ void CameraController::update(float deltaTime) {
                 float fallCatch = 3.0f;
                 float dz = *groundH - feetZ;
 
-                if (dz <= stepUp && dz >= -fallCatch &&
-                    (verticalVelocity <= 0.0f || *groundH > feetZ)) {
+                // Only snap to ground when falling/landing (not when jumping up)
+                if (dz <= stepUp && dz >= -fallCatch && verticalVelocity <= 0.0f) {
                     newPos.z = *groundH + eyeHeight;
                     verticalVelocity = 0.0f;
                     grounded = true;
