@@ -528,12 +528,15 @@ void TerrainManager::finalizeTile(const std::shared_ptr<PendingTile>& pending) {
             m2Renderer->initialize(assetManager);
         }
 
-        // Upload unique models
+        // Upload unique M2 models to GPU (stays in VRAM permanently until shutdown)
         std::unordered_set<uint32_t> uploadedModelIds;
         for (auto& m2Ready : pending->m2Models) {
             if (m2Renderer->loadModel(m2Ready.model, m2Ready.modelId)) {
                 uploadedModelIds.insert(m2Ready.modelId);
             }
+        }
+        if (!uploadedModelIds.empty()) {
+            LOG_DEBUG("  Uploaded ", uploadedModelIds.size(), " unique M2 models to VRAM for tile [", x, ",", y, "]");
         }
 
         // Create instances (deduplicate by uniqueId across tile boundaries)
@@ -1202,16 +1205,19 @@ void TerrainManager::streamTiles() {
     }
 
     if (!tilesToUnload.empty()) {
-        // Clean up models that lost all instances (once, after all tiles removed)
-        if (m2Renderer) {
-            m2Renderer->cleanupUnusedModels();
-        }
-        if (wmoRenderer) {
-            wmoRenderer->cleanupUnusedModels();
-        }
+        // Don't clean up models during streaming - keep them in VRAM for performance
+        // Modern GPUs have 8-16GB VRAM, models are only ~hundreds of MB
+        // Cleanup can be done manually when memory pressure is detected
+        // NOTE: Disabled permanent model cleanup to leverage modern VRAM capacity
+        // if (m2Renderer) {
+        //     m2Renderer->cleanupUnusedModels();
+        // }
+        // if (wmoRenderer) {
+        //     wmoRenderer->cleanupUnusedModels();
+        // }
 
         LOG_INFO("Unloaded ", tilesToUnload.size(), " distant tiles, ",
-                 loadedTiles.size(), " remain");
+                 loadedTiles.size(), " remain (models kept in VRAM)");
     }
 }
 

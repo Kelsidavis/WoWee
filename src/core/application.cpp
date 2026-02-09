@@ -731,9 +731,15 @@ void Application::setupUICallbacks() {
 
     // Taxi flight start callback - upload all precached tiles to GPU before flight begins
     gameHandler->setTaxiFlightStartCallback([this]() {
-        if (renderer && renderer->getTerrainManager()) {
-            LOG_INFO("Uploading all precached tiles to GPU before taxi flight...");
+        if (renderer && renderer->getTerrainManager() && renderer->getM2Renderer()) {
+            LOG_INFO("Uploading all precached tiles (terrain + M2 models) to GPU before taxi flight...");
+            auto start = std::chrono::steady_clock::now();
             renderer->getTerrainManager()->processAllReadyTiles();
+            auto end = std::chrono::steady_clock::now();
+            auto durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            uint32_t m2Count = renderer->getM2Renderer()->getModelCount();
+            uint32_t instCount = renderer->getM2Renderer()->getInstanceCount();
+            LOG_INFO("GPU upload completed in ", durationMs, "ms - ", m2Count, " M2 models in VRAM (", instCount, " instances)");
         }
     });
 

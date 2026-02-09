@@ -262,11 +262,11 @@ void GameHandler::update(float deltaTime) {
             }
         }
 
-        // Mounting delay for taxi (terrain precache time)
+        // Mounting delay for taxi (terrain + M2 model precache time)
         if (taxiMountingDelay_) {
             taxiMountingTimer_ += deltaTime;
-            // 3 second delay for "mounting" animation and terrain precache
-            if (taxiMountingTimer_ >= 3.0f) {
+            // 5 second delay for terrain and M2 models to load and upload to VRAM
+            if (taxiMountingTimer_ >= 5.0f) {
                 taxiMountingDelay_ = false;
                 taxiMountingTimer_ = 0.0f;
                 // Upload all precached tiles to GPU before flight starts
