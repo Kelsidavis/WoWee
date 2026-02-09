@@ -27,6 +27,7 @@ class Clouds;
 class LensFlare;
 class Weather;
 class SwimEffects;
+class MountDust;
 class CharacterRenderer;
 class WMORenderer;
 class M2Renderer;
@@ -165,6 +166,7 @@ private:
     std::unique_ptr<LensFlare> lensFlare;
     std::unique_ptr<Weather> weather;
     std::unique_ptr<SwimEffects> swimEffects;
+    std::unique_ptr<MountDust> mountDust;
     std::unique_ptr<CharacterRenderer> characterRenderer;
     std::unique_ptr<WMORenderer> wmoRenderer;
     std::unique_ptr<M2Renderer> m2Renderer;

@@ -143,6 +143,7 @@ set(WOWEE_SOURCES
     src/rendering/minimap.cpp
     src/rendering/world_map.cpp
     src/rendering/swim_effects.cpp
+    src/rendering/mount_dust.cpp
     src/rendering/loading_screen.cpp
     src/rendering/video_player.cpp
 

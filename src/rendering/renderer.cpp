@@ -13,6 +13,7 @@
 #include "rendering/lens_flare.hpp"
 #include "rendering/weather.hpp"
 #include "rendering/swim_effects.hpp"
+#include "rendering/mount_dust.hpp"
 #include "rendering/character_renderer.hpp"
 #include "rendering/wmo_renderer.hpp"
 #include "rendering/m2_renderer.hpp"
@@ -293,6 +294,13 @@ bool Renderer::initialize(core::Window* win) {
     if (!swimEffects->initialize()) {
         LOG_WARNING("Failed to initialize swim effects");
         swimEffects.reset();
+    }
+
+    // Create mount dust effects
+    mountDust = std::make_unique<MountDust>();
+    if (!mountDust->initialize()) {
+        LOG_WARNING("Failed to initialize mount dust effects");
+        mountDust.reset();
     }
 
     // Create character renderer
@@ -1251,6 +1259,29 @@ void Renderer::update(float deltaTime) {
         swimEffects->update(*camera, *cameraController, *waterRenderer, deltaTime);
     }
 
+    // Update mount dust effects
+    if (mountDust) {
+        mountDust->update(deltaTime);
+
+        // Spawn dust when mounted and moving on ground
+        if (isMounted() && cameraController && !taxiFlight_) {
+            bool isMoving = cameraController->isMoving();
+            bool onGround = cameraController->isGrounded();
+
+            if (isMoving && onGround) {
+                // Calculate velocity from camera direction and speed
+                glm::vec3 forward = camera->getForward();
+                float speed = cameraController->getMovementSpeed();
+                glm::vec3 velocity = forward * speed;
+                velocity.z = 0.0f;  // Ignore vertical component
+
+                // Spawn dust at mount's feet (slightly below character position)
+                glm::vec3 dustPos = characterPosition - glm::vec3(0.0f, 0.0f, mountHeightOffset_ * 0.8f);
+                mountDust->spawnDust(dustPos, velocity, isMoving);
+            }
+        }
+    }
+
     // Update character animations
     if (characterRenderer) {
         characterRenderer->update(deltaTime);
@@ -1648,6 +1679,11 @@ void Renderer::renderWorld(game::World* world) {
     // Render swim effects (ripples and bubbles)
     if (swimEffects && camera) {
         swimEffects->render(*camera);
+    }
+
+    // Render mount dust effects
+    if (mountDust && camera) {
+        mountDust->render(*camera);
     }
 
     // Compute view/projection once for all sub-renderers
