@@ -80,6 +80,11 @@ void CameraController::update(float deltaTime) {
         return;
     }
 
+    // Skip all collision/movement logic during taxi flights (position controlled externally)
+    if (externalFollow_) {
+        return;
+    }
+
     auto& input = core::Input::getInstance();
 
     // Don't process keyboard input when UI text input (e.g. chat box) has focus
