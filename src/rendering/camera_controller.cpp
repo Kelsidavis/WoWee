@@ -544,18 +544,27 @@ void CameraController::update(float deltaTime) {
                     grounded = false;
                     lastGroundZ = *groundH;
                 }
-            } else {
-                hasRealGround_ = false;
-                noGroundTimer_ += deltaTime;
-                if (noGroundTimer_ < NO_GROUND_GRACE) {
-                    targetPos.z = lastGroundZ;
-                    verticalVelocity = 0.0f;
-                    grounded = true;
                 } else {
-                    grounded = false;
+                    hasRealGround_ = false;
+                    noGroundTimer_ += deltaTime;
+
+                    if (noGroundTimer_ < NO_GROUND_GRACE) {
+                        // Grace should prevent instant falling at seams,
+                        // but should NEVER pull you down or cancel a jump.
+                        targetPos.z = std::max(targetPos.z, lastGroundZ);
+
+                        // Only zero velocity if we're not moving upward.
+                        if (verticalVelocity <= 0.0f) {
+                            verticalVelocity = 0.0f;
+                            grounded = true;
+                        } else {
+                            grounded = false; // jumping upward: don't "stick" to ghost ground
+                        }
+                    } else {
+                        grounded = false;
+                    }
                 }
             }
-        }
 
         // Update follow target position
         *followTarget = targetPos;
