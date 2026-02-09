@@ -5377,6 +5377,10 @@ void GameHandler::closeTaxi() {
     // Clear any pending activation
     taxiActivatePending_ = false;
     onTaxiFlight_ = false;
+
+    // Set cooldown to prevent auto-mount trigger from re-applying taxi mount
+    // (The UNIT_FLAG_TAXI_FLIGHT check in handleUpdateObject won't re-trigger during cooldown)
+    taxiLandingCooldown_ = 2.0f;
 }
 
 void GameHandler::buildTaxiCostMap() {
