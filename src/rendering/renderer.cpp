@@ -1416,9 +1416,10 @@ void Renderer::update(float deltaTime) {
         auto tile = terrainManager->getCurrentTile();
         uint32_t zoneId = zoneManager->getZoneId(tile.x, tile.y);
 
+        bool insideTavern = false;
+        std::string tavernMusic;
 
-
-        // Override with WMO-based detection (e.g., inside Stormwind)
+        // Override with WMO-based detection (e.g., inside Stormwind, taverns)
         if (wmoRenderer) {
             glm::vec3 camPos = camera->getPosition();
             uint32_t wmoModelId = 0;
@@ -1427,10 +1428,51 @@ void Renderer::update(float deltaTime) {
                 if (wmoModelId == 10047) {
                     zoneId = 1519;  // Stormwind City
                 }
+
+                // Detect taverns/inns by WMO model ID (common inn WMOs)
+                // These IDs represent typical Alliance and Horde inn buildings
+                if (wmoModelId == 191 ||    // Goldshire inn
+                    wmoModelId == 190 ||    // Small inn (common)
+                    wmoModelId == 220 ||    // Tavern building
+                    wmoModelId == 221 ||    // Large tavern
+                    wmoModelId == 5392 ||   // Horde inn
+                    wmoModelId == 5393) {   // Another inn variant
+                    insideTavern = true;
+                    // WoW tavern music (cozy ambient tracks)
+                    static const std::vector<std::string> tavernTracks = {
+                        "Sound\\Music\\GlueScreenMusic\\tavern_01.mp3",
+                        "Sound\\Music\\GlueScreenMusic\\tavern_02.mp3",
+                        "Sound\\Music\\ZoneMusic\\Tavern\\tavernAlliance01.mp3",
+                        "Sound\\Music\\ZoneMusic\\Tavern\\tavernAlliance02.mp3",
+                    };
+                    static int tavernTrackIndex = 0;
+                    tavernMusic = tavernTracks[tavernTrackIndex % tavernTracks.size()];
+                }
             }
         }
 
-        if (zoneId != currentZoneId && zoneId != 0) {
+        // Handle tavern music transitions
+        if (insideTavern) {
+            if (!inTavern_ && !tavernMusic.empty()) {
+                inTavern_ = true;
+                LOG_INFO("Entered tavern");
+                musicManager->crossfadeTo(tavernMusic);
+            }
+        } else if (inTavern_) {
+            // Exited tavern - restore zone music
+            inTavern_ = false;
+            LOG_INFO("Exited tavern");
+            auto* info = zoneManager->getZoneInfo(currentZoneId);
+            if (info) {
+                std::string music = zoneManager->getRandomMusic(currentZoneId);
+                if (!music.empty()) {
+                    musicManager->crossfadeTo(music);
+                }
+            }
+        }
+
+        // Handle normal zone transitions (only if not in tavern)
+        if (!insideTavern && zoneId != currentZoneId && zoneId != 0) {
             currentZoneId = zoneId;
             auto* info = zoneManager->getZoneInfo(zoneId);
             if (info) {

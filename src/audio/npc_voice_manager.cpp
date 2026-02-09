@@ -39,17 +39,17 @@ void NpcVoiceManager::shutdown() {
 void NpcVoiceManager::loadVoiceSounds() {
     if (!assetManager_) return;
 
-    // Generic NPC greetings (various creature sounds that work as greetings)
+    // Generic NPC greetings using Hello emote (more reliable than Greeting)
     std::vector<std::string> genericPaths = {
-        "Sound\\Character\\Human\\HumanMaleGreeting01.wav",
-        "Sound\\Character\\Human\\HumanMaleGreeting02.wav",
-        "Sound\\Character\\Human\\HumanMaleGreeting03.wav",
-        "Sound\\Character\\Human\\HumanFemaleGreeting01.wav",
-        "Sound\\Character\\Human\\HumanFemaleGreeting02.wav",
-        "Sound\\Character\\Dwarf\\DwarfMaleGreeting01.wav",
-        "Sound\\Character\\Dwarf\\DwarfMaleGreeting02.wav",
-        "Sound\\Character\\NightElf\\NightElfMaleGreeting01.wav",
-        "Sound\\Character\\NightElf\\NightElfFemaleGreeting01.wav",
+        "Sound\\Character\\Human\\HumanMaleHello01.wav",
+        "Sound\\Character\\Human\\HumanMaleHello02.wav",
+        "Sound\\Character\\Human\\HumanMaleHello03.wav",
+        "Sound\\Character\\Human\\HumanFemaleHello01.wav",
+        "Sound\\Character\\Human\\HumanFemaleHello02.wav",
+        "Sound\\Character\\Dwarf\\DwarfMaleHello01.wav",
+        "Sound\\Character\\Dwarf\\DwarfMaleHello02.wav",
+        "Sound\\Character\\NightElf\\NightElfMaleHello01.wav",
+        "Sound\\Character\\NightElf\\NightElfFemaleHello01.wav",
     };
 
     auto& genericVoices = voiceLibrary_[VoiceType::GENERIC];
@@ -62,9 +62,9 @@ void NpcVoiceManager::loadVoiceSounds() {
 
     // Human male
     std::vector<std::string> humanMalePaths = {
-        "Sound\\Character\\Human\\HumanMaleGreeting01.wav",
-        "Sound\\Character\\Human\\HumanMaleGreeting02.wav",
-        "Sound\\Character\\Human\\HumanMaleGreeting03.wav",
+        "Sound\\Character\\Human\\HumanMaleHello01.wav",
+        "Sound\\Character\\Human\\HumanMaleHello02.wav",
+        "Sound\\Character\\Human\\HumanMaleHello03.wav",
         "Sound\\Character\\Human\\HumanMaleYes01.wav",
         "Sound\\Character\\Human\\HumanMaleYes02.wav",
     };
@@ -78,8 +78,8 @@ void NpcVoiceManager::loadVoiceSounds() {
 
     // Human female
     std::vector<std::string> humanFemalePaths = {
-        "Sound\\Character\\Human\\HumanFemaleGreeting01.wav",
-        "Sound\\Character\\Human\\HumanFemaleGreeting02.wav",
+        "Sound\\Character\\Human\\HumanFemaleHello01.wav",
+        "Sound\\Character\\Human\\HumanFemaleHello02.wav",
         "Sound\\Character\\Human\\HumanFemaleYes01.wav",
     };
     auto& humanFemale = voiceLibrary_[VoiceType::HUMAN_FEMALE];
@@ -92,8 +92,8 @@ void NpcVoiceManager::loadVoiceSounds() {
 
     // Dwarf male
     std::vector<std::string> dwarfMalePaths = {
-        "Sound\\Character\\Dwarf\\DwarfMaleGreeting01.wav",
-        "Sound\\Character\\Dwarf\\DwarfMaleGreeting02.wav",
+        "Sound\\Character\\Dwarf\\DwarfMaleHello01.wav",
+        "Sound\\Character\\Dwarf\\DwarfMaleHello02.wav",
         "Sound\\Character\\Dwarf\\DwarfMaleYes01.wav",
     };
     auto& dwarfMale = voiceLibrary_[VoiceType::DWARF_MALE];
@@ -106,7 +106,7 @@ void NpcVoiceManager::loadVoiceSounds() {
 
     // Night elf male
     std::vector<std::string> nelfMalePaths = {
-        "Sound\\Character\\NightElf\\NightElfMaleGreeting01.wav",
+        "Sound\\Character\\NightElf\\NightElfMaleHello01.wav",
         "Sound\\Character\\NightElf\\NightElfMaleYes01.wav",
     };
     auto& nelfMale = voiceLibrary_[VoiceType::NIGHTELF_MALE];
@@ -119,7 +119,7 @@ void NpcVoiceManager::loadVoiceSounds() {
 
     // Night elf female
     std::vector<std::string> nelfFemalePaths = {
-        "Sound\\Character\\NightElf\\NightElfFemaleGreeting01.wav",
+        "Sound\\Character\\NightElf\\NightElfFemaleHello01.wav",
         "Sound\\Character\\NightElf\\NightElfFemaleYes01.wav",
     };
     auto& nelfFemale = voiceLibrary_[VoiceType::NIGHTELF_FEMALE];
@@ -131,10 +131,16 @@ void NpcVoiceManager::loadVoiceSounds() {
     }
 
     // Log loaded voice types
+    int totalLoaded = 0;
     for (const auto& [type, samples] : voiceLibrary_) {
         if (!samples.empty()) {
             LOG_INFO("Loaded ", samples.size(), " voice samples for type ", static_cast<int>(type));
+            totalLoaded += samples.size();
         }
+    }
+
+    if (totalLoaded == 0) {
+        LOG_WARNING("NPC voice manager: no voice samples loaded (files may not exist in MPQ)");
     }
 }
 

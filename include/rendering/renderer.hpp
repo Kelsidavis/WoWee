@@ -221,6 +221,7 @@ private:
     pipeline::AssetManager* cachedAssetManager = nullptr;
     uint32_t currentZoneId = 0;
     std::string currentZoneName;
+    bool inTavern_ = false;
 
     // Third-person character state
     glm::vec3 characterPosition = glm::vec3(0.0f);
