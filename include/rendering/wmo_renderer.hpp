@@ -190,9 +190,11 @@ public:
     void renderShadow(const glm::mat4& lightView, const glm::mat4& lightProj, Shader& shadowShader);
 
     /**
-     * Get floor height at a GL position via ray-triangle intersection
+     * Get floor height at a GL position via ray-triangle intersection.
+     * @param outNormalZ If not null, receives the Z component of the floor surface normal
+     *                   (1.0 = flat, 0.0 = vertical). Useful for slope walkability checks.
      */
-    std::optional<float> getFloorHeight(float glX, float glY, float glZ) const;
+    std::optional<float> getFloorHeight(float glX, float glY, float glZ, float* outNormalZ = nullptr) const;
 
     /**
      * Check wall collision and adjust position
@@ -234,6 +236,12 @@ public:
     void resetQueryStats();
     double getQueryTimeMs() const { return queryTimeMs; }
     uint32_t getQueryCallCount() const { return queryCallCount; }
+
+    /**
+     * Update the tracked active WMO group based on player position.
+     * Called at low frequency (every ~10 frames or on significant movement).
+     */
+    void updateActiveGroup(float glX, float glY, float glZ);
 
     // Floor cache persistence (zone-specific files)
     void setMapName(const std::string& name) { mapName_ = name; }
@@ -293,6 +301,14 @@ private:
         // cellTriangles[cellY * gridCellsX + cellX] = list of triangle start indices
         std::vector<std::vector<uint32_t>> cellTriangles;
 
+        // Pre-classified triangle lists per cell (built at load time)
+        std::vector<std::vector<uint32_t>> cellFloorTriangles;  // abs(normal.z) >= 0.45
+        std::vector<std::vector<uint32_t>> cellWallTriangles;   // abs(normal.z) < 0.55
+
+        // Pre-computed per-triangle Z bounds for fast vertical reject
+        struct TriBounds { float minZ; float maxZ; };
+        std::vector<TriBounds> triBounds;  // indexed by triStart/3
+
         // Build the spatial grid from collision geometry
         void buildCollisionGrid();
 
@@ -302,6 +318,12 @@ private:
         // Get triangle indices for a local-space XY range (for wall collision)
         void getTrianglesInRange(float minX, float minY, float maxX, float maxY,
                                  std::vector<uint32_t>& out) const;
+
+        // Get pre-classified floor/wall triangles in range
+        void getFloorTrianglesInRange(float minX, float minY, float maxX, float maxY,
+                                      std::vector<uint32_t>& out) const;
+        void getWallTrianglesInRange(float minX, float minY, float maxX, float maxY,
+                                     std::vector<uint32_t>& out) const;
     };
 
     /**
@@ -563,6 +585,50 @@ private:
 
     // Compute floor height for a single cell (expensive, done at load time)
     std::optional<float> computeFloorHeightSlow(float x, float y, float refZ) const;
+
+    // Active WMO group tracking — reduces per-query group iteration
+    struct ActiveGroupInfo {
+        uint32_t instanceIdx = UINT32_MAX;
+        uint32_t modelId = 0;
+        int32_t groupIdx = -1;
+        std::vector<uint32_t> neighborGroups;  // portal-connected groups
+        bool isValid() const { return instanceIdx != UINT32_MAX && groupIdx >= 0; }
+        void invalidate() { instanceIdx = UINT32_MAX; groupIdx = -1; neighborGroups.clear(); }
+    };
+    mutable ActiveGroupInfo activeGroup_;
+
+    // Per-frame floor height dedup cache (same XY queried 3-5x per frame)
+    struct FrameFloorCache {
+        static constexpr size_t CAPACITY = 16;
+        struct Entry { uint64_t key; float resultZ; float normalZ; uint32_t frameId; };
+        Entry entries[CAPACITY] = {};
+
+        uint64_t makeKey(float x, float y) const {
+            // 0.5-unit quantized grid
+            int32_t ix = static_cast<int32_t>(std::floor(x * 2.0f));
+            int32_t iy = static_cast<int32_t>(std::floor(y * 2.0f));
+            return (static_cast<uint64_t>(static_cast<uint32_t>(ix)) << 32) |
+                   static_cast<uint64_t>(static_cast<uint32_t>(iy));
+        }
+
+        std::optional<float> get(float x, float y, uint32_t frame, float* outNormalZ = nullptr) const {
+            uint64_t k = makeKey(x, y);
+            size_t slot = k % CAPACITY;
+            const auto& e = entries[slot];
+            if (e.frameId == frame && e.key == k) {
+                if (outNormalZ) *outNormalZ = e.normalZ;
+                return e.resultZ;
+            }
+            return std::nullopt;
+        }
+
+        void put(float x, float y, float result, float normalZ, uint32_t frame) {
+            uint64_t k = makeKey(x, y);
+            size_t slot = k % CAPACITY;
+            entries[slot] = { k, result, normalZ, frame };
+        }
+    };
+    mutable FrameFloorCache frameFloorCache_;
 };
 
 } // namespace rendering

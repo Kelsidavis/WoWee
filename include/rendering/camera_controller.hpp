@@ -161,6 +161,11 @@ private:
     int insideWMOCheckCounter = 0;
     glm::vec3 lastInsideWMOCheckPos = glm::vec3(0.0f);
 
+    // Cached camera WMO floor query (skip if camera moved < 0.3 units)
+    glm::vec3 lastCamFloorQueryPos = glm::vec3(0.0f);
+    std::optional<float> cachedCamWmoFloor;
+    bool hasCachedCamFloor = false;
+
     // Swimming
     bool swimming = false;
     bool wasSwimming = false;

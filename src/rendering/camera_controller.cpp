@@ -26,18 +26,10 @@ std::optional<float> selectReachableFloor(const std::optional<float>& terrainH,
     if (terrainH && *terrainH <= refZ + maxStepUp) reachTerrain = terrainH;
     if (wmoH && *wmoH <= refZ + maxStepUp) reachWmo = wmoH;
 
-    // Avoid snapping up to higher WMO floors when entering buildings.
-    if (reachTerrain && reachWmo && *reachWmo > refZ + 3.5f) {
-        return reachTerrain;
-    }
-
     if (reachTerrain && reachWmo) {
-        // Both available: prefer the one closest to the player's feet.
-        // This prevents tunnels/caves from snapping the player up to the
-        // terrain surface above, while still working on top of buildings.
-        float distTerrain = std::abs(*reachTerrain - refZ);
-        float distWmo = std::abs(*reachWmo - refZ);
-        return (distWmo <= distTerrain) ? reachWmo : reachTerrain;
+        // Prefer the highest surface — prevents clipping through
+        // WMO floors that sit above terrain.
+        return (*reachWmo >= *reachTerrain) ? reachWmo : reachTerrain;
     }
     if (reachWmo) return reachWmo;
     if (reachTerrain) return reachTerrain;
@@ -394,6 +386,7 @@ void CameraController::update(float deltaTime) {
                             if (wmoRenderer->checkWallCollision(stepPos, candidate, adjusted)) {
                                 candidate.x = adjusted.x;
                                 candidate.y = adjusted.y;
+                                candidate.z = std::max(candidate.z, adjusted.z);
                             }
                         }
 
@@ -467,29 +460,10 @@ void CameraController::update(float deltaTime) {
                     if (wmoRenderer) {
                         glm::vec3 adjusted;
                         if (wmoRenderer->checkWallCollision(stepPos, candidate, adjusted)) {
-                            // Before blocking, check if there's a walkable floor at the
-                            // destination (stair step-up or ramp continuation).
-                            float feetZ = stepPos.z;
-                            float probeZ = feetZ + 2.5f;
-                            auto floorH = wmoRenderer->getFloorHeight(
-                                candidate.x, candidate.y, probeZ);
-                            bool walkable = floorH &&
-                                            *floorH >= feetZ - 0.5f &&
-                                            *floorH <= feetZ + 1.6f;
-                            if (!walkable) {
-                                candidate.x = adjusted.x;
-                                candidate.y = adjusted.y;
-                                // Snap Z to floor at adjusted position to prevent fall-through
-                                auto adjFloor = wmoRenderer->getFloorHeight(adjusted.x, adjusted.y, feetZ + 2.5f);
-                                if (adjFloor && *adjFloor >= feetZ - 0.3f && *adjFloor <= feetZ + 1.6f) {
-                                    candidate.z = *adjFloor;
-                                }
-                            } else if (floorH && *floorH > candidate.z) {
-                                // Snap Z to ramp surface so subsequent sweep
-                                // steps measure feetZ from the ramp, not the
-                                // starting position.
-                                candidate.z = *floorH;
-                            }
+                            candidate.x = adjusted.x;
+                            candidate.y = adjusted.y;
+                            // Accept upward Z correction (ramps), reject downward
+                            candidate.z = std::max(candidate.z, adjusted.z);
                         }
                     }
 
@@ -505,110 +479,6 @@ void CameraController::update(float deltaTime) {
                 }
 
                 targetPos = stepPos;
-            }
-        }
-
-        // WoW-style slope limiting (50 degrees, with sliding)
-        // dot(normal, up) >= 0.64 is walkable, otherwise slide
-        constexpr bool ENABLE_SLOPE_SLIDE = false;
-        constexpr float MAX_WALK_SLOPE_DOT = 0.6428f;  // cos(50°)
-        constexpr float SAMPLE_DIST = 0.3f;  // Distance to sample for normal calculation
-        if (ENABLE_SLOPE_SLIDE) {
-            glm::vec3 oldPos = *followTarget;
-            float moveXY = glm::length(glm::vec2(targetPos.x - oldPos.x, targetPos.y - oldPos.y));
-            if (moveXY >= 0.03f) {
-                struct GroundSample {
-                    std::optional<float> height;
-                    bool fromM2 = false;
-                };
-                // Helper to get ground height at a position and whether M2 provided the top floor.
-                auto getGroundAt = [&](float x, float y) -> GroundSample {
-                    std::optional<float> terrainH;
-                    std::optional<float> wmoH;
-                    std::optional<float> m2H;
-                    if (terrainManager) {
-                        terrainH = terrainManager->getHeightAt(x, y);
-                    }
-                    float stepUpBudget = grounded ? 1.6f : 1.2f;
-                    if (wmoRenderer) {
-                        wmoH = wmoRenderer->getFloorHeight(x, y, targetPos.z + stepUpBudget + 0.5f);
-                    }
-                    if (m2Renderer) {
-                        m2H = m2Renderer->getFloorHeight(x, y, targetPos.z);
-                    }
-                    bool firstPerson = (!thirdPerson) || (currentDistance < 0.6f);
-                    if (firstPerson) {
-                        wmoH.reset();
-                    }
-                    auto base = selectReachableFloor(terrainH, wmoH, targetPos.z, stepUpBudget);
-                    bool fromM2 = false;
-                    if (m2H && *m2H <= targetPos.z + stepUpBudget && (!base || *m2H > *base)) {
-                        base = m2H;
-                        fromM2 = true;
-                    }
-                    return GroundSample{base, fromM2};
-                };
-
-                // Get ground height at target position
-                auto center = getGroundAt(targetPos.x, targetPos.y);
-                bool skipSlopeCheck = center.height && center.fromM2;
-                if (center.height && !skipSlopeCheck) {
-
-                // Calculate ground normal using height samples
-                auto hPosX = getGroundAt(targetPos.x + SAMPLE_DIST, targetPos.y);
-                auto hNegX = getGroundAt(targetPos.x - SAMPLE_DIST, targetPos.y);
-                auto hPosY = getGroundAt(targetPos.x, targetPos.y + SAMPLE_DIST);
-                auto hNegY = getGroundAt(targetPos.x, targetPos.y - SAMPLE_DIST);
-
-                // Estimate partial derivatives
-                float dzdx = 0.0f, dzdy = 0.0f;
-                if (hPosX.height && hNegX.height) {
-                    dzdx = (*hPosX.height - *hNegX.height) / (2.0f * SAMPLE_DIST);
-                } else if (hPosX.height) {
-                    dzdx = (*hPosX.height - *center.height) / SAMPLE_DIST;
-                } else if (hNegX.height) {
-                    dzdx = (*center.height - *hNegX.height) / SAMPLE_DIST;
-                }
-
-                if (hPosY.height && hNegY.height) {
-                    dzdy = (*hPosY.height - *hNegY.height) / (2.0f * SAMPLE_DIST);
-                } else if (hPosY.height) {
-                    dzdy = (*hPosY.height - *center.height) / SAMPLE_DIST;
-                } else if (hNegY.height) {
-                    dzdy = (*center.height - *hNegY.height) / SAMPLE_DIST;
-                }
-
-                // Ground normal = normalize(cross(tangentX, tangentY))
-                // tangentX = (1, 0, dzdx), tangentY = (0, 1, dzdy)
-                // cross = (-dzdx, -dzdy, 1)
-                glm::vec3 groundNormal = glm::normalize(glm::vec3(-dzdx, -dzdy, 1.0f));
-                float slopeDot = groundNormal.z;  // dot(normal, up) where up = (0,0,1)
-
-                // Check if slope is too steep
-                if (slopeDot < MAX_WALK_SLOPE_DOT) {
-                    // Slope too steep - slide instead of walk
-                    // Calculate slide direction (downhill, horizontal only)
-                    glm::vec2 slideDir = glm::normalize(glm::vec2(-groundNormal.x, -groundNormal.y));
-
-                    // Only block uphill movement, allow downhill/across
-                    glm::vec2 moveDir = glm::vec2(targetPos.x - oldPos.x, targetPos.y - oldPos.y);
-                    float moveDist = glm::length(moveDir);
-
-                    if (moveDist > 0.001f) {
-                        glm::vec2 moveDirNorm = moveDir / moveDist;
-
-                        // How much are we trying to go uphill?
-                        float uphillAmount = -glm::dot(moveDirNorm, slideDir);
-
-                        if (uphillAmount > 0.0f) {
-                            // Trying to go uphill on steep slope - slide back
-                            float slideStrength = (1.0f - slopeDot / MAX_WALK_SLOPE_DOT);
-                            targetPos.x = oldPos.x + slideDir.x * moveDist * slideStrength * 0.5f;
-                            targetPos.y = oldPos.y + slideDir.y * moveDist * slideStrength * 0.5f;
-                        }
-                    }
-                }
-                }
             }
         }
 
@@ -656,35 +526,31 @@ void CameraController::update(float deltaTime) {
             if (groundH) {
                 hasRealGround_ = true;
                 noGroundTimer_ = 0.0f;
-                float groundDiff = *groundH - lastGroundZ;
-                if (groundDiff > 2.0f) {
-                    // Landing on a higher ledge - snap up
-                    lastGroundZ = *groundH;
-                } else {
-                    // Smooth toward detected ground. Use a slower rate for large
-                    // drops so multi-story buildings don't snap to the wrong floor,
-                    // but always converge so walking off a fountain works.
-                    float rate = (groundDiff > -2.0f) ? 15.0f : 6.0f;
-                    lastGroundZ += groundDiff * std::min(1.0f, deltaTime * rate);
-                }
+                float feetZ = targetPos.z;
+                float stepUp = 1.0f;
+                float fallCatch = 3.0f;
+                float dz = *groundH - feetZ;
 
-                if (targetPos.z <= lastGroundZ + 0.1f && verticalVelocity <= 0.0f) {
-                    targetPos.z = lastGroundZ;
+                // WoW-style: snap to floor if within step-up or fall-catch range,
+                // but only when not moving upward (jumping)
+                if (dz <= stepUp && dz >= -fallCatch &&
+                    (verticalVelocity <= 0.0f || *groundH > feetZ)) {
+                    targetPos.z = *groundH;
                     verticalVelocity = 0.0f;
                     grounded = true;
+                    lastGroundZ = *groundH;
                 } else {
                     grounded = false;
+                    lastGroundZ = *groundH;
                 }
             } else {
                 hasRealGround_ = false;
                 noGroundTimer_ += deltaTime;
                 if (noGroundTimer_ < NO_GROUND_GRACE) {
-                    // Brief grace period for terrain streaming — hold position
                     targetPos.z = lastGroundZ;
                     verticalVelocity = 0.0f;
                     grounded = true;
                 } else {
-                    // No geometry found for too long — let player fall
                     grounded = false;
                 }
             }
@@ -734,6 +600,7 @@ void CameraController::update(float deltaTime) {
             float distFromLastCheck = glm::length(targetPos - lastInsideWMOCheckPos);
             if (++insideWMOCheckCounter >= 10 || distFromLastCheck > 2.0f) {
                 cachedInsideWMO = wmoRenderer->isInsideWMO(targetPos.x, targetPos.y, targetPos.z + 1.0f, nullptr);
+                wmoRenderer->updateActiveGroup(targetPos.x, targetPos.y, targetPos.z + 1.0f);
                 insideWMOCheckCounter = 0;
                 lastInsideWMOCheckPos = targetPos;
             }
@@ -781,8 +648,18 @@ void CameraController::update(float deltaTime) {
             auto camTerrainH = getTerrainFloorAt(smoothedCamPos.x, smoothedCamPos.y);
             std::optional<float> camWmoH;
             if (wmoRenderer) {
-                camWmoH = wmoRenderer->getFloorHeight(
-                    smoothedCamPos.x, smoothedCamPos.y, smoothedCamPos.z + 3.0f);
+                // Skip expensive WMO floor query if camera barely moved
+                float camDelta = glm::length(glm::vec2(smoothedCamPos.x - lastCamFloorQueryPos.x,
+                                                         smoothedCamPos.y - lastCamFloorQueryPos.y));
+                if (camDelta < 0.3f && hasCachedCamFloor) {
+                    camWmoH = cachedCamWmoFloor;
+                } else {
+                    camWmoH = wmoRenderer->getFloorHeight(
+                        smoothedCamPos.x, smoothedCamPos.y, smoothedCamPos.z + 3.0f);
+                    cachedCamWmoFloor = camWmoH;
+                    hasCachedCamFloor = true;
+                    lastCamFloorQueryPos = smoothedCamPos;
+                }
             }
             auto camFloorH = selectReachableFloor(
                 camTerrainH, camWmoH, smoothedCamPos.z, 3.0f);
@@ -925,7 +802,9 @@ void CameraController::update(float deltaTime) {
                     glm::vec3 candidate = stepPos + stepDelta;
                     glm::vec3 adjusted;
                     if (wmoRenderer->checkWallCollision(stepPos, candidate, adjusted)) {
-                        candidate = adjusted;
+                        candidate.x = adjusted.x;
+                        candidate.y = adjusted.y;
+                        candidate.z = std::max(candidate.z, adjusted.z);
                     }
                     stepPos = candidate;
                 }
@@ -963,26 +842,24 @@ void CameraController::update(float deltaTime) {
             std::optional<float> groundH = sampleGround(newPos.x, newPos.y);
 
             if (groundH) {
-                float groundDiff = *groundH - lastGroundZ;
-                if (groundDiff > 2.0f) {
-                    lastGroundZ = *groundH;
-                } else {
-                    float rate = (groundDiff > -2.0f) ? 15.0f : 6.0f;
-                    lastGroundZ += groundDiff * std::min(1.0f, deltaTime * rate);
-                }
+                float feetZ = newPos.z - eyeHeight;
+                float stepUp = 1.0f;
+                float fallCatch = 3.0f;
+                float dz = *groundH - feetZ;
 
-                float groundZ = lastGroundZ + eyeHeight;
-                if (newPos.z <= groundZ) {
-                    newPos.z = groundZ;
+                if (dz <= stepUp && dz >= -fallCatch &&
+                    (verticalVelocity <= 0.0f || *groundH > feetZ)) {
+                    newPos.z = *groundH + eyeHeight;
                     verticalVelocity = 0.0f;
                     grounded = true;
-                    swimming = false;  // Touching ground = wading
+                    lastGroundZ = *groundH;
+                    swimming = false;
                 } else if (!swimming) {
                     grounded = false;
+                    lastGroundZ = *groundH;
                 }
             } else if (!swimming) {
-                float groundZ = lastGroundZ + eyeHeight;
-                newPos.z = groundZ;
+                newPos.z = lastGroundZ + eyeHeight;
                 verticalVelocity = 0.0f;
                 grounded = true;
             }
@@ -1331,6 +1208,11 @@ void CameraController::teleportTo(const glm::vec3& pos) {
     noGroundTimer_ = 0.0f;  // Reset grace period so terrain has time to stream
     autoUnstuckFired_ = false;
     continuousFallTime_ = 0.0f;
+
+    // Invalidate active WMO group so it's re-detected at new position
+    if (wmoRenderer) {
+        wmoRenderer->updateActiveGroup(pos.x, pos.y, pos.z + 1.0f);
+    }
 
     if (thirdPerson && followTarget) {
         *followTarget = pos;
