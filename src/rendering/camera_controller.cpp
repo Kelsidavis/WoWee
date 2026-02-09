@@ -622,7 +622,7 @@ void CameraController::update(float deltaTime) {
             // Raycast upward from player to find ceiling, limit camera distance
             glm::vec3 upRayOrigin = targetPos;
             glm::vec3 upRayDir(0.0f, 0.0f, 1.0f);
-            float ceilingDist = wmoRenderer->raycast(upRayOrigin, upRayDir, 15.0f);
+            float ceilingDist = wmoRenderer->raycastBoundingBoxes(upRayOrigin, upRayDir, 15.0f);
             if (ceilingDist < 15.0f) {
                 // Found ceiling above — limit zoom to prevent camera from going through it
                 // Camera is behind player by currentDistance, at an angle
