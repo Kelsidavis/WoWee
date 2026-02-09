@@ -507,13 +507,19 @@ void Renderer::setCharacterFollow(uint32_t instanceId) {
     }
 }
 
-void Renderer::setMounted(uint32_t mountInstId, float heightOffset) {
+void Renderer::setMounted(uint32_t mountInstId, uint32_t mountDisplayId, float heightOffset) {
     mountInstanceId_ = mountInstId;
     mountHeightOffset_ = heightOffset;
     charAnimState = CharAnimState::MOUNT;
     if (cameraController) {
         cameraController->setMounted(true);
         cameraController->setMountHeightOffset(heightOffset);
+    }
+
+    // Notify mount sound manager
+    if (mountSoundManager) {
+        bool isFlying = taxiFlight_;  // Taxi flights are flying mounts
+        mountSoundManager->onMount(mountDisplayId, isFlying);
     }
 }
 
@@ -526,6 +532,11 @@ void Renderer::clearMount() {
     if (cameraController) {
         cameraController->setMounted(false);
         cameraController->setMountHeightOffset(0.0f);
+    }
+
+    // Notify mount sound manager
+    if (mountSoundManager) {
+        mountSoundManager->onDismount();
     }
 }
 
@@ -1346,6 +1357,17 @@ void Renderer::update(float deltaTime) {
         } else {
             activitySoundManager->setSwimmingState(false, false);
             sfxStateInitialized = false;
+        }
+    }
+
+    // Mount ambient sounds: wing flaps, breathing, etc.
+    if (mountSoundManager) {
+        mountSoundManager->update(deltaTime);
+        if (cameraController && isMounted()) {
+            bool moving = cameraController->isMoving();
+            bool flying = taxiFlight_ || !cameraController->isGrounded();  // Flying if taxi or airborne
+            mountSoundManager->setMoving(moving);
+            mountSoundManager->setFlying(flying);
         }
     }
 

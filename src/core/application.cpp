@@ -2803,7 +2803,7 @@ void Application::processPendingMount() {
         }
     }
 
-    renderer->setMounted(instanceId, heightOffset);
+    renderer->setMounted(instanceId, mountDisplayId, heightOffset);
     charRenderer->playAnimation(instanceId, 0, true);
 
     LOG_INFO("processPendingMount: DONE displayId=", mountDisplayId, " model=", m2Path, " heightOffset=", heightOffset);

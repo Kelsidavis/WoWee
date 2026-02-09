@@ -2,6 +2,8 @@
 
 #include <string>
 #include <cstdint>
+#include <vector>
+#include <chrono>
 
 namespace wowee {
 namespace pipeline { class AssetManager; }
@@ -13,6 +15,11 @@ enum class MountType {
     GROUND,      // Horse, wolf, raptor, etc.
     FLYING,      // Griffin, wyvern, drake, etc.
     SWIMMING     // Sea turtle, etc.
+};
+
+struct MountSample {
+    std::string path;
+    std::vector<uint8_t> data;
 };
 
 class MountSoundManager {
@@ -40,6 +47,8 @@ private:
     MountType detectMountType(uint32_t creatureDisplayId) const;
     void updateMountSounds();
     void stopAllMountSounds();
+    void loadMountSounds();
+    bool loadSound(const std::string& path, MountSample& sample);
 
     pipeline::AssetManager* assetManager_ = nullptr;
     bool mounted_ = false;
@@ -49,9 +58,17 @@ private:
     uint32_t currentDisplayId_ = 0;
     float volumeScale_ = 1.0f;
 
+    // Mount sound samples (loaded from MPQ)
+    std::vector<MountSample> wingFlapSounds_;
+    std::vector<MountSample> wingIdleSounds_;
+    std::vector<MountSample> horseBreathSounds_;
+    std::vector<MountSample> horseMoveSounds_;
+
     // Sound state tracking
     bool playingMovementSound_ = false;
     bool playingIdleSound_ = false;
+    std::chrono::steady_clock::time_point lastSoundUpdate_;
+    float soundLoopTimer_ = 0.0f;
 };
 
 } // namespace audio
