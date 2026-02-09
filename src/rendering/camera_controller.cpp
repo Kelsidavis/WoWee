@@ -606,9 +606,8 @@ void CameraController::update(float deltaTime) {
         float zoomLerp = 1.0f - std::exp(-ZOOM_SMOOTH_SPEED * deltaTime);
         currentDistance += (userTargetDistance - currentDistance) * zoomLerp;
 
-        // Limit max zoom when inside a WMO (building interior)
+        // Limit max zoom when inside a WMO with a ceiling (building interior)
         // Throttle: only recheck every 10 frames or when position changes >2 units.
-        static constexpr float WMO_MAX_DISTANCE = 3.5f;
         if (wmoRenderer) {
             float distFromLastCheck = glm::length(targetPos - lastInsideWMOCheckPos);
             if (++insideWMOCheckCounter >= 10 || distFromLastCheck > 2.0f) {
@@ -617,16 +616,13 @@ void CameraController::update(float deltaTime) {
                 insideWMOCheckCounter = 0;
                 lastInsideWMOCheckPos = targetPos;
             }
-            if (cachedInsideWMO && currentDistance > WMO_MAX_DISTANCE) {
-                currentDistance = WMO_MAX_DISTANCE;
-            }
 
             // Constrain zoom if there's a ceiling/upper floor above player
             // Raycast upward from player to find ceiling, limit camera distance
             glm::vec3 upRayOrigin = targetPos;
             glm::vec3 upRayDir(0.0f, 0.0f, 1.0f);
-            float ceilingDist = wmoRenderer->raycastBoundingBoxes(upRayOrigin, upRayDir, 15.0f);
-            if (ceilingDist < 15.0f) {
+            float ceilingDist = wmoRenderer->raycastBoundingBoxes(upRayOrigin, upRayDir, 20.0f);
+            if (ceilingDist < 20.0f) {
                 // Found ceiling above — limit zoom to prevent camera from going through it
                 // Camera is behind player by currentDistance, at an angle
                 // Approximate: if ceiling is N units above, limit zoom to ~N units
