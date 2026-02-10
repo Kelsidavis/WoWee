@@ -12,6 +12,7 @@
 #include "rendering/clouds.hpp"
 #include "rendering/lens_flare.hpp"
 #include "rendering/weather.hpp"
+#include "rendering/lighting_manager.hpp"
 #include "rendering/swim_effects.hpp"
 #include "rendering/mount_dust.hpp"
 #include "rendering/character_renderer.hpp"
@@ -294,6 +295,14 @@ bool Renderer::initialize(core::Window* win) {
     if (!weather->initialize()) {
         LOG_WARNING("Failed to initialize weather");
         weather.reset();
+    }
+
+    // Create lighting system
+    lightingManager = std::make_unique<LightingManager>();
+    auto* assetManager = core::Application::getInstance().getAssetManager();
+    if (assetManager && !lightingManager->initialize(assetManager)) {
+        LOG_WARNING("Failed to initialize lighting manager");
+        lightingManager.reset();
     }
 
     // Create swim effects
@@ -1193,6 +1202,19 @@ void Renderer::update(float deltaTime) {
         lastCameraUpdateMs = 0.0;
     }
 
+    // Update lighting system
+    if (lightingManager) {
+        // TODO: Get actual map ID from game state (0 = Eastern Kingdoms for now)
+        // TODO: Get actual game time from server (use -1 for local time fallback)
+        // TODO: Get weather/underwater state from game state
+        uint32_t mapId = 0;  // Eastern Kingdoms
+        float gameTime = -1.0f;  // Use local time for now
+        bool isRaining = false;  // TODO: Get from weather system
+        bool isUnderwater = false;  // TODO: Get from player state
+
+        lightingManager->update(characterPosition, mapId, gameTime, isRaining, isUnderwater);
+    }
+
     // Sync character model position/rotation and animation with follow target
     if (characterInstanceId > 0 && characterRenderer && cameraController && cameraController->isThirdPerson()) {
         if (meleeSwingCooldown > 0.0f) {
@@ -1800,7 +1822,21 @@ void Renderer::renderWorld(game::World* world) {
             canalUnderwater = liquidType && (*liquidType == 5 || *liquidType == 13 || *liquidType == 17);
         }
 
-        if (skybox) {
+        // Apply lighting from lighting manager
+        if (lightingManager) {
+            const auto& lighting = lightingManager->getLightingParams();
+
+            // Set lighting (direction, color, ambient)
+            float lightDir[3] = {lighting.directionalDir.x, lighting.directionalDir.y, lighting.directionalDir.z};
+            float lightColor[3] = {lighting.diffuseColor.r, lighting.diffuseColor.g, lighting.diffuseColor.b};
+            float ambientColor[3] = {lighting.ambientColor.r, lighting.ambientColor.g, lighting.ambientColor.b};
+            terrainRenderer->setLighting(lightDir, lightColor, ambientColor);
+
+            // Set fog
+            float fogColor[3] = {lighting.fogColor.r, lighting.fogColor.g, lighting.fogColor.b};
+            terrainRenderer->setFog(fogColor, lighting.fogStart, lighting.fogEnd);
+        } else if (skybox) {
+            // Fallback to skybox-based fog if no lighting manager
             glm::vec3 horizonColor = skybox->getHorizonColor(timeOfDay);
             float fogColorArray[3] = {horizonColor.r, horizonColor.g, horizonColor.b};
             terrainRenderer->setFog(fogColorArray, 400.0f, 1200.0f);

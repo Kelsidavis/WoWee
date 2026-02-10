@@ -26,6 +26,7 @@ class StarField;
 class Clouds;
 class LensFlare;
 class Weather;
+class LightingManager;
 class SwimEffects;
 class MountDust;
 class CharacterRenderer;
@@ -157,6 +158,7 @@ public:
     audio::CombatSoundManager* getCombatSoundManager() { return combatSoundManager.get(); }
     audio::SpellSoundManager* getSpellSoundManager() { return spellSoundManager.get(); }
     audio::MovementSoundManager* getMovementSoundManager() { return movementSoundManager.get(); }
+    LightingManager* getLightingManager() { return lightingManager.get(); }
 
 private:
     core::Window* window = nullptr;
@@ -173,6 +175,7 @@ private:
     std::unique_ptr<Clouds> clouds;
     std::unique_ptr<LensFlare> lensFlare;
     std::unique_ptr<Weather> weather;
+    std::unique_ptr<LightingManager> lightingManager;
     std::unique_ptr<SwimEffects> swimEffects;
     std::unique_ptr<MountDust> mountDust;
     std::unique_ptr<CharacterRenderer> characterRenderer;
