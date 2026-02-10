@@ -1020,13 +1020,16 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
             const auto& group = model.groups[gi];
 
             // Hide floating LOD shell groups that are positioned too high
-            // Groups 92/93 are at worldZ 200-225 (floating shell)
-            // Normal cathedral groups are at worldZ 98-122
+            // Groups 92/93 are at worldZ 200-225 (floating shell with massive height)
+            // Group 95 at worldZ=162 is legitimate (keep it)
             glm::vec3 groupCenter = (group.boundingBoxMin + group.boundingBoxMax) * 0.5f;
             glm::vec4 worldCenter = instance.modelMatrix * glm::vec4(groupCenter, 1.0f);
+            glm::vec3 size = group.boundingBoxMax - group.boundingBoxMin;
 
-            if (worldCenter.z > 150.0f) {
-                continue;  // Skip groups positioned above Z=150 (floating LOD shell)
+            // Skip groups that are both HIGH (worldZ > 180) AND very tall (sizeZ > 100)
+            // This catches groups 92 (worldZ=225, sizeZ=251) and 93 (worldZ=201, sizeZ=165)
+            if (worldCenter.z > 180.0f && size.z > 100.0f) {
+                continue;  // Skip floating LOD shell
             }
 
             renderGroup(group, model, instance.modelMatrix, view, projection);
