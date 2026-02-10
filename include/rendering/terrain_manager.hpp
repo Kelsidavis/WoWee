@@ -323,6 +323,9 @@ private:
 
     // Dedup set for doodad placements across tile boundaries
     std::unordered_set<uint32_t> placedDoodadIds;
+
+    // Dedup set for WMO placements across tile boundaries (prevents rendering Stormwind 16x)
+    std::unordered_set<uint32_t> placedWmoIds;
 };
 
 } // namespace rendering

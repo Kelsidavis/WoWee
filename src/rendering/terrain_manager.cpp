@@ -683,11 +683,20 @@ void TerrainManager::finalizeTile(const std::shared_ptr<PendingTile>& pending) {
 
         int loadedWMOs = 0;
         int loadedLiquids = 0;
+        int skippedWmoDedup = 0;
         for (auto& wmoReady : pending->wmoModels) {
+            // Deduplicate WMO instances by uniqueId (prevents Stormwind from rendering 16x)
+            // uniqueId is stored in modelId field (see line 522 in prepareTile)
+            if (placedWmoIds.count(wmoReady.modelId)) {
+                skippedWmoDedup++;
+                continue;
+            }
+
             if (wmoRenderer->loadModel(wmoReady.model, wmoReady.modelId)) {
                 uint32_t wmoInstId = wmoRenderer->createInstance(wmoReady.modelId, wmoReady.position, wmoReady.rotation);
                 if (wmoInstId) {
                     wmoInstanceIds.push_back(wmoInstId);
+                    placedWmoIds.insert(wmoReady.modelId);
                     loadedWMOs++;
 
                     // Load WMO liquids (canals, pools, etc.)
@@ -709,6 +718,10 @@ void TerrainManager::finalizeTile(const std::shared_ptr<PendingTile>& pending) {
                     }
                 }
             }
+        }
+        if (loadedWMOs > 0 || skippedWmoDedup > 0) {
+            LOG_INFO("  Loaded WMOs for tile [", x, ",", y, "]: ",
+                     loadedWMOs, " instances, ", skippedWmoDedup, " dedup skipped");
         }
         if (loadedLiquids > 0) {
             LOG_DEBUG("  Loaded WMO liquids for tile [", x, ",", y, "]: ", loadedLiquids);
