@@ -803,7 +803,7 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
     shader->setUniform("uLightDir", glm::vec3(-0.3f, -0.7f, -0.6f));  // Default sun direction
     shader->setUniform("uLightColor", glm::vec3(1.5f, 1.4f, 1.3f));
     shader->setUniform("uSpecularIntensity", 0.5f);
-    shader->setUniform("uAmbientColor", glm::vec3(0.4f, 0.4f, 0.5f));
+    shader->setUniform("uAmbientColor", glm::vec3(0.55f, 0.55f, 0.6f));
     shader->setUniform("uFogColor", fogColor);
     shader->setUniform("uFogStart", fogStart);
     shader->setUniform("uFogEnd", fogEnd);

@@ -428,6 +428,9 @@ bool WMOLoader::loadGroup(const std::vector<uint8_t>& groupData,
             // Read MOGP header
             uint32_t mogpOffset = offset;
             group.flags = read<uint32_t>(groupData, mogpOffset);
+            bool isInterior = (group.flags & 0x2000) != 0;
+            core::Logger::getInstance().info("  Group flags: 0x", std::hex, group.flags, std::dec,
+                                             (isInterior ? " (INTERIOR)" : " (exterior)"));
             group.boundingBoxMin.x = read<float>(groupData, mogpOffset);
             group.boundingBoxMin.y = read<float>(groupData, mogpOffset);
             group.boundingBoxMin.z = read<float>(groupData, mogpOffset);
@@ -490,10 +493,15 @@ bool WMOLoader::loadGroup(const std::vector<uint8_t>& groupData,
                 }
                 else if (subChunkId == 0x4D4F4E52) { // MONR - Normals
                     uint32_t normalCount = subChunkSize / 12;
+                    core::Logger::getInstance().info("  MONR: ", normalCount, " normals for ", group.vertices.size(), " vertices");
                     for (uint32_t i = 0; i < normalCount && i < group.vertices.size(); i++) {
                         group.vertices[i].normal.x = read<float>(groupData, mogpOffset);
                         group.vertices[i].normal.y = read<float>(groupData, mogpOffset);
                         group.vertices[i].normal.z = read<float>(groupData, mogpOffset);
+                    }
+                    if (normalCount > 0 && !group.vertices.empty()) {
+                        const auto& n = group.vertices[0].normal;
+                        core::Logger::getInstance().debug("    First normal: (", n.x, ", ", n.y, ", ", n.z, ")");
                     }
                 }
                 else if (subChunkId == 0x4D4F5456) { // MOTV - Texture coords
@@ -511,12 +519,17 @@ bool WMOLoader::loadGroup(const std::vector<uint8_t>& groupData,
                 else if (subChunkId == 0x4D4F4356) { // MOCV - Vertex colors
                     // Update vertex colors
                     uint32_t colorCount = subChunkSize / 4;
+                    core::Logger::getInstance().info("  MOCV: ", colorCount, " vertex colors for ", group.vertices.size(), " vertices");
                     for (uint32_t i = 0; i < colorCount && i < group.vertices.size(); i++) {
                         uint8_t b = read<uint8_t>(groupData, mogpOffset);
                         uint8_t g = read<uint8_t>(groupData, mogpOffset);
                         uint8_t r = read<uint8_t>(groupData, mogpOffset);
                         uint8_t a = read<uint8_t>(groupData, mogpOffset);
                         group.vertices[i].color = glm::vec4(r/255.0f, g/255.0f, b/255.0f, a/255.0f);
+                    }
+                    if (colorCount > 0 && !group.vertices.empty()) {
+                        const auto& c = group.vertices[0].color;
+                        core::Logger::getInstance().debug("    First color: (", c.r, ", ", c.g, ", ", c.b, ", ", c.a, ")");
                     }
                 }
                 else if (subChunkId == 0x4D4F4241) { // MOBA - Batches
