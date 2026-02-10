@@ -284,25 +284,6 @@ void WaterRenderer::loadFromTerrain(const pipeline::ADTTerrain& terrain, bool ap
                 }
             }
 
-            // Fix Northshire Abbey fountain terrain water
-            // Fountain at approximately (-9048, -44, 93.7)
-            float tileWorldX = (32.0f - tileX) * 533.33333f;
-            float tileWorldY = (32.0f - tileY) * 533.33333f;
-            glm::vec3 northshireFountainPos(-9048.0f, -44.2f, 93.7f);
-            float distToFountain = glm::distance(glm::vec2(tileWorldX, tileWorldY),
-                                                 glm::vec2(northshireFountainPos.x, northshireFountainPos.y));
-
-            // Lower fountain water by 2 units if within same tile/nearby
-            if (distToFountain < 300.0f && std::abs(layer.minHeight - northshireFountainPos.z) < 10.0f) {
-                LOG_INFO("  -> LOWERING Northshire fountain terrain water at tile (", tileX, ",", tileY,
-                         ") by 2 units (dist: ", distToFountain, ")");
-                for (float& h : surface.heights) {
-                    h -= 2.0f;
-                }
-                surface.minHeight -= 2.0f;
-                surface.maxHeight -= 2.0f;
-            }
-
             // Copy render mask
             surface.mask = layer.mask;
 
@@ -421,22 +402,6 @@ void WaterRenderer::loadFromWMO([[maybe_unused]] const pipeline::WMOLiquid& liqu
         } else {
             LOG_INFO("  -> SKIPPING (moonwell exclusion zone, dist: ", distToMoonwell, ")");
         }
-    }
-
-    // Fix Northshire Abbey fountain - water extends 2 units too large in diameter
-    // Fountain center at approximately (-9048, -44, 93.7)
-    glm::vec3 northshireFountainPos(-9048.0f, -44.2f, 93.7f);
-    float distToFountain = glm::distance(glm::vec2(surface.origin.x, surface.origin.y),
-                                         glm::vec2(northshireFountainPos.x, northshireFountainPos.y));
-
-    // Lower fountain water by 2 units if within 15 units of fountain center
-    if (distToFountain < 15.0f && std::abs(surface.origin.z - northshireFountainPos.z) < 5.0f) {
-        LOG_INFO("  -> LOWERING Northshire fountain by 2 units (dist: ", distToFountain, ")");
-        for (float& h : surface.heights) {
-            h -= 2.0f;
-        }
-        surface.minHeight -= 2.0f;
-        surface.maxHeight -= 2.0f;
     }
 
     // Skip WMO water that's clearly invalid (extremely high - above 300 units)
