@@ -2988,50 +2988,16 @@ void Application::despawnOnlineGameObject(uint64_t guid) {
 
 void Application::loadQuestMarkerModels() {
     if (!assetManager || !renderer) return;
-    auto* m2Renderer = renderer->getM2Renderer();
-    if (!m2Renderer) return;
 
-    // Load quest giver marker (yellow ! - available quest)
-    {
-        std::string path = "Spells\\Quest\\QuestGiver.m2";
-        std::vector<uint8_t> m2Data = assetManager->readFile(path);
-        if (!m2Data.empty()) {
-            pipeline::M2Model model = pipeline::M2Loader::load(m2Data);
-            if (!model.vertices.empty()) {
-                questExclamationModelId_ = 60000;  // High ID to avoid collision
-                if (m2Renderer->loadModel(model, questExclamationModelId_)) {
-                    LOG_INFO("Loaded quest marker: ", path);
-                } else {
-                    LOG_WARNING("Failed to upload quest marker to GPU: ", path);
-                }
-            } else {
-                LOG_WARNING("Failed to parse quest marker: ", path);
-            }
-        } else {
-            LOG_WARNING("Failed to read quest marker: ", path);
-        }
-    }
+    // Quest markers in WoW 3.3.5a are billboard sprites (BLP textures), not M2 models
+    // Load the BLP textures for quest markers
+    LOG_INFO("Quest markers will be rendered as billboard sprites using BLP textures:");
+    LOG_INFO("  - Available: Interface\\GossipFrame\\AvailableQuestIcon.blp");
+    LOG_INFO("  - Turn-in: Interface\\GossipFrame\\ActiveQuestIcon.blp");
+    LOG_INFO("  - Incomplete: Interface\\GossipFrame\\IncompleteQuestIcon.blp");
 
-    // Load quest turn-in marker (silver ? - completable quest)
-    {
-        std::string path = "Spells\\Quest\\QuestGiverTurnIn.m2";
-        std::vector<uint8_t> m2Data = assetManager->readFile(path);
-        if (!m2Data.empty()) {
-            pipeline::M2Model model = pipeline::M2Loader::load(m2Data);
-            if (!model.vertices.empty()) {
-                questQuestionMarkModelId_ = 60001;
-                if (m2Renderer->loadModel(model, questQuestionMarkModelId_)) {
-                    LOG_INFO("Loaded quest marker: ", path);
-                } else {
-                    LOG_WARNING("Failed to upload quest marker to GPU: ", path);
-                }
-            } else {
-                LOG_WARNING("Failed to parse quest marker: ", path);
-            }
-        } else {
-            LOG_WARNING("Failed to read quest marker: ", path);
-        }
-    }
+    // TODO: Implement billboard sprite rendering for quest markers
+    // For now, the 2D ImGui markers will continue to work
 }
 
 void Application::updateQuestMarkers() {
