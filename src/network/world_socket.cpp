@@ -212,6 +212,41 @@ void WorldSocket::tryParsePackets() {
         // Total packet size: size field (2) + size value (which includes opcode + payload)
         size_t totalSize = 2 + size;
 
+        // DEBUG: Log packet boundary details for quest-related opcodes
+        if (opcode == 0x18F || opcode == 0x18D || opcode == 0x188 || opcode == 0x186) {
+            char hexBuf[256];
+            snprintf(hexBuf, sizeof(hexBuf),
+                     "PACKET BOUNDARY: opcode=0x%04X size=%u totalSize=%zu bufferSize=%zu",
+                     opcode, size, totalSize, receiveBuffer.size());
+            core::Logger::getInstance().info(hexBuf);
+
+            // Dump header bytes
+            snprintf(hexBuf, sizeof(hexBuf),
+                     "  Header: %02x %02x %02x %02x",
+                     receiveBuffer[0], receiveBuffer[1], receiveBuffer[2], receiveBuffer[3]);
+            core::Logger::getInstance().info(hexBuf);
+
+            // Dump first 16 bytes of payload (if available)
+            if (totalSize <= receiveBuffer.size()) {
+                std::string payloadHex = "  Payload: ";
+                for (size_t i = 4; i < std::min(totalSize, size_t(20)); ++i) {
+                    char buf[4];
+                    snprintf(buf, sizeof(buf), "%02x ", receiveBuffer[i]);
+                    payloadHex += buf;
+                }
+                core::Logger::getInstance().info(payloadHex);
+            }
+
+            // Dump what comes after this packet (next header preview)
+            if (receiveBuffer.size() > totalSize && receiveBuffer.size() >= totalSize + 4) {
+                snprintf(hexBuf, sizeof(hexBuf),
+                         "  Next header: %02x %02x %02x %02x",
+                         receiveBuffer[totalSize], receiveBuffer[totalSize+1],
+                         receiveBuffer[totalSize+2], receiveBuffer[totalSize+3]);
+                core::Logger::getInstance().info(hexBuf);
+            }
+        }
+
         if (receiveBuffer.size() < totalSize) {
             // Not enough data yet - header stays decrypted in buffer
             break;
