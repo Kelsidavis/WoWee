@@ -792,6 +792,16 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
 
     M2ModelGPU gpuModel;
     gpuModel.name = model.name;
+
+    // Detect invisible trap models (event objects that should not render or collide)
+    std::string lowerName = model.name;
+    std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    bool isInvisibleTrap = (lowerName.find("invisibletrap") != std::string::npos);
+    gpuModel.isInvisibleTrap = isInvisibleTrap;
+    if (isInvisibleTrap) {
+        LOG_INFO("Loading InvisibleTrap model: ", model.name, " (will be invisible, no collision)");
+    }
     // Use tight bounds from actual vertices for collision/camera occlusion.
     // Header bounds in some M2s are overly conservative.
     glm::vec3 tightMin( std::numeric_limits<float>::max());
@@ -1045,10 +1055,22 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
     // Load ALL textures from the model into a local vector
     std::vector<GLuint> allTextures;
     if (assetManager) {
-        for (const auto& tex : model.textures) {
+        for (size_t ti = 0; ti < model.textures.size(); ti++) {
+            const auto& tex = model.textures[ti];
             if (!tex.filename.empty()) {
-                allTextures.push_back(loadTexture(tex.filename));
+                GLuint texId = loadTexture(tex.filename);
+                if (texId == whiteTexture) {
+                    LOG_WARNING("M2 model ", model.name, " texture[", ti, "] failed to load: ", tex.filename);
+                }
+                if (isInvisibleTrap) {
+                    LOG_INFO("  InvisibleTrap texture[", ti, "]: ", tex.filename, " -> ", (texId == whiteTexture ? "WHITE" : "OK"));
+                }
+                allTextures.push_back(texId);
             } else {
+                LOG_WARNING("M2 model ", model.name, " texture[", ti, "] has empty filename (using white fallback)");
+                if (isInvisibleTrap) {
+                    LOG_INFO("  InvisibleTrap texture[", ti, "]: EMPTY (using white fallback)");
+                }
                 allTextures.push_back(whiteTexture);
             }
         }
@@ -1669,7 +1691,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
         auto it = models.find(instance.modelId);
         if (it == models.end()) continue;
         const M2ModelGPU& model = it->second;
-        if (!model.isValid() || model.isSmoke) continue;
+        if (!model.isValid() || model.isSmoke || model.isInvisibleTrap) continue;
 
         glm::vec3 toCam = instance.position - camPos;
         float distSq = glm::dot(toCam, toCam);
@@ -2671,7 +2693,7 @@ std::optional<float> M2Renderer::getFloorHeight(float glX, float glY, float glZ)
         if (instance.scale <= 0.001f) continue;
 
         const M2ModelGPU& model = it->second;
-        if (model.collisionNoBlock) continue;
+        if (model.collisionNoBlock || model.isInvisibleTrap) continue;
 
         // --- Mesh-based floor: vertical ray vs collision triangles ---
         // Does NOT skip the AABB path — both contribute and highest wins.
@@ -2818,7 +2840,7 @@ bool M2Renderer::checkCollision(const glm::vec3& from, const glm::vec3& to,
         if (it == models.end()) continue;
 
         const M2ModelGPU& model = it->second;
-        if (model.collisionNoBlock) continue;
+        if (model.collisionNoBlock || model.isInvisibleTrap) continue;
         if (instance.scale <= 0.001f) continue;
 
         // --- Mesh-based wall collision: closest-point push ---
@@ -3058,7 +3080,7 @@ float M2Renderer::raycastBoundingBoxes(const glm::vec3& origin, const glm::vec3&
         if (it == models.end()) continue;
 
         const M2ModelGPU& model = it->second;
-        if (model.collisionNoBlock) continue;
+        if (model.collisionNoBlock || model.isInvisibleTrap) continue;
         glm::vec3 localMin, localMax;
         getTightCollisionBounds(model, localMin, localMax);
         // Skip tiny doodads for camera occlusion; they cause jitter and false hits.

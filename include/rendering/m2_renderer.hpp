@@ -60,6 +60,7 @@ struct M2ModelGPU {
     bool collisionNoBlock = false;
     bool collisionStatue = false;
     bool isSmallFoliage = false;  // Small foliage (bushes, grass, plants) - skip during taxi
+    bool isInvisibleTrap = false; // Invisible trap objects (don't render, no collision)
 
     // Collision mesh with spatial grid (from M2 bounding geometry)
     struct CollisionMesh {
