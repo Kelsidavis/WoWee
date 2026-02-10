@@ -1002,31 +1002,21 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
                 glm::vec3 groupCenter = (group.boundingBoxMin + group.boundingBoxMax) * 0.5f;
                 glm::vec4 worldCenter = instance.modelMatrix * glm::vec4(groupCenter, 1.0f);
                 float distToGroup = glm::length(cameraPos - glm::vec3(worldCenter));
+
+                // Log bounding box to identify groups that are positioned HIGH (floating shell)
+                glm::vec3 size = group.boundingBoxMax - group.boundingBoxMin;
                 LOG_INFO("  Group ", gi, ": flags=0x", std::hex, group.groupFlags, std::dec,
-                         " dist=", distToGroup, " verts=", group.vertexCount);
+                         " verts=", group.vertexCount,
+                         " centerZ=", groupCenter.z,
+                         " sizeZ=", size.z,
+                         " worldZ=", worldCenter.z);
             }
             loggedStormwindGroups = true;  // Only log once to avoid spam
         }
 
-        // Render groups with LOD shell culling
-        glm::vec3 cameraPos = camera.getPosition();
+        // Render groups (culling disabled for debugging)
         for (uint32_t gi : dl.visibleGroups) {
-            const auto& group = model.groups[gi];
-
-            // LOD shell culling: hide distant groups when camera is close to WMO
-            // The "floating cathedral" is likely a distant LOD that should hide when you're near
-            glm::vec3 groupCenter = (group.boundingBoxMin + group.boundingBoxMax) * 0.5f;
-            glm::vec4 worldCenter = instance.modelMatrix * glm::vec4(groupCenter, 1.0f);
-            float distToGroup = glm::length(cameraPos - glm::vec3(worldCenter));
-            float distToWMO = glm::length(cameraPos - instance.position);
-
-            // Skip groups that are far from camera (>200 units) when you're close to the WMO (<300 units)
-            // This hides the distant cathedral view when you're actually near/inside it
-            if (distToWMO < 300.0f && distToGroup > 200.0f) {
-                continue;  // Skip distant LOD when near WMO
-            }
-
-            renderGroup(group, model, instance.modelMatrix, view, projection);
+            renderGroup(model.groups[gi], model, instance.modelMatrix, view, projection);
         }
 
         lastPortalCulledGroups += dl.portalCulled;
