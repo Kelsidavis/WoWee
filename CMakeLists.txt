@@ -108,6 +108,7 @@ set(WOWEE_SOURCES
     src/audio/ambient_sound_manager.cpp
     src/audio/ui_sound_manager.cpp
     src/audio/combat_sound_manager.cpp
+    src/audio/spell_sound_manager.cpp
 
     # Pipeline (asset loaders)
     src/pipeline/mpq_manager.cpp
