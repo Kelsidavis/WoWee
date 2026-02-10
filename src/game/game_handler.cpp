@@ -840,9 +840,11 @@ void GameHandler::handlePacket(network::Packet& packet) {
             // Mark quest as complete in local log
             if (packet.getSize() - packet.getReadPos() >= 4) {
                 uint32_t questId = packet.readUInt32();
+                LOG_INFO("Quest completed: questId=", questId);
                 for (auto it = questLog_.begin(); it != questLog_.end(); ++it) {
                     if (it->questId == questId) {
                         questLog_.erase(it);
+                        LOG_INFO("  Removed quest ", questId, " from quest log");
                         break;
                     }
                 }
@@ -4290,6 +4292,7 @@ void GameHandler::selectGossipOption(uint32_t optionId) {
 
 void GameHandler::selectGossipQuest(uint32_t questId) {
     if (state != WorldState::IN_WORLD || !socket || !gossipWindowOpen) return;
+    LOG_INFO("Selecting gossip quest: questId=", questId, " npcGuid=", currentGossip.npcGuid);
     auto packet = QuestgiverQueryQuestPacket::build(currentGossip.npcGuid, questId);
     socket->send(packet);
     gossipWindowOpen = false;
@@ -4382,6 +4385,7 @@ void GameHandler::handleQuestOfferReward(network::Packet& packet) {
         LOG_WARNING("Failed to parse SMSG_QUESTGIVER_OFFER_REWARD");
         return;
     }
+    LOG_INFO("Quest offer reward: questId=", data.questId, " title=\"", data.title, "\"");
     currentQuestOfferReward_ = data;
     questOfferRewardOpen_ = true;
     questRequestItemsOpen_ = false;
@@ -4412,6 +4416,8 @@ void GameHandler::closeQuestRequestItems() {
 void GameHandler::chooseQuestReward(uint32_t rewardIndex) {
     if (!questOfferRewardOpen_ || state != WorldState::IN_WORLD || !socket) return;
     uint64_t npcGuid = currentQuestOfferReward_.npcGuid;
+    LOG_INFO("Completing quest: questId=", currentQuestOfferReward_.questId,
+             " npcGuid=", npcGuid, " rewardIndex=", rewardIndex);
     auto packet = QuestgiverChooseRewardPacket::build(
         npcGuid, currentQuestOfferReward_.questId, rewardIndex);
     socket->send(packet);
