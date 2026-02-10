@@ -3988,7 +3988,8 @@ void GameHandler::handleInitialSpells(network::Packet& packet) {
     // Debug: check if specific spells are in initial spells
     bool has527 = std::find(knownSpells.begin(), knownSpells.end(), 527u) != knownSpells.end();
     bool has988 = std::find(knownSpells.begin(), knownSpells.end(), 988u) != knownSpells.end();
-    LOG_INFO("Initial spells include: 527=", has527, " 988=", has988);
+    bool has1180 = std::find(knownSpells.begin(), knownSpells.end(), 1180u) != knownSpells.end();
+    LOG_INFO("Initial spells include: 527=", has527, " 988=", has988, " 1180=", has1180);
 
     // Ensure Attack (6603) and Hearthstone (8690) are always present
     if (std::find(knownSpells.begin(), knownSpells.end(), 6603u) == knownSpells.end()) {

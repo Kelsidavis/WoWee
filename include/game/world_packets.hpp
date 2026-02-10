@@ -1723,7 +1723,7 @@ public:
 
 struct TrainerSpell {
     uint32_t spellId = 0;
-    uint8_t state = 0;         // 0=known(green), 1=available, 2=unavailable(red)
+    uint8_t state = 0;         // 0=unavailable(grey), 1=available(green), 2=known(green)
     uint32_t spellCost = 0;    // copper
     uint32_t profDialog = 0;
     uint32_t profButton = 0;
