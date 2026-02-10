@@ -3596,7 +3596,13 @@ void GameScreen::renderTrainerWindow(game::GameHandler& gameHandler) {
             const auto& knownSpells = gameHandler.getKnownSpells();
             auto isKnown = [&](uint32_t id) {
                 if (id == 0) return true;
-                return std::find(knownSpells.begin(), knownSpells.end(), id) != knownSpells.end();
+                bool found = std::find(knownSpells.begin(), knownSpells.end(), id) != knownSpells.end();
+                static int debugCount = 0;
+                if (debugCount < 5 && !found && id != 0) {
+                    LOG_INFO("isKnown(", id, ") = false, knownSpells.size()=", knownSpells.size());
+                    debugCount++;
+                }
+                return found;
             };
             uint32_t playerLevel = gameHandler.getPlayerLevel();
 
@@ -3607,11 +3613,12 @@ void GameScreen::renderTrainerWindow(game::GameHandler& gameHandler) {
                     ImGui::PushID(static_cast<int>(spell->spellId));
 
                     // Check prerequisites client-side
-                    bool prereqsMet = isKnown(spell->chainNode1)
-                                   && isKnown(spell->chainNode2)
-                                   && isKnown(spell->chainNode3);
+                    bool prereq1Met = isKnown(spell->chainNode1);
+                    bool prereq2Met = isKnown(spell->chainNode2);
+                    bool prereq3Met = isKnown(spell->chainNode3);
+                    bool prereqsMet = prereq1Met && prereq2Met && prereq3Met;
                     bool levelMet = (spell->reqLevel == 0 || playerLevel >= spell->reqLevel);
-                    bool alreadyKnown = (spell->state == 0) || isKnown(spell->spellId);
+                    bool alreadyKnown = isKnown(spell->spellId);
 
                     ImVec4 color;
                     const char* statusLabel;
@@ -3690,16 +3697,23 @@ void GameScreen::renderTrainerWindow(game::GameHandler& gameHandler) {
                                   && prereqsMet && levelMet
                                   && (money >= spell->spellCost);
 
-                    // Debug logging for first spell to see why buttons are disabled
-                    static bool logged = false;
-                    if (!logged) {
+                    // Debug logging for first 3 spells to see why buttons are disabled
+                    static int logCount = 0;
+                    static uint64_t lastTrainerGuid = 0;
+                    if (trainer.trainerGuid != lastTrainerGuid) {
+                        logCount = 0;
+                        lastTrainerGuid = trainer.trainerGuid;
+                    }
+                    if (logCount < 3) {
                         LOG_INFO("Trainer button debug: spellId=", spell->spellId,
                                 " alreadyKnown=", alreadyKnown, " state=", (int)spell->state,
-                                " prereqsMet=", prereqsMet, " levelMet=", levelMet,
+                                " prereqsMet=", prereqsMet, " (", prereq1Met, ",", prereq2Met, ",", prereq3Met, ")",
+                                " levelMet=", levelMet,
+                                " reqLevel=", spell->reqLevel, " playerLevel=", playerLevel,
+                                " chain1=", spell->chainNode1, " chain2=", spell->chainNode2, " chain3=", spell->chainNode3,
                                 " canAfford=", (money >= spell->spellCost),
-                                " money=", money, " cost=", spell->spellCost,
                                 " canTrain=", canTrain);
-                        logged = true;
+                        logCount++;
                     }
 
                     if (!canTrain) ImGui::BeginDisabled();
