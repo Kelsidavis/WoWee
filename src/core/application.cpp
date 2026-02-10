@@ -2991,9 +2991,9 @@ void Application::loadQuestMarkerModels() {
     auto* m2Renderer = renderer->getM2Renderer();
     if (!m2Renderer) return;
 
-    // Load quest exclamation mark (yellow !)
+    // Load quest giver marker (yellow ! - available quest)
     {
-        std::string path = "World\\Generic\\PassiveDoodads\\Quest\\QuestExclamation.m2";
+        std::string path = "Spells\\Quest\\QuestGiver.m2";
         std::vector<uint8_t> m2Data = assetManager->readFile(path);
         if (!m2Data.empty()) {
             pipeline::M2Model model = pipeline::M2Loader::load(m2Data);
@@ -3012,9 +3012,9 @@ void Application::loadQuestMarkerModels() {
         }
     }
 
-    // Load quest question mark (silver ?)
+    // Load quest turn-in marker (silver ? - completable quest)
     {
-        std::string path = "World\\Generic\\PassiveDoodads\\Quest\\QuestQuestionMark.m2";
+        std::string path = "Spells\\Quest\\QuestGiverTurnIn.m2";
         std::vector<uint8_t> m2Data = assetManager->readFile(path);
         if (!m2Data.empty()) {
             pipeline::M2Model model = pipeline::M2Loader::load(m2Data);
