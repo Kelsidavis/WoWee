@@ -991,6 +991,23 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
 
         shader->setUniform("uModel", instance.modelMatrix);
 
+        // Debug logging for STORMWIND.WMO groups to identify LOD shell
+        static bool loggedStormwindGroups = false;
+        if (!loggedStormwindGroups && instance.modelId == 10047) {
+            glm::vec3 cameraPos = camera.getPosition();
+            float distToWMO = glm::length(cameraPos - instance.position);
+            LOG_INFO("=== STORMWIND.WMO Group Rendering (dist=", distToWMO, ") ===");
+            for (uint32_t gi : dl.visibleGroups) {
+                const auto& group = model.groups[gi];
+                glm::vec3 groupCenter = (group.boundingBoxMin + group.boundingBoxMax) * 0.5f;
+                glm::vec4 worldCenter = instance.modelMatrix * glm::vec4(groupCenter, 1.0f);
+                float distToGroup = glm::length(cameraPos - glm::vec3(worldCenter));
+                LOG_INFO("  Group ", gi, ": flags=0x", std::hex, group.groupFlags, std::dec,
+                         " dist=", distToGroup, " verts=", group.vertexCount);
+            }
+            loggedStormwindGroups = true;  // Only log once to avoid spam
+        }
+
         for (uint32_t gi : dl.visibleGroups)
             renderGroup(model.groups[gi], model, instance.modelMatrix, view, projection);
 
