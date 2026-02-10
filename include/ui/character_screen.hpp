@@ -49,12 +49,18 @@ public:
      */
     void setStatus(const std::string& message);
 
+    /**
+     * Select character by name (used after character creation)
+     */
+    void selectCharacterByName(const std::string& name);
+
 private:
     // UI state
     int selectedCharacterIndex = -1;
     bool characterSelected = false;
     uint64_t selectedCharacterGuid = 0;
     bool restoredLastCharacter = false;
+    std::string newlyCreatedCharacterName;  // Auto-select this character if set
 
     // Status
     std::string statusMessage;

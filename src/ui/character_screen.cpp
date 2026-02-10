@@ -56,13 +56,28 @@ void CharacterScreen::render(game::GameHandler& gameHandler) {
 
     // Restore last-selected character (once per screen visit)
     if (!restoredLastCharacter) {
-        uint64_t lastGuid = loadLastCharacter();
-        if (lastGuid != 0) {
+        // Priority 1: Select newly created character if set
+        if (!newlyCreatedCharacterName.empty()) {
             for (size_t i = 0; i < characters.size(); ++i) {
-                if (characters[i].guid == lastGuid) {
+                if (characters[i].name == newlyCreatedCharacterName) {
                     selectedCharacterIndex = static_cast<int>(i);
-                    selectedCharacterGuid = lastGuid;
+                    selectedCharacterGuid = characters[i].guid;
+                    saveLastCharacter(characters[i].guid);
+                    newlyCreatedCharacterName.clear();
                     break;
+                }
+            }
+        }
+        // Priority 2: Restore last selected character
+        if (selectedCharacterIndex < 0) {
+            uint64_t lastGuid = loadLastCharacter();
+            if (lastGuid != 0) {
+                for (size_t i = 0; i < characters.size(); ++i) {
+                    if (characters[i].guid == lastGuid) {
+                        selectedCharacterIndex = static_cast<int>(i);
+                        selectedCharacterGuid = lastGuid;
+                        break;
+                    }
                 }
             }
         }
@@ -296,6 +311,12 @@ void CharacterScreen::render(game::GameHandler& gameHandler) {
 
 void CharacterScreen::setStatus(const std::string& message) {
     statusMessage = message;
+}
+
+void CharacterScreen::selectCharacterByName(const std::string& name) {
+    newlyCreatedCharacterName = name;
+    restoredLastCharacter = false;  // Allow re-selection in render()
+    selectedCharacterIndex = -1;
 }
 
 ImVec4 CharacterScreen::getFactionColor(game::Race race) const {

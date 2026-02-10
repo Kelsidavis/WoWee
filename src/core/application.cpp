@@ -581,6 +581,7 @@ void Application::setupUICallbacks() {
 
     // Character create screen callbacks
     uiManager->getCharacterCreateScreen().setOnCreate([this](const game::CharCreateData& data) {
+        pendingCreatedCharacterName_ = data.name;  // Store name for auto-selection
         gameHandler->createCharacter(data);
     });
 
@@ -591,9 +592,15 @@ void Application::setupUICallbacks() {
     // Character create result callback
     gameHandler->setCharCreateCallback([this](bool success, const std::string& msg) {
         if (success) {
+            // Auto-select the newly created character
+            if (!pendingCreatedCharacterName_.empty()) {
+                uiManager->getCharacterScreen().selectCharacterByName(pendingCreatedCharacterName_);
+                pendingCreatedCharacterName_.clear();
+            }
             setState(AppState::CHARACTER_SELECTION);
         } else {
             uiManager->getCharacterCreateScreen().setStatus(msg, true);
+            pendingCreatedCharacterName_.clear();
         }
     });
 

@@ -107,6 +107,7 @@ private:
 
     AppState state = AppState::AUTHENTICATION;
     bool running = false;
+    std::string pendingCreatedCharacterName_;  // Auto-select after character creation
     bool playerCharacterSpawned = false;
     bool npcsSpawned = false;
     bool spawnSnapToGround = true;
