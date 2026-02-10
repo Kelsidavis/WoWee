@@ -73,12 +73,9 @@ bool AmbientSoundManager::initialize(pipeline::AssetManager* assets) {
     tavernSounds_.resize(1);
     bool tavernLoaded = loadSound("Sound\\Ambience\\WMOAmbience\\Tavern.wav", tavernSounds_[0], assets);
 
-    // Load multiple hammer sounds for variety (short metal hit sounds)
-    blacksmithSounds_.resize(3);
-    bool bs1 = loadSound("Sound\\Item\\Weapons\\Mace1HMetal\\1hMaceMetalHitWoodCrit.wav", blacksmithSounds_[0], assets);
-    bool bs2 = loadSound("Sound\\Item\\Weapons\\Sword2H\\m2hSwordHitMetalShield1c.wav", blacksmithSounds_[1], assets);
-    bool bs3 = loadSound("Sound\\Item\\Weapons\\Axe2H\\m2hAxeHitChain1c.wav", blacksmithSounds_[2], assets);
-    bool blacksmithLoaded = (bs1 || bs2 || bs3);
+    // Load blacksmith ambience loop
+    blacksmithSounds_.resize(1);
+    bool blacksmithLoaded = loadSound("Sound\\Ambience\\WMOAmbience\\BlackSmith.wav", blacksmithSounds_[0], assets);
 
     LOG_INFO("AmbientSoundManager: Wind loaded: ", windLoaded ? "YES" : "NO",
              ", Tavern loaded: ", tavernLoaded ? "YES" : "NO",
@@ -290,23 +287,13 @@ void AmbientSoundManager::updateBlacksmithAmbience(float deltaTime) {
         }
     }
 
-    if (hasSound) {
+    if (hasSound && blacksmithSounds_[0].loaded) {
         blacksmithLoopTime_ += deltaTime;
-        // Play every 2.5 seconds - rapid hammer strikes like real blacksmith
-        if (blacksmithLoopTime_ >= 2.5f) {
-            // Pick random hammer sound
-            int index = 0;
-            for (int i = 0; i < static_cast<int>(blacksmithSounds_.size()); i++) {
-                if (blacksmithSounds_[i].loaded) {
-                    index = i;
-                    break;
-                }
-            }
-
-            float volume = 0.25f * volumeScale_;  // Reduced 30% from 0.35
-            float pitch = 1.6f;  // Higher pitch for metallic clink
-            AudioEngine::instance().playSound2D(blacksmithSounds_[index].data, volume, pitch);
-            LOG_INFO("Playing blacksmith ambience (hammer strike)");
+        // Play blacksmith ambience loop every 15 seconds
+        if (blacksmithLoopTime_ >= 15.0f) {
+            float volume = 0.6f * volumeScale_;  // Ambient loop volume
+            AudioEngine::instance().playSound2D(blacksmithSounds_[0].data, volume, 1.0f);
+            LOG_INFO("Playing blacksmith ambience loop");
             blacksmithLoopTime_ = 0.0f;
         }
     }
