@@ -183,6 +183,19 @@ bool AmbientSoundManager::initialize(pipeline::AssetManager* assets) {
     thunderbluffNightSounds_.resize(1);
     bool thunderbluffNightLoaded = loadSound("Sound\\Ambience\\WMOAmbience\\ThunderBluffNight.wav", thunderbluffNightSounds_[0], assets);
 
+    // Load bell toll sounds
+    bellAllianceSounds_.resize(1);
+    bool bellAllianceLoaded = loadSound("Sound\\Doodad\\BellTollAlliance.wav", bellAllianceSounds_[0], assets);
+
+    bellHordeSounds_.resize(1);
+    bool bellHordeLoaded = loadSound("Sound\\Doodad\\BellTollHorde.wav", bellHordeSounds_[0], assets);
+
+    bellNightElfSounds_.resize(1);
+    bool bellNightElfLoaded = loadSound("Sound\\Doodad\\BellTollNightElf.wav", bellNightElfSounds_[0], assets);
+
+    bellTribalSounds_.resize(1);
+    bool bellTribalLoaded = loadSound("Sound\\Doodad\\BellTollTribal.wav", bellTribalSounds_[0], assets);
+
     LOG_INFO("AmbientSoundManager: Wind loaded: ", windLoaded ? "YES" : "NO",
              ", Tavern loaded: ", tavernLoaded ? "YES" : "NO",
              ", Blacksmith loaded: ", blacksmithLoaded ? "YES" : "NO");
@@ -196,6 +209,10 @@ bool AmbientSoundManager::initialize(pipeline::AssetManager* assets) {
     LOG_INFO("AmbientSoundManager: City sounds - Stormwind: ", (stormwindDayLoaded && stormwindNightLoaded) ? "YES" : "NO",
              ", Ironforge: ", ironforgeLoaded ? "YES" : "NO",
              ", Orgrimmar: ", (orgrimmarDayLoaded && orgrimmarNightLoaded) ? "YES" : "NO");
+    LOG_INFO("AmbientSoundManager: Bell tolls - Alliance: ", bellAllianceLoaded ? "YES" : "NO",
+             ", Horde: ", bellHordeLoaded ? "YES" : "NO",
+             ", NightElf: ", bellNightElfLoaded ? "YES" : "NO",
+             ", Tribal: ", bellTribalLoaded ? "YES" : "NO");
 
     // Initialize timers with random offsets
     birdTimer_ = randomFloat(0.0f, 5.0f);
@@ -258,6 +275,7 @@ void AmbientSoundManager::update(float deltaTime, const glm::vec3& cameraPos, bo
     updateWaterAmbience(deltaTime, isSwimming);
     updateZoneAmbience(deltaTime, isIndoor);
     updateCityAmbience(deltaTime);
+    updateBellTolls(deltaTime);
 
     // Track indoor state changes
     wasIndoor_ = isIndoor;
@@ -522,6 +540,7 @@ void AmbientSoundManager::setCityType(CityType type) {
                  " to ", static_cast<int>(type));
         currentCity_ = type;
         cityLoopTime_ = 12.0f;  // Play city ambience soon after entering
+        bellTollTime_ = randomFloat(60.0f, 90.0f);  // First bell toll after 1-1.5 minutes
     }
 }
 
@@ -696,6 +715,47 @@ void AmbientSoundManager::updateCityAmbience(float deltaTime) {
             LOG_INFO("Playing city ambience: type ", static_cast<int>(currentCity_),
                      " (", isDay ? "day" : "night", ")");
             cityLoopTime_ = 0.0f;
+        }
+    }
+}
+
+void AmbientSoundManager::updateBellTolls(float deltaTime) {
+    // Only play bells when in a city
+    if (currentCity_ == CityType::NONE) return;
+
+    bellTollTime_ += deltaTime;
+
+    // Select appropriate bell sound based on city faction
+    const std::vector<AmbientSample>* bellLibrary = nullptr;
+
+    switch (currentCity_) {
+        case CityType::STORMWIND:
+        case CityType::IRONFORGE:
+            bellLibrary = &bellAllianceSounds_;
+            break;
+        case CityType::DARNASSUS:
+            bellLibrary = &bellNightElfSounds_;
+            break;
+        case CityType::ORGRIMMAR:
+        case CityType::UNDERCITY:
+            bellLibrary = &bellHordeSounds_;
+            break;
+        case CityType::THUNDERBLUFF:
+            bellLibrary = &bellTribalSounds_;
+            break;
+        default:
+            return;
+    }
+
+    // Play bell toll every 120-180 seconds (2-3 minutes) with random variation
+    float bellInterval = randomFloat(120.0f, 180.0f);
+
+    if (bellLibrary && !bellLibrary->empty() && (*bellLibrary)[0].loaded) {
+        if (bellTollTime_ >= bellInterval) {
+            float volume = 0.5f * volumeScale_;  // Bell tolls at moderate-high volume
+            AudioEngine::instance().playSound2D((*bellLibrary)[0].data, volume, 1.0f);
+            LOG_INFO("Bell toll ringing in city: type ", static_cast<int>(currentCity_));
+            bellTollTime_ = 0.0f;
         }
     }
 }
