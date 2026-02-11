@@ -143,14 +143,12 @@ make -j$(nproc)
 
 ### Getting Started
 - [Quick Start](docs/quickstart.md) -- Installation and first steps
-- [Features Overview](FEATURES.md) -- Complete feature list
-- [Changelog](CHANGELOG.md) -- Development history and recent changes
+- [Build Instructions](BUILD_INSTRUCTIONS.md) -- Detailed dependency, build, and run guide
 
 ### Technical Documentation
 - [Architecture](docs/architecture.md) -- System design and module overview
 - [Authentication](docs/authentication.md) -- SRP6 auth protocol details
 - [Server Setup](docs/server-setup.md) -- Local server configuration
-- [Single Player](docs/single-player.md) -- Offline mode
 - [Sky System](docs/SKY_SYSTEM.md) -- Celestial bodies, Azeroth astronomy, and WoW-accurate sky rendering
 - [SRP Implementation](docs/srp-implementation.md) -- Cryptographic details
 - [Packet Framing](docs/packet-framing.md) -- Network protocol framing
@@ -160,7 +158,7 @@ make -j$(nproc)
 
 - **Graphics**: OpenGL 3.3 Core, GLSL 330, forward rendering with post-processing
 - **Performance**: 60 FPS (vsync), ~50k triangles/frame, ~30 draw calls, <10% GPU
-- **Platform**: Linux (primary), C++17, CMake 3.15+
+- **Platform**: Linux (primary), C++20, CMake 3.15+
 - **Dependencies**: SDL2, OpenGL/GLEW, GLM, OpenSSL, StormLib, ImGui, FFmpeg
 - **Architecture**: Modular design with clear separation (core, rendering, networking, game logic, asset pipeline, UI, audio)
 - **Networking**: Non-blocking TCP, SRP6a authentication, RC4 encryption, WoW 3.3.5a protocol
