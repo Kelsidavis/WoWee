@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 project(wowee VERSION 1.0.0 LANGUAGES CXX)
+include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -264,8 +265,13 @@ set(WOWEE_HEADERS
     include/ui/talent_screen.hpp
 )
 
+set(WOWEE_PLATFORM_SOURCES)
+if(WIN32)
+    list(APPEND WOWEE_PLATFORM_SOURCES resources/wowee.rc)
+endif()
+
 # Create executable
-add_executable(wowee ${WOWEE_SOURCES} ${WOWEE_HEADERS})
+add_executable(wowee ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES})
 
 # Include directories
 target_include_directories(wowee PRIVATE
@@ -340,6 +346,22 @@ install(TARGETS wowee
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
+
+# Linux desktop integration (launcher + icon)
+if(UNIX AND NOT APPLE)
+    set(WOWEE_LINUX_ICON_PATH "${CMAKE_INSTALL_FULL_DATAROOTDIR}/icons/hicolor/256x256/apps/wowee.png")
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/resources/wowee.desktop.in
+        ${CMAKE_CURRENT_BINARY_DIR}/wowee.desktop
+        @ONLY
+    )
+
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wowee.desktop
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/assets/Wowee.png
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps
+        RENAME wowee.png)
+endif()
 
 # Print configuration summary
 message(STATUS "")

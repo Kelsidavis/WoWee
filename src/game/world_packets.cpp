@@ -565,23 +565,8 @@ network::Packet MovementPacket::build(Opcode opcode, const MovementInfo& info, u
     // Write orientation
     packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.orientation), sizeof(float));
 
-    // Write pitch if swimming/flying
-    if (info.hasFlag(MovementFlags::SWIMMING) || info.hasFlag(MovementFlags::FLYING)) {
-        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.pitch), sizeof(float));
-    }
-
-    // Fall time is ALWAYS present in the packet (server reads it unconditionally).
-    // Jump velocity/angle data is only present when FALLING flag is set.
-    packet.writeUInt32(info.fallTime);
-
-    if (info.hasFlag(MovementFlags::FALLING)) {
-        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpVelocity), sizeof(float));
-        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpSinAngle), sizeof(float));
-        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpCosAngle), sizeof(float));
-        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpXYSpeed), sizeof(float));
-    }
-
-    // Write transport data if on transport
+    // Write transport data if on transport.
+    // 3.3.5a ordering: transport block appears before pitch/fall/jump.
     if (info.hasFlag(MovementFlags::ONTRANSPORT)) {
         // Write packed transport GUID
         uint8_t transMask = 0;
@@ -607,6 +592,30 @@ network::Packet MovementPacket::build(Opcode opcode, const MovementInfo& info, u
 
         // Write transport time
         packet.writeUInt32(info.transportTime);
+
+        // Transport seat is always present in ONTRANSPORT movement info.
+        packet.writeUInt8(static_cast<uint8_t>(info.transportSeat));
+
+        // Optional second transport time for interpolated movement.
+        if (info.flags2 & 0x0200) {
+            packet.writeUInt32(info.transportTime2);
+        }
+    }
+
+    // Write pitch if swimming/flying
+    if (info.hasFlag(MovementFlags::SWIMMING) || info.hasFlag(MovementFlags::FLYING)) {
+        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.pitch), sizeof(float));
+    }
+
+    // Fall time is ALWAYS present in the packet (server reads it unconditionally).
+    // Jump velocity/angle data is only present when FALLING flag is set.
+    packet.writeUInt32(info.fallTime);
+
+    if (info.hasFlag(MovementFlags::FALLING)) {
+        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpVelocity), sizeof(float));
+        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpSinAngle), sizeof(float));
+        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpCosAngle), sizeof(float));
+        packet.writeBytes(reinterpret_cast<const uint8_t*>(&info.jumpXYSpeed), sizeof(float));
     }
 
     // Detailed hex dump for debugging
@@ -817,15 +826,18 @@ bool UpdateObjectParser::parseMovementBlock(network::Packet& packet, UpdateBlock
         block.x = packet.readFloat();
         block.y = packet.readFloat();
         block.z = packet.readFloat();
-        /*float transportOffsetX =*/ packet.readFloat();
-        /*float transportOffsetY =*/ packet.readFloat();
-        /*float transportOffsetZ =*/ packet.readFloat();
+        block.onTransport = (transportGuid != 0);
+        block.transportGuid = transportGuid;
+        block.transportX = packet.readFloat();
+        block.transportY = packet.readFloat();
+        block.transportZ = packet.readFloat();
         block.orientation = packet.readFloat();
         /*float corpseOrientation =*/ packet.readFloat();
         block.hasMovement = true;
 
         LOG_INFO("  TRANSPORT POSITION UPDATE: guid=0x", std::hex, transportGuid, std::dec,
-                 " pos=(", block.x, ", ", block.y, ", ", block.z, "), o=", block.orientation);
+                 " pos=(", block.x, ", ", block.y, ", ", block.z, "), o=", block.orientation,
+                 " offset=(", block.transportX, ", ", block.transportY, ", ", block.transportZ, ")");
     }
     else if (updateFlags & UPDATEFLAG_STATIONARY_POSITION) {
         // Simple stationary position (4 floats)

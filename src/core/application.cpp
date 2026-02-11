@@ -888,14 +888,28 @@ void Application::setupUICallbacks() {
         // Coordinates are already canonical (converted in game_handler.cpp when entity was created)
         glm::vec3 canonicalSpawnPos(x, y, z);
 
-        // Check if we have a real path from TransportAnimation.dbc (indexed by entry)
+        // Check if we have a real path from TransportAnimation.dbc (indexed by entry).
+        // AzerothCore transport entries are not always 1:1 with DBC path ids.
         if (!transportManager->hasPathForEntry(entry)) {
-            LOG_WARNING("No TransportAnimation.dbc path for entry ", entry,
-                        " - transport will be stationary");
+            uint32_t remappedPath = transportManager->pickFallbackMovingPath(entry, displayId);
+            if (remappedPath != 0) {
+                pathId = remappedPath;
+                LOG_INFO("Using remapped fallback transport path ", pathId,
+                         " for entry ", entry, " displayId=", displayId);
+            } else {
+                uint32_t inferredPath = transportManager->inferMovingPathForSpawn(canonicalSpawnPos);
+                if (inferredPath != 0) {
+                    pathId = inferredPath;
+                    LOG_INFO("Using inferred transport path ", pathId, " for entry ", entry);
+                } else {
+                    LOG_WARNING("No TransportAnimation.dbc path for entry ", entry,
+                                " - transport will be stationary");
 
-            // Fallback: Stationary at spawn point (wait for server to send real position)
-            std::vector<glm::vec3> path = { canonicalSpawnPos };
-            transportManager->loadPathFromNodes(pathId, path, false, 0.0f);
+                    // Fallback: Stationary at spawn point (wait for server to send real position)
+                    std::vector<glm::vec3> path = { canonicalSpawnPos };
+                    transportManager->loadPathFromNodes(pathId, path, false, 0.0f);
+                }
+            }
         } else {
             LOG_INFO("Using real transport path from TransportAnimation.dbc for entry ", entry);
         }
@@ -943,12 +957,28 @@ void Application::setupUICallbacks() {
                     // Coordinates are already canonical (converted in game_handler.cpp)
                     glm::vec3 canonicalSpawnPos(x, y, z);
 
-                    // Check if we have a real path, otherwise create stationary fallback
+                    // Check if we have a real path, otherwise remap/infer/fall back to stationary.
                     if (!transportManager->hasPathForEntry(entry)) {
-                        std::vector<glm::vec3> path = { canonicalSpawnPos };
-                        transportManager->loadPathFromNodes(pathId, path, false, 0.0f);
-                        LOG_INFO("Auto-spawned transport with stationary path: entry=", entry,
-                                 " displayId=", displayId, " wmoInstance=", wmoInstanceId);
+                        uint32_t remappedPath = transportManager->pickFallbackMovingPath(entry, displayId);
+                        if (remappedPath != 0) {
+                            pathId = remappedPath;
+                            LOG_INFO("Auto-spawned transport with remapped fallback path: entry=", entry,
+                                     " remappedPath=", pathId, " displayId=", displayId,
+                                     " wmoInstance=", wmoInstanceId);
+                        } else {
+                            uint32_t inferredPath = transportManager->inferMovingPathForSpawn(canonicalSpawnPos);
+                            if (inferredPath != 0) {
+                                pathId = inferredPath;
+                                LOG_INFO("Auto-spawned transport with inferred path: entry=", entry,
+                                         " inferredPath=", pathId, " displayId=", displayId,
+                                         " wmoInstance=", wmoInstanceId);
+                            } else {
+                                std::vector<glm::vec3> path = { canonicalSpawnPos };
+                                transportManager->loadPathFromNodes(pathId, path, false, 0.0f);
+                                LOG_INFO("Auto-spawned transport with stationary path: entry=", entry,
+                                         " displayId=", displayId, " wmoInstance=", wmoInstanceId);
+                            }
+                        }
                     } else {
                         LOG_INFO("Auto-spawned transport with real path: entry=", entry,
                                  " displayId=", displayId, " wmoInstance=", wmoInstanceId);

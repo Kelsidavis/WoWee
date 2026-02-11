@@ -418,6 +418,8 @@ struct MovementInfo {
     float transportZ = 0.0f;
     float transportO = 0.0f;        // Local orientation on transport
     uint32_t transportTime = 0;     // Transport movement timestamp
+    int8_t transportSeat = -1;      // Transport seat (-1 when unknown/not seated)
+    uint32_t transportTime2 = 0;    // Secondary transport time (when interpolated movement flag is set)
 
     bool hasFlag(MovementFlags flag) const {
         return (flags & static_cast<uint32_t>(flag)) != 0;

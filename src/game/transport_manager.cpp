@@ -140,6 +140,7 @@ void TransportManager::loadPathFromNodes(uint32_t pathId, const std::vector<glm:
     TransportPath path;
     path.pathId = pathId;
     path.zOnly = false;  // Manually loaded paths are assumed to have XY movement
+    path.fromDBC = false;
 
     // Helper: compute segment duration from distance and speed
     auto segMsFromDist = [&](float dist) -> uint32_t {
@@ -237,12 +238,21 @@ void TransportManager::updateTransportMovement(ActiveTransport& transport, float
         transport.localClockMs += (uint32_t)(deltaTime * 1000.0f);
         pathTimeMs = transport.localClockMs % path.durationMs;
     } else {
-        // Server-driven but no clock yet - don't move
-        updateTransformMatrices(transport);
-        if (wmoRenderer_) {
-            wmoRenderer_->setInstanceTransform(transport.wmoInstanceId, transport.transform);
+        // Server-driven but no clock yet. If updates never arrive, fall back to local animation.
+        constexpr float kMissingUpdateFallbackSec = 2.5f;
+        if ((elapsedTime_ - transport.lastServerUpdate) >= kMissingUpdateFallbackSec) {
+            transport.useClientAnimation = true;
+            transport.localClockMs = 0;
+            pathTimeMs = 0;
+            LOG_WARNING("TransportManager: No server movement updates for transport 0x", std::hex, transport.guid, std::dec,
+                        " after ", kMissingUpdateFallbackSec, "s - enabling client fallback animation");
+        } else {
+            updateTransformMatrices(transport);
+            if (wmoRenderer_) {
+                wmoRenderer_->setInstanceTransform(transport.wmoInstanceId, transport.transform);
+            }
+            return;
         }
-        return;
     }
 
     // Evaluate position from time (path is local offsets, add base position)
@@ -496,6 +506,7 @@ void TransportManager::updateServerTransport(uint64_t guid, const glm::vec3& pos
     // Track server updates
     transport->serverUpdateCount++;
     transport->lastServerUpdate = elapsedTime_;
+    transport->useClientAnimation = false;  // Server updates take precedence
 
     auto pathIt = paths_.find(transport->pathId);
     if (pathIt == paths_.end() || pathIt->second.durationMs == 0) {
@@ -836,6 +847,7 @@ bool TransportManager::loadTransportAnimationDBC(pipeline::AssetManager* assetMg
         path.looping = false;
         path.durationMs = durationMs;
         path.zOnly = isZOnly;
+        path.fromDBC = true;
         paths_[transportEntry] = path;
         pathsLoaded++;
 
@@ -857,7 +869,95 @@ bool TransportManager::loadTransportAnimationDBC(pipeline::AssetManager* assetMg
 }
 
 bool TransportManager::hasPathForEntry(uint32_t entry) const {
-    return paths_.find(entry) != paths_.end();
+    auto it = paths_.find(entry);
+    return it != paths_.end() && it->second.fromDBC;
+}
+
+uint32_t TransportManager::inferMovingPathForSpawn(const glm::vec3& spawnWorldPos, float maxDistance) const {
+    float bestD2 = maxDistance * maxDistance;
+    uint32_t bestPathId = 0;
+
+    for (const auto& [pathId, path] : paths_) {
+        if (!path.fromDBC || path.durationMs == 0 || path.zOnly || path.points.empty()) {
+            continue;
+        }
+
+        // Find nearest waypoint on this path to spawn.
+        for (const auto& p : path.points) {
+            glm::vec3 diff = p.pos - spawnWorldPos;
+            float d2 = glm::dot(diff, diff);
+            if (d2 < bestD2) {
+                bestD2 = d2;
+                bestPathId = pathId;
+            }
+        }
+    }
+
+    if (bestPathId != 0) {
+        LOG_INFO("TransportManager: Inferred moving DBC path ", bestPathId,
+                 " for spawn at (", spawnWorldPos.x, ", ", spawnWorldPos.y, ", ", spawnWorldPos.z,
+                 "), dist=", std::sqrt(bestD2));
+    }
+
+    return bestPathId;
+}
+
+uint32_t TransportManager::pickFallbackMovingPath(uint32_t entry, uint32_t displayId) const {
+    auto isUsableMovingPath = [this](uint32_t pathId) -> bool {
+        auto it = paths_.find(pathId);
+        if (it == paths_.end()) return false;
+        const auto& path = it->second;
+        return path.fromDBC && !path.zOnly && path.durationMs > 0 && path.points.size() > 1;
+    };
+
+    // Known AzerothCore transport entry remaps (WotLK): server entry -> moving DBC path id.
+    // These entries commonly do not match TransportAnimation.dbc ids 1:1.
+    static const std::unordered_map<uint32_t, uint32_t> kEntryRemap = {
+        {176231u, 176080u}, // The Maiden's Fancy
+        {176310u, 176081u}, // The Bravery
+        {20808u,  176082u}, // The Black Princess
+        {164871u, 193182u}, // The Thundercaller
+        {176495u, 193183u}, // The Purple Princess
+        {175080u, 193182u}, // The Iron Eagle
+        {181689u, 193183u}, // Cloudkisser
+        {186238u, 193182u}, // The Mighty Wind
+        {181688u, 176083u}, // Northspear (icebreaker)
+        {190536u, 176084u}, // Stormwind's Pride (icebreaker)
+    };
+
+    auto itMapped = kEntryRemap.find(entry);
+    if (itMapped != kEntryRemap.end() && isUsableMovingPath(itMapped->second)) {
+        return itMapped->second;
+    }
+
+    // Fallback by display model family.
+    const bool looksLikeShip =
+        (displayId == 3015u || displayId == 2454u || displayId == 7446u || displayId == 455u || displayId == 462u);
+    const bool looksLikeZeppelin =
+        (displayId == 3031u || displayId == 7546u || displayId == 1587u || displayId == 807u || displayId == 808u);
+
+    if (looksLikeShip) {
+        static const uint32_t kShipCandidates[] = {176080u, 176081u, 176082u, 176083u, 176084u, 176085u, 194675u};
+        for (uint32_t id : kShipCandidates) {
+            if (isUsableMovingPath(id)) return id;
+        }
+    }
+
+    if (looksLikeZeppelin) {
+        static const uint32_t kZeppelinCandidates[] = {193182u, 193183u, 188360u, 190587u};
+        for (uint32_t id : kZeppelinCandidates) {
+            if (isUsableMovingPath(id)) return id;
+        }
+    }
+
+    // Last-resort: pick any moving DBC path so transport does not remain stationary.
+    for (const auto& [pathId, path] : paths_) {
+        if (path.fromDBC && !path.zOnly && path.durationMs > 0 && path.points.size() > 1) {
+            return pathId;
+        }
+    }
+
+    return 0;
 }
 
 } // namespace wowee::game

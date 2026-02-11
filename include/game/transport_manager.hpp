@@ -28,6 +28,7 @@ struct TransportPath {
     bool looping;  // Set to false after adding explicit wrap point
     uint32_t durationMs;   // Total loop duration in ms (includes wrap segment if added)
     bool zOnly;    // True if path only has Z movement (elevator/bobbing), false if real XY travel
+    bool fromDBC;  // True if loaded from TransportAnimation.dbc, false for runtime fallback/custom paths
 };
 
 struct ActiveTransport {
@@ -84,6 +85,15 @@ public:
 
     // Check if a path exists for a given GameObject entry
     bool hasPathForEntry(uint32_t entry) const;
+
+    // Infer a real moving DBC path by spawn position (for servers whose transport entry IDs
+    // don't map 1:1 to TransportAnimation.dbc entry IDs).
+    // Returns 0 when no suitable path match is found.
+    uint32_t inferMovingPathForSpawn(const glm::vec3& spawnWorldPos, float maxDistance = 1200.0f) const;
+
+    // Choose a deterministic fallback moving DBC path for known server transport entries/displayIds.
+    // Returns 0 when no suitable moving path is available.
+    uint32_t pickFallbackMovingPath(uint32_t entry, uint32_t displayId) const;
 
     // Update server-controlled transport position/rotation directly (bypasses path movement)
     void updateServerTransport(uint64_t guid, const glm::vec3& position, float orientation);
