@@ -610,13 +610,29 @@ void WaterRenderer::createWaterMesh(WaterSurface& surface) {
                     bool msbOrder = (maskByte & (1 << (7 - bitIndex))) != 0;
                     renderTile = lsbOrder || msbOrder;
 
-                    // If this tile is masked out, check neighbors to fill gaps
-                    if (!renderTile && x > 0 && y > 0 && x < gridWidth-2 && y < gridHeight-2) {
+                    // If this tile is masked out, check neighbors to fill coastline gaps
+                    if (!renderTile) {
                         // Check adjacent tiles - render if any neighbor is water (blend coastline)
                         for (int dy = -1; dy <= 1; dy++) {
                             for (int dx = -1; dx <= 1; dx++) {
                                 if (dx == 0 && dy == 0) continue;
-                                int neighborIdx = (y + dy) * surface.width + (x + dx);
+                                int nx = x + dx;
+                                int ny = y + dy;
+                                // Bounds check neighbors
+                                if (nx < 0 || ny < 0 || nx >= gridWidth-1 || ny >= gridHeight-1) continue;
+
+                                // Calculate neighbor mask index (consistent with main tile indexing)
+                                int neighborIdx;
+                                if (surface.wmoId == 0 && surface.mask.size() >= 8) {
+                                    // Terrain MH2O: account for xOffset/yOffset
+                                    int ncx = static_cast<int>(surface.xOffset) + nx;
+                                    int ncy = static_cast<int>(surface.yOffset) + ny;
+                                    neighborIdx = ncy * 8 + ncx;
+                                } else {
+                                    // WMO/custom: local indexing
+                                    neighborIdx = ny * surface.width + nx;
+                                }
+
                                 int nByteIdx = neighborIdx / 8;
                                 int nBitIdx = neighborIdx % 8;
                                 if (nByteIdx < static_cast<int>(surface.mask.size())) {

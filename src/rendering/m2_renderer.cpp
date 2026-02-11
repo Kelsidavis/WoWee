@@ -2505,6 +2505,28 @@ void M2Renderer::setInstancePosition(uint32_t instanceId, const glm::vec3& posit
     rebuildSpatialIndex();
 }
 
+void M2Renderer::setInstanceTransform(uint32_t instanceId, const glm::mat4& transform) {
+    auto idxIt = instanceIndexById.find(instanceId);
+    if (idxIt == instanceIndexById.end()) return;
+    auto& inst = instances[idxIt->second];
+
+    // Update model matrix directly
+    inst.modelMatrix = transform;
+    inst.invModelMatrix = glm::inverse(transform);
+
+    // Extract position from transform for bounds
+    inst.position = glm::vec3(transform[3]);
+
+    // Update bounds
+    auto modelIt = models.find(inst.modelId);
+    if (modelIt != models.end()) {
+        glm::vec3 localMin, localMax;
+        getTightCollisionBounds(modelIt->second, localMin, localMax);
+        transformAABB(inst.modelMatrix, localMin, localMax, inst.worldBoundsMin, inst.worldBoundsMax);
+    }
+    rebuildSpatialIndex();
+}
+
 void M2Renderer::removeInstance(uint32_t instanceId) {
     for (auto it = instances.begin(); it != instances.end(); ++it) {
         if (it->id == instanceId) {

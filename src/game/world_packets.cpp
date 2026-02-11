@@ -634,6 +634,15 @@ bool UpdateObjectParser::parseMovementBlock(network::Packet& packet, UpdateBlock
 
     LOG_DEBUG("  UpdateFlags: 0x", std::hex, updateFlags, std::dec);
 
+    // Log transport-related flag combinations
+    if (updateFlags & 0x0002) { // UPDATEFLAG_TRANSPORT
+        LOG_INFO("  Transport flags detected: 0x", std::hex, updateFlags, std::dec,
+                 " (TRANSPORT=", !!(updateFlags & 0x0002),
+                 ", POSITION=", !!(updateFlags & 0x0100),
+                 ", ROTATION=", !!(updateFlags & 0x0200),
+                 ", STATIONARY=", !!(updateFlags & 0x0040), ")");
+    }
+
     // UpdateFlags bit meanings:
     // 0x0001 = UPDATEFLAG_SELF
     // 0x0002 = UPDATEFLAG_TRANSPORT
@@ -771,8 +780,8 @@ bool UpdateObjectParser::parseMovementBlock(network::Packet& packet, UpdateBlock
         }
     }
     else if (updateFlags & UPDATEFLAG_POSITION) {
-        // Transport position update
-        /*uint64_t transportGuid =*/ readPackedGuid(packet);
+        // Transport position update (UPDATEFLAG_POSITION = 0x0100)
+        uint64_t transportGuid = readPackedGuid(packet);
         block.x = packet.readFloat();
         block.y = packet.readFloat();
         block.z = packet.readFloat();
@@ -783,7 +792,8 @@ bool UpdateObjectParser::parseMovementBlock(network::Packet& packet, UpdateBlock
         /*float corpseOrientation =*/ packet.readFloat();
         block.hasMovement = true;
 
-        LOG_DEBUG("  POSITION: (", block.x, ", ", block.y, ", ", block.z, "), o=", block.orientation);
+        LOG_INFO("  TRANSPORT POSITION UPDATE: guid=0x", std::hex, transportGuid, std::dec,
+                 " pos=(", block.x, ", ", block.y, ", ", block.z, "), o=", block.orientation);
     }
     else if (updateFlags & UPDATEFLAG_STATIONARY_POSITION) {
         // Simple stationary position (4 floats)

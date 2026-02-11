@@ -601,6 +601,10 @@ void GameHandler::handlePacket(network::Packet& packet) {
             handleMonsterMove(packet);
             break;
 
+        case Opcode::SMSG_MONSTER_MOVE_TRANSPORT:
+            handleMonsterMoveTransport(packet);
+            break;
+
         // ---- Speed Changes ----
         case Opcode::SMSG_FORCE_RUN_SPEED_CHANGE:
             handleForceRunSpeedChange(packet);
@@ -2007,9 +2011,10 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                         LOG_INFO("Detected transport GameObject: 0x", std::hex, block.guid, std::dec,
                                  " displayId=", go->getDisplayId(),
                                  " pos=(", go->getX(), ", ", go->getY(), ", ", go->getZ(), ")");
+                        // Note: TransportSpawnCallback will be invoked from Application after WMO instance is created
                     }
                     if (go->getDisplayId() != 0 && gameObjectSpawnCallback_) {
-                        gameObjectSpawnCallback_(block.guid, go->getDisplayId(),
+                        gameObjectSpawnCallback_(block.guid, go->getEntry(), go->getDisplayId(),
                             go->getX(), go->getY(), go->getZ(), go->getOrientation());
                     }
                     // Fire transport move callback for transports (position update on re-creation)
@@ -2337,6 +2342,12 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
             }
 
             case UpdateType::MOVEMENT: {
+                // Diagnostic: Log if we receive MOVEMENT blocks for transports
+                if (transportGuids_.count(block.guid)) {
+                    LOG_INFO("MOVEMENT update for transport 0x", std::hex, block.guid, std::dec,
+                             " pos=(", block.x, ", ", block.y, ", ", block.z, ")");
+                }
+
                 // Update entity position (server → canonical)
                 auto entity = entityManager.getEntity(block.guid);
                 if (entity) {
@@ -4245,6 +4256,49 @@ void GameHandler::handleMonsterMove(network::Packet& packet) {
             }
         }
     }
+}
+
+void GameHandler::handleMonsterMoveTransport(network::Packet& packet) {
+    // Parse transport-relative creature movement (NPCs on boats/zeppelins)
+    // Packet structure: mover GUID + transport GUID + spline data (local coords)
+
+    uint64_t moverGuid = packet.readUInt64();
+    uint8_t unk = packet.readUInt8();  // Unknown byte (usually 0)
+    uint64_t transportGuid = packet.readUInt64();
+
+    // Transport-local coordinates
+    float localX = packet.readFloat();
+    float localY = packet.readFloat();
+    float localZ = packet.readFloat();
+
+    LOG_INFO("SMSG_MONSTER_MOVE_TRANSPORT: mover=0x", std::hex, moverGuid,
+             " transport=0x", transportGuid, std::dec,
+             " localPos=(", localX, ", ", localY, ", ", localZ, ")");
+
+    // Compose world position: worldPos = transportTransform * localPos
+    auto entity = entityManager.getEntity(moverGuid);
+    if (!entity) {
+        LOG_WARNING("  NPC 0x", std::hex, moverGuid, std::dec, " not found in entity manager");
+        return;
+    }
+
+    if (transportManager_) {
+        // Use TransportManager to compose world position from local offset
+        glm::vec3 localPos(localX, localY, localZ);
+        glm::vec3 worldPos = transportManager_->getPlayerWorldPosition(transportGuid, localPos);
+
+        entity->setPosition(worldPos.x, worldPos.y, worldPos.z, entity->getOrientation());
+
+        LOG_INFO("  Composed NPC world position: (", worldPos.x, ", ", worldPos.y, ", ", worldPos.z, ")");
+    } else {
+        LOG_WARNING("  TransportManager not available for NPC position composition");
+    }
+
+    // TODO: Parse full spline data for smooth NPC movement on transport
+    // Then update entity position and call creatureMoveCallback_
+
+    // Suppress unused variable warning for now
+    (void)unk;
 }
 
 void GameHandler::handleAttackerStateUpdate(network::Packet& packet) {

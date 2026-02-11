@@ -406,6 +406,13 @@ private:
         glm::vec3 worldBoundsMax;
         std::vector<std::pair<glm::vec3, glm::vec3>> worldGroupBounds;
 
+        // Doodad tracking: M2 instances that are children of this WMO
+        struct DoodadInfo {
+            uint32_t m2InstanceId;       // ID of the M2 instance
+            glm::mat4 localTransform;    // Local transform relative to WMO origin
+        };
+        std::vector<DoodadInfo> doodads;
+
         void updateModelMatrix();
     };
 

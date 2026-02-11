@@ -253,6 +253,13 @@ public:
     void setInstancePosition(uint32_t instanceId, const glm::vec3& position);
 
     /**
+     * Update the full transform of an existing instance (e.g., for WMO doodads following parent WMO)
+     * @param instanceId Instance ID returned by createInstance()
+     * @param transform New world transform matrix
+     */
+    void setInstanceTransform(uint32_t instanceId, const glm::mat4& transform);
+
+    /**
      * Remove a specific instance by ID
      * @param instanceId Instance ID returned by createInstance()
      */

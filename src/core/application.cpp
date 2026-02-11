@@ -129,6 +129,11 @@ bool Application::initialize() {
         LOG_INFO("Asset manager initialized successfully");
         // Eagerly load creature display DBC lookups so first spawn doesn't stall
         buildCreatureDisplayLookups();
+
+        // Load transport paths from TransportAnimation.dbc
+        if (gameHandler && gameHandler->getTransportManager()) {
+            gameHandler->getTransportManager()->loadTransportAnimationDBC(assetManager.get());
+        }
     } else {
         LOG_WARNING("Failed to initialize asset manager - asset loading will be unavailable");
         LOG_WARNING("Set WOW_DATA_PATH environment variable to your WoW Data directory");
@@ -486,6 +491,14 @@ void Application::update(float deltaTime) {
             if (renderer && gameHandler) {
                 bool onTransport = gameHandler->isOnTransport();
 
+                // Debug: Log transport state changes
+                static bool wasOnTransport = false;
+                if (onTransport != wasOnTransport) {
+                    LOG_INFO("Transport state changed: onTransport=", onTransport,
+                             " guid=0x", std::hex, gameHandler->getPlayerTransportGuid(), std::dec);
+                    wasOnTransport = onTransport;
+                }
+
                 if (onTaxi) {
                     auto playerEntity = gameHandler->getEntityManager().getEntity(gameHandler->getPlayerGuid());
                     if (playerEntity) {
@@ -757,8 +770,8 @@ void Application::setupUICallbacks() {
     });
 
     // GameObject spawn callback (online mode) - spawn static models (mailboxes, etc.)
-    gameHandler->setGameObjectSpawnCallback([this](uint64_t guid, uint32_t displayId, float x, float y, float z, float orientation) {
-        pendingGameObjectSpawns_.push_back({guid, displayId, x, y, z, orientation});
+    gameHandler->setGameObjectSpawnCallback([this](uint64_t guid, uint32_t entry, uint32_t displayId, float x, float y, float z, float orientation) {
+        pendingGameObjectSpawns_.push_back({guid, entry, displayId, x, y, z, orientation});
     });
 
     // GameObject despawn callback (online mode) - remove static models
@@ -848,34 +861,134 @@ void Application::setupUICallbacks() {
         }
     });
 
-    // Transport move callback (online mode) - update transport gameobject positions
-    gameHandler->setTransportMoveCallback([this](uint64_t guid, float x, float y, float z, float /*orientation*/) {
+    // Transport spawn callback (online mode) - register transports with TransportManager
+    gameHandler->setTransportSpawnCallback([this](uint64_t guid, uint32_t entry, uint32_t displayId, float x, float y, float z, float orientation) {
+        auto* transportManager = gameHandler->getTransportManager();
+        if (!transportManager || !renderer) return;
+
+        // Get the WMO instance ID from the GameObject spawn
         auto it = gameObjectInstances_.find(guid);
-        if (it == gameObjectInstances_.end()) return;
-        glm::vec3 renderPos = core::coords::canonicalToRender(glm::vec3(x, y, z));
-        if (renderer) {
-            if (it->second.isWmo) {
-                if (auto* wmoRenderer = renderer->getWMORenderer()) {
-                    wmoRenderer->setInstancePosition(it->second.instanceId, renderPos);
+        if (it == gameObjectInstances_.end()) {
+            LOG_WARNING("Transport spawn callback: GameObject instance not found for GUID 0x", std::hex, guid, std::dec);
+            return;
+        }
+
+        uint32_t wmoInstanceId = it->second.instanceId;
+        LOG_INFO("Registering server transport: GUID=0x", std::hex, guid, std::dec,
+                 " entry=", entry, " displayId=", displayId, " wmoInstance=", wmoInstanceId,
+                 " pos=(", x, ", ", y, ", ", z, ")");
+
+        // TransportAnimation.dbc is indexed by GameObject entry
+        uint32_t pathId = entry;
+
+        bool clientAnim = transportManager->isClientSideAnimation();
+        LOG_INFO("Transport spawn callback: clientAnimation=", clientAnim,
+                 " guid=0x", std::hex, guid, std::dec, " entry=", entry, " pathId=", pathId);
+
+        // Coordinates are already canonical (converted in game_handler.cpp when entity was created)
+        glm::vec3 canonicalSpawnPos(x, y, z);
+
+        // Check if we have a real path from TransportAnimation.dbc (indexed by entry)
+        if (!transportManager->hasPathForEntry(entry)) {
+            LOG_WARNING("No TransportAnimation.dbc path for entry ", entry,
+                        " - transport will be stationary");
+
+            // Fallback: Stationary at spawn point (wait for server to send real position)
+            std::vector<glm::vec3> path = { canonicalSpawnPos };
+            transportManager->loadPathFromNodes(pathId, path, false, 0.0f);
+        } else {
+            LOG_INFO("Using real transport path from TransportAnimation.dbc for entry ", entry);
+        }
+
+        // Register the transport with spawn position (prevents rendering at origin until server update)
+        transportManager->registerTransport(guid, wmoInstanceId, pathId, canonicalSpawnPos);
+
+        if (clientAnim) {
+            LOG_INFO("Transport registered - client-side animation enabled");
+        } else {
+            // Only call updateServerTransport if client animation is disabled
+            // This sets the exact spawn position for server-controlled transports
+            // Coordinates are already canonical (converted in game_handler.cpp)
+            glm::vec3 canonicalPos(x, y, z);
+            transportManager->updateServerTransport(guid, canonicalPos, orientation);
+            LOG_INFO("Transport registered - server-controlled movement");
+        }
+    });
+
+    // Transport move callback (online mode) - update transport gameobject positions
+    gameHandler->setTransportMoveCallback([this](uint64_t guid, float x, float y, float z, float orientation) {
+        LOG_INFO("Transport move callback: GUID=0x", std::hex, guid, std::dec,
+                 " pos=(", x, ", ", y, ", ", z, ") orientation=", orientation);
+
+        auto* transportManager = gameHandler->getTransportManager();
+        if (!transportManager) {
+            LOG_WARNING("Transport move callback: TransportManager is null!");
+            return;
+        }
+
+        // Check if transport exists - if not, treat this as a late spawn (reconnection/server restart)
+        if (!transportManager->getTransport(guid)) {
+            LOG_INFO("Received position update for unregistered transport 0x", std::hex, guid, std::dec,
+                     " - auto-spawning from position update");
+
+            // Get transport info from entity manager
+            auto entity = gameHandler->getEntityManager().getEntity(guid);
+            if (entity && entity->getType() == game::ObjectType::GAMEOBJECT) {
+                auto go = std::static_pointer_cast<game::GameObject>(entity);
+                uint32_t entry = go->getEntry();
+                uint32_t displayId = go->getDisplayId();
+
+                // Find the WMO instance for this transport (should exist from earlier GameObject spawn)
+                auto it = gameObjectInstances_.find(guid);
+                if (it != gameObjectInstances_.end()) {
+                    uint32_t wmoInstanceId = it->second.instanceId;
+
+                    // TransportAnimation.dbc is indexed by GameObject entry
+                    uint32_t pathId = entry;
+
+                    // Coordinates are already canonical (converted in game_handler.cpp)
+                    glm::vec3 canonicalSpawnPos(x, y, z);
+
+                    // Check if we have a real path, otherwise create stationary fallback
+                    if (!transportManager->hasPathForEntry(entry)) {
+                        std::vector<glm::vec3> path = { canonicalSpawnPos };
+                        transportManager->loadPathFromNodes(pathId, path, false, 0.0f);
+                        LOG_INFO("Auto-spawned transport with stationary path: entry=", entry,
+                                 " displayId=", displayId, " wmoInstance=", wmoInstanceId);
+                    } else {
+                        LOG_INFO("Auto-spawned transport with real path: entry=", entry,
+                                 " displayId=", displayId, " wmoInstance=", wmoInstanceId);
+                    }
+
+                    transportManager->registerTransport(guid, wmoInstanceId, pathId, canonicalSpawnPos);
+                } else {
+                    LOG_WARNING("Cannot auto-spawn transport 0x", std::hex, guid, std::dec,
+                                " - WMO instance not found");
+                    return;
                 }
             } else {
-                if (auto* m2Renderer = renderer->getM2Renderer()) {
-                    m2Renderer->setInstancePosition(it->second.instanceId, renderPos);
-                }
+                LOG_WARNING("Cannot auto-spawn transport 0x", std::hex, guid, std::dec,
+                            " - entity not found in EntityManager");
+                return;
             }
+        }
 
-            // Move player with transport if riding it
-            if (gameHandler && gameHandler->isOnTransport() && gameHandler->getPlayerTransportGuid() == guid) {
-                auto* cc = renderer->getCameraController();
-                if (cc) {
-                    glm::vec3* ft = cc->getFollowTargetMutable();
-                    if (ft) {
-                        // Transport offset is in server/canonical coords — convert to render
-                        glm::vec3 offset = gameHandler->getPlayerTransportOffset();
-                        glm::vec3 canonicalPlayerPos = glm::vec3(x + offset.x, y + offset.y, z + offset.z);
-                        glm::vec3 playerRenderPos = core::coords::canonicalToRender(canonicalPlayerPos);
-                        *ft = playerRenderPos;
-                    }
+        // Update TransportManager's internal state (position, rotation, transform matrices)
+        // This also updates the WMO renderer automatically
+        // Coordinates are already canonical (converted in game_handler.cpp when entity was created)
+        glm::vec3 canonicalPos(x, y, z);
+        transportManager->updateServerTransport(guid, canonicalPos, orientation);
+
+        // Move player with transport if riding it
+        if (gameHandler && gameHandler->isOnTransport() && gameHandler->getPlayerTransportGuid() == guid && renderer) {
+            auto* cc = renderer->getCameraController();
+            if (cc) {
+                glm::vec3* ft = cc->getFollowTargetMutable();
+                if (ft) {
+                    // Get player world position from TransportManager (handles transform properly)
+                    glm::vec3 offset = gameHandler->getPlayerTransportOffset();
+                    glm::vec3 worldPos = transportManager->getPlayerWorldPosition(guid, offset);
+                    *ft = worldPos;
                 }
             }
         }
@@ -1671,6 +1784,12 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
     // Set map name for terrain manager
     if (renderer->getTerrainManager()) {
         renderer->getTerrainManager()->setMapName(mapName);
+    }
+
+    // Connect TransportManager to WMORenderer (for server transports)
+    if (gameHandler && gameHandler->getTransportManager() && renderer->getWMORenderer()) {
+        gameHandler->getTransportManager()->setWMORenderer(renderer->getWMORenderer());
+        LOG_INFO("TransportManager connected to WMORenderer for online mode");
     }
 
     showProgress("Loading character model...", 0.05f);
@@ -2599,7 +2718,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
              " displayId=", displayId, " at (", x, ", ", y, ", ", z, ")");
 }
 
-void Application::spawnOnlineGameObject(uint64_t guid, uint32_t displayId, float x, float y, float z, float orientation) {
+void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t displayId, float x, float y, float z, float orientation) {
     if (!renderer || !assetManager) return;
 
     if (!gameObjectLookupsBuilt_) {
@@ -2625,7 +2744,36 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t displayId, float
         return;
     }
 
-    std::string modelPath = getGameObjectModelPathForDisplayId(displayId);
+    std::string modelPath;
+
+    // Override model path for transports with wrong displayIds (preloaded transports)
+    // Check if this GUID is a known transport
+    bool isTransport = gameHandler && gameHandler->isTransportGuid(guid);
+    if (isTransport) {
+        // Map common transport displayIds to correct WMO paths
+        // DisplayIds 455, 462 = Elevators/Ships → try standard ship
+        // DisplayIds 807, 808 = Zeppelins
+        // DisplayIds 2454, 1587 = Special ships/icebreakers
+        if (displayId == 455 || displayId == 462 || displayId == 20808 || displayId == 176231 || displayId == 176310) {
+            modelPath = "World\\wmo\\transports\\transport_ship\\transportship.wmo";
+            LOG_INFO("Overriding transport displayId ", displayId, " → transportship.wmo");
+        } else if (displayId == 807 || displayId == 808 || displayId == 175080 || displayId == 176495 || displayId == 164871) {
+            modelPath = "World\\wmo\\transports\\transport_zeppelin\\transport_zeppelin.wmo";
+            LOG_INFO("Overriding transport displayId ", displayId, " → transport_zeppelin.wmo");
+        } else if (displayId == 1587) {
+            modelPath = "World\\wmo\\transports\\transport_horde_zeppelin\\Transport_Horde_Zeppelin.wmo";
+            LOG_INFO("Overriding transport displayId ", displayId, " → Transport_Horde_Zeppelin.wmo");
+        } else if (displayId == 2454 || displayId == 181688 || displayId == 190536) {
+            modelPath = "World\\wmo\\transports\\icebreaker\\Transport_Icebreaker_ship.wmo";
+            LOG_INFO("Overriding transport displayId ", displayId, " → Transport_Icebreaker_ship.wmo");
+        }
+    }
+
+    // Fallback to normal displayId lookup if not a transport or no override matched
+    if (modelPath.empty()) {
+        modelPath = getGameObjectModelPathForDisplayId(displayId);
+    }
+
     if (modelPath.empty()) {
         LOG_WARNING("No model path for gameobject displayId ", displayId, " (guid 0x", std::hex, guid, std::dec, ")");
         return;
@@ -2721,6 +2869,18 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t displayId, float
             gameObjectInstances_[guid] = {modelId, instanceId, true};
             LOG_INFO("Spawned gameobject WMO: guid=0x", std::hex, guid, std::dec,
                      " displayId=", displayId, " at (", x, ", ", y, ", ", z, ")");
+
+            // Check if this is a transport and notify via special method
+            if (gameHandler) {
+                std::string lowerModelPath = modelPath;
+                std::transform(lowerModelPath.begin(), lowerModelPath.end(), lowerModelPath.begin(),
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                if (lowerModelPath.find("transport") != std::string::npos) {
+                    // This is a transport GameObject - notify the game handler
+                    gameHandler->notifyTransportSpawned(guid, entry, displayId, x, y, z, orientation);
+                }
+            }
+
             return;
         }
 
@@ -2798,7 +2958,7 @@ void Application::processGameObjectSpawnQueue() {
     int spawned = 0;
     while (!pendingGameObjectSpawns_.empty() && spawned < MAX_SPAWNS_PER_FRAME) {
         auto& s = pendingGameObjectSpawns_.front();
-        spawnOnlineGameObject(s.guid, s.displayId, s.x, s.y, s.z, s.orientation);
+        spawnOnlineGameObject(s.guid, s.entry, s.displayId, s.x, s.y, s.z, s.orientation);
         pendingGameObjectSpawns_.erase(pendingGameObjectSpawns_.begin());
         spawned++;
     }
@@ -3214,7 +3374,7 @@ void Application::setupTestTransport() {
 
     // Register transport with transport manager
     uint64_t transportGuid = 0x1000000000000001ULL;  // Fake GUID for test
-    transportManager->registerTransport(transportGuid, wmoInstanceId, pathId);
+    transportManager->registerTransport(transportGuid, wmoInstanceId, pathId, startCanonical);
 
     // Optional: Set deck bounds (rough estimate for a ship deck)
     transportManager->setDeckBounds(transportGuid,

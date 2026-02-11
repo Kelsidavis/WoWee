@@ -87,7 +87,7 @@ private:
     void despawnOnlineCreature(uint64_t guid);
     void buildCreatureDisplayLookups();
     std::string getModelPathForDisplayId(uint32_t displayId) const;
-    void spawnOnlineGameObject(uint64_t guid, uint32_t displayId, float x, float y, float z, float orientation);
+    void spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t displayId, float x, float y, float z, float orientation);
     void despawnOnlineGameObject(uint64_t guid);
     void buildGameObjectDisplayLookups();
     std::string getGameObjectModelPathForDisplayId(uint32_t displayId) const;
@@ -197,6 +197,7 @@ private:
 
     struct PendingGameObjectSpawn {
         uint64_t guid;
+        uint32_t entry;
         uint32_t displayId;
         float x, y, z, orientation;
     };

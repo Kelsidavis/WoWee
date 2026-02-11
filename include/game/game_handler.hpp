@@ -462,8 +462,8 @@ public:
     void setCreatureDespawnCallback(CreatureDespawnCallback cb) { creatureDespawnCallback_ = std::move(cb); }
 
     // GameObject spawn callback (online mode - triggered when gameobject enters view)
-    // Parameters: guid, displayId, x, y, z (canonical), orientation
-    using GameObjectSpawnCallback = std::function<void(uint64_t guid, uint32_t displayId, float x, float y, float z, float orientation)>;
+    // Parameters: guid, entry, displayId, x, y, z (canonical), orientation
+    using GameObjectSpawnCallback = std::function<void(uint64_t guid, uint32_t entry, uint32_t displayId, float x, float y, float z, float orientation)>;
     void setGameObjectSpawnCallback(GameObjectSpawnCallback cb) { gameObjectSpawnCallback_ = std::move(cb); }
 
     // GameObject despawn callback (online mode - triggered when gameobject leaves view)
@@ -483,10 +483,25 @@ public:
     using TransportMoveCallback = std::function<void(uint64_t guid, float x, float y, float z, float orientation)>;
     void setTransportMoveCallback(TransportMoveCallback cb) { transportMoveCallback_ = std::move(cb); }
 
+    // Transport spawn callback (online mode - triggered when transport GameObject is first detected)
+    // Parameters: guid, entry, displayId, x, y, z (canonical), orientation
+    using TransportSpawnCallback = std::function<void(uint64_t guid, uint32_t entry, uint32_t displayId, float x, float y, float z, float orientation)>;
+    void setTransportSpawnCallback(TransportSpawnCallback cb) { transportSpawnCallback_ = std::move(cb); }
+
+    // Notify that a transport has been spawned (called after WMO instance creation)
+    void notifyTransportSpawned(uint64_t guid, uint32_t entry, uint32_t displayId, float x, float y, float z, float orientation) {
+        if (transportSpawnCallback_) {
+            transportSpawnCallback_(guid, entry, displayId, x, y, z, orientation);
+        }
+    }
+
     // Transport state for player-on-transport
     bool isOnTransport() const { return playerTransportGuid_ != 0; }
     uint64_t getPlayerTransportGuid() const { return playerTransportGuid_; }
     glm::vec3 getPlayerTransportOffset() const { return playerTransportOffset_; }
+
+    // Check if a GUID is a known transport
+    bool isTransportGuid(uint64_t guid) const { return transportGuids_.count(guid) > 0; }
     glm::vec3 getComposedWorldPosition();  // Compose transport transform * local offset
     TransportManager* getTransportManager() { return transportManager_.get(); }
     void setPlayerOnTransport(uint64_t transportGuid, const glm::vec3& localOffset) {
@@ -792,6 +807,7 @@ private:
 
     // ---- Creature movement handler ----
     void handleMonsterMove(network::Packet& packet);
+    void handleMonsterMoveTransport(network::Packet& packet);
 
     // ---- Phase 5 handlers ----
     void handleLootResponse(network::Packet& packet);
@@ -979,6 +995,7 @@ private:
     CreatureDespawnCallback creatureDespawnCallback_;
     CreatureMoveCallback creatureMoveCallback_;
     TransportMoveCallback transportMoveCallback_;
+    TransportSpawnCallback transportSpawnCallback_;
     GameObjectSpawnCallback gameObjectSpawnCallback_;
     GameObjectDespawnCallback gameObjectDespawnCallback_;
 
