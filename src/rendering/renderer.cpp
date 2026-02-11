@@ -713,27 +713,39 @@ void Renderer::setMounted(uint32_t mountInstId, uint32_t mountDisplayId, float h
     mountAnims_.run       = findFirst({5, 4});       // Run/Walk
     mountAnims_.stand     = findFirst({0});          // Stand (almost always 0)
 
-    // Discover idle fidget animations (head turn, tail swish, weight shift)
+    // Discover idle fidget animations using proper WoW M2 metadata (frequency, replay timers)
     mountAnims_.fidgets.clear();
     core::Logger::getInstance().info("Scanning for fidget animations in ", sequences.size(), " sequences");
 
-    // Log ALL non-looping, short, stationary animations to help identify fidgets
+    // Proper fidget discovery: frequency > 0 + replay timers indicate random idle animations
     for (const auto& seq : sequences) {
         bool isLoop = (seq.flags & 0x01) == 0;
-        if (!isLoop && seq.duration >= 400 && seq.duration <= 2000 && std::abs(seq.movingSpeed) < 0.05f) {
-            core::Logger::getInstance().info("  Candidate: id=", seq.id, " dur=", seq.duration, "ms speed=", seq.movingSpeed, " flags=0x", std::hex, seq.flags, std::dec);
-        }
-    }
+        bool hasFrequency = seq.frequency > 0;
+        bool hasReplay = seq.replayMax > 0;
+        bool isStationary = std::abs(seq.movingSpeed) < 0.05f;
+        bool reasonableDuration = seq.duration >= 400 && seq.duration <= 2500;
 
-    // Conservative selection: very short, very stationary, exclude known combat IDs
-    for (const auto& seq : sequences) {
-        bool isLoop = (seq.flags & 0x01) == 0;
-        // Strict: 500-1200ms, nearly stationary, exclude combat range (16-21) and specials (2-3)
-        if (!isLoop && seq.duration >= 500 && seq.duration <= 1200 &&
-            std::abs(seq.movingSpeed) < 0.01f &&
-            seq.id != 2 && seq.id != 3 && (seq.id < 16 || seq.id > 21)) {
+        // Log candidates with metadata
+        if (!isLoop && reasonableDuration && isStationary && (hasFrequency || hasReplay)) {
+            core::Logger::getInstance().info("  Candidate: id=", seq.id,
+                " dur=", seq.duration, "ms",
+                " freq=", seq.frequency,
+                " replay=", seq.replayMin, "-", seq.replayMax,
+                " next=", seq.nextAnimation,
+                " speed=", seq.movingSpeed);
+        }
+
+        // Select fidgets: non-looping + (frequency OR replay) + stationary
+        // Relaxed: some mounts may only have one of the markers
+        if (!isLoop && (hasFrequency || hasReplay) && isStationary && reasonableDuration) {
+            // Bonus: chains back to stand (indicates idle behavior)
+            bool chainsToStand = (seq.nextAnimation == (int16_t)mountAnims_.stand) ||
+                                 (seq.aliasNext == mountAnims_.stand) ||
+                                 (seq.nextAnimation == -1);
+
             mountAnims_.fidgets.push_back(seq.id);
-            core::Logger::getInstance().info("  >> Selected fidget: id=", seq.id);
+            core::Logger::getInstance().info("  >> Selected fidget: id=", seq.id,
+                (chainsToStand ? " (chains to stand)" : ""));
         }
     }
 
@@ -1090,19 +1102,19 @@ void Renderer::updateCharacterAnimation() {
                 mountActiveFidget_ = 0;  // Cancel any active fidget
             }
 
-            // Idle ambient sounds: random snorts/stomps/breaths when standing still
-            if (!moving && mountSoundManager) {
-                mountIdleSoundTimer_ += lastDeltaTime_;
-                static float nextIdleSoundTime = 8.0f + (rand() % 8);  // 8-15 seconds
-
-                if (mountIdleSoundTimer_ >= nextIdleSoundTime) {
-                    mountSoundManager->playIdleSound();
-                    mountIdleSoundTimer_ = 0.0f;
-                    nextIdleSoundTime = 8.0f + (rand() % 8);  // Randomize next sound time
-                }
-            } else if (moving) {
-                mountIdleSoundTimer_ = 0.0f;  // Reset timer when moving
-            }
+            // Idle ambient sounds: DISABLED for now (too frequent/annoying)
+            // if (!moving && mountSoundManager) {
+            //     mountIdleSoundTimer_ += lastDeltaTime_;
+            //     static float nextIdleSoundTime = 8.0f + (rand() % 8);  // 8-15 seconds
+            //
+            //     if (mountIdleSoundTimer_ >= nextIdleSoundTime) {
+            //         mountSoundManager->playIdleSound();
+            //         mountIdleSoundTimer_ = 0.0f;
+            //         nextIdleSoundTime = 8.0f + (rand() % 8);  // Randomize next sound time
+            //     }
+            // } else if (moving) {
+            //     mountIdleSoundTimer_ = 0.0f;  // Reset timer when moving
+            // }
 
             // Only update animation if it changed and we're not in an action sequence or playing a fidget
             if (mountAction_ == MountAction::None && mountActiveFidget_ == 0 && (!haveMountState || curMountAnim != mountAnimId)) {
