@@ -100,9 +100,10 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
             music->update(ImGui::GetIO().DeltaTime);
             if (!music->isPlaying()) {
                 static std::mt19937 rng(std::random_device{}());
-                static const std::array<const char*, 2> kLoginTracks = {
+                static const std::array<const char*, 3> kLoginTracks = {
                     "Raise the Mug, Sound the Warcry.mp3",
-                    "Wanderwewill.mp3"
+                    "Wanderwewill.mp3",
+                    "Gold on the Tide in Booty Bay.mp3"
                 };
 
                 std::vector<std::string> availableTracks;
