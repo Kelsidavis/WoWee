@@ -3544,15 +3544,11 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
                 }
             }
 
-            // Check if this is a transport and notify via special method
-            if (gameHandler) {
-                std::string lowerModelPath = modelPath;
-                std::transform(lowerModelPath.begin(), lowerModelPath.end(), lowerModelPath.begin(),
-                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-                if (lowerModelPath.find("transport") != std::string::npos) {
-                    // This is a transport GameObject - notify the game handler
-                    gameHandler->notifyTransportSpawned(guid, entry, displayId, x, y, z, orientation);
-                }
+            // Transport GameObjects are not always named "transport" in their WMO path
+            // (e.g. elevators/lifts). If the server marks it as a transport, always
+            // notify so TransportManager can animate/carry passengers.
+            if (gameHandler && gameHandler->isTransportGuid(guid)) {
+                gameHandler->notifyTransportSpawned(guid, entry, displayId, x, y, z, orientation);
             }
 
             return;
