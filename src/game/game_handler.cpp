@@ -4,6 +4,7 @@
 #include "game/opcodes.hpp"
 #include "network/world_socket.hpp"
 #include "network/packet.hpp"
+#include "auth/crypto.hpp"
 #include "core/coordinates.hpp"
 #include "core/application.hpp"
 #include "pipeline/asset_manager.hpp"
@@ -1838,29 +1839,40 @@ void GameHandler::handleWardenData(network::Packet& packet) {
             wardenCrypto_.reset();
             return;
         }
-        LOG_INFO("Warden: Crypto initialized, sending module ACK with checksum");
+        LOG_INFO("Warden: Crypto initialized, analyzing module structure");
 
-        // Build module acknowledgment response
-        // Format: [0x00 opcode][16-byte MD5 hash of module][0x01 result = success]
+        // Parse module structure (37 bytes typical):
+        // [1 byte opcode][16 bytes seed][20 bytes trailing data (SHA1?)]
+        std::vector<uint8_t> trailingBytes;
+        if (data.size() >= 37) {
+            std::string trailingHex;
+            for (size_t i = 17; i < 37; ++i) {
+                trailingBytes.push_back(data[i]);
+                char b[4];
+                snprintf(b, sizeof(b), "%02x ", data[i]);
+                trailingHex += b;
+            }
+            LOG_INFO("Warden: Module trailing data (20 bytes): ", trailingHex);
+        }
+
+        // Try response strategy: Result code + SHA1 hash of entire module
+        // Format: [0x01 success][20-byte SHA1 of module data]
         std::vector<uint8_t> moduleResponse;
 
-        // Opcode 0x00 = module info response
-        moduleResponse.push_back(0x00);
+        LOG_INFO("Warden: Trying response strategy: [0x01][SHA1 of module]");
 
-        // Compute simple checksum of module data (16 bytes)
-        // For a proper implementation, this would be MD5, but we'll use a simpler hash
-        uint8_t checksum[16] = {0};
-        for (size_t i = 0; i < data.size(); ++i) {
-            checksum[i % 16] ^= data[i];
-        }
-
-        // Add checksum to response
-        for (int i = 0; i < 16; ++i) {
-            moduleResponse.push_back(checksum[i]);
-        }
-
-        // Result code: 0x01 = module loaded successfully
+        // Success result code
         moduleResponse.push_back(0x01);
+
+        // Compute SHA1 hash of the entire module packet
+        std::vector<uint8_t> sha1Hash = auth::Crypto::sha1(data);
+
+        // Add SHA1 hash (20 bytes)
+        for (uint8_t byte : sha1Hash) {
+            moduleResponse.push_back(byte);
+        }
+
+        LOG_INFO("Warden: Response = result(0x01) + SHA1 of ", data.size(), " byte module");
 
         // Log plaintext module response
         std::string respHex;
@@ -1926,39 +1938,89 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                 responseData.push_back(0x00);
                 break;
 
-            case 0x01: // Hash request
-                LOG_INFO("Warden: Hash request");
+            case 0x01: { // Hash request
+                LOG_INFO("Warden: Hash request (file/memory hash check)");
+                // Parse hash request structure
+                // Format: [0x01][seed][hash_to_check][...]
                 responseData.push_back(0x01);
-                responseData.push_back(0x00); // Pass
-                break;
 
-            case 0x02: // Lua string check
-                LOG_INFO("Warden: Lua string check");
+                // For each hash check, respond with matching result
+                if (decrypted.size() > 1) {
+                    // Extract number of hash checks (varies by server)
+                    size_t pos = 1;
+                    while (pos < decrypted.size() && responseData.size() < 64) {
+                        responseData.push_back(0x00); // Hash matches (no violation)
+                        pos += 20; // Skip 20-byte hash (SHA1)
+                    }
+                } else {
+                    responseData.push_back(0x00); // Pass
+                }
+                LOG_INFO("Warden: Hash check response with ", responseData.size() - 1, " results");
+                break;
+            }
+
+            case 0x02: { // Lua string check
+                LOG_INFO("Warden: Lua string check (anti-addon detection)");
+                // Format: [0x02][lua_length][lua_string]
                 responseData.push_back(0x02);
-                responseData.push_back(0x00); // Empty = no detection
-                break;
 
-            case 0x05: // Memory check
-                LOG_INFO("Warden: Memory check");
+                // Return empty string = no suspicious Lua found
+                responseData.push_back(0x00); // String length = 0
+                LOG_INFO("Warden: Lua check - returned empty (no detection)");
+                break;
+            }
+
+            case 0x05: { // Memory/page check
+                LOG_INFO("Warden: Memory page check (anti-cheat scan)");
+                // Format: [0x05][seed][address_count][addresses...][length]
+
                 if (decrypted.size() >= 2) {
                     uint8_t numChecks = decrypted[1];
-                    LOG_INFO("Warden: ", (int)numChecks, " memory checks");
+                    LOG_INFO("Warden: Processing ", (int)numChecks, " memory checks");
+
                     responseData.push_back(0x05);
-                    responseData.push_back(numChecks);
+
+                    // For each memory region checked, return "clean" data
                     for (uint8_t i = 0; i < numChecks; ++i) {
-                        responseData.push_back(0x00); // All pass
+                        // Return zeroed memory (appears clean/unmodified)
+                        responseData.push_back(0x00);
                     }
+
+                    LOG_INFO("Warden: Memory check - all regions clean");
                 } else {
                     responseData.push_back(0x05);
                     responseData.push_back(0x00);
                 }
                 break;
+            }
+
+            case 0x04: { // Timing check
+                LOG_INFO("Warden: Timing check (detect speedhacks)");
+                // Return current timestamp
+                responseData.push_back(0x04);
+                uint32_t timestamp = static_cast<uint32_t>(std::time(nullptr));
+                responseData.push_back((timestamp >> 0) & 0xFF);
+                responseData.push_back((timestamp >> 8) & 0xFF);
+                responseData.push_back((timestamp >> 16) & 0xFF);
+                responseData.push_back((timestamp >> 24) & 0xFF);
+                break;
+            }
 
             default:
                 LOG_INFO("Warden: Unknown check opcode 0x", std::hex, (int)opcode, std::dec);
-                // Send minimal response
-                responseData.push_back(opcode);
-                responseData.push_back(0x00);
+                LOG_INFO("Warden: Packet dump: ", decHex);
+
+                // Try to detect packet type from size/structure
+                if (decrypted.size() > 20) {
+                    LOG_INFO("Warden: Large packet - might be batched checks");
+                    // Some servers send multiple checks in one packet
+                    // Try to respond to each one
+                    responseData.push_back(0x00); // Generic "OK" response
+                } else {
+                    // Small unknown packet - echo with success
+                    responseData.push_back(opcode);
+                    responseData.push_back(0x00);
+                }
                 break;
         }
     }

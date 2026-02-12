@@ -13,6 +13,12 @@ public:
     static std::vector<uint8_t> sha1(const std::string& data);
 
     /**
+     * MD5 hash (16 bytes)
+     */
+    static std::vector<uint8_t> md5(const std::vector<uint8_t>& data);
+    static std::vector<uint8_t> md5(const std::string& data);
+
+    /**
      * HMAC-SHA1 message authentication code
      *
      * @param key Secret key
