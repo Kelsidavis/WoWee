@@ -14,6 +14,8 @@
 #include <filesystem>
 #include <algorithm>
 #include <iomanip>
+#include <array>
+#include <random>
 
 namespace wowee { namespace ui {
 
@@ -97,15 +99,36 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
         if (music) {
             music->update(ImGui::GetIO().DeltaTime);
             if (!music->isPlaying()) {
-                std::string path = "/home/k/Desktop/wowee/assets/20-taverns.mp3";
-                if (!std::filesystem::exists(path)) {
-                    path = "assets/20-taverns.mp3";
-                    if (!std::filesystem::exists(path)) {
-                        path = (std::filesystem::current_path() / "assets/20-taverns.mp3").string();
+                static std::mt19937 rng(std::random_device{}());
+                static const std::array<const char*, 2> kLoginTracks = {
+                    "Raise the Mug, Sound the Warcry.mp3",
+                    "Wanderwewill.mp3"
+                };
+
+                std::vector<std::string> availableTracks;
+                availableTracks.reserve(kLoginTracks.size());
+                for (const char* track : kLoginTracks) {
+                    std::filesystem::path localPath = std::filesystem::path("assets") / track;
+                    if (std::filesystem::exists(localPath)) {
+                        availableTracks.push_back(localPath.string());
+                        continue;
+                    }
+
+                    std::filesystem::path cwdPath = std::filesystem::current_path() / "assets" / track;
+                    if (std::filesystem::exists(cwdPath)) {
+                        availableTracks.push_back(cwdPath.string());
                     }
                 }
-                music->playFilePath(path, true);
-                musicPlaying = music->isPlaying();
+
+                if (!availableTracks.empty()) {
+                    std::uniform_int_distribution<size_t> pick(0, availableTracks.size() - 1);
+                    const std::string& path = availableTracks[pick(rng)];
+                    music->playFilePath(path, true);
+                    LOG_INFO("AuthScreen: Playing login intro track: ", path);
+                    musicPlaying = music->isPlaying();
+                } else {
+                    LOG_WARNING("AuthScreen: No login intro tracks found in assets/");
+                }
             }
         }
     }
