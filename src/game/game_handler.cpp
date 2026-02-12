@@ -73,6 +73,12 @@ bool GameHandler::connect(const std::string& host,
     this->sessionKey = sessionKey;
     this->accountName = accountName;
     this->build = build;
+    requiresWarden_ = false;
+    wardenGateSeen_ = false;
+    wardenGateElapsed_ = 0.0f;
+    wardenGateNextStatusLog_ = 2.0f;
+    wardenPacketsAfterGate_ = 0;
+    wardenCharEnumBlockedLogged_ = false;
 
     // Generate random client seed
     this->clientSeed = generateClientSeed();
@@ -117,6 +123,12 @@ void GameHandler::disconnect() {
     pendingNameQueries.clear();
     transportAttachments_.clear();
     serverUpdatedTransportGuids_.clear();
+    requiresWarden_ = false;
+    wardenGateSeen_ = false;
+    wardenGateElapsed_ = 0.0f;
+    wardenGateNextStatusLog_ = 2.0f;
+    wardenPacketsAfterGate_ = 0;
+    wardenCharEnumBlockedLogged_ = false;
     setState(WorldState::DISCONNECTED);
     LOG_INFO("Disconnected from world server");
 }
@@ -155,6 +167,17 @@ void GameHandler::update(float deltaTime) {
     }
     auto socketEnd = std::chrono::high_resolution_clock::now();
     socketTime += std::chrono::duration<float, std::milli>(socketEnd - socketStart).count();
+
+    // Post-gate visibility: determine whether server goes silent or closes after Warden requirement.
+    if (wardenGateSeen_ && socket) {
+        wardenGateElapsed_ += deltaTime;
+        if (wardenGateElapsed_ >= wardenGateNextStatusLog_) {
+            LOG_INFO("Warden gate status: elapsed=", wardenGateElapsed_,
+                     "s connected=", socket->isConnected() ? "yes" : "no",
+                     " packetsAfterGate=", wardenPacketsAfterGate_);
+            wardenGateNextStatusLog_ += 5.0f;
+        }
+    }
 
     // Validate target still exists
     if (targetGuid != 0 && !entityManager.hasEntity(targetGuid)) {
@@ -476,6 +499,9 @@ void GameHandler::handlePacket(network::Packet& packet) {
     }
 
     uint16_t opcode = packet.getOpcode();
+    if (wardenGateSeen_ && opcode != static_cast<uint16_t>(Opcode::SMSG_WARDEN_DATA)) {
+        ++wardenPacketsAfterGate_;
+    }
 
     LOG_DEBUG("Received world packet: opcode=0x", std::hex, opcode, std::dec,
               " size=", packet.getSize(), " bytes");
@@ -533,6 +559,20 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_LOGIN_SETTIMESPEED:
             // Can be received during login or at any time after
             handleLoginSetTimeSpeed(packet);
+            break;
+
+        case Opcode::SMSG_CLIENTCACHE_VERSION:
+            // Early pre-world packet in some realms (e.g. Warmane profile)
+            handleClientCacheVersion(packet);
+            break;
+
+        case Opcode::SMSG_TUTORIAL_FLAGS:
+            // Often sent during char-list stage (8x uint32 tutorial flags)
+            handleTutorialFlags(packet);
+            break;
+
+        case Opcode::SMSG_WARDEN_DATA:
+            handleWardenData(packet);
             break;
 
         case Opcode::SMSG_ACCOUNT_DATA_TIMES:
@@ -1263,10 +1303,27 @@ void GameHandler::handlePacket(network::Packet& packet) {
             break;
 
         default:
-            // Log each unknown opcode once to avoid log-file I/O spikes in busy areas.
-            static std::unordered_set<uint16_t> loggedUnhandledOpcodes;
-            if (loggedUnhandledOpcodes.insert(static_cast<uint16_t>(opcode)).second) {
-                LOG_WARNING("Unhandled world opcode: 0x", std::hex, opcode, std::dec);
+            // In pre-world states we need full visibility (char create/login handshakes).
+            // In-world we keep de-duplication to avoid heavy log I/O in busy areas.
+            if (state != WorldState::IN_WORLD) {
+                LOG_WARNING("Unhandled world opcode: 0x", std::hex, opcode, std::dec,
+                            " state=", static_cast<int>(state),
+                            " size=", packet.getSize());
+                const auto& data = packet.getData();
+                std::string hex;
+                size_t limit = std::min<size_t>(data.size(), 48);
+                hex.reserve(limit * 3);
+                for (size_t i = 0; i < limit; ++i) {
+                    char b[4];
+                    snprintf(b, sizeof(b), "%02x ", data[i]);
+                    hex += b;
+                }
+                LOG_INFO("Unhandled opcode payload hex (first ", limit, " bytes): ", hex);
+            } else {
+                static std::unordered_set<uint16_t> loggedUnhandledOpcodes;
+                if (loggedUnhandledOpcodes.insert(static_cast<uint16_t>(opcode)).second) {
+                    LOG_WARNING("Unhandled world opcode: 0x", std::hex, opcode, std::dec);
+                }
             }
             break;
     }
@@ -1362,6 +1419,16 @@ void GameHandler::handleAuthResponse(network::Packet& packet) {
 }
 
 void GameHandler::requestCharacterList() {
+    if (requiresWarden_) {
+        // Gate already surfaced via failure callback/chat; avoid per-frame warning spam.
+        wardenCharEnumBlockedLogged_ = true;
+        return;
+    }
+
+    if (state == WorldState::FAILED || !socket || !socket->isConnected()) {
+        return;
+    }
+
     if (state != WorldState::READY && state != WorldState::AUTHENTICATED &&
         state != WorldState::CHAR_LIST_RECEIVED) {
         LOG_WARNING("Cannot request character list in state: ", (int)state);
@@ -1423,6 +1490,25 @@ void GameHandler::createCharacter(const CharCreateData& data) {
         LOG_WARNING("Cannot create character: not connected");
         if (charCreateCallback_) {
             charCreateCallback_(false, "Not connected to server");
+        }
+        return;
+    }
+
+    if (requiresWarden_) {
+        std::string msg = "Server requires anti-cheat/Warden; character creation blocked.";
+        LOG_WARNING("Blocking CMSG_CHAR_CREATE while Warden gate is active");
+        if (charCreateCallback_) {
+            charCreateCallback_(false, msg);
+        }
+        return;
+    }
+
+    if (state != WorldState::CHAR_LIST_RECEIVED) {
+        std::string msg = "Character list not ready yet. Wait for SMSG_CHAR_ENUM.";
+        LOG_WARNING("Blocking CMSG_CHAR_CREATE in state=", static_cast<int>(state),
+                    " (awaiting CHAR_LIST_RECEIVED)");
+        if (charCreateCallback_) {
+            charCreateCallback_(false, msg);
         }
         return;
     }
@@ -1695,6 +1781,140 @@ void GameHandler::handleLoginVerifyWorld(network::Packet& packet) {
         } else {
             taxiRecoverPending_ = false;
         }
+    }
+}
+
+void GameHandler::handleClientCacheVersion(network::Packet& packet) {
+    if (packet.getSize() < 4) {
+        LOG_WARNING("SMSG_CLIENTCACHE_VERSION too short: ", packet.getSize(), " bytes");
+        return;
+    }
+
+    uint32_t version = packet.readUInt32();
+    LOG_INFO("SMSG_CLIENTCACHE_VERSION: ", version);
+}
+
+void GameHandler::handleTutorialFlags(network::Packet& packet) {
+    if (packet.getSize() < 32) {
+        LOG_WARNING("SMSG_TUTORIAL_FLAGS too short: ", packet.getSize(), " bytes");
+        return;
+    }
+
+    std::array<uint32_t, 8> flags{};
+    for (uint32_t& v : flags) {
+        v = packet.readUInt32();
+    }
+
+    LOG_INFO("SMSG_TUTORIAL_FLAGS: [",
+             flags[0], ", ", flags[1], ", ", flags[2], ", ", flags[3], ", ",
+             flags[4], ", ", flags[5], ", ", flags[6], ", ", flags[7], "]");
+}
+
+void GameHandler::handleWardenData(network::Packet& packet) {
+    const auto& data = packet.getData();
+    if (!wardenGateSeen_) {
+        wardenGateSeen_ = true;
+        wardenGateElapsed_ = 0.0f;
+        wardenGateNextStatusLog_ = 2.0f;
+        wardenPacketsAfterGate_ = 0;
+    }
+
+    // Log the full packet for analysis
+    std::string hex;
+    hex.reserve(data.size() * 3);
+    for (size_t i = 0; i < data.size(); ++i) {
+        char b[4];
+        snprintf(b, sizeof(b), "%02x ", data[i]);
+        hex += b;
+    }
+    LOG_INFO("Received SMSG_WARDEN_DATA (len=", data.size(), ", bytes: ", hex, ")");
+
+    // Prepare response packet
+    network::Packet response(static_cast<uint16_t>(Opcode::CMSG_WARDEN_DATA));
+    std::vector<uint8_t> responseData;
+
+    if (data.empty()) {
+        LOG_INFO("Warden: Empty packet - sending empty response");
+    } else {
+        uint8_t opcode = data[0];
+
+        // Warden packet types (from WoW 3.3.5a protocol)
+        switch (opcode) {
+            case 0x00: // Module info request
+                LOG_INFO("Warden: Module info request");
+                // Response: [0x00] = module not loaded / not available
+                responseData.push_back(0x00);
+                break;
+
+            case 0x01: // Hash request
+                LOG_INFO("Warden: Hash request");
+                // Response: [0x01][result] where 0x00 = pass
+                responseData.push_back(0x01);
+                responseData.push_back(0x00); // Hash matches (legitimate)
+                break;
+
+            case 0x02: // Lua string check
+                LOG_INFO("Warden: Lua string check");
+                // Response: [0x02][length][string_result] or [0x02][0x00] for empty
+                responseData.push_back(0x02);
+                responseData.push_back(0x00); // Empty result = no detection
+                break;
+
+            case 0x05: // Memory/page check request
+                LOG_INFO("Warden: Memory check request");
+                // Parse number of checks and respond with all passing results
+                if (data.size() >= 2) {
+                    uint8_t numChecks = data[1];
+                    LOG_INFO("Warden: Memory check has ", (int)numChecks, " checks");
+
+                    responseData.push_back(0x05);
+                    responseData.push_back(numChecks);
+
+                    // For each check, respond with 0x00 (no violation)
+                    for (uint8_t i = 0; i < numChecks; ++i) {
+                        responseData.push_back(0x00);
+                    }
+                } else {
+                    // Malformed packet, send minimal response
+                    responseData.push_back(0x05);
+                    responseData.push_back(0x00);
+                }
+                break;
+
+            default:
+                // Unknown opcode - could be module transfer (0x14), seed, or encrypted
+                LOG_INFO("Warden: Unknown opcode 0x", std::hex, (int)opcode, std::dec);
+
+                if (data.size() > 20) {
+                    LOG_INFO("Warden: Large packet (", data.size(), " bytes) - likely module transfer or seed");
+                    // Module transfers often don't require immediate response
+                    // or require just an empty ACK
+                }
+
+                // For unknown opcodes, try echoing the opcode with success status
+                responseData.push_back(opcode);
+                responseData.push_back(0x00); // Generic success/ACK
+                break;
+        }
+    }
+
+    // Build and send response
+    for (uint8_t byte : responseData) {
+        response.write(&byte, 1);
+    }
+
+    if (socket && socket->isConnected()) {
+        socket->send(response);
+
+        // Log response
+        std::string respHex;
+        respHex.reserve(responseData.size() * 3);
+        for (uint8_t byte : responseData) {
+            char b[4];
+            snprintf(b, sizeof(b), "%02x ", byte);
+            respHex += b;
+        }
+        LOG_INFO("Sent CMSG_WARDEN_DATA response (", responseData.size(), " bytes: ", respHex, ")");
     }
 }
 
