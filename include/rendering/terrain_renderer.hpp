@@ -207,6 +207,8 @@ private:
 
     // Default white texture (fallback)
     GLuint whiteTexture = 0;
+    // Opaque alpha fallback for missing/invalid layer alpha maps
+    GLuint opaqueAlphaTexture = 0;
 
     // Shadow mapping (receiving)
     GLuint shadowDepthTex = 0;

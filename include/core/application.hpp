@@ -112,7 +112,6 @@ private:
     bool npcsSpawned = false;
     bool spawnSnapToGround = true;
     float lastFrameTime = 0.0f;
-    float movementHeartbeatTimer = 0.0f;
 
     // Player character info (for model spawning)
     game::Race playerRace_ = game::Race::HUMAN;

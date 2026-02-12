@@ -123,7 +123,7 @@ WMOModel WMOLoader::load(const std::vector<uint8_t>& wmoData) {
                 // flags and numLod (uint16 each) - skip for now
                 offset += 4;
 
-                core::Logger::getInstance().info("WMO header: nTextures=", model.nTextures, " nGroups=", model.nGroups);
+                core::Logger::getInstance().debug("WMO header: nTextures=", model.nTextures, " nGroups=", model.nGroups);
                 break;
             }
 
@@ -133,7 +133,7 @@ WMOModel WMOLoader::load(const std::vector<uint8_t>& wmoData) {
                 // We must map every offset to its texture index.
                 uint32_t texOffset = chunkStart;
                 uint32_t texIndex = 0;
-                core::Logger::getInstance().info("MOTX chunk: ", chunkSize, " bytes");
+                core::Logger::getInstance().debug("MOTX chunk: ", chunkSize, " bytes");
                 while (texOffset < chunkEnd) {
                     uint32_t relativeOffset = texOffset - chunkStart;
 
@@ -187,7 +187,7 @@ WMOModel WMOLoader::load(const std::vector<uint8_t>& wmoData) {
 
                     model.materials.push_back(mat);
                 }
-                core::Logger::getInstance().info("WMO materials: ", model.materials.size());
+                core::Logger::getInstance().debug("WMO materials: ", model.materials.size());
                 break;
             }
 
@@ -220,7 +220,7 @@ WMOModel WMOLoader::load(const std::vector<uint8_t>& wmoData) {
 
                     model.groupInfo.push_back(info);
                 }
-                core::Logger::getInstance().info("WMO group info: ", model.groupInfo.size());
+                core::Logger::getInstance().debug("WMO group info: ", model.groupInfo.size());
                 break;
             }
 
@@ -254,7 +254,7 @@ WMOModel WMOLoader::load(const std::vector<uint8_t>& wmoData) {
 
                     model.lights.push_back(light);
                 }
-                core::Logger::getInstance().info("WMO lights: ", model.lights.size());
+                core::Logger::getInstance().debug("WMO lights: ", model.lights.size());
                 break;
             }
 
@@ -303,7 +303,7 @@ WMOModel WMOLoader::load(const std::vector<uint8_t>& wmoData) {
 
                     model.doodads.push_back(doodad);
                 }
-                core::Logger::getInstance().info("WMO doodads: ", model.doodads.size());
+                core::Logger::getInstance().debug("WMO doodads: ", model.doodads.size());
                 break;
             }
 
@@ -320,7 +320,7 @@ WMOModel WMOLoader::load(const std::vector<uint8_t>& wmoData) {
 
                     model.doodadSets.push_back(set);
                 }
-                core::Logger::getInstance().info("WMO doodad sets: ", model.doodadSets.size());
+                core::Logger::getInstance().debug("WMO doodad sets: ", model.doodadSets.size());
                 break;
             }
 
@@ -352,7 +352,7 @@ WMOModel WMOLoader::load(const std::vector<uint8_t>& wmoData) {
 
                     model.portals.push_back(portal);
                 }
-                core::Logger::getInstance().info("WMO portals: ", model.portals.size());
+                core::Logger::getInstance().debug("WMO portals: ", model.portals.size());
                 break;
             }
 
@@ -367,7 +367,7 @@ WMOModel WMOLoader::load(const std::vector<uint8_t>& wmoData) {
                     ref.padding = read<uint16_t>(wmoData, offset);
                     model.portalRefs.push_back(ref);
                 }
-                core::Logger::getInstance().info("WMO portal refs: ", model.portalRefs.size());
+                core::Logger::getInstance().debug("WMO portal refs: ", model.portalRefs.size());
                 break;
             }
 
@@ -429,8 +429,8 @@ bool WMOLoader::loadGroup(const std::vector<uint8_t>& groupData,
             uint32_t mogpOffset = offset;
             group.flags = read<uint32_t>(groupData, mogpOffset);
             bool isInterior = (group.flags & 0x2000) != 0;
-            core::Logger::getInstance().info("  Group flags: 0x", std::hex, group.flags, std::dec,
-                                             (isInterior ? " (INTERIOR)" : " (exterior)"));
+            core::Logger::getInstance().debug("  Group flags: 0x", std::hex, group.flags, std::dec,
+                                              (isInterior ? " (INTERIOR)" : " (exterior)"));
             group.boundingBoxMin.x = read<float>(groupData, mogpOffset);
             group.boundingBoxMin.y = read<float>(groupData, mogpOffset);
             group.boundingBoxMin.z = read<float>(groupData, mogpOffset);
@@ -493,7 +493,7 @@ bool WMOLoader::loadGroup(const std::vector<uint8_t>& groupData,
                 }
                 else if (subChunkId == 0x4D4F4E52) { // MONR - Normals
                     uint32_t normalCount = subChunkSize / 12;
-                    core::Logger::getInstance().info("  MONR: ", normalCount, " normals for ", group.vertices.size(), " vertices");
+                    core::Logger::getInstance().debug("  MONR: ", normalCount, " normals for ", group.vertices.size(), " vertices");
                     for (uint32_t i = 0; i < normalCount && i < group.vertices.size(); i++) {
                         group.vertices[i].normal.x = read<float>(groupData, mogpOffset);
                         group.vertices[i].normal.y = read<float>(groupData, mogpOffset);
@@ -507,7 +507,7 @@ bool WMOLoader::loadGroup(const std::vector<uint8_t>& groupData,
                 else if (subChunkId == 0x4D4F5456) { // MOTV - Texture coords
                     // Update texture coords for existing vertices
                     uint32_t texCoordCount = subChunkSize / 8;
-                    core::Logger::getInstance().info("  MOTV: ", texCoordCount, " tex coords for ", group.vertices.size(), " vertices");
+                    core::Logger::getInstance().debug("  MOTV: ", texCoordCount, " tex coords for ", group.vertices.size(), " vertices");
                     for (uint32_t i = 0; i < texCoordCount && i < group.vertices.size(); i++) {
                         group.vertices[i].texCoord.x = read<float>(groupData, mogpOffset);
                         group.vertices[i].texCoord.y = read<float>(groupData, mogpOffset);
@@ -519,7 +519,7 @@ bool WMOLoader::loadGroup(const std::vector<uint8_t>& groupData,
                 else if (subChunkId == 0x4D4F4356) { // MOCV - Vertex colors
                     // Update vertex colors
                     uint32_t colorCount = subChunkSize / 4;
-                    core::Logger::getInstance().info("  MOCV: ", colorCount, " vertex colors for ", group.vertices.size(), " vertices");
+                    core::Logger::getInstance().debug("  MOCV: ", colorCount, " vertex colors for ", group.vertices.size(), " vertices");
                     for (uint32_t i = 0; i < colorCount && i < group.vertices.size(); i++) {
                         uint8_t b = read<uint8_t>(groupData, mogpOffset);
                         uint8_t g = read<uint8_t>(groupData, mogpOffset);
@@ -555,7 +555,7 @@ bool WMOLoader::loadGroup(const std::vector<uint8_t>& groupData,
 
                         static int batchLogCount = 0;
                         if (batchLogCount < 15) {
-                            core::Logger::getInstance().info("  Batch[", i, "]: start=", batch.startIndex,
+                            core::Logger::getInstance().debug("  Batch[", i, "]: start=", batch.startIndex,
                                 " count=", batch.indexCount, " verts=[", batch.startVertex, "-",
                                 batch.lastVertex, "] mat=", (int)batch.materialId, " flags=", (int)batch.flags);
                             batchLogCount++;
@@ -633,10 +633,10 @@ bool WMOLoader::loadGroup(const std::vector<uint8_t>& groupData,
         group.batches.push_back(batch);
     }
 
-    core::Logger::getInstance().info("WMO group ", groupIndex, " loaded: ",
-                                     group.vertices.size(), " vertices, ",
-                                     group.indices.size(), " indices, ",
-                                     group.batches.size(), " batches");
+    core::Logger::getInstance().debug("WMO group ", groupIndex, " loaded: ",
+                                      group.vertices.size(), " vertices, ",
+                                      group.indices.size(), " indices, ",
+                                      group.batches.size(), " batches");
     return !group.vertices.empty() && !group.indices.empty();
 }
 

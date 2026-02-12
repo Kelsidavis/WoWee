@@ -65,7 +65,7 @@ private:
     struct ActiveSound {
         ma_sound* sound;
         void* buffer;  // ma_audio_buffer* - Keep audio buffer alive
-        std::vector<uint8_t> pcmData;  // Keep PCM data alive
+        std::shared_ptr<const std::vector<uint8_t>> pcmDataRef;  // Keep decoded PCM alive
     };
     std::vector<ActiveSound> activeSounds_;
 

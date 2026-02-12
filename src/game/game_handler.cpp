@@ -18,6 +18,7 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <functional>
 #include <cstdlib>
 #include <zlib.h>
@@ -169,7 +170,8 @@ void GameHandler::update(float deltaTime) {
             timeSinceLastPing = 0.0f;
         }
 
-        if (timeSinceLastMoveHeartbeat_ >= moveHeartbeatInterval_) {
+        float heartbeatInterval = (onTaxiFlight_ || taxiActivatePending_ || taxiClientActive_) ? 0.25f : moveHeartbeatInterval_;
+        if (timeSinceLastMoveHeartbeat_ >= heartbeatInterval) {
             sendMovement(Opcode::CMSG_MOVE_HEARTBEAT);
             timeSinceLastMoveHeartbeat_ = 0.0f;
         }
@@ -311,7 +313,13 @@ void GameHandler::update(float deltaTime) {
 
         if (taxiActivatePending_) {
             taxiActivateTimer_ += deltaTime;
-            if (!onTaxiFlight_ && taxiActivateTimer_ > 5.0f) {
+            if (taxiActivateTimer_ > 5.0f) {
+                // If client taxi simulation is already active, server reply may be missing/late.
+                // Do not cancel the flight in that case; clear pending state and continue.
+                if (onTaxiFlight_ || taxiClientActive_ || taxiMountActive_) {
+                    taxiActivatePending_ = false;
+                    taxiActivateTimer_ = 0.0f;
+                } else {
                 taxiActivatePending_ = false;
                 taxiActivateTimer_ = 0.0f;
                 if (taxiMountActive_ && mountCallback_) {
@@ -323,6 +331,7 @@ void GameHandler::update(float deltaTime) {
                 taxiClientPath_.clear();
                 onTaxiFlight_ = false;
                 LOG_WARNING("Taxi activation timed out");
+                }
             }
         }
 
@@ -531,7 +540,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
             break;
 
         case Opcode::SMSG_UPDATE_OBJECT:
-            LOG_INFO("Received SMSG_UPDATE_OBJECT, state=", static_cast<int>(state), " size=", packet.getSize());
+            LOG_DEBUG("Received SMSG_UPDATE_OBJECT, state=", static_cast<int>(state), " size=", packet.getSize());
             // Can be received after entering world
             if (state == WorldState::IN_WORLD) {
                 handleUpdateObject(packet);
@@ -539,7 +548,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
             break;
 
         case Opcode::SMSG_COMPRESSED_UPDATE_OBJECT:
-            LOG_INFO("Received SMSG_COMPRESSED_UPDATE_OBJECT, state=", static_cast<int>(state), " size=", packet.getSize());
+            LOG_DEBUG("Received SMSG_COMPRESSED_UPDATE_OBJECT, state=", static_cast<int>(state), " size=", packet.getSize());
             // Compressed version of UPDATE_OBJECT
             if (state == WorldState::IN_WORLD) {
                 handleCompressedUpdateObject(packet);
@@ -1243,7 +1252,11 @@ void GameHandler::handlePacket(network::Packet& packet) {
             break;
 
         default:
-            LOG_WARNING("Unhandled world opcode: 0x", std::hex, opcode, std::dec);
+            // Log each unknown opcode once to avoid log-file I/O spikes in busy areas.
+            static std::unordered_set<uint16_t> loggedUnhandledOpcodes;
+            if (loggedUnhandledOpcodes.insert(static_cast<uint16_t>(opcode)).second) {
+                LOG_WARNING("Unhandled world opcode: 0x", std::hex, opcode, std::dec);
+            }
             break;
     }
 }
@@ -1755,8 +1768,7 @@ void GameHandler::sendMovement(Opcode opcode) {
         (opcode == Opcode::CMSG_MOVE_STOP) ||
         (opcode == Opcode::CMSG_MOVE_STOP_STRAFE) ||
         (opcode == Opcode::CMSG_MOVE_STOP_TURN) ||
-        (opcode == Opcode::CMSG_MOVE_STOP_SWIM) ||
-        (opcode == Opcode::CMSG_MOVE_FALL_LAND);
+        (opcode == Opcode::CMSG_MOVE_STOP_SWIM);
     if ((onTaxiFlight_ || taxiMountActive_) && !taxiAllowed) return;
     if (resurrectPending_ && !taxiAllowed) return;
 
@@ -1809,6 +1821,10 @@ void GameHandler::sendMovement(Opcode opcode) {
             break;
         default:
             break;
+    }
+
+    if (onTaxiFlight_ || taxiMountActive_ || taxiActivatePending_ || taxiClientActive_) {
+        sanitizeMovementForTaxi();
     }
 
     // Add transport data if player is on a transport
@@ -1866,6 +1882,29 @@ void GameHandler::sendMovement(Opcode opcode) {
     // Build and send movement packet
     auto packet = MovementPacket::build(opcode, wireInfo, playerGuid);
     socket->send(packet);
+}
+
+void GameHandler::sanitizeMovementForTaxi() {
+    constexpr uint32_t kClearTaxiFlags =
+        static_cast<uint32_t>(MovementFlags::FORWARD) |
+        static_cast<uint32_t>(MovementFlags::BACKWARD) |
+        static_cast<uint32_t>(MovementFlags::STRAFE_LEFT) |
+        static_cast<uint32_t>(MovementFlags::STRAFE_RIGHT) |
+        static_cast<uint32_t>(MovementFlags::TURN_LEFT) |
+        static_cast<uint32_t>(MovementFlags::TURN_RIGHT) |
+        static_cast<uint32_t>(MovementFlags::PITCH_UP) |
+        static_cast<uint32_t>(MovementFlags::PITCH_DOWN) |
+        static_cast<uint32_t>(MovementFlags::FALLING) |
+        static_cast<uint32_t>(MovementFlags::FALLINGFAR) |
+        static_cast<uint32_t>(MovementFlags::SWIMMING);
+
+    movementInfo.flags &= ~kClearTaxiFlags;
+    movementInfo.fallTime = 0;
+    movementInfo.jumpVelocity = 0.0f;
+    movementInfo.jumpSinAngle = 0.0f;
+    movementInfo.jumpCosAngle = 0.0f;
+    movementInfo.jumpXYSpeed = 0.0f;
+    movementInfo.pitch = 0.0f;
 }
 
 void GameHandler::forceClearTaxiAndMovementState() {
@@ -1934,7 +1973,7 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                 continue;
             }
 
-            LOG_INFO("Entity went out of range: 0x", std::hex, guid, std::dec);
+            LOG_DEBUG("Entity went out of range: 0x", std::hex, guid, std::dec);
             // Trigger despawn callbacks before removing entity
             auto entity = entityManager.getEntity(guid);
             if (entity) {
@@ -2092,6 +2131,7 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                         if ((unit->getUnitFlags() & UNIT_FLAG_TAXI_FLIGHT) != 0 && !onTaxiFlight_ && taxiLandingCooldown_ <= 0.0f) {
                             onTaxiFlight_ = true;
                             taxiStartGrace_ = std::max(taxiStartGrace_, 2.0f);
+                            sanitizeMovementForTaxi();
                             applyTaxiMountForCurrentNode();
                         }
                     }
@@ -2598,7 +2638,7 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
 }
 
 void GameHandler::handleCompressedUpdateObject(network::Packet& packet) {
-    LOG_INFO("Handling SMSG_COMPRESSED_UPDATE_OBJECT, packet size: ", packet.getSize());
+    LOG_DEBUG("Handling SMSG_COMPRESSED_UPDATE_OBJECT, packet size: ", packet.getSize());
 
     // First 4 bytes = decompressed size
     if (packet.getSize() < 4) {
@@ -2607,7 +2647,7 @@ void GameHandler::handleCompressedUpdateObject(network::Packet& packet) {
     }
 
     uint32_t decompressedSize = packet.readUInt32();
-    LOG_INFO("  Decompressed size: ", decompressedSize);
+    LOG_DEBUG("  Decompressed size: ", decompressedSize);
 
     if (decompressedSize == 0 || decompressedSize > 1024 * 1024) {
         LOG_WARNING("Invalid decompressed size: ", decompressedSize);
@@ -6335,6 +6375,7 @@ void GameHandler::startClientTaxiPath(const std::vector<uint32_t>& pathNodes) {
     movementInfo.y = start.y;
     movementInfo.z = start.z;
     movementInfo.orientation = initialOrientation;
+    sanitizeMovementForTaxi();
 
     auto playerEntity = entityManager.getEntity(playerGuid);
     if (playerEntity) {
@@ -6495,8 +6536,8 @@ void GameHandler::handleActivateTaxiReply(network::Packet& packet) {
     }
 
     // Guard against stray/mis-mapped packets being treated as taxi replies.
-    // Only honor taxi replies when a taxi flow is actually active.
-    if (!taxiActivatePending_ && !taxiWindowOpen_ && !onTaxiFlight_) {
+    // We only consume a reply while an activation request is pending.
+    if (!taxiActivatePending_) {
         LOG_DEBUG("Ignoring stray taxi reply: result=", data.result);
         return;
     }
@@ -6509,6 +6550,7 @@ void GameHandler::handleActivateTaxiReply(network::Packet& packet) {
         }
         onTaxiFlight_ = true;
         taxiStartGrace_ = std::max(taxiStartGrace_, 2.0f);
+        sanitizeMovementForTaxi();
         taxiWindowOpen_ = false;
         taxiActivatePending_ = false;
         taxiActivateTimer_ = 0.0f;
@@ -6518,6 +6560,13 @@ void GameHandler::handleActivateTaxiReply(network::Packet& packet) {
         }
         LOG_INFO("Taxi flight started!");
     } else {
+        // If local taxi motion already started, treat late failure as stale and ignore.
+        if (onTaxiFlight_ || taxiClientActive_) {
+            LOG_WARNING("Ignoring stale taxi failure reply while flight is active: result=", data.result);
+            taxiActivatePending_ = false;
+            taxiActivateTimer_ = 0.0f;
+            return;
+        }
         LOG_WARNING("Taxi activation failed, result=", data.result);
         addSystemChatMessage("Cannot take that flight path.");
         taxiActivatePending_ = false;
@@ -6678,6 +6727,7 @@ void GameHandler::activateTaxi(uint32_t destNodeId) {
     taxiStartGrace_ = 2.0f;
     if (!onTaxiFlight_) {
         onTaxiFlight_ = true;
+        sanitizeMovementForTaxi();
         applyTaxiMountForCurrentNode();
     }
     if (socket) {
@@ -6720,6 +6770,11 @@ void GameHandler::activateTaxi(uint32_t destNodeId) {
         taxiFlightStartCallback_();
     }
     startClientTaxiPath(path);
+    // We run taxi movement locally immediately; don't keep a long-lived pending state.
+    if (taxiClientActive_) {
+        taxiActivatePending_ = false;
+        taxiActivateTimer_ = 0.0f;
+    }
 
     addSystemChatMessage("Flight started.");
 

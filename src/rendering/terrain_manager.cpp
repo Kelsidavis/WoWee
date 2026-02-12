@@ -244,7 +244,7 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
     auto adtData = assetManager->readFile(adtPath);
 
     if (adtData.empty()) {
-        LOG_WARNING("Failed to load ADT file: ", adtPath);
+        logMissingAdtOnce(adtPath);
         return nullptr;
     }
 
@@ -322,7 +322,7 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
                         preparedModelIds.insert(modelId);
                     } else {
                         skippedInvalid++;
-                        LOG_WARNING("M2 model invalid (no verts/indices): ", m2Path);
+                        LOG_DEBUG("M2 model invalid (no verts/indices): ", m2Path);
                     }
                 } else {
                     skippedFileNotFound++;
@@ -352,7 +352,7 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
         }
 
         if (skippedNameId > 0 || skippedFileNotFound > 0 || skippedInvalid > 0) {
-            LOG_WARNING("Tile [", x, ",", y, "] doodad issues: ",
+            LOG_DEBUG("Tile [", x, ",", y, "] doodad issues: ",
                        skippedNameId, " bad nameId, ",
                        skippedFileNotFound, " file not found, ",
                        skippedInvalid, " invalid model, ",
@@ -547,6 +547,17 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
     return pending;
 }
 
+void TerrainManager::logMissingAdtOnce(const std::string& adtPath) {
+    std::string normalized = adtPath;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    std::lock_guard<std::mutex> lock(missingAdtWarningsMutex_);
+    if (missingAdtWarnings_.insert(normalized).second) {
+        LOG_WARNING("Failed to load ADT file: ", adtPath);
+    }
+}
+
 void TerrainManager::finalizeTile(const std::shared_ptr<PendingTile>& pending) {
     int x = pending->coord.x;
     int y = pending->coord.y;
@@ -723,7 +734,7 @@ void TerrainManager::finalizeTile(const std::shared_ptr<PendingTile>& pending) {
             }
         }
         if (loadedWMOs > 0 || skippedWmoDedup > 0) {
-            LOG_INFO("  Loaded WMOs for tile [", x, ",", y, "]: ",
+            LOG_DEBUG("  Loaded WMOs for tile [", x, ",", y, "]: ",
                      loadedWMOs, " instances, ", skippedWmoDedup, " dedup skipped");
         }
         if (loadedLiquids > 0) {
@@ -817,8 +828,8 @@ void TerrainManager::workerLoop() {
 
 void TerrainManager::processReadyTiles() {
     // Process tiles with time budget to avoid frame spikes
-    // Budget: 5ms per frame (allows 3 tiles at ~1.5ms each or 1 heavy tile)
-    const float timeBudgetMs = 5.0f;
+    // Taxi mode gets a slightly larger budget to avoid visible late-pop terrain/models.
+    const float timeBudgetMs = taxiStreamingMode_ ? 8.0f : 5.0f;
     auto startTime = std::chrono::high_resolution_clock::now();
     int processed = 0;
 
@@ -1010,9 +1021,7 @@ void TerrainManager::unloadTile(int x, int y) {
 
     // Remove M2 doodad instances
     if (m2Renderer) {
-        for (uint32_t id : tile->m2InstanceIds) {
-            m2Renderer->removeInstance(id);
-        }
+        m2Renderer->removeInstances(tile->m2InstanceIds);
         LOG_DEBUG("  Removed ", tile->m2InstanceIds.size(), " M2 instances");
     }
 
@@ -1023,8 +1032,8 @@ void TerrainManager::unloadTile(int x, int y) {
             if (waterRenderer) {
                 waterRenderer->removeWMO(id);
             }
-            wmoRenderer->removeInstance(id);
         }
+        wmoRenderer->removeInstances(tile->wmoInstanceIds);
         LOG_DEBUG("  Removed ", tile->wmoInstanceIds.size(), " WMO instances");
     }
 
@@ -1328,6 +1337,18 @@ std::optional<std::string> TerrainManager::getDominantTextureAt(float glX, float
 }
 
 void TerrainManager::streamTiles() {
+    auto shouldSkipMissingAdt = [this](const TileCoord& coord) -> bool {
+        if (!assetManager) return false;
+        if (failedTiles.find(coord) != failedTiles.end()) return true;
+        const std::string adtPath = getADTPath(coord);
+        if (!assetManager->fileExists(adtPath)) {
+            // Mark permanently failed so future stream/precache passes do not retry.
+            failedTiles[coord] = true;
+            return true;
+        }
+        return false;
+    };
+
     // Enqueue tiles in radius around current tile for async loading
     {
         std::lock_guard<std::mutex> lock(queueMutex);
@@ -1353,6 +1374,7 @@ void TerrainManager::streamTiles() {
                 if (loadedTiles.find(coord) != loadedTiles.end()) continue;
                 if (pendingTiles.find(coord) != pendingTiles.end()) continue;
                 if (failedTiles.find(coord) != failedTiles.end()) continue;
+                if (shouldSkipMissingAdt(coord)) continue;
 
                 loadQueue.push_back(coord);
                 pendingTiles[coord] = true;
@@ -1403,12 +1425,18 @@ void TerrainManager::precacheTiles(const std::vector<std::pair<int, int>>& tiles
     std::lock_guard<std::mutex> lock(queueMutex);
 
     for (const auto& [x, y] : tiles) {
+        if (x < 0 || x > 63 || y < 0 || y > 63) continue;
+
         TileCoord coord = {x, y};
 
         // Skip if already loaded, pending, or failed
         if (loadedTiles.find(coord) != loadedTiles.end()) continue;
         if (pendingTiles.find(coord) != pendingTiles.end()) continue;
         if (failedTiles.find(coord) != failedTiles.end()) continue;
+        if (assetManager && !assetManager->fileExists(getADTPath(coord))) {
+            failedTiles[coord] = true;
+            continue;
+        }
 
         // Precache work is prioritized so taxi-route tiles are prepared before
         // opportunistic radius streaming tiles.

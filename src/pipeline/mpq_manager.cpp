@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <cctype>
 
 #ifdef HAVE_STORMLIB
 #include <StormLib.h>
@@ -20,6 +21,14 @@ typedef void* HANDLE;
 
 namespace wowee {
 namespace pipeline {
+
+namespace {
+std::string toLowerCopy(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return value;
+}
+}
 
 MPQManager::MPQManager() = default;
 
@@ -95,6 +104,10 @@ void MPQManager::shutdown() {
 
     archives.clear();
     archiveNames.clear();
+    {
+        std::lock_guard<std::mutex> lock(missingFileMutex_);
+        missingFileWarnings_.clear();
+    }
     initialized = false;
 }
 
@@ -229,7 +242,7 @@ std::vector<uint8_t> MPQManager::readFile(const std::string& filename) const {
             }
         }
         if (!found) {
-            LOG_WARNING("File not found: ", filename);
+            logMissingFileOnce(filename);
             return std::vector<uint8_t>();
         }
     }
@@ -247,8 +260,16 @@ std::vector<uint8_t> MPQManager::readFile(const std::string& filename) const {
         }
     }
 
-    LOG_WARNING("File not found: ", filename);
+    logMissingFileOnce(filename);
     return std::vector<uint8_t>();
+}
+
+void MPQManager::logMissingFileOnce(const std::string& filename) const {
+    std::string normalized = toLowerCopy(filename);
+    std::lock_guard<std::mutex> lock(missingFileMutex_);
+    if (missingFileWarnings_.insert(normalized).second) {
+        LOG_WARNING("File not found: ", filename);
+    }
 }
 
 uint32_t MPQManager::getFileSize(const std::string& filename) const {

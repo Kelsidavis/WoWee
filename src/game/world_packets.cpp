@@ -1683,7 +1683,7 @@ bool CreatureQueryResponseParser::parse(network::Packet& packet, CreatureQueryRe
     // Skip remaining fields (kill credits, display IDs, modifiers, quest items, etc.)
     // We've got what we need for display purposes
 
-    LOG_INFO("Creature query response: ", data.name, " (type=", data.creatureType,
+    LOG_DEBUG("Creature query response: ", data.name, " (type=", data.creatureType,
              " rank=", data.rank, ")");
     return true;
 }
@@ -1718,7 +1718,7 @@ bool GameObjectQueryResponseParser::parse(network::Packet& packet, GameObjectQue
     packet.readString();
     packet.readString();
 
-    LOG_INFO("GameObject query response: ", data.name, " (type=", data.type, " entry=", data.entry, ")");
+    LOG_DEBUG("GameObject query response: ", data.name, " (type=", data.type, " entry=", data.entry, ")");
     return true;
 }
 

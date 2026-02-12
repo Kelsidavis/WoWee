@@ -268,8 +268,8 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
         return true;
     }
 
-    core::Logger::getInstance().info("Loading WMO model ", id, " with ", model.groups.size(), " groups, ",
-                                     model.textures.size(), " textures...");
+    core::Logger::getInstance().debug("Loading WMO model ", id, " with ", model.groups.size(), " groups, ",
+                                      model.textures.size(), " textures...");
 
     ModelData modelData;
     modelData.id = id;
@@ -282,11 +282,11 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
         modelData.isLowPlatform = (vert < 6.0f && horiz > 20.0f);
     }
 
-    core::Logger::getInstance().info("  WMO bounds: min=(", model.boundingBoxMin.x, ", ", model.boundingBoxMin.y, ", ", model.boundingBoxMin.z,
-                                     ") max=(", model.boundingBoxMax.x, ", ", model.boundingBoxMax.y, ", ", model.boundingBoxMax.z, ")");
+    core::Logger::getInstance().debug("  WMO bounds: min=(", model.boundingBoxMin.x, ", ", model.boundingBoxMin.y, ", ", model.boundingBoxMin.z,
+                                      ") max=(", model.boundingBoxMax.x, ", ", model.boundingBoxMax.y, ", ", model.boundingBoxMax.z, ")");
 
     // Load textures for this model
-    core::Logger::getInstance().info("  WMO has ", model.textures.size(), " texture paths, ", model.materials.size(), " materials");
+    core::Logger::getInstance().debug("  WMO has ", model.textures.size(), " texture paths, ", model.materials.size(), " materials");
     if (assetManager && !model.textures.empty()) {
         for (size_t i = 0; i < model.textures.size(); i++) {
             const auto& texPath = model.textures[i];
@@ -294,13 +294,13 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
             GLuint texId = loadTexture(texPath);
             modelData.textures.push_back(texId);
         }
-        core::Logger::getInstance().info("  Loaded ", modelData.textures.size(), " textures for WMO");
+        core::Logger::getInstance().debug("  Loaded ", modelData.textures.size(), " textures for WMO");
     }
 
     // Store material -> texture index mapping
     // IMPORTANT: mat.texture1 is a byte offset into MOTX, not an array index!
     // We need to convert it using the textureOffsetToIndex map
-    core::Logger::getInstance().info("  textureOffsetToIndex map has ", model.textureOffsetToIndex.size(), " entries");
+    core::Logger::getInstance().debug("  textureOffsetToIndex map has ", model.textureOffsetToIndex.size(), " entries");
     static int matLogCount = 0;
     for (size_t i = 0; i < model.materials.size(); i++) {
         const auto& mat = model.materials[i];
@@ -310,19 +310,19 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
         if (it != model.textureOffsetToIndex.end()) {
             texIndex = it->second;
             if (matLogCount < 20) {
-                core::Logger::getInstance().info("  Material ", i, ": texture1 offset ", mat.texture1, " -> texture index ", texIndex);
+                core::Logger::getInstance().debug("  Material ", i, ": texture1 offset ", mat.texture1, " -> texture index ", texIndex);
                 matLogCount++;
             }
         } else if (mat.texture1 < model.textures.size()) {
             // Fallback: maybe it IS an index in some files?
             texIndex = mat.texture1;
             if (matLogCount < 20) {
-                core::Logger::getInstance().info("  Material ", i, ": using texture1 as direct index: ", texIndex);
+                core::Logger::getInstance().debug("  Material ", i, ": using texture1 as direct index: ", texIndex);
                 matLogCount++;
             }
         } else {
             if (matLogCount < 20) {
-                core::Logger::getInstance().info("  Material ", i, ": texture1 offset ", mat.texture1, " NOT FOUND, using default");
+                core::Logger::getInstance().debug("  Material ", i, ": texture1 offset ", mat.texture1, " NOT FOUND, using default");
                 matLogCount++;
             }
         }
@@ -435,8 +435,8 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
     }
 
     if (!modelData.portals.empty()) {
-        core::Logger::getInstance().info("WMO portals: ", modelData.portals.size(),
-                                         " refs: ", modelData.portalRefs.size());
+        core::Logger::getInstance().debug("WMO portals: ", modelData.portals.size(),
+                                          " refs: ", modelData.portalRefs.size());
     }
 
     // Store doodad templates (M2 models placed in WMO) for instancing later
@@ -478,12 +478,12 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
         }
 
         if (!modelData.doodadTemplates.empty()) {
-            core::Logger::getInstance().info("WMO has ", modelData.doodadTemplates.size(), " doodad templates");
+            core::Logger::getInstance().debug("WMO has ", modelData.doodadTemplates.size(), " doodad templates");
         }
     }
 
     loadedModels[id] = std::move(modelData);
-    core::Logger::getInstance().info("WMO model ", id, " loaded successfully (", loadedGroups, " groups)");
+    core::Logger::getInstance().debug("WMO model ", id, " loaded successfully (", loadedGroups, " groups)");
     return true;
 }
 
@@ -570,7 +570,7 @@ uint32_t WMORenderer::createInstance(uint32_t modelId, const glm::vec3& position
             }
         }
     }
-    core::Logger::getInstance().info("Created WMO instance ", instance.id, " (model ", modelId, ")");
+    core::Logger::getInstance().debug("Created WMO instance ", instance.id, " (model ", modelId, ")");
     return instance.id;
 }
 
@@ -677,7 +677,27 @@ void WMORenderer::removeInstance(uint32_t instanceId) {
     if (it != instances.end()) {
         instances.erase(it);
         rebuildSpatialIndex();
-        core::Logger::getInstance().info("Removed WMO instance ", instanceId);
+        core::Logger::getInstance().debug("Removed WMO instance ", instanceId);
+    }
+}
+
+void WMORenderer::removeInstances(const std::vector<uint32_t>& instanceIds) {
+    if (instanceIds.empty() || instances.empty()) {
+        return;
+    }
+
+    std::unordered_set<uint32_t> toRemove(instanceIds.begin(), instanceIds.end());
+    const size_t oldSize = instances.size();
+    instances.erase(std::remove_if(instances.begin(), instances.end(),
+                   [&toRemove](const WMOInstance& inst) {
+                       return toRemove.find(inst.id) != toRemove.end();
+                   }),
+                   instances.end());
+
+    if (instances.size() != oldSize) {
+        rebuildSpatialIndex();
+        core::Logger::getInstance().debug("Removed ", (oldSize - instances.size()),
+                                          " WMO instances (batched)");
     }
 }
 
@@ -1582,7 +1602,9 @@ GLuint WMORenderer::loadTexture(const std::string& path) {
     pipeline::BLPImage blp = assetManager->loadTexture(path);
     if (!blp.isValid()) {
         core::Logger::getInstance().warning("WMO: Failed to load texture: ", path);
-        textureCache[path] = whiteTexture;
+        // Do not cache failures as white. MPQ reads can fail transiently
+        // during streaming/contention, and caching white here permanently
+        // poisons the texture for this session.
         return whiteTexture;
     }
 

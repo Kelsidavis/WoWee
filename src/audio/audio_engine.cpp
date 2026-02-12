@@ -6,9 +6,86 @@
 #include "../../extern/miniaudio.h"
 
 #include <cstring>
+#include <memory>
+#include <unordered_map>
 
 namespace wowee {
 namespace audio {
+
+namespace {
+
+struct DecodedWavCacheEntry {
+    ma_format format = ma_format_unknown;
+    ma_uint32 channels = 0;
+    ma_uint32 sampleRate = 0;
+    ma_uint64 frames = 0;
+    std::shared_ptr<std::vector<uint8_t>> pcmData;
+};
+
+static std::unordered_map<uint64_t, DecodedWavCacheEntry> gDecodedWavCache;
+
+static uint64_t makeWavCacheKey(const std::vector<uint8_t>& wavData) {
+    uint64_t ptr = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(wavData.data()));
+    uint64_t sz = static_cast<uint64_t>(wavData.size());
+    return (ptr * 11400714819323198485ull) ^ (sz + 0x9e3779b97f4a7c15ull + (ptr << 6) + (ptr >> 2));
+}
+
+static bool decodeWavCached(const std::vector<uint8_t>& wavData, DecodedWavCacheEntry& out) {
+    if (wavData.empty()) return false;
+
+    const uint64_t key = makeWavCacheKey(wavData);
+    if (auto it = gDecodedWavCache.find(key); it != gDecodedWavCache.end()) {
+        out = it->second;
+        return true;
+    }
+
+    ma_decoder decoder;
+    ma_decoder_config decoderConfig = ma_decoder_config_init_default();
+    ma_result result = ma_decoder_init_memory(
+        wavData.data(),
+        wavData.size(),
+        &decoderConfig,
+        &decoder
+    );
+    if (result != MA_SUCCESS) {
+        LOG_ERROR("AudioEngine: Failed to decode WAV data (", wavData.size(), " bytes): error ", result);
+        return false;
+    }
+
+    ma_uint64 totalFrames = 0;
+    result = ma_decoder_get_length_in_pcm_frames(&decoder, &totalFrames);
+    if (result != MA_SUCCESS) totalFrames = 0;
+
+    ma_format format = decoder.outputFormat;
+    ma_uint32 channels = decoder.outputChannels;
+    ma_uint32 sampleRate = decoder.outputSampleRate;
+    ma_uint64 maxFrames = sampleRate * 60;
+    if (totalFrames == 0 || totalFrames > maxFrames) totalFrames = maxFrames;
+
+    size_t bufferSize = totalFrames * channels * ma_get_bytes_per_sample(format);
+    auto pcmData = std::make_shared<std::vector<uint8_t>>(bufferSize);
+    ma_uint64 framesRead = 0;
+    result = ma_decoder_read_pcm_frames(&decoder, pcmData->data(), totalFrames, &framesRead);
+    ma_decoder_uninit(&decoder);
+    if (result != MA_SUCCESS || framesRead == 0) {
+        LOG_ERROR("AudioEngine: Failed to read frames from WAV: error ", result, ", framesRead=", framesRead);
+        return false;
+    }
+
+    pcmData->resize(framesRead * channels * ma_get_bytes_per_sample(format));
+
+    DecodedWavCacheEntry entry;
+    entry.format = format;
+    entry.channels = channels;
+    entry.sampleRate = sampleRate;
+    entry.frames = framesRead;
+    entry.pcmData = pcmData;
+    gDecodedWavCache.emplace(key, entry);
+    out = entry;
+    return true;
+}
+
+} // namespace
 
 AudioEngine& AudioEngine::instance() {
     static AudioEngine instance;
@@ -121,76 +198,26 @@ void AudioEngine::setListenerOrientation(const glm::vec3& forward, const glm::ve
 }
 
 bool AudioEngine::playSound2D(const std::vector<uint8_t>& wavData, float volume, float pitch) {
-    if (!initialized_ || !engine_ || wavData.empty()) {
+    (void)pitch;
+    if (!initialized_ || !engine_ || wavData.empty()) return false;
+
+    DecodedWavCacheEntry decoded;
+    if (!decodeWavCached(wavData, decoded) || !decoded.pcmData || decoded.frames == 0) {
         return false;
     }
-
-    // Decode the WAV data first to get PCM format
-    ma_decoder decoder;
-    ma_decoder_config decoderConfig = ma_decoder_config_init_default();
-    ma_result result = ma_decoder_init_memory(
-        wavData.data(),
-        wavData.size(),
-        &decoderConfig,
-        &decoder
-    );
-
-    if (result != MA_SUCCESS) {
-        LOG_ERROR("AudioEngine: Failed to decode WAV data (", wavData.size(), " bytes): error ", result);
-        return false;
-    }
-
-    // Get decoder format info
-    ma_format format = decoder.outputFormat;
-    ma_uint32 channels = decoder.outputChannels;
-    ma_uint32 sampleRate = decoder.outputSampleRate;
-
-    // Calculate total frame count
-    ma_uint64 totalFrames;
-    result = ma_decoder_get_length_in_pcm_frames(&decoder, &totalFrames);
-    if (result != MA_SUCCESS) {
-        totalFrames = 0;  // Unknown length, will decode what we can
-    }
-
-    // Allocate buffer for decoded PCM data (limit to 60 seconds max for ambient loops)
-    ma_uint64 maxFrames = sampleRate * 60;
-    if (totalFrames == 0 || totalFrames > maxFrames) {
-        totalFrames = maxFrames;
-    }
-
-    size_t bufferSize = totalFrames * channels * ma_get_bytes_per_sample(format);
-    std::vector<uint8_t> pcmData(bufferSize);
-
-    // Decode all frames
-    ma_uint64 framesRead = 0;
-    result = ma_decoder_read_pcm_frames(&decoder, pcmData.data(), totalFrames, &framesRead);
-    ma_decoder_uninit(&decoder);
-
-    if (result != MA_SUCCESS || framesRead == 0) {
-        LOG_ERROR("AudioEngine: Failed to read frames from WAV: error ", result, ", framesRead=", framesRead);
-        return false;
-    }
-
-    // Only log for large files (>1MB)
-    if (wavData.size() > 1000000) {
-        LOG_INFO("AudioEngine: Decoded ", framesRead, " frames (", framesRead / (float)sampleRate, "s) from ", wavData.size(), " byte WAV");
-    }
-
-    // Resize pcmData to actual size used
-    pcmData.resize(framesRead * channels * ma_get_bytes_per_sample(format));
 
     // Create audio buffer from decoded PCM data (heap allocated to keep alive)
     ma_audio_buffer_config bufferConfig = ma_audio_buffer_config_init(
-        format,
-        channels,
-        framesRead,
-        pcmData.data(),
+        decoded.format,
+        decoded.channels,
+        decoded.frames,
+        decoded.pcmData->data(),
         nullptr  // No custom allocator
     );
-    bufferConfig.sampleRate = sampleRate;  // Critical: preserve original sample rate!
+    bufferConfig.sampleRate = decoded.sampleRate;  // Critical: preserve original sample rate!
 
     ma_audio_buffer* audioBuffer = new ma_audio_buffer();
-    result = ma_audio_buffer_init(&bufferConfig, audioBuffer);
+    ma_result result = ma_audio_buffer_init(&bufferConfig, audioBuffer);
     if (result != MA_SUCCESS) {
         LOG_WARNING("Failed to create audio buffer: ", result);
         delete audioBuffer;
@@ -229,8 +256,8 @@ bool AudioEngine::playSound2D(const std::vector<uint8_t>& wavData, float volume,
         return false;
     }
 
-    // Track this sound for cleanup (move pcmData to keep it alive)
-    activeSounds_.push_back({sound, audioBuffer, std::move(pcmData)});
+    // Track this sound for cleanup (decoded PCM shared across plays)
+    activeSounds_.push_back({sound, audioBuffer, decoded.pcmData});
 
     return true;
 }
@@ -244,68 +271,29 @@ bool AudioEngine::playSound2D(const std::string& mpqPath, float volume, float pi
 
 bool AudioEngine::playSound3D(const std::vector<uint8_t>& wavData, const glm::vec3& position,
                               float volume, float pitch, float maxDistance) {
-    if (!initialized_ || !engine_ || wavData.empty()) {
+    if (!initialized_ || !engine_ || wavData.empty()) return false;
+
+    DecodedWavCacheEntry decoded;
+    if (!decodeWavCached(wavData, decoded) || !decoded.pcmData || decoded.frames == 0) {
         return false;
     }
 
-    // Decode WAV data first
-    ma_decoder decoder;
-    ma_decoder_config decoderConfig = ma_decoder_config_init_default();
-    ma_result result = ma_decoder_init_memory(
-        wavData.data(),
-        wavData.size(),
-        &decoderConfig,
-        &decoder
-    );
-
-    if (result != MA_SUCCESS) {
-        LOG_WARNING("playSound3D: Failed to decode WAV, error: ", result);
-        return false;
-    }
-
-    ma_format format = decoder.outputFormat;
-    ma_uint32 channels = decoder.outputChannels;
-    ma_uint32 sampleRate = decoder.outputSampleRate;
-
-    LOG_DEBUG("playSound3D: Decoded WAV - format:", format, " channels:", channels, " sampleRate:", sampleRate, " pitch:", pitch);
-
-    ma_uint64 totalFrames;
-    result = ma_decoder_get_length_in_pcm_frames(&decoder, &totalFrames);
-    if (result != MA_SUCCESS) {
-        totalFrames = 0;
-    }
-
-    // Limit to 60 seconds max for ambient loops (same as 2D)
-    ma_uint64 maxFrames = sampleRate * 60;
-    if (totalFrames == 0 || totalFrames > maxFrames) {
-        totalFrames = maxFrames;
-    }
-
-    size_t bufferSize = totalFrames * channels * ma_get_bytes_per_sample(format);
-    std::vector<uint8_t> pcmData(bufferSize);
-
-    ma_uint64 framesRead = 0;
-    result = ma_decoder_read_pcm_frames(&decoder, pcmData.data(), totalFrames, &framesRead);
-    ma_decoder_uninit(&decoder);
-
-    if (result != MA_SUCCESS || framesRead == 0) {
-        return false;
-    }
-
-    pcmData.resize(framesRead * channels * ma_get_bytes_per_sample(format));
+    LOG_DEBUG("playSound3D: cached WAV - format:", decoded.format,
+              " channels:", decoded.channels, " sampleRate:", decoded.sampleRate,
+              " pitch:", pitch);
 
     // Create audio buffer with correct sample rate
     ma_audio_buffer_config bufferConfig = ma_audio_buffer_config_init(
-        format,
-        channels,
-        framesRead,
-        pcmData.data(),
+        decoded.format,
+        decoded.channels,
+        decoded.frames,
+        decoded.pcmData->data(),
         nullptr
     );
-    bufferConfig.sampleRate = sampleRate;  // Critical: preserve original sample rate!
+    bufferConfig.sampleRate = decoded.sampleRate;  // Critical: preserve original sample rate!
 
     ma_audio_buffer* audioBuffer = new ma_audio_buffer();
-    result = ma_audio_buffer_init(&bufferConfig, audioBuffer);
+    ma_result result = ma_audio_buffer_init(&bufferConfig, audioBuffer);
     if (result != MA_SUCCESS) {
         delete audioBuffer;
         return false;
@@ -350,7 +338,7 @@ bool AudioEngine::playSound3D(const std::vector<uint8_t>& wavData, const glm::ve
     }
 
     // Track for cleanup
-    activeSounds_.push_back({sound, audioBuffer, std::move(pcmData)});
+    activeSounds_.push_back({sound, audioBuffer, decoded.pcmData});
 
     return true;
 }

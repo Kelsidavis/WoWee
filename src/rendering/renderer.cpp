@@ -574,7 +574,7 @@ void Renderer::setMounted(uint32_t mountInstId, uint32_t mountDisplayId, float h
     }
 
     // Discover mount animation capabilities (property-based, not hardcoded IDs)
-    LOG_INFO("=== Mount Animation Dump (Display ID ", mountDisplayId, ") ===");
+    LOG_DEBUG("=== Mount Animation Dump (Display ID ", mountDisplayId, ") ===");
     characterRenderer->dumpAnimations(mountInstId);
 
     // Get all sequences for property-based analysis
@@ -597,9 +597,9 @@ void Renderer::setMounted(uint32_t mountInstId, uint32_t mountDisplayId, float h
     // Property-based jump animation discovery with chain-based scoring
     auto discoverJumpSet = [&]() {
         // Debug: log all sequences for analysis
-        LOG_INFO("=== Full sequence table for mount ===");
+        LOG_DEBUG("=== Full sequence table for mount ===");
         for (const auto& seq : sequences) {
-            LOG_INFO("SEQ id=", seq.id,
+            LOG_DEBUG("SEQ id=", seq.id,
                      " dur=", seq.duration,
                      " flags=0x", std::hex, seq.flags, std::dec,
                      " moveSpd=", seq.movingSpeed,
@@ -607,7 +607,7 @@ void Renderer::setMounted(uint32_t mountInstId, uint32_t mountDisplayId, float h
                      " next=", seq.nextAnimation,
                      " alias=", seq.aliasNext);
         }
-        LOG_INFO("=== End sequence table ===");
+        LOG_DEBUG("=== End sequence table ===");
 
         // Known combat/bad animation IDs to avoid
         std::set<uint32_t> forbiddenIds = {53, 54, 16};  // jumpkick, attack
@@ -701,7 +701,7 @@ void Renderer::setMounted(uint32_t mountInstId, uint32_t mountDisplayId, float h
             }
         }
 
-        LOG_INFO("Property-based jump discovery: start=", start, " loop=", loop, " end=", end,
+        LOG_DEBUG("Property-based jump discovery: start=", start, " loop=", loop, " end=", end,
                  " scores: start=", bestStart, " end=", bestEnd);
         return std::make_tuple(start, loop, end);
     };
@@ -718,17 +718,17 @@ void Renderer::setMounted(uint32_t mountInstId, uint32_t mountDisplayId, float h
 
     // Discover idle fidget animations using proper WoW M2 metadata (frequency, replay timers)
     mountAnims_.fidgets.clear();
-    core::Logger::getInstance().info("Scanning for fidget animations in ", sequences.size(), " sequences");
+    core::Logger::getInstance().debug("Scanning for fidget animations in ", sequences.size(), " sequences");
 
     // DEBUG: Log ALL non-looping, short, stationary animations to identify stamps/tosses
-    core::Logger::getInstance().info("=== ALL potential fidgets (no metadata filter) ===");
+    core::Logger::getInstance().debug("=== ALL potential fidgets (no metadata filter) ===");
     for (const auto& seq : sequences) {
         bool isLoop = (seq.flags & 0x01) == 0;
         bool isStationary = std::abs(seq.movingSpeed) < 0.05f;
         bool reasonableDuration = seq.duration >= 400 && seq.duration <= 2500;
 
         if (!isLoop && reasonableDuration && isStationary) {
-            core::Logger::getInstance().info("  ALL: id=", seq.id,
+            core::Logger::getInstance().debug("  ALL: id=", seq.id,
                 " dur=", seq.duration, "ms",
                 " freq=", seq.frequency,
                 " replay=", seq.replayMin, "-", seq.replayMax,
@@ -747,7 +747,7 @@ void Renderer::setMounted(uint32_t mountInstId, uint32_t mountDisplayId, float h
 
         // Log candidates with metadata
         if (!isLoop && reasonableDuration && isStationary && (hasFrequency || hasReplay)) {
-            core::Logger::getInstance().info("  Candidate: id=", seq.id,
+            core::Logger::getInstance().debug("  Candidate: id=", seq.id,
                 " dur=", seq.duration, "ms",
                 " freq=", seq.frequency,
                 " replay=", seq.replayMin, "-", seq.replayMax,
@@ -770,7 +770,7 @@ void Renderer::setMounted(uint32_t mountInstId, uint32_t mountDisplayId, float h
                                  (seq.nextAnimation == -1);
 
             mountAnims_.fidgets.push_back(seq.id);
-            core::Logger::getInstance().info("  >> Selected fidget: id=", seq.id,
+            core::Logger::getInstance().debug("  >> Selected fidget: id=", seq.id,
                 (chainsToStand ? " (chains to stand)" : ""));
         }
     }
@@ -779,7 +779,7 @@ void Renderer::setMounted(uint32_t mountInstId, uint32_t mountDisplayId, float h
     if (mountAnims_.stand == 0) mountAnims_.stand = 0;  // Force 0 even if not found
     if (mountAnims_.run == 0) mountAnims_.run = mountAnims_.stand;  // Fallback to stand if no run
 
-    core::Logger::getInstance().info("Mount animation set: jumpStart=", mountAnims_.jumpStart,
+    core::Logger::getInstance().debug("Mount animation set: jumpStart=", mountAnims_.jumpStart,
         " jumpLoop=", mountAnims_.jumpLoop,
         " jumpEnd=", mountAnims_.jumpEnd,
         " rearUp=", mountAnims_.rearUp,
@@ -1001,7 +1001,7 @@ void Renderer::updateCharacterAnimation() {
             if (cameraController->isJumpKeyPressed() && grounded && mountAction_ == MountAction::None) {
                 if (moving && mountAnims_.jumpLoop > 0) {
                     // Moving: skip JumpStart (looks like stopping), go straight to airborne loop
-                    LOG_INFO("Mount jump triggered while moving: using jumpLoop anim ", mountAnims_.jumpLoop);
+                    LOG_DEBUG("Mount jump triggered while moving: using jumpLoop anim ", mountAnims_.jumpLoop);
                     characterRenderer->playAnimation(mountInstanceId_, mountAnims_.jumpLoop, true);
                     mountAction_ = MountAction::Jump;
                     mountActionPhase_ = 1;  // Start in airborne phase
@@ -1014,7 +1014,7 @@ void Renderer::updateCharacterAnimation() {
                     }
                 } else if (!moving && mountAnims_.rearUp > 0) {
                     // Standing still: rear-up flourish
-                    LOG_INFO("Mount rear-up triggered: playing rearUp anim ", mountAnims_.rearUp);
+                    LOG_DEBUG("Mount rear-up triggered: playing rearUp anim ", mountAnims_.rearUp);
                     characterRenderer->playAnimation(mountInstanceId_, mountAnims_.rearUp, false);
                     mountAction_ = MountAction::RearUp;
                     mountActionPhase_ = 0;
@@ -1035,17 +1035,17 @@ void Renderer::updateCharacterAnimation() {
                     // Jump sequence: start → loop → end (physics-driven)
                     if (mountActionPhase_ == 0 && animFinished && mountAnims_.jumpLoop > 0) {
                         // JumpStart finished, go to JumpLoop (airborne)
-                        LOG_INFO("Mount jump: phase 0→1 (JumpStart→JumpLoop anim ", mountAnims_.jumpLoop, ")");
+                        LOG_DEBUG("Mount jump: phase 0→1 (JumpStart→JumpLoop anim ", mountAnims_.jumpLoop, ")");
                         characterRenderer->playAnimation(mountInstanceId_, mountAnims_.jumpLoop, true);
                         mountActionPhase_ = 1;
                         mountAnimId = mountAnims_.jumpLoop;
                     } else if (mountActionPhase_ == 0 && animFinished && mountAnims_.jumpLoop == 0) {
                         // No JumpLoop, go straight to airborne phase 1 (hold JumpStart pose)
-                        LOG_INFO("Mount jump: phase 0→1 (no JumpLoop, holding JumpStart)");
+                        LOG_DEBUG("Mount jump: phase 0→1 (no JumpLoop, holding JumpStart)");
                         mountActionPhase_ = 1;
                     } else if (mountActionPhase_ == 1 && grounded && mountAnims_.jumpEnd > 0) {
                         // Landed after airborne phase! Go to JumpEnd (grounded-triggered)
-                        LOG_INFO("Mount jump: phase 1→2 (landed, JumpEnd anim ", mountAnims_.jumpEnd, ")");
+                        LOG_DEBUG("Mount jump: phase 1→2 (landed, JumpEnd anim ", mountAnims_.jumpEnd, ")");
                         characterRenderer->playAnimation(mountInstanceId_, mountAnims_.jumpEnd, false);
                         mountActionPhase_ = 2;
                         mountAnimId = mountAnims_.jumpEnd;
@@ -1055,14 +1055,14 @@ void Renderer::updateCharacterAnimation() {
                         }
                     } else if (mountActionPhase_ == 1 && grounded && mountAnims_.jumpEnd == 0) {
                         // No JumpEnd animation, return directly to movement after landing
-                        LOG_INFO("Mount jump: phase 1→done (landed, no JumpEnd, returning to ",
+                        LOG_DEBUG("Mount jump: phase 1→done (landed, no JumpEnd, returning to ",
                                  moving ? "run" : "stand", " anim ", (moving ? mountAnims_.run : mountAnims_.stand), ")");
                         mountAction_ = MountAction::None;
                         mountAnimId = moving ? mountAnims_.run : mountAnims_.stand;
                         characterRenderer->playAnimation(mountInstanceId_, mountAnimId, true);
                     } else if (mountActionPhase_ == 2 && animFinished) {
                         // JumpEnd finished, return to movement
-                        LOG_INFO("Mount jump: phase 2→done (JumpEnd finished, returning to ",
+                        LOG_DEBUG("Mount jump: phase 2→done (JumpEnd finished, returning to ",
                                  moving ? "run" : "stand", " anim ", (moving ? mountAnims_.run : mountAnims_.stand), ")");
                         mountAction_ = MountAction::None;
                         mountAnimId = moving ? mountAnims_.run : mountAnims_.stand;
@@ -1073,7 +1073,7 @@ void Renderer::updateCharacterAnimation() {
                 } else if (mountAction_ == MountAction::RearUp) {
                     // Rear-up: single animation, return to stand when done
                     if (animFinished) {
-                        LOG_INFO("Mount rear-up: finished, returning to ",
+                        LOG_DEBUG("Mount rear-up: finished, returning to ",
                                  moving ? "run" : "stand", " anim ", (moving ? mountAnims_.run : mountAnims_.stand));
                         mountAction_ = MountAction::None;
                         mountAnimId = moving ? mountAnims_.run : mountAnims_.stand;
@@ -1110,7 +1110,7 @@ void Renderer::updateCharacterAnimation() {
                     // If animation changed or completed, clear active fidget
                     if (curAnim != mountActiveFidget_ || curTime >= curDur * 0.95f) {
                         mountActiveFidget_ = 0;
-                        LOG_INFO("Mount fidget completed");
+                        LOG_DEBUG("Mount fidget completed");
                     }
                 }
             }
@@ -1131,7 +1131,7 @@ void Renderer::updateCharacterAnimation() {
                     mountIdleFidgetTimer_ = 0.0f;
                     nextFidgetTime = 6.0f + (rand() % 7);  // Randomize next fidget time
 
-                    LOG_INFO("Mount idle fidget: playing anim ", fidgetAnim);
+                    LOG_DEBUG("Mount idle fidget: playing anim ", fidgetAnim);
                 }
             }
             if (moving) {
@@ -1666,6 +1666,10 @@ audio::FootstepSurface Renderer::resolveFootstepSurface() const {
 }
 
 void Renderer::update(float deltaTime) {
+    if (musicSwitchCooldown_ > 0.0f) {
+        musicSwitchCooldown_ = std::max(0.0f, musicSwitchCooldown_ - deltaTime);
+    }
+
     auto updateStart = std::chrono::steady_clock::now();
     lastDeltaTime_ = deltaTime;  // Cache for use in updateCharacterAnimation()
 
@@ -1695,6 +1699,14 @@ void Renderer::update(float deltaTime) {
     }
     auto cam2 = std::chrono::high_resolution_clock::now();
     camTime += std::chrono::duration<float, std::milli>(cam2 - cam1).count();
+
+    // Visibility hardening: ensure player instance cannot stay hidden after
+    // taxi/camera transitions, but preserve first-person self-hide.
+    if (characterRenderer && characterInstanceId > 0 && cameraController) {
+        if ((cameraController->isThirdPerson() && !cameraController->isFirstPersonView()) || taxiFlight_) {
+            characterRenderer->setInstanceVisible(characterInstanceId, true);
+        }
+    }
 
     // Update lighting system
     auto light1 = std::chrono::high_resolution_clock::now();
@@ -2082,6 +2094,7 @@ void Renderer::update(float deltaTime) {
                 inTavern_ = true;
                 LOG_INFO("Entered tavern");
                 musicManager->playMusic(tavernMusic, true);  // Immediate playback, looping
+                musicSwitchCooldown_ = 6.0f;
             }
         } else if (inTavern_) {
             // Exited tavern - restore zone music with crossfade
@@ -2092,6 +2105,7 @@ void Renderer::update(float deltaTime) {
                 std::string music = zoneManager->getRandomMusic(currentZoneId);
                 if (!music.empty()) {
                     musicManager->crossfadeTo(music);
+                    musicSwitchCooldown_ = 6.0f;
                 }
             }
         }
@@ -2112,6 +2126,7 @@ void Renderer::update(float deltaTime) {
                 std::string music = zoneManager->getRandomMusic(currentZoneId);
                 if (!music.empty()) {
                     musicManager->crossfadeTo(music);
+                    musicSwitchCooldown_ = 6.0f;
                 }
             }
         }
@@ -2123,9 +2138,12 @@ void Renderer::update(float deltaTime) {
             if (info) {
                 currentZoneName = info->name;
                 LOG_INFO("Entered zone: ", info->name);
-                std::string music = zoneManager->getRandomMusic(zoneId);
-                if (!music.empty()) {
-                    musicManager->crossfadeTo(music);
+                if (musicSwitchCooldown_ <= 0.0f) {
+                    std::string music = zoneManager->getRandomMusic(zoneId);
+                    if (!music.empty()) {
+                        musicManager->crossfadeTo(music);
+                        musicSwitchCooldown_ = 6.0f;
+                    }
                 }
             }
         }

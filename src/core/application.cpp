@@ -57,9 +57,10 @@ const char* Application::mapIdToName(uint32_t mapId) {
     switch (mapId) {
         case 0: return "Azeroth";
         case 1: return "Kalimdor";
+        case 369: return "DeeprunTram";
         case 530: return "Outland";
         case 571: return "Northrend";
-        default: return "Azeroth";
+        default: return "";
     }
 }
 
@@ -568,11 +569,10 @@ void Application::update(float deltaTime) {
             }
             if (renderer && renderer->getTerrainManager()) {
                 renderer->getTerrainManager()->setStreamingEnabled(true);
-                // Slightly slower stream tick on taxi reduces bursty I/O and frame hitches.
-                renderer->getTerrainManager()->setUpdateInterval(onTaxi ? 0.2f : 0.1f);
-                // Keep taxi streaming focused ahead on the route to reduce burst loads.
-                renderer->getTerrainManager()->setLoadRadius(onTaxi ? 2 : 4);
-                renderer->getTerrainManager()->setUnloadRadius(onTaxi ? 5 : 7);
+                // Keep taxi streaming responsive so flight paths don't outrun terrain/model uploads.
+                renderer->getTerrainManager()->setUpdateInterval(onTaxi ? 0.1f : 0.1f);
+                renderer->getTerrainManager()->setLoadRadius(onTaxi ? 3 : 4);
+                renderer->getTerrainManager()->setUnloadRadius(onTaxi ? 6 : 7);
                 renderer->getTerrainManager()->setTaxiStreamingMode(onTaxi);
             }
             lastTaxiFlight_ = onTaxi;
@@ -637,17 +637,8 @@ void Application::update(float deltaTime) {
                 }
             }
 
-            // Send periodic movement heartbeats.
-            // Keep them active during taxi as well to avoid occasional server-side
-            // flight stalls waiting for movement sync updates.
-            if (gameHandler && renderer) {
-                movementHeartbeatTimer += deltaTime;
-                float hbInterval = onTaxi ? 0.25f : 0.5f;
-                if (movementHeartbeatTimer >= hbInterval) {
-                    movementHeartbeatTimer = 0.0f;
-                    gameHandler->sendMovement(game::Opcode::CMSG_MOVE_HEARTBEAT);
-                }
-            }
+            // Movement heartbeat is sent from GameHandler::update() to avoid
+            // duplicate packets from multiple update loops.
 
             auto sync2 = std::chrono::high_resolution_clock::now();
             syncTime += std::chrono::duration<float, std::milli>(sync2 - sync1).count();
@@ -1048,17 +1039,24 @@ void Application::setupUICallbacks() {
         std::set<std::pair<int, int>> uniqueTiles;
 
         // Sample waypoints along path and gather tiles.
-        // Use stride to avoid enqueueing huge numbers of tiles at once.
-        const size_t stride = 4;
+        // Denser sampling + neighbor coverage reduces in-flight stream spikes.
+        const size_t stride = 2;
         for (size_t i = 0; i < path.size(); i += stride) {
             const auto& waypoint = path[i];
             glm::vec3 renderPos = core::coords::canonicalToRender(waypoint);
             int tileX = static_cast<int>(32 - (renderPos.x / 533.33333f));
             int tileY = static_cast<int>(32 - (renderPos.y / 533.33333f));
 
-            // Precache only the sampled tile itself; terrain streaming handles neighbors.
             if (tileX >= 0 && tileX <= 63 && tileY >= 0 && tileY <= 63) {
-                uniqueTiles.insert({tileX, tileY});
+                for (int dx = -1; dx <= 1; ++dx) {
+                    for (int dy = -1; dy <= 1; ++dy) {
+                        int nx = tileX + dx;
+                        int ny = tileY + dy;
+                        if (nx >= 0 && nx <= 63 && ny >= 0 && ny <= 63) {
+                            uniqueTiles.insert({nx, ny});
+                        }
+                    }
+                }
             }
         }
         // Ensure final destination tile is included.
@@ -1067,11 +1065,22 @@ void Application::setupUICallbacks() {
             int tileX = static_cast<int>(32 - (renderPos.x / 533.33333f));
             int tileY = static_cast<int>(32 - (renderPos.y / 533.33333f));
             if (tileX >= 0 && tileX <= 63 && tileY >= 0 && tileY <= 63) {
-                uniqueTiles.insert({tileX, tileY});
+                for (int dx = -1; dx <= 1; ++dx) {
+                    for (int dy = -1; dy <= 1; ++dy) {
+                        int nx = tileX + dx;
+                        int ny = tileY + dy;
+                        if (nx >= 0 && nx <= 63 && ny >= 0 && ny <= 63) {
+                            uniqueTiles.insert({nx, ny});
+                        }
+                    }
+                }
             }
         }
 
         std::vector<std::pair<int, int>> tilesToLoad(uniqueTiles.begin(), uniqueTiles.end());
+        if (tilesToLoad.size() > 512) {
+            tilesToLoad.resize(512);
+        }
         LOG_INFO("Precaching ", tilesToLoad.size(), " tiles for taxi route");
         renderer->getTerrainManager()->precacheTiles(tilesToLoad);
     });
@@ -2051,7 +2060,37 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
 
     showProgress("Entering world...", 0.0f);
 
-    std::string mapName = mapIdToName(mapId);
+    // Resolve map folder name from Map.dbc (authoritative for world/instance maps).
+    // This is required for instances like DeeprunTram (map 369) that are not Azeroth/Kalimdor.
+    static bool mapNameCacheLoaded = false;
+    static std::unordered_map<uint32_t, std::string> mapNameById;
+    if (!mapNameCacheLoaded && assetManager) {
+        mapNameCacheLoaded = true;
+        if (auto mapDbc = assetManager->loadDBC("Map.dbc"); mapDbc && mapDbc->isLoaded()) {
+            mapNameById.reserve(mapDbc->getRecordCount());
+            for (uint32_t i = 0; i < mapDbc->getRecordCount(); i++) {
+                uint32_t id = mapDbc->getUInt32(i, 0);
+                std::string internalName = mapDbc->getString(i, 1);
+                if (!internalName.empty()) {
+                    mapNameById[id] = std::move(internalName);
+                }
+            }
+            LOG_INFO("Loaded Map.dbc map-name cache: ", mapNameById.size(), " entries");
+        } else {
+            LOG_WARNING("Map.dbc not available; using fallback map-id mapping");
+        }
+    }
+
+    std::string mapName;
+    if (auto it = mapNameById.find(mapId); it != mapNameById.end()) {
+        mapName = it->second;
+    } else {
+        mapName = mapIdToName(mapId);
+    }
+    if (mapName.empty()) {
+        LOG_WARNING("Unknown mapId ", mapId, " (no Map.dbc entry); falling back to Azeroth");
+        mapName = "Azeroth";
+    }
     LOG_INFO("Loading online world terrain for map '", mapName, "' (ID ", mapId, ")");
 
     // Convert server coordinates to canonical WoW coordinates
@@ -3091,7 +3130,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
     // Track instance
     creatureInstances_[guid] = instanceId;
     creatureModelIds_[guid] = modelId;
-    LOG_INFO("Spawned creature: guid=0x", std::hex, guid, std::dec,
+    LOG_DEBUG("Spawned creature: guid=0x", std::hex, guid, std::dec,
              " displayId=", displayId, " at (", x, ", ", y, ", ", z, ")");
 }
 
@@ -3107,7 +3146,7 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
         // Already have a render instance — update its position (e.g. transport re-creation)
         auto& info = gameObjectInstances_[guid];
         glm::vec3 renderPos = core::coords::canonicalToRender(glm::vec3(x, y, z));
-        LOG_INFO("GameObject position update: displayId=", displayId, " guid=0x", std::hex, guid, std::dec,
+        LOG_DEBUG("GameObject position update: displayId=", displayId, " guid=0x", std::hex, guid, std::dec,
                  " pos=(", x, ", ", y, ", ", z, ")");
         if (renderer) {
             if (info.isWmo) {
@@ -3157,7 +3196,7 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
     }
 
     // Log spawns to help debug duplicate objects (e.g., cathedral issue)
-    LOG_INFO("GameObject spawn: displayId=", displayId, " guid=0x", std::hex, guid, std::dec,
+    LOG_DEBUG("GameObject spawn: displayId=", displayId, " guid=0x", std::hex, guid, std::dec,
              " model=", modelPath, " pos=(", x, ", ", y, ", ", z, ")");
 
     std::string lowerPath = modelPath;
@@ -3182,7 +3221,7 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
             auto wmoData = assetManager->readFile(modelPath);
             if (!wmoData.empty()) {
                 pipeline::WMOModel wmoModel = pipeline::WMOLoader::load(wmoData);
-                LOG_INFO("Gameobject WMO root loaded: ", modelPath, " nGroups=", wmoModel.nGroups);
+                LOG_DEBUG("Gameobject WMO root loaded: ", modelPath, " nGroups=", wmoModel.nGroups);
                 int loadedGroups = 0;
                 if (wmoModel.nGroups > 0) {
                     std::string basePath = modelPath;
@@ -3244,7 +3283,7 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
             }
 
             gameObjectInstances_[guid] = {modelId, instanceId, true};
-            LOG_INFO("Spawned gameobject WMO: guid=0x", std::hex, guid, std::dec,
+            LOG_DEBUG("Spawned gameobject WMO: guid=0x", std::hex, guid, std::dec,
                      " displayId=", displayId, " at (", x, ", ", y, ", ", z, ")");
 
             // Spawn WMO doodads (chairs, furniture, etc.) as child M2 instances
@@ -3372,7 +3411,7 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
         gameObjectInstances_[guid] = {modelId, instanceId, false};
     }
 
-    LOG_INFO("Spawned gameobject: guid=0x", std::hex, guid, std::dec,
+    LOG_DEBUG("Spawned gameobject: guid=0x", std::hex, guid, std::dec,
              " displayId=", displayId, " at (", x, ", ", y, ", ", z, ")");
 }
 
@@ -3697,7 +3736,7 @@ void Application::despawnOnlineCreature(uint64_t guid) {
     creatureInstances_.erase(it);
     creatureModelIds_.erase(guid);
 
-    LOG_INFO("Despawned creature: guid=0x", std::hex, guid, std::dec);
+    LOG_DEBUG("Despawned creature: guid=0x", std::hex, guid, std::dec);
 }
 
 void Application::despawnOnlineGameObject(uint64_t guid) {
@@ -3718,7 +3757,7 @@ void Application::despawnOnlineGameObject(uint64_t guid) {
 
     gameObjectInstances_.erase(it);
 
-    LOG_INFO("Despawned gameobject: guid=0x", std::hex, guid, std::dec);
+    LOG_DEBUG("Despawned gameobject: guid=0x", std::hex, guid, std::dec);
 }
 
 void Application::loadQuestMarkerModels() {

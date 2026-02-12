@@ -121,6 +121,10 @@ public:
      * @param instanceId Instance to remove
      */
     void removeInstance(uint32_t instanceId);
+    /**
+     * Remove multiple WMO instances with a single spatial-index rebuild.
+     */
+    void removeInstances(const std::vector<uint32_t>& instanceIds);
 
     /**
      * Remove all instances

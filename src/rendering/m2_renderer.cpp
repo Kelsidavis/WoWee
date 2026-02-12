@@ -2520,6 +2520,24 @@ void M2Renderer::removeInstance(uint32_t instanceId) {
     }
 }
 
+void M2Renderer::removeInstances(const std::vector<uint32_t>& instanceIds) {
+    if (instanceIds.empty() || instances.empty()) {
+        return;
+    }
+
+    std::unordered_set<uint32_t> toRemove(instanceIds.begin(), instanceIds.end());
+    const size_t oldSize = instances.size();
+    instances.erase(std::remove_if(instances.begin(), instances.end(),
+                   [&toRemove](const M2Instance& inst) {
+                       return toRemove.find(inst.id) != toRemove.end();
+                   }),
+                   instances.end());
+
+    if (instances.size() != oldSize) {
+        rebuildSpatialIndex();
+    }
+}
+
 void M2Renderer::clear() {
     for (auto& [id, model] : models) {
         if (model.vao != 0) glDeleteVertexArrays(1, &model.vao);

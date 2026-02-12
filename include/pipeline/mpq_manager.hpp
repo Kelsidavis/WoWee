@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <memory>
 #include <map>
+#include <unordered_set>
+#include <mutex>
 
 // Forward declare StormLib handle
 typedef void* HANDLE;
@@ -103,6 +105,11 @@ private:
      * @param locale Locale string (e.g., "enUS")
      */
     bool loadLocaleArchives(const std::string& locale);
+
+    void logMissingFileOnce(const std::string& filename) const;
+
+    mutable std::mutex missingFileMutex_;
+    mutable std::unordered_set<std::string> missingFileWarnings_;
 };
 
 } // namespace pipeline

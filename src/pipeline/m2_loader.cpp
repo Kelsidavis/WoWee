@@ -967,7 +967,7 @@ void M2Loader::loadAnimFile(const std::vector<uint8_t>& m2Data,
         patchTrack(db.scale, bone.scale, TrackType::VEC3);
     }
 
-    core::Logger::getInstance().info("Loaded .anim for sequence ", sequenceIndex,
+    core::Logger::getInstance().debug("Loaded .anim for sequence ", sequenceIndex,
         " (id=", model.sequences[sequenceIndex].id, "): patched ", patchedTracks, " bone tracks");
 }
 

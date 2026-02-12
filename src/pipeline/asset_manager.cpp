@@ -83,7 +83,7 @@ BLPImage AssetManager::loadTexture(const std::string& path) {
         return BLPImage();
     }
 
-    LOG_INFO("Loaded texture: ", normalizedPath, " (", image.width, "x", image.height, ")");
+    LOG_DEBUG("Loaded texture: ", normalizedPath, " (", image.width, "x", image.height, ")");
     return image;
 }
 

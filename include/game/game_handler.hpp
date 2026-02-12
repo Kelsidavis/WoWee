@@ -1103,6 +1103,7 @@ private:
     std::unordered_map<uint32_t, uint32_t> taxiCostMap_; // destNodeId -> total cost in copper
     void buildTaxiCostMap();
     void applyTaxiMountForCurrentNode();
+    void sanitizeMovementForTaxi();
     void startClientTaxiPath(const std::vector<uint32_t>& pathNodes);
     void updateClientTaxi(float deltaTime);
 

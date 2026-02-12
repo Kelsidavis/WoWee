@@ -64,6 +64,7 @@ public:
     float getPitch() const { return pitch; }
     float getFacingYaw() const { return facingYaw; }
     bool isThirdPerson() const { return thirdPerson; }
+    bool isFirstPersonView() const { return thirdPerson && (userTargetDistance <= MIN_DISTANCE + 0.15f); }
     bool isGrounded() const { return grounded; }
     bool isJumping() const { return !grounded && verticalVelocity > 0.0f; }
     bool isFalling() const { return !grounded && verticalVelocity <= 0.0f; }

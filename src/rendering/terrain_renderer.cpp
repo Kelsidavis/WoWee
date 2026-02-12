@@ -46,6 +46,17 @@ bool TerrainRenderer::initialize(pipeline::AssetManager* assets) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
 
+    // Create default opaque alpha texture for terrain layer masks
+    uint8_t opaqueAlpha = 255;
+    glGenTextures(1, &opaqueAlphaTexture);
+    glBindTexture(GL_TEXTURE_2D, opaqueAlphaTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 1, 1, 0, GL_RED, GL_UNSIGNED_BYTE, &opaqueAlpha);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
     LOG_INFO("Terrain renderer initialized");
     return true;
 }
@@ -60,6 +71,10 @@ void TerrainRenderer::shutdown() {
         glDeleteTextures(1, &whiteTexture);
         whiteTexture = 0;
     }
+    if (opaqueAlphaTexture) {
+        glDeleteTextures(1, &opaqueAlphaTexture);
+        opaqueAlphaTexture = 0;
+    }
 
     // Delete cached textures
     for (auto& pair : textureCache) {
@@ -73,7 +88,7 @@ void TerrainRenderer::shutdown() {
 bool TerrainRenderer::loadTerrain(const pipeline::TerrainMesh& mesh,
                                    const std::vector<std::string>& texturePaths,
                                    int tileX, int tileY) {
-    LOG_INFO("Loading terrain mesh: ", mesh.validChunkCount, " chunks");
+    LOG_DEBUG("Loading terrain mesh: ", mesh.validChunkCount, " chunks");
 
     // Upload each chunk to GPU
     for (int y = 0; y < 16; y++) {
@@ -116,7 +131,7 @@ bool TerrainRenderer::loadTerrain(const pipeline::TerrainMesh& mesh,
                     gpuChunk.layerTextures.push_back(layerTex);
 
                     // Create alpha texture
-                    GLuint alphaTex = 0;
+                    GLuint alphaTex = opaqueAlphaTexture;
                     if (!layer.alphaData.empty()) {
                         alphaTex = createAlphaTexture(layer.alphaData);
                     }
@@ -133,7 +148,7 @@ bool TerrainRenderer::loadTerrain(const pipeline::TerrainMesh& mesh,
         }
     }
 
-    LOG_INFO("Loaded ", chunks.size(), " terrain chunks to GPU");
+    LOG_DEBUG("Loaded ", chunks.size(), " terrain chunks to GPU");
     return !chunks.empty();
 }
 
@@ -218,7 +233,8 @@ GLuint TerrainRenderer::loadTexture(const std::string& path) {
     pipeline::BLPImage blp = assetManager->loadTexture(path);
     if (!blp.isValid()) {
         LOG_WARNING("Failed to load texture: ", path);
-        textureCache[path] = whiteTexture;
+        // Do not cache failure as white: MPQ/file reads can fail transiently
+        // during heavy streaming and should be allowed to recover.
         return whiteTexture;
     }
 
@@ -257,7 +273,8 @@ void TerrainRenderer::uploadPreloadedTextures(const std::unordered_map<std::stri
         // Skip if already cached
         if (textureCache.find(path) != textureCache.end()) continue;
         if (!blp.isValid()) {
-            textureCache[path] = whiteTexture;
+            // Don't poison cache with white on invalid preload; allow fallback
+            // path to retry loading this texture later.
             continue;
         }
 
@@ -281,20 +298,32 @@ void TerrainRenderer::uploadPreloadedTextures(const std::unordered_map<std::stri
 
 GLuint TerrainRenderer::createAlphaTexture(const std::vector<uint8_t>& alphaData) {
     if (alphaData.empty()) {
-        return 0;
+        return opaqueAlphaTexture;
+    }
+
+    if (alphaData.size() != 4096) {
+        LOG_WARNING("Unexpected terrain alpha size: ", alphaData.size(), " (expected 4096)");
     }
 
     GLuint textureID;
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
 
-    // Alpha data is always expanded to 4096 bytes (64x64 at 8-bit) by terrain_mesh
+    // Alpha data should be 64x64 (4096 bytes). Clamp to a sane fallback when malformed.
+    std::vector<uint8_t> expanded;
+    const uint8_t* src = alphaData.data();
+    if (alphaData.size() < 4096) {
+        expanded.assign(4096, 255);
+        std::copy(alphaData.begin(), alphaData.end(), expanded.begin());
+        src = expanded.data();
+    }
+
     int width = 64;
-    int height = static_cast<int>(alphaData.size()) / 64;
+    int height = 64;
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RED,
                  width, height, 0,
-                 GL_RED, GL_UNSIGNED_BYTE, alphaData.data());
+                 GL_RED, GL_UNSIGNED_BYTE, src);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -329,6 +358,9 @@ void TerrainRenderer::render(const Camera& camera) {
     // Enable depth testing
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glDisable(GL_BLEND);
 
     // Disable backface culling temporarily to debug flashing
     glDisable(GL_CULL_FACE);

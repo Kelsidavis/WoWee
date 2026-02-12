@@ -319,10 +319,13 @@ private:
     std::shared_ptr<PendingTile> getCachedTile(const TileCoord& coord);
     void putCachedTile(const std::shared_ptr<PendingTile>& tile);
     size_t estimatePendingTileBytes(const PendingTile& tile) const;
+    void logMissingAdtOnce(const std::string& adtPath);
     std::atomic<bool> workerRunning{false};
 
     // Track tiles currently queued or being processed to avoid duplicates
     std::unordered_map<TileCoord, bool, TileCoord::Hash> pendingTiles;
+    std::unordered_set<std::string> missingAdtWarnings_;
+    std::mutex missingAdtWarningsMutex_;
 
     // Dedup set for doodad placements across tile boundaries
     std::unordered_set<uint32_t> placedDoodadIds;

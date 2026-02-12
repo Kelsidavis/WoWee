@@ -184,10 +184,10 @@ void WaterRenderer::loadFromTerrain(const pipeline::ADTTerrain& terrain, bool ap
     constexpr float TILE_SIZE = 33.33333f / 8.0f;
 
     if (!append) {
-        LOG_INFO("Loading water from terrain (replacing)");
+        LOG_DEBUG("Loading water from terrain (replacing)");
         clear();
     } else {
-        LOG_INFO("Loading water from terrain (appending)");
+        LOG_DEBUG("Loading water from terrain (appending)");
     }
 
     // Load water surfaces from MH2O data
@@ -285,14 +285,14 @@ void WaterRenderer::loadFromTerrain(const pipeline::ADTTerrain& terrain, bool ap
                                                       glm::vec2(moonwellPos.x, moonwellPos.y));
 
                 if (distToMoonwell > 300.0f) {  // Terrain tiles are large, use bigger exclusion radius
-                    LOG_INFO("  -> LOWERING water at tile (", tileX, ",", tileY, ") from height ", layer.minHeight, " by 1 unit");
+                    LOG_DEBUG("  -> LOWERING water at tile (", tileX, ",", tileY, ") from height ", layer.minHeight, " by 1 unit");
                     for (float& h : surface.heights) {
                         h -= 1.0f;
                     }
                     surface.minHeight -= 1.0f;
                     surface.maxHeight -= 1.0f;
                 } else {
-                    LOG_INFO("  -> SKIPPING tile (", tileX, ",", tileY, ") - moonwell exclusion (dist: ", distToMoonwell, ")");
+                    LOG_DEBUG("  -> SKIPPING tile (", tileX, ",", tileY, ") - moonwell exclusion (dist: ", distToMoonwell, ")");
                 }
             }
 
@@ -307,7 +307,7 @@ void WaterRenderer::loadFromTerrain(const pipeline::ADTTerrain& terrain, bool ap
         }
     }
 
-    LOG_INFO("Loaded ", totalLayers, " water layers from MH2O data");
+    LOG_DEBUG("Loaded ", totalLayers, " water layers from MH2O data");
 }
 
 void WaterRenderer::removeTile(int tileX, int tileY) {
@@ -391,7 +391,7 @@ void WaterRenderer::loadFromWMO([[maybe_unused]] const pipeline::WMOLiquid& liqu
     int tileY = static_cast<int>(std::floor((32.0f - surface.origin.y / 533.33333f)));
 
     // Log all WMO water to debug park issue
-    LOG_INFO("WMO water at pos=(", surface.origin.x, ",", surface.origin.y, ",", surface.origin.z,
+    LOG_DEBUG("WMO water at pos=(", surface.origin.x, ",", surface.origin.y, ",", surface.origin.z,
              ") tile=(", tileX, ",", tileY, ") wmoId=", wmoId);
 
     // Expanded bounds to cover all of Stormwind including outlying areas and park
@@ -405,27 +405,27 @@ void WaterRenderer::loadFromWMO([[maybe_unused]] const pipeline::WMOLiquid& liqu
                                               glm::vec2(moonwellPos.x, moonwellPos.y));
 
         if (distToMoonwell > 20.0f) {
-            LOG_INFO("  -> LOWERING by 1 unit (dist to moonwell: ", distToMoonwell, ")");
+            LOG_DEBUG("  -> LOWERING by 1 unit (dist to moonwell: ", distToMoonwell, ")");
             for (float& h : surface.heights) {
                 h -= 1.0f;
             }
             surface.minHeight -= 1.0f;
             surface.maxHeight -= 1.0f;
         } else {
-            LOG_INFO("  -> SKIPPING (moonwell exclusion zone, dist: ", distToMoonwell, ")");
+            LOG_DEBUG("  -> SKIPPING (moonwell exclusion zone, dist: ", distToMoonwell, ")");
         }
     }
 
     // Skip WMO water that's clearly invalid (extremely high - above 300 units)
     // This is a conservative global filter that won't affect normal gameplay
     if (surface.origin.z > 300.0f) {
-        LOG_INFO("WMO water filtered: height=", surface.origin.z, " wmoId=", wmoId, " (too high)");
+        LOG_DEBUG("WMO water filtered: height=", surface.origin.z, " wmoId=", wmoId, " (too high)");
         return;
     }
 
     // Skip WMO water that's extremely low (deep underground where it shouldn't be)
     if (surface.origin.z < -100.0f) {
-        LOG_INFO("WMO water filtered: height=", surface.origin.z, " wmoId=", wmoId, " (too low)");
+        LOG_DEBUG("WMO water filtered: height=", surface.origin.z, " wmoId=", wmoId, " (too low)");
         return;
     }
 

@@ -898,7 +898,8 @@ void CameraController::update(float deltaTime) {
         // WoW fades between ~1.0m and ~0.5m, hides fully below 0.5m
         // For now, just hide below first-person threshold
         if (characterRenderer && playerInstanceId > 0) {
-            bool shouldHidePlayer = (actualDist < MIN_DISTANCE + 0.1f);  // Hide in first-person
+            // Honor first-person intent even if anti-clipping pushes camera back slightly.
+            bool shouldHidePlayer = isFirstPersonView() || (actualDist < MIN_DISTANCE + 0.1f);
             characterRenderer->setInstanceVisible(playerInstanceId, !shouldHidePlayer);
         }
     } else {

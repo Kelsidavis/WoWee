@@ -254,84 +254,15 @@ void TransportManager::updateTransportMovement(ActiveTransport& transport, float
         }
         pathTimeMs = transport.localClockMs % path.durationMs;
     } else {
-        // Server-driven transport without clock sync.
-        // Do not auto-fallback to local DBC paths; remapped paths can be wrong and cause
-        // fast sideways movement, diving below water, or despawn-like behavior.
-        // Instead, briefly dead-reckon from recent authoritative velocity to avoid visual stutter
-        // when update bursts are sparse.
+        // Server-driven transport without clock sync:
+        // stay server-authoritative and never switch to DBC/client animation fallback.
+        // For short server update gaps, apply lightweight dead-reckoning only when we
+        // have measured velocity from at least one authoritative delta.
         constexpr float kMaxExtrapolationSec = 8.0f;
         const float ageSec = elapsedTime_ - transport.lastServerUpdate;
         if (transport.hasServerVelocity && ageSec > 0.0f && ageSec <= kMaxExtrapolationSec) {
             const float blend = glm::clamp(1.0f - (ageSec / kMaxExtrapolationSec), 0.0f, 1.0f);
             transport.position += transport.serverLinearVelocity * (deltaTime * blend);
-        } else if (transport.serverUpdateCount <= 1 &&
-                   ageSec >= 1.0f &&
-                   path.fromDBC && !path.zOnly && path.durationMs > 0 && path.points.size() > 1 &&
-                   ((transport.guid & 0xFFF0000000000000ULL) == 0x1FC0000000000000ULL)) {
-            // Spawn-only fallback: only for world transport GUIDs (0x1fc...), not all transport-like objects.
-            glm::vec3 localTarget = transport.position - transport.basePosition;
-            uint32_t bestTimeMs = 0;
-            float bestScore = FLT_MAX;
-            float bestD2 = FLT_MAX;
-            constexpr uint32_t samples = 600;
-            for (uint32_t i = 0; i < samples; ++i) {
-                uint32_t t = static_cast<uint32_t>((static_cast<uint64_t>(i) * path.durationMs) / samples);
-                glm::vec3 off = evalTimedCatmullRom(path, t);
-                glm::vec3 d = off - localTarget;
-                float d2 = glm::dot(d, d);
-
-                float score = d2;
-                if (transport.hasServerYaw) {
-                    constexpr uint32_t kHeadingDtMs = 250;
-                    uint32_t tNext = (t + kHeadingDtMs) % path.durationMs;
-                    glm::vec3 offNext = evalTimedCatmullRom(path, tNext);
-                    glm::vec3 tangent = offNext - off;
-                    if (glm::length2(tangent) > 1e-6f) {
-                        float yaw = std::atan2(tangent.y, tangent.x);
-                        float dyaw = yaw - transport.serverYaw;
-                        while (dyaw > glm::pi<float>()) dyaw -= glm::two_pi<float>();
-                        while (dyaw < -glm::pi<float>()) dyaw += glm::two_pi<float>();
-                        constexpr float kHeadingWeight = 60.0f;
-                        score += (kHeadingWeight * std::abs(dyaw)) * (kHeadingWeight * std::abs(dyaw));
-                    }
-                }
-
-                if (score < bestScore) {
-                    bestScore = score;
-                    bestD2 = d2;
-                    bestTimeMs = t;
-                }
-            }
-
-            constexpr float kMaxPhaseDrift = 120.0f;
-            if (bestD2 <= (kMaxPhaseDrift * kMaxPhaseDrift)) {
-                bool reverse = false;
-                if (transport.hasServerYaw) {
-                    constexpr uint32_t kYawDtMs = 250;
-                    uint32_t tNext = (bestTimeMs + kYawDtMs) % path.durationMs;
-                    glm::vec3 p0 = evalTimedCatmullRom(path, bestTimeMs);
-                    glm::vec3 p1 = evalTimedCatmullRom(path, tNext);
-                    glm::vec3 d = p1 - p0;
-                    if (glm::length2(d) > 1e-6f) {
-                        float yawFwd = std::atan2(d.y, d.x);
-                        float yawRev = yawFwd + glm::pi<float>();
-                        auto angleDiff = [](float a, float b) -> float {
-                            float d = a - b;
-                            while (d > glm::pi<float>()) d -= glm::two_pi<float>();
-                            while (d < -glm::pi<float>()) d += glm::two_pi<float>();
-                            return std::abs(d);
-                        };
-                        reverse = angleDiff(yawRev, transport.serverYaw) < angleDiff(yawFwd, transport.serverYaw);
-                    }
-                }
-
-                transport.useClientAnimation = true;
-                transport.localClockMs = bestTimeMs;
-                transport.clientAnimationReverse = reverse;
-                LOG_WARNING("TransportManager: No follow-up server updates for world transport 0x", std::hex, transport.guid, std::dec,
-                            " (", ageSec, "s since spawn); enabling guarded fallback at t=", bestTimeMs,
-                            "ms (phaseDrift=", std::sqrt(bestD2), ", reverse=", reverse, ")");
-            }
         }
 
         updateTransformMatrices(transport);

@@ -733,7 +733,7 @@ void CharacterRenderer::setModelTexture(uint32_t modelId, uint32_t textureSlot, 
     }
 
     gpuModel.textureIds[textureSlot] = textureId;
-    core::Logger::getInstance().info("Replaced model ", modelId, " texture slot ", textureSlot, " with composited texture");
+    core::Logger::getInstance().debug("Replaced model ", modelId, " texture slot ", textureSlot, " with composited texture");
 }
 
 void CharacterRenderer::resetModelTexture(uint32_t modelId, uint32_t textureSlot) {
@@ -773,9 +773,9 @@ bool CharacterRenderer::loadModel(const pipeline::M2Model& model, uint32_t id) {
 
     models[id] = std::move(gpuModel);
 
-    core::Logger::getInstance().info("Loaded M2 model ", id, " (", model.vertices.size(),
-                      " verts, ", model.bones.size(), " bones, ", model.sequences.size(),
-                      " anims, ", model.textures.size(), " textures)");
+    core::Logger::getInstance().debug("Loaded M2 model ", id, " (", model.vertices.size(),
+                       " verts, ", model.bones.size(), " bones, ", model.sequences.size(),
+                       " anims, ", model.textures.size(), " textures)");
 
     return true;
 }
@@ -1306,16 +1306,16 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
                     }
 
                     if (filtered) skipped++; else rendered++;
-                    LOG_INFO("Batch ", bIdx, ": submesh=", b.submeshId,
-                             " level=", b.submeshLevel,
-                             " idxStart=", b.indexStart, " idxCount=", b.indexCount,
-                             " tex=", texInfo,
-                             filtered ? " [SKIP]" : " [RENDER]");
+                    LOG_DEBUG("Batch ", bIdx, ": submesh=", b.submeshId,
+                              " level=", b.submeshLevel,
+                              " idxStart=", b.indexStart, " idxCount=", b.indexCount,
+                              " tex=", texInfo,
+                              filtered ? " [SKIP]" : " [RENDER]");
                     bIdx++;
                 }
-                LOG_INFO("Batch summary: ", rendered, " rendered, ", skipped, " skipped, ",
-                         gpuModel.textureIds.size(), " textures loaded, ",
-                         gpuModel.data.textureLookup.size(), " in lookup table");
+                LOG_DEBUG("Batch summary: ", rendered, " rendered, ", skipped, " skipped, ",
+                          gpuModel.textureIds.size(), " textures loaded, ",
+                          gpuModel.data.textureLookup.size(), " in lookup table");
                 for (size_t t = 0; t < gpuModel.data.textures.size(); t++) {
                 }
             }

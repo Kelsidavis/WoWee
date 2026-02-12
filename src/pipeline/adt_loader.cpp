@@ -45,7 +45,7 @@ ADTTerrain ADTLoader::load(const std::vector<uint8_t>& adtData) {
         return terrain;
     }
 
-    LOG_INFO("Loading ADT terrain (", adtData.size(), " bytes)");
+    LOG_DEBUG("Loading ADT terrain (", adtData.size(), " bytes)");
 
     size_t offset = 0;
     int chunkIndex = 0;
@@ -88,7 +88,7 @@ ADTTerrain ADTLoader::load(const std::vector<uint8_t>& adtData) {
             parseMODF(chunkData, chunkSize, terrain);
         }
         else if (header.magic == MH2O) {
-            LOG_INFO("Found MH2O chunk (", chunkSize, " bytes)");
+            LOG_DEBUG("Found MH2O chunk (", chunkSize, " bytes)");
             parseMH2O(chunkData, chunkSize, terrain);
         }
         else if (header.magic == MCNK) {
@@ -204,13 +204,13 @@ void ADTLoader::parseMWMO(const uint8_t* data, size_t size, ADTTerrain& terrain)
         offset += nameLen + 1;
     }
 
-    LOG_INFO("Loaded ", terrain.wmoNames.size(), " WMO names from MWMO chunk");
+    LOG_DEBUG("Loaded ", terrain.wmoNames.size(), " WMO names from MWMO chunk");
     for (size_t i = 0; i < terrain.wmoNames.size(); i++) {
-        LOG_INFO("  WMO[", i, "]: ", terrain.wmoNames[i]);
+        LOG_DEBUG("  WMO[", i, "]: ", terrain.wmoNames[i]);
         // Flag potential duplicate cathedral models
         if (terrain.wmoNames[i].find("cathedral") != std::string::npos ||
             terrain.wmoNames[i].find("Cathedral") != std::string::npos) {
-            LOG_INFO("*** CATHEDRAL WMO FOUND: ", terrain.wmoNames[i]);
+            LOG_DEBUG("*** CATHEDRAL WMO FOUND: ", terrain.wmoNames[i]);
         }
     }
 }
@@ -238,7 +238,7 @@ void ADTLoader::parseMDDF(const uint8_t* data, size_t size, ADTTerrain& terrain)
         terrain.doodadPlacements.push_back(placement);
     }
 
-    LOG_INFO("Loaded ", terrain.doodadPlacements.size(), " doodad placements");
+    LOG_DEBUG("Loaded ", terrain.doodadPlacements.size(), " doodad placements");
 }
 
 void ADTLoader::parseMODF(const uint8_t* data, size_t size, ADTTerrain& terrain) {
@@ -276,7 +276,7 @@ void ADTLoader::parseMODF(const uint8_t* data, size_t size, ADTTerrain& terrain)
             std::transform(upperName.begin(), upperName.end(), upperName.begin(), ::toupper);
 
             if (upperName.find("STORMWIND.WMO") != std::string::npos) {
-                LOG_INFO("*** STORMWIND.WMO PLACEMENT:",
+                LOG_DEBUG("*** STORMWIND.WMO PLACEMENT:",
                          " uniqueId=", placement.uniqueId,
                          " pos=(", placement.position[0], ", ", placement.position[1], ", ", placement.position[2], ")",
                          " rot=(", placement.rotation[0], ", ", placement.rotation[1], ", ", placement.rotation[2], ")",
@@ -286,7 +286,7 @@ void ADTLoader::parseMODF(const uint8_t* data, size_t size, ADTTerrain& terrain)
         }
     }
 
-    LOG_INFO("Loaded ", terrain.wmoPlacements.size(), " WMO placements");
+    LOG_DEBUG("Loaded ", terrain.wmoPlacements.size(), " WMO placements");
 }
 
 void ADTLoader::parseMCNK(const uint8_t* data, size_t size, int chunkIndex, ADTTerrain& terrain) {
@@ -321,7 +321,7 @@ void ADTLoader::parseMCNK(const uint8_t* data, size_t size, int chunkIndex, ADTT
 
     // Debug first chunk only
     if (chunkIndex == 0) {
-        LOG_INFO("MCNK[0] offsets: nLayers=", nLayers,
+        LOG_DEBUG("MCNK[0] offsets: nLayers=", nLayers,
                  " height=", ofsHeight, " normal=", ofsNormal,
                  " layer=", ofsLayer, " alpha=", ofsAlpha,
                  " sizeAlpha=", sizeAlpha, " size=", size,
@@ -345,7 +345,7 @@ void ADTLoader::parseMCNK(const uint8_t* data, size_t size, int chunkIndex, ADTT
         if (possibleMagic == MCVT) {
             headerSkip = 8;  // Skip magic + size
             if (chunkIndex == 0) {
-                LOG_INFO("MCNK sub-chunks have headers (MCVT magic found at offset ", ofsHeight, ")");
+                LOG_DEBUG("MCNK sub-chunks have headers (MCVT magic found at offset ", ofsHeight, ")");
             }
         }
         parseMCVT(data + ofsHeight + headerSkip, 580, chunk);
@@ -434,7 +434,7 @@ void ADTLoader::parseMCLY(const uint8_t* data, size_t size, MapChunk& chunk) {
         layer.effectId = readUInt32(data, i * 16 + 12);
 
         if (layerLogCount < 10) {
-            LOG_INFO("  MCLY[", i, "]: texId=", layer.textureId,
+            LOG_DEBUG("  MCLY[", i, "]: texId=", layer.textureId,
                      " flags=0x", std::hex, layer.flags, std::dec,
                      " alphaOfs=", layer.offsetMCAL,
                      " useAlpha=", layer.useAlpha(),
@@ -574,7 +574,7 @@ void ADTLoader::parseMH2O(const uint8_t* data, size_t size, ADTTerrain& terrain)
         }
     }
 
-    LOG_INFO("Loaded MH2O water data: ", totalLayers, " liquid layers across ", size, " bytes");
+    LOG_DEBUG("Loaded MH2O water data: ", totalLayers, " liquid layers across ", size, " bytes");
 }
 
 } // namespace pipeline

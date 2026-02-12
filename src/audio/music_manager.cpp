@@ -58,9 +58,6 @@ void MusicManager::playMusic(const std::string& mpqPath, bool loop) {
         return;
     }
 
-    // Stop current playback
-    AudioEngine::instance().stopMusic();
-
     // Play with AudioEngine (non-blocking, streams from memory)
     float volume = volumePercent / 100.0f;
     if (AudioEngine::instance().playMusic(cacheIt->second, volume, loop)) {
@@ -102,9 +99,6 @@ void MusicManager::playFilePath(const std::string& filePath, bool loop) {
         LOG_ERROR("Music: Could not read file: ", filePath);
         return;
     }
-
-    // Stop current playback
-    AudioEngine::instance().stopMusic();
 
     // Play with AudioEngine
     float volume = volumePercent / 100.0f;

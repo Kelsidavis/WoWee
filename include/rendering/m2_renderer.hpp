@@ -264,6 +264,10 @@ public:
      * @param instanceId Instance ID returned by createInstance()
      */
     void removeInstance(uint32_t instanceId);
+    /**
+     * Remove multiple instances with one spatial-index rebuild.
+     */
+    void removeInstances(const std::vector<uint32_t>& instanceIds);
 
     /**
      * Clear all models and instances

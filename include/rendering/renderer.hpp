@@ -243,6 +243,7 @@ private:
     std::string currentZoneName;
     bool inTavern_ = false;
     bool inBlacksmith_ = false;
+    float musicSwitchCooldown_ = 0.0f;
 
     // Third-person character state
     glm::vec3 characterPosition = glm::vec3(0.0f);
