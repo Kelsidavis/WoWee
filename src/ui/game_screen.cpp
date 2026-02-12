@@ -77,7 +77,9 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         auto* renderer = core::Application::getInstance().getRenderer();
         if (renderer) {
             if (auto* minimap = renderer->getMinimap()) {
-                minimap->setRotateWithCamera(minimapRotate_);
+                minimapRotate_ = false;
+                pendingMinimapRotate = false;
+                minimap->setRotateWithCamera(false);
                 minimap->setSquareShape(minimapSquare_);
                 minimapSettingsApplied_ = true;
             }
@@ -4651,10 +4653,12 @@ void GameScreen::renderSettingsWindow() {
                     saveSettings();
                 }
                 if (ImGui::Checkbox("Rotate Minimap", &pendingMinimapRotate)) {
-                    minimapRotate_ = pendingMinimapRotate;
+                    // Force north-up minimap.
+                    minimapRotate_ = false;
+                    pendingMinimapRotate = false;
                     if (renderer) {
                         if (auto* minimap = renderer->getMinimap()) {
-                            minimap->setRotateWithCamera(minimapRotate_);
+                            minimap->setRotateWithCamera(false);
                         }
                     }
                     saveSettings();
@@ -4836,7 +4840,7 @@ void GameScreen::renderMinimapMarkers(game::GameHandler& gameHandler) {
     float bearing = 0.0f;
     float cosB = 1.0f;
     float sinB = 0.0f;
-    if (minimapRotate_) {
+    if (minimap->isRotateWithCamera()) {
         glm::vec3 fwd = camera->getForward();
         bearing = std::atan2(-fwd.x, fwd.y);
         cosB = std::cos(bearing);
@@ -5115,9 +5119,9 @@ void GameScreen::loadSettings() {
                     uiOpacity_ = static_cast<float>(v) / 100.0f;
                 }
             } else if (key == "minimap_rotate") {
-                int v = std::stoi(val);
-                minimapRotate_ = (v != 0);
-                pendingMinimapRotate = minimapRotate_;
+                // Ignore persisted rotate state; keep north-up.
+                minimapRotate_ = false;
+                pendingMinimapRotate = false;
             } else if (key == "minimap_square") {
                 int v = std::stoi(val);
                 minimapSquare_ = (v != 0);

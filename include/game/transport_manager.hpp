@@ -55,11 +55,17 @@ struct ActiveTransport {
     bool hasServerClock;            // Whether we've synced with server time
     int32_t serverClockOffsetMs;   // Offset: serverClock - localNow
     bool useClientAnimation;        // Use client-side path animation
+    bool clientAnimationReverse;    // Run client animation in reverse along the selected path
     float serverYaw;                // Server-authoritative yaw (radians)
     bool hasServerYaw;              // Whether we've received server yaw
 
     float lastServerUpdate;         // Time of last server movement update
     int serverUpdateCount;          // Number of server updates received
+
+    // Dead-reckoning from latest authoritative updates (used only when updates are sparse).
+    glm::vec3 serverLinearVelocity;
+    float serverAngularVelocity;
+    bool hasServerVelocity;
 };
 
 class TransportManager {
@@ -85,6 +91,8 @@ public:
 
     // Check if a path exists for a given GameObject entry
     bool hasPathForEntry(uint32_t entry) const;
+    // Check if a path has meaningful XY travel (used to reject near-stationary false positives).
+    bool hasUsableMovingPathForEntry(uint32_t entry, float minXYRange = 1.0f) const;
 
     // Infer a real moving DBC path by spawn position (for servers whose transport entry IDs
     // don't map 1:1 to TransportAnimation.dbc entry IDs).

@@ -890,17 +890,28 @@ void Application::setupUICallbacks() {
 
         // Check if we have a real path from TransportAnimation.dbc (indexed by entry).
         // AzerothCore transport entries are not always 1:1 with DBC path ids.
-        if (!transportManager->hasPathForEntry(entry)) {
-            uint32_t remappedPath = transportManager->pickFallbackMovingPath(entry, displayId);
-            if (remappedPath != 0) {
-                pathId = remappedPath;
-                LOG_INFO("Using remapped fallback transport path ", pathId,
-                         " for entry ", entry, " displayId=", displayId);
+        const bool shipOrZeppelinDisplay =
+            (displayId == 3015 || displayId == 3031 || displayId == 7546 ||
+             displayId == 7446 || displayId == 1587 || displayId == 2454 ||
+             displayId == 807 || displayId == 808 || displayId == 455 || displayId == 462);
+        bool hasUsablePath = transportManager->hasPathForEntry(entry);
+        if (shipOrZeppelinDisplay) {
+            // For true transports, reject tiny XY tracks that effectively look stationary.
+            hasUsablePath = transportManager->hasUsableMovingPathForEntry(entry, 25.0f);
+        }
+
+        if (!hasUsablePath) {
+            uint32_t inferredPath = transportManager->inferMovingPathForSpawn(canonicalSpawnPos);
+            if (inferredPath != 0) {
+                pathId = inferredPath;
+                LOG_INFO("Using inferred transport path ", pathId, " for entry ", entry);
             } else {
-                uint32_t inferredPath = transportManager->inferMovingPathForSpawn(canonicalSpawnPos);
-                if (inferredPath != 0) {
-                    pathId = inferredPath;
-                    LOG_INFO("Using inferred transport path ", pathId, " for entry ", entry);
+                uint32_t remappedPath = transportManager->pickFallbackMovingPath(entry, displayId);
+                if (remappedPath != 0) {
+                    pathId = remappedPath;
+                    LOG_INFO("Using remapped fallback transport path ", pathId,
+                             " for entry ", entry, " displayId=", displayId,
+                             " (usableEntryPath=", transportManager->hasPathForEntry(entry), ")");
                 } else {
                     LOG_WARNING("No TransportAnimation.dbc path for entry ", entry,
                                 " - transport will be stationary");
@@ -957,20 +968,29 @@ void Application::setupUICallbacks() {
                     // Coordinates are already canonical (converted in game_handler.cpp)
                     glm::vec3 canonicalSpawnPos(x, y, z);
 
-                    // Check if we have a real path, otherwise remap/infer/fall back to stationary.
-                    if (!transportManager->hasPathForEntry(entry)) {
-                        uint32_t remappedPath = transportManager->pickFallbackMovingPath(entry, displayId);
-                        if (remappedPath != 0) {
-                            pathId = remappedPath;
-                            LOG_INFO("Auto-spawned transport with remapped fallback path: entry=", entry,
-                                     " remappedPath=", pathId, " displayId=", displayId,
+                    // Check if we have a real usable path, otherwise remap/infer/fall back to stationary.
+                    const bool shipOrZeppelinDisplay =
+                        (displayId == 3015 || displayId == 3031 || displayId == 7546 ||
+                         displayId == 7446 || displayId == 1587 || displayId == 2454 ||
+                         displayId == 807 || displayId == 808 || displayId == 455 || displayId == 462);
+                    bool hasUsablePath = transportManager->hasPathForEntry(entry);
+                    if (shipOrZeppelinDisplay) {
+                        hasUsablePath = transportManager->hasUsableMovingPathForEntry(entry, 25.0f);
+                    }
+
+                    if (!hasUsablePath) {
+                        uint32_t inferredPath = transportManager->inferMovingPathForSpawn(canonicalSpawnPos);
+                        if (inferredPath != 0) {
+                            pathId = inferredPath;
+                            LOG_INFO("Auto-spawned transport with inferred path: entry=", entry,
+                                     " inferredPath=", pathId, " displayId=", displayId,
                                      " wmoInstance=", wmoInstanceId);
                         } else {
-                            uint32_t inferredPath = transportManager->inferMovingPathForSpawn(canonicalSpawnPos);
-                            if (inferredPath != 0) {
-                                pathId = inferredPath;
-                                LOG_INFO("Auto-spawned transport with inferred path: entry=", entry,
-                                         " inferredPath=", pathId, " displayId=", displayId,
+                            uint32_t remappedPath = transportManager->pickFallbackMovingPath(entry, displayId);
+                            if (remappedPath != 0) {
+                                pathId = remappedPath;
+                                LOG_INFO("Auto-spawned transport with remapped fallback path: entry=", entry,
+                                         " remappedPath=", pathId, " displayId=", displayId,
                                          " wmoInstance=", wmoInstanceId);
                             } else {
                                 std::vector<glm::vec3> path = { canonicalSpawnPos };

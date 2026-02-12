@@ -76,10 +76,14 @@ void TransportManager::registerTransport(uint64_t guid, uint32_t wmoInstanceId, 
     transport.serverClockOffsetMs = 0;
     // Server-authoritative movement only - no client-side animation
     transport.useClientAnimation = false;
+    transport.clientAnimationReverse = false;
     transport.serverYaw = 0.0f;
     transport.hasServerYaw = false;
     transport.lastServerUpdate = 0.0f;
     transport.serverUpdateCount = 0;
+    transport.serverLinearVelocity = glm::vec3(0.0f);
+    transport.serverAngularVelocity = 0.0f;
+    transport.hasServerVelocity = false;
 
     updateTransformMatrices(transport);
 
@@ -235,28 +239,116 @@ void TransportManager::updateTransportMovement(ActiveTransport& transport, float
         pathTimeMs = (uint32_t)wrapped;
     } else if (transport.useClientAnimation) {
         // Pure local clock (no server sync yet, client-driven)
-        transport.localClockMs += (uint32_t)(deltaTime * 1000.0f);
+        uint32_t dtMs = static_cast<uint32_t>(deltaTime * 1000.0f);
+        if (!transport.clientAnimationReverse) {
+            transport.localClockMs += dtMs;
+        } else {
+            if (dtMs > path.durationMs) {
+                dtMs %= path.durationMs;
+            }
+            if (transport.localClockMs >= dtMs) {
+                transport.localClockMs -= dtMs;
+            } else {
+                transport.localClockMs = path.durationMs - (dtMs - transport.localClockMs);
+            }
+        }
         pathTimeMs = transport.localClockMs % path.durationMs;
     } else {
-        // Server-driven but no clock yet. If updates never arrive, fall back to local animation.
-        constexpr float kMissingUpdateFallbackSec = 2.5f;
-        if ((elapsedTime_ - transport.lastServerUpdate) >= kMissingUpdateFallbackSec) {
-            transport.useClientAnimation = true;
-            transport.localClockMs = 0;
-            pathTimeMs = 0;
-            LOG_WARNING("TransportManager: No server movement updates for transport 0x", std::hex, transport.guid, std::dec,
-                        " after ", kMissingUpdateFallbackSec, "s - enabling client fallback animation");
-        } else {
-            updateTransformMatrices(transport);
-            if (wmoRenderer_) {
-                wmoRenderer_->setInstanceTransform(transport.wmoInstanceId, transport.transform);
+        // Server-driven transport without clock sync.
+        // Do not auto-fallback to local DBC paths; remapped paths can be wrong and cause
+        // fast sideways movement, diving below water, or despawn-like behavior.
+        // Instead, briefly dead-reckon from recent authoritative velocity to avoid visual stutter
+        // when update bursts are sparse.
+        constexpr float kMaxExtrapolationSec = 8.0f;
+        const float ageSec = elapsedTime_ - transport.lastServerUpdate;
+        if (transport.hasServerVelocity && ageSec > 0.0f && ageSec <= kMaxExtrapolationSec) {
+            const float blend = glm::clamp(1.0f - (ageSec / kMaxExtrapolationSec), 0.0f, 1.0f);
+            transport.position += transport.serverLinearVelocity * (deltaTime * blend);
+        } else if (transport.serverUpdateCount <= 1 &&
+                   ageSec >= 1.0f &&
+                   path.fromDBC && !path.zOnly && path.durationMs > 0 && path.points.size() > 1 &&
+                   ((transport.guid & 0xFFF0000000000000ULL) == 0x1FC0000000000000ULL)) {
+            // Spawn-only fallback: only for world transport GUIDs (0x1fc...), not all transport-like objects.
+            glm::vec3 localTarget = transport.position - transport.basePosition;
+            uint32_t bestTimeMs = 0;
+            float bestScore = FLT_MAX;
+            float bestD2 = FLT_MAX;
+            constexpr uint32_t samples = 600;
+            for (uint32_t i = 0; i < samples; ++i) {
+                uint32_t t = static_cast<uint32_t>((static_cast<uint64_t>(i) * path.durationMs) / samples);
+                glm::vec3 off = evalTimedCatmullRom(path, t);
+                glm::vec3 d = off - localTarget;
+                float d2 = glm::dot(d, d);
+
+                float score = d2;
+                if (transport.hasServerYaw) {
+                    constexpr uint32_t kHeadingDtMs = 250;
+                    uint32_t tNext = (t + kHeadingDtMs) % path.durationMs;
+                    glm::vec3 offNext = evalTimedCatmullRom(path, tNext);
+                    glm::vec3 tangent = offNext - off;
+                    if (glm::length2(tangent) > 1e-6f) {
+                        float yaw = std::atan2(tangent.y, tangent.x);
+                        float dyaw = yaw - transport.serverYaw;
+                        while (dyaw > glm::pi<float>()) dyaw -= glm::two_pi<float>();
+                        while (dyaw < -glm::pi<float>()) dyaw += glm::two_pi<float>();
+                        constexpr float kHeadingWeight = 60.0f;
+                        score += (kHeadingWeight * std::abs(dyaw)) * (kHeadingWeight * std::abs(dyaw));
+                    }
+                }
+
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestD2 = d2;
+                    bestTimeMs = t;
+                }
             }
-            return;
+
+            constexpr float kMaxPhaseDrift = 120.0f;
+            if (bestD2 <= (kMaxPhaseDrift * kMaxPhaseDrift)) {
+                bool reverse = false;
+                if (transport.hasServerYaw) {
+                    constexpr uint32_t kYawDtMs = 250;
+                    uint32_t tNext = (bestTimeMs + kYawDtMs) % path.durationMs;
+                    glm::vec3 p0 = evalTimedCatmullRom(path, bestTimeMs);
+                    glm::vec3 p1 = evalTimedCatmullRom(path, tNext);
+                    glm::vec3 d = p1 - p0;
+                    if (glm::length2(d) > 1e-6f) {
+                        float yawFwd = std::atan2(d.y, d.x);
+                        float yawRev = yawFwd + glm::pi<float>();
+                        auto angleDiff = [](float a, float b) -> float {
+                            float d = a - b;
+                            while (d > glm::pi<float>()) d -= glm::two_pi<float>();
+                            while (d < -glm::pi<float>()) d += glm::two_pi<float>();
+                            return std::abs(d);
+                        };
+                        reverse = angleDiff(yawRev, transport.serverYaw) < angleDiff(yawFwd, transport.serverYaw);
+                    }
+                }
+
+                transport.useClientAnimation = true;
+                transport.localClockMs = bestTimeMs;
+                transport.clientAnimationReverse = reverse;
+                LOG_WARNING("TransportManager: No follow-up server updates for world transport 0x", std::hex, transport.guid, std::dec,
+                            " (", ageSec, "s since spawn); enabling guarded fallback at t=", bestTimeMs,
+                            "ms (phaseDrift=", std::sqrt(bestD2), ", reverse=", reverse, ")");
+            }
         }
+
+        updateTransformMatrices(transport);
+        if (wmoRenderer_) {
+            wmoRenderer_->setInstanceTransform(transport.wmoInstanceId, transport.transform);
+        }
+        return;
     }
 
     // Evaluate position from time (path is local offsets, add base position)
     glm::vec3 pathOffset = evalTimedCatmullRom(path, pathTimeMs);
+    // Guard against bad fallback Z curves on some remapped transport paths (notably icebreakers),
+    // where path offsets can sink far below sea level when we only have spawn-time data.
+    if (transport.useClientAnimation && transport.serverUpdateCount <= 1) {
+        constexpr float kMinFallbackZOffset = -2.0f;
+        pathOffset.z = glm::max(pathOffset.z, kMinFallbackZOffset);
+    }
     transport.position = transport.basePosition + pathOffset;
 
     // Use server yaw if available (authoritative), otherwise compute from tangent
@@ -503,10 +595,15 @@ void TransportManager::updateServerTransport(uint64_t guid, const glm::vec3& pos
         return;
     }
 
+    const bool hadPrevUpdate = (transport->serverUpdateCount > 0);
+    const float prevUpdateTime = transport->lastServerUpdate;
+    const glm::vec3 prevPos = transport->position;
+
     // Track server updates
     transport->serverUpdateCount++;
     transport->lastServerUpdate = elapsedTime_;
     transport->useClientAnimation = false;  // Server updates take precedence
+    transport->clientAnimationReverse = false;
 
     auto pathIt = paths_.find(transport->pathId);
     if (pathIt == paths_.end() || pathIt->second.durationMs == 0) {
@@ -521,162 +618,41 @@ void TransportManager::updateServerTransport(uint64_t guid, const glm::vec3& pos
         return;
     }
 
-    const auto& path = pathIt->second;
-
-    // Z-only paths (elevator/bobbing): server is authoritative, no projection needed
-    if (path.zOnly) {
-        transport->position = position;
-        transport->serverYaw = orientation;
-        transport->hasServerYaw = true;
-        transport->rotation = glm::angleAxis(transport->serverYaw, glm::vec3(0.0f, 0.0f, 1.0f));
-        transport->useClientAnimation = false;  // Server-driven
-
-        updateTransformMatrices(*transport);
-        if (wmoRenderer_) {
-            wmoRenderer_->setInstanceTransform(transport->wmoInstanceId, transport->transform);
-        }
-
-        LOG_INFO("TransportManager: Z-only transport 0x", std::hex, guid, std::dec,
-                 " updated from server: pos=(", position.x, ", ", position.y, ", ", position.z, ")");
-        return;
+    // Server-authoritative transport mode:
+    // Trust explicit server world position/orientation directly for all moving transports.
+    // This avoids wrong-route and direction errors when local DBC path mapping differs from server route IDs.
+    transport->hasServerClock = false;
+    transport->useClientAnimation = false;
+    if (transport->serverUpdateCount == 1) {
+        // Seed once from first authoritative update; keep stable base for fallback phase estimation.
+        transport->basePosition = position;
     }
-
-    // Seed basePosition from t=0 assumption before first search
-    // (t=0 corresponds to spawn point / first path point)
-    if (!transport->hasServerClock) {
-        glm::vec3 offset0 = evalTimedCatmullRom(path, 0);
-        transport->basePosition = position - offset0;
-    }
-
-    // Estimate server's path time by projecting position onto path
-    // Path positions are local offsets, server position is world position
-    // basePosition = serverWorldPos - pathLocalOffset
-
-    uint32_t bestTimeMs = 0;
-    float bestD2 = FLT_MAX;
-    glm::vec3 bestPathOffset(0.0f);
-
-    // After initial sync, search only in small window around predicted time
-    bool hasInitialSync = transport->hasServerClock;
-    uint32_t nowMs = (uint32_t)(elapsedTime_ * 1000.0f);
-    uint32_t predictedTimeMs = 0;
-    if (hasInitialSync) {
-        // Predict where server should be based on last clock offset
-        int64_t serverTimeMs = (int64_t)nowMs + transport->serverClockOffsetMs;
-        int64_t mod = (int64_t)path.durationMs;
-        int64_t wrapped = serverTimeMs % mod;
-        if (wrapped < 0) wrapped += mod;
-        predictedTimeMs = (uint32_t)wrapped;
-    }
-
-    uint32_t searchStart = 0;
-    uint32_t searchEnd = path.durationMs;
-    uint32_t sampleCount = 1000;  // Dense sampling for accuracy
-
-    if (hasInitialSync) {
-        // Search in ±5 second window around predicted time
-        uint32_t windowMs = 5000;
-        searchStart = (predictedTimeMs > windowMs) ? (predictedTimeMs - windowMs) : 0;
-        searchEnd = glm::min(predictedTimeMs + windowMs, path.durationMs);
-        sampleCount = 200;  // Fewer samples needed in small window
-    }
-
-    for (uint32_t i = 0; i < sampleCount; i++) {
-        // Map i to [searchStart, searchEnd)
-        uint32_t testTimeMs = searchStart + (uint32_t)((uint64_t)i * (searchEnd - searchStart) / sampleCount);
-        glm::vec3 testPathOffset = evalTimedCatmullRom(path, testTimeMs);
-        glm::vec3 testWorldPos = transport->basePosition + testPathOffset;  // Convert local → world
-        glm::vec3 diff = testWorldPos - position;
-        float d2 = glm::dot(diff, diff);  // distance² (cheaper, no sqrt)
-        if (d2 < bestD2) {
-            bestD2 = d2;
-            bestTimeMs = testTimeMs;
-            bestPathOffset = testPathOffset;
-        }
-    }
-
-    // Refine with finer sampling around best match
-    uint32_t refineSampleCount = 50;
-    uint32_t refineWindow = glm::max(1u, (searchEnd - searchStart) / sampleCount);  // Clamp to prevent zero
-    uint32_t refineStart = (bestTimeMs > refineWindow) ? (bestTimeMs - refineWindow) : 0;
-    uint32_t refineEnd = glm::min(bestTimeMs + refineWindow, path.durationMs);
-    uint32_t refineInterval = (refineEnd > refineStart) ? ((refineEnd - refineStart) / refineSampleCount) : 1;
-    if (refineInterval > 0) {
-        for (uint32_t i = 0; i < refineSampleCount; i++) {
-            uint32_t testTimeMs = refineStart + i * refineInterval;
-            glm::vec3 testPathOffset = evalTimedCatmullRom(path, testTimeMs);  // local offset
-            glm::vec3 testWorldPos = transport->basePosition + testPathOffset;  // Convert local → world
-            glm::vec3 diff = testWorldPos - position;  // Compare world to world
-            float d2 = glm::dot(diff, diff);
-            if (d2 < bestD2) {
-                bestD2 = d2;
-                bestTimeMs = testTimeMs;
-                bestPathOffset = testPathOffset;  // Update best offset when improving match
-            }
-        }
-    }
-
-    float bestDistance = std::sqrt(bestD2);
-
-    // Infer base position: serverWorldPos = basePos + pathOffset
-    // So: basePos = serverWorldPos - pathOffset
-    glm::vec3 inferredBasePos = position - bestPathOffset;
-
-    // Compute server clock offset with wrap-aware smoothing
-    int32_t newOffset = (int32_t)bestTimeMs - (int32_t)nowMs;
-
-    if (!transport->hasServerClock) {
-        // First sync: accept immediately and set base position
-        transport->basePosition = inferredBasePos;
-        transport->serverClockOffsetMs = newOffset;
-        transport->hasServerClock = true;
-        LOG_INFO("TransportManager: Initial server clock sync for transport 0x", std::hex, guid, std::dec,
-                 " serverTime=", bestTimeMs, "ms / ", path.durationMs, "ms",
-                 " drift=", bestDistance, " units",
-                 " basePos=(", inferredBasePos.x, ", ", inferredBasePos.y, ", ", inferredBasePos.z, ")",
-                 " offset=", newOffset, "ms");
-    } else {
-        // Subsequent syncs: wrap-aware smoothing to avoid phase jumps
-        int32_t oldOffset = transport->serverClockOffsetMs;
-        int32_t delta = newOffset - oldOffset;
-        int32_t mod = (int32_t)path.durationMs;
-
-        // Wrap delta to shortest path: [-mod/2, mod/2]
-        if (delta > mod / 2) delta -= mod;
-        if (delta < -mod / 2) delta += mod;
-
-        // Smooth delta, not absolute offset
-        transport->serverClockOffsetMs = oldOffset + (int32_t)(0.1f * delta);
-
-        // Only update basePosition if projection is accurate (< 5 units drift)
-        // This prevents "swim" from projection noise near ambiguous geometry
-        if (bestDistance < 5.0f) {
-            transport->basePosition = glm::mix(transport->basePosition, inferredBasePos, 0.1f);
-            LOG_INFO("TransportManager: Server clock correction for transport 0x", std::hex, guid, std::dec,
-                     " drift=", bestDistance, " units (updated base)",
-                     " oldOffset=", oldOffset, "ms → newOffset=", transport->serverClockOffsetMs, "ms",
-                     " (delta=", delta, "ms, smoothed by 0.1)");
-        } else {
-            LOG_INFO("TransportManager: Server clock correction for transport 0x", std::hex, guid, std::dec,
-                     " drift=", bestDistance, " units (base unchanged, clock only)",
-                     " oldOffset=", oldOffset, "ms → newOffset=", transport->serverClockOffsetMs, "ms",
-                     " (delta=", delta, "ms, smoothed by 0.1)");
-        }
-    }
-
-    // Update position immediately from synced clock
-    glm::vec3 pathOffset = evalTimedCatmullRom(path, bestTimeMs);
-    transport->position = transport->basePosition + pathOffset;
-
-    // Store server's authoritative yaw (orientation is in radians around Z axis)
+    transport->position = position;
     transport->serverYaw = orientation;
     transport->hasServerYaw = true;
     transport->rotation = glm::angleAxis(transport->serverYaw, glm::vec3(0.0f, 0.0f, 1.0f));
+
+    if (hadPrevUpdate) {
+        const float dt = elapsedTime_ - prevUpdateTime;
+        if (dt > 0.001f) {
+            glm::vec3 v = (position - prevPos) / dt;
+            const float speed = glm::length(v);
+            constexpr float kMaxSpeed = 60.0f;
+            if (speed > kMaxSpeed) {
+                v *= (kMaxSpeed / speed);
+            }
+
+            transport->serverLinearVelocity = v;
+            transport->serverAngularVelocity = 0.0f;
+            transport->hasServerVelocity = true;
+        }
+    }
 
     updateTransformMatrices(*transport);
     if (wmoRenderer_) {
         wmoRenderer_->setInstanceTransform(transport->wmoInstanceId, transport->transform);
     }
+    return;
 }
 
 bool TransportManager::loadTransportAnimationDBC(pipeline::AssetManager* assetMgr) {
@@ -871,6 +847,30 @@ bool TransportManager::loadTransportAnimationDBC(pipeline::AssetManager* assetMg
 bool TransportManager::hasPathForEntry(uint32_t entry) const {
     auto it = paths_.find(entry);
     return it != paths_.end() && it->second.fromDBC;
+}
+
+bool TransportManager::hasUsableMovingPathForEntry(uint32_t entry, float minXYRange) const {
+    auto it = paths_.find(entry);
+    if (it == paths_.end()) return false;
+
+    const auto& path = it->second;
+    if (!path.fromDBC || path.points.size() < 2 || path.durationMs == 0 || path.zOnly) {
+        return false;
+    }
+
+    float minX = path.points.front().pos.x;
+    float maxX = minX;
+    float minY = path.points.front().pos.y;
+    float maxY = minY;
+    for (const auto& p : path.points) {
+        minX = std::min(minX, p.pos.x);
+        maxX = std::max(maxX, p.pos.x);
+        minY = std::min(minY, p.pos.y);
+        maxY = std::max(maxY, p.pos.y);
+    }
+
+    float rangeXY = std::max(maxX - minX, maxY - minY);
+    return rangeXY >= minXYRange;
 }
 
 uint32_t TransportManager::inferMovingPathForSpawn(const glm::vec3& spawnWorldPos, float maxDistance) const {

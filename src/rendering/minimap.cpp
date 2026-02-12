@@ -173,16 +173,15 @@ bool Minimap::initialize(int size) {
             if (maxDist > 0.5) discard;
 
             // Rotate screen coords → composite UV offset
-            // Composite: U increases east, V increases south
+            // Composite: U increases east, V increases north
             // Screen: +X=right, +Y=up
-            // The -cos(a) term in dV inherently flips V (screen up → composite north)
             float c = cos(uRotation);
             float s = sin(uRotation);
             float scale = uZoomRadius * 2.0;
 
             vec2 offset = vec2(
                 centered.x * c + centered.y * s,
-                centered.x * s - centered.y * c
+                -centered.x * s + centered.y * c
             ) * scale;
 
             vec2 uv = uPlayerUV + offset;
@@ -194,7 +193,7 @@ bool Minimap::initialize(int size) {
             }
 
             // Player arrow at center (always points up = forward)
-            vec2 ap = rot2(centered, -uArrowRotation);
+            vec2 ap = rot2(centered, -(uArrowRotation + 3.14159265));
             vec2 tip = vec2(0.0, 0.035);
             vec2 lt  = vec2(-0.018, -0.016);
             vec2 rt  = vec2(0.018, -0.016);

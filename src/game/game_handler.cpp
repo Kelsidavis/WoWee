@@ -1853,6 +1853,12 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
     // Process out-of-range objects first
     for (uint64_t guid : data.outOfRangeGuids) {
         if (entityManager.hasEntity(guid)) {
+            const bool isKnownTransport = transportGuids_.count(guid) > 0;
+            if (isKnownTransport) {
+                LOG_INFO("Ignoring out-of-range removal for transport: 0x", std::hex, guid, std::dec);
+                continue;
+            }
+
             LOG_INFO("Entity went out of range: 0x", std::hex, guid, std::dec);
             // Trigger despawn callbacks before removing entity
             auto entity = entityManager.getEntity(guid);
@@ -1933,11 +1939,6 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                         block.transportGuid != 0) {
                         glm::vec3 localOffset = core::coords::serverToCanonical(
                             glm::vec3(block.transportX, block.transportY, block.transportZ));
-
-                        // Refresh parent transport transform from this packet stream.
-                        if (transportMoveCallback_) {
-                            transportMoveCallback_(block.transportGuid, pos.x, pos.y, pos.z, block.orientation);
-                        }
 
                         if (transportManager_ && transportManager_->getTransport(block.transportGuid)) {
                             glm::vec3 composed = transportManager_->getPlayerWorldPosition(block.transportGuid, localOffset);
@@ -2428,10 +2429,6 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                         glm::vec3 localOffset = core::coords::serverToCanonical(
                             glm::vec3(block.transportX, block.transportY, block.transportZ));
 
-                        if (transportMoveCallback_) {
-                            transportMoveCallback_(block.transportGuid, pos.x, pos.y, pos.z, block.orientation);
-                        }
-
                         if (transportManager_ && transportManager_->getTransport(block.transportGuid)) {
                             glm::vec3 composed = transportManager_->getPlayerWorldPosition(block.transportGuid, localOffset);
                             entity->setPosition(composed.x, composed.y, composed.z, entity->getOrientation());
@@ -2538,6 +2535,10 @@ void GameHandler::handleDestroyObject(network::Packet& packet) {
 
     // Remove entity
     if (entityManager.hasEntity(data.guid)) {
+        if (transportGuids_.count(data.guid) > 0) {
+            LOG_INFO("Ignoring destroy for transport entity: 0x", std::hex, data.guid, std::dec);
+            return;
+        }
         entityManager.removeEntity(data.guid);
         LOG_INFO("Destroyed entity: 0x", std::hex, data.guid, std::dec,
                  " (", (data.isDeath ? "death" : "despawn"), ")");
