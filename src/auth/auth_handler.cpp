@@ -283,14 +283,20 @@ void AuthHandler::sendLogonProof() {
         }
     }
 
-    auto packet = LogonProofPacket::build(A, M1, securityFlags_, crcHashPtr, pinClientSaltPtr, pinHashPtr);
-    socket->send(packet);
+    if (clientInfo.protocolVersion < 8) {
+        // Legacy proof format: no securityFlags byte on the wire, but CRC/integrity hash still applies.
+        auto packet = LogonProofPacket::buildLegacy(A, M1, crcHashPtr);
+        socket->send(packet);
+    } else {
+        auto packet = LogonProofPacket::build(A, M1, securityFlags_, crcHashPtr, pinClientSaltPtr, pinHashPtr);
+        socket->send(packet);
 
-    if ((securityFlags_ & 0x04) && clientInfo.protocolVersion >= 8) {
-        // TrinityCore-style Google Authenticator token: send immediately after proof.
-        const std::string token = pendingSecurityCode_;
-        auto tokPkt = AuthenticatorTokenPacket::build(token);
-        socket->send(tokPkt);
+        if (securityFlags_ & 0x04) {
+            // TrinityCore-style Google Authenticator token: send immediately after proof.
+            const std::string token = pendingSecurityCode_;
+            auto tokPkt = AuthenticatorTokenPacket::build(token);
+            socket->send(tokPkt);
+        }
     }
 
     setState(AuthState::PROOF_SENT);

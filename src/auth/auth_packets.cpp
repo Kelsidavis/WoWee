@@ -167,6 +167,12 @@ network::Packet LogonProofPacket::build(const std::vector<uint8_t>& A,
 
 network::Packet LogonProofPacket::buildLegacy(const std::vector<uint8_t>& A,
                                               const std::vector<uint8_t>& M1) {
+    return buildLegacy(A, M1, nullptr);
+}
+
+network::Packet LogonProofPacket::buildLegacy(const std::vector<uint8_t>& A,
+                                              const std::vector<uint8_t>& M1,
+                                              const std::array<uint8_t, 20>* crcHash) {
     if (A.size() != 32) {
         LOG_ERROR("Invalid A size: ", A.size(), " (expected 32)");
     }
@@ -177,7 +183,11 @@ network::Packet LogonProofPacket::buildLegacy(const std::vector<uint8_t>& A,
     network::Packet packet(static_cast<uint16_t>(AuthOpcode::LOGON_PROOF));
     packet.writeBytes(A.data(), A.size());
     packet.writeBytes(M1.data(), M1.size());
-    for (int i = 0; i < 20; ++i) packet.writeUInt8(0); // CRC hash
+    if (crcHash) {
+        packet.writeBytes(crcHash->data(), crcHash->size());
+    } else {
+        for (int i = 0; i < 20; ++i) packet.writeUInt8(0); // CRC hash
+    }
     packet.writeUInt8(0); // number of keys
     return packet;
 }

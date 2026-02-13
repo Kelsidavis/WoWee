@@ -231,7 +231,7 @@ int main(int argc, char** argv) {
         }
 
         if (fmt == ProofFormat::Legacy) {
-            auto pkt = auth::LogonProofPacket::buildLegacy(A, M1);
+            auto pkt = auth::LogonProofPacket::buildLegacy(A, M1, crcHashPtr);
             sock.send(pkt);
             std::cerr << "Sent LOGON_PROOF legacy (proto=" << (int)info.protocolVersion << ")\n";
         } else {

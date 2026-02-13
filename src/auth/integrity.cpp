@@ -36,19 +36,35 @@ bool computeIntegrityHashWin32WithExe(const std::array<uint8_t, 16>& checksumSal
                                       std::string& outError) {
     // Files expected by 1.12.x Windows clients for the integrity check.
     // If this needs to vary by build, make it data-driven in expansion.json later.
-    const char* kFiles[] = {
+    //
+    // Turtle WoW ships a custom loader DLL. Some Turtle auth servers appear to validate integrity against
+    // that distribution rather than a stock 1.12.1 client, so when using Turtle's executable we include
+    // Turtle-specific DLLs as well.
+    const bool isTurtleExe = (exeName == "TurtleWoW.exe");
+    const char* kFilesBase[] = {
         nullptr, // exeName
         "fmod.dll",
         "ijl15.dll",
         "dbghelp.dll",
         "unicows.dll",
     };
+    const char* kFilesTurtleExtra[] = {
+        "twloader.dll",
+        "twdiscord.dll",
+    };
+
+    std::vector<std::string> files;
+    files.reserve(1 + 4 + (isTurtleExe ? (sizeof(kFilesTurtleExtra) / sizeof(kFilesTurtleExtra[0])) : 0));
+    for (const char* f : kFilesBase) {
+        files.push_back(f ? std::string(f) : exeName);
+    }
+    if (isTurtleExe) {
+        for (const char* f : kFilesTurtleExtra) files.push_back(std::string(f));
+    }
 
     std::vector<uint8_t> allFiles;
     std::string err;
-    for (size_t idx = 0; idx < (sizeof(kFiles) / sizeof(kFiles[0])); ++idx) {
-        const char* name = kFiles[idx];
-        std::string nameStr = name ? std::string(name) : exeName;
+    for (const auto& nameStr : files) {
         std::vector<uint8_t> bytes;
         std::string path = miscDir;
         if (!path.empty() && path.back() != '/') path += '/';
