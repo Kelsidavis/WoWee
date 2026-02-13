@@ -59,9 +59,11 @@ network::Packet AuthSessionPacket::build(uint32_t build,
         packet.writeString(upperAccount);
         packet.writeUInt32(0);                 // LoginServerType
         packet.writeUInt32(clientSeed);
-        packet.writeUInt32(0);                 // RegionID
-        packet.writeUInt32(0);                 // BattlegroupID
-        packet.writeUInt32(realmId);           // RealmID
+        // Some private cores validate these fields against realmlist/worldserver settings.
+        // Default to 1/1 and realmId (falling back to 1) rather than all zeros.
+        packet.writeUInt32(1);                 // RegionID
+        packet.writeUInt32(1);                 // BattlegroupID
+        packet.writeUInt32(realmId ? realmId : 1);  // RealmID
         LOG_DEBUG("  Realm ID: ", realmId);
         packet.writeUInt32(0);                 // DOS response (uint64)
         packet.writeUInt32(0);
