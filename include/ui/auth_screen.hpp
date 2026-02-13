@@ -54,6 +54,7 @@ private:
     char hostname[256] = "127.0.0.1";
     char username[256] = "";
     char password[256] = "";
+    char pinCode[32] = "";
     int port = 3724;
     int expansionIndex = 0;     // Index into expansion registry profiles
     bool authenticating = false;

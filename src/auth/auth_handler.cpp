@@ -1,9 +1,12 @@
 #include "auth/auth_handler.hpp"
+#include "auth/pin_auth.hpp"
 #include "network/tcp_socket.hpp"
 #include "network/packet.hpp"
 #include "core/logger.hpp"
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
+#include <cctype>
 
 namespace wowee {
 namespace auth {
@@ -17,7 +20,17 @@ AuthHandler::~AuthHandler() {
 }
 
 bool AuthHandler::connect(const std::string& host, uint16_t port) {
-    LOG_INFO("Connecting to auth server: ", host, ":", port);
+    auto trimHost = [](std::string s) {
+        auto isSpace = [](unsigned char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; };
+        size_t b = 0;
+        while (b < s.size() && isSpace(static_cast<unsigned char>(s[b]))) ++b;
+        size_t e = s.size();
+        while (e > b && isSpace(static_cast<unsigned char>(s[e - 1]))) --e;
+        return s.substr(b, e - b);
+    };
+
+    const std::string hostTrimmed = trimHost(host);
+    LOG_INFO("Connecting to auth server: ", hostTrimmed, ":", port);
 
     socket = std::make_unique<network::TCPSocket>();
 
@@ -28,7 +41,7 @@ bool AuthHandler::connect(const std::string& host, uint16_t port) {
         handlePacket(mutablePacket);
     });
 
-    if (!socket->connect(host, port)) {
+    if (!socket->connect(hostTrimmed, port)) {
         LOG_ERROR("Failed to connect to auth server");
         setState(AuthState::FAILED);
         return false;
@@ -84,6 +97,10 @@ void AuthHandler::authenticate(const std::string& user, const std::string& pass)
 
     username = user;
     password = pass;
+    pendingPin_.clear();
+    securityFlags_ = 0;
+    pinGridSeed_ = 0;
+    pinServerSalt_ = {};
 
     // Initialize SRP
     srp = std::make_unique<SRP>();
@@ -110,6 +127,10 @@ void AuthHandler::authenticateWithHash(const std::string& user, const std::vecto
 
     username = user;
     password.clear();
+    pendingPin_.clear();
+    securityFlags_ = 0;
+    pinGridSeed_ = 0;
+    pinServerSalt_ = {};
 
     // Initialize SRP with pre-computed hash
     srp = std::make_unique<SRP>();
@@ -144,7 +165,7 @@ void AuthHandler::handleLogonChallengeResponse(network::Packet& packet) {
 
     if (response.securityFlags != 0) {
         LOG_WARNING("Server sent security flags: 0x", std::hex, (int)response.securityFlags, std::dec);
-        if (response.securityFlags & 0x01) LOG_WARNING("  PIN required (not supported)");
+        if (response.securityFlags & 0x01) LOG_WARNING("  PIN required");
         if (response.securityFlags & 0x02) LOG_WARNING("  Matrix card required (not supported)");
         if (response.securityFlags & 0x04) LOG_WARNING("  Authenticator required (not supported)");
     }
@@ -155,9 +176,20 @@ void AuthHandler::handleLogonChallengeResponse(network::Packet& packet) {
     // Feed SRP with server challenge data
     srp->feed(response.B, response.g, response.N, response.salt);
 
+    securityFlags_ = response.securityFlags;
+    if (securityFlags_ & 0x01) {
+        pinGridSeed_ = response.pinGridSeed;
+        pinServerSalt_ = response.pinSalt;
+    }
+
     setState(AuthState::CHALLENGE_RECEIVED);
 
-    // Send LOGON_PROOF immediately
+    // If PIN is required, wait for user input.
+    if ((securityFlags_ & 0x01) && pendingPin_.empty()) {
+        setState(AuthState::PIN_REQUIRED);
+        return;
+    }
+
     sendLogonProof();
 }
 
@@ -167,10 +199,36 @@ void AuthHandler::sendLogonProof() {
     auto A = srp->getA();
     auto M1 = srp->getM1();
 
-    auto packet = LogonProofPacket::build(A, M1);
+    std::array<uint8_t, 16> pinClientSalt{};
+    std::array<uint8_t, 20> pinHash{};
+    const std::array<uint8_t, 16>* pinClientSaltPtr = nullptr;
+    const std::array<uint8_t, 20>* pinHashPtr = nullptr;
+
+    if (securityFlags_ & 0x01) {
+        try {
+            PinProof proof = computePinProof(pendingPin_, pinGridSeed_, pinServerSalt_);
+            pinClientSalt = proof.clientSalt;
+            pinHash = proof.hash;
+            pinClientSaltPtr = &pinClientSalt;
+            pinHashPtr = &pinHash;
+        } catch (const std::exception& e) {
+            fail(std::string("PIN required but invalid: ") + e.what());
+            return;
+        }
+    }
+
+    auto packet = LogonProofPacket::build(A, M1, securityFlags_, pinClientSaltPtr, pinHashPtr);
     socket->send(packet);
 
     setState(AuthState::PROOF_SENT);
+}
+
+void AuthHandler::submitPin(const std::string& pin) {
+    pendingPin_ = pin;
+    // If we're waiting on a PIN, continue immediately.
+    if (state == AuthState::PIN_REQUIRED) {
+        sendLogonProof();
+    }
 }
 
 void AuthHandler::handleLogonProofResponse(network::Packet& packet) {

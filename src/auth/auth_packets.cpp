@@ -135,18 +135,38 @@ bool LogonChallengeResponseParser::parse(network::Packet& packet, LogonChallenge
     // Security flags
     response.securityFlags = packet.readUInt8();
 
+    // Optional security extensions (protocol v8+)
+    if (response.securityFlags & 0x01) {
+        // PIN required: u32 pin_grid_seed + u8[16] pin_salt
+        response.pinGridSeed = packet.readUInt32();
+        for (size_t i = 0; i < response.pinSalt.size(); ++i) {
+            response.pinSalt[i] = packet.readUInt8();
+        }
+    }
+
     LOG_DEBUG("Parsed LOGON_CHALLENGE response:");
     LOG_DEBUG("  B size: ", response.B.size(), " bytes");
     LOG_DEBUG("  g size: ", response.g.size(), " bytes");
     LOG_DEBUG("  N size: ", response.N.size(), " bytes");
     LOG_DEBUG("  salt size: ", response.salt.size(), " bytes");
     LOG_DEBUG("  Security flags: ", (int)response.securityFlags);
+    if (response.securityFlags & 0x01) {
+        LOG_DEBUG("  PIN grid seed: ", response.pinGridSeed);
+    }
 
     return true;
 }
 
 network::Packet LogonProofPacket::build(const std::vector<uint8_t>& A,
                                          const std::vector<uint8_t>& M1) {
+    return build(A, M1, 0, nullptr, nullptr);
+}
+
+network::Packet LogonProofPacket::build(const std::vector<uint8_t>& A,
+                                         const std::vector<uint8_t>& M1,
+                                         uint8_t securityFlags,
+                                         const std::array<uint8_t, 16>* pinClientSalt,
+                                         const std::array<uint8_t, 20>* pinHash) {
     if (A.size() != 32) {
         LOG_ERROR("Invalid A size: ", A.size(), " (expected 32)");
     }
@@ -171,7 +191,17 @@ network::Packet LogonProofPacket::build(const std::vector<uint8_t>& A,
     packet.writeUInt8(0);
 
     // Security flags
-    packet.writeUInt8(0);
+    packet.writeUInt8(securityFlags);
+
+    if (securityFlags & 0x01) {
+        if (!pinClientSalt || !pinHash) {
+            LOG_ERROR("LOGON_PROOF: PIN flag set but PIN data missing");
+        } else {
+            // PIN: u8[16] client_salt + u8[20] pin_hash
+            packet.writeBytes(pinClientSalt->data(), pinClientSalt->size());
+            packet.writeBytes(pinHash->data(), pinHash->size());
+        }
+    }
 
     LOG_DEBUG("Built LOGON_PROOF packet:");
     LOG_DEBUG("  A size: ", A.size(), " bytes");

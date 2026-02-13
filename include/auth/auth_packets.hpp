@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <array>
 
 namespace wowee {
 namespace auth {
@@ -38,6 +39,10 @@ struct LogonChallengeResponse {
     std::vector<uint8_t> salt;  // Salt (32 bytes)
     uint8_t securityFlags;
 
+    // PIN extension (securityFlags & 0x01)
+    uint32_t pinGridSeed = 0;
+    std::array<uint8_t, 16> pinSalt{};
+
     bool isSuccess() const { return result == AuthResult::SUCCESS; }
 };
 
@@ -52,6 +57,11 @@ class LogonProofPacket {
 public:
     static network::Packet build(const std::vector<uint8_t>& A,
                                   const std::vector<uint8_t>& M1);
+    static network::Packet build(const std::vector<uint8_t>& A,
+                                  const std::vector<uint8_t>& M1,
+                                  uint8_t securityFlags,
+                                  const std::array<uint8_t, 16>* pinClientSalt,
+                                  const std::array<uint8_t, 20>* pinHash);
 };
 
 // LOGON_PROOF response data

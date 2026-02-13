@@ -354,15 +354,26 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
 
     // Connect button
     if (authenticating) {
-        authTimer += ImGui::GetIO().DeltaTime;
+        auto state = authHandler.getState();
+        if (state != auth::AuthState::PIN_REQUIRED) {
+            authTimer += ImGui::GetIO().DeltaTime;
 
-        // Show progress with elapsed time
-        char progressBuf[128];
-        snprintf(progressBuf, sizeof(progressBuf), "Authenticating... (%.0fs)", authTimer);
-        ImGui::Text("%s", progressBuf);
+            // Show progress with elapsed time
+            char progressBuf[128];
+            snprintf(progressBuf, sizeof(progressBuf), "Authenticating... (%.0fs)", authTimer);
+            ImGui::Text("%s", progressBuf);
+        } else {
+            ImGui::TextWrapped("This server requires a PIN. Enter your PIN to continue.");
+            ImGui::InputText("PIN", pinCode, sizeof(pinCode), ImGuiInputTextFlags_Password);
+            ImGui::SameLine();
+            if (ImGui::Button("Submit PIN")) {
+                authHandler.submitPin(pinCode);
+                // Don't keep the PIN around longer than needed.
+                pinCode[0] = '\0';
+            }
+        }
 
         // Check authentication status
-        auto state = authHandler.getState();
         if (state == auth::AuthState::AUTHENTICATED) {
             setStatus("Authentication successful!", false);
             authenticating = false;
@@ -390,7 +401,7 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
                 setStatus("Authentication failed", true);
             }
             authenticating = false;
-        } else if (authTimer >= AUTH_TIMEOUT) {
+        } else if (state != auth::AuthState::PIN_REQUIRED && authTimer >= AUTH_TIMEOUT) {
             setStatus("Connection timed out - server did not respond", true);
             authenticating = false;
             authHandler.disconnect();

@@ -89,6 +89,7 @@ set(WOWEE_SOURCES
     src/auth/auth_handler.cpp
     src/auth/auth_opcodes.cpp
     src/auth/auth_packets.cpp
+    src/auth/pin_auth.cpp
     src/auth/srp.cpp
     src/auth/big_num.cpp
     src/auth/crypto.cpp

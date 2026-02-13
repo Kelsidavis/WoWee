@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <functional>
+#include <array>
 
 namespace wowee {
 namespace network { class TCPSocket; class Packet; }
@@ -19,6 +20,7 @@ enum class AuthState {
     CONNECTED,
     CHALLENGE_SENT,
     CHALLENGE_RECEIVED,
+    PIN_REQUIRED,
     PROOF_SENT,
     AUTHENTICATED,
     REALM_LIST_REQUESTED,
@@ -44,6 +46,9 @@ public:
     // Authentication
     void authenticate(const std::string& username, const std::string& password);
     void authenticateWithHash(const std::string& username, const std::vector<uint8_t>& authHash);
+    // Optional: when the auth server requires a PIN (securityFlags & 0x01), call this to continue.
+    // PIN must be 4-10 digits.
+    void submitPin(const std::string& pin);
 
     // Set client version info (call before authenticate)
     void setClientInfo(const ClientInfo& info) { clientInfo = info; }
@@ -96,6 +101,12 @@ private:
 
     // Receive buffer
     std::vector<uint8_t> receiveBuffer;
+
+    // Challenge security extension (PIN)
+    uint8_t securityFlags_ = 0;
+    uint32_t pinGridSeed_ = 0;
+    std::array<uint8_t, 16> pinServerSalt_{}; // from LOGON_CHALLENGE response
+    std::string pendingPin_;
 };
 
 } // namespace auth
