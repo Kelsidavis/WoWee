@@ -250,6 +250,11 @@ void WorldSocket::send(const Packet& packet) {
 void WorldSocket::update() {
     if (!connected) return;
 
+    // Drain the socket. Some servers send an auth response and immediately close; a single recv()
+    // may read the response, and a subsequent recv() can return 0 (FIN). If we disconnect right
+    // away we lose the buffered response and the UI ends up with a generic "no characters" symptom.
+    bool sawClose = false;
+    bool receivedAny = false;
     size_t bytesReadThisTick = 0;
     int readOps = 0;
     while (connected) {
@@ -257,6 +262,7 @@ void WorldSocket::update() {
         ssize_t received = net::portableRecv(sockfd, buffer, sizeof(buffer));
 
         if (received > 0) {
+            receivedAny = true;
             ++readOps;
             bytesReadThisTick += static_cast<size_t>(received);
             receiveBuffer.insert(receiveBuffer.end(), buffer, buffer + received);
@@ -270,9 +276,8 @@ void WorldSocket::update() {
         }
 
         if (received == 0) {
-            LOG_INFO("World server connection closed");
-            disconnect();
-            return;
+            sawClose = true;
+            break;
         }
 
         int err = net::lastError();
@@ -285,7 +290,7 @@ void WorldSocket::update() {
         return;
     }
 
-    if (bytesReadThisTick > 0) {
+    if (receivedAny) {
         LOG_DEBUG("World socket read ", bytesReadThisTick, " bytes in ", readOps,
                   " recv call(s), buffered=", receiveBuffer.size());
         tryParsePackets();
@@ -293,6 +298,12 @@ void WorldSocket::update() {
             LOG_DEBUG("World socket parse left ", receiveBuffer.size(),
                       " bytes buffered (awaiting complete packet)");
         }
+    }
+
+    if (sawClose) {
+        LOG_INFO("World server connection closed");
+        disconnect();
+        return;
     }
 }
 
