@@ -4,7 +4,7 @@
   "shortName": "Turtle",
   "version": { "major": 1, "minor": 12, "patch": 1 },
   "build": 5875,
-  "protocolVersion": 8,
+  "protocolVersion": 3,
   "locale": "enGB",
   "maxLevel": 60,
   "races": [1, 2, 3, 4, 5, 6, 7, 8],

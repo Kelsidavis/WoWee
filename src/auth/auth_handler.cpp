@@ -236,15 +236,20 @@ void AuthHandler::sendLogonProof() {
         }
     }
 
-    auto packet = LogonProofPacket::build(A, M1, securityFlags_, pinClientSaltPtr, pinHashPtr);
-    socket->send(packet);
+    // Protocol < 8 uses a shorter proof packet (no securityFlags byte).
+    if (clientInfo.protocolVersion < 8) {
+        auto packet = LogonProofPacket::buildLegacy(A, M1);
+        socket->send(packet);
+    } else {
+        auto packet = LogonProofPacket::build(A, M1, securityFlags_, pinClientSaltPtr, pinHashPtr);
+        socket->send(packet);
 
-    if (securityFlags_ & 0x04) {
-        // TrinityCore-style Google Authenticator token: send immediately after proof.
-        // Token is typically 6 digits.
-        const std::string token = pendingSecurityCode_;
-        auto tokPkt = AuthenticatorTokenPacket::build(token);
-        socket->send(tokPkt);
+        if (securityFlags_ & 0x04) {
+            // TrinityCore-style Google Authenticator token: send immediately after proof.
+            const std::string token = pendingSecurityCode_;
+            auto tokPkt = AuthenticatorTokenPacket::build(token);
+            socket->send(tokPkt);
+        }
     }
 
     setState(AuthState::PROOF_SENT);

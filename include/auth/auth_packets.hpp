@@ -60,6 +60,9 @@ class LogonProofPacket {
 public:
     static network::Packet build(const std::vector<uint8_t>& A,
                                   const std::vector<uint8_t>& M1);
+    // Legacy (protocol < 8): A(32) + M1(20) + crc(20) + number_of_keys(1). No securityFlags byte.
+    static network::Packet buildLegacy(const std::vector<uint8_t>& A,
+                                       const std::vector<uint8_t>& M1);
     static network::Packet build(const std::vector<uint8_t>& A,
                                   const std::vector<uint8_t>& M1,
                                   uint8_t securityFlags,
