@@ -68,8 +68,9 @@
   "GameObjectDisplayInfo": { "ID": 0, "ModelName": 1 },
   "Emotes": { "ID": 0, "AnimID": 2 },
   "EmotesText": {
-    "Command": 1, "EmoteRef": 2,
-    "SenderTargetTextID": 5, "SenderNoTargetTextID": 9
+    "ID": 0, "Command": 1, "EmoteRef": 2,
+    "OthersTargetTextID": 3, "SenderTargetTextID": 5,
+    "OthersNoTargetTextID": 7, "SenderNoTargetTextID": 9
   },
   "EmotesTextData": { "ID": 0, "Text": 1 },
   "Light": {

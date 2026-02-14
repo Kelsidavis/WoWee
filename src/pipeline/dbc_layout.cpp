@@ -107,7 +107,7 @@ void DBCLayout::loadWotlkDefaults() {
     // EmotesText.dbc
     // Fields 3-18 are 16 EmotesTextData refs: [others+target, target+target, sender+target, ?,
     //   others+notarget, ?, sender+notarget, ?, female variants...]
-    layouts_["EmotesText"] = {{{ "Command", 1 }, { "EmoteRef", 2 },
+    layouts_["EmotesText"] = {{{ "ID", 0 }, { "Command", 1 }, { "EmoteRef", 2 },
         { "OthersTargetTextID", 3 }, { "SenderTargetTextID", 5 },
         { "OthersNoTargetTextID", 7 }, { "SenderNoTargetTextID", 9 }}};
 

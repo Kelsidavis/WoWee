@@ -801,7 +801,6 @@ void GameHandler::handlePacket(network::Packet& packet) {
             handleItemQueryResponse(packet);
             break;
 
-        case Opcode::SMSG_INSPECT_RESULTS:
         case Opcode::SMSG_INSPECT_TALENT:
             handleInspectResults(packet);
             break;
