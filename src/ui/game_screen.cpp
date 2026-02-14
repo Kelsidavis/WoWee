@@ -627,9 +627,7 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
         if (msg.type == game::ChatType::SYSTEM) {
             renderTextWithLinks(msg.message, color);
         } else if (msg.type == game::ChatType::TEXT_EMOTE) {
-            // Local emotes (senderGuid==0) need "You " prefix; incoming already have sender name
-            std::string full = (msg.senderGuid == 0) ? ("You " + msg.message) : msg.message;
-            renderTextWithLinks(full, color);
+            renderTextWithLinks(msg.message, color);
         } else if (!msg.senderName.empty()) {
             if (msg.type == game::ChatType::MONSTER_SAY || msg.type == game::ChatType::MONSTER_YELL) {
                 std::string prefix = msg.senderName + " says: ";
