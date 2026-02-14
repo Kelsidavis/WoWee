@@ -170,6 +170,8 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     renderCombatText(gameHandler);
     renderPartyFrames(gameHandler);
     renderGroupInvitePopup(gameHandler);
+    renderGuildInvitePopup(gameHandler);
+    renderGuildRoster(gameHandler);
     renderBuffBar(gameHandler);
     renderLootWindow(gameHandler);
     renderGossipWindow(gameHandler);
@@ -1584,6 +1586,24 @@ void GameScreen::sendChatMessage(game::GameHandler& gameHandler) {
                 msg.type = game::ChatType::SYSTEM;
                 msg.language = game::ChatLanguage::UNIVERSAL;
                 msg.message = "Usage: /ginvite <player>";
+                gameHandler.addLocalChatMessage(msg);
+                chatInputBuffer[0] = '\0';
+                return;
+            }
+
+            // /gkick command
+            if (cmdLower == "gkick" || cmdLower == "guildkick") {
+                if (spacePos != std::string::npos) {
+                    std::string playerName = command.substr(spacePos + 1);
+                    gameHandler.kickGuildMember(playerName);
+                    chatInputBuffer[0] = '\0';
+                    return;
+                }
+
+                game::MessageChatData msg;
+                msg.type = game::ChatType::SYSTEM;
+                msg.language = game::ChatLanguage::UNIVERSAL;
+                msg.message = "Usage: /gkick <player>";
                 gameHandler.addLocalChatMessage(msg);
                 chatInputBuffer[0] = '\0';
                 return;
@@ -3179,6 +3199,135 @@ void GameScreen::renderGroupInvitePopup(game::GameHandler& gameHandler) {
         }
     }
     ImGui::End();
+}
+
+void GameScreen::renderGuildInvitePopup(game::GameHandler& gameHandler) {
+    if (!gameHandler.hasPendingGuildInvite()) return;
+
+    auto* window = core::Application::getInstance().getWindow();
+    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
+
+    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - 175, 250), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(350, 0), ImGuiCond_Always);
+
+    if (ImGui::Begin("Guild Invite", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize)) {
+        ImGui::TextWrapped("%s has invited you to join %s.",
+                           gameHandler.getPendingGuildInviterName().c_str(),
+                           gameHandler.getPendingGuildInviteGuildName().c_str());
+        ImGui::Spacing();
+
+        if (ImGui::Button("Accept", ImVec2(155, 30))) {
+            gameHandler.acceptGuildInvite();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Decline", ImVec2(155, 30))) {
+            gameHandler.declineGuildInvite();
+        }
+    }
+    ImGui::End();
+}
+
+void GameScreen::renderGuildRoster(game::GameHandler& gameHandler) {
+    // O key toggle (WoW default Social/Guild keybind)
+    if (!ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(ImGuiKey_O)) {
+        showGuildRoster_ = !showGuildRoster_;
+        if (showGuildRoster_) {
+            if (!gameHandler.isInGuild()) {
+                gameHandler.addLocalChatMessage(game::MessageChatData{
+                    game::ChatType::SYSTEM, game::ChatLanguage::UNIVERSAL, 0, "", 0, "", "You are not in a guild.", "", 0});
+                showGuildRoster_ = false;
+                return;
+            }
+            gameHandler.requestGuildRoster();
+        }
+    }
+
+    if (!showGuildRoster_) return;
+
+    auto* window = core::Application::getInstance().getWindow();
+    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
+    float screenH = window ? static_cast<float>(window->getHeight()) : 720.0f;
+
+    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - 300, screenH / 2 - 250), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(600, 500), ImGuiCond_Once);
+
+    std::string title = gameHandler.isInGuild() ? (gameHandler.getGuildName() + " - Roster") : "Guild Roster";
+    bool open = showGuildRoster_;
+    if (ImGui::Begin(title.c_str(), &open, ImGuiWindowFlags_NoCollapse)) {
+        if (!gameHandler.hasGuildRoster()) {
+            ImGui::Text("Loading roster...");
+        } else {
+            const auto& roster = gameHandler.getGuildRoster();
+
+            // MOTD
+            if (!roster.motd.empty()) {
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "MOTD: %s", roster.motd.c_str());
+                ImGui::Separator();
+            }
+
+            // Count online
+            int onlineCount = 0;
+            for (const auto& m : roster.members) {
+                if (m.online) ++onlineCount;
+            }
+            ImGui::Text("%d members (%d online)", (int)roster.members.size(), onlineCount);
+            ImGui::Separator();
+
+            // Table
+            if (ImGui::BeginTable("GuildRoster", 6,
+                    ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV |
+                    ImGuiTableFlags_Sortable)) {
+                ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_DefaultSort);
+                ImGui::TableSetupColumn("Rank");
+                ImGui::TableSetupColumn("Level", ImGuiTableColumnFlags_WidthFixed, 40.0f);
+                ImGui::TableSetupColumn("Class", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+                ImGui::TableSetupColumn("Zone", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                ImGui::TableSetupColumn("Note");
+                ImGui::TableHeadersRow();
+
+                // Online members first, then offline
+                auto sortedMembers = roster.members;
+                std::sort(sortedMembers.begin(), sortedMembers.end(), [](const auto& a, const auto& b) {
+                    if (a.online != b.online) return a.online > b.online;
+                    return a.name < b.name;
+                });
+
+                static const char* classNames[] = {
+                    "Unknown", "Warrior", "Paladin", "Hunter", "Rogue",
+                    "Priest", "Death Knight", "Shaman", "Mage", "Warlock",
+                    "", "Druid"
+                };
+
+                for (const auto& m : sortedMembers) {
+                    ImGui::TableNextRow();
+                    ImVec4 textColor = m.online ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f)
+                                                : ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
+
+                    ImGui::TableNextColumn();
+                    ImGui::TextColored(textColor, "%s", m.name.c_str());
+
+                    ImGui::TableNextColumn();
+                    ImGui::TextColored(textColor, "%u", m.rankIndex);
+
+                    ImGui::TableNextColumn();
+                    ImGui::TextColored(textColor, "%u", m.level);
+
+                    ImGui::TableNextColumn();
+                    const char* className = (m.classId < 12) ? classNames[m.classId] : "Unknown";
+                    ImGui::TextColored(textColor, "%s", className);
+
+                    ImGui::TableNextColumn();
+                    ImGui::TextColored(textColor, "%u", m.zoneId);
+
+                    ImGui::TableNextColumn();
+                    ImGui::TextColored(textColor, "%s", m.publicNote.c_str());
+                }
+                ImGui::EndTable();
+            }
+        }
+    }
+    ImGui::End();
+    showGuildRoster_ = open;
 }
 
 // ============================================================

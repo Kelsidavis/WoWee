@@ -444,5 +444,78 @@ bool ClassicPacketParsers::parseMessageChat(network::Packet& packet, MessageChat
     return true;
 }
 
+// ============================================================================
+// Classic guild roster parser
+// Differences from WotLK:
+// - No rankCount field (fixed 10 ranks, read rights only)
+// - No per-rank bank tab data
+// - No gender byte per member
+// ============================================================================
+
+bool ClassicPacketParsers::parseGuildRoster(network::Packet& packet, GuildRosterData& data) {
+    if (packet.getSize() < 4) {
+        LOG_ERROR("Classic SMSG_GUILD_ROSTER too small: ", packet.getSize());
+        return false;
+    }
+    uint32_t numMembers = packet.readUInt32();
+    data.motd = packet.readString();
+    data.guildInfo = packet.readString();
+
+    // Classic: fixed 10 ranks, just uint32 rights each (no goldLimit, no bank tabs)
+    data.ranks.resize(10);
+    for (int i = 0; i < 10; ++i) {
+        data.ranks[i].rights = packet.readUInt32();
+        data.ranks[i].goldLimit = 0;
+    }
+
+    data.members.resize(numMembers);
+    for (uint32_t i = 0; i < numMembers; ++i) {
+        auto& m = data.members[i];
+        m.guid = packet.readUInt64();
+        m.online = (packet.readUInt8() != 0);
+        m.name = packet.readString();
+        m.rankIndex = packet.readUInt32();
+        m.level = packet.readUInt8();
+        m.classId = packet.readUInt8();
+        // Classic: NO gender byte
+        m.gender = 0;
+        m.zoneId = packet.readUInt32();
+        if (!m.online) {
+            m.lastOnline = packet.readFloat();
+        }
+        m.publicNote = packet.readString();
+        m.officerNote = packet.readString();
+    }
+    LOG_INFO("Parsed Classic SMSG_GUILD_ROSTER: ", numMembers, " members");
+    return true;
+}
+
+// ============================================================================
+// Classic guild query response parser
+// Differences from WotLK:
+// - No trailing rankCount uint32
+// ============================================================================
+
+bool ClassicPacketParsers::parseGuildQueryResponse(network::Packet& packet, GuildQueryResponseData& data) {
+    if (packet.getSize() < 8) {
+        LOG_ERROR("Classic SMSG_GUILD_QUERY_RESPONSE too small: ", packet.getSize());
+        return false;
+    }
+    data.guildId = packet.readUInt32();
+    data.guildName = packet.readString();
+    for (int i = 0; i < 10; ++i) {
+        data.rankNames[i] = packet.readString();
+    }
+    data.emblemStyle = packet.readUInt32();
+    data.emblemColor = packet.readUInt32();
+    data.borderStyle = packet.readUInt32();
+    data.borderColor = packet.readUInt32();
+    data.backgroundColor = packet.readUInt32();
+    // Classic: NO trailing rankCount
+    data.rankCount = 10;
+    LOG_INFO("Parsed Classic SMSG_GUILD_QUERY_RESPONSE: guild=", data.guildName);
+    return true;
+}
+
 } // namespace game
 } // namespace wowee

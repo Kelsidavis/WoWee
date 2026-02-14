@@ -114,6 +114,18 @@ public:
         return DestroyObjectParser::parse(packet, data);
     }
 
+    // --- Guild ---
+
+    /** Parse SMSG_GUILD_ROSTER */
+    virtual bool parseGuildRoster(network::Packet& packet, GuildRosterData& data) {
+        return GuildRosterParser::parse(packet, data);
+    }
+
+    /** Parse SMSG_GUILD_QUERY_RESPONSE */
+    virtual bool parseGuildQueryResponse(network::Packet& packet, GuildQueryResponseData& data) {
+        return GuildQueryResponseParser::parse(packet, data);
+    }
+
     // --- Utility ---
 
     /** Read a packed GUID from the packet */
@@ -190,6 +202,8 @@ public:
                                          const MovementInfo& info,
                                          uint64_t playerGuid = 0) override;
     bool parseMessageChat(network::Packet& packet, MessageChatData& data) override;
+    bool parseGuildRoster(network::Packet& packet, GuildRosterData& data) override;
+    bool parseGuildQueryResponse(network::Packet& packet, GuildQueryResponseData& data) override;
 };
 
 /**

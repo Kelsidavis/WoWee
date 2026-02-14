@@ -312,13 +312,29 @@ struct M2TextureTransformDisk {
     M2TrackDisk scaling;        // 20
 };
 
-// M2 attachment point (on-disk)
+// Vanilla M2 texture transform (3 × 28-byte tracks = 84 bytes)
+struct M2TextureTransformDiskVanilla {
+    M2TrackDiskVanilla translation; // 28
+    M2TrackDiskVanilla rotation;    // 28
+    M2TrackDiskVanilla scaling;     // 28
+};
+
+// M2 attachment point (on-disk, WotLK — 40 bytes)
 struct M2AttachmentDisk {
     uint32_t id;
     uint16_t bone;
     uint16_t unknown;
     float position[3];
-    uint8_t trackData[20]; // M2Track<uint8_t> — skip
+    uint8_t trackData[20]; // M2TrackDisk (20 bytes)
+};
+
+// M2 attachment point (on-disk, vanilla — 48 bytes, track is 28 bytes)
+struct M2AttachmentDiskVanilla {
+    uint32_t id;
+    uint16_t bone;
+    uint16_t unknown;
+    float position[3];
+    uint8_t trackData[28]; // M2TrackDiskVanilla (28 bytes)
 };
 
 template<typename T>
@@ -448,6 +464,96 @@ void parseAnimTrack(const std::vector<uint8_t>& data,
                 } else {
                     q = glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // identity
                 }
+                track.sequences[i].quatValues.push_back(q);
+            }
+        }
+    }
+}
+
+// Vanilla M2 range: indices into flat timestamp/key arrays for a given sequence
+struct M2Range { uint32_t start; uint32_t end; };
+
+// Parse a vanilla M2 animation track (version < 264).
+// Vanilla uses flat arrays with per-sequence M2Range indices, unlike WotLK's array-of-arrays.
+// Vanilla also uses Quaternion16 (simple x/32767) instead of WotLK's CompressedQuaternion.
+void parseAnimTrackVanilla(const std::vector<uint8_t>& data,
+                           const M2TrackDiskVanilla& disk,
+                           M2AnimationTrack& track,
+                           TrackType type) {
+    track.interpolationType = disk.interpolationType;
+    track.globalSequence = disk.globalSequence;
+
+    if (disk.nTimestamps == 0 || disk.nKeys == 0) return;
+    // Sanity caps
+    if (disk.nTimestamps > 100000 || disk.nKeys > 100000) return;
+
+    // Validate flat timestamp array
+    if (disk.ofsTimestamps + disk.nTimestamps * sizeof(uint32_t) > data.size()) return;
+    auto allTimestamps = readArray<uint32_t>(data, disk.ofsTimestamps, disk.nTimestamps);
+
+    // Validate flat key array
+    // Vanilla stores rotations as full float quaternions (16 bytes), NOT compressed int16 (8 bytes)
+    size_t keySize;
+    if (type == TrackType::FLOAT) keySize = sizeof(float);
+    else if (type == TrackType::VEC3) keySize = sizeof(float) * 3;
+    else keySize = sizeof(float) * 4; // C4Quaternion (float[4]) in vanilla
+    if (disk.ofsKeys + disk.nKeys * keySize > data.size()) return;
+
+    // Read per-sequence ranges
+    std::vector<M2Range> ranges;
+    if (disk.nRanges > 0 && disk.ofsRanges > 0 &&
+        disk.nRanges < 4096 &&
+        disk.ofsRanges + disk.nRanges * sizeof(M2Range) <= data.size()) {
+        ranges = readArray<M2Range>(data, disk.ofsRanges, disk.nRanges);
+    }
+
+    // If no ranges, treat entire array as one sequence
+    if (ranges.empty()) {
+        ranges.push_back({0, disk.nTimestamps});
+    }
+
+    track.sequences.resize(ranges.size());
+
+    for (size_t i = 0; i < ranges.size(); i++) {
+        uint32_t start = ranges[i].start;
+        uint32_t end = ranges[i].end;
+        if (start >= end || start >= disk.nTimestamps) continue;
+        end = std::min(end, disk.nTimestamps);
+
+        // Copy timestamps for this sequence
+        track.sequences[i].timestamps.assign(
+            allTimestamps.begin() + start, allTimestamps.begin() + end);
+
+        // Copy key values for this sequence
+        if (start >= disk.nKeys) continue;
+        uint32_t keyEnd = std::min(end, disk.nKeys);
+        uint32_t keyCount = keyEnd - start;
+
+        if (type == TrackType::FLOAT) {
+            auto allValues = readArray<float>(data, disk.ofsKeys, disk.nKeys);
+            track.sequences[i].floatValues.assign(
+                allValues.begin() + start, allValues.begin() + start + keyCount);
+        } else if (type == TrackType::VEC3) {
+            struct Vec3Disk { float x, y, z; };
+            auto allValues = readArray<Vec3Disk>(data, disk.ofsKeys, disk.nKeys);
+            track.sequences[i].vec3Values.reserve(keyCount);
+            for (uint32_t k = start; k < start + keyCount; k++) {
+                track.sequences[i].vec3Values.emplace_back(
+                    allValues[k].x, allValues[k].y, allValues[k].z);
+            }
+        } else {
+            // Vanilla: C4Quaternion — full float[4] per key (XYZW on disk)
+            // NOT compressed int16 like WotLK
+            struct C4Quaternion { float x, y, z, w; };
+            auto allQ = readArray<C4Quaternion>(data, disk.ofsKeys, disk.nKeys);
+            track.sequences[i].quatValues.reserve(keyCount);
+            for (uint32_t k = start; k < start + keyCount; k++) {
+                const auto& fq = allQ[k];
+                // Disk order: XYZW, glm::quat constructor: (w, x, y, z)
+                glm::quat q(fq.w, fq.x, fq.y, fq.z);
+                float len = glm::length(q);
+                if (len > 0.001f) q = q / len;
+                else q = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
                 track.sequences[i].quatValues.push_back(q);
             }
         }
@@ -803,11 +909,17 @@ M2Model M2Loader::load(const std::vector<uint8_t>& m2Data) {
                 scale = db.scale;
             }
 
-            // Parse animation tracks (skip for vanilla — flat array format differs from WotLK)
+            // Parse animation tracks
             if (header.version >= 264) {
                 parseAnimTrack(m2Data, translation, bone.translation, TrackType::VEC3, seqFlags);
                 parseAnimTrack(m2Data, rotation, bone.rotation, TrackType::QUAT_COMPRESSED, seqFlags);
                 parseAnimTrack(m2Data, scale, bone.scale, TrackType::VEC3, seqFlags);
+            } else {
+                // Vanilla: flat array format with per-sequence ranges + Quaternion16
+                M2BoneDiskVanilla dbv = readValue<M2BoneDiskVanilla>(m2Data, boneOffset);
+                parseAnimTrackVanilla(m2Data, dbv.translation, bone.translation, TrackType::VEC3);
+                parseAnimTrackVanilla(m2Data, dbv.rotation, bone.rotation, TrackType::QUAT_COMPRESSED);
+                parseAnimTrackVanilla(m2Data, dbv.scale, bone.scale, TrackType::VEC3);
             }
 
             if (bone.translation.hasData() || bone.rotation.hasData() || bone.scale.hasData()) {
@@ -860,8 +972,8 @@ M2Model M2Loader::load(const std::vector<uint8_t>& m2Data) {
         core::Logger::getInstance().debug("  Materials: ", model.materials.size());
     }
 
-    // Read texture transforms (UV animation data) — skip for vanilla (different track format)
-    if (header.nUVAnimation > 0 && header.ofsUVAnimation > 0 && header.version >= 264) {
+    // Read texture transforms (UV animation data)
+    if (header.nUVAnimation > 0 && header.ofsUVAnimation > 0) {
         // Build per-sequence flags for skipping external .anim data
         std::vector<uint32_t> seqFlags;
         seqFlags.reserve(model.sequences.size());
@@ -869,16 +981,27 @@ M2Model M2Loader::load(const std::vector<uint8_t>& m2Data) {
             seqFlags.push_back(seq.flags);
         }
 
+        size_t uvStructSize = (header.version >= 264)
+            ? sizeof(M2TextureTransformDisk)
+            : sizeof(M2TextureTransformDiskVanilla);
+
         model.textureTransforms.reserve(header.nUVAnimation);
         for (uint32_t i = 0; i < header.nUVAnimation; i++) {
-            uint32_t ofs = header.ofsUVAnimation + i * sizeof(M2TextureTransformDisk);
-            if (ofs + sizeof(M2TextureTransformDisk) > m2Data.size()) break;
+            uint32_t ofs = header.ofsUVAnimation + i * uvStructSize;
+            if (ofs + uvStructSize > m2Data.size()) break;
 
-            M2TextureTransformDisk dt = readValue<M2TextureTransformDisk>(m2Data, ofs);
             M2TextureTransform tt;
-            parseAnimTrack(m2Data, dt.translation, tt.translation, TrackType::VEC3, seqFlags);
-            parseAnimTrack(m2Data, dt.rotation, tt.rotation, TrackType::QUAT_COMPRESSED, seqFlags);
-            parseAnimTrack(m2Data, dt.scaling, tt.scale, TrackType::VEC3, seqFlags);
+            if (header.version >= 264) {
+                M2TextureTransformDisk dt = readValue<M2TextureTransformDisk>(m2Data, ofs);
+                parseAnimTrack(m2Data, dt.translation, tt.translation, TrackType::VEC3, seqFlags);
+                parseAnimTrack(m2Data, dt.rotation, tt.rotation, TrackType::QUAT_COMPRESSED, seqFlags);
+                parseAnimTrack(m2Data, dt.scaling, tt.scale, TrackType::VEC3, seqFlags);
+            } else {
+                M2TextureTransformDiskVanilla dt = readValue<M2TextureTransformDiskVanilla>(m2Data, ofs);
+                parseAnimTrackVanilla(m2Data, dt.translation, tt.translation, TrackType::VEC3);
+                parseAnimTrackVanilla(m2Data, dt.rotation, tt.rotation, TrackType::QUAT_COMPRESSED);
+                parseAnimTrackVanilla(m2Data, dt.scaling, tt.scale, TrackType::VEC3);
+            }
             model.textureTransforms.push_back(std::move(tt));
         }
         core::Logger::getInstance().debug("  Texture transforms: ", model.textureTransforms.size());
@@ -889,16 +1012,27 @@ M2Model M2Loader::load(const std::vector<uint8_t>& m2Data) {
         model.textureTransformLookup = readArray<uint16_t>(m2Data, header.ofsTransLookup, header.nTransLookup);
     }
 
-    // Read attachment points
+    // Read attachment points (vanilla uses 48-byte struct, WotLK uses 40-byte)
     if (header.nAttachments > 0 && header.ofsAttachments > 0) {
-        auto diskAttachments = readArray<M2AttachmentDisk>(m2Data, header.ofsAttachments, header.nAttachments);
-        model.attachments.reserve(diskAttachments.size());
-        for (const auto& da : diskAttachments) {
-            M2Attachment att;
-            att.id = da.id;
-            att.bone = da.bone;
-            att.position = glm::vec3(da.position[0], da.position[1], da.position[2]);
-            model.attachments.push_back(att);
+        model.attachments.reserve(header.nAttachments);
+        if (header.version < 264) {
+            auto diskAttachments = readArray<M2AttachmentDiskVanilla>(m2Data, header.ofsAttachments, header.nAttachments);
+            for (const auto& da : diskAttachments) {
+                M2Attachment att;
+                att.id = da.id;
+                att.bone = da.bone;
+                att.position = glm::vec3(da.position[0], da.position[1], da.position[2]);
+                model.attachments.push_back(att);
+            }
+        } else {
+            auto diskAttachments = readArray<M2AttachmentDisk>(m2Data, header.ofsAttachments, header.nAttachments);
+            for (const auto& da : diskAttachments) {
+                M2Attachment att;
+                att.id = da.id;
+                att.bone = da.bone;
+                att.position = glm::vec3(da.position[0], da.position[1], da.position[2]);
+                model.attachments.push_back(att);
+            }
         }
         core::Logger::getInstance().debug("  Attachments: ", model.attachments.size());
     }

@@ -1,7 +1,7 @@
 {
   "Spell": {
-    "ID": 0, "Attributes": 5, "IconID": 124,
-    "Name": 127, "Tooltip": 154, "Rank": 136
+    "ID": 0, "Attributes": 5, "IconID": 117,
+    "Name": 120, "Tooltip": 147, "Rank": 129
   },
   "ItemDisplayInfo": {
     "ID": 0, "LeftModel": 1, "LeftModelTexture": 3,

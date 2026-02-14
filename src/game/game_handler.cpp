@@ -879,6 +879,26 @@ void GameHandler::handlePacket(network::Packet& packet) {
             handlePartyCommandResult(packet);
             break;
 
+        // ---- Guild ----
+        case Opcode::SMSG_GUILD_INFO:
+            handleGuildInfo(packet);
+            break;
+        case Opcode::SMSG_GUILD_ROSTER:
+            handleGuildRoster(packet);
+            break;
+        case Opcode::SMSG_GUILD_QUERY_RESPONSE:
+            handleGuildQueryResponse(packet);
+            break;
+        case Opcode::SMSG_GUILD_EVENT:
+            handleGuildEvent(packet);
+            break;
+        case Opcode::SMSG_GUILD_INVITE:
+            handleGuildInvite(packet);
+            break;
+        case Opcode::SMSG_GUILD_COMMAND_RESULT:
+            handleGuildCommandResult(packet);
+            break;
+
         // ---- Phase 5: Loot/Gossip/Vendor ----
         case Opcode::SMSG_LOOT_RESPONSE:
             handleLootResponse(packet);
@@ -1914,6 +1934,16 @@ void GameHandler::handleLoginVerifyWorld(network::Packet& packet) {
         worldEntryCallback_(data.mapId, data.x, data.y, data.z);
     }
 
+    // Auto-query guild info on login
+    const Character* activeChar = getActiveCharacter();
+    if (activeChar && activeChar->hasGuild() && socket) {
+        auto gqPacket = GuildQueryPacket::build(activeChar->guildId);
+        socket->send(gqPacket);
+        auto grPacket = GuildRosterPacket::build();
+        socket->send(grPacket);
+        LOG_INFO("Auto-queried guild info (guildId=", activeChar->guildId, ")");
+    }
+
     // If we disconnected mid-taxi, attempt to recover to destination after login.
     if (taxiRecoverPending_ && taxiRecoverMapId_ == data.mapId) {
         float dx = movementInfo.x - taxiRecoverPos_.x;
@@ -2629,8 +2659,10 @@ void GameHandler::sendMovement(Opcode opcode) {
         wireInfo.transportO = core::coords::normalizeAngleRad(-wireInfo.transportO);
     }
 
-    // Build and send movement packet
-    auto packet = MovementPacket::build(opcode, wireInfo, playerGuid);
+    // Build and send movement packet (expansion-specific format)
+    auto packet = packetParsers_
+        ? packetParsers_->buildMovementPacket(opcode, wireInfo, playerGuid)
+        : MovementPacket::build(opcode, wireInfo, playerGuid);
     socket->send(packet);
 }
 
@@ -6478,6 +6510,161 @@ void GameHandler::handlePartyCommandResult(network::Packet& packet) {
         msg.message = "Party command failed (error " + std::to_string(static_cast<uint32_t>(data.result)) + ")";
         if (!data.name.empty()) msg.message += " for " + data.name;
         addLocalChatMessage(msg);
+    }
+}
+
+// ============================================================
+// Guild Handlers
+// ============================================================
+
+void GameHandler::kickGuildMember(const std::string& playerName) {
+    if (state != WorldState::IN_WORLD || !socket) return;
+    auto packet = GuildRemovePacket::build(playerName);
+    socket->send(packet);
+    LOG_INFO("Kicking guild member: ", playerName);
+}
+
+void GameHandler::acceptGuildInvite() {
+    if (state != WorldState::IN_WORLD || !socket) return;
+    pendingGuildInvite_ = false;
+    auto packet = GuildAcceptPacket::build();
+    socket->send(packet);
+    LOG_INFO("Accepted guild invite");
+}
+
+void GameHandler::declineGuildInvite() {
+    if (state != WorldState::IN_WORLD || !socket) return;
+    pendingGuildInvite_ = false;
+    auto packet = GuildDeclineInvitationPacket::build();
+    socket->send(packet);
+    LOG_INFO("Declined guild invite");
+}
+
+void GameHandler::queryGuildInfo(uint32_t guildId) {
+    if (state != WorldState::IN_WORLD || !socket) return;
+    auto packet = GuildQueryPacket::build(guildId);
+    socket->send(packet);
+    LOG_INFO("Querying guild info: guildId=", guildId);
+}
+
+void GameHandler::handleGuildInfo(network::Packet& packet) {
+    GuildInfoData data;
+    if (!GuildInfoParser::parse(packet, data)) return;
+
+    addSystemChatMessage("Guild: " + data.guildName + " (" +
+                         std::to_string(data.numMembers) + " members, " +
+                         std::to_string(data.numAccounts) + " accounts)");
+}
+
+void GameHandler::handleGuildRoster(network::Packet& packet) {
+    GuildRosterData data;
+    if (!packetParsers_->parseGuildRoster(packet, data)) return;
+
+    guildRoster_ = std::move(data);
+    hasGuildRoster_ = true;
+    LOG_INFO("Guild roster received: ", guildRoster_.members.size(), " members");
+}
+
+void GameHandler::handleGuildQueryResponse(network::Packet& packet) {
+    GuildQueryResponseData data;
+    if (!packetParsers_->parseGuildQueryResponse(packet, data)) return;
+
+    guildName_ = data.guildName;
+    guildRankNames_.clear();
+    for (uint32_t i = 0; i < 10; ++i) {
+        guildRankNames_.push_back(data.rankNames[i]);
+    }
+    LOG_INFO("Guild name set to: ", guildName_);
+    addSystemChatMessage("Guild: <" + guildName_ + ">");
+}
+
+void GameHandler::handleGuildEvent(network::Packet& packet) {
+    GuildEventData data;
+    if (!GuildEventParser::parse(packet, data)) return;
+
+    std::string msg;
+    switch (data.eventType) {
+        case GuildEvent::PROMOTION:
+            if (data.numStrings >= 3)
+                msg = data.strings[0] + " has promoted " + data.strings[1] + " to " + data.strings[2] + ".";
+            break;
+        case GuildEvent::DEMOTION:
+            if (data.numStrings >= 3)
+                msg = data.strings[0] + " has demoted " + data.strings[1] + " to " + data.strings[2] + ".";
+            break;
+        case GuildEvent::MOTD:
+            if (data.numStrings >= 1)
+                msg = "Guild MOTD: " + data.strings[0];
+            break;
+        case GuildEvent::JOINED:
+            if (data.numStrings >= 1)
+                msg = data.strings[0] + " has joined the guild.";
+            break;
+        case GuildEvent::LEFT:
+            if (data.numStrings >= 1)
+                msg = data.strings[0] + " has left the guild.";
+            break;
+        case GuildEvent::REMOVED:
+            if (data.numStrings >= 2)
+                msg = data.strings[1] + " has been kicked from the guild by " + data.strings[0] + ".";
+            break;
+        case GuildEvent::LEADER_IS:
+            if (data.numStrings >= 1)
+                msg = data.strings[0] + " is the guild leader.";
+            break;
+        case GuildEvent::LEADER_CHANGED:
+            if (data.numStrings >= 2)
+                msg = data.strings[0] + " has made " + data.strings[1] + " the new guild leader.";
+            break;
+        case GuildEvent::DISBANDED:
+            msg = "Guild has been disbanded.";
+            guildName_.clear();
+            guildRankNames_.clear();
+            guildRoster_ = GuildRosterData{};
+            hasGuildRoster_ = false;
+            break;
+        case GuildEvent::SIGNED_ON:
+            if (data.numStrings >= 1)
+                msg = "[Guild] " + data.strings[0] + " has come online.";
+            break;
+        case GuildEvent::SIGNED_OFF:
+            if (data.numStrings >= 1)
+                msg = "[Guild] " + data.strings[0] + " has gone offline.";
+            break;
+        default:
+            msg = "Guild event " + std::to_string(data.eventType);
+            break;
+    }
+
+    if (!msg.empty()) {
+        MessageChatData chatMsg;
+        chatMsg.type = ChatType::GUILD;
+        chatMsg.language = ChatLanguage::UNIVERSAL;
+        chatMsg.message = msg;
+        addLocalChatMessage(chatMsg);
+    }
+}
+
+void GameHandler::handleGuildInvite(network::Packet& packet) {
+    GuildInviteResponseData data;
+    if (!GuildInviteResponseParser::parse(packet, data)) return;
+
+    pendingGuildInvite_ = true;
+    pendingGuildInviterName_ = data.inviterName;
+    pendingGuildInviteGuildName_ = data.guildName;
+    LOG_INFO("Guild invite from: ", data.inviterName, " to guild: ", data.guildName);
+    addSystemChatMessage(data.inviterName + " has invited you to join " + data.guildName + ".");
+}
+
+void GameHandler::handleGuildCommandResult(network::Packet& packet) {
+    GuildCommandResultData data;
+    if (!GuildCommandResultParser::parse(packet, data)) return;
+
+    if (data.errorCode != 0) {
+        std::string msg = "Guild command failed";
+        if (!data.name.empty()) msg += " for " + data.name;
+        msg += " (error " + std::to_string(data.errorCode) + ")";
+        addSystemChatMessage(msg);
     }
 }
 

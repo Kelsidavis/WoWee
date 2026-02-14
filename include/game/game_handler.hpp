@@ -314,6 +314,19 @@ public:
     void demoteGuildMember(const std::string& playerName);
     void leaveGuild();
     void inviteToGuild(const std::string& playerName);
+    void kickGuildMember(const std::string& playerName);
+    void acceptGuildInvite();
+    void declineGuildInvite();
+    void queryGuildInfo(uint32_t guildId);
+
+    // Guild state accessors
+    bool isInGuild() const { return !guildName_.empty(); }
+    const std::string& getGuildName() const { return guildName_; }
+    const GuildRosterData& getGuildRoster() const { return guildRoster_; }
+    bool hasGuildRoster() const { return hasGuildRoster_; }
+    bool hasPendingGuildInvite() const { return pendingGuildInvite_; }
+    const std::string& getPendingGuildInviterName() const { return pendingGuildInviterName_; }
+    const std::string& getPendingGuildInviteGuildName() const { return pendingGuildInviteGuildName_; }
 
     // Ready check
     void initiateReadyCheck();
@@ -878,6 +891,14 @@ private:
     void handleGroupUninvite(network::Packet& packet);
     void handlePartyCommandResult(network::Packet& packet);
 
+    // ---- Guild handlers ----
+    void handleGuildInfo(network::Packet& packet);
+    void handleGuildRoster(network::Packet& packet);
+    void handleGuildQueryResponse(network::Packet& packet);
+    void handleGuildEvent(network::Packet& packet);
+    void handleGuildInvite(network::Packet& packet);
+    void handleGuildCommandResult(network::Packet& packet);
+
     // ---- Character creation handler ----
     void handleCharCreateResponse(network::Packet& packet);
 
@@ -1154,6 +1175,15 @@ private:
     GroupListData partyData;
     bool pendingGroupInvite = false;
     std::string pendingInviterName;
+
+    // ---- Guild state ----
+    std::string guildName_;
+    std::vector<std::string> guildRankNames_;
+    GuildRosterData guildRoster_;
+    bool hasGuildRoster_ = false;
+    bool pendingGuildInvite_ = false;
+    std::string pendingGuildInviterName_;
+    std::string pendingGuildInviteGuildName_;
 
     uint64_t activeCharacterGuid_ = 0;
     Race playerRace_ = Race::HUMAN;

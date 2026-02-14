@@ -53,6 +53,7 @@ private:
     bool showEntityWindow = false;
     bool showChatWindow = true;
     bool showPlayerInfo = false;
+    bool showGuildRoster_ = false;
     bool refocusChatInput = false;
     bool chatWindowLocked = true;
     ImVec2 chatWindowPos_ = ImVec2(0.0f, 0.0f);
@@ -166,6 +167,8 @@ private:
     void renderSettingsWindow();
     void renderQuestMarkers(game::GameHandler& gameHandler);
     void renderMinimapMarkers(game::GameHandler& gameHandler);
+    void renderGuildRoster(game::GameHandler& gameHandler);
+    void renderGuildInvitePopup(game::GameHandler& gameHandler);
 
     /**
      * Inventory screen

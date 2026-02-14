@@ -1531,6 +1531,151 @@ network::Packet GuildInvitePacket::build(const std::string& playerName) {
     return packet;
 }
 
+network::Packet GuildQueryPacket::build(uint32_t guildId) {
+    network::Packet packet(wireOpcode(Opcode::CMSG_GUILD_QUERY));
+    packet.writeUInt32(guildId);
+    LOG_DEBUG("Built CMSG_GUILD_QUERY: guildId=", guildId);
+    return packet;
+}
+
+network::Packet GuildRemovePacket::build(const std::string& playerName) {
+    network::Packet packet(wireOpcode(Opcode::CMSG_GUILD_REMOVE));
+    packet.writeString(playerName);
+    LOG_DEBUG("Built CMSG_GUILD_REMOVE: ", playerName);
+    return packet;
+}
+
+network::Packet GuildAcceptPacket::build() {
+    network::Packet packet(wireOpcode(Opcode::CMSG_GUILD_ACCEPT));
+    LOG_DEBUG("Built CMSG_GUILD_ACCEPT");
+    return packet;
+}
+
+network::Packet GuildDeclineInvitationPacket::build() {
+    network::Packet packet(wireOpcode(Opcode::CMSG_GUILD_DECLINE_INVITATION));
+    LOG_DEBUG("Built CMSG_GUILD_DECLINE_INVITATION");
+    return packet;
+}
+
+bool GuildQueryResponseParser::parse(network::Packet& packet, GuildQueryResponseData& data) {
+    if (packet.getSize() < 8) {
+        LOG_ERROR("SMSG_GUILD_QUERY_RESPONSE too small: ", packet.getSize());
+        return false;
+    }
+    data.guildId = packet.readUInt32();
+    data.guildName = packet.readString();
+    for (int i = 0; i < 10; ++i) {
+        data.rankNames[i] = packet.readString();
+    }
+    data.emblemStyle = packet.readUInt32();
+    data.emblemColor = packet.readUInt32();
+    data.borderStyle = packet.readUInt32();
+    data.borderColor = packet.readUInt32();
+    data.backgroundColor = packet.readUInt32();
+    if ((packet.getSize() - packet.getReadPos()) >= 4) {
+        data.rankCount = packet.readUInt32();
+    }
+    LOG_INFO("Parsed SMSG_GUILD_QUERY_RESPONSE: guild=", data.guildName, " id=", data.guildId);
+    return true;
+}
+
+bool GuildInfoParser::parse(network::Packet& packet, GuildInfoData& data) {
+    if (packet.getSize() < 4) {
+        LOG_ERROR("SMSG_GUILD_INFO too small: ", packet.getSize());
+        return false;
+    }
+    data.guildName = packet.readString();
+    data.creationDay = packet.readUInt32();
+    data.creationMonth = packet.readUInt32();
+    data.creationYear = packet.readUInt32();
+    data.numMembers = packet.readUInt32();
+    data.numAccounts = packet.readUInt32();
+    LOG_INFO("Parsed SMSG_GUILD_INFO: ", data.guildName, " members=", data.numMembers);
+    return true;
+}
+
+bool GuildRosterParser::parse(network::Packet& packet, GuildRosterData& data) {
+    if (packet.getSize() < 4) {
+        LOG_ERROR("SMSG_GUILD_ROSTER too small: ", packet.getSize());
+        return false;
+    }
+    uint32_t numMembers = packet.readUInt32();
+    data.motd = packet.readString();
+    data.guildInfo = packet.readString();
+
+    uint32_t rankCount = packet.readUInt32();
+    data.ranks.resize(rankCount);
+    for (uint32_t i = 0; i < rankCount; ++i) {
+        data.ranks[i].rights = packet.readUInt32();
+        data.ranks[i].goldLimit = packet.readUInt32();
+        // 6 bank tab flags + 6 bank tab items per day
+        for (int t = 0; t < 6; ++t) {
+            packet.readUInt32(); // tabFlags
+            packet.readUInt32(); // tabItemsPerDay
+        }
+    }
+
+    data.members.resize(numMembers);
+    for (uint32_t i = 0; i < numMembers; ++i) {
+        auto& m = data.members[i];
+        m.guid = packet.readUInt64();
+        m.online = (packet.readUInt8() != 0);
+        m.name = packet.readString();
+        m.rankIndex = packet.readUInt32();
+        m.level = packet.readUInt8();
+        m.classId = packet.readUInt8();
+        m.gender = packet.readUInt8();
+        m.zoneId = packet.readUInt32();
+        if (!m.online) {
+            m.lastOnline = packet.readFloat();
+        }
+        m.publicNote = packet.readString();
+        m.officerNote = packet.readString();
+    }
+    LOG_INFO("Parsed SMSG_GUILD_ROSTER: ", numMembers, " members, motd=", data.motd);
+    return true;
+}
+
+bool GuildEventParser::parse(network::Packet& packet, GuildEventData& data) {
+    if (packet.getSize() < 2) {
+        LOG_ERROR("SMSG_GUILD_EVENT too small: ", packet.getSize());
+        return false;
+    }
+    data.eventType = packet.readUInt8();
+    data.numStrings = packet.readUInt8();
+    for (uint8_t i = 0; i < data.numStrings && i < 3; ++i) {
+        data.strings[i] = packet.readString();
+    }
+    if ((packet.getSize() - packet.getReadPos()) >= 8) {
+        data.guid = packet.readUInt64();
+    }
+    LOG_INFO("Parsed SMSG_GUILD_EVENT: type=", (int)data.eventType, " strings=", (int)data.numStrings);
+    return true;
+}
+
+bool GuildInviteResponseParser::parse(network::Packet& packet, GuildInviteResponseData& data) {
+    if (packet.getSize() < 2) {
+        LOG_ERROR("SMSG_GUILD_INVITE too small: ", packet.getSize());
+        return false;
+    }
+    data.inviterName = packet.readString();
+    data.guildName = packet.readString();
+    LOG_INFO("Parsed SMSG_GUILD_INVITE: from=", data.inviterName, " guild=", data.guildName);
+    return true;
+}
+
+bool GuildCommandResultParser::parse(network::Packet& packet, GuildCommandResultData& data) {
+    if (packet.getSize() < 8) {
+        LOG_ERROR("SMSG_GUILD_COMMAND_RESULT too small: ", packet.getSize());
+        return false;
+    }
+    data.command = packet.readUInt32();
+    data.name = packet.readString();
+    data.errorCode = packet.readUInt32();
+    LOG_INFO("Parsed SMSG_GUILD_COMMAND_RESULT: cmd=", data.command, " error=", data.errorCode);
+    return true;
+}
+
 // ============================================================
 // Ready Check
 // ============================================================

@@ -880,6 +880,166 @@ public:
     static network::Packet build(const std::string& playerName);
 };
 
+/** CMSG_GUILD_QUERY packet builder */
+class GuildQueryPacket {
+public:
+    static network::Packet build(uint32_t guildId);
+};
+
+/** CMSG_GUILD_REMOVE packet builder */
+class GuildRemovePacket {
+public:
+    static network::Packet build(const std::string& playerName);
+};
+
+/** CMSG_GUILD_ACCEPT packet builder (empty body) */
+class GuildAcceptPacket {
+public:
+    static network::Packet build();
+};
+
+/** CMSG_GUILD_DECLINE_INVITATION packet builder (empty body) */
+class GuildDeclineInvitationPacket {
+public:
+    static network::Packet build();
+};
+
+// Guild event type constants
+namespace GuildEvent {
+    constexpr uint8_t PROMOTION      = 0;
+    constexpr uint8_t DEMOTION       = 1;
+    constexpr uint8_t MOTD           = 2;
+    constexpr uint8_t JOINED         = 3;
+    constexpr uint8_t LEFT           = 4;
+    constexpr uint8_t REMOVED        = 5;
+    constexpr uint8_t LEADER_IS      = 6;
+    constexpr uint8_t LEADER_CHANGED = 7;
+    constexpr uint8_t DISBANDED      = 8;
+    constexpr uint8_t SIGNED_ON      = 14;
+    constexpr uint8_t SIGNED_OFF     = 15;
+}
+
+/** SMSG_GUILD_QUERY_RESPONSE data */
+struct GuildQueryResponseData {
+    uint32_t guildId = 0;
+    std::string guildName;
+    std::string rankNames[10];
+    uint32_t emblemStyle = 0;
+    uint32_t emblemColor = 0;
+    uint32_t borderStyle = 0;
+    uint32_t borderColor = 0;
+    uint32_t backgroundColor = 0;
+    uint32_t rankCount = 0;
+
+    bool isValid() const { return guildId != 0 && !guildName.empty(); }
+};
+
+/** SMSG_GUILD_QUERY_RESPONSE parser */
+class GuildQueryResponseParser {
+public:
+    static bool parse(network::Packet& packet, GuildQueryResponseData& data);
+};
+
+/** SMSG_GUILD_INFO data */
+struct GuildInfoData {
+    std::string guildName;
+    uint32_t creationDay = 0;
+    uint32_t creationMonth = 0;
+    uint32_t creationYear = 0;
+    uint32_t numMembers = 0;
+    uint32_t numAccounts = 0;
+
+    bool isValid() const { return !guildName.empty(); }
+};
+
+/** SMSG_GUILD_INFO parser */
+class GuildInfoParser {
+public:
+    static bool parse(network::Packet& packet, GuildInfoData& data);
+};
+
+/** Guild roster member entry */
+struct GuildRosterMember {
+    uint64_t guid = 0;
+    bool online = false;
+    std::string name;
+    uint32_t rankIndex = 0;
+    uint8_t level = 0;
+    uint8_t classId = 0;
+    uint8_t gender = 0;
+    uint32_t zoneId = 0;
+    float lastOnline = 0.0f;
+    std::string publicNote;
+    std::string officerNote;
+};
+
+/** Guild rank info */
+struct GuildRankInfo {
+    uint32_t rights = 0;
+    uint32_t goldLimit = 0;
+};
+
+/** SMSG_GUILD_ROSTER data */
+struct GuildRosterData {
+    std::string motd;
+    std::string guildInfo;
+    std::vector<GuildRankInfo> ranks;
+    std::vector<GuildRosterMember> members;
+
+    bool isEmpty() const { return members.empty(); }
+};
+
+/** SMSG_GUILD_ROSTER parser */
+class GuildRosterParser {
+public:
+    static bool parse(network::Packet& packet, GuildRosterData& data);
+};
+
+/** SMSG_GUILD_EVENT data */
+struct GuildEventData {
+    uint8_t eventType = 0;
+    uint8_t numStrings = 0;
+    std::string strings[3];
+    uint64_t guid = 0;
+
+    bool isValid() const { return true; }
+};
+
+/** SMSG_GUILD_EVENT parser */
+class GuildEventParser {
+public:
+    static bool parse(network::Packet& packet, GuildEventData& data);
+};
+
+/** SMSG_GUILD_INVITE data */
+struct GuildInviteResponseData {
+    std::string inviterName;
+    std::string guildName;
+
+    bool isValid() const { return !inviterName.empty(); }
+};
+
+/** SMSG_GUILD_INVITE parser */
+class GuildInviteResponseParser {
+public:
+    static bool parse(network::Packet& packet, GuildInviteResponseData& data);
+};
+
+/** SMSG_GUILD_COMMAND_RESULT data */
+struct GuildCommandResultData {
+    uint32_t command = 0;
+    std::string name;
+    uint32_t errorCode = 0;
+
+    bool isValid() const { return true; }
+};
+
+/** SMSG_GUILD_COMMAND_RESULT parser */
+class GuildCommandResultParser {
+public:
+    static bool parse(network::Packet& packet, GuildCommandResultData& data);
+};
+
 // ============================================================
 // Ready Check
 // ============================================================
