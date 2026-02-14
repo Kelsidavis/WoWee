@@ -565,11 +565,103 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
     ImGui::BeginChild("ChatHistory", ImVec2(0, -70), true, ImGuiWindowFlags_HorizontalScrollbar);
     bool chatHistoryHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 
-    // Helper: render text with clickable URLs
-    auto renderTextWithLinks = [](const std::string& text, const ImVec4& color) {
+    // Helper: parse WoW color code |cAARRGGBB → ImVec4
+    auto parseWowColor = [](const std::string& text, size_t pos) -> ImVec4 {
+        // |cAARRGGBB (10 chars total: |c + 8 hex)
+        if (pos + 10 > text.size()) return ImVec4(1, 1, 1, 1);
+        auto hexByte = [&](size_t offset) -> float {
+            const char* s = text.c_str() + pos + offset;
+            char buf[3] = {s[0], s[1], '\0'};
+            return static_cast<float>(strtol(buf, nullptr, 16)) / 255.0f;
+        };
+        float a = hexByte(2);
+        float r = hexByte(4);
+        float g = hexByte(6);
+        float b = hexByte(8);
+        return ImVec4(r, g, b, a);
+    };
+
+    // Helper: render an item tooltip from ItemQueryResponseData
+    auto renderItemLinkTooltip = [&](uint32_t itemEntry) {
+        const auto* info = gameHandler.getItemInfo(itemEntry);
+        if (!info || !info->valid) return;
+
+        ImGui::BeginTooltip();
+        // Quality color for name
+        ImVec4 qColor(1, 1, 1, 1);
+        switch (info->quality) {
+            case 0: qColor = ImVec4(0.62f, 0.62f, 0.62f, 1.0f); break; // Poor
+            case 1: qColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); break;    // Common
+            case 2: qColor = ImVec4(0.12f, 1.0f, 0.0f, 1.0f); break;   // Uncommon
+            case 3: qColor = ImVec4(0.0f, 0.44f, 0.87f, 1.0f); break;  // Rare
+            case 4: qColor = ImVec4(0.64f, 0.21f, 0.93f, 1.0f); break; // Epic
+            case 5: qColor = ImVec4(1.0f, 0.50f, 0.0f, 1.0f); break;   // Legendary
+        }
+        ImGui::TextColored(qColor, "%s", info->name.c_str());
+
+        // Slot type
+        if (info->inventoryType > 0) {
+            const char* slotName = "";
+            switch (info->inventoryType) {
+                case 1:  slotName = "Head"; break;
+                case 2:  slotName = "Neck"; break;
+                case 3:  slotName = "Shoulder"; break;
+                case 4:  slotName = "Shirt"; break;
+                case 5:  slotName = "Chest"; break;
+                case 6:  slotName = "Waist"; break;
+                case 7:  slotName = "Legs"; break;
+                case 8:  slotName = "Feet"; break;
+                case 9:  slotName = "Wrist"; break;
+                case 10: slotName = "Hands"; break;
+                case 11: slotName = "Finger"; break;
+                case 12: slotName = "Trinket"; break;
+                case 13: slotName = "One-Hand"; break;
+                case 14: slotName = "Shield"; break;
+                case 15: slotName = "Ranged"; break;
+                case 16: slotName = "Back"; break;
+                case 17: slotName = "Two-Hand"; break;
+                case 18: slotName = "Bag"; break;
+                case 19: slotName = "Tabard"; break;
+                case 20: slotName = "Robe"; break;
+                case 21: slotName = "Main Hand"; break;
+                case 22: slotName = "Off Hand"; break;
+                case 23: slotName = "Held In Off-hand"; break;
+                case 25: slotName = "Thrown"; break;
+                case 26: slotName = "Ranged"; break;
+            }
+            if (slotName[0]) {
+                if (!info->subclassName.empty())
+                    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s  %s", slotName, info->subclassName.c_str());
+                else
+                    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", slotName);
+            }
+        }
+        if (info->armor > 0) ImGui::Text("%d Armor", info->armor);
+        ImVec4 green(0.0f, 1.0f, 0.0f, 1.0f);
+        auto renderStat = [&](int32_t val, const char* name) {
+            if (val > 0) ImGui::TextColored(green, "+%d %s", val, name);
+            else if (val < 0) ImGui::TextColored(ImVec4(1, 0.2f, 0.2f, 1), "%d %s", val, name);
+        };
+        renderStat(info->stamina, "Stamina");
+        renderStat(info->strength, "Strength");
+        renderStat(info->agility, "Agility");
+        renderStat(info->intellect, "Intellect");
+        renderStat(info->spirit, "Spirit");
+        if (info->sellPrice > 0) {
+            uint32_t g = info->sellPrice / 10000;
+            uint32_t s = (info->sellPrice / 100) % 100;
+            uint32_t c = info->sellPrice % 100;
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "Sell Price: %ug %us %uc", g, s, c);
+        }
+        ImGui::EndTooltip();
+    };
+
+    // Helper: render text with clickable URLs and WoW item links
+    auto renderTextWithLinks = [&](const std::string& text, const ImVec4& color) {
         size_t pos = 0;
         while (pos < text.size()) {
-            // Find next URL (http:// or https://)
+            // Find next special element: URL or WoW link
             size_t urlStart = std::string::npos;
             size_t httpPos = text.find("http://", pos);
             size_t httpsPos = text.find("https://", pos);
@@ -578,8 +670,16 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
             else if (httpsPos != std::string::npos)
                 urlStart = httpsPos;
 
-            if (urlStart == std::string::npos) {
-                // No more URLs, render remaining text
+            // Find next WoW item link: |cXXXXXXXX|Hitem:ENTRY:...|h[Name]|h|r
+            size_t linkStart = text.find("|c", pos);
+            // Also handle bare |Hitem: without color prefix
+            size_t bareLinkStart = text.find("|Hitem:", pos);
+
+            // Determine which comes first
+            size_t nextSpecial = std::min({urlStart, linkStart, bareLinkStart});
+
+            if (nextSpecial == std::string::npos) {
+                // No more special elements, render remaining text
                 std::string remaining = text.substr(pos);
                 if (!remaining.empty()) {
                     ImGui::PushStyleColor(ImGuiCol_Text, color);
@@ -589,33 +689,117 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
                 break;
             }
 
-            // Render text before URL
-            if (urlStart > pos) {
-                std::string before = text.substr(pos, urlStart - pos);
+            // Render plain text before special element
+            if (nextSpecial > pos) {
+                std::string before = text.substr(pos, nextSpecial - pos);
                 ImGui::PushStyleColor(ImGuiCol_Text, color);
                 ImGui::TextWrapped("%s", before.c_str());
                 ImGui::PopStyleColor();
+                ImGui::SameLine(0, 0);
             }
 
-            // Find end of URL (space, newline, or end of string)
-            size_t urlEnd = text.find_first_of(" \t\n\r", urlStart);
-            if (urlEnd == std::string::npos) urlEnd = text.size();
-            std::string url = text.substr(urlStart, urlEnd - urlStart);
+            // Handle WoW item link
+            if (nextSpecial == linkStart || nextSpecial == bareLinkStart) {
+                ImVec4 linkColor = color;
+                size_t hStart = std::string::npos;
 
-            // Render URL as clickable link
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));
-            ImGui::TextWrapped("%s", url.c_str());
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-                ImGui::SetTooltip("Open: %s", url.c_str());
-            }
-            if (ImGui::IsItemClicked()) {
-                std::string cmd = "xdg-open '" + url + "' &";
-                [[maybe_unused]] int result = system(cmd.c_str());
-            }
-            ImGui::PopStyleColor();
+                if (nextSpecial == linkStart && text.size() > linkStart + 10) {
+                    // Parse |cAARRGGBB color
+                    linkColor = parseWowColor(text, linkStart);
+                    hStart = text.find("|Hitem:", linkStart + 10);
+                } else if (nextSpecial == bareLinkStart) {
+                    hStart = bareLinkStart;
+                }
 
-            pos = urlEnd;
+                if (hStart != std::string::npos) {
+                    // Parse item entry: |Hitem:ENTRY:...
+                    size_t entryStart = hStart + 7; // skip "|Hitem:"
+                    size_t entryEnd = text.find(':', entryStart);
+                    uint32_t itemEntry = 0;
+                    if (entryEnd != std::string::npos) {
+                        itemEntry = static_cast<uint32_t>(strtoul(
+                            text.substr(entryStart, entryEnd - entryStart).c_str(), nullptr, 10));
+                    }
+
+                    // Find display name: |h[Name]|h
+                    size_t nameTagStart = text.find("|h[", hStart);
+                    size_t nameTagEnd = (nameTagStart != std::string::npos)
+                        ? text.find("]|h", nameTagStart + 3) : std::string::npos;
+
+                    std::string itemName = "Unknown Item";
+                    if (nameTagStart != std::string::npos && nameTagEnd != std::string::npos) {
+                        itemName = text.substr(nameTagStart + 3, nameTagEnd - nameTagStart - 3);
+                    }
+
+                    // Find end of entire link sequence (|r or after ]|h)
+                    size_t linkEnd = (nameTagEnd != std::string::npos) ? nameTagEnd + 3 : hStart + 7;
+                    size_t resetPos = text.find("|r", linkEnd);
+                    if (resetPos != std::string::npos && resetPos <= linkEnd + 2) {
+                        linkEnd = resetPos + 2;
+                    }
+
+                    // Ensure item info is cached (trigger query if needed)
+                    if (itemEntry > 0) {
+                        gameHandler.ensureItemInfo(itemEntry);
+                    }
+
+                    // Render bracketed item name in quality color
+                    std::string display = "[" + itemName + "]";
+                    ImGui::PushStyleColor(ImGuiCol_Text, linkColor);
+                    ImGui::TextWrapped("%s", display.c_str());
+                    ImGui::PopStyleColor();
+
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                        if (itemEntry > 0) {
+                            renderItemLinkTooltip(itemEntry);
+                        }
+                    }
+
+                    // Shift-click: insert item link into chat input
+                    if (ImGui::IsItemClicked() && ImGui::GetIO().KeyShift) {
+                        std::string linkText = text.substr(nextSpecial, linkEnd - nextSpecial);
+                        size_t curLen = strlen(chatInputBuffer);
+                        if (curLen + linkText.size() + 1 < sizeof(chatInputBuffer)) {
+                            strncat(chatInputBuffer, linkText.c_str(), sizeof(chatInputBuffer) - curLen - 1);
+                            chatInputMoveCursorToEnd = true;
+                        }
+                    }
+
+                    pos = linkEnd;
+                    continue;
+                }
+
+                // Failed to parse as item link — render the |c literally and continue
+                ImGui::PushStyleColor(ImGuiCol_Text, color);
+                ImGui::TextWrapped("|c");
+                ImGui::PopStyleColor();
+                ImGui::SameLine(0, 0);
+                pos = nextSpecial + 2;
+                continue;
+            }
+
+            // Handle URL
+            if (nextSpecial == urlStart) {
+                size_t urlEnd = text.find_first_of(" \t\n\r", urlStart);
+                if (urlEnd == std::string::npos) urlEnd = text.size();
+                std::string url = text.substr(urlStart, urlEnd - urlStart);
+
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));
+                ImGui::TextWrapped("%s", url.c_str());
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                    ImGui::SetTooltip("Open: %s", url.c_str());
+                }
+                if (ImGui::IsItemClicked()) {
+                    std::string cmd = "xdg-open '" + url + "' &";
+                    [[maybe_unused]] int result = system(cmd.c_str());
+                }
+                ImGui::PopStyleColor();
+
+                pos = urlEnd;
+                continue;
+            }
         }
     };
 

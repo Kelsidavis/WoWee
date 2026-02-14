@@ -765,6 +765,11 @@ public:
         auto it = itemInfoCache_.find(itemId);
         return (it != itemInfoCache_.end()) ? &it->second : nullptr;
     }
+    // Request item info from server if not already cached/pending
+    void ensureItemInfo(uint32_t entry) {
+        if (entry == 0 || itemInfoCache_.count(entry) || pendingItemQueries_.count(entry)) return;
+        queryItemInfo(entry, 0);
+    }
     uint64_t getBackpackItemGuid(int index) const {
         if (index < 0 || index >= static_cast<int>(backpackSlotGuids_.size())) return 0;
         return backpackSlotGuids_[index];
