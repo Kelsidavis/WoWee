@@ -520,9 +520,17 @@ void parseAnimTrackVanilla(const std::vector<uint8_t>& data,
         if (start >= end || start >= disk.nTimestamps) continue;
         end = std::min(end, disk.nTimestamps);
 
-        // Copy timestamps for this sequence
+        // Copy timestamps for this sequence, normalized to start at 0
+        // (vanilla stores absolute timestamps in the flat array, but the
+        // renderer expects 0-relative times matching sequence duration)
         track.sequences[i].timestamps.assign(
             allTimestamps.begin() + start, allTimestamps.begin() + end);
+        if (!track.sequences[i].timestamps.empty()) {
+            uint32_t firstTime = track.sequences[i].timestamps[0];
+            for (auto& ts : track.sequences[i].timestamps) {
+                ts -= firstTime;
+            }
+        }
 
         // Copy key values for this sequence
         if (start >= disk.nKeys) continue;
