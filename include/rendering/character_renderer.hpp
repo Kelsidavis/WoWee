@@ -247,6 +247,7 @@ private:
         uint64_t lastUse = 0;
     };
     std::unordered_map<std::string, TextureCacheEntry> textureCache;
+    std::unordered_map<std::string, GLuint> compositeCache_;  // key → GPU texture for reuse
     size_t textureCacheBytes_ = 0;
     uint64_t textureCacheCounter_ = 0;
     size_t textureCacheBudgetBytes_ = 1024ull * 1024 * 1024;  // Default, overridden at init

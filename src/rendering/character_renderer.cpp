@@ -572,6 +572,21 @@ GLuint CharacterRenderer::compositeTextures(const std::vector<std::string>& laye
 GLuint CharacterRenderer::compositeWithRegions(const std::string& basePath,
                                                 const std::vector<std::string>& baseLayers,
                                                 const std::vector<std::pair<int, std::string>>& regionLayers) {
+    // Build cache key from all inputs to avoid redundant compositing
+    std::string cacheKey = basePath;
+    for (const auto& bl : baseLayers) { cacheKey += '|'; cacheKey += bl; }
+    cacheKey += '#';
+    for (const auto& rl : regionLayers) {
+        cacheKey += std::to_string(rl.first);
+        cacheKey += ':';
+        cacheKey += rl.second;
+        cacheKey += ',';
+    }
+    auto cacheIt = compositeCache_.find(cacheKey);
+    if (cacheIt != compositeCache_.end() && cacheIt->second != 0) {
+        return cacheIt->second;
+    }
+
     // Region index → pixel coordinates on the 512x512 atlas
     static const int regionCoords[][2] = {
         {   0,   0 },  // 0 = ArmUpper
@@ -717,6 +732,7 @@ GLuint CharacterRenderer::compositeWithRegions(const std::string& basePath,
 
     core::Logger::getInstance().info("compositeWithRegions: created ", width, "x", height,
         " texture with ", regionLayers.size(), " equipment regions");
+    compositeCache_[cacheKey] = texId;
     return texId;
 }
 

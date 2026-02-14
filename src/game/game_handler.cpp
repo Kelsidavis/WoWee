@@ -5251,10 +5251,25 @@ void GameHandler::handleItemQueryResponse(network::Packet& packet) {
         itemInfoCache_[data.entry] = data;
         rebuildOnlineInventory();
         maybeDetectVisibleItemLayout();
-        emitAllOtherPlayerEquipment();
-        // If we have inspect-based item entry lists, re-emit for any players that now resolve.
+
+        // Selectively re-emit only players whose equipment references this item entry
+        const uint32_t resolvedEntry = data.entry;
+        for (const auto& [guid, entries] : otherPlayerVisibleItemEntries_) {
+            for (uint32_t e : entries) {
+                if (e == resolvedEntry) {
+                    emitOtherPlayerEquipment(guid);
+                    break;
+                }
+            }
+        }
+        // Same for inspect-based entries
         if (playerEquipmentCallback_) {
             for (const auto& [guid, entries] : inspectedPlayerItemEntries_) {
+                bool relevant = false;
+                for (uint32_t e : entries) {
+                    if (e == resolvedEntry) { relevant = true; break; }
+                }
+                if (!relevant) continue;
                 std::array<uint32_t, 19> displayIds{};
                 std::array<uint8_t, 19> invTypes{};
                 for (int s = 0; s < 19; s++) {

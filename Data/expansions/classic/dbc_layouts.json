@@ -5,7 +5,10 @@
   },
   "ItemDisplayInfo": {
     "ID": 0, "LeftModel": 1, "LeftModelTexture": 3,
-    "InventoryIcon": 5, "GeosetGroup1": 7, "GeosetGroup3": 9
+    "InventoryIcon": 5, "GeosetGroup1": 7, "GeosetGroup3": 9,
+    "TextureArmUpper": 14, "TextureArmLower": 15, "TextureHand": 16,
+    "TextureTorsoUpper": 17, "TextureTorsoLower": 18,
+    "TextureLegUpper": 19, "TextureLegLower": 20, "TextureFoot": 21
   },
   "CharSections": {
     "RaceID": 1, "SexID": 2, "BaseSection": 3,

@@ -3127,6 +3127,19 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                             "TorsoUpperTexture", "TorsoLowerTexture",
                             "LegUpperTexture", "LegLowerTexture", "FootTexture",
                         };
+                        const auto* idiL = pipeline::getActiveDBCLayout()
+                            ? pipeline::getActiveDBCLayout()->getLayout("ItemDisplayInfo") : nullptr;
+                        // Texture component region fields (8 regions: ArmUpper..Foot)
+                        const uint32_t texRegionFields[8] = {
+                            idiL ? (*idiL)["TextureArmUpper"]  : 14u,
+                            idiL ? (*idiL)["TextureArmLower"]  : 15u,
+                            idiL ? (*idiL)["TextureHand"]      : 16u,
+                            idiL ? (*idiL)["TextureTorsoUpper"]: 17u,
+                            idiL ? (*idiL)["TextureTorsoLower"]: 18u,
+                            idiL ? (*idiL)["TextureLegUpper"]  : 19u,
+                            idiL ? (*idiL)["TextureLegLower"]  : 20u,
+                            idiL ? (*idiL)["TextureFoot"]      : 21u,
+                        };
                         const bool npcIsFemale = (extra.sexId == 1);
 
                         // Iterate all 11 NPC equipment slots; let DBC lookup filter which have textures
@@ -3138,10 +3151,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
 
                             for (int region = 0; region < 8; region++) {
                                 std::string texName = npcItemDisplayDbc->getString(
-                                    static_cast<uint32_t>(recIdx), 14 + region);
-                                if (texName.empty())
-                                    texName = npcItemDisplayDbc->getString(
-                                        static_cast<uint32_t>(recIdx), 15 + region);
+                                    static_cast<uint32_t>(recIdx), texRegionFields[region]);
                                 if (texName.empty()) continue;
 
                                 std::string base = "Item\\TextureComponents\\" +
@@ -3958,6 +3968,18 @@ void Application::setOnlinePlayerEquipment(uint64_t guid,
         "FootTexture",
     };
 
+    // Texture component region fields from DBC layout
+    const uint32_t texRegionFields[8] = {
+        idiL ? (*idiL)["TextureArmUpper"]  : 14u,
+        idiL ? (*idiL)["TextureArmLower"]  : 15u,
+        idiL ? (*idiL)["TextureHand"]      : 16u,
+        idiL ? (*idiL)["TextureTorsoUpper"]: 17u,
+        idiL ? (*idiL)["TextureTorsoLower"]: 18u,
+        idiL ? (*idiL)["TextureLegUpper"]  : 19u,
+        idiL ? (*idiL)["TextureLegLower"]  : 20u,
+        idiL ? (*idiL)["TextureFoot"]      : 21u,
+    };
+
     std::vector<std::pair<int, std::string>> regionLayers;
     const bool isFemale = (st.genderId == 1);
 
@@ -3968,8 +3990,8 @@ void Application::setOnlinePlayerEquipment(uint64_t guid,
         if (recIdx < 0) continue;
 
         for (int region = 0; region < 8; region++) {
-            std::string texName = displayInfoDbc->getString(static_cast<uint32_t>(recIdx), 14 + region);
-            if (texName.empty()) texName = displayInfoDbc->getString(static_cast<uint32_t>(recIdx), 15 + region);
+            std::string texName = displayInfoDbc->getString(
+                static_cast<uint32_t>(recIdx), texRegionFields[region]);
             if (texName.empty()) continue;
 
             std::string base = "Item\\TextureComponents\\" + std::string(componentDirs[region]) + "\\" + texName;
