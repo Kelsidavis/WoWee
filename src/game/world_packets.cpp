@@ -1184,6 +1184,8 @@ bool MessageChatParser::parse(network::Packet& packet, MessageChatData& data) {
     packet.readUInt32();
 
     // Type-specific data
+    // WoW 3.3.5 SMSG_MESSAGECHAT format: after senderGuid+unk, most types
+    // have a receiverGuid (uint64). Some types have extra fields before it.
     switch (data.type) {
         case ChatType::MONSTER_SAY:
         case ChatType::MONSTER_YELL:
@@ -1196,33 +1198,29 @@ bool MessageChatParser::parse(network::Packet& packet, MessageChatData& data) {
                     data.senderName[i] = static_cast<char>(packet.readUInt8());
                 }
             }
-
-            // Read receiver GUID (usually 0 for monsters)
+            // Read receiver GUID
             data.receiverGuid = packet.readUInt64();
             break;
         }
 
-        case ChatType::WHISPER_INFORM: {
-            // Read receiver name
-            data.receiverName = packet.readString();
-            break;
-        }
-
         case ChatType::CHANNEL: {
-            // Read channel name
+            // Read channel name, then receiver GUID
             data.channelName = packet.readString();
+            data.receiverGuid = packet.readUInt64();
             break;
         }
 
         case ChatType::ACHIEVEMENT:
         case ChatType::GUILD_ACHIEVEMENT: {
-            // Read achievement ID
-            packet.readUInt32();
+            // Read target GUID
+            data.receiverGuid = packet.readUInt64();
             break;
         }
 
         default:
-            // No additional data for most types
+            // SAY, GUILD, PARTY, YELL, WHISPER, WHISPER_INFORM, RAID, etc.
+            // All have receiverGuid (typically senderGuid repeated)
+            data.receiverGuid = packet.readUInt64();
             break;
     }
 
