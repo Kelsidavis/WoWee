@@ -2,6 +2,7 @@
 #include "game/packet_parsers.hpp"
 #include "game/transport_manager.hpp"
 #include "game/warden_crypto.hpp"
+#include "game/warden_memory.hpp"
 #include "game/warden_module.hpp"
 #include "game/opcodes.hpp"
 #include "game/update_field_table.hpp"
@@ -2355,10 +2356,25 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         uint8_t readLen = decrypted[pos++];
                         LOG_INFO("Warden:   MEM offset=0x", [&]{char s[12];snprintf(s,12,"%08x",offset);return std::string(s);}(),
                                  " len=", (int)readLen);
-                        // Response: [uint8 result=0][data zeros]
-                        // We don't have real memory, send zeros
+
+                        // Lazy-load WoW.exe PE image on first MEM_CHECK
+                        if (!wardenMemory_) {
+                            wardenMemory_ = std::make_unique<WardenMemory>();
+                            if (!wardenMemory_->load()) {
+                                LOG_WARNING("Warden: Could not load WoW.exe for MEM_CHECK");
+                            }
+                        }
+
+                        // Read real bytes from PE image (falls back to zeros if unavailable)
+                        std::vector<uint8_t> memBuf(readLen, 0);
+                        if (wardenMemory_->isLoaded() && wardenMemory_->readMemory(offset, readLen, memBuf.data())) {
+                            LOG_INFO("Warden:   MEM_CHECK served from PE image");
+                        } else {
+                            LOG_WARNING("Warden:   MEM_CHECK fallback to zeros for 0x",
+                                        [&]{char s[12];snprintf(s,12,"%08x",offset);return std::string(s);}());
+                        }
                         resultData.push_back(0x00);
-                        for (int i = 0; i < readLen; i++) resultData.push_back(0x00);
+                        resultData.insert(resultData.end(), memBuf.begin(), memBuf.end());
                         break;
                     }
                     case CT_PAGE_A: {

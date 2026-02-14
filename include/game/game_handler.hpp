@@ -24,6 +24,7 @@
 namespace wowee::game {
     class TransportManager;
     class WardenCrypto;
+    class WardenMemory;
     class WardenModuleManager;
     class PacketParsers;
 }
@@ -1299,6 +1300,7 @@ private:
     uint32_t wardenPacketsAfterGate_ = 0;
     bool wardenCharEnumBlockedLogged_ = false;
     std::unique_ptr<WardenCrypto> wardenCrypto_;
+    std::unique_ptr<WardenMemory> wardenMemory_;
     std::unique_ptr<WardenModuleManager> wardenModuleManager_;
 
     // Warden module download state
