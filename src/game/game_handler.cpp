@@ -3122,7 +3122,18 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                 uint32_t old = currentMountDisplayId_;
                                 currentMountDisplayId_ = val;
                                 if (val != old && mountCallback_) mountCallback_(val);
+                                if (old == 0 && val != 0) {
+                                    // Just mounted — find the mount aura (indefinite duration, self-cast)
+                                    mountAuraSpellId_ = 0;
+                                    for (const auto& a : playerAuras) {
+                                        if (!a.isEmpty() && a.maxDurationMs < 0 && a.casterGuid == playerGuid) {
+                                            mountAuraSpellId_ = a.spellId;
+                                        }
+                                    }
+                                    LOG_INFO("Mount detected: displayId=", val, " auraSpellId=", mountAuraSpellId_);
+                                }
                                 if (old != 0 && val == 0) {
+                                    mountAuraSpellId_ = 0;
                                     for (auto& a : playerAuras)
                                         if (!a.isEmpty() && a.maxDurationMs < 0) a = AuraSlot{};
                                 }
@@ -3502,7 +3513,17 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                     uint32_t old = currentMountDisplayId_;
                                     currentMountDisplayId_ = val;
                                     if (val != old && mountCallback_) mountCallback_(val);
+                                    if (old == 0 && val != 0) {
+                                        mountAuraSpellId_ = 0;
+                                        for (const auto& a : playerAuras) {
+                                            if (!a.isEmpty() && a.maxDurationMs < 0 && a.casterGuid == playerGuid) {
+                                                mountAuraSpellId_ = a.spellId;
+                                            }
+                                        }
+                                        LOG_INFO("Mount detected (values update): displayId=", val, " auraSpellId=", mountAuraSpellId_);
+                                    }
                                     if (old != 0 && val == 0) {
+                                        mountAuraSpellId_ = 0;
                                         for (auto& a : playerAuras)
                                             if (!a.isEmpty() && a.maxDurationMs < 0) a = AuraSlot{};
                                     }
@@ -5973,6 +5994,7 @@ void GameHandler::dismount() {
     if (!socket) return;
     // Clear local mount state immediately (optimistic dismount).
     // Server will confirm via SMSG_UPDATE_OBJECT with mountDisplayId=0.
+    uint32_t savedMountAura = mountAuraSpellId_;
     if (currentMountDisplayId_ != 0 || taxiMountActive_) {
         if (mountCallback_) {
             mountCallback_(0);
@@ -5980,11 +6002,31 @@ void GameHandler::dismount() {
         currentMountDisplayId_ = 0;
         taxiMountActive_ = false;
         taxiMountDisplayId_ = 0;
+        mountAuraSpellId_ = 0;
         LOG_INFO("Dismount: cleared local mount state");
     }
-    network::Packet pkt(wireOpcode(Opcode::CMSG_CANCEL_MOUNT_AURA));
-    socket->send(pkt);
-    LOG_INFO("Sent CMSG_CANCEL_MOUNT_AURA");
+    // CMSG_CANCEL_MOUNT_AURA exists in TBC+ (0x0375). Classic/Vanilla doesn't have it.
+    uint16_t cancelMountWire = wireOpcode(Opcode::CMSG_CANCEL_MOUNT_AURA);
+    if (cancelMountWire != 0xFFFF) {
+        network::Packet pkt(cancelMountWire);
+        socket->send(pkt);
+        LOG_INFO("Sent CMSG_CANCEL_MOUNT_AURA");
+    } else if (savedMountAura != 0) {
+        // Fallback for Classic/Vanilla: cancel the mount aura by spell ID
+        auto pkt = CancelAuraPacket::build(savedMountAura);
+        socket->send(pkt);
+        LOG_INFO("Sent CMSG_CANCEL_AURA (mount spell ", savedMountAura, ") — Classic fallback");
+    } else {
+        // No tracked mount aura — try cancelling all indefinite self-cast auras
+        // (mount aura detection may have missed if aura arrived after mount field)
+        for (const auto& a : playerAuras) {
+            if (!a.isEmpty() && a.maxDurationMs < 0 && a.casterGuid == playerGuid) {
+                auto pkt = CancelAuraPacket::build(a.spellId);
+                socket->send(pkt);
+                LOG_INFO("Sent CMSG_CANCEL_AURA (spell ", a.spellId, ") — brute force dismount");
+            }
+        }
+    }
 }
 
 void GameHandler::handleForceRunSpeedChange(network::Packet& packet) {
@@ -6622,6 +6664,17 @@ void GameHandler::handleAuraUpdate(network::Packet& packet, bool isAll) {
                 auraList->push_back(AuraSlot{});
             }
             (*auraList)[slot] = aura;
+        }
+
+        // If player is mounted but we haven't identified the mount aura yet,
+        // check newly added auras (aura update may arrive after mountDisplayId)
+        if (data.guid == playerGuid && currentMountDisplayId_ != 0 && mountAuraSpellId_ == 0) {
+            for (const auto& [slot, aura] : data.updates) {
+                if (!aura.isEmpty() && aura.maxDurationMs < 0 && aura.casterGuid == playerGuid) {
+                    mountAuraSpellId_ = aura.spellId;
+                    LOG_INFO("Mount aura detected from aura update: spellId=", aura.spellId);
+                }
+            }
         }
     }
 }

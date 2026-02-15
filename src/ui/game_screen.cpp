@@ -770,12 +770,51 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
                     continue;
                 }
 
-                // Failed to parse as item link — render the |c literally and continue
-                ImGui::PushStyleColor(ImGuiCol_Text, color);
-                ImGui::TextWrapped("|c");
-                ImGui::PopStyleColor();
-                ImGui::SameLine(0, 0);
-                pos = nextSpecial + 2;
+                // Not an item link — treat as colored text: |cAARRGGBB...text...|r
+                if (nextSpecial == linkStart && text.size() > linkStart + 10) {
+                    ImVec4 cColor = parseWowColor(text, linkStart);
+                    size_t textStart = linkStart + 10; // after |cAARRGGBB
+                    size_t resetPos2 = text.find("|r", textStart);
+                    std::string coloredText;
+                    if (resetPos2 != std::string::npos) {
+                        coloredText = text.substr(textStart, resetPos2 - textStart);
+                        pos = resetPos2 + 2; // skip |r
+                    } else {
+                        coloredText = text.substr(textStart);
+                        pos = text.size();
+                    }
+                    // Strip any remaining WoW markup from the colored segment
+                    // (e.g. |H...|h pairs that aren't item links)
+                    std::string clean;
+                    for (size_t i = 0; i < coloredText.size(); i++) {
+                        if (coloredText[i] == '|' && i + 1 < coloredText.size()) {
+                            char next = coloredText[i + 1];
+                            if (next == 'H') {
+                                // Skip |H...|h
+                                size_t hEnd = coloredText.find("|h", i + 2);
+                                if (hEnd != std::string::npos) { i = hEnd + 1; continue; }
+                            } else if (next == 'h') {
+                                i += 1; continue; // skip |h
+                            } else if (next == 'r') {
+                                i += 1; continue; // skip |r
+                            }
+                        }
+                        clean += coloredText[i];
+                    }
+                    if (!clean.empty()) {
+                        ImGui::PushStyleColor(ImGuiCol_Text, cColor);
+                        ImGui::TextWrapped("%s", clean.c_str());
+                        ImGui::PopStyleColor();
+                        ImGui::SameLine(0, 0);
+                    }
+                } else {
+                    // Bare |c without enough chars for color — render literally
+                    ImGui::PushStyleColor(ImGuiCol_Text, color);
+                    ImGui::TextWrapped("|c");
+                    ImGui::PopStyleColor();
+                    ImGui::SameLine(0, 0);
+                    pos = nextSpecial + 2;
+                }
                 continue;
             }
 

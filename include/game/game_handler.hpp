@@ -1401,6 +1401,7 @@ private:
     TaxiOrientationCallback taxiOrientationCallback_;
     TaxiFlightStartCallback taxiFlightStartCallback_;
     uint32_t currentMountDisplayId_ = 0;
+    uint32_t mountAuraSpellId_ = 0;       // Spell ID of the aura that caused mounting (for CMSG_CANCEL_AURA fallback)
     float serverRunSpeed_ = 7.0f;
     bool playerDead_ = false;
     bool releasedSpirit_ = false;
