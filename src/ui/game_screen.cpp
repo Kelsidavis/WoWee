@@ -939,7 +939,11 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
         if (chatShowTimestamps_) {
             auto tt = std::chrono::system_clock::to_time_t(msg.timestamp);
             std::tm tm{};
+#ifdef _WIN32
+            localtime_s(&tm, &tt);
+#else
             localtime_r(&tt, &tm);
+#endif
             char tsBuf[16];
             snprintf(tsBuf, sizeof(tsBuf), "[%02d:%02d] ", tm.tm_hour, tm.tm_min);
             tsPrefix = tsBuf;
