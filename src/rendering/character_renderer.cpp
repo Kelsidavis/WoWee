@@ -32,6 +32,7 @@
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <limits>
@@ -128,6 +129,11 @@ bool CharacterRenderer::initialize() {
         uniform int uShadowEnabled;
         uniform float uShadowStrength;
         uniform float uOpacity;
+        uniform int uAlphaTest;
+        uniform int uColorKeyBlack;
+        uniform int uUnlit;
+        uniform float uEmissiveBoost;
+        uniform vec3 uEmissiveTint;
 
         out vec4 FragColor;
 
@@ -165,17 +171,34 @@ bool CharacterRenderer::initialize() {
 
             // Sample texture
             vec4 texColor = texture(uTexture0, TexCoord);
+            if (uAlphaTest != 0 && texColor.a < 0.5) discard;
+            if (uColorKeyBlack != 0) {
+                float key = max(texColor.r, max(texColor.g, texColor.b));
+                // Soft black-key: fade fringe instead of hard-cut to avoid dark halo.
+                float keyAlpha = smoothstep(0.12, 0.30, key);
+                texColor.a *= keyAlpha;
+                if (texColor.a < 0.02) discard;
+            }
 
             // Combine
-            vec3 result = (ambient + (diff * vec3(1.0) + specular) * shadow) * texColor.rgb;
+            vec3 litResult = (ambient + (diff * vec3(1.0) + specular) * shadow) * texColor.rgb;
+            vec3 warmBase = vec3(
+                max(texColor.r, texColor.g * 0.92),
+                texColor.g * 0.90,
+                texColor.b * 0.45
+            );
+            vec3 emissiveResult = warmBase * uEmissiveTint * uEmissiveBoost;
+            vec3 result = (uUnlit != 0) ? emissiveResult : litResult;
 
             // Fog
             float fogDist = length(uViewPos - FragPos);
             float fogFactor = clamp((uFogEnd - fogDist) / (uFogEnd - uFogStart), 0.0, 1.0);
             result = mix(uFogColor, result, fogFactor);
 
-            // Apply opacity (for fade-in effects)
-            FragColor = vec4(result, uOpacity);
+            // Apply texture alpha and instance opacity (for fade-in effects)
+            float finalAlpha = texColor.a * uOpacity;
+            if (finalAlpha < 0.02) discard;
+            FragColor = vec4(result, finalAlpha);
         }
     )";
 
@@ -221,8 +244,14 @@ bool CharacterRenderer::initialize() {
         in vec2 vTexCoord;
         uniform sampler2D uTexture;
         uniform bool uAlphaTest;
+        uniform bool uColorKeyBlack;
         void main() {
-            if (uAlphaTest && texture(uTexture, vTexCoord).a < 0.5) discard;
+            vec4 tex = texture(uTexture, vTexCoord);
+            if (uAlphaTest && tex.a < 0.5) discard;
+            if (uColorKeyBlack) {
+                float key = max(tex.r, max(tex.g, tex.b));
+                if (key < 0.14) discard;
+            }
         }
     )";
 
@@ -307,6 +336,8 @@ void CharacterRenderer::shutdown() {
         }
     }
     textureCache.clear();
+    textureHasAlphaById_.clear();
+    textureColorKeyBlackById_.clear();
     textureCacheBytes_ = 0;
     textureCacheCounter_ = 0;
 
@@ -340,6 +371,14 @@ GLuint CharacterRenderer::loadTexture(const std::string& path) {
         return key;
     };
     std::string key = normalizeKey(path);
+    auto containsToken = [](const std::string& haystack, const char* token) {
+        return haystack.find(token) != std::string::npos;
+    };
+    const bool colorKeyBlackHint =
+        containsToken(key, "candle") ||
+        containsToken(key, "flame") ||
+        containsToken(key, "fire") ||
+        containsToken(key, "torch");
 
     // Check cache
     auto it = textureCache.find(key);
@@ -364,6 +403,14 @@ GLuint CharacterRenderer::loadTexture(const std::string& path) {
         return whiteTexture;
     }
 
+    bool hasAlpha = false;
+    for (size_t i = 3; i < blpImage.data.size(); i += 4) {
+        if (blpImage.data[i] != 255) {
+            hasAlpha = true;
+            break;
+        }
+    }
+
     GLuint texId;
     glGenTextures(1, &texId);
     glBindTexture(GL_TEXTURE_2D, texId);
@@ -381,8 +428,12 @@ GLuint CharacterRenderer::loadTexture(const std::string& path) {
     e.id = texId;
     e.approxBytes = approxTextureBytesWithMips(blpImage.width, blpImage.height);
     e.lastUse = ++textureCacheCounter_;
+    e.hasAlpha = hasAlpha;
+    e.colorKeyBlack = colorKeyBlackHint;
     textureCacheBytes_ += e.approxBytes;
     textureCache[key] = e;
+    textureHasAlphaById_[texId] = hasAlpha;
+    textureColorKeyBlackById_[texId] = colorKeyBlackHint;
     if (textureCacheBytes_ > textureCacheBudgetBytes_) {
         core::Logger::getInstance().warning(
             "Character texture cache over budget: ",
@@ -1353,6 +1404,12 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
     // Shadows
     characterShader->setUniform("uShadowEnabled", shadowEnabled ? 1 : 0);
     characterShader->setUniform("uShadowStrength", 0.65f);
+    characterShader->setUniform("uTexture0", 0);
+    characterShader->setUniform("uAlphaTest", 0);
+    characterShader->setUniform("uColorKeyBlack", 0);
+    characterShader->setUniform("uUnlit", 0);
+    characterShader->setUniform("uEmissiveBoost", 1.0f);
+    characterShader->setUniform("uEmissiveTint", glm::vec3(1.0f));
     if (shadowEnabled) {
         characterShader->setUniform("uLightSpaceMatrix", lightSpaceMatrix);
         glActiveTexture(GL_TEXTURE7);
@@ -1519,6 +1576,23 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
 	                // Resolve texture for this batch (prefer hair textures for hair geosets).
 	                GLuint texId = resolveBatchTexture(instance, gpuModel, batch);
 
+                // Respect M2 material blend mode for creature/character submeshes.
+                uint16_t blendMode = 0;
+                uint16_t materialFlags = 0;
+                if (batch.materialIndex < gpuModel.data.materials.size()) {
+                    blendMode = gpuModel.data.materials[batch.materialIndex].blendMode;
+                    materialFlags = gpuModel.data.materials[batch.materialIndex].flags;
+                }
+                switch (blendMode) {
+                    case 0: glBlendFunc(GL_ONE, GL_ZERO); break;                      // Opaque
+                    case 1: glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); break; // AlphaKey
+                    case 2: glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); break; // Alpha
+                    case 3: glBlendFunc(GL_SRC_ALPHA, GL_ONE); break;                 // Additive
+                    case 4: glBlendFunc(GL_DST_COLOR, GL_ZERO); break;                // Mod
+                    case 5: glBlendFunc(GL_DST_COLOR, GL_SRC_COLOR); break;           // Mod2x
+                    case 6: glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); break;       // BlendAdd
+                    default: glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); break;
+                }
 
 
                 // For body/equipment parts with white/fallback texture, use skin (type 1) texture.
@@ -1560,6 +1634,36 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
 
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, texId);
+                bool alphaCutout = false;
+                bool colorKeyBlack = false;
+                if (texId != 0 && texId != whiteTexture) {
+                    auto ait = textureHasAlphaById_.find(texId);
+                    alphaCutout = (ait != textureHasAlphaById_.end()) ? ait->second : false;
+                    auto cit = textureColorKeyBlackById_.find(texId);
+                    colorKeyBlack = (cit != textureColorKeyBlackById_.end()) ? cit->second : false;
+                }
+                const bool blendNeedsCutout = (blendMode == 1) || (blendMode >= 2 && !alphaCutout);
+                characterShader->setUniform("uAlphaTest", (blendNeedsCutout || alphaCutout) ? 1 : 0);
+                characterShader->setUniform("uColorKeyBlack", (blendNeedsCutout || colorKeyBlack) ? 1 : 0);
+                const bool unlit = ((materialFlags & 0x01) != 0) || (blendMode >= 3);
+                characterShader->setUniform("uUnlit", unlit ? 1 : 0);
+                float emissiveBoost = 1.0f;
+                glm::vec3 emissiveTint(1.0f, 1.0f, 1.0f);
+                if (unlit) {
+                    using clock = std::chrono::steady_clock;
+                    float t = std::chrono::duration<float>(clock::now().time_since_epoch()).count();
+                    float phase = static_cast<float>(batch.submeshId) * 0.31f;
+                    float f1 = std::sin(t * 7.9f + phase);
+                    float f2 = std::sin(t * 12.7f + phase * 1.73f);
+                    float f3 = std::sin(t * 4.3f + phase * 2.11f);
+                    float flicker = 0.90f + 0.10f * f1 + 0.06f * f2 + 0.04f * f3;
+                    flicker = std::clamp(flicker, 0.72f, 1.12f);
+                    emissiveBoost = (blendMode >= 3) ? (2.4f * flicker) : (1.5f * flicker);
+                    // Warm flame bias to avoid green cast from source textures.
+                    emissiveTint = glm::vec3(1.28f, 1.04f, 0.82f);
+                }
+                characterShader->setUniform("uEmissiveBoost", emissiveBoost);
+                characterShader->setUniform("uEmissiveTint", emissiveTint);
 
                 glDrawElements(GL_TRIANGLES,
                                batch.indexCount,
@@ -1568,8 +1672,14 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
             }
         } else {
             // Draw entire model with first texture
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, !gpuModel.textureIds.empty() ? gpuModel.textureIds[0] : whiteTexture);
+            characterShader->setUniform("uAlphaTest", 0);
+            characterShader->setUniform("uColorKeyBlack", 0);
+            characterShader->setUniform("uUnlit", 0);
+            characterShader->setUniform("uEmissiveBoost", 1.0f);
+            characterShader->setUniform("uEmissiveTint", glm::vec3(1.0f));
 
             glDrawElements(GL_TRIANGLES,
                           static_cast<GLsizei>(gpuModel.data.indices.size()),
@@ -1594,6 +1704,7 @@ void CharacterRenderer::renderShadow(const glm::mat4& lightSpaceMatrix) {
     GLint modelLoc = glGetUniformLocation(shadowCasterProgram, "uModel");
     GLint texLoc = glGetUniformLocation(shadowCasterProgram, "uTexture");
     GLint alphaTestLoc = glGetUniformLocation(shadowCasterProgram, "uAlphaTest");
+    GLint colorKeyLoc = glGetUniformLocation(shadowCasterProgram, "uColorKeyBlack");
     GLint bonesLoc = glGetUniformLocation(shadowCasterProgram, "uBones[0]");
     if (lightSpaceLoc < 0 || modelLoc < 0) {
         return;
@@ -1637,8 +1748,16 @@ void CharacterRenderer::renderShadow(const glm::mat4& lightSpaceMatrix) {
                     }
                 }
 
-                bool alphaCutout = (texId != 0 && texId != whiteTexture);
+                bool alphaCutout = false;
+                bool colorKeyBlack = false;
+                if (texId != 0 && texId != whiteTexture) {
+                    auto itA = textureHasAlphaById_.find(texId);
+                    alphaCutout = (itA != textureHasAlphaById_.end()) ? itA->second : false;
+                    auto itC = textureColorKeyBlackById_.find(texId);
+                    colorKeyBlack = (itC != textureColorKeyBlackById_.end()) ? itC->second : false;
+                }
                 if (alphaTestLoc >= 0) glUniform1i(alphaTestLoc, alphaCutout ? 1 : 0);
+                if (colorKeyLoc >= 0) glUniform1i(colorKeyLoc, colorKeyBlack ? 1 : 0);
                 glBindTexture(GL_TEXTURE_2D, texId ? texId : whiteTexture);
 
                 glDrawElements(GL_TRIANGLES,
@@ -1648,6 +1767,7 @@ void CharacterRenderer::renderShadow(const glm::mat4& lightSpaceMatrix) {
             }
         } else {
             if (alphaTestLoc >= 0) glUniform1i(alphaTestLoc, 0);
+            if (colorKeyLoc >= 0) glUniform1i(colorKeyLoc, 0);
             glBindTexture(GL_TEXTURE_2D, whiteTexture);
             glDrawElements(GL_TRIANGLES,
                            static_cast<GLsizei>(gpuModel.data.indices.size()),

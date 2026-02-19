@@ -248,8 +248,12 @@ private:
         GLuint id = 0;
         size_t approxBytes = 0;
         uint64_t lastUse = 0;
+        bool hasAlpha = false;
+        bool colorKeyBlack = false;
     };
     std::unordered_map<std::string, TextureCacheEntry> textureCache;
+    std::unordered_map<GLuint, bool> textureHasAlphaById_;
+    std::unordered_map<GLuint, bool> textureColorKeyBlackById_;
     std::unordered_map<std::string, GLuint> compositeCache_;  // key → GPU texture for reuse
     std::unordered_set<std::string> failedTextureCache_;  // negative cache for missing textures
     size_t textureCacheBytes_ = 0;
