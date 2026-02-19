@@ -3818,7 +3818,7 @@ void GameScreen::renderCastBar(game::GameHandler& gameHandler) {
 
         char overlay[64];
         uint32_t currentSpellId = gameHandler.getCurrentCastSpellId();
-        if (gameHandler.isGameObjectInteractionCasting()) {
+        if (gameHandler.getCurrentCastSpellId() == 0) {
             snprintf(overlay, sizeof(overlay), "Opening... (%.1fs)", gameHandler.getCastTimeRemaining());
         } else {
             const std::string& spellName = gameHandler.getSpellName(currentSpellId);
