@@ -965,6 +965,22 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 handleFriendStatus(packet);
             }
             break;
+        case Opcode::SMSG_CONTACT_LIST: {
+            // Known variants:
+            // - Full form: uint32 listMask, uint32 count, then variable-size entries.
+            // - Minimal/legacy keepalive-ish form observed on some servers: 1 byte.
+            size_t remaining = packet.getSize() - packet.getReadPos();
+            if (remaining >= 8) {
+                /*uint32_t listMask =*/ packet.readUInt32();
+                /*uint32_t count =*/ packet.readUInt32();
+            } else if (remaining == 1) {
+                /*uint8_t marker =*/ packet.readUInt8();
+            } else if (remaining > 0) {
+                // Unknown short variant: consume to keep stream aligned, no warning spam.
+                packet.setReadPos(packet.getSize());
+            }
+            break;
+        }
 
         case Opcode::MSG_RANDOM_ROLL:
             if (state == WorldState::IN_WORLD) {
@@ -1019,6 +1035,28 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_FORCE_RUN_SPEED_CHANGE:
             handleForceRunSpeedChange(packet);
             break;
+        case Opcode::SMSG_CLIENT_CONTROL_UPDATE: {
+            // Minimal parse: PackedGuid + uint8 allowMovement.
+            if (packet.getSize() - packet.getReadPos() < 2) {
+                LOG_WARNING("SMSG_CLIENT_CONTROL_UPDATE too short: ", packet.getSize(), " bytes");
+                break;
+            }
+            uint8_t guidMask = packet.readUInt8();
+            size_t guidBytes = 0;
+            for (int i = 0; i < 8; ++i) {
+                if (guidMask & (1u << i)) ++guidBytes;
+            }
+            if (packet.getSize() - packet.getReadPos() < guidBytes + 1) {
+                LOG_WARNING("SMSG_CLIENT_CONTROL_UPDATE malformed (truncated packed guid)");
+                packet.setReadPos(packet.getSize());
+                break;
+            }
+            for (size_t i = 0; i < guidBytes; ++i) {
+                packet.readUInt8();
+            }
+            /*uint8_t allowMovement =*/ packet.readUInt8();
+            break;
+        }
 
         // ---- Phase 2: Combat ----
         case Opcode::SMSG_ATTACKSTART:
@@ -1253,6 +1291,48 @@ void GameHandler::handlePacket(network::Packet& packet) {
         }
 
         // Silently ignore common packets we don't handle yet
+        case Opcode::SMSG_INIT_WORLD_STATES: {
+            // Minimal parse: uint32 mapId, uint32 zoneId, uint16 count, repeated (uint32 key, uint32 val)
+            if (packet.getSize() - packet.getReadPos() < 10) {
+                LOG_WARNING("SMSG_INIT_WORLD_STATES too short: ", packet.getSize(), " bytes");
+                break;
+            }
+            /*uint32_t mapId =*/ packet.readUInt32();
+            /*uint32_t zoneId =*/ packet.readUInt32();
+            uint16_t count = packet.readUInt16();
+            size_t needed = static_cast<size_t>(count) * 8;
+            if (packet.getSize() - packet.getReadPos() < needed) {
+                LOG_WARNING("SMSG_INIT_WORLD_STATES truncated: expected ", needed,
+                            " bytes of state pairs, got ", packet.getSize() - packet.getReadPos());
+                packet.setReadPos(packet.getSize());
+                break;
+            }
+            for (uint16_t i = 0; i < count; ++i) {
+                packet.readUInt32();
+                packet.readUInt32();
+            }
+            break;
+        }
+        case Opcode::SMSG_INITIALIZE_FACTIONS: {
+            // Minimal parse: uint32 count, repeated (uint8 flags, int32 standing)
+            if (packet.getSize() - packet.getReadPos() < 4) {
+                LOG_WARNING("SMSG_INITIALIZE_FACTIONS too short: ", packet.getSize(), " bytes");
+                break;
+            }
+            uint32_t count = packet.readUInt32();
+            size_t needed = static_cast<size_t>(count) * 5;
+            if (packet.getSize() - packet.getReadPos() < needed) {
+                LOG_WARNING("SMSG_INITIALIZE_FACTIONS truncated: expected ", needed,
+                            " bytes of faction data, got ", packet.getSize() - packet.getReadPos());
+                packet.setReadPos(packet.getSize());
+                break;
+            }
+            for (uint32_t i = 0; i < count; ++i) {
+                packet.readUInt8();
+                packet.readUInt32();
+            }
+            break;
+        }
         case Opcode::SMSG_FEATURE_SYSTEM_STATUS:
         case Opcode::SMSG_SET_FLAT_SPELL_MODIFIER:
         case Opcode::SMSG_SET_PCT_SPELL_MODIFIER:
@@ -1579,6 +1659,15 @@ void GameHandler::handlePacket(network::Packet& packet) {
                     break;
                 }
             }
+            break;
+        }
+        case Opcode::SMSG_QUEST_FORCE_REMOVE: {
+            // Minimal parse: uint32 questId
+            if (packet.getSize() - packet.getReadPos() < 4) {
+                LOG_WARNING("SMSG_QUEST_FORCE_REMOVE too short");
+                break;
+            }
+            /*uint32_t questId =*/ packet.readUInt32();
             break;
         }
         case Opcode::SMSG_QUEST_QUERY_RESPONSE: {
