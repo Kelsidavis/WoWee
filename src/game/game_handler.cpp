@@ -1837,11 +1837,16 @@ void GameHandler::handlePacket(network::Packet& packet) {
         }
         case Opcode::SMSG_QUESTUPDATE_ADD_KILL: {
             // Quest kill count update
-            if (packet.getSize() - packet.getReadPos() >= 16) {
+            // Compatibility: some classic-family opcode tables swap ADD_KILL and COMPLETE.
+            size_t rem = packet.getSize() - packet.getReadPos();
+            if (rem >= 12) {
                 uint32_t questId = packet.readUInt32();
-                uint32_t entry = packet.readUInt32();  // Creature entry
-                uint32_t count = packet.readUInt32();  // Current kills
-                uint32_t reqCount = packet.readUInt32(); // Required kills
+                uint32_t entry = packet.readUInt32();   // Creature entry
+                uint32_t count = packet.readUInt32();   // Current kills
+                uint32_t reqCount = 0;
+                if (packet.getSize() - packet.getReadPos() >= 4) {
+                    reqCount = packet.readUInt32();     // Required kills (if present)
+                }
 
                 LOG_INFO("Quest kill update: questId=", questId, " entry=", entry,
                          " count=", count, "/", reqCount);
@@ -1849,10 +1854,14 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 // Update quest log with kill count
                 for (auto& quest : questLog_) {
                     if (quest.questId == questId) {
-                        // Store kill progress (using entry as objective index)
+                        // Preserve prior required count if this packet variant omits it.
+                        if (reqCount == 0) {
+                            auto it = quest.killCounts.find(entry);
+                            if (it != quest.killCounts.end()) reqCount = it->second.second;
+                            if (reqCount == 0) reqCount = count;
+                        }
                         quest.killCounts[entry] = {count, reqCount};
 
-                        // Show progress message
                         std::string progressMsg = quest.title + ": " +
                                                 std::to_string(count) + "/" +
                                                 std::to_string(reqCount);
@@ -1860,6 +1869,17 @@ void GameHandler::handlePacket(network::Packet& packet) {
 
                         LOG_INFO("Updated kill count for quest ", questId, ": ",
                                  count, "/", reqCount);
+                        break;
+                    }
+                }
+            } else if (rem >= 4) {
+                // Swapped mapping fallback: treat as QUESTUPDATE_COMPLETE packet.
+                uint32_t questId = packet.readUInt32();
+                LOG_INFO("Quest objectives completed (compat via ADD_KILL): questId=", questId);
+                for (auto& quest : questLog_) {
+                    if (quest.questId == questId) {
+                        quest.complete = true;
+                        addSystemChatMessage("Quest Complete: " + quest.title);
                         break;
                     }
                 }
@@ -1895,16 +1915,37 @@ void GameHandler::handlePacket(network::Packet& packet) {
             break;
         }
         case Opcode::SMSG_QUESTUPDATE_COMPLETE: {
-            // Quest objectives completed - mark as ready to turn in
-            uint32_t questId = packet.readUInt32();
-            LOG_INFO("Quest objectives completed: questId=", questId);
+            // Quest objectives completed - mark as ready to turn in.
+            // Compatibility: some classic-family opcode tables swap COMPLETE and ADD_KILL.
+            size_t rem = packet.getSize() - packet.getReadPos();
+            if (rem >= 12) {
+                uint32_t questId = packet.readUInt32();
+                uint32_t entry = packet.readUInt32();
+                uint32_t count = packet.readUInt32();
+                uint32_t reqCount = 0;
+                if (packet.getSize() - packet.getReadPos() >= 4) reqCount = packet.readUInt32();
+                if (reqCount == 0) reqCount = count;
+                LOG_INFO("Quest kill update (compat via COMPLETE): questId=", questId,
+                         " entry=", entry, " count=", count, "/", reqCount);
+                for (auto& quest : questLog_) {
+                    if (quest.questId == questId) {
+                        quest.killCounts[entry] = {count, reqCount};
+                        addSystemChatMessage(quest.title + ": " + std::to_string(count) +
+                                             "/" + std::to_string(reqCount));
+                        break;
+                    }
+                }
+            } else if (rem >= 4) {
+                uint32_t questId = packet.readUInt32();
+                LOG_INFO("Quest objectives completed: questId=", questId);
 
-            for (auto& quest : questLog_) {
-                if (quest.questId == questId) {
-                    quest.complete = true;
-                    addSystemChatMessage("Quest Complete: " + quest.title);
-                    LOG_INFO("Marked quest ", questId, " as complete");
-                    break;
+                for (auto& quest : questLog_) {
+                    if (quest.questId == questId) {
+                        quest.complete = true;
+                        addSystemChatMessage("Quest Complete: " + quest.title);
+                        LOG_INFO("Marked quest ", questId, " as complete");
+                        break;
+                    }
                 }
             }
             break;
@@ -8681,12 +8722,46 @@ void GameHandler::selectGossipOption(uint32_t optionId) {
 void GameHandler::selectGossipQuest(uint32_t questId) {
     if (state != WorldState::IN_WORLD || !socket || !gossipWindowOpen) return;
 
-    // Always query quest from gossip and let the server drive next step:
-    // - details (new quest), or
-    // - request items (turn-in check), or
-    // - offer reward.
-    auto packet = QuestgiverQueryQuestPacket::build(currentGossip.npcGuid, questId);
-    socket->send(packet);
+    // Prefer current gossip icon semantics to choose flow.
+    // WotLK/classic gossip icon conventions commonly use:
+    //   2 = available (!), 4 = active/incomplete (?), 5 = completable (?)
+    const GossipQuestItem* gossipQuest = nullptr;
+    for (const auto& q : currentGossip.quests) {
+        if (q.questId == questId) {
+            gossipQuest = &q;
+            break;
+        }
+    }
+
+    const bool iconSaysAvailable = gossipQuest && gossipQuest->questIcon == 2;
+    const bool iconSaysActive = gossipQuest &&
+        (gossipQuest->questIcon == 4 || gossipQuest->questIcon == 5);
+
+    // Keep quest-log fallback for servers that don't use canonical icon values.
+    const QuestLogEntry* activeQuest = nullptr;
+    for (const auto& q : questLog_) {
+        if (q.questId == questId) {
+            activeQuest = &q;
+            break;
+        }
+    }
+
+    const bool shouldStartProgressFlow = iconSaysActive || (!iconSaysAvailable && activeQuest);
+    if (shouldStartProgressFlow) {
+        pendingTurnInQuestId_ = questId;
+        pendingTurnInNpcGuid_ = currentGossip.npcGuid;
+        pendingTurnInRewardRequest_ = activeQuest ? activeQuest->complete : false;
+        auto packet = QuestgiverCompleteQuestPacket::build(currentGossip.npcGuid, questId);
+        socket->send(packet);
+    } else {
+        pendingTurnInQuestId_ = 0;
+        pendingTurnInNpcGuid_ = 0;
+        pendingTurnInRewardRequest_ = false;
+        auto packet = packetParsers_
+            ? packetParsers_->buildQueryQuestPacket(currentGossip.npcGuid, questId)
+            : QuestgiverQueryQuestPacket::build(currentGossip.npcGuid, questId);
+        socket->send(packet);
+    }
 
     gossipWindowOpen = false;
 }
@@ -9227,7 +9302,11 @@ void GameHandler::handleGossipMessage(network::Packet& packet) {
     gossipWindowOpen = true;
     vendorWindowOpen = false; // Close vendor if gossip opens
 
-    // Query quest data and update quest log based on gossip quests
+    // Update known quest-log entries based on gossip quests.
+    // Do not synthesize new "active quest" entries from gossip alone.
+    bool hasAvailableQuest = false;
+    bool hasRewardQuest = false;
+    bool hasIncompleteQuest = false;
     for (const auto& questItem : currentGossip.quests) {
         // WotLK gossip questIcon is an integer enum, NOT a bitmask:
         //   2 = yellow !  (available, not yet accepted)
@@ -9237,28 +9316,30 @@ void GameHandler::handleGossipMessage(network::Packet& packet) {
         // quests as completable and causing the server to reject the turn-in request.
         bool isCompletable = (questItem.questIcon == 5);  // Gold ? = can turn in
         bool isIncomplete  = (questItem.questIcon == 4);  // Gray ? = in progress
+        bool isAvailable   = (questItem.questIcon == 2);  // Yellow ! = available
 
-        // Add or update quest in log
-        bool found = false;
+        hasAvailableQuest |= isAvailable;
+        hasRewardQuest |= isCompletable;
+        hasIncompleteQuest |= isIncomplete;
+
+        // Update existing quest entry if present
         for (auto& quest : questLog_) {
             if (quest.questId == questItem.questId) {
                 quest.complete = isCompletable;
                 quest.title = questItem.title;
-                found = true;
                 LOG_INFO("Updated quest ", questItem.questId, " in log: complete=", isCompletable);
                 break;
             }
         }
+    }
 
-        if (!found && (isCompletable || isIncomplete)) {
-            // Quest is active (either completable or incomplete) - add to log
-            QuestLogEntry entry;
-            entry.questId = questItem.questId;
-            entry.complete = isCompletable;
-            entry.title = questItem.title;
-            questLog_.push_back(entry);
-            LOG_INFO("Added quest ", questItem.questId, " to log: complete=", isCompletable);
-        }
+    // Keep overhead marker aligned with what this gossip actually offers.
+    if (currentGossip.npcGuid != 0) {
+        QuestGiverStatus derivedStatus = QuestGiverStatus::NONE;
+        if (hasRewardQuest) derivedStatus = QuestGiverStatus::REWARD;
+        else if (hasAvailableQuest) derivedStatus = QuestGiverStatus::AVAILABLE;
+        else if (hasIncompleteQuest) derivedStatus = QuestGiverStatus::INCOMPLETE;
+        npcQuestStatus_[currentGossip.npcGuid] = derivedStatus;
     }
 
     // Play NPC greeting voice

@@ -5069,6 +5069,7 @@ void Application::updateQuestMarkers() {
                 markerType = 0;  // Available (yellow !)
                 break;
             case QuestGiverStatus::REWARD:
+            case QuestGiverStatus::REWARD_REP:
                 markerType = 1;  // Turn-in (yellow ?)
                 break;
             case QuestGiverStatus::INCOMPLETE:

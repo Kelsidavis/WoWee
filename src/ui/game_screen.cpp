@@ -6013,7 +6013,8 @@ void GameScreen::renderQuestMarkers(game::GameHandler& gameHandler) {
         } else if (status == game::QuestGiverStatus::AVAILABLE_LOW) {
             marker = "!";
             color = IM_COL32(160, 160, 160, 255); // gray
-        } else if (status == game::QuestGiverStatus::REWARD) {
+        } else if (status == game::QuestGiverStatus::REWARD ||
+                   status == game::QuestGiverStatus::REWARD_REP) {
             marker = "?";
         } else if (status == game::QuestGiverStatus::INCOMPLETE) {
             marker = "?";
@@ -6115,7 +6116,8 @@ void GameScreen::renderMinimapMarkers(game::GameHandler& gameHandler) {
         } else if (status == game::QuestGiverStatus::AVAILABLE_LOW) {
             dotColor = IM_COL32(160, 160, 160, 255);
             marker = "!";
-        } else if (status == game::QuestGiverStatus::REWARD) {
+        } else if (status == game::QuestGiverStatus::REWARD ||
+                   status == game::QuestGiverStatus::REWARD_REP) {
             dotColor = IM_COL32(255, 210, 0, 255);
             marker = "?";
         } else if (status == game::QuestGiverStatus::INCOMPLETE) {
