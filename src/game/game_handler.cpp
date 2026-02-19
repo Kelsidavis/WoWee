@@ -941,6 +941,73 @@ void GameHandler::handlePacket(network::Packet& packet) {
             LOG_INFO("SMSG_PLAY_MUSIC (0x0103 alias): soundId=", soundId);
             return;
         }
+    } else if (opcode == 0x0480) {
+        // Observed on this WotLK profile immediately after CMSG_BUYBACK_ITEM.
+        // Treat as vendor/buyback transaction result (7-byte payload on this core).
+        if (packet.getSize() - packet.getReadPos() >= 7) {
+            uint8_t opType = packet.readUInt8();
+            uint8_t resultCode = packet.readUInt8();
+            uint8_t slotOrCount = packet.readUInt8();
+            uint32_t itemId = packet.readUInt32();
+            LOG_INFO("Vendor txn result (0x480): opType=", static_cast<int>(opType),
+                     " result=", static_cast<int>(resultCode),
+                     " slot/count=", static_cast<int>(slotOrCount),
+                     " itemId=", itemId,
+                     " pendingBuybackSlot=", pendingBuybackSlot_,
+                     " pendingBuyItemId=", pendingBuyItemId_,
+                     " pendingBuyItemSlot=", pendingBuyItemSlot_);
+
+            if (pendingBuybackSlot_ >= 0) {
+                if (resultCode == 0) {
+                    // Success: remove the bought-back slot from our local UI cache.
+                    if (pendingBuybackSlot_ < static_cast<int>(buybackItems_.size())) {
+                        buybackItems_.erase(buybackItems_.begin() + pendingBuybackSlot_);
+                    }
+                } else {
+                    const char* msg = "Buyback failed.";
+                    // Best-effort mapping; keep raw code visible for unknowns.
+                    switch (resultCode) {
+                        case 2: msg = "Buyback failed: not enough money."; break;
+                        case 4: msg = "Buyback failed: vendor too far away."; break;
+                        case 5: msg = "Buyback failed: item unavailable."; break;
+                        case 6: msg = "Buyback failed: inventory full."; break;
+                        case 8: msg = "Buyback failed: requirements not met."; break;
+                        default: break;
+                    }
+                    addSystemChatMessage(std::string(msg) + " (code " + std::to_string(resultCode) + ")");
+                }
+                pendingBuybackSlot_ = -1;
+
+                // Refresh vendor list so UI state stays in sync after buyback result.
+                if (currentVendorItems.vendorGuid != 0 && socket && state == WorldState::IN_WORLD) {
+                    auto pkt = ListInventoryPacket::build(currentVendorItems.vendorGuid);
+                    socket->send(pkt);
+                }
+            } else if (pendingBuyItemId_ != 0) {
+                if (resultCode != 0) {
+                    const char* msg = "Purchase failed.";
+                    switch (resultCode) {
+                        case 2: msg = "Purchase failed: not enough money."; break;
+                        case 4: msg = "Purchase failed: vendor too far away."; break;
+                        case 5: msg = "Purchase failed: item sold out."; break;
+                        case 6: msg = "Purchase failed: inventory full."; break;
+                        case 8: msg = "Purchase failed: requirements not met."; break;
+                        default: break;
+                    }
+                    addSystemChatMessage(std::string(msg) + " (code " + std::to_string(resultCode) + ")");
+                }
+                pendingBuyItemId_ = 0;
+                pendingBuyItemSlot_ = 0;
+            }
+            return;
+        }
+    } else if (opcode == 0x046A) {
+        // Server-specific vendor/buyback state packet (observed 25-byte records).
+        // Consume to keep stream aligned; currently not used for gameplay logic.
+        if (packet.getSize() - packet.getReadPos() >= 25) {
+            packet.setReadPos(packet.getReadPos() + 25);
+            return;
+        }
     }
 
     auto preLogicalOp = opcodeTable_.fromWire(opcode);
@@ -1646,10 +1713,25 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_SELL_ITEM: {
             // uint64 vendorGuid, uint64 itemGuid, uint8 result
             if ((packet.getSize() - packet.getReadPos()) >= 17) {
-                packet.readUInt64(); // vendorGuid
-                packet.readUInt64(); // itemGuid
+                uint64_t vendorGuid = packet.readUInt64();
+                uint64_t itemGuid = packet.readUInt64(); // itemGuid
                 uint8_t result = packet.readUInt8();
-                if (result != 0) {
+                LOG_INFO("SMSG_SELL_ITEM: vendorGuid=0x", std::hex, vendorGuid,
+                         " itemGuid=0x", itemGuid, std::dec,
+                         " result=", static_cast<int>(result));
+                if (result == 0) {
+                    pendingSellToBuyback_.erase(itemGuid);
+                } else {
+                    auto it = pendingSellToBuyback_.find(itemGuid);
+                    if (it != pendingSellToBuyback_.end()) {
+                        for (auto bit = buybackItems_.begin(); bit != buybackItems_.end(); ++bit) {
+                            if (bit->itemGuid == itemGuid) {
+                                buybackItems_.erase(bit);
+                                break;
+                            }
+                        }
+                        pendingSellToBuyback_.erase(it);
+                    }
                     static const char* sellErrors[] = {
                         "OK", "Can't find item", "Can't sell item",
                         "Can't find vendor", "You don't own that item",
@@ -1738,11 +1820,18 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_BUY_FAILED: {
             // vendorGuid(8) + itemId(4) + errorCode(1)
             if (packet.getSize() - packet.getReadPos() >= 13) {
-                /*uint64_t vendorGuid =*/ packet.readUInt64();
-                /*uint32_t itemId    =*/ packet.readUInt32();
+                uint64_t vendorGuid = packet.readUInt64();
+                uint32_t itemIdOrSlot = packet.readUInt32();
                 uint8_t errCode = packet.readUInt8();
+                LOG_INFO("SMSG_BUY_FAILED: vendorGuid=0x", std::hex, vendorGuid, std::dec,
+                         " item/slot=", itemIdOrSlot,
+                         " err=", static_cast<int>(errCode),
+                         " pendingBuybackSlot=", pendingBuybackSlot_,
+                         " pendingBuyItemId=", pendingBuyItemId_,
+                         " pendingBuyItemSlot=", pendingBuyItemSlot_);
                 const char* msg = "Purchase failed.";
                 switch (errCode) {
+                    case 0: msg = "Purchase failed: item not found."; break;
                     case 2: msg = "You don't have enough money."; break;
                     case 4: msg = "Seller is too far away."; break;
                     case 5: msg = "That item is sold out."; break;
@@ -8978,6 +9067,7 @@ void GameHandler::closeGossip() {
 
 void GameHandler::openVendor(uint64_t npcGuid) {
     if (state != WorldState::IN_WORLD || !socket) return;
+    buybackItems_.clear();
     auto packet = ListInventoryPacket::build(npcGuid);
     socket->send(packet);
 }
@@ -8985,17 +9075,48 @@ void GameHandler::openVendor(uint64_t npcGuid) {
 void GameHandler::closeVendor() {
     vendorWindowOpen = false;
     currentVendorItems = ListInventoryData{};
+    buybackItems_.clear();
+    pendingSellToBuyback_.clear();
+    pendingBuybackSlot_ = -1;
+    pendingBuyItemId_ = 0;
+    pendingBuyItemSlot_ = 0;
 }
 
 void GameHandler::buyItem(uint64_t vendorGuid, uint32_t itemId, uint32_t slot, uint32_t count) {
     if (state != WorldState::IN_WORLD || !socket) return;
-    (void)slot;
-    auto packet = BuyItemPacket::build(vendorGuid, itemId, count);
+    LOG_INFO("Buy request: vendorGuid=0x", std::hex, vendorGuid, std::dec,
+             " itemId=", itemId, " slot=", slot, " count=", count,
+             " wire=0x", std::hex, wireOpcode(Opcode::CMSG_BUY_ITEM), std::dec);
+    pendingBuyItemId_ = itemId;
+    pendingBuyItemSlot_ = slot;
+    auto packet = BuyItemPacket::build(vendorGuid, itemId, slot, count);
+    socket->send(packet);
+}
+
+void GameHandler::buyBackItem(uint32_t buybackSlot) {
+    if (state != WorldState::IN_WORLD || !socket || currentVendorItems.vendorGuid == 0) return;
+    // AzerothCore/WotLK expects absolute buyback inventory slot IDs, not 0-based UI row index.
+    // BUYBACK_SLOT_START is 74 in this protocol family.
+    constexpr uint32_t kBuybackSlotStart = 74;
+    uint32_t wireSlot = kBuybackSlotStart + buybackSlot;
+    // This request is independent from normal buy path; avoid stale pending buy context in logs.
+    pendingBuyItemId_ = 0;
+    pendingBuyItemSlot_ = 0;
+    LOG_INFO("Buyback request: vendorGuid=0x", std::hex, currentVendorItems.vendorGuid,
+             std::dec, " uiSlot=", buybackSlot, " wireSlot=", wireSlot,
+             " source=absolute-buyback-slot",
+             " wire=0x", std::hex,
+             wireOpcode(Opcode::CMSG_BUYBACK_ITEM), std::dec);
+    pendingBuybackSlot_ = static_cast<int>(buybackSlot);
+    auto packet = BuybackItemPacket::build(currentVendorItems.vendorGuid, wireSlot);
     socket->send(packet);
 }
 
 void GameHandler::sellItem(uint64_t vendorGuid, uint64_t itemGuid, uint32_t count) {
     if (state != WorldState::IN_WORLD || !socket) return;
+    LOG_INFO("Sell request: vendorGuid=0x", std::hex, vendorGuid,
+             " itemGuid=0x", itemGuid, std::dec,
+             " count=", count, " wire=0x", std::hex, wireOpcode(Opcode::CMSG_SELL_ITEM), std::dec);
     auto packet = SellItemPacket::build(vendorGuid, itemGuid, count);
     socket->send(packet);
 }
@@ -9004,6 +9125,17 @@ void GameHandler::sellItemBySlot(int backpackIndex) {
     if (backpackIndex < 0 || backpackIndex >= inventory.getBackpackSize()) return;
     const auto& slot = inventory.getBackpackSlot(backpackIndex);
     if (slot.empty()) return;
+
+    uint32_t sellPrice = slot.item.sellPrice;
+    if (sellPrice == 0) {
+        if (auto* info = getItemInfo(slot.item.itemId); info && info->valid) {
+            sellPrice = info->sellPrice;
+        }
+    }
+    if (sellPrice == 0) {
+        addSystemChatMessage("Cannot sell: this item has no vendor value.");
+        return;
+    }
 
     uint64_t itemGuid = backpackSlotGuids_[backpackIndex];
     if (itemGuid == 0) {
@@ -9014,6 +9146,13 @@ void GameHandler::sellItemBySlot(int backpackIndex) {
               " itemGuid=0x", std::hex, itemGuid, std::dec,
               " vendorGuid=0x", std::hex, currentVendorItems.vendorGuid, std::dec);
     if (itemGuid != 0 && currentVendorItems.vendorGuid != 0) {
+        BuybackItem sold;
+        sold.itemGuid = itemGuid;
+        sold.item = slot.item;
+        sold.count = 1;
+        buybackItems_.push_front(sold);
+        if (buybackItems_.size() > 12) buybackItems_.pop_back();
+        pendingSellToBuyback_[itemGuid] = sold;
         sellItem(currentVendorItems.vendorGuid, itemGuid, 1);
     } else if (itemGuid == 0) {
         addSystemChatMessage("Cannot sell: item not found in inventory.");
@@ -9053,6 +9192,17 @@ void GameHandler::sellItemInBag(int bagIndex, int slotIndex) {
     const auto& slot = inventory.getBagSlot(bagIndex, slotIndex);
     if (slot.empty()) return;
 
+    uint32_t sellPrice = slot.item.sellPrice;
+    if (sellPrice == 0) {
+        if (auto* info = getItemInfo(slot.item.itemId); info && info->valid) {
+            sellPrice = info->sellPrice;
+        }
+    }
+    if (sellPrice == 0) {
+        addSystemChatMessage("Cannot sell: this item has no vendor value.");
+        return;
+    }
+
     // Resolve item GUID from container contents
     uint64_t itemGuid = 0;
     uint64_t bagGuid = equipSlotGuids_[19 + bagIndex];
@@ -9067,6 +9217,13 @@ void GameHandler::sellItemInBag(int bagIndex, int slotIndex) {
     }
 
     if (itemGuid != 0 && currentVendorItems.vendorGuid != 0) {
+        BuybackItem sold;
+        sold.itemGuid = itemGuid;
+        sold.item = slot.item;
+        sold.count = 1;
+        buybackItems_.push_front(sold);
+        if (buybackItems_.size() > 12) buybackItems_.pop_back();
+        pendingSellToBuyback_[itemGuid] = sold;
         sellItem(currentVendorItems.vendorGuid, itemGuid, 1);
     } else if (itemGuid == 0) {
         addSystemChatMessage("Cannot sell: item not found.");

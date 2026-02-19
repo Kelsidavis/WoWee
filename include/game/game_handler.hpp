@@ -808,6 +808,13 @@ public:
     void sellItem(uint64_t vendorGuid, uint64_t itemGuid, uint32_t count);
     void sellItemBySlot(int backpackIndex);
     void sellItemInBag(int bagIndex, int slotIndex);
+    struct BuybackItem {
+        uint64_t itemGuid = 0;
+        ItemDef item;
+        uint32_t count = 1;
+    };
+    void buyBackItem(uint32_t buybackSlot);
+    const std::deque<BuybackItem>& getBuybackItems() const { return buybackItems_; }
     void autoEquipItemBySlot(int backpackIndex);
     void autoEquipItemInBag(int bagIndex, int slotIndex);
     void useItemBySlot(int backpackIndex);
@@ -1532,6 +1539,11 @@ private:
     // Vendor
     bool vendorWindowOpen = false;
     ListInventoryData currentVendorItems;
+    std::deque<BuybackItem> buybackItems_;
+    std::unordered_map<uint64_t, BuybackItem> pendingSellToBuyback_;
+    int pendingBuybackSlot_ = -1;
+    uint32_t pendingBuyItemId_ = 0;
+    uint32_t pendingBuyItemSlot_ = 0;
 
     // Trainer
     bool trainerWindowOpen_ = false;
