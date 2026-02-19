@@ -567,9 +567,22 @@ void GameHandler::update(float deltaTime) {
         }
 
         // Update cast timer (Phase 3)
+        if (pendingGameObjectInteractGuid_ != 0 &&
+            (autoAttacking || !hostileAttackers_.empty())) {
+            pendingGameObjectInteractGuid_ = 0;
+            casting = false;
+            currentCastSpellId = 0;
+            castTimeRemaining = 0.0f;
+            addSystemChatMessage("Interrupted.");
+        }
         if (casting && castTimeRemaining > 0.0f) {
             castTimeRemaining -= deltaTime;
             if (castTimeRemaining <= 0.0f) {
+                if (pendingGameObjectInteractGuid_ != 0) {
+                    uint64_t interactGuid = pendingGameObjectInteractGuid_;
+                    pendingGameObjectInteractGuid_ = 0;
+                    performGameObjectInteractionNow(interactGuid);
+                }
                 casting = false;
                 currentCastSpellId = 0;
                 castTimeRemaining = 0.0f;
@@ -2636,6 +2649,7 @@ void GameHandler::selectCharacter(uint64_t characterGuid) {
     autoAttackTarget = 0;
     casting = false;
     currentCastSpellId = 0;
+    pendingGameObjectInteractGuid_ = 0;
     castTimeRemaining = 0.0f;
     castTimeTotal = 0.0f;
     playerDead_ = false;
@@ -6029,13 +6043,16 @@ void GameHandler::stopCasting() {
         return; // Not casting anything
     }
 
-    // Send cancel cast packet with current spell ID
-    auto packet = CancelCastPacket::build(currentCastSpellId);
-    socket->send(packet);
+    // Send cancel cast packet only for real spell casts.
+    if (pendingGameObjectInteractGuid_ == 0 && currentCastSpellId != 0) {
+        auto packet = CancelCastPacket::build(currentCastSpellId);
+        socket->send(packet);
+    }
 
     // Reset casting state
     casting = false;
     currentCastSpellId = 0;
+    pendingGameObjectInteractGuid_ = 0;
     castTimeRemaining = 0.0f;
     castTimeTotal = 0.0f;
 
@@ -7872,10 +7889,14 @@ void GameHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
 
 void GameHandler::cancelCast() {
     if (!casting) return;
-    if (state == WorldState::IN_WORLD && socket) {
+    // GameObject interaction cast is client-side timing only.
+    if (pendingGameObjectInteractGuid_ == 0 &&
+        state == WorldState::IN_WORLD && socket &&
+        currentCastSpellId != 0) {
         auto packet = CancelCastPacket::build(currentCastSpellId);
         socket->send(packet);
     }
+    pendingGameObjectInteractGuid_ = 0;
     casting = false;
     currentCastSpellId = 0;
     castTimeRemaining = 0.0f;
@@ -8545,6 +8566,21 @@ void GameHandler::interactWithNpc(uint64_t guid) {
 }
 
 void GameHandler::interactWithGameObject(uint64_t guid) {
+    if (guid == 0) return;
+    if (state != WorldState::IN_WORLD || !socket) return;
+    if (casting && currentCastSpellId != 0) return;  // don't overlap spell cast bar
+    if (autoAttacking) {
+        stopAutoAttack();
+    }
+    pendingGameObjectInteractGuid_ = guid;
+    casting = true;
+    currentCastSpellId = 0;
+    castTimeTotal = 1.5f;
+    castTimeRemaining = castTimeTotal;
+}
+
+void GameHandler::performGameObjectInteractionNow(uint64_t guid) {
+    if (guid == 0) return;
     if (state != WorldState::IN_WORLD || !socket) return;
     bool turtleMode = isActiveExpansion("turtle");
 
@@ -8564,10 +8600,6 @@ void GameHandler::interactWithGameObject(uint64_t guid) {
     if (autoAttacking) {
         stopAutoAttack();
     }
-    if (targetGuid != guid) {
-        setTarget(guid);
-    }
-
     auto entity = entityManager.getEntity(guid);
 
     auto packet = GameObjectUsePacket::build(guid);
@@ -9258,6 +9290,16 @@ void GameHandler::handleGossipMessage(network::Packet& packet) {
     bool hasAvailableQuest = false;
     bool hasRewardQuest = false;
     bool hasIncompleteQuest = false;
+    auto questIconIsCompletable = [](uint32_t icon) {
+        return icon == 5 || icon == 6 || icon == 10;
+    };
+    auto questIconIsIncomplete = [](uint32_t icon) {
+        return icon == 3 || icon == 4;
+    };
+    auto questIconIsAvailable = [](uint32_t icon) {
+        return icon == 2 || icon == 7 || icon == 8;
+    };
+
     for (const auto& questItem : currentGossip.quests) {
         // WotLK gossip questIcon is an integer enum, NOT a bitmask:
         //   2 = yellow !  (available, not yet accepted)
@@ -9265,9 +9307,9 @@ void GameHandler::handleGossipMessage(network::Packet& packet) {
         //   5 = gold ?    (complete, ready to turn in)
         // Bit-masking these values is wrong: 4 & 0x04 = true, treating incomplete
         // quests as completable and causing the server to reject the turn-in request.
-        bool isCompletable = (questItem.questIcon == 5);  // Gold ? = can turn in
-        bool isIncomplete  = (questItem.questIcon == 4);  // Gray ? = in progress
-        bool isAvailable   = (questItem.questIcon == 2);  // Yellow ! = available
+        bool isCompletable = questIconIsCompletable(questItem.questIcon);
+        bool isIncomplete  = questIconIsIncomplete(questItem.questIcon);
+        bool isAvailable   = questIconIsAvailable(questItem.questIcon);
 
         hasAvailableQuest |= isAvailable;
         hasRewardQuest |= isCompletable;
@@ -9290,7 +9332,9 @@ void GameHandler::handleGossipMessage(network::Packet& packet) {
         if (hasRewardQuest) derivedStatus = QuestGiverStatus::REWARD;
         else if (hasAvailableQuest) derivedStatus = QuestGiverStatus::AVAILABLE;
         else if (hasIncompleteQuest) derivedStatus = QuestGiverStatus::INCOMPLETE;
-        npcQuestStatus_[currentGossip.npcGuid] = derivedStatus;
+        if (derivedStatus != QuestGiverStatus::NONE) {
+            npcQuestStatus_[currentGossip.npcGuid] = derivedStatus;
+        }
     }
 
     // Play NPC greeting voice
@@ -9371,10 +9415,20 @@ void GameHandler::handleQuestgiverQuestList(network::Packet& packet) {
     bool hasAvailableQuest = false;
     bool hasRewardQuest = false;
     bool hasIncompleteQuest = false;
+    auto questIconIsCompletable = [](uint32_t icon) {
+        return icon == 5 || icon == 6 || icon == 10;
+    };
+    auto questIconIsIncomplete = [](uint32_t icon) {
+        return icon == 3 || icon == 4;
+    };
+    auto questIconIsAvailable = [](uint32_t icon) {
+        return icon == 2 || icon == 7 || icon == 8;
+    };
+
     for (const auto& questItem : currentGossip.quests) {
-        bool isCompletable = (questItem.questIcon == 5 || questItem.questIcon == 10);
-        bool isIncomplete  = (questItem.questIcon == 3 || questItem.questIcon == 4);
-        bool isAvailable   = (questItem.questIcon == 2 || questItem.questIcon == 7 || questItem.questIcon == 8);
+        bool isCompletable = questIconIsCompletable(questItem.questIcon);
+        bool isIncomplete  = questIconIsIncomplete(questItem.questIcon);
+        bool isAvailable   = questIconIsAvailable(questItem.questIcon);
         hasAvailableQuest |= isAvailable;
         hasRewardQuest |= isCompletable;
         hasIncompleteQuest |= isIncomplete;
@@ -9384,7 +9438,9 @@ void GameHandler::handleQuestgiverQuestList(network::Packet& packet) {
         if (hasRewardQuest) derivedStatus = QuestGiverStatus::REWARD;
         else if (hasAvailableQuest) derivedStatus = QuestGiverStatus::AVAILABLE;
         else if (hasIncompleteQuest) derivedStatus = QuestGiverStatus::INCOMPLETE;
-        npcQuestStatus_[currentGossip.npcGuid] = derivedStatus;
+        if (derivedStatus != QuestGiverStatus::NONE) {
+            npcQuestStatus_[currentGossip.npcGuid] = derivedStatus;
+        }
     }
 
     LOG_INFO("Questgiver quest list: npc=0x", std::hex, currentGossip.npcGuid, std::dec,
@@ -9990,6 +10046,7 @@ void GameHandler::handleNewWorld(network::Packet& packet) {
     stopAutoAttack();
     casting = false;
     currentCastSpellId = 0;
+    pendingGameObjectInteractGuid_ = 0;
     castTimeRemaining = 0.0f;
 
     // Send MSG_MOVE_WORLDPORT_ACK to tell the server we're ready

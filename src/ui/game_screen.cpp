@@ -4826,48 +4826,27 @@ void GameScreen::renderQuestOfferRewardWindow(game::GameHandler& gameHandler) {
                     }
                 }
 
-                // Render item with icon
+                // Render item with icon + visible selectable label
                 ImGui::PushID(static_cast<int>(i));
-                if (ImGui::Selectable("##reward", selected, 0, ImVec2(0, 40))) {
+                std::string label;
+                if (info && info->valid && !info->name.empty()) {
+                    label = info->name;
+                } else {
+                    label = "Item " + std::to_string(item.itemId);
+                }
+                if (item.count > 1) {
+                    label += " x" + std::to_string(item.count);
+                }
+                if (ImGui::Selectable(label.c_str(), selected, 0, ImVec2(0, 24))) {
                     selectedChoice = static_cast<int>(i);
                 }
-
-                // Draw icon and text over the selectable
-                ImGui::SameLine();
-                ImGui::SetCursorPosX(ImGui::GetCursorPosX() - ImGui::GetItemRectSize().x + 4);
-
+                if (ImGui::IsItemHovered() && iconTex) {
+                    ImGui::SetTooltip("Reward option");
+                }
                 if (iconTex) {
-                    ImGui::Image((void*)(intptr_t)iconTex, ImVec2(36, 36));
                     ImGui::SameLine();
+                    ImGui::Image((void*)(intptr_t)iconTex, ImVec2(18, 18));
                 }
-
-                ImGui::BeginGroup();
-                if (info && info->valid) {
-                    ImGui::TextColored(qualityColor, "%s", info->name.c_str());
-                    if (item.count > 1) {
-                        ImGui::SameLine();
-                        ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.7f), "x%u", item.count);
-                    }
-                    // Show stats
-                    if (info->armor > 0 || info->stamina > 0 || info->strength > 0 ||
-                        info->agility > 0 || info->intellect > 0 || info->spirit > 0) {
-                        std::string stats;
-                        if (info->armor > 0) stats += std::to_string(info->armor) + " Armor ";
-                        if (info->stamina > 0) stats += "+" + std::to_string(info->stamina) + " Sta ";
-                        if (info->strength > 0) stats += "+" + std::to_string(info->strength) + " Str ";
-                        if (info->agility > 0) stats += "+" + std::to_string(info->agility) + " Agi ";
-                        if (info->intellect > 0) stats += "+" + std::to_string(info->intellect) + " Int ";
-                        if (info->spirit > 0) stats += "+" + std::to_string(info->spirit) + " Spi ";
-                        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s", stats.c_str());
-                    }
-                } else {
-                    ImGui::TextColored(qualityColor, "Item %u", item.itemId);
-                    if (item.count > 0) {
-                        ImGui::SameLine();
-                        ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.7f), "x%u", item.count);
-                    }
-                }
-                ImGui::EndGroup();
                 ImGui::PopID();
             }
         }

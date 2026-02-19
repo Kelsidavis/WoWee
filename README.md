@@ -12,14 +12,14 @@ A native C++ World of Warcraft client with a custom OpenGL renderer.
 
 [![Watch the video](https://img.youtube.com/vi/J4NXegzqWSQ/maxresdefault.jpg)](https://youtu.be/J4NXegzqWSQ)
 
-Compatible with **Vanilla (Classic) 1.12 + TBC 2.4.3 + WotLK 3.3.5a**, including Turtle WoW (1.17). All three expansions are broadly functional with roughly even support.
+Compatible with **Vanilla (Classic) 1.12 + TBC 2.4.3 + WotLK 3.3.5a**. All three expansions are broadly functional with roughly even support.
 
 > **Legal Disclaimer**: This is an educational/research project. It does not include any Blizzard Entertainment assets, data files, or proprietary code. World of Warcraft and all related assets are the property of Blizzard Entertainment, Inc. This project is not affiliated with or endorsed by Blizzard Entertainment. Users are responsible for supplying their own legally obtained game data files and for ensuring compliance with all applicable laws in their jurisdiction.
 
 ## Status & Direction (2026-02-18)
 
-- **Compatibility**: **Vanilla (Classic) 1.12 + TBC 2.4.3 + WotLK 3.3.5a** are all broadly supported via expansion profiles and per-expansion packet parsers (`src/game/packet_parsers_classic.cpp`, `src/game/packet_parsers_tbc.cpp`). Turtle WoW (1.17) is also supported. All three expansions are roughly on par — no single one is significantly more complete than the others.
-- **Tested against**: AzerothCore, TrinityCore, Turtle WoW, and ChromieCraft.
+- **Compatibility**: **Vanilla (Classic) 1.12 + TBC 2.4.3 + WotLK 3.3.5a** are all broadly supported via expansion profiles and per-expansion packet parsers (`src/game/packet_parsers_classic.cpp`, `src/game/packet_parsers_tbc.cpp`). All three expansions are roughly on par — no single one is significantly more complete than the others.
+- **Tested against**: AzerothCore, TrinityCore, and ChromieCraft.
 - **Current focus**: protocol correctness across server variants, visual accuracy (M2/WMO edge cases, equipment textures), and multi-expansion coverage.
 - **Warden**: Full module execution via Unicorn Engine CPU emulation. Decrypts (RC4→RSA→zlib), parses and relocates the PE module, executes via x86 emulation with Windows API interception. Module cache at `~/.local/share/wowee/warden_cache/`.
 
@@ -113,7 +113,7 @@ Data/
 Notes:
 
 - `StormLib` is required to build/run the extractor (`asset_extract`), but the main client does not require StormLib at runtime.
-- `extract_assets.sh` supports `classic`, `turtle`, `tbc`, `wotlk` targets.
+- `extract_assets.sh` supports `classic`, `tbc`, `wotlk` targets.
 
 #### 2) Point wowee at the extracted data
 

@@ -419,6 +419,9 @@ public:
     void cancelAura(uint32_t spellId);
     const std::unordered_set<uint32_t>& getKnownSpells() const { return knownSpells; }
     bool isCasting() const { return casting; }
+    bool isGameObjectInteractionCasting() const {
+        return casting && currentCastSpellId == 0 && pendingGameObjectInteractGuid_ != 0;
+    }
     uint32_t getCurrentCastSpellId() const { return currentCastSpellId; }
     float getCastProgress() const { return castTimeTotal > 0 ? (castTimeTotal - castTimeRemaining) / castTimeTotal : 0.0f; }
     float getCastTimeRemaining() const { return castTimeRemaining; }
@@ -1372,6 +1375,7 @@ private:
     bool casting = false;
     uint32_t currentCastSpellId = 0;
     float castTimeRemaining = 0.0f;
+    uint64_t pendingGameObjectInteractGuid_ = 0;
 
     // Talents (dual-spec support)
     uint8_t activeTalentSpec_ = 0;                              // Currently active spec (0 or 1)
@@ -1430,6 +1434,8 @@ private:
     // Gossip
     bool gossipWindowOpen = false;
     GossipMessageData currentGossip;
+
+    void performGameObjectInteractionNow(uint64_t guid);
 
     // Quest details
     bool questDetailsOpen = false;

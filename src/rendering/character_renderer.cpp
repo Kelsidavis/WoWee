@@ -1649,7 +1649,19 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
                 characterShader->setUniform("uUnlit", unlit ? 1 : 0);
                 float emissiveBoost = 1.0f;
                 glm::vec3 emissiveTint(1.0f, 1.0f, 1.0f);
-                if (unlit) {
+                // Keep custom warm/flicker treatment narrowly scoped to kobold candle flames.
+                bool koboldCandleFlame = false;
+                if (colorKeyBlack) {
+                    std::string modelKey = gpuModel.data.name;
+                    std::transform(modelKey.begin(), modelKey.end(), modelKey.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    koboldCandleFlame =
+                        (modelKey.find("kobold") != std::string::npos) &&
+                        ((modelKey.find("candle") != std::string::npos) ||
+                         (modelKey.find("torch") != std::string::npos) ||
+                         (modelKey.find("mine") != std::string::npos));
+                }
+                if (unlit && koboldCandleFlame) {
                     using clock = std::chrono::steady_clock;
                     float t = std::chrono::duration<float>(clock::now().time_since_epoch()).count();
                     float phase = static_cast<float>(batch.submeshId) * 0.31f;

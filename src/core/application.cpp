@@ -5084,6 +5084,16 @@ void Application::updateQuestMarkers() {
         // Get NPC entity position
         auto entity = gameHandler->getEntityManager().getEntity(guid);
         if (!entity) continue;
+        if (entity->getType() == game::ObjectType::UNIT) {
+            auto unit = std::static_pointer_cast<game::Unit>(entity);
+            std::string name = unit->getName();
+            std::transform(name.begin(), name.end(), name.begin(),
+                           [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+            if (name.find("spirit healer") != std::string::npos ||
+                name.find("spirit guide") != std::string::npos) {
+                continue; // Spirit healers/guides use their own white visual cue.
+            }
+        }
 
         glm::vec3 canonical(entity->getX(), entity->getY(), entity->getZ());
         glm::vec3 renderPos = coords::canonicalToRender(canonical);
