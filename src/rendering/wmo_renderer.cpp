@@ -37,6 +37,7 @@ WMORenderer::~WMORenderer() {
 }
 
 bool WMORenderer::initialize(pipeline::AssetManager* assets) {
+    if (initialized_) { assetManager = assets; return true; }
     core::Logger::getInstance().info("Initializing WMO renderer...");
 
     assetManager = assets;
@@ -204,6 +205,7 @@ bool WMORenderer::initialize(pipeline::AssetManager* assets) {
     initOcclusionResources();
 
     core::Logger::getInstance().info("WMO renderer initialized");
+    initialized_ = true;
     return true;
 }
 
@@ -1205,19 +1207,16 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
         for (uint32_t gi : dl.visibleGroups) {
             const auto& group = model.groups[gi];
 
-            // Skip non-renderable groups:
-            // 0x20000 = SHOW_SKYBOX (transparent sky windows)
-            // 0x4000000 = ANTIPORTAL (occlusion planes, not visible geometry)
-            // 0x8000000 = disables batch rendering
-            if (group.groupFlags & (0x20000 | 0x4000000 | 0x8000000)) {
+            // Skip truly non-visible groups:
+            // 0x20000 = SHOW_SKYBOX (window/skybox planes)
+            // 0x4000000 = ANTIPORTAL (occlusion planes, not render geometry)
+            // Note: 0x8000000 is *not* a safe global skip; some valid world WMOs use it.
+            if (group.groupFlags & (0x20000 | 0x4000000)) {
                 continue;
             }
 
-            // Skip groups where ALL batches use the fallback white texture —
-            // these are collision/placeholder/LOD shell groups with no visual data
-            if (group.allUntextured) {
-                continue;
-            }
+            // Do not globally cull untextured groups: some valid world WMOs can
+            // temporarily resolve to fallback textures. Render geometry anyway.
 
 
             // STORMWIND.WMO specific fix: LOD shell visibility control

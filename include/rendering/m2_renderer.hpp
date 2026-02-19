@@ -322,6 +322,7 @@ public:
     uint32_t getQueryCallCount() const { return queryCallCount; }
 
     // Stats
+    bool isInitialized() const { return initialized_; }
     uint32_t getModelCount() const { return static_cast<uint32_t>(models.size()); }
     uint32_t getInstanceCount() const { return static_cast<uint32_t>(instances.size()); }
     uint32_t getTotalTriangleCount() const;
@@ -347,6 +348,7 @@ public:
     void setOnTaxi(bool onTaxi) { onTaxi_ = onTaxi; }
 
 private:
+    bool initialized_ = false;
     bool insideInterior = false;
     bool onTaxi_ = false;
     pipeline::AssetManager* assetManager = nullptr;

@@ -142,6 +142,7 @@ public:
     /**
      * Get number of loaded models
      */
+    bool isInitialized() const { return initialized_; }
     uint32_t getModelCount() const { return loadedModels.size(); }
 
     /**
@@ -572,6 +573,8 @@ private:
     // Active instances
     std::vector<WMOInstance> instances;
     uint32_t nextInstanceId = 1;
+
+    bool initialized_ = false;
 
     // Rendering state
     bool wireframeMode = false;

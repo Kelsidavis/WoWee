@@ -61,6 +61,7 @@ void Logger::log(LogLevel level, const std::string& message) {
     std::cout << line.str() << '\n';
     if (fileStream.is_open()) {
         fileStream << line.str() << '\n';
+        fileStream.flush();
     }
 }
 

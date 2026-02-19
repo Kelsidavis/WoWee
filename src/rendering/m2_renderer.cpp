@@ -261,6 +261,7 @@ M2Renderer::~M2Renderer() {
 }
 
 bool M2Renderer::initialize(pipeline::AssetManager* assets) {
+    if (initialized_) { assetManager = assets; return true; }
     assetManager = assets;
 
     numAnimThreads_ = std::min(4u, std::max(1u, std::thread::hardware_concurrency() - 1));
@@ -635,6 +636,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
     }
 
     LOG_INFO("M2 renderer initialized");
+    initialized_ = true;
     return true;
 }
 
