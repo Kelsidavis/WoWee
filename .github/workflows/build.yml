@@ -29,7 +29,7 @@ jobs:
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
-          path: /var/cache/apt/archives
+          path: /var/cache/apt/archives/*.deb
           key: apt-${{ matrix.arch }}-${{ hashFiles('.github/workflows/build.yml') }}
           restore-keys: apt-${{ matrix.arch }}-
 
