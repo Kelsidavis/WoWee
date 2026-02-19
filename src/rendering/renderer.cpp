@@ -2449,9 +2449,11 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
     lastWMORenderMs = 0.0;
     lastM2RenderMs = 0.0;
 
-    // Shadow pass (before main scene)
+    // Shadow pass (before main scene) — throttled to every 2 frames (depth buffer persists)
     if (shadowsEnabled && shadowFBO && shadowShaderProgram && terrainLoaded) {
-        renderShadowPass();
+        if (shadowFrameCounter_++ % 2 == 0) {
+            renderShadowPass();
+        }
     } else {
         // Clear shadow maps when disabled
         if (terrainRenderer) terrainRenderer->clearShadowMap();

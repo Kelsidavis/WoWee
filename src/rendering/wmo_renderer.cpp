@@ -161,14 +161,8 @@ bool WMORenderer::initialize(pipeline::AssetManager* assets) {
                         float edgeDist = max(abs(proj.x - 0.5), abs(proj.y - 0.5));
                         float coverageFade = 1.0 - smoothstep(0.40, 0.49, edgeDist);
                         float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.001);
-                        shadow = 0.0;
-                        vec2 texelSize = vec2(1.0 / 2048.0);
-                        for (int sx = -1; sx <= 1; sx++) {
-                            for (int sy = -1; sy <= 1; sy++) {
-                                shadow += texture(uShadowMap, vec3(proj.xy + vec2(sx, sy) * texelSize, proj.z - bias));
-                            }
-                        }
-                        shadow /= 9.0;
+                        // Single hardware PCF tap — GL_LINEAR + compare mode gives 2×2 bilinear PCF for free
+                        shadow = texture(uShadowMap, vec3(proj.xy, proj.z - bias));
                         shadow = mix(1.0, shadow, coverageFade);
                     }
                 }

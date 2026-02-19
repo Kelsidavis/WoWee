@@ -52,14 +52,8 @@ float calcShadow() {
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(-uLightDir);
     float bias = max(0.005 * (1.0 - dot(norm, lightDir)), 0.001);
-    float shadow = 0.0;
-    vec2 texelSize = vec2(1.0 / 2048.0);
-    for (int x = -1; x <= 1; x++) {
-        for (int y = -1; y <= 1; y++) {
-            shadow += texture(uShadowMap, vec3(proj.xy + vec2(x, y) * texelSize, proj.z - bias));
-        }
-    }
-    shadow /= 9.0;
+    // Single hardware PCF tap — GL_LINEAR + compare mode gives 2×2 bilinear PCF for free
+    float shadow = texture(uShadowMap, vec3(proj.xy, proj.z - bias));
     return mix(1.0, shadow, coverageFade);
 }
 
