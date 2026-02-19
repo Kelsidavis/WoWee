@@ -389,15 +389,7 @@ install(TARGETS wowee
     ARCHIVE DESTINATION lib
 )
 
-# Install tools alongside main binary
-foreach(_tool dbc_to_csv blp_convert auth_probe auth_login_probe)
-    if(TARGET ${_tool})
-        install(TARGETS ${_tool} RUNTIME DESTINATION bin)
-    endif()
-endforeach()
-if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR)
-    install(TARGETS asset_extract RUNTIME DESTINATION bin)
-endif()
+# Note: tool install rules are placed next to each target definition below.
 
 # Install built-in assets (exclude proprietary music)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets
@@ -451,6 +443,7 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR)
     set_target_properties(asset_extract PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     )
+    install(TARGETS asset_extract RUNTIME DESTINATION bin)
     message(STATUS "  asset_extract tool: ENABLED")
 else()
     message(STATUS "  asset_extract tool: DISABLED (requires StormLib)")
@@ -469,6 +462,7 @@ target_link_libraries(dbc_to_csv PRIVATE Threads::Threads)
 set_target_properties(dbc_to_csv PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
+install(TARGETS dbc_to_csv RUNTIME DESTINATION bin)
 
 # ---- Tool: auth_probe (LOGON_CHALLENGE probe) ----
 add_executable(auth_probe
@@ -488,6 +482,7 @@ target_link_libraries(auth_probe PRIVATE Threads::Threads OpenSSL::Crypto)
 set_target_properties(auth_probe PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
+install(TARGETS auth_probe RUNTIME DESTINATION bin)
 
 # ---- Tool: auth_login_probe (challenge + proof probe) ----
 add_executable(auth_login_probe
@@ -510,6 +505,7 @@ target_link_libraries(auth_login_probe PRIVATE Threads::Threads OpenSSL::Crypto)
 set_target_properties(auth_login_probe PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
+install(TARGETS auth_login_probe RUNTIME DESTINATION bin)
 
 # ---- Tool: blp_convert (BLP ↔ PNG) ----
 add_executable(blp_convert
@@ -525,6 +521,7 @@ target_link_libraries(blp_convert PRIVATE Threads::Threads)
 set_target_properties(blp_convert PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
+install(TARGETS blp_convert RUNTIME DESTINATION bin)
 
 # Print configuration summary
 message(STATUS "")

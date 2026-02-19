@@ -9,10 +9,13 @@
 namespace wowee {
 namespace core {
 
+// Suppress the wingdi.h "#define ERROR 0" macro for the entire header so that
+// LogLevel::ERROR inside template bodies compiles correctly on Windows.
 #ifdef _WIN32
 #pragma push_macro("ERROR")
 #undef ERROR
 #endif
+
 enum class LogLevel {
     DEBUG,
     INFO,
@@ -20,9 +23,6 @@ enum class LogLevel {
     ERROR,
     FATAL
 };
-#ifdef _WIN32
-#pragma pop_macro("ERROR")
-#endif
 
 class Logger {
 public:
@@ -85,3 +85,8 @@ private:
 
 } // namespace core
 } // namespace wowee
+
+// Restore the ERROR macro now that all LogLevel::ERROR references are done.
+#ifdef _WIN32
+#pragma pop_macro("ERROR")
+#endif
