@@ -1437,6 +1437,9 @@ private:
     // Quest turn-in
     bool questRequestItemsOpen_ = false;
     QuestRequestItemsData currentQuestRequestItems_;
+    uint32_t pendingTurnInQuestId_ = 0;
+    uint64_t pendingTurnInNpcGuid_ = 0;
+    bool pendingTurnInRewardRequest_ = false;
     bool questOfferRewardOpen_ = false;
     QuestOfferRewardData currentQuestOfferReward_;
 

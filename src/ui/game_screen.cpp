@@ -6161,49 +6161,22 @@ std::string GameScreen::replaceGenderPlaceholders(const std::string& text, game:
 
     // Helper to trim whitespace
     auto trim = [](std::string& s) {
-        s.erase(0, s.find_first_not_of(" \t\n\r"));
-        s.erase(s.find_last_not_of(" \t\n\r") + 1);
+        const char* ws = " \t\n\r";
+        size_t start = s.find_first_not_of(ws);
+        if (start == std::string::npos) { s.clear(); return; }
+        size_t end = s.find_last_not_of(ws);
+        s = s.substr(start, end - start + 1);
     };
 
-    // Replace simple placeholders first
-    // $n = player name
-    // $p = subject pronoun (he/she/they)
-    // $o = object pronoun (him/her/them)
-    // $s = possessive adjective (his/her/their)
-    // $S = possessive pronoun (his/hers/theirs)
+    // Replace $g/$G placeholders first.
     size_t pos = 0;
     while ((pos = result.find('$', pos)) != std::string::npos) {
         if (pos + 1 >= result.length()) break;
+        char marker = result[pos + 1];
+        if (marker != 'g' && marker != 'G') { pos++; continue; }
 
-        char code = result[pos + 1];
-        std::string replacement;
-
-        switch (code) {
-            case 'n': case 'N': replacement = playerName; break;
-            case 'p': replacement = pronouns.subject; break;
-            case 'o': replacement = pronouns.object; break;
-            case 's': replacement = pronouns.possessive; break;
-            case 'S': replacement = pronouns.possessiveP; break;
-            case 'g':
-                // Handle $g separately below
-                pos++;
-                continue;
-            default:
-                pos++;
-                continue;
-        }
-
-        // Replace the placeholder
-        result.replace(pos, 2, replacement);
-        pos += replacement.length();
-    }
-
-    // Find and replace all $g placeholders (gender-specific text)
-    // Format: $g<male>:<female>; or $g<male>:<female>:<nonbinary>;
-    pos = 0;
-    while ((pos = result.find("$g", pos)) != std::string::npos) {
         size_t endPos = result.find(';', pos);
-        if (endPos == std::string::npos) break;
+        if (endPos == std::string::npos) { pos += 2; continue; }
 
         std::string placeholder = result.substr(pos + 2, endPos - pos - 2);
 
@@ -6259,6 +6232,46 @@ std::string GameScreen::replaceGenderPlaceholders(const std::string& text, game:
 
         result.replace(pos, endPos - pos + 1, replacement);
         pos += replacement.length();
+    }
+
+    // Replace simple placeholders.
+    // $n = player name
+    // $p = subject pronoun (he/she/they)
+    // $o = object pronoun (him/her/them)
+    // $s = possessive adjective (his/her/their)
+    // $S = possessive pronoun (his/hers/theirs)
+    // $b/$B = line break
+    pos = 0;
+    while ((pos = result.find('$', pos)) != std::string::npos) {
+        if (pos + 1 >= result.length()) break;
+
+        char code = result[pos + 1];
+        std::string replacement;
+        switch (code) {
+            case 'n': case 'N': replacement = playerName; break;
+            case 'p': replacement = pronouns.subject; break;
+            case 'o': replacement = pronouns.object; break;
+            case 's': replacement = pronouns.possessive; break;
+            case 'S': replacement = pronouns.possessiveP; break;
+            case 'b': case 'B': replacement = "\n"; break;
+            case 'g': case 'G': pos++; continue;
+            default: pos++; continue;
+        }
+
+        result.replace(pos, 2, replacement);
+        pos += replacement.length();
+    }
+
+    // WoW markup linebreak token.
+    pos = 0;
+    while ((pos = result.find("|n", pos)) != std::string::npos) {
+        result.replace(pos, 2, "\n");
+        pos += 1;
+    }
+    pos = 0;
+    while ((pos = result.find("|N", pos)) != std::string::npos) {
+        result.replace(pos, 2, "\n");
+        pos += 1;
     }
 
     return result;

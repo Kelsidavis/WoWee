@@ -95,7 +95,7 @@ std::string replaceGenderPlaceholders(const std::string& text, game::GameHandler
             case 's': replacement = pronouns.possessive; break;
             case 'S': replacement = pronouns.possessiveP; break;
             case 'r': replacement = pronouns.object; break;
-            case 'b': replacement = "\n"; break;
+            case 'b': case 'B': replacement = "\n"; break;
             case 'g': case 'G': pos++; continue;
             default: pos++; continue;
         }
@@ -107,6 +107,11 @@ std::string replaceGenderPlaceholders(const std::string& text, game::GameHandler
     // WoW markup linebreak token
     pos = 0;
     while ((pos = result.find("|n", pos)) != std::string::npos) {
+        result.replace(pos, 2, "\n");
+        pos += 1;
+    }
+    pos = 0;
+    while ((pos = result.find("|N", pos)) != std::string::npos) {
         result.replace(pos, 2, "\n");
         pos += 1;
     }

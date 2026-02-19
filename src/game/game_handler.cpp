@@ -1771,6 +1771,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
             // Quest query failed - parse failure reason
             if (packet.getSize() - packet.getReadPos() >= 4) {
                 uint32_t failReason = packet.readUInt32();
+                pendingTurnInRewardRequest_ = false;
                 const char* reasonStr = "Unknown";
                 switch (failReason) {
                     case 0: reasonStr = "Don't have quest"; break;
@@ -1794,6 +1795,11 @@ void GameHandler::handlePacket(network::Packet& packet) {
             if (packet.getSize() - packet.getReadPos() >= 4) {
                 uint32_t questId = packet.readUInt32();
                 LOG_INFO("Quest completed: questId=", questId);
+                if (pendingTurnInQuestId_ == questId) {
+                    pendingTurnInQuestId_ = 0;
+                    pendingTurnInNpcGuid_ = 0;
+                    pendingTurnInRewardRequest_ = false;
+                }
                 for (auto it = questLog_.begin(); it != questLog_.end(); ++it) {
                     if (it->questId == questId) {
                         questLog_.erase(it);
@@ -8765,6 +8771,20 @@ void GameHandler::handleQuestRequestItems(network::Packet& packet) {
         LOG_WARNING("Failed to parse SMSG_QUESTGIVER_REQUEST_ITEMS");
         return;
     }
+
+    // Expansion-safe fallback: COMPLETE_QUEST is the default flow.
+    // If a server echoes REQUEST_ITEMS again while still completable,
+    // request the reward explicitly once.
+    if (pendingTurnInRewardRequest_ &&
+        data.questId == pendingTurnInQuestId_ &&
+        data.npcGuid == pendingTurnInNpcGuid_ &&
+        data.isCompletable() &&
+        socket) {
+        auto rewardReq = QuestgiverRequestRewardPacket::build(data.npcGuid, data.questId);
+        socket->send(rewardReq);
+        pendingTurnInRewardRequest_ = false;
+    }
+
     currentQuestRequestItems_ = data;
     questRequestItemsOpen_ = true;
     gossipWindowOpen = false;
@@ -8814,6 +8834,11 @@ void GameHandler::handleQuestOfferReward(network::Packet& packet) {
         return;
     }
     LOG_INFO("Quest offer reward: questId=", data.questId, " title=\"", data.title, "\"");
+    if (pendingTurnInQuestId_ == data.questId) {
+        pendingTurnInQuestId_ = 0;
+        pendingTurnInNpcGuid_ = 0;
+        pendingTurnInRewardRequest_ = false;
+    }
     currentQuestOfferReward_ = data;
     questOfferRewardOpen_ = true;
     questRequestItemsOpen_ = false;
@@ -8829,6 +8854,11 @@ void GameHandler::handleQuestOfferReward(network::Packet& packet) {
 
 void GameHandler::completeQuest() {
     if (!questRequestItemsOpen_ || state != WorldState::IN_WORLD || !socket) return;
+    pendingTurnInQuestId_ = currentQuestRequestItems_.questId;
+    pendingTurnInNpcGuid_ = currentQuestRequestItems_.npcGuid;
+    pendingTurnInRewardRequest_ = currentQuestRequestItems_.isCompletable();
+
+    // Default quest turn-in flow used by all branches.
     auto packet = QuestgiverCompleteQuestPacket::build(
         currentQuestRequestItems_.npcGuid, currentQuestRequestItems_.questId);
     socket->send(packet);
@@ -8837,6 +8867,7 @@ void GameHandler::completeQuest() {
 }
 
 void GameHandler::closeQuestRequestItems() {
+    pendingTurnInRewardRequest_ = false;
     questRequestItemsOpen_ = false;
     currentQuestRequestItems_ = QuestRequestItemsData{};
 }
@@ -8849,6 +8880,9 @@ void GameHandler::chooseQuestReward(uint32_t rewardIndex) {
     auto packet = QuestgiverChooseRewardPacket::build(
         npcGuid, currentQuestOfferReward_.questId, rewardIndex);
     socket->send(packet);
+    pendingTurnInQuestId_ = 0;
+    pendingTurnInNpcGuid_ = 0;
+    pendingTurnInRewardRequest_ = false;
     questOfferRewardOpen_ = false;
     currentQuestOfferReward_ = QuestOfferRewardData{};
 
@@ -8861,6 +8895,7 @@ void GameHandler::chooseQuestReward(uint32_t rewardIndex) {
 }
 
 void GameHandler::closeQuestOfferReward() {
+    pendingTurnInRewardRequest_ = false;
     questOfferRewardOpen_ = false;
     currentQuestOfferReward_ = QuestOfferRewardData{};
 }

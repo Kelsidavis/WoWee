@@ -2006,6 +2006,12 @@ public:
     static network::Packet build(uint64_t npcGuid, uint32_t questId);
 };
 
+/** CMSG_QUESTGIVER_REQUEST_REWARD packet builder */
+class QuestgiverRequestRewardPacket {
+public:
+    static network::Packet build(uint64_t npcGuid, uint32_t questId);
+};
+
 /** CMSG_QUESTGIVER_CHOOSE_REWARD packet builder */
 class QuestgiverChooseRewardPacket {
 public:

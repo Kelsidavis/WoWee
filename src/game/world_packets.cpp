@@ -3110,30 +3110,75 @@ bool QuestRequestItemsParser::parse(network::Packet& packet, QuestRequestItemsDa
         return true;
     }
 
-    // emoteDelay (uint32) + emoteId (uint32) + autoFinish (uint8) = 9 bytes
-    // (same format in vanilla 1.12 and WotLK 3.3.5a)
-    /*uint32_t emoteDelay =*/ packet.readUInt32();
-    /*uint32_t emoteId    =*/ packet.readUInt32();
-    /*uint8_t  autoFinish =*/ packet.readUInt8();
+    struct ParsedTail {
+        uint32_t requiredMoney = 0;
+        uint32_t completableFlags = 0;
+        std::vector<QuestRewardItem> requiredItems;
+        bool ok = false;
+        int score = -1;
+    };
 
-    if (packet.getReadPos() + 4 > packet.getSize()) return true;
-    data.requiredMoney = packet.readUInt32();
+    auto parseTail = [&](size_t startPos, bool closeFlagIsU32) -> ParsedTail {
+        ParsedTail out;
+        packet.setReadPos(startPos);
 
-    if (packet.getReadPos() + 4 > packet.getSize()) return true;
-    uint32_t requiredItemCount = packet.readUInt32();
+        if (packet.getReadPos() + 8 > packet.getSize()) return out;
+        /*uint32_t emoteDelay =*/ packet.readUInt32();
+        /*uint32_t emoteId    =*/ packet.readUInt32();
 
-    for (uint32_t i = 0; i < requiredItemCount && requiredItemCount < 20; ++i) {
-        if (packet.getReadPos() + 12 > packet.getSize()) break;
-        QuestRewardItem item;
-        item.itemId = packet.readUInt32();
-        item.count = packet.readUInt32();
-        item.displayInfoId = packet.readUInt32();
-        if (item.itemId > 0)
-            data.requiredItems.push_back(item);
+        if (closeFlagIsU32) {
+            if (packet.getReadPos() + 4 > packet.getSize()) return out;
+            /*uint32_t closeOnCancel =*/ packet.readUInt32();
+        } else {
+            if (packet.getReadPos() + 1 > packet.getSize()) return out;
+            /*uint8_t autoFinish =*/ packet.readUInt8();
+        }
+
+        if (packet.getReadPos() + 8 > packet.getSize()) return out;
+        out.requiredMoney = packet.readUInt32();
+        uint32_t requiredItemCount = packet.readUInt32();
+        if (requiredItemCount > 64) return out;  // sanity guard against misalignment
+
+        out.requiredItems.reserve(requiredItemCount);
+        for (uint32_t i = 0; i < requiredItemCount; ++i) {
+            if (packet.getReadPos() + 12 > packet.getSize()) return out;
+            QuestRewardItem item;
+            item.itemId = packet.readUInt32();
+            item.count = packet.readUInt32();
+            item.displayInfoId = packet.readUInt32();
+            if (item.itemId != 0) out.requiredItems.push_back(item);
+        }
+
+        if (packet.getReadPos() + 4 > packet.getSize()) return out;
+        out.completableFlags = packet.readUInt32();
+        out.ok = true;
+
+        // Prefer layouts that produce plausible quest-requirement shapes.
+        out.score = 0;
+        if (requiredItemCount <= 6) out.score += 4;
+        if (out.requiredItems.size() == requiredItemCount) out.score += 3;
+        if ((out.completableFlags & ~0x3u) == 0) out.score += 2;
+        if (closeFlagIsU32) out.score += 1;  // classic cores often use 32-bit here
+        return out;
+    };
+
+    size_t tailStart = packet.getReadPos();
+    ParsedTail parseU8 = parseTail(tailStart, false);
+    ParsedTail parseU32 = parseTail(tailStart, true);
+    const ParsedTail* chosen = nullptr;
+    if (parseU8.ok && parseU32.ok) {
+        chosen = (parseU32.score >= parseU8.score) ? &parseU32 : &parseU8;
+    } else if (parseU32.ok) {
+        chosen = &parseU32;
+    } else if (parseU8.ok) {
+        chosen = &parseU8;
+    } else {
+        return true;
     }
 
-    if (packet.getReadPos() + 4 > packet.getSize()) return true;
-    data.completableFlags = packet.readUInt32();
+    data.requiredMoney = chosen->requiredMoney;
+    data.completableFlags = chosen->completableFlags;
+    data.requiredItems = chosen->requiredItems;
 
     LOG_INFO("Quest request items: id=", data.questId, " title='", data.title,
              "' items=", data.requiredItems.size(), " completable=", data.isCompletable());
@@ -3204,6 +3249,13 @@ bool QuestOfferRewardParser::parse(network::Packet& packet, QuestOfferRewardData
 
 network::Packet QuestgiverCompleteQuestPacket::build(uint64_t npcGuid, uint32_t questId) {
     network::Packet packet(wireOpcode(Opcode::CMSG_QUESTGIVER_COMPLETE_QUEST));
+    packet.writeUInt64(npcGuid);
+    packet.writeUInt32(questId);
+    return packet;
+}
+
+network::Packet QuestgiverRequestRewardPacket::build(uint64_t npcGuid, uint32_t questId) {
+    network::Packet packet(wireOpcode(Opcode::CMSG_QUESTGIVER_REQUEST_REWARD));
     packet.writeUInt64(npcGuid);
     packet.writeUInt32(questId);
     return packet;
