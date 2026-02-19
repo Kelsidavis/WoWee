@@ -263,7 +263,6 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
 
     // Check if already loaded
     if (loadedModels.find(id) != loadedModels.end()) {
-        core::Logger::getInstance().warning("WMO model ", id, " already loaded");
         return true;
     }
 
@@ -301,29 +300,46 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
     // We need to convert it using the textureOffsetToIndex map
     core::Logger::getInstance().debug("  textureOffsetToIndex map has ", model.textureOffsetToIndex.size(), " entries");
     static int matLogCount = 0;
+    auto resolveTextureIndex = [&](uint32_t textureField) -> uint32_t {
+        auto it = model.textureOffsetToIndex.find(textureField);
+        if (it != model.textureOffsetToIndex.end()) {
+            return it->second;
+        }
+        // Some files may store direct index instead of MOTX byte offset.
+        if (textureField < model.textures.size()) {
+            return textureField;
+        }
+        return std::numeric_limits<uint32_t>::max();
+    };
+
     for (size_t i = 0; i < model.materials.size(); i++) {
         const auto& mat = model.materials[i];
         uint32_t texIndex = 0;  // Default to first texture
+        const uint32_t t1 = resolveTextureIndex(mat.texture1);
+        const uint32_t t2 = resolveTextureIndex(mat.texture2);
+        const uint32_t t3 = resolveTextureIndex(mat.texture3);
 
-        auto it = model.textureOffsetToIndex.find(mat.texture1);
-        if (it != model.textureOffsetToIndex.end()) {
-            texIndex = it->second;
-            if (matLogCount < 20) {
-                core::Logger::getInstance().debug("  Material ", i, ": texture1 offset ", mat.texture1, " -> texture index ", texIndex);
-                matLogCount++;
+        // Prefer first valid non-empty texture among texture1/2/3.
+        auto pickValid = [&](uint32_t idx) -> bool {
+            if (idx == std::numeric_limits<uint32_t>::max()) return false;
+            if (idx >= model.textures.size()) return false;
+            if (model.textures[idx].empty()) return false;
+            texIndex = idx;
+            return true;
+        };
+        if (!pickValid(t1)) {
+            if (!pickValid(t2)) {
+                pickValid(t3);
             }
-        } else if (mat.texture1 < model.textures.size()) {
-            // Fallback: maybe it IS an index in some files?
-            texIndex = mat.texture1;
-            if (matLogCount < 20) {
-                core::Logger::getInstance().debug("  Material ", i, ": using texture1 as direct index: ", texIndex);
-                matLogCount++;
-            }
-        } else {
-            if (matLogCount < 20) {
-                core::Logger::getInstance().debug("  Material ", i, ": texture1 offset ", mat.texture1, " NOT FOUND, using default");
-                matLogCount++;
-            }
+        }
+
+        if (matLogCount < 20) {
+            core::Logger::getInstance().debug("  Material ", i,
+                ": tex1=", mat.texture1, "->", t1,
+                " tex2=", mat.texture2, "->", t2,
+                " tex3=", mat.texture3, "->", t3,
+                " chosen=", texIndex);
+            matLogCount++;
         }
 
         modelData.materialTextureIndices.push_back(texIndex);
@@ -1047,20 +1063,13 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
     }
 
     // ── Phase 1: Parallel visibility culling ──────────────────────────
-    // Build list of instances that pass the coarse instance-level frustum test.
+    // Build list of instances for draw list generation.
     std::vector<size_t> visibleInstances;
     visibleInstances.reserve(instances.size());
     for (size_t i = 0; i < instances.size(); ++i) {
         const auto& instance = instances[i];
         if (loadedModels.find(instance.modelId) == loadedModels.end())
             continue;
-
-        if (frustumCulling) {
-            glm::vec3 instMin = instance.worldBoundsMin - glm::vec3(0.5f);
-            glm::vec3 instMax = instance.worldBoundsMax + glm::vec3(0.5f);
-            if (!frustum.intersectsAABB(instMin, instMax))
-                continue;
-        }
         visibleInstances.push_back(i);
     }
 
@@ -1069,7 +1078,8 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
     glm::vec3 camPos = camera.getPosition();
     bool doPortalCull = portalCulling;
     bool doOcclusionCull = occlusionCulling;
-    bool doFrustumCull = frustumCulling;
+    bool doFrustumCull = false; // Temporarily disabled: can over-cull world WMOs
+    bool doDistanceCull = distanceCulling;
 
     auto cullInstance = [&](size_t instIdx) -> InstanceDrawList {
         if (instIdx >= instances.size()) return InstanceDrawList{};
@@ -1107,13 +1117,13 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
             if (gi < instance.worldGroupBounds.size()) {
                 const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
 
-                // Hard distance cutoff (increased for better visibility of major structures)
-                // 500 units = 250000.0f squared (was 160 units / 25600.0f)
-                glm::vec3 closestPoint = glm::clamp(camPos, gMin, gMax);
-                float distSq = glm::dot(closestPoint - camPos, closestPoint - camPos);
-                if (distSq > 250000.0f) {
-                    result.distanceCulled++;
-                    continue;
+                if (doDistanceCull) {
+                    glm::vec3 closestPoint = glm::clamp(camPos, gMin, gMax);
+                    float distSq = glm::dot(closestPoint - camPos, closestPoint - camPos);
+                    if (distSq > 250000.0f) {
+                        result.distanceCulled++;
+                        continue;
+                    }
                 }
 
                 // Frustum culling
@@ -1180,38 +1190,13 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
 
         shader->setUniform("uModel", instance.modelMatrix);
 
-        // Debug logging for STORMWIND.WMO groups to identify LOD shell
-        static bool loggedStormwindGroups = false;
-        if (!loggedStormwindGroups && instance.modelId == 10047) {
-            glm::vec3 cameraPos = camera.getPosition();
-            float distToWMO = glm::length(cameraPos - instance.position);
-            LOG_INFO("=== STORMWIND.WMO Group Rendering (dist=", distToWMO, ") ===");
-            for (uint32_t gi : dl.visibleGroups) {
-                const auto& group = model.groups[gi];
-                glm::vec3 groupCenter = (group.boundingBoxMin + group.boundingBoxMax) * 0.5f;
-                glm::vec4 worldCenter = instance.modelMatrix * glm::vec4(groupCenter, 1.0f);
-
-                // Log bounding box to identify groups that are positioned HIGH (floating shell)
-                glm::vec3 size = group.boundingBoxMax - group.boundingBoxMin;
-                LOG_INFO("  Group ", gi, ": flags=0x", std::hex, group.groupFlags, std::dec,
-                         " verts=", group.vertexCount,
-                         " centerZ=", groupCenter.z,
-                         " sizeZ=", size.z,
-                         " worldZ=", worldCenter.z);
-            }
-            loggedStormwindGroups = true;  // Only log once to avoid spam
-        }
-
-        // Render groups with floating LOD shell culling
-        glm::vec3 cameraPos = camera.getPosition();
+        // Render visible groups
         for (uint32_t gi : dl.visibleGroups) {
             const auto& group = model.groups[gi];
 
-            // Skip truly non-visible groups:
-            // 0x20000 = SHOW_SKYBOX (window/skybox planes)
-            // 0x4000000 = ANTIPORTAL (occlusion planes, not render geometry)
-            // Note: 0x8000000 is *not* a safe global skip; some valid world WMOs use it.
-            if (group.groupFlags & (0x20000 | 0x4000000)) {
+            // Only skip antiportal geometry. Other flags vary across assets and can
+            // incorrectly hide valid world building groups.
+            if (group.groupFlags & 0x4000000) {
                 continue;
             }
 
@@ -1219,44 +1204,7 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
             // temporarily resolve to fallback textures. Render geometry anyway.
 
 
-            // STORMWIND.WMO specific fix: LOD shell visibility control
-            // Combination of distance culling + backface culling for best results
-            bool isLODShell = false;
-            if (instance.modelId == 10047) {
-                glm::vec3 groupCenter = (group.boundingBoxMin + group.boundingBoxMax) * 0.5f;
-                glm::vec4 worldCenter = instance.modelMatrix * glm::vec4(groupCenter, 1.0f);
-                glm::vec3 size = group.boundingBoxMax - group.boundingBoxMin;
-
-                // Detect LOD shell groups: Groups 92/93 at worldZ 200-225 with massive height
-                if (worldCenter.z > 195.0f && size.z > 160.0f) {
-                    // Measure distance to the actual group center, not WMO origin
-                    float distToGroup = glm::length(cameraPos - glm::vec3(worldCenter));
-
-                    static int logCounter = 0;
-                    if (logCounter++ % 10000 == 0) {
-                        LOG_DEBUG("LOD Shell Group ", gi, ": worldZ=", worldCenter.z, " sizeZ=", size.z,
-                                 " distToGroup=", distToGroup, " (hiding if < 185)");
-                    }
-
-                    // Completely hide LOD shell when close (underneath/inside city)
-                    // NOTE: 185 units threshold - may need further tuning based on gameplay testing
-                    if (distToGroup < 185.0f) {
-                        continue;  // Skip rendering entirely when close
-                    }
-
-                    // When farther away, use backface culling to hide interior faces
-                    isLODShell = true;
-                    glEnable(GL_CULL_FACE);  // Enable backface culling for LOD shell
-                    glCullFace(GL_BACK);     // Cull back faces (reduces artifacts from outside)
-                }
-            }
-
             renderGroup(group, model, instance.modelMatrix, view, projection);
-
-            // Restore culling state after LOD shell group
-            if (isLODShell) {
-                glDisable(GL_CULL_FACE);
-            }
         }
 
         lastPortalCulledGroups += dl.portalCulled;
@@ -1430,33 +1378,31 @@ void WMORenderer::renderGroup(const GroupResources& group, [[maybe_unused]] cons
     shader->setUniform("uIsInterior", isInterior);
 
     // Use pre-computed merged batches (built at load time)
-    // Track bound state to avoid redundant GL calls
-    static GLuint lastBoundTex = 0;
-    static bool lastHasTexture = false;
-    static bool lastAlphaTest = false;
-    static bool lastUnlit = false;
+    // Track state within this draw call only.
+    GLuint lastBoundTex = std::numeric_limits<GLuint>::max();
+    bool lastHasTexture = false;
+    bool lastAlphaTest = false;
+    bool lastUnlit = false;
+    bool firstBatch = true;
 
     for (const auto& mb : group.mergedBatches) {
-        // Skip untextured batches — these are collision/placeholder geometry
-        // that renders as solid grey when drawn with the fallback white texture.
-        if (!mb.hasTexture) continue;
-
-        if (mb.texId != lastBoundTex) {
+        if (firstBatch || mb.texId != lastBoundTex) {
             glBindTexture(GL_TEXTURE_2D, mb.texId);
             lastBoundTex = mb.texId;
         }
-        if (mb.hasTexture != lastHasTexture) {
+        if (firstBatch || mb.hasTexture != lastHasTexture) {
             shader->setUniform("uHasTexture", mb.hasTexture);
             lastHasTexture = mb.hasTexture;
         }
-        if (mb.alphaTest != lastAlphaTest) {
+        if (firstBatch || mb.alphaTest != lastAlphaTest) {
             shader->setUniform("uAlphaTest", mb.alphaTest);
             lastAlphaTest = mb.alphaTest;
         }
-        if (mb.unlit != lastUnlit) {
+        if (firstBatch || mb.unlit != lastUnlit) {
             shader->setUniform("uUnlit", mb.unlit);
             lastUnlit = mb.unlit;
         }
+        firstBatch = false;
 
         // Enable alpha blending for translucent materials (blendMode >= 2)
         bool needsBlend = (mb.blendMode >= 2);
@@ -1649,17 +1595,81 @@ GLuint WMORenderer::loadTexture(const std::string& path) {
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return key;
     };
-    std::string key = normalizeKey(path);
+    std::string key = path;
+    // Some assets contain stray bytes after a NUL in path chunks.
+    size_t nul = key.find('\0');
+    if (nul != std::string::npos) key.resize(nul);
+    key = normalizeKey(key);
+    if (key.rfind(".\\", 0) == 0) key = key.substr(2);
+    while (!key.empty() && key.front() == '\\') key.erase(key.begin());
+    if (key.empty()) return whiteTexture;
 
-    // Check cache first
-    auto it = textureCache.find(key);
-    if (it != textureCache.end()) {
-        it->second.lastUse = ++textureCacheCounter_;
-        return it->second.id;
+    auto hasKnownExt = [](const std::string& p) {
+        if (p.size() < 4) return false;
+        std::string ext = p.substr(p.size() - 4);
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return (ext == ".blp" || ext == ".tga" || ext == ".dds");
+    };
+    auto toBlp = [](std::string p) {
+        if (p.size() >= 4) {
+            std::string ext = p.substr(p.size() - 4);
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (ext == ".tga" || ext == ".dds") {
+                p = p.substr(0, p.size() - 4) + ".blp";
+            }
+        }
+        return p;
+    };
+
+    std::vector<std::string> candidates;
+    auto addCandidate = [&](const std::string& raw) {
+        std::string c = normalizeKey(raw);
+        if (c.rfind(".\\", 0) == 0) c = c.substr(2);
+        while (!c.empty() && c.front() == '\\') c.erase(c.begin());
+        if (!c.empty()) candidates.push_back(c);
+    };
+
+    addCandidate(toBlp(key));
+    if (!hasKnownExt(key)) addCandidate(key + ".blp");
+
+    // Common WMO references omit folder prefix; manifest often stores these under textures\...
+    std::string keyWithExt = hasKnownExt(key) ? toBlp(key) : (key + ".blp");
+    if (key.find('\\') == std::string::npos) {
+        addCandidate(std::string("textures\\") + keyWithExt);
+    }
+    if (key.rfind("texture\\", 0) == 0) {
+        addCandidate(std::string("textures\\") + key.substr(8));
     }
 
-    // Load BLP texture
-    pipeline::BLPImage blp = assetManager->loadTexture(key);
+    // De-duplicate while preserving order.
+    std::vector<std::string> uniqueCandidates;
+    uniqueCandidates.reserve(candidates.size());
+    std::unordered_set<std::string> seen;
+    for (const auto& c : candidates) {
+        if (seen.insert(c).second) uniqueCandidates.push_back(c);
+    }
+
+    // Cache lookup across all candidate keys
+    for (const auto& c : uniqueCandidates) {
+        auto it = textureCache.find(c);
+        if (it != textureCache.end()) {
+            it->second.lastUse = ++textureCacheCounter_;
+            return it->second.id;
+        }
+    }
+
+    // Try loading all candidates until one succeeds
+    pipeline::BLPImage blp;
+    std::string resolvedKey;
+    for (const auto& c : uniqueCandidates) {
+        blp = assetManager->loadTexture(c);
+        if (blp.isValid()) {
+            resolvedKey = c;
+            break;
+        }
+    }
     if (!blp.isValid()) {
         core::Logger::getInstance().warning("WMO: Failed to load texture: ", path);
         // Do not cache failures as white. MPQ reads can fail transiently
@@ -1697,7 +1707,11 @@ GLuint WMORenderer::loadTexture(const std::string& path) {
     e.approxBytes = base + (base / 3);
     e.lastUse = ++textureCacheCounter_;
     textureCacheBytes_ += e.approxBytes;
-    textureCache[key] = e;
+    if (!resolvedKey.empty()) {
+        textureCache[resolvedKey] = e;
+    } else {
+        textureCache[key] = e;
+    }
     core::Logger::getInstance().debug("WMO: Loaded texture: ", path, " (", blp.width, "x", blp.height, ")");
 
     return textureID;
