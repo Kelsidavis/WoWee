@@ -805,7 +805,12 @@ void GameHandler::handlePacket(network::Packet& packet) {
     // Translate wire opcode to logical opcode via expansion table
     auto logicalOp = opcodeTable_.fromWire(opcode);
     if (!logicalOp) {
-        LOG_WARNING("Unhandled world opcode: 0x", std::hex, opcode, std::dec);
+        static std::unordered_set<uint16_t> loggedUnknownWireOpcodes;
+        if (loggedUnknownWireOpcodes.insert(opcode).second) {
+            LOG_WARNING("Unhandled world opcode: 0x", std::hex, opcode, std::dec,
+                        " state=", static_cast<int>(state),
+                        " size=", packet.getSize());
+        }
         return;
     }
 
@@ -1256,6 +1261,9 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_PERIODICAURALOG:
         case Opcode::SMSG_SPELLENERGIZELOG:
         case Opcode::SMSG_ENVIRONMENTALDAMAGELOG:
+        case Opcode::SMSG_SET_PROFICIENCY:
+        case Opcode::SMSG_ACTION_BUTTONS:
+        case Opcode::SMSG_LEVELUP_INFO:
             break;
 
         case Opcode::SMSG_LOOT_MONEY_NOTIFY: {
