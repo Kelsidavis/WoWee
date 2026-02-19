@@ -766,6 +766,19 @@ void GameHandler::update(float deltaTime) {
             }
         }
 
+        // Keep active melee attackers visually facing the player as positions change.
+        // Some servers don't stream frequent orientation updates during combat.
+        if (!hostileAttackers_.empty()) {
+            for (uint64_t attackerGuid : hostileAttackers_) {
+                auto attacker = entityManager.getEntity(attackerGuid);
+                if (!attacker) continue;
+                float dx = movementInfo.x - attacker->getX();
+                float dy = movementInfo.y - attacker->getY();
+                if (std::abs(dx) < 0.01f && std::abs(dy) < 0.01f) continue;
+                attacker->setOrientation(std::atan2(-dy, dx));
+            }
+        }
+
         // Close vendor/gossip/taxi window if player walks too far from NPC
         if (vendorWindowOpen && currentVendorItems.vendorGuid != 0) {
             auto npc = entityManager.getEntity(currentVendorItems.vendorGuid);

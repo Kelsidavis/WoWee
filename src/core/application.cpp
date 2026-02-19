@@ -1694,6 +1694,7 @@ void Application::setupUICallbacks() {
 
     // NPC death callback (online mode) - play death animation
     gameHandler->setNpcDeathCallback([this](uint64_t guid) {
+        deadCreatureGuids_.insert(guid);
         auto it = creatureInstances_.find(guid);
         if (it != creatureInstances_.end() && renderer && renderer->getCharacterRenderer()) {
             renderer->getCharacterRenderer()->playAnimation(it->second, 1, false); // Death
@@ -1702,6 +1703,7 @@ void Application::setupUICallbacks() {
 
     // NPC respawn callback (online mode) - reset to idle animation
     gameHandler->setNpcRespawnCallback([this](uint64_t guid) {
+        deadCreatureGuids_.erase(guid);
         auto it = creatureInstances_.find(guid);
         if (it != creatureInstances_.end() && renderer && renderer->getCharacterRenderer()) {
             renderer->getCharacterRenderer()->playAnimation(it->second, 0, true); // Idle
@@ -2777,6 +2779,7 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
         auto* app = this;
 
         gameHandler->setNpcDeathCallback([cr, app](uint64_t guid) {
+            app->deadCreatureGuids_.insert(guid);
             auto it = app->creatureInstances_.find(guid);
             if (it != app->creatureInstances_.end() && cr) {
                 cr->playAnimation(it->second, 1, false); // animation ID 1 = Death
@@ -2784,6 +2787,7 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
         });
 
         gameHandler->setNpcRespawnCallback([cr, app](uint64_t guid) {
+            app->deadCreatureGuids_.erase(guid);
             auto it = app->creatureInstances_.find(guid);
             if (it != app->creatureInstances_.end() && cr) {
                 cr->playAnimation(it->second, 0, true); // animation ID 0 = Idle
@@ -3802,8 +3806,13 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
         }
     }
 
-    // Play idle animation and fade in
-    charRenderer->playAnimation(instanceId, 0, true);
+    // Spawn in the correct pose. If the server marked this creature dead before
+    // the queued spawn was processed, start directly in death animation.
+    if (deadCreatureGuids_.count(guid)) {
+        charRenderer->playAnimation(instanceId, 1, false); // Death
+    } else {
+        charRenderer->playAnimation(instanceId, 0, true); // Idle
+    }
     charRenderer->startFadeIn(instanceId, 0.5f);
 
     // Track instance
@@ -4970,6 +4979,7 @@ void Application::despawnOnlineCreature(uint64_t guid) {
     pendingCreatureSpawnGuids_.erase(guid);
     creatureSpawnRetryCounts_.erase(guid);
     creaturePermanentFailureGuids_.erase(guid);
+    deadCreatureGuids_.erase(guid);
 
     auto it = creatureInstances_.find(guid);
     if (it == creatureInstances_.end()) return;
