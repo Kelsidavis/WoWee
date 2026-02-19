@@ -2065,7 +2065,7 @@ void GameHandler::handleCharCreateResponse(network::Packet& packet) {
     } else {
         std::string msg;
         switch (data.result) {
-            case CharCreateResult::ERROR: msg = "Server error"; break;
+            case CharCreateResult::CHAR_ERROR: msg = "Server error"; break;
             case CharCreateResult::FAILED: msg = "Creation failed"; break;
             case CharCreateResult::NAME_IN_USE: msg = "Name already in use"; break;
             case CharCreateResult::DISABLED: msg = "Character creation disabled"; break;

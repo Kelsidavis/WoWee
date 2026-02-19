@@ -187,7 +187,7 @@ enum class CharCreateResult : uint8_t {
 
     // CHAR_CREATE error codes
     IN_PROGRESS          = 0x2E,  // CHAR_CREATE_IN_PROGRESS
-    ERROR                = 0x30,  // CHAR_CREATE_ERROR
+    CHAR_ERROR           = 0x30,  // CHAR_CREATE_ERROR
     FAILED               = 0x31,  // CHAR_CREATE_FAILED
     NAME_IN_USE          = 0x32,  // CHAR_CREATE_NAME_IN_USE
     DISABLED             = 0x33,  // CHAR_CREATE_DISABLED

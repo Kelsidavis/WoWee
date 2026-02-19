@@ -3,11 +3,15 @@
 #include <cstring>
 #include <chrono>
 
+#ifdef HAVE_UNICORN
 // Unicorn Engine headers
 #include <unicorn/unicorn.h>
+#endif
 
 namespace wowee {
 namespace game {
+
+#ifdef HAVE_UNICORN
 
 // Memory layout for emulated environment
 constexpr uint32_t STACK_BASE = 0x00100000;  // 1MB
@@ -395,6 +399,32 @@ void WardenEmulator::hookMemInvalid(uc_engine* uc, int type, uint64_t address, i
               << " at 0x" << std::hex << address << std::dec
               << " (size=" << size << ")" << std::endl;
 }
+
+#else // !HAVE_UNICORN
+// Stub implementations — Unicorn Engine not available on this platform.
+WardenEmulator::WardenEmulator()
+    : uc_(nullptr), moduleBase_(0), moduleSize_(0)
+    , stackBase_(0), stackSize_(0)
+    , heapBase_(0), heapSize_(0)
+    , apiStubBase_(0), nextHeapAddr_(0) {}
+WardenEmulator::~WardenEmulator() {}
+bool WardenEmulator::initialize(const void*, size_t, uint32_t) { return false; }
+uint32_t WardenEmulator::hookAPI(const std::string&, const std::string&,
+    std::function<uint32_t(WardenEmulator&, const std::vector<uint32_t>&)>) { return 0; }
+uint32_t WardenEmulator::callFunction(uint32_t, const std::vector<uint32_t>&) { return 0; }
+bool WardenEmulator::readMemory(uint32_t, void*, size_t) { return false; }
+bool WardenEmulator::writeMemory(uint32_t, const void*, size_t) { return false; }
+std::string WardenEmulator::readString(uint32_t, size_t) { return {}; }
+uint32_t WardenEmulator::allocateMemory(size_t, uint32_t) { return 0; }
+bool WardenEmulator::freeMemory(uint32_t) { return false; }
+uint32_t WardenEmulator::getRegister(int) { return 0; }
+void WardenEmulator::setRegister(int, uint32_t) {}
+void WardenEmulator::setupCommonAPIHooks() {}
+uint32_t WardenEmulator::writeData(const void*, size_t) { return 0; }
+std::vector<uint8_t> WardenEmulator::readData(uint32_t, size_t) { return {}; }
+void WardenEmulator::hookCode(uc_engine*, uint64_t, uint32_t, void*) {}
+void WardenEmulator::hookMemInvalid(uc_engine*, int, uint64_t, int, int64_t, void*) {}
+#endif // HAVE_UNICORN
 
 } // namespace game
 } // namespace wowee

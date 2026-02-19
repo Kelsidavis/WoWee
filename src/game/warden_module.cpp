@@ -9,14 +9,18 @@
 #include <openssl/bn.h>
 #include <openssl/sha.h>
 
-#ifndef _WIN32
+#ifdef _WIN32
+    #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+    #endif
+    #include <windows.h>
+#else
     #include <sys/mman.h>
     #include <cerrno>
 #endif
 
-#ifdef HAVE_UNICORN
-    #include "game/warden_emulator.hpp"
-#endif
+// Always include the full definition so unique_ptr<WardenEmulator> destructor compiles
+#include "game/warden_emulator.hpp"
 
 namespace wowee {
 namespace game {
