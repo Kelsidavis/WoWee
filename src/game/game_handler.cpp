@@ -971,10 +971,12 @@ void GameHandler::handlePacket(network::Packet& packet) {
             // - Minimal/legacy keepalive-ish form observed on some servers: 1 byte.
             size_t remaining = packet.getSize() - packet.getReadPos();
             if (remaining >= 8) {
-                /*uint32_t listMask =*/ packet.readUInt32();
-                /*uint32_t count =*/ packet.readUInt32();
+                lastContactListMask_ = packet.readUInt32();
+                lastContactListCount_ = packet.readUInt32();
             } else if (remaining == 1) {
                 /*uint8_t marker =*/ packet.readUInt8();
+                lastContactListMask_ = 0;
+                lastContactListCount_ = 0;
             } else if (remaining > 0) {
                 // Unknown short variant: consume to keep stream aligned, no warning spam.
                 packet.setReadPos(packet.getSize());
@@ -1043,6 +1045,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
             }
             uint8_t guidMask = packet.readUInt8();
             size_t guidBytes = 0;
+            uint64_t controlGuid = 0;
             for (int i = 0; i < 8; ++i) {
                 if (guidMask & (1u << i)) ++guidBytes;
             }
@@ -1051,10 +1054,33 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 packet.setReadPos(packet.getSize());
                 break;
             }
-            for (size_t i = 0; i < guidBytes; ++i) {
-                packet.readUInt8();
+            for (int i = 0; i < 8; ++i) {
+                if (guidMask & (1u << i)) {
+                    uint8_t b = packet.readUInt8();
+                    controlGuid |= (static_cast<uint64_t>(b) << (i * 8));
+                }
             }
-            /*uint8_t allowMovement =*/ packet.readUInt8();
+            bool allowMovement = (packet.readUInt8() != 0);
+            if (controlGuid == 0 || controlGuid == playerGuid) {
+                bool changed = (serverMovementAllowed_ != allowMovement);
+                serverMovementAllowed_ = allowMovement;
+                if (changed && !allowMovement) {
+                    // Force-stop local movement immediately when server revokes control.
+                    movementInfo.flags &= ~(static_cast<uint32_t>(MovementFlags::FORWARD) |
+                                            static_cast<uint32_t>(MovementFlags::BACKWARD) |
+                                            static_cast<uint32_t>(MovementFlags::STRAFE_LEFT) |
+                                            static_cast<uint32_t>(MovementFlags::STRAFE_RIGHT) |
+                                            static_cast<uint32_t>(MovementFlags::TURN_LEFT) |
+                                            static_cast<uint32_t>(MovementFlags::TURN_RIGHT));
+                    sendMovement(Opcode::CMSG_MOVE_STOP);
+                    sendMovement(Opcode::CMSG_MOVE_STOP_STRAFE);
+                    sendMovement(Opcode::CMSG_MOVE_STOP_TURN);
+                    sendMovement(Opcode::CMSG_MOVE_STOP_SWIM);
+                    addSystemChatMessage("Movement disabled by server.");
+                } else if (changed && allowMovement) {
+                    addSystemChatMessage("Movement re-enabled.");
+                }
+            }
             break;
         }
 
@@ -1297,8 +1323,8 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 LOG_WARNING("SMSG_INIT_WORLD_STATES too short: ", packet.getSize(), " bytes");
                 break;
             }
-            /*uint32_t mapId =*/ packet.readUInt32();
-            /*uint32_t zoneId =*/ packet.readUInt32();
+            worldStateMapId_ = packet.readUInt32();
+            worldStateZoneId_ = packet.readUInt32();
             uint16_t count = packet.readUInt16();
             size_t needed = static_cast<size_t>(count) * 8;
             if (packet.getSize() - packet.getReadPos() < needed) {
@@ -1307,9 +1333,12 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 packet.setReadPos(packet.getSize());
                 break;
             }
+            worldStates_.clear();
+            worldStates_.reserve(count);
             for (uint16_t i = 0; i < count; ++i) {
-                packet.readUInt32();
-                packet.readUInt32();
+                uint32_t key = packet.readUInt32();
+                uint32_t val = packet.readUInt32();
+                worldStates_[key] = val;
             }
             break;
         }
@@ -1327,9 +1356,13 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 packet.setReadPos(packet.getSize());
                 break;
             }
+            initialFactions_.clear();
+            initialFactions_.reserve(count);
             for (uint32_t i = 0; i < count; ++i) {
-                packet.readUInt8();
-                packet.readUInt32();
+                FactionStandingInit fs{};
+                fs.flags = packet.readUInt8();
+                fs.standing = static_cast<int32_t>(packet.readUInt32());
+                initialFactions_.push_back(fs);
             }
             break;
         }
@@ -1667,7 +1700,32 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 LOG_WARNING("SMSG_QUEST_FORCE_REMOVE too short");
                 break;
             }
-            /*uint32_t questId =*/ packet.readUInt32();
+            uint32_t questId = packet.readUInt32();
+            std::string removedTitle;
+            for (auto it = questLog_.begin(); it != questLog_.end(); ++it) {
+                if (it->questId == questId) {
+                    removedTitle = it->title;
+                    questLog_.erase(it);
+                    break;
+                }
+            }
+            if (currentQuestDetails.questId == questId) {
+                questDetailsOpen = false;
+                currentQuestDetails = QuestDetailsData{};
+            }
+            if (currentQuestRequestItems_.questId == questId) {
+                questRequestItemsOpen_ = false;
+                currentQuestRequestItems_ = QuestRequestItemsData{};
+            }
+            if (currentQuestOfferReward_.questId == questId) {
+                questOfferRewardOpen_ = false;
+                currentQuestOfferReward_ = QuestOfferRewardData{};
+            }
+            if (!removedTitle.empty()) {
+                addSystemChatMessage("Quest removed: " + removedTitle);
+            } else {
+                addSystemChatMessage("Quest removed (ID " + std::to_string(questId) + ").");
+            }
             break;
         }
         case Opcode::SMSG_QUEST_QUERY_RESPONSE: {
@@ -3200,6 +3258,7 @@ void GameHandler::sendMovement(Opcode opcode) {
         (opcode == Opcode::CMSG_MOVE_STOP_STRAFE) ||
         (opcode == Opcode::CMSG_MOVE_STOP_TURN) ||
         (opcode == Opcode::CMSG_MOVE_STOP_SWIM);
+    if (!serverMovementAllowed_ && !taxiAllowed) return;
     if ((onTaxiFlight_ || taxiMountActive_) && !taxiAllowed) return;
     if (resurrectPending_ && !taxiAllowed) return;
 
@@ -9536,6 +9595,7 @@ void GameHandler::handleNewWorld(network::Packet& packet) {
     movementInfo.orientation = core::coords::serverToCanonicalYaw(orientation);
     movementInfo.flags = 0;
     movementInfo.flags2 = 0;
+    serverMovementAllowed_ = true;
     resurrectPending_ = false;
     resurrectRequestPending_ = false;
     onTaxiFlight_ = false;
@@ -9554,6 +9614,9 @@ void GameHandler::handleNewWorld(network::Packet& packet) {
     // Clear world state for the new map
     entityManager.clear();
     hostileAttackers_.clear();
+    worldStates_.clear();
+    worldStateMapId_ = mapId;
+    worldStateZoneId_ = 0;
     stopAutoAttack();
     casting = false;
     currentCastSpellId = 0;

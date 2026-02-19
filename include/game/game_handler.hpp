@@ -707,6 +707,23 @@ public:
     };
     const std::vector<QuestLogEntry>& getQuestLog() const { return questLog_; }
     void abandonQuest(uint32_t questId);
+    const std::unordered_map<uint32_t, uint32_t>& getWorldStates() const { return worldStates_; }
+    std::optional<uint32_t> getWorldState(uint32_t key) const {
+        auto it = worldStates_.find(key);
+        if (it == worldStates_.end()) return std::nullopt;
+        return it->second;
+    }
+    uint32_t getWorldStateMapId() const { return worldStateMapId_; }
+    uint32_t getWorldStateZoneId() const { return worldStateZoneId_; }
+
+    struct FactionStandingInit {
+        uint8_t flags = 0;
+        int32_t standing = 0;
+    };
+    const std::vector<FactionStandingInit>& getInitialFactions() const { return initialFactions_; }
+    uint32_t getLastContactListMask() const { return lastContactListMask_; }
+    uint32_t getLastContactListCount() const { return lastContactListCount_; }
+    bool isServerMovementAllowed() const { return serverMovementAllowed_; }
 
     // Quest giver status (! and ? markers)
     QuestGiverStatus getQuestGiverStatus(uint64_t guid) const {
@@ -1185,6 +1202,7 @@ private:
     // Movement
     MovementInfo movementInfo;               // Current player movement state
     uint32_t movementTime = 0;               // Movement timestamp counter
+    bool serverMovementAllowed_ = true;
 
     // Inventory
     Inventory inventory;
@@ -1232,6 +1250,14 @@ private:
 
     // ---- Friend list cache ----
     std::unordered_map<std::string, uint64_t> friendsCache;  // name -> guid
+    uint32_t lastContactListMask_ = 0;
+    uint32_t lastContactListCount_ = 0;
+
+    // ---- World state and faction initialization snapshots ----
+    uint32_t worldStateMapId_ = 0;
+    uint32_t worldStateZoneId_ = 0;
+    std::unordered_map<uint32_t, uint32_t> worldStates_;
+    std::vector<FactionStandingInit> initialFactions_;
 
     // ---- Ignore list cache ----
     std::unordered_map<std::string, uint64_t> ignoreCache;  // name -> guid
