@@ -361,8 +361,18 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     inventoryScreen.setVendorMode(gameHandler.isVendorWindowOpen(), &gameHandler);
 
     // Auto-open bags when vendor window opens
-    if (gameHandler.isVendorWindowOpen() && !inventoryScreen.isOpen()) {
-        inventoryScreen.setOpen(true);
+    if (gameHandler.isVendorWindowOpen()) {
+        if (inventoryScreen.isSeparateBags()) {
+            if (!inventoryScreen.isBackpackOpen() &&
+                !inventoryScreen.isBagOpen(0) &&
+                !inventoryScreen.isBagOpen(1) &&
+                !inventoryScreen.isBagOpen(2) &&
+                !inventoryScreen.isBagOpen(3)) {
+                inventoryScreen.openAllBags();
+            }
+        } else if (!inventoryScreen.isOpen()) {
+            inventoryScreen.setOpen(true);
+        }
     }
 
     // Bags (B key toggle handled inside)
@@ -800,7 +810,7 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
         if (!bonusLine.empty()) {
             ImGui::TextColored(green, "%s", bonusLine.c_str());
         }
-        if (!isWeapon && info->armor > 0) {
+        if (info->armor > 0) {
             ImGui::Text("%d Armor", info->armor);
         }
         if (info->sellPrice > 0) {
@@ -826,7 +836,7 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
                     float dps = ((eq->item.damageMin + eq->item.damageMax) * 0.5f) / speed;
                     ImGui::Text("%.1f DPS", dps);
                 }
-                if (!isWeaponInventoryType(eq->item.inventoryType) && eq->item.armor > 0) {
+                if (eq->item.armor > 0) {
                     ImGui::Text("%d Armor", eq->item.armor);
                 }
                 std::string eqBonusLine;
@@ -4944,6 +4954,55 @@ void GameScreen::renderVendorWindow(game::GameHandler& gameHandler) {
         ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Right-click bag items to sell");
         ImGui::Separator();
 
+        const auto& buyback = gameHandler.getBuybackItems();
+        if (!buyback.empty()) {
+            ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.0f, 1.0f), "Buy Back");
+            if (ImGui::BeginTable("BuybackTable", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+                ImGui::TableSetupColumn("Item", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("Price", ImGuiTableColumnFlags_WidthFixed, 110.0f);
+                ImGui::TableSetupColumn("Buy", ImGuiTableColumnFlags_WidthFixed, 62.0f);
+                ImGui::TableHeadersRow();
+                // Show only the most recently sold item (LIFO).
+                const int i = 0;
+                const auto& entry = buyback[0];
+                uint32_t sellPrice = entry.item.sellPrice;
+                if (sellPrice == 0) {
+                    if (auto* info = gameHandler.getItemInfo(entry.item.itemId); info && info->valid) {
+                        sellPrice = info->sellPrice;
+                    }
+                }
+                uint64_t price = static_cast<uint64_t>(sellPrice) *
+                                 static_cast<uint64_t>(entry.count > 0 ? entry.count : 1);
+                uint32_t g = static_cast<uint32_t>(price / 10000);
+                uint32_t s = static_cast<uint32_t>((price / 100) % 100);
+                uint32_t c = static_cast<uint32_t>(price % 100);
+                bool canAfford = money >= price;
+
+                ImGui::TableNextRow();
+                ImGui::PushID(8000 + i);
+                ImGui::TableSetColumnIndex(0);
+                const char* name = entry.item.name.empty() ? "Unknown Item" : entry.item.name.c_str();
+                if (entry.count > 1) {
+                    ImGui::Text("%s x%u", name, entry.count);
+                } else {
+                    ImGui::Text("%s", name);
+                }
+                ImGui::TableSetColumnIndex(1);
+                if (!canAfford) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+                ImGui::Text("%ug %us %uc", g, s, c);
+                if (!canAfford) ImGui::PopStyleColor();
+                ImGui::TableSetColumnIndex(2);
+                if (!canAfford) ImGui::BeginDisabled();
+                if (ImGui::SmallButton("Buy Back##buyback_0")) {
+                    gameHandler.buyBackItem(0);
+                }
+                if (!canAfford) ImGui::EndDisabled();
+                ImGui::PopID();
+                ImGui::EndTable();
+            }
+            ImGui::Separator();
+        }
+
         if (vendor.items.empty()) {
             ImGui::TextDisabled("This vendor has nothing for sale.");
         } else {
@@ -5021,7 +5080,8 @@ void GameScreen::renderVendorWindow(game::GameHandler& gameHandler) {
                     }
 
                     ImGui::TableSetColumnIndex(3);
-                    if (ImGui::SmallButton("Buy")) {
+                    std::string buyBtnId = "Buy##vendor_" + std::to_string(vi);
+                    if (ImGui::SmallButton(buyBtnId.c_str())) {
                         gameHandler.buyItem(vendor.vendorGuid, item.itemId, item.slot, 1);
                     }
 

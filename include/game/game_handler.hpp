@@ -1542,6 +1542,7 @@ private:
     std::deque<BuybackItem> buybackItems_;
     std::unordered_map<uint64_t, BuybackItem> pendingSellToBuyback_;
     int pendingBuybackSlot_ = -1;
+    uint32_t pendingBuybackWireSlot_ = 0;
     uint32_t pendingBuyItemId_ = 0;
     uint32_t pendingBuyItemSlot_ = 0;
 

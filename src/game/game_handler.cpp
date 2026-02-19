@@ -977,6 +977,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
                     addSystemChatMessage(std::string(msg) + " (code " + std::to_string(resultCode) + ")");
                 }
                 pendingBuybackSlot_ = -1;
+                pendingBuybackWireSlot_ = 0;
 
                 // Refresh vendor list so UI state stays in sync after buyback result.
                 if (currentVendorItems.vendorGuid != 0 && socket && state == WorldState::IN_WORLD) {
@@ -1722,6 +1723,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 if (result == 0) {
                     pendingSellToBuyback_.erase(itemGuid);
                 } else {
+                    bool removedPending = false;
                     auto it = pendingSellToBuyback_.find(itemGuid);
                     if (it != pendingSellToBuyback_.end()) {
                         for (auto bit = buybackItems_.begin(); bit != buybackItems_.end(); ++bit) {
@@ -1731,6 +1733,23 @@ void GameHandler::handlePacket(network::Packet& packet) {
                             }
                         }
                         pendingSellToBuyback_.erase(it);
+                        removedPending = true;
+                    }
+                    if (!removedPending) {
+                        // Some cores return a non-item GUID on sell failure; drop the newest
+                        // optimistic entry if it is still pending so stale rows don't block buyback.
+                        if (!buybackItems_.empty()) {
+                            uint64_t frontGuid = buybackItems_.front().itemGuid;
+                            if (pendingSellToBuyback_.erase(frontGuid) > 0) {
+                                buybackItems_.pop_front();
+                                removedPending = true;
+                            }
+                        }
+                    }
+                    if (!removedPending && !pendingSellToBuyback_.empty()) {
+                        // Last-resort desync recovery.
+                        pendingSellToBuyback_.clear();
+                        buybackItems_.clear();
                     }
                     static const char* sellErrors[] = {
                         "OK", "Can't find item", "Can't sell item",
@@ -1827,8 +1846,42 @@ void GameHandler::handlePacket(network::Packet& packet) {
                          " item/slot=", itemIdOrSlot,
                          " err=", static_cast<int>(errCode),
                          " pendingBuybackSlot=", pendingBuybackSlot_,
+                         " pendingBuybackWireSlot=", pendingBuybackWireSlot_,
                          " pendingBuyItemId=", pendingBuyItemId_,
                          " pendingBuyItemSlot=", pendingBuyItemSlot_);
+                if (pendingBuybackSlot_ >= 0) {
+                    // Some cores require probing absolute buyback slots until a live entry is found.
+                    if (errCode == 0) {
+                        constexpr uint16_t kWotlkCmsgBuybackItemOpcode = 0x290;
+                        constexpr uint32_t kBuybackSlotEnd = 85;
+                        if (pendingBuybackWireSlot_ >= 74 && pendingBuybackWireSlot_ < kBuybackSlotEnd &&
+                            socket && state == WorldState::IN_WORLD && currentVendorItems.vendorGuid != 0) {
+                            ++pendingBuybackWireSlot_;
+                            LOG_INFO("Buyback retry: vendorGuid=0x", std::hex, currentVendorItems.vendorGuid,
+                                     std::dec, " uiSlot=", pendingBuybackSlot_,
+                                     " wireSlot=", pendingBuybackWireSlot_);
+                            network::Packet retry(kWotlkCmsgBuybackItemOpcode);
+                            retry.writeUInt64(currentVendorItems.vendorGuid);
+                            retry.writeUInt32(pendingBuybackWireSlot_);
+                            socket->send(retry);
+                            break;
+                        }
+                        // Exhausted slot probe: drop stale local row and advance.
+                        if (pendingBuybackSlot_ < static_cast<int>(buybackItems_.size())) {
+                            buybackItems_.erase(buybackItems_.begin() + pendingBuybackSlot_);
+                        }
+                        pendingBuybackSlot_ = -1;
+                        pendingBuybackWireSlot_ = 0;
+                        if (currentVendorItems.vendorGuid != 0 && socket && state == WorldState::IN_WORLD) {
+                            auto pkt = ListInventoryPacket::build(currentVendorItems.vendorGuid);
+                            socket->send(pkt);
+                        }
+                        break;
+                    }
+                    pendingBuybackSlot_ = -1;
+                    pendingBuybackWireSlot_ = 0;
+                }
+
                 const char* msg = "Purchase failed.";
                 switch (errCode) {
                     case 0: msg = "Purchase failed: item not found."; break;
@@ -9078,6 +9131,7 @@ void GameHandler::closeVendor() {
     buybackItems_.clear();
     pendingSellToBuyback_.clear();
     pendingBuybackSlot_ = -1;
+    pendingBuybackWireSlot_ = 0;
     pendingBuyItemId_ = 0;
     pendingBuyItemSlot_ = 0;
 }
@@ -9089,7 +9143,14 @@ void GameHandler::buyItem(uint64_t vendorGuid, uint32_t itemId, uint32_t slot, u
              " wire=0x", std::hex, wireOpcode(Opcode::CMSG_BUY_ITEM), std::dec);
     pendingBuyItemId_ = itemId;
     pendingBuyItemSlot_ = slot;
-    auto packet = BuyItemPacket::build(vendorGuid, itemId, slot, count);
+    // Build directly to avoid helper-signature drift across branches (3-arg vs 4-arg helper).
+    network::Packet packet(wireOpcode(Opcode::CMSG_BUY_ITEM));
+    packet.writeUInt64(vendorGuid);
+    packet.writeUInt32(itemId); // item entry
+    packet.writeUInt32(slot);   // vendor slot index
+    packet.writeUInt32(count);
+    // WotLK/AzerothCore expects a trailing byte here.
+    packet.writeUInt8(0);
     socket->send(packet);
 }
 
@@ -9102,13 +9163,18 @@ void GameHandler::buyBackItem(uint32_t buybackSlot) {
     // This request is independent from normal buy path; avoid stale pending buy context in logs.
     pendingBuyItemId_ = 0;
     pendingBuyItemSlot_ = 0;
+    // Build directly so this compiles even when Opcode::CMSG_BUYBACK_ITEM / BuybackItemPacket
+    // are not available in some branches.
+    constexpr uint16_t kWotlkCmsgBuybackItemOpcode = 0x290;
     LOG_INFO("Buyback request: vendorGuid=0x", std::hex, currentVendorItems.vendorGuid,
              std::dec, " uiSlot=", buybackSlot, " wireSlot=", wireSlot,
              " source=absolute-buyback-slot",
-             " wire=0x", std::hex,
-             wireOpcode(Opcode::CMSG_BUYBACK_ITEM), std::dec);
+             " wire=0x", std::hex, kWotlkCmsgBuybackItemOpcode, std::dec);
     pendingBuybackSlot_ = static_cast<int>(buybackSlot);
-    auto packet = BuybackItemPacket::build(currentVendorItems.vendorGuid, wireSlot);
+    pendingBuybackWireSlot_ = wireSlot;
+    network::Packet packet(kWotlkCmsgBuybackItemOpcode);
+    packet.writeUInt64(currentVendorItems.vendorGuid);
+    packet.writeUInt32(wireSlot);
     socket->send(packet);
 }
 
