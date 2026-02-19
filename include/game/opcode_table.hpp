@@ -64,6 +64,7 @@ enum class LogicalOpcode : uint16_t {
     // ---- Entity/Object updates ----
     SMSG_UPDATE_OBJECT,
     SMSG_COMPRESSED_UPDATE_OBJECT,
+    SMSG_UNKNOWN_1F5,
     SMSG_MONSTER_MOVE_TRANSPORT,
     SMSG_SPLINE_MOVE_SET_WALK_MODE,
     SMSG_SPLINE_MOVE_SET_RUN_MODE,
@@ -439,6 +440,9 @@ enum class LogicalOpcode : uint16_t {
     SMSG_AUCTION_OWNER_NOTIFICATION,
     SMSG_AUCTION_BIDDER_NOTIFICATION,
     CMSG_AUCTION_LIST_BIDDER_ITEMS,
+
+    // ---- Expansion-Specific / Unknown (safe consume) ----
+    SMSG_UNKNOWN_319,
 
     // Sentinel
     COUNT

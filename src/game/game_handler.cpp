@@ -914,6 +914,10 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 handleCompressedUpdateObject(packet);
             }
             break;
+        case Opcode::SMSG_UNKNOWN_1F5:
+            // Observed custom server packet (16 bytes). Consume safely for stream alignment.
+            packet.setReadPos(packet.getSize());
+            break;
 
         case Opcode::SMSG_DESTROY_OBJECT:
             // Can be received after entering world
@@ -999,6 +1003,11 @@ void GameHandler::handlePacket(network::Packet& packet) {
             if (state == WorldState::IN_WORLD) {
                 handleRandomRoll(packet);
             }
+            break;
+        case Opcode::CMSG_DUEL_PROPOSED:
+            // Some servers reuse this wire value for an outbound server packet variant.
+            // Consume safely until we have a concrete parser.
+            packet.setReadPos(packet.getSize());
             break;
 
         case Opcode::SMSG_LOGOUT_RESPONSE:
@@ -2031,6 +2040,10 @@ void GameHandler::handlePacket(network::Packet& packet) {
             break;
         case Opcode::SMSG_AUCTION_COMMAND_RESULT:
             handleAuctionCommandResult(packet);
+            break;
+        case Opcode::SMSG_UNKNOWN_319:
+            // Observed custom server packet (8 bytes). Safe-consume for now.
+            packet.setReadPos(packet.getSize());
             break;
 
         default:
