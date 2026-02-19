@@ -1,4 +1,5 @@
 #include "rendering/camera_controller.hpp"
+#include <algorithm>
 #include "rendering/terrain_manager.hpp"
 #include "rendering/wmo_renderer.hpp"
 #include "rendering/m2_renderer.hpp"
