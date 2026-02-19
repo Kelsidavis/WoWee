@@ -106,6 +106,134 @@ std::string formatCopperAmount(uint32_t amount) {
     }
     return oss.str();
 }
+
+bool readCStringAt(const std::vector<uint8_t>& data, size_t start, std::string& out, size_t& nextPos) {
+    out.clear();
+    if (start >= data.size()) return false;
+    size_t i = start;
+    while (i < data.size()) {
+        uint8_t b = data[i++];
+        if (b == 0) {
+            nextPos = i;
+            return true;
+        }
+        out.push_back(static_cast<char>(b));
+    }
+    return false;
+}
+
+bool isReadableQuestText(const std::string& s, size_t minLen, size_t maxLen) {
+    if (s.size() < minLen || s.size() > maxLen) return false;
+    bool hasAlpha = false;
+    for (unsigned char c : s) {
+        if (c < 0x20 || c > 0x7E) return false;
+        if (std::isalpha(c)) hasAlpha = true;
+    }
+    return hasAlpha;
+}
+
+bool isPlaceholderQuestTitle(const std::string& s) {
+    return s.rfind("Quest #", 0) == 0;
+}
+
+bool looksLikeQuestDescriptionText(const std::string& s) {
+    int spaces = 0;
+    int commas = 0;
+    for (unsigned char c : s) {
+        if (c == ' ') spaces++;
+        if (c == ',') commas++;
+    }
+    const int words = spaces + 1;
+    if (words > 8) return true;
+    if (commas > 0 && words > 5) return true;
+    if (s.find(". ") != std::string::npos) return true;
+    if (s.find(':') != std::string::npos && words > 5) return true;
+    return false;
+}
+
+bool isStrongQuestTitle(const std::string& s) {
+    if (!isReadableQuestText(s, 6, 72)) return false;
+    if (looksLikeQuestDescriptionText(s)) return false;
+    unsigned char first = static_cast<unsigned char>(s.front());
+    return std::isupper(first) != 0;
+}
+
+int scoreQuestTitle(const std::string& s) {
+    if (!isReadableQuestText(s, 4, 72)) return -1000;
+    if (looksLikeQuestDescriptionText(s)) return -1000;
+    int score = 0;
+    score += static_cast<int>(std::min<size_t>(s.size(), 32));
+    unsigned char first = static_cast<unsigned char>(s.front());
+    if (std::isupper(first)) score += 20;
+    if (std::islower(first)) score -= 20;
+    if (s.find(' ') != std::string::npos) score += 8;
+    if (s.find('.') != std::string::npos) score -= 18;
+    if (s.find('!') != std::string::npos || s.find('?') != std::string::npos) score -= 6;
+    return score;
+}
+
+struct QuestQueryTextCandidate {
+    std::string title;
+    std::string objectives;
+    int score = -1000;
+};
+
+QuestQueryTextCandidate pickBestQuestQueryTexts(const std::vector<uint8_t>& data, bool classicHint) {
+    QuestQueryTextCandidate best;
+    if (data.size() <= 9) return best;
+
+    std::vector<size_t> seedOffsets;
+    const size_t base = 8;
+    const size_t classicOffset = base + 40u * 4u;
+    const size_t wotlkOffset = base + 55u * 4u;
+    if (classicHint) {
+        seedOffsets.push_back(classicOffset);
+        seedOffsets.push_back(wotlkOffset);
+    } else {
+        seedOffsets.push_back(wotlkOffset);
+        seedOffsets.push_back(classicOffset);
+    }
+    for (size_t off : seedOffsets) {
+        if (off < data.size()) {
+            std::string title;
+            size_t next = off;
+            if (readCStringAt(data, off, title, next)) {
+                QuestQueryTextCandidate c;
+                c.title = title;
+                c.score = scoreQuestTitle(title) + 20; // Prefer expected struct offsets
+
+                std::string s2;
+                size_t n2 = next;
+                if (readCStringAt(data, next, s2, n2) && isReadableQuestText(s2, 8, 600)) {
+                    c.objectives = s2;
+                }
+                if (c.score > best.score) best = c;
+            }
+        }
+    }
+
+    // Fallback: scan packet for best printable C-string title candidate.
+    for (size_t start = 8; start < data.size(); ++start) {
+        std::string title;
+        size_t next = start;
+        if (!readCStringAt(data, start, title, next)) continue;
+
+        QuestQueryTextCandidate c;
+        c.title = title;
+        c.score = scoreQuestTitle(title);
+        if (c.score < 0) continue;
+
+        std::string s2, s3;
+        size_t n2 = next, n3 = next;
+        if (readCStringAt(data, next, s2, n2)) {
+            if (isReadableQuestText(s2, 8, 600)) c.objectives = s2;
+            else if (readCStringAt(data, n2, s3, n3) && isReadableQuestText(s3, 8, 600)) c.objectives = s3;
+        }
+        if (c.score > best.score) best = c;
+    }
+
+    return best;
+}
 } // namespace
 
 
@@ -1764,6 +1892,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 break;
             }
             uint32_t questId = packet.readUInt32();
+            pendingQuestQueryIds_.erase(questId);
             if (questId == 0) {
                 // Some servers emit a zero-id variant during world bootstrap.
                 // Treat as no-op to avoid false "Quest removed" spam.
@@ -1805,75 +1934,43 @@ void GameHandler::handlePacket(network::Packet& packet) {
             break;
         }
         case Opcode::SMSG_QUEST_QUERY_RESPONSE: {
-            // Quest data from server (big packet with title, objectives, rewards, etc.)
-            LOG_INFO("SMSG_QUEST_QUERY_RESPONSE: packet size=", packet.getSize());
-
             if (packet.getSize() < 8) {
                 LOG_WARNING("SMSG_QUEST_QUERY_RESPONSE: packet too small (", packet.getSize(), " bytes)");
                 break;
             }
 
             uint32_t questId = packet.readUInt32();
-            uint32_t questMethod = packet.readUInt32();
+            packet.readUInt32(); // questMethod
 
-            LOG_INFO("  questId=", questId, " questMethod=", questMethod);
-
-            // SMSG_QUEST_QUERY_RESPONSE layout varies by expansion.
-            //
-            // Classic/Turtle (1.12.x) after questId+questMethod:
-            //   16 header uint32s (questLevel, zoneOrSort, type, suggestedPlayers,
-            //                      repFaction, repValue, nextChain, xpId,
-            //                      rewMoney, rewMoneyMax, rewSpell, rewSpellCast,
-            //                      rewHonor, rewHonorMult, srcItemId, questFlags)
-            //    8 reward items    (4 slots × 2: itemId + count)
-            //   12 choice items    (6 slots × 2: itemId + count)
-            //    4 POI uint32s     (mapId, x, y, opt)
-            //   = 40 uint32s before title string
-            //
-            // WotLK (3.3.5) after questId+questMethod:
-            //   21 header uint32s (adds minLevel, questInfoId, 2nd repFaction/Value, questFlags2)
-            //   12 reward items   (4 slots × 3: itemId + count + displayId)
-            //   18 choice items   (6 slots × 3: itemId + count + displayId)
-            //    4 POI uint32s
-            //   = 55 uint32s before title string
-            //
-            // Read all numeric fields, then look for the title string.
-            // Using packetParsers_->questLogStride() as expansion discriminator:
-            //   stride==3 → Classic layout (40 skips)
-            //   stride==5 → WotLK layout  (55 skips)
             const bool isClassicLayout = packetParsers_ && packetParsers_->questLogStride() == 3;
-            const int skipCount = isClassicLayout ? 40 : 55;
+            const QuestQueryTextCandidate parsed = pickBestQuestQueryTexts(packet.getData(), isClassicLayout);
 
-            for (int i = 0; i < skipCount; ++i) {
-                packet.readUInt32();
+            for (auto& q : questLog_) {
+                if (q.questId != questId) continue;
+
+                const int existingScore = scoreQuestTitle(q.title);
+                const bool parsedStrong = isStrongQuestTitle(parsed.title);
+                const bool parsedLongEnough = parsed.title.size() >= 6;
+                const bool notShorterThanExisting =
+                    isPlaceholderQuestTitle(q.title) || q.title.empty() || parsed.title.size() + 2 >= q.title.size();
+                const bool shouldReplaceTitle =
+                    parsed.score > -1000 &&
+                    parsedStrong &&
+                    parsedLongEnough &&
+                    notShorterThanExisting &&
+                    (isPlaceholderQuestTitle(q.title) || q.title.empty() || parsed.score >= existingScore + 12);
+
+                if (shouldReplaceTitle && !parsed.title.empty()) {
+                    q.title = parsed.title;
+                }
+                if (!parsed.objectives.empty() &&
+                    (q.objectives.empty() || parsed.objectives.size() > q.objectives.size())) {
+                    q.objectives = parsed.objectives;
+                }
+                break;
             }
 
-            if (packet.getReadPos() < packet.getSize()) {
-                std::string title = packet.readString();
-                LOG_INFO("  Quest title: '", title, "'");
-
-                // Only update if we got a non-empty, printable title (guards against
-                // landing in the middle of binary reward data on wrong layouts).
-                bool validTitle = !title.empty();
-                if (validTitle) {
-                    for (char c : title) {
-                        if ((unsigned char)c < 0x20 && c != '\t') { validTitle = false; break; }
-                    }
-                }
-
-                if (validTitle) {
-                    for (auto& q : questLog_) {
-                        if (q.questId == questId) {
-                            q.title = title;
-                            LOG_INFO("Updated quest log entry ", questId, " with title: ", title);
-                            break;
-                        }
-                    }
-                } else {
-                    LOG_INFO("  Skipping non-printable title (wrong layout?) for quest ", questId);
-                }
-            }
-
+            pendingQuestQueryIds_.erase(questId);
             break;
         }
         case Opcode::SMSG_QUESTLOG_FULL: {
@@ -2463,6 +2560,7 @@ void GameHandler::selectCharacter(uint64_t characterGuid) {
     hasPlayerExploredZones_ = false;
     playerSkills_.clear();
     questLog_.clear();
+    pendingQuestQueryIds_.clear();
     npcQuestStatus_.clear();
     hostileAttackers_.clear();
     combatText.clear();
@@ -4157,12 +4255,7 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                     questLog_.push_back(entry);
                                     LOG_INFO("Found quest in update fields: ", questId);
 
-                                    // Request quest details from server
-                                    if (socket) {
-                                        network::Packet qPkt(wireOpcode(Opcode::CMSG_QUEST_QUERY));
-                                        qPkt.writeUInt32(questId);
-                                        socket->send(qPkt);
-                                    }
+                                    requestQuestQuery(questId);
                                 }
                             }
                         }
@@ -4472,11 +4565,7 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                             entry.title = "Quest #" + std::to_string(qId);
                                             questLog_.push_back(entry);
                                             LOG_INFO("Quest found in VALUES update: ", qId);
-                                            if (socket) {
-                                                network::Packet qPkt(wireOpcode(Opcode::CMSG_QUEST_QUERY));
-                                                qPkt.writeUInt32(qId);
-                                                socket->send(qPkt);
-                                            }
+                                            requestQuestQuery(qId);
                                         }
                                     } else {
                                         // Quest slot cleared — remove from log if present
@@ -8579,27 +8668,30 @@ void GameHandler::selectGossipQuest(uint32_t questId) {
         }
     }
 
-    LOG_INFO("selectGossipQuest: questId=", questId, " isInLog=", isInLog, " isCompletable=", isCompletable);
-    LOG_INFO("  Current quest log size: ", questLog_.size());
-    for (const auto& q : questLog_) {
-        LOG_INFO("    Quest ", q.questId, ": complete=", q.complete);
-    }
-
     if (isInLog && isCompletable) {
         // Quest is ready to turn in - request reward
-        LOG_INFO("Turning in quest: questId=", questId, " npcGuid=", currentGossip.npcGuid);
         network::Packet packet(wireOpcode(Opcode::CMSG_QUESTGIVER_REQUEST_REWARD));
         packet.writeUInt64(currentGossip.npcGuid);
         packet.writeUInt32(questId);
         socket->send(packet);
     } else {
         // New quest or not completable - query details
-        LOG_INFO("Querying quest details: questId=", questId, " npcGuid=", currentGossip.npcGuid);
         auto packet = QuestgiverQueryQuestPacket::build(currentGossip.npcGuid, questId);
         socket->send(packet);
     }
 
     gossipWindowOpen = false;
+}
+
+bool GameHandler::requestQuestQuery(uint32_t questId, bool force) {
+    if (questId == 0 || state != WorldState::IN_WORLD || !socket) return false;
+    if (!force && pendingQuestQueryIds_.count(questId)) return false;
+
+    network::Packet pkt(wireOpcode(Opcode::CMSG_QUEST_QUERY));
+    pkt.writeUInt32(questId);
+    socket->send(pkt);
+    pendingQuestQueryIds_.insert(questId);
+    return true;
 }
 
 void GameHandler::handleQuestDetails(network::Packet& packet) {
@@ -8611,6 +8703,16 @@ void GameHandler::handleQuestDetails(network::Packet& packet) {
         return;
     }
     currentQuestDetails = data;
+    for (auto& q : questLog_) {
+        if (q.questId != data.questId) continue;
+        if (!data.title.empty() && (isPlaceholderQuestTitle(q.title) || data.title.size() >= q.title.size())) {
+            q.title = data.title;
+        }
+        if (!data.objectives.empty() && (q.objectives.empty() || data.objectives.size() > q.objectives.size())) {
+            q.objectives = data.objectives;
+        }
+        break;
+    }
     questDetailsOpen = true;
     gossipWindowOpen = false;
 }

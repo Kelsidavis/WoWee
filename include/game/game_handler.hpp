@@ -707,6 +707,7 @@ public:
     };
     const std::vector<QuestLogEntry>& getQuestLog() const { return questLog_; }
     void abandonQuest(uint32_t questId);
+    bool requestQuestQuery(uint32_t questId, bool force = false);
     const std::unordered_map<uint32_t, uint32_t>& getWorldStates() const { return worldStates_; }
     std::optional<uint32_t> getWorldState(uint32_t key) const {
         auto it = worldStates_.find(key);
@@ -1435,6 +1436,7 @@ private:
 
     // Quest log
     std::vector<QuestLogEntry> questLog_;
+    std::unordered_set<uint32_t> pendingQuestQueryIds_;
 
     // Quest giver status per NPC
     std::unordered_map<uint64_t, QuestGiverStatus> npcQuestStatus_;

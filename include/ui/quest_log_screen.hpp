@@ -2,6 +2,7 @@
 
 #include "game/game_handler.hpp"
 #include <imgui.h>
+#include <cstdint>
 
 namespace wowee { namespace ui {
 
@@ -16,6 +17,7 @@ private:
     bool open = false;
     bool lKeyWasDown = false;
     int selectedIndex = -1;
+    uint32_t lastDetailRequestQuestId_ = 0;
 };
 
 }} // namespace wowee::ui
