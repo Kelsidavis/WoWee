@@ -4532,6 +4532,23 @@ void GameScreen::renderQuestRequestItemsWindow(game::GameHandler& gameHandler) {
 
     bool open = true;
     const auto& quest = gameHandler.getQuestRequestItems();
+    auto countItemInInventory = [&](uint32_t itemId) -> uint32_t {
+        const auto& inv = gameHandler.getInventory();
+        uint32_t total = 0;
+        for (int i = 0; i < inv.getBackpackSize(); ++i) {
+            const auto& slot = inv.getBackpackSlot(i);
+            if (!slot.empty() && slot.item.itemId == itemId) total += slot.item.stackCount;
+        }
+        for (int bag = 0; bag < game::Inventory::NUM_BAG_SLOTS; ++bag) {
+            int bagSize = inv.getBagSize(bag);
+            for (int s = 0; s < bagSize; ++s) {
+                const auto& slot = inv.getBagSlot(bag, s);
+                if (!slot.empty() && slot.item.itemId == itemId) total += slot.item.stackCount;
+            }
+        }
+        return total;
+    };
+
     std::string processedTitle = replaceGenderPlaceholders(quest.title, gameHandler);
     if (ImGui::Begin(processedTitle.c_str(), &open, ImGuiWindowFlags_NoCollapse)) {
         if (!quest.completionText.empty()) {
@@ -4545,11 +4562,17 @@ void GameScreen::renderQuestRequestItemsWindow(game::GameHandler& gameHandler) {
             ImGui::Separator();
             ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.0f, 1.0f), "Required Items:");
             for (const auto& item : quest.requiredItems) {
+                uint32_t have = countItemInInventory(item.itemId);
+                bool enough = have >= item.count;
                 auto* info = gameHandler.getItemInfo(item.itemId);
-                if (info && info->valid)
-                    ImGui::Text("  %s x%u", info->name.c_str(), item.count);
-                else
-                    ImGui::Text("  Item %u x%u", item.itemId, item.count);
+                const char* name = (info && info->valid) ? info->name.c_str() : nullptr;
+                if (name && *name) {
+                    ImGui::TextColored(enough ? ImVec4(0.6f, 1.0f, 0.6f, 1.0f) : ImVec4(1.0f, 0.6f, 0.6f, 1.0f),
+                                       "  %s  %u/%u", name, have, item.count);
+                } else {
+                    ImGui::TextColored(enough ? ImVec4(0.6f, 1.0f, 0.6f, 1.0f) : ImVec4(1.0f, 0.6f, 0.6f, 1.0f),
+                                       "  Item %u  %u/%u", item.itemId, have, item.count);
+                }
             }
         }
 
@@ -4566,18 +4589,16 @@ void GameScreen::renderQuestRequestItemsWindow(game::GameHandler& gameHandler) {
         ImGui::Separator();
         ImGui::Spacing();
         float buttonW = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-        if (quest.isCompletable()) {
-            if (ImGui::Button("Complete Quest", ImVec2(buttonW, 0))) {
-                gameHandler.completeQuest();
-            }
-        } else {
-            ImGui::BeginDisabled();
-            ImGui::Button("Incomplete", ImVec2(buttonW, 0));
-            ImGui::EndDisabled();
+        if (ImGui::Button("Complete Quest", ImVec2(buttonW, 0))) {
+            gameHandler.completeQuest();
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(buttonW, 0))) {
             gameHandler.closeQuestRequestItems();
+        }
+
+        if (!quest.isCompletable()) {
+            ImGui::TextDisabled("Server flagged this quest as incomplete; completion will be server-validated.");
         }
     }
     ImGui::End();

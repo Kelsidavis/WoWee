@@ -3,6 +3,7 @@
 #include "game/game_handler.hpp"
 #include <imgui.h>
 #include <cstdint>
+#include <unordered_set>
 
 namespace wowee { namespace ui {
 
@@ -18,6 +19,8 @@ private:
     bool lKeyWasDown = false;
     int selectedIndex = -1;
     uint32_t lastDetailRequestQuestId_ = 0;
+    double lastDetailRequestAt_ = 0.0;
+    std::unordered_set<uint32_t> questDetailQueryNoResponse_;
 };
 
 }} // namespace wowee::ui

@@ -932,6 +932,25 @@ void GameHandler::handlePacket(network::Packet& packet) {
 
     // Translate wire opcode to logical opcode via expansion table
     auto logicalOp = opcodeTable_.fromWire(opcode);
+
+    if (questQueryTracePacketsLeft_ > 0) {
+        int logicalId = logicalOp ? static_cast<int>(*logicalOp) : -1;
+        size_t limit = std::min<size_t>(24, packet.getSize());
+        std::string hex;
+        const auto& raw = packet.getData();
+        for (size_t i = 0; i < limit && i < raw.size(); ++i) {
+            char buf[4];
+            snprintf(buf, sizeof(buf), "%02x ", raw[i]);
+            hex += buf;
+        }
+        LOG_INFO("QTRACE RX: wire=0x", std::hex, opcode, std::dec,
+                 " logical=", logicalId,
+                 " size=", packet.getSize(),
+                 " qid=", questQueryTraceQuestId_,
+                 " head=[", hex, "]");
+        --questQueryTracePacketsLeft_;
+    }
+
     if (!logicalOp) {
         static std::unordered_set<uint16_t> loggedUnknownWireOpcodes;
         if (loggedUnknownWireOpcodes.insert(opcode).second) {
@@ -1861,6 +1880,10 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 bool updatedAny = false;
                 for (auto& quest : questLog_) {
                     if (quest.complete) continue;
+                    const bool tracksItem =
+                        quest.requiredItemCounts.count(itemId) > 0 ||
+                        quest.itemCounts.count(itemId) > 0;
+                    if (!tracksItem) continue;
                     quest.itemCounts[itemId] = count;
                     updatedAny = true;
                 }
@@ -1940,6 +1963,8 @@ void GameHandler::handlePacket(network::Packet& packet) {
             }
 
             uint32_t questId = packet.readUInt32();
+            LOG_INFO("Quest query RX: wire=0x", std::hex, opcode, std::dec,
+                     " questId=", questId, " payloadSize=", packet.getSize());
             packet.readUInt32(); // questMethod
 
             const bool isClassicLayout = packetParsers_ && packetParsers_->questLogStride() == 3;
@@ -1964,7 +1989,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
                     q.title = parsed.title;
                 }
                 if (!parsed.objectives.empty() &&
-                    (q.objectives.empty() || parsed.objectives.size() > q.objectives.size())) {
+                    (q.objectives.empty() || q.objectives.size() < 16)) {
                     q.objectives = parsed.objectives;
                 }
                 break;
@@ -8657,28 +8682,12 @@ void GameHandler::selectGossipOption(uint32_t optionId) {
 void GameHandler::selectGossipQuest(uint32_t questId) {
     if (state != WorldState::IN_WORLD || !socket || !gossipWindowOpen) return;
 
-    // Check if quest is in our quest log and completable
-    bool isInLog = false;
-    bool isCompletable = false;
-    for (const auto& quest : questLog_) {
-        if (quest.questId == questId) {
-            isInLog = true;
-            isCompletable = quest.complete;
-            break;
-        }
-    }
-
-    if (isInLog && isCompletable) {
-        // Quest is ready to turn in - request reward
-        network::Packet packet(wireOpcode(Opcode::CMSG_QUESTGIVER_REQUEST_REWARD));
-        packet.writeUInt64(currentGossip.npcGuid);
-        packet.writeUInt32(questId);
-        socket->send(packet);
-    } else {
-        // New quest or not completable - query details
-        auto packet = QuestgiverQueryQuestPacket::build(currentGossip.npcGuid, questId);
-        socket->send(packet);
-    }
+    // Always query quest from gossip and let the server drive next step:
+    // - details (new quest), or
+    // - request items (turn-in check), or
+    // - offer reward.
+    auto packet = QuestgiverQueryQuestPacket::build(currentGossip.npcGuid, questId);
+    socket->send(packet);
 
     gossipWindowOpen = false;
 }
@@ -8689,6 +8698,11 @@ bool GameHandler::requestQuestQuery(uint32_t questId, bool force) {
 
     network::Packet pkt(wireOpcode(Opcode::CMSG_QUEST_QUERY));
     pkt.writeUInt32(questId);
+    questQueryTraceQuestId_ = questId;
+    questQueryTracePacketsLeft_ = 60;
+    LOG_INFO("Quest query TX: questId=", questId, " wireOpcode=0x",
+             std::hex, wireOpcode(Opcode::CMSG_QUEST_QUERY), std::dec,
+             " force=", force ? 1 : 0);
     socket->send(pkt);
     pendingQuestQueryIds_.insert(questId);
     return true;
@@ -8784,6 +8798,37 @@ void GameHandler::handleQuestRequestItems(network::Packet& packet) {
     // Query item names for required items
     for (const auto& item : data.requiredItems) {
         queryItemInfo(item.itemId, 0);
+    }
+
+    // Server-authoritative turn-in requirements: sync quest-log summary so
+    // UI doesn't show stale/inferred objective numbers.
+    for (auto& q : questLog_) {
+        if (q.questId != data.questId) continue;
+        q.complete = data.isCompletable();
+        q.requiredItemCounts.clear();
+
+        std::ostringstream oss;
+        if (!data.completionText.empty()) {
+            oss << data.completionText;
+            if (!data.requiredItems.empty() || data.requiredMoney > 0) oss << "\n\n";
+        }
+        if (!data.requiredItems.empty()) {
+            oss << "Required items:";
+            for (const auto& item : data.requiredItems) {
+                std::string itemLabel = "Item " + std::to_string(item.itemId);
+                if (const auto* info = getItemInfo(item.itemId)) {
+                    if (!info->name.empty()) itemLabel = info->name;
+                }
+                q.requiredItemCounts[item.itemId] = item.count;
+                oss << "\n- " << itemLabel << " x" << item.count;
+            }
+        }
+        if (data.requiredMoney > 0) {
+            if (!data.requiredItems.empty()) oss << "\n";
+            oss << "\nRequired money: " << formatCopperAmount(data.requiredMoney);
+        }
+        q.objectives = oss.str();
+        break;
     }
 }
 

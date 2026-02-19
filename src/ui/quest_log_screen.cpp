@@ -284,11 +284,14 @@ void QuestLogScreen::render(game::GameHandler& gameHandler) {
                 if (clicked) {
                     selectedIndex = static_cast<int>(i);
                     if (q.objectives.empty()) {
-                        if (gameHandler.requestQuestQuery(q.questId)) {
+                        if (!questDetailQueryNoResponse_.count(q.questId) &&
+                            gameHandler.requestQuestQuery(q.questId)) {
                             lastDetailRequestQuestId_ = q.questId;
+                            lastDetailRequestAt_ = ImGui::GetTime();
                         }
                     } else if (lastDetailRequestQuestId_ == q.questId) {
                         lastDetailRequestQuestId_ = 0;
+                        questDetailQueryNoResponse_.erase(q.questId);
                     }
                 }
                 ImGui::PopID();
@@ -310,23 +313,37 @@ void QuestLogScreen::render(game::GameHandler& gameHandler) {
                 ImGui::Separator();
 
                 if (sel.objectives.empty()) {
-                    if (lastDetailRequestQuestId_ != sel.questId) {
-                        if (gameHandler.requestQuestQuery(sel.questId)) {
-                            lastDetailRequestQuestId_ = sel.questId;
-                        }
+                    bool noResponse = questDetailQueryNoResponse_.count(sel.questId) > 0;
+                    bool pending = noResponse ? false : gameHandler.isQuestQueryPending(sel.questId);
+                    const bool requestTimedOut =
+                        (lastDetailRequestQuestId_ == sel.questId) &&
+                        ((ImGui::GetTime() - lastDetailRequestAt_) > 5.0);
+                    if (lastDetailRequestQuestId_ == sel.questId && !pending) {
+                        lastDetailRequestQuestId_ = 0;
+                        questDetailQueryNoResponse_.erase(sel.questId);
+                    } else if (requestTimedOut) {
+                        lastDetailRequestQuestId_ = 0;
+                        pending = false;
+                        questDetailQueryNoResponse_.insert(sel.questId);
+                        noResponse = true;
+                        gameHandler.clearQuestQueryPending(sel.questId);
                     }
-                    if (lastDetailRequestQuestId_ == sel.questId) {
+                    if (pending) {
                         ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.8f, 1.0f), "Loading quest details...");
                     } else {
                         ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.8f, 1.0f), "Quest summary not available yet.");
                     }
                     if (ImGui::Button("Retry Details")) {
+                        questDetailQueryNoResponse_.erase(sel.questId);
+                        gameHandler.clearQuestQueryPending(sel.questId);
                         if (gameHandler.requestQuestQuery(sel.questId, true)) {
                             lastDetailRequestQuestId_ = sel.questId;
+                            lastDetailRequestAt_ = ImGui::GetTime();
                         }
                     }
                 } else {
                     if (lastDetailRequestQuestId_ == sel.questId) lastDetailRequestQuestId_ = 0;
+                    questDetailQueryNoResponse_.erase(sel.questId);
                     ImGui::TextColored(ImVec4(0.82f, 0.9f, 1.0f, 1.0f), "Summary");
                     std::string processedObjectives = replaceGenderPlaceholders(sel.objectives, gameHandler);
                     float textHeight = ImGui::GetContentRegionAvail().y * 0.45f;

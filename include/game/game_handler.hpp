@@ -704,10 +704,16 @@ public:
         std::unordered_map<uint32_t, std::pair<uint32_t, uint32_t>> killCounts;
         // Quest item progress: itemId -> current count
         std::unordered_map<uint32_t, uint32_t> itemCounts;
+        // Server-authoritative quest item requirements from REQUEST_ITEMS
+        std::unordered_map<uint32_t, uint32_t> requiredItemCounts;
     };
     const std::vector<QuestLogEntry>& getQuestLog() const { return questLog_; }
     void abandonQuest(uint32_t questId);
     bool requestQuestQuery(uint32_t questId, bool force = false);
+    bool isQuestQueryPending(uint32_t questId) const {
+        return pendingQuestQueryIds_.count(questId) > 0;
+    }
+    void clearQuestQueryPending(uint32_t questId) { pendingQuestQueryIds_.erase(questId); }
     const std::unordered_map<uint32_t, uint32_t>& getWorldStates() const { return worldStates_; }
     std::optional<uint32_t> getWorldState(uint32_t key) const {
         auto it = worldStates_.find(key);
@@ -1437,6 +1443,8 @@ private:
     // Quest log
     std::vector<QuestLogEntry> questLog_;
     std::unordered_set<uint32_t> pendingQuestQueryIds_;
+    int questQueryTracePacketsLeft_ = 0;
+    uint32_t questQueryTraceQuestId_ = 0;
 
     // Quest giver status per NPC
     std::unordered_map<uint64_t, QuestGiverStatus> npcQuestStatus_;
