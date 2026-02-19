@@ -309,6 +309,12 @@ set(WOWEE_HEADERS
 
 set(WOWEE_PLATFORM_SOURCES)
 if(WIN32)
+    # Copy icon into build tree so llvm-rc can find it via the relative path in wowee.rc
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/Wowee.ico
+        ${CMAKE_CURRENT_BINARY_DIR}/assets/wowee.ico
+        COPYONLY
+    )
     list(APPEND WOWEE_PLATFORM_SOURCES resources/wowee.rc)
 endif()
 

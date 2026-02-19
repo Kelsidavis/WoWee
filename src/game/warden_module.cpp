@@ -494,7 +494,6 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
             return false;
         }
     #else
-        #include <sys/mman.h>
         moduleMemory_ = mmap(
             nullptr,
             finalCodeSize,
