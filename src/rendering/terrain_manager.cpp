@@ -521,7 +521,10 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
                 }
 
                 PendingTile::WMOReady ready;
-                ready.modelId = placement.uniqueId;
+                // Cache WMO model uploads by path; placement dedup uses uniqueId separately.
+                ready.modelId = static_cast<uint32_t>(std::hash<std::string>{}(wmoPath));
+                if (ready.modelId == 0) ready.modelId = 1;
+                ready.uniqueId = placement.uniqueId;
                 ready.model = std::move(wmoModel);
                 ready.position = pos;
                 ready.rotation = rot;
@@ -647,10 +650,11 @@ void TerrainManager::finalizeTile(const std::shared_ptr<PendingTile>& pending) {
     std::vector<uint32_t> m2InstanceIds;
     std::vector<uint32_t> wmoInstanceIds;
     std::vector<uint32_t> tileUniqueIds;
+    std::vector<uint32_t> tileWmoUniqueIds;
 
     // Upload M2 models to GPU and create instances
     if (m2Renderer && assetManager) {
-        if (!m2Renderer->getModelCount()) {
+        if (!m2Renderer->isInitialized()) {
             m2Renderer->initialize(assetManager);
         }
 
@@ -691,7 +695,7 @@ void TerrainManager::finalizeTile(const std::shared_ptr<PendingTile>& pending) {
 
     // Upload WMO models to GPU and create instances
     if (wmoRenderer && assetManager) {
-        if (!wmoRenderer->getModelCount()) {
+        if (!wmoRenderer->isInitialized()) {
             wmoRenderer->initialize(assetManager);
         }
 
@@ -699,9 +703,9 @@ void TerrainManager::finalizeTile(const std::shared_ptr<PendingTile>& pending) {
         int loadedLiquids = 0;
         int skippedWmoDedup = 0;
         for (auto& wmoReady : pending->wmoModels) {
-            // Deduplicate WMO instances by uniqueId (prevents Stormwind from rendering 16x)
-            // uniqueId is stored in modelId field (see line 522 in prepareTile)
-            if (placedWmoIds.count(wmoReady.modelId)) {
+            // Deduplicate by placement uniqueId when available.
+            // Some ADTs use uniqueId=0, which is not safe for dedup.
+            if (wmoReady.uniqueId != 0 && placedWmoIds.count(wmoReady.uniqueId)) {
                 skippedWmoDedup++;
                 continue;
             }
@@ -710,7 +714,10 @@ void TerrainManager::finalizeTile(const std::shared_ptr<PendingTile>& pending) {
                 uint32_t wmoInstId = wmoRenderer->createInstance(wmoReady.modelId, wmoReady.position, wmoReady.rotation);
                 if (wmoInstId) {
                     wmoInstanceIds.push_back(wmoInstId);
-                    placedWmoIds.insert(wmoReady.modelId);
+                    if (wmoReady.uniqueId != 0) {
+                        placedWmoIds.insert(wmoReady.uniqueId);
+                        tileWmoUniqueIds.push_back(wmoReady.uniqueId);
+                    }
                     loadedWMOs++;
 
                     // Load WMO liquids (canals, pools, etc.)
@@ -773,6 +780,7 @@ void TerrainManager::finalizeTile(const std::shared_ptr<PendingTile>& pending) {
     tile->loaded = true;
     tile->m2InstanceIds = std::move(m2InstanceIds);
     tile->wmoInstanceIds = std::move(wmoInstanceIds);
+    tile->wmoUniqueIds = std::move(tileWmoUniqueIds);
     tile->doodadUniqueIds = std::move(tileUniqueIds);
 
     // Calculate world bounds
@@ -1017,6 +1025,9 @@ void TerrainManager::unloadTile(int x, int y) {
     // Remove doodad unique IDs from dedup set
     for (uint32_t uid : tile->doodadUniqueIds) {
         placedDoodadIds.erase(uid);
+    }
+    for (uint32_t uid : tile->wmoUniqueIds) {
+        placedWmoIds.erase(uid);
     }
 
     // Remove M2 doodad instances

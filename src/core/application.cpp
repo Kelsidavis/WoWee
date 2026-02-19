@@ -1659,14 +1659,14 @@ void Application::setupUICallbacks() {
                     transportManager->registerTransport(guid, wmoInstanceId, pathId, canonicalSpawnPos, entry);
                 } else {
                     pendingTransportMoves_[guid] = PendingTransportMove{x, y, z, orientation};
-                    LOG_WARNING("Cannot auto-spawn transport 0x", std::hex, guid, std::dec,
-                                " - WMO instance not found (queued move for replay)");
+                    LOG_DEBUG("Cannot auto-spawn transport 0x", std::hex, guid, std::dec,
+                              " - WMO instance not found yet (queued move for replay)");
                     return;
                 }
             } else {
                 pendingTransportMoves_[guid] = PendingTransportMove{x, y, z, orientation};
-                LOG_WARNING("Cannot auto-spawn transport 0x", std::hex, guid, std::dec,
-                            " - entity not found in EntityManager (queued move for replay)");
+                LOG_DEBUG("Cannot auto-spawn transport 0x", std::hex, guid, std::dec,
+                          " - entity not found in EntityManager (queued move for replay)");
                 return;
             }
         }
@@ -5137,23 +5137,34 @@ void Application::setupTestTransport() {
     transportManager->loadPathFromNodes(pathId, harborPath, true, speed);
     LOG_INFO("Registered transport path ", pathId, " with ", harborPath.size(), " waypoints, speed=", speed);
 
-    // Try to load a transport WMO model
-    // Common transport WMOs: Transportship.wmo (generic ship)
-    std::string transportWmoPath = "Transports\\Transportship\\Transportship.wmo";
+    // Try transport WMOs in manifest-backed paths first.
+    std::vector<std::string> transportCandidates = {
+        "World\\wmo\\transports\\transport_ship\\transportship.wmo",
+        "World\\wmo\\transports\\transport_zeppelin\\transport_zeppelin.wmo",
+        "World\\wmo\\transports\\transport_horde_zeppelin\\Transport_Horde_Zeppelin.wmo",
+        "World\\wmo\\transports\\icebreaker\\Transport_Icebreaker_ship.wmo",
+        // Legacy fallbacks
+        "Transports\\Transportship\\Transportship.wmo",
+        "Transports\\Boat\\Boat.wmo",
+    };
 
-    auto wmoData = assetManager->readFile(transportWmoPath);
-    if (wmoData.empty()) {
-        LOG_WARNING("Could not load transport WMO: ", transportWmoPath);
-        LOG_INFO("Trying alternative: Boat transport");
-        transportWmoPath = "Transports\\Boat\\Boat.wmo";
-        wmoData = assetManager->readFile(transportWmoPath);
+    std::string transportWmoPath;
+    std::vector<uint8_t> wmoData;
+    for (const auto& candidate : transportCandidates) {
+        wmoData = assetManager->readFile(candidate);
+        if (!wmoData.empty()) {
+            transportWmoPath = candidate;
+            break;
+        }
     }
 
     if (wmoData.empty()) {
         LOG_WARNING("No transport WMO found - test transport disabled");
-        LOG_INFO("Available transport WMOs are typically in Transports\\ directory");
+        LOG_INFO("Expected under World\\wmo\\transports\\...");
         return;
     }
+
+    LOG_INFO("Using transport WMO: ", transportWmoPath);
 
     // Load WMO model
     pipeline::WMOModel wmoModel = pipeline::WMOLoader::load(wmoData);

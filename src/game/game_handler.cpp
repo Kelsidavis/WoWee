@@ -3307,7 +3307,6 @@ void GameHandler::setOrientation(float orientation) {
 }
 
 void GameHandler::handleUpdateObject(network::Packet& packet) {
-
     UpdateObjectData data;
     if (!packetParsers_->parseUpdateObject(packet, data)) {
         LOG_WARNING("Failed to parse SMSG_UPDATE_OBJECT");
@@ -10588,7 +10587,10 @@ void GameHandler::saveCharacterConfig() {
 
     out << "character_guid=" << playerGuid << "\n";
     out << "gender=" << static_cast<int>(ch->gender) << "\n";
-    out << "use_female_model=" << (ch->useFemaleModel ? 1 : 0) << "\n";
+    // For male/female, derive from gender; only nonbinary has a meaningful separate choice
+    bool saveUseFemaleModel = (ch->gender == Gender::NONBINARY) ? ch->useFemaleModel
+                                                                 : (ch->gender == Gender::FEMALE);
+    out << "use_female_model=" << (saveUseFemaleModel ? 1 : 0) << "\n";
     for (int i = 0; i < ACTION_BAR_SLOTS; i++) {
         out << "action_bar_" << i << "_type=" << static_cast<int>(actionBar[i].type) << "\n";
         out << "action_bar_" << i << "_id=" << actionBar[i].id << "\n";
@@ -10666,8 +10668,14 @@ void GameHandler::loadCharacterConfig() {
         for (auto& character : characters) {
             if (character.guid == playerGuid) {
                 character.gender = static_cast<Gender>(savedGender);
-                if (savedUseFemaleModel >= 0) {
-                    character.useFemaleModel = (savedUseFemaleModel != 0);
+                if (character.gender == Gender::NONBINARY) {
+                    // Only nonbinary characters have a meaningful body type choice
+                    if (savedUseFemaleModel >= 0) {
+                        character.useFemaleModel = (savedUseFemaleModel != 0);
+                    }
+                } else {
+                    // Male/female always use the model matching their gender
+                    character.useFemaleModel = (character.gender == Gender::FEMALE);
                 }
                 LOG_INFO("Applied saved gender: ", getGenderName(character.gender),
                          ", body type: ", (character.useFemaleModel ? "feminine" : "masculine"));

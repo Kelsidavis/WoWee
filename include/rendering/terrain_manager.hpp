@@ -60,6 +60,7 @@ struct TerrainTile {
 
     // Instance IDs for cleanup on unload
     std::vector<uint32_t> wmoInstanceIds;
+    std::vector<uint32_t> wmoUniqueIds;  // For WMO dedup cleanup on unload
     std::vector<uint32_t> m2InstanceIds;
     std::vector<uint32_t> doodadUniqueIds;  // For dedup cleanup on unload
 };
@@ -93,6 +94,7 @@ struct PendingTile {
     // Pre-loaded WMO data
     struct WMOReady {
         uint32_t modelId;
+        uint32_t uniqueId;
         pipeline::WMOModel model;
         glm::vec3 position;
         glm::vec3 rotation;
