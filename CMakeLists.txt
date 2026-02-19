@@ -558,9 +558,9 @@ if(WIN32)
     # Run wowee from bin/ so that ./assets/ resolves correctly.
     # SetOutPath sets the shortcut's working directory in NSIS.
     set(CPACK_NSIS_CREATE_ICONS_EXTRA
-        "SetOutPath '$INSTDIR\\bin'\nCreateShortCut '$SMPROGRAMS\\$STARTMENU_FOLDER\\Wowee.lnk' '$INSTDIR\\bin\\wowee.exe'")
+        "SetOutPath '$INSTDIR\\\\bin'\nCreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Wowee.lnk' '$INSTDIR\\\\bin\\\\wowee.exe'")
     set(CPACK_NSIS_DELETE_ICONS_EXTRA
-        "Delete '$SMPROGRAMS\\$STARTMENU_FOLDER\\Wowee.lnk'")
+        "Delete '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Wowee.lnk'")
 elseif(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
 else()
