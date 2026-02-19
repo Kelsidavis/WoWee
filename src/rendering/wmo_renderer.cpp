@@ -1205,7 +1205,6 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
         auto modelIt = loadedModels.find(instance.modelId);
         if (modelIt == loadedModels.end()) continue;
         const ModelData& model = modelIt->second;
-
         // Occlusion query pre-pass (GL calls — must be main thread)
         if (occlusionCulling && occlusionShader && bboxVao != 0) {
             runOcclusionQueries(instance, model, view, projection);
