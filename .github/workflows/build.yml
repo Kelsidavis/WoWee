@@ -74,8 +74,6 @@ jobs:
         include:
           - arch: arm64
             runner: macos-15
-          - arch: x86-64
-            runner: macos-13
 
     steps:
       - name: Checkout
