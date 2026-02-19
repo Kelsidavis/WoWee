@@ -369,14 +369,42 @@ void CameraController::update(float deltaTime) {
         }
 
         if (!externalFollow_) {
-            // Check for water at current position — simple submersion test.
-            // If the player's feet are meaningfully below the water surface, swim.
+            // Enter swim only when water is deep enough (waist-deep+),
+            // not for shallow wading.
             std::optional<float> waterH;
             if (waterRenderer) {
                 waterH = waterRenderer->getWaterHeightAt(targetPos.x, targetPos.y);
             }
-            bool inWater = waterH && (targetPos.z < (*waterH - 0.3f));
-            // Keep swimming through water-data gaps (chunk boundaries).
+            constexpr float MAX_SWIM_DEPTH_FROM_SURFACE = 12.0f;
+            constexpr float MIN_SWIM_WATER_DEPTH = 1.0f;
+            bool inWater = false;
+            if (waterH && targetPos.z < *waterH) {
+                std::optional<uint16_t> waterType;
+                if (waterRenderer) {
+                    waterType = waterRenderer->getWaterTypeAt(targetPos.x, targetPos.y);
+                }
+                bool isOcean = false;
+                if (waterType && *waterType != 0) {
+                    isOcean = (((*waterType - 1) % 4) == 1);
+                }
+                bool depthAllowed = isOcean || ((*waterH - targetPos.z) <= MAX_SWIM_DEPTH_FROM_SURFACE);
+                if (depthAllowed) {
+                    std::optional<float> terrainH;
+                    std::optional<float> wmoH;
+                    std::optional<float> m2H;
+                    if (terrainManager) terrainH = terrainManager->getHeightAt(targetPos.x, targetPos.y);
+                    if (wmoRenderer) wmoH = wmoRenderer->getFloorHeight(targetPos.x, targetPos.y, targetPos.z + 2.0f);
+                    if (m2Renderer) m2H = m2Renderer->getFloorHeight(targetPos.x, targetPos.y, targetPos.z + 1.0f);
+                    auto floorH = selectHighestFloor(terrainH, wmoH, m2H);
+
+                    // Prefer measured depth from floor; if floor sample is missing,
+                    // fall back to feet-to-surface depth.
+                    float depthFromFeet = (*waterH - targetPos.z);
+                    inWater = (floorH && ((*waterH - *floorH) >= MIN_SWIM_WATER_DEPTH)) ||
+                              (!floorH && (depthFromFeet >= MIN_SWIM_WATER_DEPTH));
+                }
+            }
+            // Keep swimming through water-data gaps at chunk boundaries.
             if (!inWater && swimming && !waterH) {
                 inWater = true;
             }
@@ -1122,7 +1150,7 @@ void CameraController::update(float deltaTime) {
             if (wmoRenderer) wmoH = wmoRenderer->getFloorHeight(newPos.x, newPos.y, feetZ + 2.0f);
             if (m2Renderer && !externalFollow_) m2H = m2Renderer->getFloorHeight(newPos.x, newPos.y, feetZ + 1.0f);
             auto floorH = selectHighestFloor(terrainH, wmoH, m2H);
-            constexpr float MIN_SWIM_WATER_DEPTH = 1.8f;
+            constexpr float MIN_SWIM_WATER_DEPTH = 1.0f;
             inWater = (floorH && ((*waterH - *floorH) >= MIN_SWIM_WATER_DEPTH)) || (isOcean && !floorH);
             }
         }

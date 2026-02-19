@@ -220,7 +220,8 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     if (!volumeSettingsApplied_) {
         auto* renderer = core::Application::getInstance().getRenderer();
         if (renderer && renderer->getUiSoundManager()) {
-            float masterScale = static_cast<float>(pendingMasterVolume) / 100.0f;
+            float masterScale = soundMuted_ ? 0.0f : static_cast<float>(pendingMasterVolume) / 100.0f;
+            audio::AudioEngine::instance().setMasterVolume(soundMuted_ ? 0.0f : masterScale);
             if (auto* music = renderer->getMusicManager()) {
                 music->setVolume(static_cast<int>(pendingMusicVolume * masterScale));
             }
@@ -5690,7 +5691,8 @@ void GameScreen::renderSettingsWindow() {
                 // Helper lambda to apply audio settings
                 auto applyAudioSettings = [&]() {
                     if (!renderer) return;
-                    float masterScale = static_cast<float>(pendingMasterVolume) / 100.0f;
+                    float masterScale = soundMuted_ ? 0.0f : static_cast<float>(pendingMasterVolume) / 100.0f;
+                    audio::AudioEngine::instance().setMasterVolume(soundMuted_ ? 0.0f : masterScale);
                     if (auto* music = renderer->getMusicManager()) {
                         music->setVolume(static_cast<int>(pendingMusicVolume * masterScale));
                     }
@@ -6193,33 +6195,94 @@ void GameScreen::renderMinimapMarkers(game::GameHandler& gameHandler) {
             IM_COL32(0, 0, 0, 255), marker);
     }
 
-    // Add zoom + mute buttons at the bottom edge of the minimap
-    ImGui::SetNextWindowPos(ImVec2(centerX - 45, centerY + mapRadius - 30), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(90, 24), ImGuiCond_Always);
+    auto applyMuteState = [&]() {
+        auto* activeRenderer = core::Application::getInstance().getRenderer();
+        float masterScale = soundMuted_ ? 0.0f : static_cast<float>(pendingMasterVolume) / 100.0f;
+        audio::AudioEngine::instance().setMasterVolume(masterScale);
+        if (!activeRenderer) return;
+        if (auto* music = activeRenderer->getMusicManager()) {
+            music->setVolume(static_cast<int>(pendingMusicVolume * masterScale));
+        }
+        if (auto* ambient = activeRenderer->getAmbientSoundManager()) {
+            ambient->setVolumeScale(pendingAmbientVolume / 100.0f * masterScale);
+        }
+        if (auto* ui = activeRenderer->getUiSoundManager()) {
+            ui->setVolumeScale(pendingUiVolume / 100.0f * masterScale);
+        }
+        if (auto* combat = activeRenderer->getCombatSoundManager()) {
+            combat->setVolumeScale(pendingCombatVolume / 100.0f * masterScale);
+        }
+        if (auto* spell = activeRenderer->getSpellSoundManager()) {
+            spell->setVolumeScale(pendingSpellVolume / 100.0f * masterScale);
+        }
+        if (auto* movement = activeRenderer->getMovementSoundManager()) {
+            movement->setVolumeScale(pendingMovementVolume / 100.0f * masterScale);
+        }
+        if (auto* footstep = activeRenderer->getFootstepManager()) {
+            footstep->setVolumeScale(pendingFootstepVolume / 100.0f * masterScale);
+        }
+        if (auto* npcVoice = activeRenderer->getNpcVoiceManager()) {
+            npcVoice->setVolumeScale(pendingNpcVoiceVolume / 100.0f * masterScale);
+        }
+        if (auto* mount = activeRenderer->getMountSoundManager()) {
+            mount->setVolumeScale(pendingMountVolume / 100.0f * masterScale);
+        }
+        if (auto* activity = activeRenderer->getActivitySoundManager()) {
+            activity->setVolumeScale(pendingActivityVolume / 100.0f * masterScale);
+        }
+    };
+
+    // Speaker mute button at the minimap top-right corner
+    ImGui::SetNextWindowPos(ImVec2(centerX + mapRadius - 26.0f, centerY - mapRadius + 4.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(22.0f, 22.0f), ImGuiCond_Always);
+    ImGuiWindowFlags muteFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                                 ImGuiWindowFlags_NoBackground;
+    if (ImGui::Begin("##MinimapMute", nullptr, muteFlags)) {
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        ImVec2 p = ImGui::GetCursorScreenPos();
+        ImVec2 size(20.0f, 20.0f);
+        if (ImGui::InvisibleButton("##MinimapMuteButton", size)) {
+            soundMuted_ = !soundMuted_;
+            if (soundMuted_) {
+                preMuteVolume_ = audio::AudioEngine::instance().getMasterVolume();
+            }
+            applyMuteState();
+            saveSettings();
+        }
+        bool hovered = ImGui::IsItemHovered();
+        ImU32 bg = soundMuted_ ? IM_COL32(135, 42, 42, 230) : IM_COL32(38, 38, 38, 210);
+        if (hovered) bg = soundMuted_ ? IM_COL32(160, 58, 58, 230) : IM_COL32(65, 65, 65, 220);
+        ImU32 fg = IM_COL32(255, 255, 255, 245);
+        draw->AddRectFilled(p, ImVec2(p.x + size.x, p.y + size.y), bg, 4.0f);
+        draw->AddRect(ImVec2(p.x + 0.5f, p.y + 0.5f), ImVec2(p.x + size.x - 0.5f, p.y + size.y - 0.5f),
+                      IM_COL32(255, 255, 255, 42), 4.0f);
+        draw->AddRectFilled(ImVec2(p.x + 4.0f, p.y + 8.0f), ImVec2(p.x + 7.0f, p.y + 12.0f), fg, 1.0f);
+        draw->AddTriangleFilled(ImVec2(p.x + 7.0f, p.y + 7.0f),
+                                ImVec2(p.x + 7.0f, p.y + 13.0f),
+                                ImVec2(p.x + 11.8f, p.y + 10.0f), fg);
+        if (soundMuted_) {
+            draw->AddLine(ImVec2(p.x + 13.5f, p.y + 6.2f), ImVec2(p.x + 17.2f, p.y + 13.8f), fg, 1.8f);
+            draw->AddLine(ImVec2(p.x + 17.2f, p.y + 6.2f), ImVec2(p.x + 13.5f, p.y + 13.8f), fg, 1.8f);
+        } else {
+            draw->PathArcTo(ImVec2(p.x + 11.8f, p.y + 10.0f), 3.6f, -0.7f, 0.7f, 12);
+            draw->PathStroke(fg, 0, 1.4f);
+            draw->PathArcTo(ImVec2(p.x + 11.8f, p.y + 10.0f), 5.5f, -0.7f, 0.7f, 12);
+            draw->PathStroke(fg, 0, 1.2f);
+        }
+        if (hovered) ImGui::SetTooltip(soundMuted_ ? "Unmute" : "Mute");
+    }
+    ImGui::End();
+
+    // Zoom buttons at the bottom edge of the minimap
+    ImGui::SetNextWindowPos(ImVec2(centerX - 22, centerY + mapRadius - 30), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(44, 24), ImGuiCond_Always);
     ImGuiWindowFlags zoomFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
                                   ImGuiWindowFlags_NoBackground;
     if (ImGui::Begin("##MinimapZoom", nullptr, zoomFlags)) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0));
-
-        // Mute toggle button: red tint when muted
-        if (soundMuted_) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.15f, 0.15f, 0.9f));
-        if (ImGui::SmallButton(soundMuted_ ? "[M]" : " M ")) {
-            soundMuted_ = !soundMuted_;
-            auto& engine = audio::AudioEngine::instance();
-            if (soundMuted_) {
-                preMuteVolume_ = engine.getMasterVolume();
-                engine.setMasterVolume(0.0f);
-            } else {
-                engine.setMasterVolume(preMuteVolume_);
-            }
-            saveSettings();
-        }
-        if (soundMuted_) ImGui::PopStyleColor();
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip(soundMuted_ ? "Unmute" : "Mute");
-
-        ImGui::SameLine();
         if (ImGui::SmallButton("-")) {
             if (minimap) minimap->zoomOut();
         }

@@ -223,6 +223,7 @@ void ActivitySoundManager::rebuildHardLandClipsForProfile(const std::string& rac
 
 bool ActivitySoundManager::playOneShot(const std::vector<Sample>& clips, float volume, float pitchLo, float pitchHi) {
     if (clips.empty()) return false;
+    if (volumeScale <= 0.0001f || volume <= 0.0001f) return true; // Intentionally muted
     reapProcesses();
     if (oneShotPid != INVALID_PROCESS) return false;
 
@@ -236,7 +237,7 @@ bool ActivitySoundManager::playOneShot(const std::vector<Sample>& clips, float v
     std::uniform_real_distribution<float> pitchDist(pitchLo, pitchHi);
     float pitch = pitchDist(rng);
     volume *= volumeScale;
-    if (volume < 0.1f) volume = 0.1f;
+    if (volume <= 0.0001f) return true; // Intentionally muted
     if (volume > 1.2f) volume = 1.2f;
     std::string filter = "asetrate=44100*" + std::to_string(pitch) +
                          ",aresample=44100,volume=" + std::to_string(volume);
