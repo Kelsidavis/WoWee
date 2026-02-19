@@ -760,9 +760,35 @@ void InventoryScreen::render(game::Inventory& inventory, uint64_t moneyCopper) {
         ImGui::Text("Destroy \"%s\"?", dropItemName_.c_str());
         ImGui::Spacing();
         if (ImGui::Button("Yes", ImVec2(80, 0))) {
+            if (gameHandler_) {
+                uint8_t srcBag = 0xFF;
+                uint8_t srcSlot = 0;
+                bool haveSource = false;
+                if (heldSource == HeldSource::BACKPACK && heldBackpackIndex >= 0) {
+                    srcSlot = static_cast<uint8_t>(23 + heldBackpackIndex);
+                    haveSource = true;
+                } else if (heldSource == HeldSource::BAG && heldBagIndex >= 0 && heldBagSlotIndex >= 0) {
+                    srcBag = static_cast<uint8_t>(19 + heldBagIndex);
+                    srcSlot = static_cast<uint8_t>(heldBagSlotIndex);
+                    haveSource = true;
+                } else if (heldSource == HeldSource::EQUIPMENT &&
+                           heldEquipSlot != game::EquipSlot::NUM_SLOTS) {
+                    srcSlot = static_cast<uint8_t>(heldEquipSlot);
+                    haveSource = true;
+                }
+                if (haveSource) {
+                    uint8_t destroyCount = static_cast<uint8_t>(std::clamp<uint32_t>(
+                        std::max<uint32_t>(1u, heldItem.stackCount), 1u, 255u));
+                    gameHandler_->destroyItem(srcBag, srcSlot, destroyCount);
+                }
+            }
             holdingItem = false;
             heldItem = game::ItemDef{};
             heldSource = HeldSource::NONE;
+            heldBackpackIndex = -1;
+            heldBagIndex = -1;
+            heldBagSlotIndex = -1;
+            heldEquipSlot = game::EquipSlot::NUM_SLOTS;
             inventoryDirty = true;
             dropItemName_.clear();
             ImGui::CloseCurrentPopup();
@@ -1610,7 +1636,7 @@ void InventoryScreen::renderItemTooltip(const game::ItemDef& item, const game::I
         ImGui::TextColored(green, "%s", bonusLine.c_str());
     }
 
-    if (!isWeapon && item.armor > 0) {
+    if (item.armor > 0) {
         ImGui::Text("%d Armor", item.armor);
     }
     if (item.sellPrice > 0) {
@@ -1638,7 +1664,7 @@ void InventoryScreen::renderItemTooltip(const game::ItemDef& item, const game::I
                 float dps = ((eq->item.damageMin + eq->item.damageMax) * 0.5f) / speed;
                 ImGui::Text("%.1f DPS", dps);
             }
-            if (!isWeaponInventoryType(eq->item.inventoryType) && eq->item.armor > 0) {
+            if (eq->item.armor > 0) {
                 ImGui::Text("%d Armor", eq->item.armor);
             }
             std::string eqBonusLine;

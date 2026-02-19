@@ -2763,6 +2763,7 @@ void GameHandler::selectCharacter(uint64_t characterGuid) {
     // Reset per-character state so previous character data doesn't bleed through
     inventory = Inventory();
     onlineItems_.clear();
+    itemInfoCache_.clear();
     pendingItemQueries_.clear();
     equipSlotGuids_ = {};
     backpackSlotGuids_ = {};
@@ -9325,6 +9326,22 @@ void GameHandler::swapContainerItems(uint8_t srcBag, uint8_t srcSlot, uint8_t ds
     LOG_INFO("swapContainerItems: src(bag=", (int)srcBag, " slot=", (int)srcSlot,
              ") -> dst(bag=", (int)dstBag, " slot=", (int)dstSlot, ")");
     auto packet = SwapItemPacket::build(dstBag, dstSlot, srcBag, srcSlot);
+    socket->send(packet);
+}
+
+void GameHandler::destroyItem(uint8_t bag, uint8_t slot, uint8_t count) {
+    if (state != WorldState::IN_WORLD || !socket) return;
+    if (count == 0) count = 1;
+
+    // AzerothCore WotLK expects CMSG_DESTROYITEM(bag:u8, slot:u8, count:u32).
+    // This opcode is currently not modeled as a logical opcode in our table.
+    constexpr uint16_t kCmsgDestroyItem = 0x111;
+    network::Packet packet(kCmsgDestroyItem);
+    packet.writeUInt8(bag);
+    packet.writeUInt8(slot);
+    packet.writeUInt32(static_cast<uint32_t>(count));
+    LOG_DEBUG("Destroy item request: bag=", (int)bag, " slot=", (int)slot,
+              " count=", (int)count, " wire=0x", std::hex, kCmsgDestroyItem, std::dec);
     socket->send(packet);
 }
 
