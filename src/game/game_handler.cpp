@@ -9513,10 +9513,11 @@ void GameHandler::loadTaxiDbc() {
                     node.mountDisplayIdHorde = nodesDbc->getUInt32(i, mountHordeFB);
                 }
             }
-            if (node.id > 0) {
-                taxiNodes_[node.id] = std::move(node);
+            uint32_t nodeId = node.id;
+            if (nodeId > 0) {
+                taxiNodes_[nodeId] = std::move(node);
             }
-            if (node.id == 195) {
+            if (nodeId == 195) {
                 std::string fields;
                 for (uint32_t f = 0; f < fieldCount; f++) {
                     fields += std::to_string(f) + ":" + std::to_string(nodesDbc->getUInt32(i, f)) + " ";

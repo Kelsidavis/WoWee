@@ -5462,7 +5462,7 @@ void GameScreen::renderSettingsWindow() {
                 break;
             }
         }
-        pendingUiOpacity = static_cast<int>(uiOpacity_ * 100.0f + 0.5f);
+        pendingUiOpacity = static_cast<int>(std::lround(uiOpacity_ * 100.0f));
         pendingMinimapRotate = minimapRotate_;
         pendingMinimapSquare = minimapSquare_;
         if (renderer) {

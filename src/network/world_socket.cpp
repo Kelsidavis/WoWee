@@ -60,7 +60,7 @@ WorldSocket::WorldSocket() {
 }
 
 WorldSocket::~WorldSocket() {
-    disconnect();
+    WorldSocket::disconnect();  // qualified call: virtual dispatch is bypassed in destructors
 }
 
 bool WorldSocket::connect(const std::string& host, uint16_t port) {

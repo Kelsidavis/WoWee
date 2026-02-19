@@ -11,7 +11,7 @@ TCPSocket::TCPSocket() {
 }
 
 TCPSocket::~TCPSocket() {
-    disconnect();
+    TCPSocket::disconnect();  // qualified call: virtual dispatch is bypassed in destructors
 }
 
 bool TCPSocket::connect(const std::string& host, uint16_t port) {

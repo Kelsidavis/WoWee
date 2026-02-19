@@ -890,8 +890,12 @@ void WMORenderer::precomputeFloorCache() {
         float startX = std::floor(boundsMin.x / FLOOR_GRID_CELL_SIZE) * FLOOR_GRID_CELL_SIZE;
         float startY = std::floor(boundsMin.y / FLOOR_GRID_CELL_SIZE) * FLOOR_GRID_CELL_SIZE;
 
-        for (float x = startX; x <= boundsMax.x; x += FLOOR_GRID_CELL_SIZE) {
-            for (float y = startY; y <= boundsMax.y; y += FLOOR_GRID_CELL_SIZE) {
+        int stepsX = static_cast<int>((boundsMax.x - startX) / FLOOR_GRID_CELL_SIZE) + 1;
+        int stepsY = static_cast<int>((boundsMax.y - startY) / FLOOR_GRID_CELL_SIZE) + 1;
+        for (int ix = 0; ix < stepsX; ++ix) {
+            float x = startX + ix * FLOOR_GRID_CELL_SIZE;
+            for (int iy = 0; iy < stepsY; ++iy) {
+                float y = startY + iy * FLOOR_GRID_CELL_SIZE;
                 // Sample at grid cell center
                 float sampleX = x + FLOOR_GRID_CELL_SIZE * 0.5f;
                 float sampleY = y + FLOOR_GRID_CELL_SIZE * 0.5f;
