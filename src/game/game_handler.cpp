@@ -1764,30 +1764,43 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 break;
             }
             uint32_t questId = packet.readUInt32();
+            if (questId == 0) {
+                // Some servers emit a zero-id variant during world bootstrap.
+                // Treat as no-op to avoid false "Quest removed" spam.
+                break;
+            }
+
+            bool removed = false;
             std::string removedTitle;
             for (auto it = questLog_.begin(); it != questLog_.end(); ++it) {
                 if (it->questId == questId) {
                     removedTitle = it->title;
                     questLog_.erase(it);
+                    removed = true;
                     break;
                 }
             }
             if (currentQuestDetails.questId == questId) {
                 questDetailsOpen = false;
                 currentQuestDetails = QuestDetailsData{};
+                removed = true;
             }
             if (currentQuestRequestItems_.questId == questId) {
                 questRequestItemsOpen_ = false;
                 currentQuestRequestItems_ = QuestRequestItemsData{};
+                removed = true;
             }
             if (currentQuestOfferReward_.questId == questId) {
                 questOfferRewardOpen_ = false;
                 currentQuestOfferReward_ = QuestOfferRewardData{};
+                removed = true;
             }
-            if (!removedTitle.empty()) {
-                addSystemChatMessage("Quest removed: " + removedTitle);
-            } else {
-                addSystemChatMessage("Quest removed (ID " + std::to_string(questId) + ").");
+            if (removed) {
+                if (!removedTitle.empty()) {
+                    addSystemChatMessage("Quest removed: " + removedTitle);
+                } else {
+                    addSystemChatMessage("Quest removed (ID " + std::to_string(questId) + ").");
+                }
             }
             break;
         }
