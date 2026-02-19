@@ -122,6 +122,7 @@ jobs:
           install: >-
             mingw-w64-clang-aarch64-cmake
             mingw-w64-clang-aarch64-clang
+            mingw-w64-clang-aarch64-ninja
             mingw-w64-clang-aarch64-pkgconf
             mingw-w64-clang-aarch64-SDL2
             mingw-w64-clang-aarch64-glew
@@ -137,7 +138,7 @@ jobs:
 
       - name: Configure
         shell: msys2 {0}
-        run: cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         shell: msys2 {0}
@@ -165,6 +166,7 @@ jobs:
           install: >-
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-ninja
             mingw-w64-x86_64-pkgconf
             mingw-w64-x86_64-SDL2
             mingw-w64-x86_64-glew
@@ -181,7 +183,7 @@ jobs:
 
       - name: Configure
         shell: msys2 {0}
-        run: cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         shell: msys2 {0}
