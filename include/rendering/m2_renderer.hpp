@@ -32,6 +32,7 @@ struct M2ModelGPU {
         uint32_t indexStart = 0;   // offset in indices (not bytes)
         uint32_t indexCount = 0;
         bool hasAlpha = false;
+        bool colorKeyBlack = false;
         uint16_t textureAnimIndex = 0xFFFF; // 0xFFFF = no texture animation
         uint16_t blendMode = 0;   // 0=Opaque, 1=AlphaKey, 2=Alpha, 3=Add, etc.
         uint16_t materialFlags = 0; // M2 material flags (0x01=Unlit, 0x04=TwoSided, 0x10=NoDepthWrite)
@@ -366,9 +367,11 @@ private:
         size_t approxBytes = 0;
         uint64_t lastUse = 0;
         bool hasAlpha = true;
+        bool colorKeyBlack = false;
     };
     std::unordered_map<std::string, TextureCacheEntry> textureCache;
     std::unordered_map<GLuint, bool> textureHasAlphaById_;
+    std::unordered_map<GLuint, bool> textureColorKeyBlackById_;
     size_t textureCacheBytes_ = 0;
     uint64_t textureCacheCounter_ = 0;
     size_t textureCacheBudgetBytes_ = 2048ull * 1024 * 1024;  // Default, overridden at init

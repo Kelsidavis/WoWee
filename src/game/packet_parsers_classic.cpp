@@ -882,8 +882,40 @@ bool ClassicPacketParsers::parseItemQueryResponse(network::Packet& packet, ItemQ
     uint32_t subClass = packet.readUInt32();
     // Vanilla: NO SoundOverrideSubclass
 
-    (void)itemClass;
-    (void)subClass;
+    data.itemClass = itemClass;
+    data.subClass = subClass;
+    data.subclassName = "";
+    if (itemClass == 2) { // Weapon
+        switch (subClass) {
+            case 0: data.subclassName = "Axe"; break;
+            case 1: data.subclassName = "Axe"; break;
+            case 2: data.subclassName = "Bow"; break;
+            case 3: data.subclassName = "Gun"; break;
+            case 4: data.subclassName = "Mace"; break;
+            case 5: data.subclassName = "Mace"; break;
+            case 6: data.subclassName = "Polearm"; break;
+            case 7: data.subclassName = "Sword"; break;
+            case 8: data.subclassName = "Sword"; break;
+            case 10: data.subclassName = "Staff"; break;
+            case 13: data.subclassName = "Fist Weapon"; break;
+            case 15: data.subclassName = "Dagger"; break;
+            case 16: data.subclassName = "Thrown"; break;
+            case 18: data.subclassName = "Crossbow"; break;
+            case 19: data.subclassName = "Wand"; break;
+            case 20: data.subclassName = "Fishing Pole"; break;
+            default: data.subclassName = "Weapon"; break;
+        }
+    } else if (itemClass == 4) { // Armor
+        switch (subClass) {
+            case 0: data.subclassName = "Miscellaneous"; break;
+            case 1: data.subclassName = "Cloth"; break;
+            case 2: data.subclassName = "Leather"; break;
+            case 3: data.subclassName = "Mail"; break;
+            case 4: data.subclassName = "Plate"; break;
+            case 6: data.subclassName = "Shield"; break;
+            default: data.subclassName = "Armor"; break;
+        }
+    }
 
     // 4 name strings
     data.name = packet.readString();
@@ -935,13 +967,33 @@ bool ClassicPacketParsers::parseItemQueryResponse(network::Packet& packet, ItemQ
     // Vanilla: NO ScalingStatDistribution, NO ScalingStatValue
 
     // Vanilla: 5 damage types (same count as WotLK)
+    bool haveWeaponDamage = false;
     for (int i = 0; i < 5; i++) {
-        packet.readFloat();   // DamageMin
-        packet.readFloat();   // DamageMax
-        packet.readUInt32();  // DamageType
+        float dmgMin = packet.readFloat();
+        float dmgMax = packet.readFloat();
+        uint32_t damageType = packet.readUInt32();
+        if (!haveWeaponDamage && dmgMax > 0.0f) {
+            // Prefer physical damage (type 0) when present.
+            if (damageType == 0 || data.damageMax <= 0.0f) {
+                data.damageMin = dmgMin;
+                data.damageMax = dmgMax;
+                haveWeaponDamage = (damageType == 0);
+            }
+        }
     }
 
     data.armor = static_cast<int32_t>(packet.readUInt32());
+
+    // Remaining tail can vary by core. Read resistances + delay when present.
+    if (packet.getSize() - packet.getReadPos() >= 28) {
+        packet.readUInt32(); // HolyRes
+        packet.readUInt32(); // FireRes
+        packet.readUInt32(); // NatureRes
+        packet.readUInt32(); // FrostRes
+        packet.readUInt32(); // ShadowRes
+        packet.readUInt32(); // ArcaneRes
+        data.delayMs = packet.readUInt32();
+    }
 
     data.valid = !data.name.empty();
     LOG_DEBUG("[Classic] Item query response: ", data.name, " (quality=", data.quality,

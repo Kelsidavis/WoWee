@@ -4283,9 +4283,6 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                     const uint16_t ufPlayerNextXp = fieldIndex(UF::PLAYER_NEXT_LEVEL_XP);
                     const uint16_t ufPlayerLevel = fieldIndex(UF::UNIT_FIELD_LEVEL);
                     const uint16_t ufCoinage = fieldIndex(UF::PLAYER_FIELD_COINAGE);
-                    const uint16_t ufQuestStart = fieldIndex(UF::PLAYER_QUEST_LOG_START);
-                    const uint8_t qStride = packetParsers_ ? packetParsers_->questLogStride() : 5;
-                    const uint16_t ufQuestEnd = ufQuestStart + 25 * qStride; // 25 quest slots
                     for (const auto& [key, val] : block.fields) {
                         if (key == ufPlayerXp) { playerXp_ = val; }
                         else if (key == ufPlayerNextXp) { playerNextLevelXp_ = val; }
@@ -4299,31 +4296,9 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                             playerMoneyCopper_ = val;
                             LOG_INFO("Money set from update fields: ", val, " copper");
                         }
-                        // Parse quest log fields (stride varies by expansion: 5=WotLK, 3=Classic)
-                        else if (key >= ufQuestStart && key < ufQuestEnd && (key - ufQuestStart) % qStride == 0) {
-                            uint32_t questId = val;
-                            if (questId != 0) {
-                                // Check if quest is already in log
-                                bool found = false;
-                                for (auto& q : questLog_) {
-                                    if (q.questId == questId) {
-                                        found = true;
-                                        break;
-                                    }
-                                }
-                                if (!found) {
-                                    // Add quest to log and request quest details
-                                    QuestLogEntry entry;
-                                    entry.questId = questId;
-                                    entry.complete = false;  // Will be updated by gossip or quest status packets
-                                    entry.title = "Quest #" + std::to_string(questId);
-                                    questLog_.push_back(entry);
-                                    LOG_INFO("Found quest in update fields: ", questId);
-
-                                    requestQuestQuery(questId);
-                                }
-                            }
-                        }
+                        // Do not synthesize quest-log entries from raw update-field slots.
+                        // Slot layouts differ on some classic-family realms and can produce
+                        // phantom "already accepted" quests that block quest acceptance.
                     }
                     if (applyInventoryFields(block.fields)) slotsChanged = true;
                     if (slotsChanged) rebuildOnlineInventory();
@@ -4608,38 +4583,8 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                 }
                             }
                         }
-                        // Scan quest log fields in VALUES updates too (server may re-send them
-                        // after quest accept, abandon, or same-map repositions).
-                        {
-                            const uint16_t ufQuestStart = fieldIndex(UF::PLAYER_QUEST_LOG_START);
-                            const uint8_t qStride = packetParsers_ ? packetParsers_->questLogStride() : 5;
-                            const uint16_t ufQuestEnd = ufQuestStart + 25 * qStride;
-                            for (const auto& [key, val] : block.fields) {
-                                if (key >= ufQuestStart && key < ufQuestEnd &&
-                                    (key - ufQuestStart) % qStride == 0) {
-                                    uint32_t qId = val;
-                                    if (qId != 0) {
-                                        bool found = false;
-                                        for (auto& q : questLog_) {
-                                            if (q.questId == qId) { found = true; break; }
-                                        }
-                                        if (!found) {
-                                            QuestLogEntry entry;
-                                            entry.questId = qId;
-                                            entry.complete = false;
-                                            entry.title = "Quest #" + std::to_string(qId);
-                                            questLog_.push_back(entry);
-                                            LOG_INFO("Quest found in VALUES update: ", qId);
-                                            requestQuestQuery(qId);
-                                        }
-                                    } else {
-                                        // Quest slot cleared — remove from log if present
-                                        uint16_t slot = (key - ufQuestStart) / qStride;
-                                        (void)slot; // slot index available if needed
-                                    }
-                                }
-                            }
-                        }
+                        // Do not auto-create quests from VALUES quest-log slot fields for the
+                        // same reason as CREATE_OBJECT2 above (can be misaligned per realm).
                         if (applyInventoryFields(block.fields)) slotsChanged = true;
                         if (slotsChanged) rebuildOnlineInventory();
                         extractSkillFields(lastPlayerFields_);
@@ -8722,22 +8667,7 @@ void GameHandler::selectGossipOption(uint32_t optionId) {
 void GameHandler::selectGossipQuest(uint32_t questId) {
     if (state != WorldState::IN_WORLD || !socket || !gossipWindowOpen) return;
 
-    // Prefer current gossip icon semantics to choose flow.
-    // WotLK/classic gossip icon conventions commonly use:
-    //   2 = available (!), 4 = active/incomplete (?), 5 = completable (?)
-    const GossipQuestItem* gossipQuest = nullptr;
-    for (const auto& q : currentGossip.quests) {
-        if (q.questId == questId) {
-            gossipQuest = &q;
-            break;
-        }
-    }
-
-    const bool iconSaysAvailable = gossipQuest && gossipQuest->questIcon == 2;
-    const bool iconSaysActive = gossipQuest &&
-        (gossipQuest->questIcon == 4 || gossipQuest->questIcon == 5);
-
-    // Keep quest-log fallback for servers that don't use canonical icon values.
+    // Keep quest-log fallback for servers that don't provide stable icon semantics.
     const QuestLogEntry* activeQuest = nullptr;
     for (const auto& q : questLog_) {
         if (q.questId == questId) {
@@ -8746,7 +8676,25 @@ void GameHandler::selectGossipQuest(uint32_t questId) {
         }
     }
 
-    const bool shouldStartProgressFlow = iconSaysActive || (!iconSaysAvailable && activeQuest);
+    // Validate against server-auth quest slot fields to avoid stale local entries
+    // forcing turn-in flow for quests that are not actually accepted.
+    auto questInServerLogSlots = [&](uint32_t qid) -> bool {
+        if (qid == 0 || lastPlayerFields_.empty()) return false;
+        const uint16_t ufQuestStart = fieldIndex(UF::PLAYER_QUEST_LOG_START);
+        const uint8_t qStride = packetParsers_ ? packetParsers_->questLogStride() : 5;
+        const uint16_t ufQuestEnd = ufQuestStart + 25 * qStride;
+        for (const auto& [key, val] : lastPlayerFields_) {
+            if (key < ufQuestStart || key >= ufQuestEnd) continue;
+            if ((key - ufQuestStart) % qStride != 0) continue;
+            if (val == qid) return true;
+        }
+        return false;
+    };
+    const bool activeQuestConfirmedByServer = activeQuest && questInServerLogSlots(questId);
+    // Only trust server quest-log slots for deciding "already accepted" flow.
+    // Gossip icon values can differ across cores/expansions and misclassify
+    // available quests as active, which blocks acceptance.
+    const bool shouldStartProgressFlow = activeQuestConfirmedByServer;
     if (shouldStartProgressFlow) {
         pendingTurnInQuestId_ = questId;
         pendingTurnInNpcGuid_ = currentGossip.npcGuid;

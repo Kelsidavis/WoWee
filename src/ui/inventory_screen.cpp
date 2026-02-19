@@ -1571,51 +1571,53 @@ void InventoryScreen::renderItemTooltip(const game::ItemDef& item, const game::I
         }
     }
 
-    if (item.damageMax > 0.0f) {
-        ImGui::Text("%.0f - %.0f Damage", item.damageMin, item.damageMax);
-        if (item.delayMs > 0) {
-            float speed = static_cast<float>(item.delayMs) / 1000.0f;
-            float dps = ((item.damageMin + item.damageMax) * 0.5f) / speed;
-            ImGui::Text("Speed %.2f", speed);
-            ImGui::Text("%.1f damage per second", dps);
-        }
-    }
-
-    // Armor
-    if (item.armor > 0) {
-        ImGui::Text("%d Armor", item.armor);
-    }
-
-    // Stats with "Equip:" prefix style
-    ImVec4 green(0.0f, 1.0f, 0.0f, 1.0f);
-    ImVec4 red(1.0f, 0.2f, 0.2f, 1.0f);
-
-    auto renderStat = [&](int32_t val, const char* name) {
-        if (val > 0) {
-            ImGui::TextColored(green, "+%d %s", val, name);
-        } else if (val < 0) {
-            ImGui::TextColored(red, "%d %s", val, name);
+    auto isWeaponInventoryType = [](uint32_t invType) {
+        switch (invType) {
+            case 13: // One-Hand
+            case 15: // Ranged
+            case 17: // Two-Hand
+            case 21: // Main Hand
+            case 25: // Thrown
+            case 26: // Ranged Right
+                return true;
+            default:
+                return false;
         }
     };
+    const bool isWeapon = isWeaponInventoryType(item.inventoryType);
 
-    renderStat(item.stamina, "Stamina");
-    renderStat(item.strength, "Strength");
-    renderStat(item.agility, "Agility");
-    renderStat(item.intellect, "Intellect");
-    renderStat(item.spirit, "Spirit");
-
-    // Stack info
-    if (item.maxStack > 1) {
-        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Stack: %u/%u", item.stackCount, item.maxStack);
+    // Compact stats view for weapons: DPS + condensed stat bonuses.
+    // Non-weapons keep armor/sell info visible.
+    ImVec4 green(0.0f, 1.0f, 0.0f, 1.0f);
+    if (isWeapon && item.damageMax > 0.0f && item.delayMs > 0) {
+        float speed = static_cast<float>(item.delayMs) / 1000.0f;
+        float dps = ((item.damageMin + item.damageMax) * 0.5f) / speed;
+        ImGui::Text("%.1f DPS", dps);
+    }
+    auto appendBonus = [](std::string& out, int32_t val, const char* shortName) {
+        if (val <= 0) return;
+        if (!out.empty()) out += "  ";
+        out += "+" + std::to_string(val) + " ";
+        out += shortName;
+    };
+    std::string bonusLine;
+    appendBonus(bonusLine, item.strength, "Str");
+    appendBonus(bonusLine, item.agility, "Agi");
+    appendBonus(bonusLine, item.stamina, "Sta");
+    appendBonus(bonusLine, item.intellect, "Int");
+    appendBonus(bonusLine, item.spirit, "Spi");
+    if (!bonusLine.empty()) {
+        ImGui::TextColored(green, "%s", bonusLine.c_str());
     }
 
-    // Sell price
+    if (!isWeapon && item.armor > 0) {
+        ImGui::Text("%d Armor", item.armor);
+    }
     if (item.sellPrice > 0) {
         uint32_t g = item.sellPrice / 10000;
         uint32_t s = (item.sellPrice / 100) % 100;
         uint32_t c = item.sellPrice % 100;
-        ImGui::Separator();
-        ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "Sell Price: %ug %us %uc", g, s, c);
+        ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "Sell: %ug %us %uc", g, s, c);
     }
 
     // Shift-hover comparison with currently equipped equivalent.
@@ -1630,15 +1632,24 @@ void InventoryScreen::renderItemTooltip(const game::ItemDef& item, const game::I
             }
             ImGui::TextColored(getQualityColor(eq->item.quality), "%s", eq->item.name.c_str());
 
-            if (eq->item.damageMax > 0.0f) {
-                ImGui::Text("%.0f - %.0f Damage", eq->item.damageMin, eq->item.damageMax);
+            if (isWeaponInventoryType(eq->item.inventoryType) &&
+                eq->item.damageMax > 0.0f && eq->item.delayMs > 0) {
+                float speed = static_cast<float>(eq->item.delayMs) / 1000.0f;
+                float dps = ((eq->item.damageMin + eq->item.damageMax) * 0.5f) / speed;
+                ImGui::Text("%.1f DPS", dps);
             }
-            if (eq->item.armor > 0) ImGui::Text("%d Armor", eq->item.armor);
-            renderStat(eq->item.stamina, "Stamina");
-            renderStat(eq->item.strength, "Strength");
-            renderStat(eq->item.agility, "Agility");
-            renderStat(eq->item.intellect, "Intellect");
-            renderStat(eq->item.spirit, "Spirit");
+            if (!isWeaponInventoryType(eq->item.inventoryType) && eq->item.armor > 0) {
+                ImGui::Text("%d Armor", eq->item.armor);
+            }
+            std::string eqBonusLine;
+            appendBonus(eqBonusLine, eq->item.strength, "Str");
+            appendBonus(eqBonusLine, eq->item.agility, "Agi");
+            appendBonus(eqBonusLine, eq->item.stamina, "Sta");
+            appendBonus(eqBonusLine, eq->item.intellect, "Int");
+            appendBonus(eqBonusLine, eq->item.spirit, "Spi");
+            if (!eqBonusLine.empty()) {
+                ImGui::TextColored(green, "%s", eqBonusLine.c_str());
+            }
         }
     }
 

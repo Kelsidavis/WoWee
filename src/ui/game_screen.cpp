@@ -763,32 +763,50 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
                     ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", slotName);
             }
         }
-        if (info->damageMax > 0.0f) {
-            ImGui::Text("%.0f - %.0f Damage", info->damageMin, info->damageMax);
-            if (info->delayMs > 0) {
-                float speed = static_cast<float>(info->delayMs) / 1000.0f;
-                float dps = ((info->damageMin + info->damageMax) * 0.5f) / speed;
-                ImGui::Text("Speed %.2f", speed);
-                ImGui::Text("%.1f damage per second", dps);
+        auto isWeaponInventoryType = [](uint32_t invType) {
+            switch (invType) {
+                case 13: // One-Hand
+                case 15: // Ranged
+                case 17: // Two-Hand
+                case 21: // Main Hand
+                case 25: // Thrown
+                case 26: // Ranged Right
+                    return true;
+                default:
+                    return false;
             }
-        }
-        if (info->armor > 0) ImGui::Text("%d Armor", info->armor);
-        ImVec4 green(0.0f, 1.0f, 0.0f, 1.0f);
-        auto renderStat = [&](int32_t val, const char* name) {
-            if (val > 0) ImGui::TextColored(green, "+%d %s", val, name);
-            else if (val < 0) ImGui::TextColored(ImVec4(1, 0.2f, 0.2f, 1), "%d %s", val, name);
         };
-        renderStat(info->stamina, "Stamina");
-        renderStat(info->strength, "Strength");
-        renderStat(info->agility, "Agility");
-        renderStat(info->intellect, "Intellect");
-        renderStat(info->spirit, "Spirit");
+        const bool isWeapon = isWeaponInventoryType(info->inventoryType);
+
+        if (isWeapon && info->damageMax > 0.0f && info->delayMs > 0) {
+            float speed = static_cast<float>(info->delayMs) / 1000.0f;
+            float dps = ((info->damageMin + info->damageMax) * 0.5f) / speed;
+            ImGui::Text("%.1f DPS", dps);
+        }
+        ImVec4 green(0.0f, 1.0f, 0.0f, 1.0f);
+        auto appendBonus = [](std::string& out, int32_t val, const char* shortName) {
+            if (val <= 0) return;
+            if (!out.empty()) out += "  ";
+            out += "+" + std::to_string(val) + " ";
+            out += shortName;
+        };
+        std::string bonusLine;
+        appendBonus(bonusLine, info->strength, "Str");
+        appendBonus(bonusLine, info->agility, "Agi");
+        appendBonus(bonusLine, info->stamina, "Sta");
+        appendBonus(bonusLine, info->intellect, "Int");
+        appendBonus(bonusLine, info->spirit, "Spi");
+        if (!bonusLine.empty()) {
+            ImGui::TextColored(green, "%s", bonusLine.c_str());
+        }
+        if (!isWeapon && info->armor > 0) {
+            ImGui::Text("%d Armor", info->armor);
+        }
         if (info->sellPrice > 0) {
             uint32_t g = info->sellPrice / 10000;
             uint32_t s = (info->sellPrice / 100) % 100;
             uint32_t c = info->sellPrice % 100;
-            ImGui::Separator();
-            ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "Sell Price: %ug %us %uc", g, s, c);
+            ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "Sell: %ug %us %uc", g, s, c);
         }
 
         if (ImGui::GetIO().KeyShift && info->inventoryType > 0) {
@@ -801,15 +819,24 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
                     ImGui::SameLine();
                 }
                 ImGui::TextColored(InventoryScreen::getQualityColor(eq->item.quality), "%s", eq->item.name.c_str());
-                if (eq->item.damageMax > 0.0f) {
-                    ImGui::Text("%.0f - %.0f Damage", eq->item.damageMin, eq->item.damageMax);
+                if (isWeaponInventoryType(eq->item.inventoryType) &&
+                    eq->item.damageMax > 0.0f && eq->item.delayMs > 0) {
+                    float speed = static_cast<float>(eq->item.delayMs) / 1000.0f;
+                    float dps = ((eq->item.damageMin + eq->item.damageMax) * 0.5f) / speed;
+                    ImGui::Text("%.1f DPS", dps);
                 }
-                if (eq->item.armor > 0) ImGui::Text("%d Armor", eq->item.armor);
-                renderStat(eq->item.stamina, "Stamina");
-                renderStat(eq->item.strength, "Strength");
-                renderStat(eq->item.agility, "Agility");
-                renderStat(eq->item.intellect, "Intellect");
-                renderStat(eq->item.spirit, "Spirit");
+                if (!isWeaponInventoryType(eq->item.inventoryType) && eq->item.armor > 0) {
+                    ImGui::Text("%d Armor", eq->item.armor);
+                }
+                std::string eqBonusLine;
+                appendBonus(eqBonusLine, eq->item.strength, "Str");
+                appendBonus(eqBonusLine, eq->item.agility, "Agi");
+                appendBonus(eqBonusLine, eq->item.stamina, "Sta");
+                appendBonus(eqBonusLine, eq->item.intellect, "Int");
+                appendBonus(eqBonusLine, eq->item.spirit, "Spi");
+                if (!eqBonusLine.empty()) {
+                    ImGui::TextColored(green, "%s", eqBonusLine.c_str());
+                }
             }
         }
         ImGui::EndTooltip();
@@ -1002,6 +1029,7 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
 
     for (const auto& msg : chatHistory) {
         if (!shouldShowMessage(msg, activeChatTab_)) continue;
+        std::string processedMessage = replaceGenderPlaceholders(msg.message, gameHandler);
 
         ImVec4 color = getChatTypeColor(msg.type);
 
@@ -1027,7 +1055,7 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
                 ImGui::PopStyleColor();
                 ImGui::SameLine(0, 0);
             }
-            renderTextWithLinks(msg.message, color);
+            renderTextWithLinks(processedMessage, color);
         } else if (msg.type == game::ChatType::TEXT_EMOTE) {
             if (!tsPrefix.empty()) {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
@@ -1035,7 +1063,7 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
                 ImGui::PopStyleColor();
                 ImGui::SameLine(0, 0);
             }
-            renderTextWithLinks(msg.message, color);
+            renderTextWithLinks(processedMessage, color);
         } else if (!msg.senderName.empty()) {
             if (msg.type == game::ChatType::MONSTER_SAY || msg.type == game::ChatType::MONSTER_YELL) {
                 std::string prefix = tsPrefix + msg.senderName + " says: ";
@@ -1043,7 +1071,7 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
                 ImGui::TextWrapped("%s", prefix.c_str());
                 ImGui::PopStyleColor();
                 ImGui::SameLine(0, 0);
-                renderTextWithLinks(msg.message, color);
+                renderTextWithLinks(processedMessage, color);
             } else if (msg.type == game::ChatType::CHANNEL && !msg.channelName.empty()) {
                 int chIdx = gameHandler.getChannelIndex(msg.channelName);
                 std::string chDisplay = chIdx > 0
@@ -1054,14 +1082,14 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
                 ImGui::TextWrapped("%s", prefix.c_str());
                 ImGui::PopStyleColor();
                 ImGui::SameLine(0, 0);
-                renderTextWithLinks(msg.message, color);
+                renderTextWithLinks(processedMessage, color);
             } else {
                 std::string prefix = tsPrefix + "[" + std::string(getChatTypeName(msg.type)) + "] " + msg.senderName + ": ";
                 ImGui::PushStyleColor(ImGuiCol_Text, color);
                 ImGui::TextWrapped("%s", prefix.c_str());
                 ImGui::PopStyleColor();
                 ImGui::SameLine(0, 0);
-                renderTextWithLinks(msg.message, color);
+                renderTextWithLinks(processedMessage, color);
             }
         } else {
             std::string prefix = tsPrefix + "[" + std::string(getChatTypeName(msg.type)) + "] ";
@@ -1069,7 +1097,7 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
             ImGui::TextWrapped("%s", prefix.c_str());
             ImGui::PopStyleColor();
             ImGui::SameLine(0, 0);
-            renderTextWithLinks(msg.message, color);
+            renderTextWithLinks(processedMessage, color);
         }
     }
 

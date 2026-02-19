@@ -325,6 +325,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
         uniform sampler2D uTexture;
         uniform bool uHasTexture;
         uniform bool uAlphaTest;
+        uniform bool uColorKeyBlack;
         uniform bool uUnlit;
         uniform float uFadeAlpha;
 
@@ -348,8 +349,14 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
                 texColor = vec4(0.6, 0.5, 0.4, 1.0);  // Fallback brownish
             }
 
-            // Alpha test for leaves, fences, etc.
+            // Alpha test / alpha-key cutout for card textures.
             if (uAlphaTest && texColor.a < 0.5) {
+                discard;
+            }
+            if (uAlphaTest && max(texColor.r, max(texColor.g, texColor.b)) < 0.06) {
+                discard;
+            }
+            if (uColorKeyBlack && max(texColor.r, max(texColor.g, texColor.b)) < 0.08) {
                 discard;
             }
 
@@ -536,6 +543,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
             in float vTile;
             uniform sampler2D uTexture;
             uniform vec2 uTileCount;
+            uniform bool uAlphaKey;
             out vec4 FragColor;
 
             void main() {
@@ -555,6 +563,14 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
                 vec2 tileSize = vec2(1.0 / tilesX, 1.0 / tilesY);
                 vec2 uv = gl_PointCoord * tileSize + vec2(col, row) * tileSize;
                 vec4 texColor = texture(uTexture, uv);
+
+                // Alpha-key particle textures often encode transparency as near-black
+                // color without meaningful alpha.
+                if (uAlphaKey) {
+                    float maxRgb = max(texColor.r, max(texColor.g, texColor.b));
+                    if (maxRgb < 0.06 || texColor.a < 0.5) discard;
+                }
+
                 FragColor = texColor * vColor;
                 FragColor.a *= edgeFade;
                 if (FragColor.a < 0.01) discard;
@@ -665,6 +681,7 @@ void M2Renderer::shutdown() {
     textureCacheBytes_ = 0;
     textureCacheCounter_ = 0;
     textureHasAlphaById_.clear();
+    textureColorKeyBlackById_.clear();
     if (whiteTexture != 0) {
         glDeleteTextures(1, &whiteTexture);
         whiteTexture = 0;
@@ -1170,7 +1187,18 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
                 texFailed = !textureLoadFailed.empty() && textureLoadFailed[0];
             }
             bgpu.texture = tex;
-            bgpu.hasAlpha = (tex != 0 && tex != whiteTexture);
+            bool texHasAlpha = false;
+            if (tex != 0 && tex != whiteTexture) {
+                auto ait = textureHasAlphaById_.find(tex);
+                texHasAlpha = (ait != textureHasAlphaById_.end()) ? ait->second : false;
+            }
+            bgpu.hasAlpha = texHasAlpha;
+            bool colorKeyBlack = false;
+            if (tex != 0 && tex != whiteTexture) {
+                auto cit = textureColorKeyBlackById_.find(tex);
+                colorKeyBlack = (cit != textureColorKeyBlackById_.end()) ? cit->second : false;
+            }
+            bgpu.colorKeyBlack = colorKeyBlack;
             // textureCoordIndex is an index into a texture coord combo table, not directly
             // a UV set selector. Most batches have index=0 (UV set 0). We always use UV set 0
             // since we don't have the full combo table — dual-UV effects are rare edge cases.
@@ -1218,7 +1246,18 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
         bgpu.indexStart = 0;
         bgpu.indexCount = gpuModel.indexCount;
         bgpu.texture = allTextures.empty() ? whiteTexture : allTextures[0];
-        bgpu.hasAlpha = (bgpu.texture != 0 && bgpu.texture != whiteTexture);
+        bool texHasAlpha = false;
+        if (bgpu.texture != 0 && bgpu.texture != whiteTexture) {
+            auto ait = textureHasAlphaById_.find(bgpu.texture);
+            texHasAlpha = (ait != textureHasAlphaById_.end()) ? ait->second : false;
+        }
+        bgpu.hasAlpha = texHasAlpha;
+        bool colorKeyBlack = false;
+        if (bgpu.texture != 0 && bgpu.texture != whiteTexture) {
+            auto cit = textureColorKeyBlackById_.find(bgpu.texture);
+            colorKeyBlack = (cit != textureColorKeyBlackById_.end()) ? cit->second : false;
+        }
+        bgpu.colorKeyBlack = colorKeyBlack;
         gpuModel.batches.push_back(bgpu);
     }
 
@@ -1826,6 +1865,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
     static GLuint lastBoundTexture = 0;
     static bool lastHasTexture = false;
     static bool lastAlphaTest = false;
+    static bool lastColorKeyBlack = false;
     static bool lastUnlit = false;
     static bool lastUseBones = false;
     static bool lastInteriorDarken = false;
@@ -1838,6 +1878,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
     lastBoundTexture = 0;
     lastHasTexture = false;
     lastAlphaTest = false;
+    lastColorKeyBlack = false;
     lastUnlit = false;
     lastUseBones = false;
     lastInteriorDarken = false;
@@ -1849,6 +1890,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
     // Set texture unit once per frame instead of per-batch
     glActiveTexture(GL_TEXTURE0);
     shader->setUniform("uTexture", 0);  // Texture unit 0, set once per frame
+    shader->setUniform("uColorKeyBlack", false);
 
     // Performance counters
     uint32_t boneMatrixUploads = 0;
@@ -1942,19 +1984,8 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             // Skip batches with zero opacity from texture weight tracks (should be invisible)
             if (batch.batchOpacity < 0.01f) continue;
 
-            // Additive/mod batches (glow halos, light effects): collect as glow sprites
-            // instead of rendering the mesh geometry which appears as flat orange disks.
-            if (batch.blendMode >= 3) {
-                if (entry.distSq < 120.0f * 120.0f) { // Only render glow within 120 units
-                    glm::vec3 worldPos = glm::vec3(instance.modelMatrix * glm::vec4(batch.center, 1.0f));
-                    GlowSprite gs;
-                    gs.worldPos = worldPos;
-                    gs.color = glm::vec4(1.0f, 0.75f, 0.35f, 0.85f);
-                    gs.size = batch.glowSize * instance.scale;
-                    glowSprites_.push_back(gs);
-                }
-                continue;
-            }
+            // Render additive/mod batches as authored geometry so alpha-cutout cards
+            // (e.g. candle flames) keep their original transparency/glow behavior.
 
             // Compute UV offset for texture animation (only set uniform if changed)
             glm::vec2 uvOffset(0.0f, 0.0f);
@@ -2040,10 +2071,16 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
                 lastHasTexture = hasTexture;
             }
 
-            bool alphaTest = (batch.blendMode == 1);
+            bool alphaTest = (batch.blendMode == 1) ||
+                             (batch.blendMode >= 2 && !batch.hasAlpha);
             if (alphaTest != lastAlphaTest) {
                 shader->setUniform("uAlphaTest", alphaTest);
                 lastAlphaTest = alphaTest;
+            }
+            bool colorKeyBlack = batch.colorKeyBlack;
+            if (colorKeyBlack != lastColorKeyBlack) {
+                shader->setUniform("uColorKeyBlack", colorKeyBlack);
+                lastColorKeyBlack = colorKeyBlack;
             }
 
             // Only bind texture if it changed (texture unit already set to GL_TEXTURE0)
@@ -2519,6 +2556,7 @@ void M2Renderer::renderM2Particles(const glm::mat4& view, const glm::mat4& proj)
     GLint projLoc = glGetUniformLocation(m2ParticleShader_, "uProjection");
     GLint texLoc = glGetUniformLocation(m2ParticleShader_, "uTexture");
     GLint tileLoc = glGetUniformLocation(m2ParticleShader_, "uTileCount");
+    GLint alphaKeyLoc = glGetUniformLocation(m2ParticleShader_, "uAlphaKey");
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
     glUniform1i(texLoc, 0);
@@ -2532,6 +2570,7 @@ void M2Renderer::renderM2Particles(const glm::mat4& view, const glm::mat4& proj)
         // Use blend mode as specified by the emitter — don't override based on texture alpha.
         // BlendType: 0=opaque, 1=alphaKey, 2=alpha, 3=add, 4=mod
         uint8_t blendType = group.blendType;
+        glUniform1i(alphaKeyLoc, (blendType == 1) ? 1 : 0);
         if (blendType == 3 || blendType == 4) {
             glBlendFunc(GL_SRC_ALPHA, GL_ONE);  // Additive
         } else {
@@ -2819,6 +2858,15 @@ GLuint M2Renderer::loadTexture(const std::string& path, uint32_t texFlags) {
         return it->second.id;
     }
 
+    auto containsToken = [](const std::string& haystack, const char* token) {
+        return haystack.find(token) != std::string::npos;
+    };
+    const bool colorKeyBlackHint =
+        containsToken(key, "candle") ||
+        containsToken(key, "flame") ||
+        containsToken(key, "fire") ||
+        containsToken(key, "torch");
+
     // Load BLP texture
     pipeline::BLPImage blp = assetManager->loadTexture(key);
     if (!blp.isValid()) {
@@ -2860,10 +2908,12 @@ GLuint M2Renderer::loadTexture(const std::string& path, uint32_t texFlags) {
     size_t base = static_cast<size_t>(blp.width) * static_cast<size_t>(blp.height) * 4ull;
     e.approxBytes = base + (base / 3);
     e.hasAlpha = hasAlpha;
+    e.colorKeyBlack = colorKeyBlackHint;
     e.lastUse = ++textureCacheCounter_;
     textureCacheBytes_ += e.approxBytes;
     textureCache[key] = e;
     textureHasAlphaById_[textureID] = hasAlpha;
+    textureColorKeyBlackById_[textureID] = colorKeyBlackHint;
     LOG_DEBUG("M2: Loaded texture: ", path, " (", blp.width, "x", blp.height, ")");
 
     return textureID;
