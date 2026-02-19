@@ -24,9 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Clone ImGui
-        run: git clone --depth 1 https://github.com/ocornut/imgui.git extern/imgui
+        with:
+          submodules: true
 
       - name: Cache apt packages
         uses: actions/cache@v4
@@ -84,9 +83,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Clone ImGui
-        run: git clone --depth 1 https://github.com/ocornut/imgui.git extern/imgui
+        with:
+          submodules: true
 
       - name: Install dependencies
         run: |
@@ -165,6 +163,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Set up MSYS2
         uses: msys2/setup-msys2@v2
@@ -183,10 +183,6 @@ jobs:
             mingw-w64-clang-aarch64-zlib
             mingw-w64-clang-aarch64-ffmpeg
             git
-
-      - name: Clone ImGui
-        shell: msys2 {0}
-        run: git clone --depth 1 https://github.com/ocornut/imgui.git extern/imgui
 
       - name: Configure
         shell: msys2 {0}
@@ -221,6 +217,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Set up MSYS2
         uses: msys2/setup-msys2@v2
@@ -241,10 +239,6 @@ jobs:
             mingw-w64-x86_64-unicorn
             mingw-w64-x86_64-nsis
             git
-
-      - name: Clone ImGui
-        shell: msys2 {0}
-        run: git clone --depth 1 https://github.com/ocornut/imgui.git extern/imgui
 
       - name: Configure
         shell: msys2 {0}

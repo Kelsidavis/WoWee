@@ -41,9 +41,10 @@ wowee
 *~
 .DS_Store
 
-# External dependencies (except CMakeLists.txt)
+# External dependencies (except submodules)
 extern/*
 !extern/.gitkeep
+!extern/imgui
 
 # ImGui state
 imgui.ini
