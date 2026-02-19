@@ -2872,42 +2872,63 @@ bool LootResponseParser::parse(network::Packet& packet, LootResponseData& data) 
     data.gold = packet.readUInt32();
     uint8_t itemCount = packet.readUInt8();
 
-    data.items.reserve(itemCount);
-    for (uint8_t i = 0; i < itemCount; ++i) {
-        if (packet.getSize() - packet.getReadPos() < 22) {
-            LOG_WARNING("LootResponseParser: truncated regular item list");
-            return false;
+    auto parseLootItemList = [&](uint8_t listCount, bool markQuestItems) -> bool {
+        for (uint8_t i = 0; i < listCount; ++i) {
+            size_t remaining = packet.getSize() - packet.getReadPos();
+            if (remaining < 10) {
+                return false;
+            }
+
+            // Prefer the richest format when possible:
+            // 22-byte (WotLK/full): slot+id+count+display+randSuffix+randProp+slotType
+            // 14-byte (compact):    slot+id+count+display+slotType
+            // 10-byte (minimal):    slot+id+count+slotType
+            uint8_t bytesPerItem = 10;
+            if (remaining >= 22) {
+                bytesPerItem = 22;
+            } else if (remaining >= 14) {
+                bytesPerItem = 14;
+            }
+
+            LootItem item;
+            item.slotIndex = packet.readUInt8();
+            item.itemId = packet.readUInt32();
+            item.count = packet.readUInt32();
+
+            if (bytesPerItem >= 14) {
+                item.displayInfoId = packet.readUInt32();
+            } else {
+                item.displayInfoId = 0;
+            }
+
+            if (bytesPerItem == 22) {
+                item.randomSuffix = packet.readUInt32();
+                item.randomPropertyId = packet.readUInt32();
+            } else {
+                item.randomSuffix = 0;
+                item.randomPropertyId = 0;
+            }
+
+            item.lootSlotType = packet.readUInt8();
+            item.isQuestItem = markQuestItems;
+            data.items.push_back(item);
         }
-        LootItem item;
-        item.slotIndex = packet.readUInt8();
-        item.itemId = packet.readUInt32();
-        item.count = packet.readUInt32();
-        item.displayInfoId = packet.readUInt32();
-        item.randomSuffix = packet.readUInt32();
-        item.randomPropertyId = packet.readUInt32();
-        item.lootSlotType = packet.readUInt8();
-        data.items.push_back(item);
+        return true;
+    };
+
+    data.items.reserve(itemCount);
+    if (!parseLootItemList(itemCount, false)) {
+        LOG_WARNING("LootResponseParser: truncated regular item list");
+        return false;
     }
 
     uint8_t questItemCount = 0;
     if (packet.getSize() - packet.getReadPos() >= 1) {
         questItemCount = packet.readUInt8();
         data.items.reserve(data.items.size() + questItemCount);
-        for (uint8_t i = 0; i < questItemCount; ++i) {
-            if (packet.getSize() - packet.getReadPos() < 22) {
-                LOG_WARNING("LootResponseParser: truncated quest item list");
-                return false;
-            }
-            LootItem item;
-            item.slotIndex = packet.readUInt8();
-            item.itemId = packet.readUInt32();
-            item.count = packet.readUInt32();
-            item.displayInfoId = packet.readUInt32();
-            item.randomSuffix = packet.readUInt32();
-            item.randomPropertyId = packet.readUInt32();
-            item.lootSlotType = packet.readUInt8();
-            item.isQuestItem = true;
-            data.items.push_back(item);
+        if (!parseLootItemList(questItemCount, true)) {
+            LOG_WARNING("LootResponseParser: truncated quest item list");
+            return false;
         }
     }
 
