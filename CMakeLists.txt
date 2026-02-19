@@ -484,7 +484,8 @@ add_executable(auth_probe
 target_include_directories(auth_probe PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-target_link_libraries(auth_probe PRIVATE Threads::Threads OpenSSL::Crypto)
+target_link_libraries(auth_probe PRIVATE Threads::Threads OpenSSL::Crypto
+    $<$<BOOL:${WIN32}>:ws2_32>)
 set_target_properties(auth_probe PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
@@ -507,7 +508,8 @@ add_executable(auth_login_probe
 target_include_directories(auth_login_probe PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-target_link_libraries(auth_login_probe PRIVATE Threads::Threads OpenSSL::Crypto)
+target_link_libraries(auth_login_probe PRIVATE Threads::Threads OpenSSL::Crypto
+    $<$<BOOL:${WIN32}>:ws2_32>)
 set_target_properties(auth_login_probe PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
