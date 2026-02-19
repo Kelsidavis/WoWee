@@ -5,6 +5,9 @@
 #include <sstream>
 #ifdef _WIN32
 #include <windows.h>
+#elif defined(__APPLE__)
+#include <sys/types.h>
+#include <sys/sysctl.h>
 #else
 #include <sys/sysinfo.h>
 #endif
@@ -12,7 +15,7 @@
 namespace wowee {
 namespace core {
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__APPLE__)
 namespace {
 size_t readMemAvailableBytesFromProc() {
     std::ifstream meminfo("/proc/meminfo");
@@ -31,7 +34,7 @@ size_t readMemAvailableBytesFromProc() {
     return 0;
 }
 } // namespace
-#endif
+#endif // !_WIN32 && !__APPLE__
 
 MemoryMonitor& MemoryMonitor::getInstance() {
     static MemoryMonitor instance;
@@ -43,6 +46,16 @@ void MemoryMonitor::initialize() {
     ULONGLONG totalKB = 0;
     if (GetPhysicallyInstalledSystemMemory(&totalKB)) {
         totalRAM_ = static_cast<size_t>(totalKB) * 1024ull;
+        LOG_INFO("System RAM detected: ", totalRAM_ / (1024 * 1024 * 1024), " GB");
+    } else {
+        totalRAM_ = 16ull * 1024 * 1024 * 1024;
+        LOG_WARNING("Could not detect system RAM, assuming 16GB");
+    }
+#elif defined(__APPLE__)
+    int64_t physmem = 0;
+    size_t len = sizeof(physmem);
+    if (sysctlbyname("hw.memsize", &physmem, &len, nullptr, 0) == 0) {
+        totalRAM_ = static_cast<size_t>(physmem);
         LOG_INFO("System RAM detected: ", totalRAM_ / (1024 * 1024 * 1024), " GB");
     } else {
         totalRAM_ = 16ull * 1024 * 1024 * 1024;
@@ -67,6 +80,13 @@ size_t MemoryMonitor::getAvailableRAM() const {
     status.dwLength = sizeof(status);
     if (GlobalMemoryStatusEx(&status)) {
         return static_cast<size_t>(status.ullAvailPhys);
+    }
+    return totalRAM_ / 2;
+#elif defined(__APPLE__)
+    int64_t usermem = 0;
+    size_t len = sizeof(usermem);
+    if (sysctlbyname("hw.usermem", &usermem, &len, nullptr, 0) == 0) {
+        return static_cast<size_t>(usermem);
     }
     return totalRAM_ / 2;
 #else

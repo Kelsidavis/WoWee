@@ -65,6 +65,91 @@ jobs:
           path: build/bin/
           if-no-files-found: error
 
+  build-macos:
+    name: Build (macOS ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x86-64
+            runner: macos-13
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clone ImGui
+        run: git clone --depth 1 https://github.com/ocornut/imgui.git extern/imgui
+
+      - name: Install dependencies
+        run: |
+          brew install cmake pkg-config sdl2 glew glm openssl@3 zlib ffmpeg unicorn
+
+      - name: Configure
+        run: |
+          BREW=$(brew --prefix)
+          export PKG_CONFIG_PATH="$BREW/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig"
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$BREW" \
+            -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
+
+      - name: Build
+        run: cmake --build build --parallel $(sysctl -n hw.logicalcpu)
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wowee-macos-${{ matrix.arch }}
+          path: build/bin/
+          if-no-files-found: error
+
+  build-windows-arm:
+    name: Build (windows-arm64)
+    runs-on: windows-11-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANGARM64
+          update: false
+          install: >-
+            mingw-w64-clang-aarch64-cmake
+            mingw-w64-clang-aarch64-clang
+            mingw-w64-clang-aarch64-pkgconf
+            mingw-w64-clang-aarch64-SDL2
+            mingw-w64-clang-aarch64-glew
+            mingw-w64-clang-aarch64-glm
+            mingw-w64-clang-aarch64-openssl
+            mingw-w64-clang-aarch64-zlib
+            mingw-w64-clang-aarch64-ffmpeg
+            git
+
+      - name: Clone ImGui
+        shell: msys2 {0}
+        run: git clone --depth 1 https://github.com/ocornut/imgui.git extern/imgui
+
+      - name: Configure
+        shell: msys2 {0}
+        run: cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        shell: msys2 {0}
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wowee-windows-arm64
+          path: build/bin/
+          if-no-files-found: error
+
   build-windows:
     name: Build (windows-x86-64)
     runs-on: windows-latest
