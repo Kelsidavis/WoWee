@@ -236,7 +236,7 @@ public:
     /**
      * Render depth-only pass for shadow casting
      */
-    void renderShadow(GLuint shadowShaderProgram);
+    void renderShadow(GLuint shadowShaderProgram, const glm::vec3& shadowCenter, float halfExtent);
 
     /**
      * Render smoke particles (call after render())

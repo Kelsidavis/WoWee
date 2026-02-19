@@ -2151,7 +2151,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
     }
 }
 
-void M2Renderer::renderShadow(GLuint shadowShaderProgram) {
+void M2Renderer::renderShadow(GLuint shadowShaderProgram, const glm::vec3& shadowCenter, float halfExtent) {
     if (instances.empty() || shadowShaderProgram == 0) {
         return;
     }
@@ -2172,6 +2172,12 @@ void M2Renderer::renderShadow(GLuint shadowShaderProgram) {
     glActiveTexture(GL_TEXTURE0);
 
     for (const auto& instance : instances) {
+        // Cull instances whose AABB doesn't overlap the shadow frustum (XY plane)
+        glm::vec3 instCenter = (instance.worldBoundsMin + instance.worldBoundsMax) * 0.5f;
+        glm::vec3 instHalf   = (instance.worldBoundsMax - instance.worldBoundsMin) * 0.5f;
+        if (std::abs(instCenter.x - shadowCenter.x) > halfExtent + instHalf.x) continue;
+        if (std::abs(instCenter.y - shadowCenter.y) > halfExtent + instHalf.y) continue;
+
         auto it = models.find(instance.modelId);
         if (it == models.end()) continue;
 

@@ -3444,9 +3444,10 @@ void Renderer::renderShadowPass() {
     if (useBonesLoc >= 0) glUniform1i(useBonesLoc, 0);
     if (texLoc >= 0) glUniform1i(texLoc, 0);
 
-    // Render terrain into shadow map
+    // Render terrain into shadow map (only chunks within shadow frustum)
     if (terrainRenderer) {
-        terrainRenderer->renderShadow(shadowShaderProgram);
+        glm::vec3 shadowCtr = shadowCenterInitialized ? shadowCenter : characterPosition;
+        terrainRenderer->renderShadow(shadowShaderProgram, shadowCtr, kShadowHalfExtent);
     }
 
     // Render WMO into shadow map
@@ -3476,9 +3477,10 @@ void Renderer::renderShadowPass() {
         shadowShaderWrapper.releaseProgram();  // Don't let wrapper delete our program
     }
 
-    // Render M2 doodads into shadow map
+    // Render M2 doodads into shadow map (only instances within shadow frustum)
     if (m2Renderer) {
-        m2Renderer->renderShadow(shadowShaderProgram);
+        glm::vec3 shadowCtr = shadowCenterInitialized ? shadowCenter : characterPosition;
+        m2Renderer->renderShadow(shadowShaderProgram, shadowCtr, kShadowHalfExtent);
     }
 
     // Render characters into shadow map

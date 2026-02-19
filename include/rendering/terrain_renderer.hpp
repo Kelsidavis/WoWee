@@ -135,7 +135,7 @@ public:
     /**
      * Render terrain geometry into shadow depth map
      */
-    void renderShadow(GLuint shaderProgram);
+    void renderShadow(GLuint shaderProgram, const glm::vec3& shadowCenter, float halfExtent);
 
     /**
      * Set shadow map for receiving shadows

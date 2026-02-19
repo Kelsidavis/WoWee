@@ -369,7 +369,7 @@ GLuint TerrainRenderer::createAlphaTexture(const std::vector<uint8_t>& alphaData
     return textureID;
 }
 
-void TerrainRenderer::renderShadow(GLuint shaderProgram) {
+void TerrainRenderer::renderShadow(GLuint shaderProgram, const glm::vec3& shadowCenter, float halfExtent) {
     if (chunks.empty()) return;
 
     GLint modelLoc = glGetUniformLocation(shaderProgram, "uModel");
@@ -378,6 +378,13 @@ void TerrainRenderer::renderShadow(GLuint shaderProgram) {
 
     for (const auto& chunk : chunks) {
         if (!chunk.isValid()) continue;
+
+        // Cull chunks whose bounding sphere doesn't overlap the shadow frustum (XY plane)
+        float maxDist = halfExtent + chunk.boundingSphereRadius;
+        float dx = chunk.boundingSphereCenter.x - shadowCenter.x;
+        float dy = chunk.boundingSphereCenter.y - shadowCenter.y;
+        if (dx * dx + dy * dy > maxDist * maxDist) continue;
+
         glBindVertexArray(chunk.vao);
         glDrawElements(GL_TRIANGLES, chunk.indexCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
