@@ -1443,8 +1443,6 @@ private:
     // Quest log
     std::vector<QuestLogEntry> questLog_;
     std::unordered_set<uint32_t> pendingQuestQueryIds_;
-    int questQueryTracePacketsLeft_ = 0;
-    uint32_t questQueryTraceQuestId_ = 0;
 
     // Quest giver status per NPC
     std::unordered_map<uint64_t, QuestGiverStatus> npcQuestStatus_;

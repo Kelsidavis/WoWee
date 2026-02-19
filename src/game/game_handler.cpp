@@ -933,24 +933,6 @@ void GameHandler::handlePacket(network::Packet& packet) {
     // Translate wire opcode to logical opcode via expansion table
     auto logicalOp = opcodeTable_.fromWire(opcode);
 
-    if (questQueryTracePacketsLeft_ > 0) {
-        int logicalId = logicalOp ? static_cast<int>(*logicalOp) : -1;
-        size_t limit = std::min<size_t>(24, packet.getSize());
-        std::string hex;
-        const auto& raw = packet.getData();
-        for (size_t i = 0; i < limit && i < raw.size(); ++i) {
-            char buf[4];
-            snprintf(buf, sizeof(buf), "%02x ", raw[i]);
-            hex += buf;
-        }
-        LOG_INFO("QTRACE RX: wire=0x", std::hex, opcode, std::dec,
-                 " logical=", logicalId,
-                 " size=", packet.getSize(),
-                 " qid=", questQueryTraceQuestId_,
-                 " head=[", hex, "]");
-        --questQueryTracePacketsLeft_;
-    }
-
     if (!logicalOp) {
         static std::unordered_set<uint16_t> loggedUnknownWireOpcodes;
         if (loggedUnknownWireOpcodes.insert(opcode).second) {
@@ -1963,8 +1945,6 @@ void GameHandler::handlePacket(network::Packet& packet) {
             }
 
             uint32_t questId = packet.readUInt32();
-            LOG_INFO("Quest query RX: wire=0x", std::hex, opcode, std::dec,
-                     " questId=", questId, " payloadSize=", packet.getSize());
             packet.readUInt32(); // questMethod
 
             const bool isClassicLayout = packetParsers_ && packetParsers_->questLogStride() == 3;
@@ -8698,11 +8678,6 @@ bool GameHandler::requestQuestQuery(uint32_t questId, bool force) {
 
     network::Packet pkt(wireOpcode(Opcode::CMSG_QUEST_QUERY));
     pkt.writeUInt32(questId);
-    questQueryTraceQuestId_ = questId;
-    questQueryTracePacketsLeft_ = 60;
-    LOG_INFO("Quest query TX: questId=", questId, " wireOpcode=0x",
-             std::hex, wireOpcode(Opcode::CMSG_QUEST_QUERY), std::dec,
-             " force=", force ? 1 : 0);
     socket->send(pkt);
     pendingQuestQueryIds_.insert(questId);
     return true;
