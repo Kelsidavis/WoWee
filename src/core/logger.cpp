@@ -35,7 +35,11 @@ void Logger::log(LogLevel level, const std::string& message) {
         now.time_since_epoch()) % 1000;
 
     std::tm tm;
+#ifdef _WIN32
+    localtime_s(&tm, &time);
+#else
     localtime_r(&time, &tm);
+#endif
 
     // Format: [YYYY-MM-DD HH:MM:SS.mmm] [LEVEL] message
     std::ostringstream line;

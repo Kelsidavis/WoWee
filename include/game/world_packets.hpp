@@ -176,6 +176,11 @@ public:
 // ============================================================
 
 // WoW 3.3.5a ResponseCodes for character creation (from ResponseCodes enum)
+// Windows wingdi.h defines ERROR as 0; undefine it for this enum scope.
+#ifdef _WIN32
+#pragma push_macro("ERROR")
+#undef ERROR
+#endif
 enum class CharCreateResult : uint8_t {
     // Success codes
     SUCCESS              = 0x2F,  // CHAR_CREATE_SUCCESS
@@ -224,6 +229,9 @@ enum class CharCreateResult : uint8_t {
     NAME_RUSSIAN_SILENT_AT_BEGIN_OR_END = 0x66,  // CHAR_NAME_RUSSIAN_SILENT_CHARACTER_AT_BEGINNING_OR_END
     NAME_DECLENSION_DOESNT_MATCH = 0x67,  // CHAR_NAME_DECLENSION_DOESNT_MATCH_BASE_NAME
 };
+#ifdef _WIN32
+#pragma pop_macro("ERROR")
+#endif
 
 struct CharCreateData {
     std::string name;

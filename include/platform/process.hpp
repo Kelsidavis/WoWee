@@ -13,7 +13,7 @@
   #include <windows.h>
 
   using ProcessHandle = HANDLE;
-  inline constexpr ProcessHandle INVALID_PROCESS = INVALID_HANDLE_VALUE;
+  inline const ProcessHandle INVALID_PROCESS = INVALID_HANDLE_VALUE;
 
 #else
   #include <sys/types.h>
