@@ -384,6 +384,20 @@ else()
     target_compile_options(wowee PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+# Release build optimizations
+include(CheckIPOSupported)
+check_ipo_supported(RESULT _ipo_supported OUTPUT _ipo_error)
+if(_ipo_supported)
+    set_property(TARGET wowee PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+endif()
+if(NOT MSVC)
+    # -O3: more aggressive inlining and auto-vectorization vs CMake's default -O2
+    target_compile_options(wowee PRIVATE $<$<CONFIG:Release>:-O3>)
+    # -fvisibility=hidden: keeps all symbols internal by default, shrinks binary
+    # and gives the linker and optimizer more freedom to dead-strip and inline
+    target_compile_options(wowee PRIVATE $<$<CONFIG:Release>:-fvisibility=hidden -fvisibility-inlines-hidden>)
+endif()
+
 # Copy assets to build directory
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/assets
      DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})

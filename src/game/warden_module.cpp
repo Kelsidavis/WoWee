@@ -51,25 +51,25 @@ bool WardenModule::load(const std::vector<uint8_t>& moduleData,
     for (size_t i = 0; i < std::min(md5Hash.size(), size_t(8)); ++i) {
         printf("%02X", md5Hash[i]);
     }
-    std::cout << "...)" << std::endl;
+    std::cout << "...)" << '\n';
 
     // Step 1: Verify MD5 hash
     if (!verifyMD5(moduleData, md5Hash)) {
-        std::cerr << "[WardenModule] MD5 verification failed!" << std::endl;
+        std::cerr << "[WardenModule] MD5 verification failed!" << '\n';
         return false;
     }
-    std::cout << "[WardenModule] ✓ MD5 verified" << std::endl;
+    std::cout << "[WardenModule] ✓ MD5 verified" << '\n';
 
     // Step 2: RC4 decrypt
     if (!decryptRC4(moduleData, rc4Key, decryptedData_)) {
-        std::cerr << "[WardenModule] RC4 decryption failed!" << std::endl;
+        std::cerr << "[WardenModule] RC4 decryption failed!" << '\n';
         return false;
     }
-    std::cout << "[WardenModule] ✓ RC4 decrypted (" << decryptedData_.size() << " bytes)" << std::endl;
+    std::cout << "[WardenModule] ✓ RC4 decrypted (" << decryptedData_.size() << " bytes)" << '\n';
 
     // Step 3: Verify RSA signature
     if (!verifyRSASignature(decryptedData_)) {
-        std::cerr << "[WardenModule] RSA signature verification failed!" << std::endl;
+        std::cerr << "[WardenModule] RSA signature verification failed!" << '\n';
         // Note: Currently returns true (skipping verification) due to placeholder modulus
     }
 
@@ -81,31 +81,31 @@ bool WardenModule::load(const std::vector<uint8_t>& moduleData,
         dataWithoutSig = decryptedData_;
     }
     if (!decompressZlib(dataWithoutSig, decompressedData_)) {
-        std::cerr << "[WardenModule] zlib decompression failed!" << std::endl;
+        std::cerr << "[WardenModule] zlib decompression failed!" << '\n';
         return false;
     }
 
     // Step 5: Parse custom executable format
     if (!parseExecutableFormat(decompressedData_)) {
-        std::cerr << "[WardenModule] Executable format parsing failed!" << std::endl;
+        std::cerr << "[WardenModule] Executable format parsing failed!" << '\n';
         return false;
     }
 
     // Step 6: Apply relocations
     if (!applyRelocations()) {
-        std::cerr << "[WardenModule] Address relocations failed!" << std::endl;
+        std::cerr << "[WardenModule] Address relocations failed!" << '\n';
         return false;
     }
 
     // Step 7: Bind APIs
     if (!bindAPIs()) {
-        std::cerr << "[WardenModule] API binding failed!" << std::endl;
+        std::cerr << "[WardenModule] API binding failed!" << '\n';
         // Note: Currently returns true (stub) on both Windows and Linux
     }
 
     // Step 8: Initialize module
     if (!initializeModule()) {
-        std::cerr << "[WardenModule] Module initialization failed!" << std::endl;
+        std::cerr << "[WardenModule] Module initialization failed!" << '\n';
         return false;
     }
 
@@ -113,13 +113,13 @@ bool WardenModule::load(const std::vector<uint8_t>& moduleData,
     // Note: Steps 6-8 are stubs/platform-limited, but infrastructure is ready
     loaded_ = true; // Mark as loaded (infrastructure complete)
 
-    std::cout << "[WardenModule] ✓ Module loading pipeline COMPLETE" << std::endl;
-    std::cout << "[WardenModule]   Status: Infrastructure ready, execution stubs in place" << std::endl;
-    std::cout << "[WardenModule]   Limitations:" << std::endl;
-    std::cout << "[WardenModule]     - Relocations: needs real module data" << std::endl;
-    std::cout << "[WardenModule]     - API Binding: Windows only (or Wine on Linux)" << std::endl;
-    std::cout << "[WardenModule]     - Execution: disabled (unsafe without validation)" << std::endl;
-    std::cout << "[WardenModule]   For strict servers: Would need to enable actual x86 execution" << std::endl;
+    std::cout << "[WardenModule] ✓ Module loading pipeline COMPLETE" << '\n';
+    std::cout << "[WardenModule]   Status: Infrastructure ready, execution stubs in place" << '\n';
+    std::cout << "[WardenModule]   Limitations:" << '\n';
+    std::cout << "[WardenModule]     - Relocations: needs real module data" << '\n';
+    std::cout << "[WardenModule]     - API Binding: Windows only (or Wine on Linux)" << '\n';
+    std::cout << "[WardenModule]     - Execution: disabled (unsafe without validation)" << '\n';
+    std::cout << "[WardenModule]   For strict servers: Would need to enable actual x86 execution" << '\n';
 
     return true;
 }
@@ -127,25 +127,25 @@ bool WardenModule::load(const std::vector<uint8_t>& moduleData,
 bool WardenModule::processCheckRequest(const std::vector<uint8_t>& checkData,
                                        std::vector<uint8_t>& responseOut) {
     if (!loaded_) {
-        std::cerr << "[WardenModule] Module not loaded, cannot process checks" << std::endl;
+        std::cerr << "[WardenModule] Module not loaded, cannot process checks" << '\n';
         return false;
     }
 
     #ifdef HAVE_UNICORN
         if (emulator_ && emulator_->isInitialized() && funcList_.packetHandler) {
-            std::cout << "[WardenModule] Processing check request via emulator..." << std::endl;
-            std::cout << "[WardenModule]   Check data: " << checkData.size() << " bytes" << std::endl;
+            std::cout << "[WardenModule] Processing check request via emulator..." << '\n';
+            std::cout << "[WardenModule]   Check data: " << checkData.size() << " bytes" << '\n';
 
             // Allocate memory for check data in emulated space
             uint32_t checkDataAddr = emulator_->allocateMemory(checkData.size(), 0x04);
             if (checkDataAddr == 0) {
-                std::cerr << "[WardenModule] Failed to allocate memory for check data" << std::endl;
+                std::cerr << "[WardenModule] Failed to allocate memory for check data" << '\n';
                 return false;
             }
 
             // Write check data to emulated memory
             if (!emulator_->writeMemory(checkDataAddr, checkData.data(), checkData.size())) {
-                std::cerr << "[WardenModule] Failed to write check data" << std::endl;
+                std::cerr << "[WardenModule] Failed to write check data" << '\n';
                 emulator_->freeMemory(checkDataAddr);
                 return false;
             }
@@ -153,7 +153,7 @@ bool WardenModule::processCheckRequest(const std::vector<uint8_t>& checkData,
             // Allocate response buffer in emulated space (assume max 1KB response)
             uint32_t responseAddr = emulator_->allocateMemory(1024, 0x04);
             if (responseAddr == 0) {
-                std::cerr << "[WardenModule] Failed to allocate response buffer" << std::endl;
+                std::cerr << "[WardenModule] Failed to allocate response buffer" << '\n';
                 emulator_->freeMemory(checkDataAddr);
                 return false;
             }
@@ -162,13 +162,13 @@ bool WardenModule::processCheckRequest(const std::vector<uint8_t>& checkData,
                 // Call module's PacketHandler
                 // void PacketHandler(uint8_t* checkData, size_t checkSize,
                 //                   uint8_t* responseOut, size_t* responseSizeOut)
-                std::cout << "[WardenModule] Calling PacketHandler..." << std::endl;
+                std::cout << "[WardenModule] Calling PacketHandler..." << '\n';
 
                 // For now, this is a placeholder - actual calling would depend on
                 // the module's exact function signature
-                std::cout << "[WardenModule] ⚠ PacketHandler execution stubbed" << std::endl;
-                std::cout << "[WardenModule]   Would call emulated function to process checks" << std::endl;
-                std::cout << "[WardenModule]   This would generate REAL responses (not fakes!)" << std::endl;
+                std::cout << "[WardenModule] ⚠ PacketHandler execution stubbed" << '\n';
+                std::cout << "[WardenModule]   Would call emulated function to process checks" << '\n';
+                std::cout << "[WardenModule]   This would generate REAL responses (not fakes!)" << '\n';
 
                 // Clean up
                 emulator_->freeMemory(checkDataAddr);
@@ -179,7 +179,7 @@ bool WardenModule::processCheckRequest(const std::vector<uint8_t>& checkData,
                 return false;
 
             } catch (const std::exception& e) {
-                std::cerr << "[WardenModule] Exception during PacketHandler: " << e.what() << std::endl;
+                std::cerr << "[WardenModule] Exception during PacketHandler: " << e.what() << '\n';
                 emulator_->freeMemory(checkDataAddr);
                 emulator_->freeMemory(responseAddr);
                 return false;
@@ -187,8 +187,8 @@ bool WardenModule::processCheckRequest(const std::vector<uint8_t>& checkData,
         }
     #endif
 
-    std::cout << "[WardenModule] ⚠ processCheckRequest NOT IMPLEMENTED" << std::endl;
-    std::cout << "[WardenModule]   Would call module->PacketHandler() here" << std::endl;
+    std::cout << "[WardenModule] ⚠ processCheckRequest NOT IMPLEMENTED" << '\n';
+    std::cout << "[WardenModule]   Would call module->PacketHandler() here" << '\n';
 
     // For now, return false to fall back to fake responses in GameHandler
     return false;
@@ -219,13 +219,13 @@ void WardenModule::unload() {
     if (moduleMemory_) {
         // Call module's Unload() function if loaded
         if (loaded_ && funcList_.unload) {
-            std::cout << "[WardenModule] Calling module unload callback..." << std::endl;
+            std::cout << "[WardenModule] Calling module unload callback..." << '\n';
             // TODO: Implement callback when execution layer is complete
             // funcList_.unload(nullptr);
         }
 
         // Free executable memory region
-        std::cout << "[WardenModule] Freeing " << moduleSize_ << " bytes of executable memory" << std::endl;
+        std::cout << "[WardenModule] Freeing " << moduleSize_ << " bytes of executable memory" << '\n';
         #ifdef _WIN32
             VirtualFree(moduleMemory_, 0, MEM_RELEASE);
         #else
@@ -264,7 +264,7 @@ bool WardenModule::decryptRC4(const std::vector<uint8_t>& encrypted,
                               const std::vector<uint8_t>& key,
                               std::vector<uint8_t>& decryptedOut) {
     if (key.size() != 16) {
-        std::cerr << "[WardenModule] Invalid RC4 key size: " << key.size() << " (expected 16)" << std::endl;
+        std::cerr << "[WardenModule] Invalid RC4 key size: " << key.size() << " (expected 16)" << '\n';
         return false;
     }
 
@@ -299,7 +299,7 @@ bool WardenModule::decryptRC4(const std::vector<uint8_t>& encrypted,
 bool WardenModule::verifyRSASignature(const std::vector<uint8_t>& data) {
     // RSA-2048 signature is last 256 bytes
     if (data.size() < 256) {
-        std::cerr << "[WardenModule] Data too small for RSA signature (need at least 256 bytes)" << std::endl;
+        std::cerr << "[WardenModule] Data too small for RSA signature (need at least 256 bytes)" << '\n';
         return false;
     }
 
@@ -345,7 +345,7 @@ bool WardenModule::verifyRSASignature(const std::vector<uint8_t>& data) {
     // Create RSA public key structure
     RSA* rsa = RSA_new();
     if (!rsa) {
-        std::cerr << "[WardenModule] Failed to create RSA structure" << std::endl;
+        std::cerr << "[WardenModule] Failed to create RSA structure" << '\n';
         return false;
     }
 
@@ -375,7 +375,7 @@ bool WardenModule::verifyRSASignature(const std::vector<uint8_t>& data) {
     RSA_free(rsa);
 
     if (decryptedLen < 0) {
-        std::cerr << "[WardenModule] RSA public decrypt failed" << std::endl;
+        std::cerr << "[WardenModule] RSA public decrypt failed" << '\n';
         return false;
     }
 
@@ -388,24 +388,24 @@ bool WardenModule::verifyRSASignature(const std::vector<uint8_t>& data) {
         std::vector<uint8_t> actualHash(decryptedSig.end() - 20, decryptedSig.end());
 
         if (std::memcmp(actualHash.data(), expectedHash.data(), 20) == 0) {
-            std::cout << "[WardenModule] ✓ RSA signature verified" << std::endl;
+            std::cout << "[WardenModule] ✓ RSA signature verified" << '\n';
             return true;
         }
     }
 
-    std::cerr << "[WardenModule] RSA signature verification FAILED (hash mismatch)" << std::endl;
-    std::cerr << "[WardenModule] NOTE: Using placeholder modulus - extract real modulus from WoW.exe for actual verification" << std::endl;
+    std::cerr << "[WardenModule] RSA signature verification FAILED (hash mismatch)" << '\n';
+    std::cerr << "[WardenModule] NOTE: Using placeholder modulus - extract real modulus from WoW.exe for actual verification" << '\n';
 
     // For development, return true to proceed (since we don't have real modulus)
     // TODO: Set to false once real modulus is extracted
-    std::cout << "[WardenModule] ⚠ Skipping RSA verification (placeholder modulus)" << std::endl;
+    std::cout << "[WardenModule] ⚠ Skipping RSA verification (placeholder modulus)" << '\n';
     return true; // TEMPORARY - change to false for production
 }
 
 bool WardenModule::decompressZlib(const std::vector<uint8_t>& compressed,
                                   std::vector<uint8_t>& decompressedOut) {
     if (compressed.size() < 4) {
-        std::cerr << "[WardenModule] Compressed data too small (need at least 4 bytes for size header)" << std::endl;
+        std::cerr << "[WardenModule] Compressed data too small (need at least 4 bytes for size header)" << '\n';
         return false;
     }
 
@@ -416,11 +416,11 @@ bool WardenModule::decompressZlib(const std::vector<uint8_t>& compressed,
         (compressed[2] << 16) |
         (compressed[3] << 24);
 
-    std::cout << "[WardenModule] Uncompressed size: " << uncompressedSize << " bytes" << std::endl;
+    std::cout << "[WardenModule] Uncompressed size: " << uncompressedSize << " bytes" << '\n';
 
     // Sanity check (modules shouldn't be larger than 10MB)
     if (uncompressedSize > 10 * 1024 * 1024) {
-        std::cerr << "[WardenModule] Uncompressed size suspiciously large: " << uncompressedSize << " bytes" << std::endl;
+        std::cerr << "[WardenModule] Uncompressed size suspiciously large: " << uncompressedSize << " bytes" << '\n';
         return false;
     }
 
@@ -437,7 +437,7 @@ bool WardenModule::decompressZlib(const std::vector<uint8_t>& compressed,
     // Initialize inflater
     int ret = inflateInit(&stream);
     if (ret != Z_OK) {
-        std::cerr << "[WardenModule] inflateInit failed: " << ret << std::endl;
+        std::cerr << "[WardenModule] inflateInit failed: " << ret << '\n';
         return false;
     }
 
@@ -448,19 +448,19 @@ bool WardenModule::decompressZlib(const std::vector<uint8_t>& compressed,
     inflateEnd(&stream);
 
     if (ret != Z_STREAM_END) {
-        std::cerr << "[WardenModule] inflate failed: " << ret << std::endl;
+        std::cerr << "[WardenModule] inflate failed: " << ret << '\n';
         return false;
     }
 
     std::cout << "[WardenModule] ✓ zlib decompression successful ("
-              << stream.total_out << " bytes decompressed)" << std::endl;
+              << stream.total_out << " bytes decompressed)" << '\n';
 
     return true;
 }
 
 bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
     if (exeData.size() < 4) {
-        std::cerr << "[WardenModule] Executable data too small for header" << std::endl;
+        std::cerr << "[WardenModule] Executable data too small for header" << '\n';
         return false;
     }
 
@@ -471,11 +471,11 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
         (exeData[2] << 16) |
         (exeData[3] << 24);
 
-    std::cout << "[WardenModule] Final code size: " << finalCodeSize << " bytes" << std::endl;
+    std::cout << "[WardenModule] Final code size: " << finalCodeSize << " bytes" << '\n';
 
     // Sanity check (executable shouldn't be larger than 5MB)
     if (finalCodeSize > 5 * 1024 * 1024 || finalCodeSize == 0) {
-        std::cerr << "[WardenModule] Invalid final code size: " << finalCodeSize << std::endl;
+        std::cerr << "[WardenModule] Invalid final code size: " << finalCodeSize << '\n';
         return false;
     }
 
@@ -490,7 +490,7 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
             PAGE_EXECUTE_READWRITE
         );
         if (!moduleMemory_) {
-            std::cerr << "[WardenModule] VirtualAlloc failed" << std::endl;
+            std::cerr << "[WardenModule] VirtualAlloc failed" << '\n';
             return false;
         }
     #else
@@ -503,7 +503,7 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
             0
         );
         if (moduleMemory_ == MAP_FAILED) {
-            std::cerr << "[WardenModule] mmap failed: " << strerror(errno) << std::endl;
+            std::cerr << "[WardenModule] mmap failed: " << strerror(errno) << '\n';
             moduleMemory_ = nullptr;
             return false;
         }
@@ -513,7 +513,7 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
     std::memset(moduleMemory_, 0, moduleSize_); // Zero-initialize
 
     std::cout << "[WardenModule] Allocated " << moduleSize_ << " bytes of executable memory at "
-              << moduleMemory_ << std::endl;
+              << moduleMemory_ << '\n';
 
     // Parse skip/copy pairs
     // Format: repeated [2B skip_count][2B copy_count][copy_count bytes data]
@@ -537,7 +537,7 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
 
         // Read copy count (2 bytes LE)
         if (pos + 2 > exeData.size()) {
-            std::cerr << "[WardenModule] Unexpected end of data reading copy count" << std::endl;
+            std::cerr << "[WardenModule] Unexpected end of data reading copy count" << '\n';
             break;
         }
         uint16_t copyCount = exeData[pos] | (exeData[pos + 1] << 8);
@@ -545,7 +545,7 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
 
         if (copyCount > 0) {
             if (pos + copyCount > exeData.size()) {
-                std::cerr << "[WardenModule] Copy section extends beyond data bounds" << std::endl;
+                std::cerr << "[WardenModule] Copy section extends beyond data bounds" << '\n';
                 #ifdef _WIN32
                     VirtualFree(moduleMemory_, 0, MEM_RELEASE);
                 #else
@@ -556,7 +556,7 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
             }
 
             if (destOffset + copyCount > moduleSize_) {
-                std::cerr << "[WardenModule] Copy section exceeds module size" << std::endl;
+                std::cerr << "[WardenModule] Copy section exceeds module size" << '\n';
                 #ifdef _WIN32
                     VirtualFree(moduleMemory_, 0, MEM_RELEASE);
                 #else
@@ -577,23 +577,23 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
 
         pairCount++;
         std::cout << "[WardenModule]   Pair " << pairCount << ": skip " << skipCount
-                  << ", copy " << copyCount << " (dest offset=" << destOffset << ")" << std::endl;
+                  << ", copy " << copyCount << " (dest offset=" << destOffset << ")" << '\n';
     }
 
     // Save position — remaining decompressed data contains relocation entries
     relocDataOffset_ = pos;
 
     std::cout << "[WardenModule] Parsed " << pairCount << " skip/copy pairs, final offset: "
-              << destOffset << "/" << finalCodeSize << std::endl;
+              << destOffset << "/" << finalCodeSize << '\n';
     std::cout << "[WardenModule] Relocation data starts at decompressed offset " << relocDataOffset_
-              << " (" << (exeData.size() - relocDataOffset_) << " bytes remaining)" << std::endl;
+              << " (" << (exeData.size() - relocDataOffset_) << " bytes remaining)" << '\n';
 
     return true;
 }
 
 bool WardenModule::applyRelocations() {
     if (!moduleMemory_ || moduleSize_ == 0) {
-        std::cerr << "[WardenModule] No module memory allocated for relocations" << std::endl;
+        std::cerr << "[WardenModule] No module memory allocated for relocations" << '\n';
         return false;
     }
 
@@ -602,7 +602,7 @@ bool WardenModule::applyRelocations() {
     // Each offset in the module image has moduleBase_ added to the 32-bit value there
 
     if (relocDataOffset_ == 0 || relocDataOffset_ >= decompressedData_.size()) {
-        std::cout << "[WardenModule] No relocation data available" << std::endl;
+        std::cout << "[WardenModule] No relocation data available" << '\n';
         return true;
     }
 
@@ -625,23 +625,23 @@ bool WardenModule::applyRelocations() {
             relocCount++;
         } else {
             std::cerr << "[WardenModule] Relocation offset " << currentOffset
-                      << " out of bounds (moduleSize=" << moduleSize_ << ")" << std::endl;
+                      << " out of bounds (moduleSize=" << moduleSize_ << ")" << '\n';
         }
     }
 
     std::cout << "[WardenModule] Applied " << relocCount << " relocations (base=0x"
-              << std::hex << moduleBase_ << std::dec << ")" << std::endl;
+              << std::hex << moduleBase_ << std::dec << ")" << '\n';
 
     return true;
 }
 
 bool WardenModule::bindAPIs() {
     if (!moduleMemory_ || moduleSize_ == 0) {
-        std::cerr << "[WardenModule] No module memory allocated for API binding" << std::endl;
+        std::cerr << "[WardenModule] No module memory allocated for API binding" << '\n';
         return false;
     }
 
-    std::cout << "[WardenModule] Binding Windows APIs for module..." << std::endl;
+    std::cout << "[WardenModule] Binding Windows APIs for module..." << '\n';
 
     // Common Windows APIs used by Warden modules:
     //
@@ -661,14 +661,14 @@ bool WardenModule::bindAPIs() {
 
     #ifdef _WIN32
         // On Windows: Use GetProcAddress to resolve imports
-        std::cout << "[WardenModule] Platform: Windows - using GetProcAddress" << std::endl;
+        std::cout << "[WardenModule] Platform: Windows - using GetProcAddress" << '\n';
 
         HMODULE kernel32 = GetModuleHandleA("kernel32.dll");
         HMODULE user32 = GetModuleHandleA("user32.dll");
         HMODULE ntdll = GetModuleHandleA("ntdll.dll");
 
         if (!kernel32 || !user32 || !ntdll) {
-            std::cerr << "[WardenModule] Failed to get module handles" << std::endl;
+            std::cerr << "[WardenModule] Failed to get module handles" << '\n';
             return false;
         }
 
@@ -679,8 +679,8 @@ bool WardenModule::bindAPIs() {
         //     - Resolve address using GetProcAddress
         //     - Write address to Import Address Table (IAT)
 
-        std::cout << "[WardenModule] ⚠ Windows API binding is STUB (needs PE import table parsing)" << std::endl;
-        std::cout << "[WardenModule]   Would parse PE headers and patch IAT with resolved addresses" << std::endl;
+        std::cout << "[WardenModule] ⚠ Windows API binding is STUB (needs PE import table parsing)" << '\n';
+        std::cout << "[WardenModule]   Would parse PE headers and patch IAT with resolved addresses" << '\n';
 
     #else
         // On Linux: Cannot directly execute Windows code
@@ -689,15 +689,15 @@ bool WardenModule::bindAPIs() {
         // 2. Implement Windows API stubs (limited functionality)
         // 3. Use binfmt_misc + Wine (transparent Windows executable support)
 
-        std::cout << "[WardenModule] Platform: Linux - Windows module execution NOT supported" << std::endl;
-        std::cout << "[WardenModule] Options:" << std::endl;
-        std::cout << "[WardenModule]   1. Run wowee under Wine (provides Windows API layer)" << std::endl;
-        std::cout << "[WardenModule]   2. Use a Windows VM" << std::endl;
-        std::cout << "[WardenModule]   3. Implement Windows API stubs (limited, complex)" << std::endl;
+        std::cout << "[WardenModule] Platform: Linux - Windows module execution NOT supported" << '\n';
+        std::cout << "[WardenModule] Options:" << '\n';
+        std::cout << "[WardenModule]   1. Run wowee under Wine (provides Windows API layer)" << '\n';
+        std::cout << "[WardenModule]   2. Use a Windows VM" << '\n';
+        std::cout << "[WardenModule]   3. Implement Windows API stubs (limited, complex)" << '\n';
 
         // For now, we'll return true to continue the loading pipeline
         // Real execution would fail, but this allows testing the infrastructure
-        std::cout << "[WardenModule] ⚠ Skipping API binding (Linux platform limitation)" << std::endl;
+        std::cout << "[WardenModule] ⚠ Skipping API binding (Linux platform limitation)" << '\n';
     #endif
 
     return true; // Return true to continue (stub implementation)
@@ -705,11 +705,11 @@ bool WardenModule::bindAPIs() {
 
 bool WardenModule::initializeModule() {
     if (!moduleMemory_ || moduleSize_ == 0) {
-        std::cerr << "[WardenModule] No module memory allocated for initialization" << std::endl;
+        std::cerr << "[WardenModule] No module memory allocated for initialization" << '\n';
         return false;
     }
 
-    std::cout << "[WardenModule] Initializing Warden module..." << std::endl;
+    std::cout << "[WardenModule] Initializing Warden module..." << '\n';
 
     // Module initialization protocol:
     //
@@ -746,27 +746,27 @@ bool WardenModule::initializeModule() {
 
     // Stub callbacks (would need real implementations)
     callbacks.sendPacket = [](uint8_t* data, size_t len) {
-        std::cout << "[WardenModule Callback] sendPacket(" << len << " bytes)" << std::endl;
+        std::cout << "[WardenModule Callback] sendPacket(" << len << " bytes)" << '\n';
         // TODO: Send CMSG_WARDEN_DATA packet
     };
 
     callbacks.validateModule = [](uint8_t* hash) {
-        std::cout << "[WardenModule Callback] validateModule()" << std::endl;
+        std::cout << "[WardenModule Callback] validateModule()" << '\n';
         // TODO: Validate module hash
     };
 
     callbacks.allocMemory = [](size_t size) -> void* {
-        std::cout << "[WardenModule Callback] allocMemory(" << size << ")" << std::endl;
+        std::cout << "[WardenModule Callback] allocMemory(" << size << ")" << '\n';
         return malloc(size);
     };
 
     callbacks.freeMemory = [](void* ptr) {
-        std::cout << "[WardenModule Callback] freeMemory()" << std::endl;
+        std::cout << "[WardenModule Callback] freeMemory()" << '\n';
         free(ptr);
     };
 
     callbacks.generateRC4 = [](uint8_t* seed) {
-        std::cout << "[WardenModule Callback] generateRC4()" << std::endl;
+        std::cout << "[WardenModule Callback] generateRC4()" << '\n';
         // TODO: Re-key RC4 cipher
     };
 
@@ -775,7 +775,7 @@ bool WardenModule::initializeModule() {
     };
 
     callbacks.logMessage = [](const char* msg) {
-        std::cout << "[WardenModule Log] " << msg << std::endl;
+        std::cout << "[WardenModule Log] " << msg << '\n';
     };
 
     // Module entry point is typically at offset 0 (first bytes of loaded code)
@@ -783,24 +783,24 @@ bool WardenModule::initializeModule() {
 
     #ifdef HAVE_UNICORN
         // Use Unicorn emulator for cross-platform execution
-        std::cout << "[WardenModule] Initializing Unicorn emulator..." << std::endl;
+        std::cout << "[WardenModule] Initializing Unicorn emulator..." << '\n';
 
         emulator_ = std::make_unique<WardenEmulator>();
         if (!emulator_->initialize(moduleMemory_, moduleSize_, moduleBase_)) {
-            std::cerr << "[WardenModule] Failed to initialize emulator" << std::endl;
+            std::cerr << "[WardenModule] Failed to initialize emulator" << '\n';
             return false;
         }
 
         // Setup Windows API hooks
         emulator_->setupCommonAPIHooks();
 
-        std::cout << "[WardenModule] ✓ Emulator initialized successfully" << std::endl;
-        std::cout << "[WardenModule]   Ready to execute module at 0x" << std::hex << moduleBase_ << std::dec << std::endl;
+        std::cout << "[WardenModule] ✓ Emulator initialized successfully" << '\n';
+        std::cout << "[WardenModule]   Ready to execute module at 0x" << std::hex << moduleBase_ << std::dec << '\n';
 
         // Allocate memory for ClientCallbacks structure in emulated space
         uint32_t callbackStructAddr = emulator_->allocateMemory(sizeof(ClientCallbacks), 0x04);
         if (callbackStructAddr == 0) {
-            std::cerr << "[WardenModule] Failed to allocate memory for callbacks" << std::endl;
+            std::cerr << "[WardenModule] Failed to allocate memory for callbacks" << '\n';
             return false;
         }
 
@@ -823,13 +823,13 @@ bool WardenModule::initializeModule() {
             emulator_->writeMemory(callbackStructAddr + (i * 4), &addr, 4);
         }
 
-        std::cout << "[WardenModule] Prepared ClientCallbacks at 0x" << std::hex << callbackStructAddr << std::dec << std::endl;
+        std::cout << "[WardenModule] Prepared ClientCallbacks at 0x" << std::hex << callbackStructAddr << std::dec << '\n';
 
         // Call module entry point
         // Entry point is typically at module base (offset 0)
         uint32_t entryPoint = moduleBase_;
 
-        std::cout << "[WardenModule] Calling module entry point at 0x" << std::hex << entryPoint << std::dec << std::endl;
+        std::cout << "[WardenModule] Calling module entry point at 0x" << std::hex << entryPoint << std::dec << '\n';
 
         try {
             // Call: WardenFuncList* InitModule(ClientCallbacks* callbacks)
@@ -837,21 +837,21 @@ bool WardenModule::initializeModule() {
             uint32_t result = emulator_->callFunction(entryPoint, args);
 
             if (result == 0) {
-                std::cerr << "[WardenModule] Module entry returned NULL" << std::endl;
+                std::cerr << "[WardenModule] Module entry returned NULL" << '\n';
                 return false;
             }
 
-            std::cout << "[WardenModule] ✓ Module initialized, WardenFuncList at 0x" << std::hex << result << std::dec << std::endl;
+            std::cout << "[WardenModule] ✓ Module initialized, WardenFuncList at 0x" << std::hex << result << std::dec << '\n';
 
             // Read WardenFuncList structure from emulated memory
             // Structure has 4 function pointers (16 bytes)
             uint32_t funcAddrs[4] = {};
             if (emulator_->readMemory(result, funcAddrs, 16)) {
-                std::cout << "[WardenModule] Module exported functions:" << std::endl;
-                std::cout << "[WardenModule]   generateRC4Keys: 0x" << std::hex << funcAddrs[0] << std::dec << std::endl;
-                std::cout << "[WardenModule]   unload:          0x" << std::hex << funcAddrs[1] << std::dec << std::endl;
-                std::cout << "[WardenModule]   packetHandler:   0x" << std::hex << funcAddrs[2] << std::dec << std::endl;
-                std::cout << "[WardenModule]   tick:            0x" << std::hex << funcAddrs[3] << std::dec << std::endl;
+                std::cout << "[WardenModule] Module exported functions:" << '\n';
+                std::cout << "[WardenModule]   generateRC4Keys: 0x" << std::hex << funcAddrs[0] << std::dec << '\n';
+                std::cout << "[WardenModule]   unload:          0x" << std::hex << funcAddrs[1] << std::dec << '\n';
+                std::cout << "[WardenModule]   packetHandler:   0x" << std::hex << funcAddrs[2] << std::dec << '\n';
+                std::cout << "[WardenModule]   tick:            0x" << std::hex << funcAddrs[3] << std::dec << '\n';
 
                 // Store function addresses for later use
                 // funcList_.generateRC4Keys = ... (would wrap emulator calls)
@@ -860,10 +860,10 @@ bool WardenModule::initializeModule() {
                 // funcList_.tick = ...
             }
 
-            std::cout << "[WardenModule] ✓ Module fully initialized and ready!" << std::endl;
+            std::cout << "[WardenModule] ✓ Module fully initialized and ready!" << '\n';
 
         } catch (const std::exception& e) {
-            std::cerr << "[WardenModule] Exception during module initialization: " << e.what() << std::endl;
+            std::cerr << "[WardenModule] Exception during module initialization: " << e.what() << '\n';
             return false;
         }
 
@@ -872,14 +872,14 @@ bool WardenModule::initializeModule() {
         typedef void* (*ModuleEntryPoint)(ClientCallbacks*);
         ModuleEntryPoint entryPoint = reinterpret_cast<ModuleEntryPoint>(moduleMemory_);
 
-        std::cout << "[WardenModule] Calling module entry point at " << moduleMemory_ << std::endl;
+        std::cout << "[WardenModule] Calling module entry point at " << moduleMemory_ << '\n';
 
         // NOTE: This would execute native x86 code
         // Extremely dangerous without proper validation!
         // void* result = entryPoint(&callbacks);
 
-        std::cout << "[WardenModule] ⚠ Module entry point call is DISABLED (unsafe without validation)" << std::endl;
-        std::cout << "[WardenModule]   Would execute x86 code at " << moduleMemory_ << std::endl;
+        std::cout << "[WardenModule] ⚠ Module entry point call is DISABLED (unsafe without validation)" << '\n';
+        std::cout << "[WardenModule]   Would execute x86 code at " << moduleMemory_ << '\n';
 
         // TODO: Extract WardenFuncList from result
         // funcList_.packetHandler = ...
@@ -888,9 +888,9 @@ bool WardenModule::initializeModule() {
         // funcList_.unload = ...
 
     #else
-        std::cout << "[WardenModule] ⚠ Cannot execute Windows x86 code on Linux" << std::endl;
-        std::cout << "[WardenModule]   Module entry point: " << moduleMemory_ << std::endl;
-        std::cout << "[WardenModule]   Would call entry point with ClientCallbacks struct" << std::endl;
+        std::cout << "[WardenModule] ⚠ Cannot execute Windows x86 code on Linux" << '\n';
+        std::cout << "[WardenModule]   Module entry point: " << moduleMemory_ << '\n';
+        std::cout << "[WardenModule]   Would call entry point with ClientCallbacks struct" << '\n';
     #endif
 
     // For now, return true to mark module as "loaded" at infrastructure level
@@ -900,7 +900,7 @@ bool WardenModule::initializeModule() {
     // 3. Exception handling for crashes
     // 4. Sandboxing for security
 
-    std::cout << "[WardenModule] ⚠ Module initialization is STUB" << std::endl;
+    std::cout << "[WardenModule] ⚠ Module initialization is STUB" << '\n';
     return true; // Stub implementation
 }
 
@@ -925,7 +925,7 @@ WardenModuleManager::WardenModuleManager() {
     // Create cache directory if it doesn't exist
     std::filesystem::create_directories(cacheDirectory_);
 
-    std::cout << "[WardenModuleManager] Cache directory: " << cacheDirectory_ << std::endl;
+    std::cout << "[WardenModuleManager] Cache directory: " << cacheDirectory_ << '\n';
 }
 
 WardenModuleManager::~WardenModuleManager() {
@@ -963,11 +963,11 @@ bool WardenModuleManager::receiveModuleChunk(const std::vector<uint8_t>& md5Hash
     buffer.insert(buffer.end(), chunkData.begin(), chunkData.end());
 
     std::cout << "[WardenModuleManager] Received chunk (" << chunkData.size()
-              << " bytes, total: " << buffer.size() << ")" << std::endl;
+              << " bytes, total: " << buffer.size() << ")" << '\n';
 
     if (isComplete) {
         std::cout << "[WardenModuleManager] Module download complete ("
-                  << buffer.size() << " bytes)" << std::endl;
+                  << buffer.size() << " bytes)" << '\n';
 
         // Cache to disk
         cacheModule(md5Hash, buffer);
@@ -987,14 +987,14 @@ bool WardenModuleManager::cacheModule(const std::vector<uint8_t>& md5Hash,
 
     std::ofstream file(cachePath, std::ios::binary);
     if (!file) {
-        std::cerr << "[WardenModuleManager] Failed to write cache: " << cachePath << std::endl;
+        std::cerr << "[WardenModuleManager] Failed to write cache: " << cachePath << '\n';
         return false;
     }
 
     file.write(reinterpret_cast<const char*>(moduleData.data()), moduleData.size());
     file.close();
 
-    std::cout << "[WardenModuleManager] Cached module to: " << cachePath << std::endl;
+    std::cout << "[WardenModuleManager] Cached module to: " << cachePath << '\n';
     return true;
 }
 
@@ -1018,7 +1018,7 @@ bool WardenModuleManager::loadCachedModule(const std::vector<uint8_t>& md5Hash,
     file.read(reinterpret_cast<char*>(moduleDataOut.data()), fileSize);
     file.close();
 
-    std::cout << "[WardenModuleManager] Loaded cached module (" << fileSize << " bytes)" << std::endl;
+    std::cout << "[WardenModuleManager] Loaded cached module (" << fileSize << " bytes)" << '\n';
     return true;
 }
 

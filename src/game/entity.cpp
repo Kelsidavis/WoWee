@@ -10,7 +10,7 @@ void EntityManager::addEntity(uint64_t guid, std::shared_ptr<Entity> entity) {
         return;
     }
 
-    entities[guid] = entity;
+    entities[guid] = std::move(entity);
 
     LOG_DEBUG("Added entity: GUID=0x", std::hex, guid, std::dec,
               ", Type=", static_cast<int>(entity->getType()));

@@ -6,10 +6,10 @@ namespace wowee {
 namespace rendering {
 
 void Scene::addMesh(std::shared_ptr<Mesh> mesh) {
-    meshes.push_back(mesh);
+    meshes.push_back(std::move(mesh));
 }
 
-void Scene::removeMesh(std::shared_ptr<Mesh> mesh) {
+void Scene::removeMesh(const std::shared_ptr<Mesh>& mesh) {
     auto it = std::find(meshes.begin(), meshes.end(), mesh);
     if (it != meshes.end()) {
         meshes.erase(it);

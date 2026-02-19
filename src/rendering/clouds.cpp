@@ -182,13 +182,13 @@ void Clouds::generateMesh() {
     // Generate hemisphere mesh for clouds
     for (int ring = 0; ring <= RINGS; ++ring) {
         float phi = (ring / static_cast<float>(RINGS)) * (M_PI * 0.5f);  // 0 to π/2
-        float y = RADIUS * cos(phi);
-        float ringRadius = RADIUS * sin(phi);
+        float y = RADIUS * cosf(phi);
+        float ringRadius = RADIUS * sinf(phi);
 
         for (int segment = 0; segment <= SEGMENTS; ++segment) {
             float theta = (segment / static_cast<float>(SEGMENTS)) * (2.0f * M_PI);
-            float x = ringRadius * cos(theta);
-            float z = ringRadius * sin(theta);
+            float x = ringRadius * cosf(theta);
+            float z = ringRadius * sinf(theta);
 
             vertices.push_back(glm::vec3(x, y, z));
         }

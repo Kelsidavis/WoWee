@@ -5112,6 +5112,7 @@ void GameScreen::renderTrainerWindow(game::GameHandler& gameHandler) {
             } else {
                 // Single tab or no categorization - flat list
                 std::vector<const game::TrainerSpell*> allSpells;
+                allSpells.reserve(trainer.spells.size());
                 for (const auto& spell : trainer.spells) {
                     allSpells.push_back(&spell);
                 }

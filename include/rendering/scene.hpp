@@ -14,7 +14,7 @@ public:
     ~Scene() = default;
 
     void addMesh(std::shared_ptr<Mesh> mesh);
-    void removeMesh(std::shared_ptr<Mesh> mesh);
+    void removeMesh(const std::shared_ptr<Mesh>& mesh);
     void clear();
 
     const std::vector<std::shared_ptr<Mesh>>& getMeshes() const { return meshes; }

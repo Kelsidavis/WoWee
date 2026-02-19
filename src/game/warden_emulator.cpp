@@ -41,17 +41,17 @@ WardenEmulator::~WardenEmulator() {
 
 bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint32_t baseAddress) {
     if (uc_) {
-        std::cerr << "[WardenEmulator] Already initialized" << std::endl;
+        std::cerr << "[WardenEmulator] Already initialized" << '\n';
         return false;
     }
 
-    std::cout << "[WardenEmulator] Initializing x86 emulator (Unicorn Engine)" << std::endl;
-    std::cout << "[WardenEmulator]   Module: " << moduleSize << " bytes at 0x" << std::hex << baseAddress << std::dec << std::endl;
+    std::cout << "[WardenEmulator] Initializing x86 emulator (Unicorn Engine)" << '\n';
+    std::cout << "[WardenEmulator]   Module: " << moduleSize << " bytes at 0x" << std::hex << baseAddress << std::dec << '\n';
 
     // Create x86 32-bit emulator
     uc_err err = uc_open(UC_ARCH_X86, UC_MODE_32, &uc_);
     if (err != UC_ERR_OK) {
-        std::cerr << "[WardenEmulator] uc_open failed: " << uc_strerror(err) << std::endl;
+        std::cerr << "[WardenEmulator] uc_open failed: " << uc_strerror(err) << '\n';
         return false;
     }
 
@@ -61,7 +61,7 @@ bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint3
     // Map module memory (code + data)
     err = uc_mem_map(uc_, moduleBase_, moduleSize_, UC_PROT_ALL);
     if (err != UC_ERR_OK) {
-        std::cerr << "[WardenEmulator] Failed to map module memory: " << uc_strerror(err) << std::endl;
+        std::cerr << "[WardenEmulator] Failed to map module memory: " << uc_strerror(err) << '\n';
         uc_close(uc_);
         uc_ = nullptr;
         return false;
@@ -70,7 +70,7 @@ bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint3
     // Write module code to emulated memory
     err = uc_mem_write(uc_, moduleBase_, moduleCode, moduleSize);
     if (err != UC_ERR_OK) {
-        std::cerr << "[WardenEmulator] Failed to write module code: " << uc_strerror(err) << std::endl;
+        std::cerr << "[WardenEmulator] Failed to write module code: " << uc_strerror(err) << '\n';
         uc_close(uc_);
         uc_ = nullptr;
         return false;
@@ -79,7 +79,7 @@ bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint3
     // Map stack
     err = uc_mem_map(uc_, stackBase_, stackSize_, UC_PROT_READ | UC_PROT_WRITE);
     if (err != UC_ERR_OK) {
-        std::cerr << "[WardenEmulator] Failed to map stack: " << uc_strerror(err) << std::endl;
+        std::cerr << "[WardenEmulator] Failed to map stack: " << uc_strerror(err) << '\n';
         uc_close(uc_);
         uc_ = nullptr;
         return false;
@@ -93,7 +93,7 @@ bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint3
     // Map heap
     err = uc_mem_map(uc_, heapBase_, heapSize_, UC_PROT_READ | UC_PROT_WRITE);
     if (err != UC_ERR_OK) {
-        std::cerr << "[WardenEmulator] Failed to map heap: " << uc_strerror(err) << std::endl;
+        std::cerr << "[WardenEmulator] Failed to map heap: " << uc_strerror(err) << '\n';
         uc_close(uc_);
         uc_ = nullptr;
         return false;
@@ -102,7 +102,7 @@ bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint3
     // Map API stub area
     err = uc_mem_map(uc_, apiStubBase_, 0x10000, UC_PROT_ALL);
     if (err != UC_ERR_OK) {
-        std::cerr << "[WardenEmulator] Failed to map API stub area: " << uc_strerror(err) << std::endl;
+        std::cerr << "[WardenEmulator] Failed to map API stub area: " << uc_strerror(err) << '\n';
         uc_close(uc_);
         uc_ = nullptr;
         return false;
@@ -113,9 +113,9 @@ bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint3
     uc_hook_add(uc_, &hh, UC_HOOK_MEM_INVALID, (void*)hookMemInvalid, this, 1, 0);
     hooks_.push_back(hh);
 
-    std::cout << "[WardenEmulator] ✓ Emulator initialized successfully" << std::endl;
-    std::cout << "[WardenEmulator]   Stack: 0x" << std::hex << stackBase_ << " - 0x" << (stackBase_ + stackSize_) << std::endl;
-    std::cout << "[WardenEmulator]   Heap:  0x" << heapBase_ << " - 0x" << (heapBase_ + heapSize_) << std::dec << std::endl;
+    std::cout << "[WardenEmulator] ✓ Emulator initialized successfully" << '\n';
+    std::cout << "[WardenEmulator]   Stack: 0x" << std::hex << stackBase_ << " - 0x" << (stackBase_ + stackSize_) << '\n';
+    std::cout << "[WardenEmulator]   Heap:  0x" << heapBase_ << " - 0x" << (heapBase_ + heapSize_) << std::dec << '\n';
 
     return true;
 }
@@ -132,7 +132,7 @@ uint32_t WardenEmulator::hookAPI(const std::string& dllName,
     apiAddresses_[dllName][functionName] = stubAddr;
 
     std::cout << "[WardenEmulator] Hooked " << dllName << "!" << functionName
-              << " at 0x" << std::hex << stubAddr << std::dec << std::endl;
+              << " at 0x" << std::hex << stubAddr << std::dec << '\n';
 
     // TODO: Write stub code that triggers a hook callback
     // For now, just return the address for IAT patching
@@ -141,7 +141,7 @@ uint32_t WardenEmulator::hookAPI(const std::string& dllName,
 }
 
 void WardenEmulator::setupCommonAPIHooks() {
-    std::cout << "[WardenEmulator] Setting up common Windows API hooks..." << std::endl;
+    std::cout << "[WardenEmulator] Setting up common Windows API hooks..." << '\n';
 
     // kernel32.dll
     hookAPI("kernel32.dll", "VirtualAlloc", apiVirtualAlloc);
@@ -152,7 +152,7 @@ void WardenEmulator::setupCommonAPIHooks() {
     hookAPI("kernel32.dll", "GetCurrentProcessId", apiGetCurrentProcessId);
     hookAPI("kernel32.dll", "ReadProcessMemory", apiReadProcessMemory);
 
-    std::cout << "[WardenEmulator] ✓ Common API hooks registered" << std::endl;
+    std::cout << "[WardenEmulator] ✓ Common API hooks registered" << '\n';
 }
 
 uint32_t WardenEmulator::writeData(const void* data, size_t size) {
@@ -176,12 +176,12 @@ std::vector<uint8_t> WardenEmulator::readData(uint32_t address, size_t size) {
 
 uint32_t WardenEmulator::callFunction(uint32_t address, const std::vector<uint32_t>& args) {
     if (!uc_) {
-        std::cerr << "[WardenEmulator] Not initialized" << std::endl;
+        std::cerr << "[WardenEmulator] Not initialized" << '\n';
         return 0;
     }
 
     std::cout << "[WardenEmulator] Calling function at 0x" << std::hex << address << std::dec
-              << " with " << args.size() << " args" << std::endl;
+              << " with " << args.size() << " args" << '\n';
 
     // Get current ESP
     uint32_t esp;
@@ -205,7 +205,7 @@ uint32_t WardenEmulator::callFunction(uint32_t address, const std::vector<uint32
     // Execute until return address
     uc_err err = uc_emu_start(uc_, address, retAddr, 0, 0);
     if (err != UC_ERR_OK) {
-        std::cerr << "[WardenEmulator] Execution failed: " << uc_strerror(err) << std::endl;
+        std::cerr << "[WardenEmulator] Execution failed: " << uc_strerror(err) << '\n';
         return 0;
     }
 
@@ -213,7 +213,7 @@ uint32_t WardenEmulator::callFunction(uint32_t address, const std::vector<uint32
     uint32_t eax;
     uc_reg_read(uc_, UC_X86_REG_EAX, &eax);
 
-    std::cout << "[WardenEmulator] Function returned 0x" << std::hex << eax << std::dec << std::endl;
+    std::cout << "[WardenEmulator] Function returned 0x" << std::hex << eax << std::dec << '\n';
 
     return eax;
 }
@@ -244,7 +244,7 @@ uint32_t WardenEmulator::allocateMemory(size_t size, uint32_t protection) {
     size = (size + 0xFFF) & ~0xFFF;
 
     if (nextHeapAddr_ + size > heapBase_ + heapSize_) {
-        std::cerr << "[WardenEmulator] Heap exhausted" << std::endl;
+        std::cerr << "[WardenEmulator] Heap exhausted" << '\n';
         return 0;
     }
 
@@ -253,7 +253,7 @@ uint32_t WardenEmulator::allocateMemory(size_t size, uint32_t protection) {
 
     allocations_[addr] = size;
 
-    std::cout << "[WardenEmulator] Allocated " << size << " bytes at 0x" << std::hex << addr << std::dec << std::endl;
+    std::cout << "[WardenEmulator] Allocated " << size << " bytes at 0x" << std::hex << addr << std::dec << '\n';
 
     return addr;
 }
@@ -261,11 +261,11 @@ uint32_t WardenEmulator::allocateMemory(size_t size, uint32_t protection) {
 bool WardenEmulator::freeMemory(uint32_t address) {
     auto it = allocations_.find(address);
     if (it == allocations_.end()) {
-        std::cerr << "[WardenEmulator] Invalid free at 0x" << std::hex << address << std::dec << std::endl;
+        std::cerr << "[WardenEmulator] Invalid free at 0x" << std::hex << address << std::dec << '\n';
         return false;
     }
 
-    std::cout << "[WardenEmulator] Freed " << it->second << " bytes at 0x" << std::hex << address << std::dec << std::endl;
+    std::cout << "[WardenEmulator] Freed " << it->second << " bytes at 0x" << std::hex << address << std::dec << '\n';
     allocations_.erase(it);
     return true;
 }
@@ -298,7 +298,7 @@ uint32_t WardenEmulator::apiVirtualAlloc(WardenEmulator& emu, const std::vector<
     uint32_t flProtect = args[3];
 
     std::cout << "[WinAPI] VirtualAlloc(0x" << std::hex << lpAddress << ", " << std::dec
-              << dwSize << ", 0x" << std::hex << flAllocationType << ", 0x" << flProtect << ")" << std::dec << std::endl;
+              << dwSize << ", 0x" << std::hex << flAllocationType << ", 0x" << flProtect << ")" << std::dec << '\n';
 
     // Ignore lpAddress hint for now
     return emu.allocateMemory(dwSize, flProtect);
@@ -310,7 +310,7 @@ uint32_t WardenEmulator::apiVirtualFree(WardenEmulator& emu, const std::vector<u
 
     uint32_t lpAddress = args[0];
 
-    std::cout << "[WinAPI] VirtualFree(0x" << std::hex << lpAddress << ")" << std::dec << std::endl;
+    std::cout << "[WinAPI] VirtualFree(0x" << std::hex << lpAddress << ")" << std::dec << '\n';
 
     return emu.freeMemory(lpAddress) ? 1 : 0;
 }
@@ -320,7 +320,7 @@ uint32_t WardenEmulator::apiGetTickCount(WardenEmulator& emu, const std::vector<
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     uint32_t ticks = static_cast<uint32_t>(ms & 0xFFFFFFFF);
 
-    std::cout << "[WinAPI] GetTickCount() = " << ticks << std::endl;
+    std::cout << "[WinAPI] GetTickCount() = " << ticks << '\n';
     return ticks;
 }
 
@@ -328,18 +328,18 @@ uint32_t WardenEmulator::apiSleep(WardenEmulator& emu, const std::vector<uint32_
     if (args.size() < 1) return 0;
     uint32_t dwMilliseconds = args[0];
 
-    std::cout << "[WinAPI] Sleep(" << dwMilliseconds << ")" << std::endl;
+    std::cout << "[WinAPI] Sleep(" << dwMilliseconds << ")" << '\n';
     // Don't actually sleep in emulator
     return 0;
 }
 
 uint32_t WardenEmulator::apiGetCurrentThreadId(WardenEmulator& emu, const std::vector<uint32_t>& args) {
-    std::cout << "[WinAPI] GetCurrentThreadId() = 1234" << std::endl;
+    std::cout << "[WinAPI] GetCurrentThreadId() = 1234" << '\n';
     return 1234; // Fake thread ID
 }
 
 uint32_t WardenEmulator::apiGetCurrentProcessId(WardenEmulator& emu, const std::vector<uint32_t>& args) {
-    std::cout << "[WinAPI] GetCurrentProcessId() = 5678" << std::endl;
+    std::cout << "[WinAPI] GetCurrentProcessId() = 5678" << '\n';
     return 5678; // Fake process ID
 }
 
@@ -354,7 +354,7 @@ uint32_t WardenEmulator::apiReadProcessMemory(WardenEmulator& emu, const std::ve
     uint32_t lpNumberOfBytesRead = args[4];
 
     std::cout << "[WinAPI] ReadProcessMemory(0x" << std::hex << lpBaseAddress
-              << ", " << std::dec << nSize << " bytes)" << std::endl;
+              << ", " << std::dec << nSize << " bytes)" << '\n';
 
     // Read from emulated memory and write to buffer
     std::vector<uint8_t> data(nSize);
@@ -379,7 +379,7 @@ uint32_t WardenEmulator::apiReadProcessMemory(WardenEmulator& emu, const std::ve
 
 void WardenEmulator::hookCode(uc_engine* uc, uint64_t address, uint32_t size, void* userData) {
     WardenEmulator* emu = static_cast<WardenEmulator*>(userData);
-    std::cout << "[Trace] 0x" << std::hex << address << std::dec << std::endl;
+    std::cout << "[Trace] 0x" << std::hex << address << std::dec << '\n';
 }
 
 void WardenEmulator::hookMemInvalid(uc_engine* uc, int type, uint64_t address, int size, int64_t value, void* userData) {
@@ -397,7 +397,7 @@ void WardenEmulator::hookMemInvalid(uc_engine* uc, int type, uint64_t address, i
 
     std::cerr << "[WardenEmulator] Invalid memory access: " << typeStr
               << " at 0x" << std::hex << address << std::dec
-              << " (size=" << size << ")" << std::endl;
+              << " (size=" << size << ")" << '\n';
 }
 
 #else // !HAVE_UNICORN
