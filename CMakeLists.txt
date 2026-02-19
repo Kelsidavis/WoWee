@@ -59,6 +59,8 @@ find_package(glm QUIET)
 if(NOT glm_FOUND)
     message(STATUS "GLM not found, will use system includes or download")
 endif()
+# GLM GTX extensions (quaternion, norm, etc.) require this flag on newer GLM versions
+add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
 
 # StormLib for MPQ extraction tool (not needed for main executable)
 find_library(STORMLIB_LIBRARY NAMES StormLib stormlib storm)
