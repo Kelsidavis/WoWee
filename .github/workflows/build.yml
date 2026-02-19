@@ -16,8 +16,10 @@ jobs:
         include:
           - arch: x86-64
             runner: ubuntu-24.04
+            deb_arch: amd64
           - arch: arm64
             runner: ubuntu-24.04-arm
+            deb_arch: arm64
 
     steps:
       - name: Checkout
@@ -50,7 +52,8 @@ jobs:
             libswscale-dev \
             libavutil-dev \
             libunicorn-dev \
-            libx11-dev
+            libx11-dev \
+            libstormlib-dev || true
 
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -58,11 +61,14 @@ jobs:
       - name: Build
         run: cmake --build build --parallel $(nproc)
 
-      - name: Upload artifacts
+      - name: Package (DEB)
+        run: cd build && cpack -G DEB
+
+      - name: Upload DEB
         uses: actions/upload-artifact@v4
         with:
-          name: wowee-${{ matrix.arch }}
-          path: build/bin/
+          name: wowee-linux-${{ matrix.arch }}-deb
+          path: build/wowee-*.deb
           if-no-files-found: error
 
   build-macos:
@@ -84,7 +90,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install cmake pkg-config sdl2 glew glm openssl@3 zlib ffmpeg unicorn
+          brew install cmake pkg-config sdl2 glew glm openssl@3 zlib ffmpeg unicorn \
+            stormlib dylibbundler || true
+          # dylibbundler may not be in all brew mirrors; install separately to not block others
+          brew install dylibbundler 2>/dev/null || true
 
       - name: Configure
         run: |
@@ -98,11 +107,56 @@ jobs:
       - name: Build
         run: cmake --build build --parallel $(sysctl -n hw.logicalcpu)
 
-      - name: Upload artifacts
+      - name: Create .app bundle
+        run: |
+          mkdir -p Wowee.app/Contents/{MacOS,Frameworks,Resources}
+
+          # Wrapper launch script — cd to MacOS/ so ./assets/ resolves correctly
+          printf '#!/bin/bash\ncd "$(dirname "$0")"\nexec ./wowee_bin "$@"\n' \
+            > Wowee.app/Contents/MacOS/wowee
+          chmod +x Wowee.app/Contents/MacOS/wowee
+
+          # Actual binary
+          cp build/bin/wowee Wowee.app/Contents/MacOS/wowee_bin
+
+          # Assets (exclude proprietary music)
+          rsync -a --exclude='Original Music' build/bin/assets/ \
+            Wowee.app/Contents/MacOS/assets/
+
+          # Bundle dylibs (if dylibbundler available)
+          if command -v dylibbundler &>/dev/null; then
+            dylibbundler -od -b \
+              -x Wowee.app/Contents/MacOS/wowee_bin \
+              -d Wowee.app/Contents/Frameworks/ \
+              -p @executable_path/../Frameworks/
+          fi
+
+          # Info.plist
+          cat > Wowee.app/Contents/Info.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleExecutable</key><string>wowee</string>
+            <key>CFBundleIdentifier</key><string>com.wowee.app</string>
+            <key>CFBundleName</key><string>Wowee</string>
+            <key>CFBundleVersion</key><string>1.0.0</string>
+            <key>CFBundleShortVersionString</key><string>1.0.0</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+          </dict></plist>
+          EOF
+
+          # Ad-hoc codesign (allows running on the local machine)
+          codesign --force --deep --sign - Wowee.app
+
+      - name: Create DMG
+        run: hdiutil create -volname Wowee -srcfolder Wowee.app -ov -format UDZO Wowee.dmg
+
+      - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
-          name: wowee-macos-${{ matrix.arch }}
-          path: build/bin/
+          name: wowee-macos-${{ matrix.arch }}-dmg
+          path: Wowee.dmg
           if-no-files-found: error
 
   build-windows-arm:
@@ -142,11 +196,23 @@ jobs:
         shell: msys2 {0}
         run: cmake --build build --parallel $(nproc)
 
-      - name: Upload artifacts
+      - name: Bundle DLLs
+        shell: msys2 {0}
+        run: |
+          ldd build/bin/wowee.exe \
+            | awk '/=> \// { print $3 }' \
+            | grep -iv '^/c/Windows' \
+            | xargs -I{} sh -c 'cp -n "{}" build/bin/ 2>/dev/null || true'
+
+      - name: Package (ZIP)
+        shell: msys2 {0}
+        run: cd build && cpack -G ZIP
+
+      - name: Upload ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: wowee-windows-arm64
-          path: build/bin/
+          name: wowee-windows-arm64-zip
+          path: build/wowee-*.zip
           if-no-files-found: error
 
   build-windows:
@@ -173,6 +239,7 @@ jobs:
             mingw-w64-x86_64-zlib
             mingw-w64-x86_64-ffmpeg
             mingw-w64-x86_64-unicorn
+            mingw-w64-x86_64-nsis
             git
 
       - name: Clone ImGui
@@ -187,9 +254,21 @@ jobs:
         shell: msys2 {0}
         run: cmake --build build --parallel $(nproc)
 
-      - name: Upload artifacts
+      - name: Bundle DLLs
+        shell: msys2 {0}
+        run: |
+          ldd build/bin/wowee.exe \
+            | awk '/=> \// { print $3 }' \
+            | grep -iv '^/c/Windows' \
+            | xargs -I{} sh -c 'cp -n "{}" build/bin/ 2>/dev/null || true'
+
+      - name: Package (NSIS)
+        shell: msys2 {0}
+        run: cd build && cpack -G NSIS
+
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: wowee-windows-x86-64
-          path: build/bin/
+          name: wowee-windows-x86-64-installer
+          path: build/wowee-*.exe
           if-no-files-found: error
