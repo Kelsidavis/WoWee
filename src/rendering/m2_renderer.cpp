@@ -1975,6 +1975,17 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             }
         }
 
+        std::string modelKeyLower = model.name;
+        std::transform(modelKeyLower.begin(), modelKeyLower.end(), modelKeyLower.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        const bool flameLikeModel =
+            (modelKeyLower.find("lantern") != std::string::npos) ||
+            (modelKeyLower.find("lamp") != std::string::npos) ||
+            (modelKeyLower.find("torch") != std::string::npos) ||
+            (modelKeyLower.find("candle") != std::string::npos) ||
+            (modelKeyLower.find("flame") != std::string::npos) ||
+            (modelKeyLower.find("fire") != std::string::npos);
+
         for (const auto& batch : model.batches) {
             if (batch.indexCount == 0) continue;
 
@@ -1984,8 +1995,31 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             // Skip batches with zero opacity from texture weight tracks (should be invisible)
             if (batch.batchOpacity < 0.01f) continue;
 
-            // Render additive/mod batches as authored geometry so alpha-cutout cards
-            // (e.g. candle flames) keep their original transparency/glow behavior.
+            const bool koboldFlameCard =
+                batch.colorKeyBlack &&
+                (modelKeyLower.find("kobold") != std::string::npos) &&
+                ((modelKeyLower.find("candle") != std::string::npos) ||
+                 (modelKeyLower.find("torch") != std::string::npos) ||
+                 (modelKeyLower.find("mine") != std::string::npos));
+
+            // Replace only likely flame-card submeshes with sprite glow. Keep larger geometry
+            // (lantern housings, posts, etc.) authored so the prop itself remains visible.
+            const bool smallCardLikeBatch = (batch.glowSize <= 1.35f);
+            const bool shouldUseGlowSprite =
+                !koboldFlameCard &&
+                smallCardLikeBatch &&
+                ((batch.blendMode >= 3) || (batch.colorKeyBlack && flameLikeModel && batch.blendMode >= 1));
+            if (shouldUseGlowSprite) {
+                if (entry.distSq < 180.0f * 180.0f) {
+                    glm::vec3 worldPos = glm::vec3(instance.modelMatrix * glm::vec4(batch.center, 1.0f));
+                    GlowSprite gs;
+                    gs.worldPos = worldPos;
+                    gs.color = glm::vec4(1.0f, 0.82f, 0.46f, 1.15f);
+                    gs.size = batch.glowSize * instance.scale * 1.45f;
+                    glowSprites_.push_back(gs);
+                }
+                continue;
+            }
 
             // Compute UV offset for texture animation (only set uniform if changed)
             glm::vec2 uvOffset(0.0f, 0.0f);
