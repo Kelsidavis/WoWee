@@ -9,6 +9,10 @@
 namespace wowee {
 namespace core {
 
+#ifdef _WIN32
+#pragma push_macro("ERROR")
+#undef ERROR
+#endif
 enum class LogLevel {
     DEBUG,
     INFO,
@@ -16,6 +20,9 @@ enum class LogLevel {
     ERROR,
     FATAL
 };
+#ifdef _WIN32
+#pragma pop_macro("ERROR")
+#endif
 
 class Logger {
 public:

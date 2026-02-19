@@ -11,7 +11,9 @@
   #pragma comment(lib, "ws2_32.lib")
 
   using socket_t  = SOCKET;
-  using ssize_t   = int;             // recv/send return int on Windows
+#ifndef __MINGW32__
+  using ssize_t   = int;             // recv/send return int on MSVC
+#endif
 
   inline constexpr socket_t INVALID_SOCK = INVALID_SOCKET;
 
