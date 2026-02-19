@@ -906,13 +906,18 @@ bool WardenModule::initializeModule() {
 // ============================================================================
 
 WardenModuleManager::WardenModuleManager() {
-    // Set cache directory: ~/.local/share/wowee/warden_cache/
-    const char* home = std::getenv("HOME");
-    if (home) {
+    // Set cache directory
+#ifdef _WIN32
+    if (const char* appdata = std::getenv("APPDATA"))
+        cacheDirectory_ = std::string(appdata) + "\\wowee\\warden_cache";
+    else
+        cacheDirectory_ = ".\\warden_cache";
+#else
+    if (const char* home = std::getenv("HOME"))
         cacheDirectory_ = std::string(home) + "/.local/share/wowee/warden_cache";
-    } else {
+    else
         cacheDirectory_ = "./warden_cache";
-    }
+#endif
 
     // Create cache directory if it doesn't exist
     std::filesystem::create_directories(cacheDirectory_);

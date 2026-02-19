@@ -2397,11 +2397,15 @@ bool GameHandler::loadWardenCRFile(const std::string& moduleHashHex) {
     wardenCREntries_.clear();
 
     // Look for .cr file in warden cache
-    std::string homeDir;
-    if (const char* h = std::getenv("HOME")) homeDir = h;
-    else homeDir = ".";
-
-    std::string crPath = homeDir + "/.local/share/wowee/warden_cache/" + moduleHashHex + ".cr";
+    std::string cacheBase;
+#ifdef _WIN32
+    if (const char* h = std::getenv("APPDATA")) cacheBase = std::string(h) + "\\wowee\\warden_cache";
+    else cacheBase = ".\\warden_cache";
+#else
+    if (const char* h = std::getenv("HOME")) cacheBase = std::string(h) + "/.local/share/wowee/warden_cache";
+    else cacheBase = "./warden_cache";
+#endif
+    std::string crPath = cacheBase + "/" + moduleHashHex + ".cr";
 
     std::ifstream crFile(crPath, std::ios::binary);
     if (!crFile) {
@@ -2581,10 +2585,15 @@ void GameHandler::handleWardenData(network::Packet& packet) {
 
                 // Cache raw module to disk
                 {
-                    std::string homeDir;
-                    if (const char* h = std::getenv("HOME")) homeDir = h;
-                    else homeDir = ".";
-                    std::string cacheDir = homeDir + "/.local/share/wowee/warden_cache";
+#ifdef _WIN32
+                    std::string cacheDir;
+                    if (const char* h = std::getenv("APPDATA")) cacheDir = std::string(h) + "\\wowee\\warden_cache";
+                    else cacheDir = ".\\warden_cache";
+#else
+                    std::string cacheDir;
+                    if (const char* h = std::getenv("HOME")) cacheDir = std::string(h) + "/.local/share/wowee/warden_cache";
+                    else cacheDir = "./warden_cache";
+#endif
                     std::filesystem::create_directories(cacheDir);
 
                     std::string hashHex;

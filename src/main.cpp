@@ -3,6 +3,7 @@
 #include <exception>
 #include <csignal>
 #include <SDL2/SDL.h>
+#ifdef __linux__
 #include <X11/Xlib.h>
 
 // Keep a persistent X11 connection for emergency mouse release in signal handlers.
@@ -16,6 +17,9 @@ static void releaseMouseGrab() {
         XFlush(g_emergencyDisplay);
     }
 }
+#else
+static void releaseMouseGrab() {}
+#endif
 
 static void crashHandler(int sig) {
     releaseMouseGrab();
@@ -24,7 +28,9 @@ static void crashHandler(int sig) {
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
+#ifdef __linux__
     g_emergencyDisplay = XOpenDisplay(nullptr);
+#endif
     std::signal(SIGSEGV, crashHandler);
     std::signal(SIGABRT, crashHandler);
     std::signal(SIGFPE,  crashHandler);
@@ -46,7 +52,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         app.shutdown();
 
         LOG_INFO("Application exited successfully");
+#ifdef __linux__
         if (g_emergencyDisplay) { XCloseDisplay(g_emergencyDisplay); g_emergencyDisplay = nullptr; }
+#endif
         return 0;
     }
     catch (const std::exception& e) {
