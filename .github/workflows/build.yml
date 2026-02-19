@@ -52,8 +52,8 @@ jobs:
             libswscale-dev \
             libavutil-dev \
             libunicorn-dev \
-            libx11-dev \
-            libstormlib-dev || true
+            libx11-dev
+          sudo apt-get install -y libstormlib-dev || true
 
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
