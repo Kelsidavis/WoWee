@@ -1406,6 +1406,9 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_GOSSIP_MESSAGE:
             handleGossipMessage(packet);
             break;
+        case Opcode::SMSG_QUESTGIVER_QUEST_LIST:
+            handleQuestgiverQuestList(packet);
+            break;
         case Opcode::SMSG_BINDPOINTUPDATE: {
             BindPointUpdateData data;
             if (BindPointUpdateParser::parse(packet, data)) {
@@ -9298,6 +9301,94 @@ void GameHandler::handleGossipMessage(network::Packet& packet) {
             npcGreetingCallback_(currentGossip.npcGuid, npcPos);
         }
     }
+}
+
+void GameHandler::handleQuestgiverQuestList(network::Packet& packet) {
+    if (packet.getSize() - packet.getReadPos() < 8) return;
+
+    GossipMessageData data;
+    data.npcGuid = packet.readUInt64();
+    data.menuId = 0;
+    data.titleTextId = 0;
+
+    // Server text (header/greeting) and optional emote fields.
+    std::string header = packet.readString();
+    if (packet.getSize() - packet.getReadPos() >= 8) {
+        (void)packet.readUInt32(); // emoteDelay / unk
+        (void)packet.readUInt32(); // emote / unk
+    }
+    (void)header;
+
+    auto readQuestCount = [&](network::Packet& pkt) -> uint32_t {
+        size_t rem = pkt.getSize() - pkt.getReadPos();
+        if (rem >= 4) {
+            size_t p = pkt.getReadPos();
+            uint32_t c = pkt.readUInt32();
+            if (c <= 64) return c;
+            pkt.setReadPos(p);
+        }
+        if (rem >= 1) {
+            return static_cast<uint32_t>(pkt.readUInt8());
+        }
+        return 0;
+    };
+
+    uint32_t questCount = readQuestCount(packet);
+    data.quests.reserve(questCount);
+    for (uint32_t i = 0; i < questCount; ++i) {
+        if (packet.getSize() - packet.getReadPos() < 12) break;
+        GossipQuestItem q;
+        q.questId = packet.readUInt32();
+        q.questIcon = packet.readUInt32();
+        q.questLevel = static_cast<int32_t>(packet.readUInt32());
+
+        // WotLK includes questFlags + isRepeatable; Classic variants may omit.
+        size_t titlePos = packet.getReadPos();
+        if (packet.getSize() - packet.getReadPos() >= 5) {
+            q.questFlags = packet.readUInt32();
+            q.isRepeatable = packet.readUInt8();
+            q.title = packet.readString();
+            if (q.title.empty()) {
+                packet.setReadPos(titlePos);
+                q.questFlags = 0;
+                q.isRepeatable = 0;
+                q.title = packet.readString();
+            }
+        } else {
+            q.questFlags = 0;
+            q.isRepeatable = 0;
+            q.title = packet.readString();
+        }
+        if (q.questId != 0) {
+            data.quests.push_back(std::move(q));
+        }
+    }
+
+    currentGossip = std::move(data);
+    gossipWindowOpen = true;
+    vendorWindowOpen = false;
+
+    bool hasAvailableQuest = false;
+    bool hasRewardQuest = false;
+    bool hasIncompleteQuest = false;
+    for (const auto& questItem : currentGossip.quests) {
+        bool isCompletable = (questItem.questIcon == 5 || questItem.questIcon == 10);
+        bool isIncomplete  = (questItem.questIcon == 3 || questItem.questIcon == 4);
+        bool isAvailable   = (questItem.questIcon == 2 || questItem.questIcon == 7 || questItem.questIcon == 8);
+        hasAvailableQuest |= isAvailable;
+        hasRewardQuest |= isCompletable;
+        hasIncompleteQuest |= isIncomplete;
+    }
+    if (currentGossip.npcGuid != 0) {
+        QuestGiverStatus derivedStatus = QuestGiverStatus::NONE;
+        if (hasRewardQuest) derivedStatus = QuestGiverStatus::REWARD;
+        else if (hasAvailableQuest) derivedStatus = QuestGiverStatus::AVAILABLE;
+        else if (hasIncompleteQuest) derivedStatus = QuestGiverStatus::INCOMPLETE;
+        npcQuestStatus_[currentGossip.npcGuid] = derivedStatus;
+    }
+
+    LOG_INFO("Questgiver quest list: npc=0x", std::hex, currentGossip.npcGuid, std::dec,
+             " quests=", currentGossip.quests.size());
 }
 
 void GameHandler::handleGossipComplete(network::Packet& packet) {
