@@ -262,8 +262,32 @@ bool WMORenderer::loadModel(const pipeline::WMOModel& model, uint32_t id) {
     }
 
     // Check if already loaded
-    if (loadedModels.find(id) != loadedModels.end()) {
-        return true;
+    auto existingIt = loadedModels.find(id);
+    if (existingIt != loadedModels.end()) {
+        // If a model was first loaded while texture resolution failed (or before
+        // assets were fully available), it can remain permanently white because
+        // merged batches cache texture IDs at load time. Do a one-time reload for
+        // models that have texture paths but no resolved non-white textures.
+        if (assetManager && !model.textures.empty()) {
+            bool hasResolvedTexture = false;
+            for (GLuint texId : existingIt->second.textures) {
+                if (texId != 0 && texId != whiteTexture) {
+                    hasResolvedTexture = true;
+                    break;
+                }
+            }
+            static std::unordered_set<uint32_t> retryReloadedModels;
+            if (!hasResolvedTexture && retryReloadedModels.insert(id).second) {
+                core::Logger::getInstance().warning(
+                    "WMO model ", id,
+                    " has only fallback textures; forcing one-time reload");
+                unloadModel(id);
+            } else {
+                return true;
+            }
+        } else {
+            return true;
+        }
     }
 
     core::Logger::getInstance().debug("Loading WMO model ", id, " with ", model.groups.size(), " groups, ",
