@@ -74,12 +74,17 @@ For local AzerothCore setup, see `docs/server-setup.md`.
 - `Mouse`: Look/orbit camera
 - `Tab`: Cycle targets
 - `1-9,0,-,=`: Action bar slots
-- `I`: Inventory
+- `B`: Bags
+- `C`: Character
 - `P`: Spellbook
+- `N`: Talents
 - `L`: Quest log
+- `M`: World map
+- `O`: Guild roster
 - `Enter`: Chat
+- `/`: Chat slash command
 - `F1`: Performance HUD
-- `F2`: Wireframe
+- `F4`: Toggle shadows
 
 ## Troubleshooting
 

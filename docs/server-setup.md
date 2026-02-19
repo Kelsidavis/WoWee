@@ -207,7 +207,7 @@ account onlinelist
 server shutdown 10  # Shutdown in 10 seconds
 ```
 
-## Connecting with Wowee-Native
+## Connecting with WoWee
 
 ### 1. Start the Client
 
@@ -335,7 +335,11 @@ ifconfig | grep inet
 
 Edit `authserver.conf`:
 ```ini
-BindIP = "<bind-address>"  # Listen on all interfaces
+# Local-only testing on the same machine:
+BindIP = "127.0.0.1"
+
+# LAN/remote testing (listen on all interfaces):
+# BindIP = "0.0.0.0"
 ```
 
 Edit database:
@@ -366,7 +370,8 @@ For testing with a remote server (VPS, dedicated server):
 **Server configuration:**
 ```ini
 # authserver.conf
-BindIP = "<bind-address>"
+# Public/remote access:
+BindIP = "0.0.0.0"
 
 # Database
 UPDATE realmlist SET address='your.server.ip' WHERE id=1;
@@ -420,27 +425,18 @@ Once connected and in-world, test client features:
 - **Mouse** - Look around
 - **Shift** - Move faster
 
-**Rendering Features:**
+**UI/Gameplay Windows:**
+- **B** - Toggle bags
+- **C** - Toggle character
+- **P** - Toggle spellbook
+- **N** - Toggle talents
+- **L** - Toggle quest log
+- **M** - Toggle world map
+- **O** - Toggle guild roster
+
+**Debug Features:**
 - **F1** - Toggle performance HUD
-- **F2** - Wireframe mode
-- **F8** - Toggle water rendering
-- **F9** - Toggle time progression
-- **F10** - Toggle sun/moon
-- **F11** - Toggle stars
-- **F12** - Toggle fog
-- **+/-** - Change time of day
-
-**Effects:**
-- **C** - Toggle clouds
-- **L** - Toggle lens flare
-- **W** - Cycle weather (rain/snow)
-- **M** - Toggle moon phases
-
-**Character/Buildings:**
-- **K** - Spawn test character
-- **O** - Spawn test WMO building
-- **Shift+O** - Load real WMO from MPQ (if WOW_DATA_PATH set)
-- **P** - Clear all WMOs
+- **F4** - Toggle shadows
 
 ### Performance Monitoring
 
@@ -510,10 +506,7 @@ Rate.Player.Haste = 1
 ### Client Performance
 
 - Keep performance HUD (F1) enabled to monitor FPS
-- Disable heavy effects if FPS drops:
-  - Weather (W key to None)
-  - Clouds (C key to disable)
-  - Lens flare (L key to disable)
+- Reduce quality/effects from Settings if FPS drops
 
 ## Security Notes
 
@@ -581,8 +574,9 @@ export WOW_DATA_PATH="/path/to/extracted/Data"
 5. **Test Features:**
 - Create a character
 - Enter world
-- Test rendering (F1-F12, C, L, W, M keys)
-- Spawn objects (K, O, Shift+O, P keys)
+- Test windows (`B`, `C`, `P`, `N`, `L`, `M`, `O`)
+- Test vendor flow (buy, sell, buyback)
+- Test quest flow (accept, progress tracking, turn-in markers)
 - Test movement (WASD, mouse)
 
 6. **Stop Server (worldserver console):**

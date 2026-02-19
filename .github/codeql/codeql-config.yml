@@ -1,0 +1,7 @@
+name: wowee-codeql-config
+
+# Warden stream crypto must remain RC4 for protocol compatibility.
+# Keep weak-crypto detection enabled project-wide, but exclude this one file
+# so CodeQL doesn't raise an unfixable compatibility alert.
+paths-ignore:
+  - src/game/warden_crypto.cpp

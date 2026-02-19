@@ -72,21 +72,9 @@ bool WardenCrypto::initFromSessionKey(const std::vector<uint8_t>& sessionKey) {
     uint8_t decryptKey[16];
     sha1RandxGenerate(sessionKey, encryptKey, decryptKey);
 
-    // Log derived keys
-    {
-        std::string hex;
-        for (int i = 0; i < 16; ++i) {
-            char b[4]; snprintf(b, sizeof(b), "%02x ", encryptKey[i]); hex += b;
-        }
-        LOG_INFO("Warden: Encrypt key (C→S): ", hex);
-        hex.clear();
-        for (int i = 0; i < 16; ++i) {
-            char b[4]; snprintf(b, sizeof(b), "%02x ", decryptKey[i]); hex += b;
-        }
-        LOG_INFO("Warden: Decrypt key (S→C): ", hex);
-    }
-
-    // Initialize RC4 ciphers
+    // Warden protocol compatibility note:
+    // Blizzard's Warden stream crypto is RC4-based; this cannot be upgraded
+    // without breaking protocol interoperability with supported servers.
     std::vector<uint8_t> ek(encryptKey, encryptKey + 16);
     std::vector<uint8_t> dk(decryptKey, decryptKey + 16);
 
@@ -95,6 +83,12 @@ bool WardenCrypto::initFromSessionKey(const std::vector<uint8_t>& sessionKey) {
 
     initRC4(ek, encryptRC4State_, encryptRC4_i_, encryptRC4_j_);
     initRC4(dk, decryptRC4State_, decryptRC4_i_, decryptRC4_j_);
+
+    // Scrub temporary key material after RC4 state initialization.
+    std::fill(ek.begin(), ek.end(), 0);
+    std::fill(dk.begin(), dk.end(), 0);
+    std::fill(std::begin(encryptKey), std::end(encryptKey), 0);
+    std::fill(std::begin(decryptKey), std::end(decryptKey), 0);
 
     initialized_ = true;
     LOG_INFO("Warden: Crypto initialized from session key");

@@ -57,13 +57,13 @@ Compatible with **Vanilla (Classic) 1.12 + TBC 2.4.3 + WotLK 3.3.5a**. All three
 - **Action Bar** -- 12 slots, drag-drop from spellbook/inventory, click-to-cast, keybindings
 - **Trainers** -- Spell trainer UI, buy spells, known/available/unavailable states
 - **Quests** -- Quest markers (! and ?) on NPCs and minimap, quest log, quest details, turn-in flow
-- **Vendors** -- Buy and sell items, gold tracking, inventory sync
+- **Vendors** -- Buy, sell, and buyback (most recent sold item), gold tracking, inventory sync
 - **Loot** -- Loot window, gold looting, item pickup
 - **Gossip** -- NPC interaction, dialogue options
 - **Chat** -- Tabs/channels, emotes, chat bubbles, clickable URLs, clickable item links with tooltips
 - **Party** -- Group invites, party list
 - **Warden** -- Warden anti-cheat module execution via Unicorn Engine x86 emulation (cross-platform, no Wine)
-- **UI** -- Loading screens with progress bar, settings window, minimap with zoom/rotation/square mode
+- **UI** -- Loading screens with progress bar, settings window, minimap with zoom/rotation/square mode, top-right minimap mute speaker, separate bag windows with compact-empty mode (aggregate view)
 
 ## Building
 
@@ -150,10 +150,15 @@ make -j$(nproc)
 ### UI & Windows
 | Key | Action |
 |-----|--------|
-| I | Toggle inventory |
+| B | Toggle bags |
+| C | Toggle character |
 | P | Toggle spellbook |
+| N | Toggle talents |
 | L | Toggle quest log |
+| M | Toggle world map |
+| O | Toggle guild roster |
 | Enter | Open chat |
+| / | Open chat with slash |
 | Escape | Close windows / deselect |
 
 ### Action Bar
@@ -167,16 +172,7 @@ make -j$(nproc)
 | Key | Action |
 |-----|--------|
 | F1 | Performance HUD |
-| F2 | Wireframe mode |
-| F9 | Toggle time progression |
-| F10 | Toggle celestial bodies (sun + moons) |
-| F11 | Toggle procedural stars (debug mode) |
-| +/- | Change time of day |
-| C | Toggle clouds |
-| L | Toggle lens flare |
-| W | Cycle weather (None/Rain/Snow) |
-| K / J | Spawn / remove test characters |
-| O / P | Spawn / clear WMOs |
+| F4 | Toggle shadows |
 
 ## Documentation
 
@@ -195,6 +191,14 @@ make -j$(nproc)
 - [Realm List](docs/realm-list.md) -- Realm selection system
 - [Warden Quick Reference](docs/WARDEN_QUICK_REFERENCE.md) -- Warden module execution overview and testing
 - [Warden Implementation](docs/WARDEN_IMPLEMENTATION.md) -- Technical details of the implementation
+
+## Security
+
+- GitHub Actions runs a dedicated security workflow at `.github/workflows/security.yml`.
+- Current checks include:
+  - `CodeQL` for C/C++
+  - `Semgrep` static analysis
+  - Sanitizer build (`ASan` + `UBSan`)
 
 ## Technical Details
 
