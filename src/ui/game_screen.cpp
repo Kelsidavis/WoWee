@@ -663,6 +663,55 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
     auto renderItemLinkTooltip = [&](uint32_t itemEntry) {
         const auto* info = gameHandler.getItemInfo(itemEntry);
         if (!info || !info->valid) return;
+        auto findComparableEquipped = [&](uint8_t inventoryType) -> const game::ItemSlot* {
+            using ES = game::EquipSlot;
+            const auto& inv = gameHandler.getInventory();
+            auto slotPtr = [&](ES slot) -> const game::ItemSlot* {
+                const auto& s = inv.getEquipSlot(slot);
+                return s.empty() ? nullptr : &s;
+            };
+            switch (inventoryType) {
+                case 1: return slotPtr(ES::HEAD);
+                case 2: return slotPtr(ES::NECK);
+                case 3: return slotPtr(ES::SHOULDERS);
+                case 4: return slotPtr(ES::SHIRT);
+                case 5:
+                case 20: return slotPtr(ES::CHEST);
+                case 6: return slotPtr(ES::WAIST);
+                case 7: return slotPtr(ES::LEGS);
+                case 8: return slotPtr(ES::FEET);
+                case 9: return slotPtr(ES::WRISTS);
+                case 10: return slotPtr(ES::HANDS);
+                case 11: {
+                    if (auto* s = slotPtr(ES::RING1)) return s;
+                    return slotPtr(ES::RING2);
+                }
+                case 12: {
+                    if (auto* s = slotPtr(ES::TRINKET1)) return s;
+                    return slotPtr(ES::TRINKET2);
+                }
+                case 13:
+                    if (auto* s = slotPtr(ES::MAIN_HAND)) return s;
+                    return slotPtr(ES::OFF_HAND);
+                case 14:
+                case 22:
+                case 23: return slotPtr(ES::OFF_HAND);
+                case 15:
+                case 25:
+                case 26: return slotPtr(ES::RANGED);
+                case 16: return slotPtr(ES::BACK);
+                case 17:
+                case 21: return slotPtr(ES::MAIN_HAND);
+                case 18:
+                    for (int i = 0; i < game::Inventory::NUM_BAG_SLOTS; ++i) {
+                        auto slot = static_cast<ES>(static_cast<int>(ES::BAG1) + i);
+                        if (auto* s = slotPtr(slot)) return s;
+                    }
+                    return nullptr;
+                case 19: return slotPtr(ES::TABARD);
+                default: return nullptr;
+            }
+        };
 
         ImGui::BeginTooltip();
         // Quality color for name
@@ -740,6 +789,28 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
             uint32_t c = info->sellPrice % 100;
             ImGui::Separator();
             ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "Sell Price: %ug %us %uc", g, s, c);
+        }
+
+        if (ImGui::GetIO().KeyShift && info->inventoryType > 0) {
+            if (const auto* eq = findComparableEquipped(static_cast<uint8_t>(info->inventoryType))) {
+                ImGui::Separator();
+                ImGui::TextDisabled("Equipped:");
+                GLuint eqIcon = inventoryScreen.getItemIcon(eq->item.displayInfoId);
+                if (eqIcon) {
+                    ImGui::Image((ImTextureID)(uintptr_t)eqIcon, ImVec2(18.0f, 18.0f));
+                    ImGui::SameLine();
+                }
+                ImGui::TextColored(InventoryScreen::getQualityColor(eq->item.quality), "%s", eq->item.name.c_str());
+                if (eq->item.damageMax > 0.0f) {
+                    ImGui::Text("%.0f - %.0f Damage", eq->item.damageMin, eq->item.damageMax);
+                }
+                if (eq->item.armor > 0) ImGui::Text("%d Armor", eq->item.armor);
+                renderStat(eq->item.stamina, "Stamina");
+                renderStat(eq->item.strength, "Strength");
+                renderStat(eq->item.agility, "Agility");
+                renderStat(eq->item.intellect, "Intellect");
+                renderStat(eq->item.spirit, "Spirit");
+            }
         }
         ImGui::EndTooltip();
     };
@@ -3504,6 +3575,14 @@ void GameScreen::renderBagBar(game::GameHandler& gameHandler) {
                 }
             }
 
+            if (inventoryScreen.isSeparateBags() &&
+                inventoryScreen.isBagOpen(i)) {
+                ImDrawList* dl = ImGui::GetWindowDrawList();
+                ImVec2 r0 = ImGui::GetItemRectMin();
+                ImVec2 r1 = ImGui::GetItemRectMax();
+                dl->AddRect(r0, r1, IM_COL32(255, 255, 255, 255), 3.0f, 0, 2.0f);
+            }
+
             // Accept dragged item from inventory
             if (ImGui::IsItemHovered() && inventoryScreen.isHoldingItem()) {
                 const auto& heldItem = inventoryScreen.getHeldItem();
@@ -3544,7 +3623,15 @@ void GameScreen::renderBagBar(game::GameHandler& gameHandler) {
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Backpack");
         }
+        if (inventoryScreen.isSeparateBags() &&
+            inventoryScreen.isBackpackOpen()) {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImVec2 r0 = ImGui::GetItemRectMin();
+            ImVec2 r1 = ImGui::GetItemRectMax();
+            dl->AddRect(r0, r1, IM_COL32(255, 255, 255, 255), 3.0f, 0, 2.0f);
+        }
         ImGui::PopID();
+
     }
     ImGui::End();
 

@@ -37,6 +37,10 @@ public:
     void closeAllBags();
     void setSeparateBags(bool sep) { separateBags_ = sep; }
     bool isSeparateBags() const { return separateBags_; }
+    void toggleCompactBags() { compactBags_ = !compactBags_; }
+    bool isCompactBags() const { return compactBags_; }
+    bool isBackpackOpen() const { return backpackOpen_; }
+    bool isBagOpen(int idx) const { return idx >= 0 && idx < 4 ? bagOpen_[idx] : false; }
 
     bool isCharacterOpen() const { return characterOpen; }
     void toggleCharacter() { characterOpen = !characterOpen; }
@@ -74,6 +78,7 @@ private:
     bool characterOpen = false;
     bool bKeyWasDown = false;
     bool separateBags_ = true;
+    bool compactBags_ = false;
     bool backpackOpen_ = false;
     std::array<bool, 4> bagOpen_{};
     bool cKeyWasDown = false;
@@ -125,7 +130,7 @@ private:
     void renderBagWindow(const char* title, bool& isOpen, game::Inventory& inventory,
                          int bagIndex, float defaultX, float defaultY, uint64_t moneyCopper);
     void renderEquipmentPanel(game::Inventory& inventory);
-    void renderBackpackPanel(game::Inventory& inventory);
+    void renderBackpackPanel(game::Inventory& inventory, bool collapseEmptySections = false);
     void renderStatsPanel(game::Inventory& inventory, uint32_t playerLevel);
 
     // Slot rendering with interaction support
@@ -135,7 +140,7 @@ private:
                         SlotKind kind, int backpackIndex,
                         game::EquipSlot equipSlot,
                         int bagIndex = -1, int bagSlotIndex = -1);
-    void renderItemTooltip(const game::ItemDef& item);
+    void renderItemTooltip(const game::ItemDef& item, const game::Inventory* inventory = nullptr);
 
     // Held item helpers
     void pickupFromBackpack(game::Inventory& inv, int index);
@@ -147,6 +152,7 @@ private:
     void cancelPickup(game::Inventory& inv);
     game::EquipSlot getEquipSlotForType(uint8_t inventoryType, game::Inventory& inv);
     void renderHeldItem();
+    bool bagHasAnyItems(const game::Inventory& inventory, int bagIndex) const;
 
     // Drop confirmation
     bool dropConfirmOpen_ = false;
