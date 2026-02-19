@@ -4438,8 +4438,6 @@ void GameHandler::handleCompressedUpdateObject(network::Packet& packet) {
         return;
     }
 
-    LOG_DEBUG("  Decompressed ", compressedSize, " -> ", destLen, " bytes");
-
     // Create packet from decompressed data and parse it
     network::Packet decompressedPacket(wireOpcode(Opcode::SMSG_UPDATE_OBJECT), decompressed);
     handleUpdateObject(decompressedPacket);
