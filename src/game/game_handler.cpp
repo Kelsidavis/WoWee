@@ -934,6 +934,17 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 handleTextEmote(packet);
             }
             break;
+        case Opcode::SMSG_EMOTE: {
+            if (state != WorldState::IN_WORLD) break;
+            // SMSG_EMOTE: uint32 emoteAnim, uint64 sourceGuid
+            if (packet.getSize() - packet.getReadPos() < 12) break;
+            uint32_t emoteAnim = packet.readUInt32();
+            uint64_t sourceGuid = packet.readUInt64();
+            if (emoteAnimCallback_ && sourceGuid != 0) {
+                emoteAnimCallback_(sourceGuid, emoteAnim);
+            }
+            break;
+        }
 
         case Opcode::SMSG_CHANNEL_NOTIFY:
             // Accept during ENTERING_WORLD too — server auto-joins channels before VERIFY_WORLD
@@ -1032,6 +1043,28 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_MONSTER_MOVE_TRANSPORT:
             handleMonsterMoveTransport(packet);
             break;
+        case Opcode::SMSG_SPLINE_MOVE_SET_WALK_MODE:
+        case Opcode::SMSG_SPLINE_MOVE_SET_RUN_MODE: {
+            // Minimal parse: PackedGuid
+            if (packet.getSize() - packet.getReadPos() >= 1) {
+                (void)UpdateObjectParser::readPackedGuid(packet);
+            }
+            break;
+        }
+        case Opcode::SMSG_SPLINE_MOVE_SET_RUN_SPEED:
+        case Opcode::SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED:
+        case Opcode::SMSG_SPLINE_MOVE_SET_SWIM_SPEED: {
+            // Minimal parse: PackedGuid + float speed
+            if (packet.getSize() - packet.getReadPos() < 5) break;
+            uint64_t guid = UpdateObjectParser::readPackedGuid(packet);
+            if (packet.getSize() - packet.getReadPos() < 4) break;
+            float speed = packet.readFloat();
+            if (guid == playerGuid && std::isfinite(speed) && speed > 0.1f && speed < 100.0f &&
+                *logicalOp == Opcode::SMSG_SPLINE_MOVE_SET_RUN_SPEED) {
+                serverRunSpeed_ = speed;
+            }
+            break;
+        }
 
         // ---- Speed Changes ----
         case Opcode::SMSG_FORCE_RUN_SPEED_CHANGE:
@@ -1094,9 +1127,30 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_ATTACKERSTATEUPDATE:
             handleAttackerStateUpdate(packet);
             break;
+        case Opcode::SMSG_AI_REACTION: {
+            // SMSG_AI_REACTION: uint64 guid, uint32 reaction
+            if (packet.getSize() - packet.getReadPos() < 12) break;
+            uint64_t guid = packet.readUInt64();
+            uint32_t reaction = packet.readUInt32();
+            // Reaction 2 commonly indicates aggro.
+            if (reaction == 2 && npcAggroCallback_) {
+                auto entity = entityManager.getEntity(guid);
+                if (entity) {
+                    npcAggroCallback_(guid, glm::vec3(entity->getX(), entity->getY(), entity->getZ()));
+                }
+            }
+            break;
+        }
         case Opcode::SMSG_SPELLNONMELEEDAMAGELOG:
             handleSpellDamageLog(packet);
             break;
+        case Opcode::SMSG_PLAY_SPELL_VISUAL: {
+            // Minimal parse: uint64 casterGuid, uint32 visualId
+            if (packet.getSize() - packet.getReadPos() < 12) break;
+            packet.readUInt64();
+            packet.readUInt32();
+            break;
+        }
         case Opcode::SMSG_SPELLHEALLOG:
             handleSpellHealLog(packet);
             break;
