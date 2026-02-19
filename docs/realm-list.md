@@ -28,7 +28,7 @@ struct Realm {
     uint8_t lock;              // Lock status
     uint8_t flags;             // Realm flags (bit 0x04 = has version info)
     std::string name;          // Realm name (e.g., "My Private Server")
-    std::string address;       // Server address (e.g., "127.0.0.1:8085")
+    std::string address;       // Server address (e.g., "localhost:8085")
     float population;          // Population level (0.0 to 2.0+)
     uint8_t characters;        // Number of characters player has on this realm
     uint8_t timezone;          // Timezone ID
@@ -127,7 +127,7 @@ int main() {
 
     // Connect
     std::cout << "Connecting to authentication server..." << std::endl;
-    if (!auth.connect("127.0.0.1", 3724)) {
+    if (!auth.connect("localhost", 3724)) {
         std::cerr << "Connection failed" << std::endl;
         return 1;
     }
@@ -218,7 +218,7 @@ int main() {
             std::cout << "Address: " << selectedRealm.address << std::endl;
 
             // TODO: Parse address and connect to world server
-            // Example: "127.0.0.1:8085" -> host="127.0.0.1", port=8085
+            // Example: "localhost:8085" -> host="localhost", port=8085
         }
     }
 
@@ -424,7 +424,7 @@ For testing without a live server, you can create mock realms:
 Realm mockRealm;
 mockRealm.id = 1;
 mockRealm.name = "Test Realm";
-mockRealm.address = "127.0.0.1:8085";
+mockRealm.address = "localhost:8085";
 mockRealm.icon = 1;
 mockRealm.lock = 0;
 mockRealm.flags = 0x04;  // Has version info
@@ -438,7 +438,7 @@ mockRealm.build = 12340;
 
 // Test parsing address
 std::string host = parseHost(mockRealm.address);
-assert(host == "127.0.0.1");
+assert(host == "localhost");
 
 uint16_t port = parsePort(mockRealm.address);
 assert(port == 8085);

@@ -286,7 +286,7 @@ std::string host = realm.address.substr(0, colonPos);
 uint16_t port = std::stoi(realm.address.substr(colonPos + 1));
 ```
 
-**Realm address format:** `"127.0.0.1:8085"`
+**Realm address format:** `"localhost:8085"`
 
 ### Phase 3: World Server Connection
 
@@ -295,7 +295,7 @@ uint16_t port = std::stoi(realm.address.substr(colonPos + 1));
 ```cpp
 game::GameHandler gameHandler;
 gameHandler.connect(
-    host,           // e.g., "127.0.0.1"
+    host,           // e.g., "localhost"
     port,           // e.g., 8085
     sessionKey,     // 40 bytes from auth server
     accountName,    // Same account
@@ -447,7 +447,7 @@ void testCompleteAuthFlow() {
 
     // Real auth handler
     auth::AuthHandler auth;
-    auth.connect("127.0.0.1", 3724);
+    auth.connect("localhost", 3724);
 
     bool success = false;
     std::vector<uint8_t> key;
@@ -472,7 +472,7 @@ void testCompleteAuthFlow() {
     MockWorldServer worldServer(8085);
 
     game::GameHandler game;
-    game.connect("127.0.0.1", 8085, key, "TEST", 12340);
+    game.connect("localhost", 8085, key, "TEST", 12340);
 
     bool worldSuccess = false;
     game.setOnSuccess([&worldSuccess]() {

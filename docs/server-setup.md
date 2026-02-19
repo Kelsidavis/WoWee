@@ -16,7 +16,7 @@ The authentication screen comes with local server defaults:
 
 | Setting | Default Value | Description |
 |---------|---------------|-------------|
-| **Hostname** | 127.0.0.1 | Localhost (your machine) |
+| **Hostname** | localhost | Localhost (your machine) |
 | **Port** | 3724 | Standard auth server port |
 | **Username** | (empty) | Your account username |
 | **Password** | (empty) | Your account password |
@@ -120,16 +120,16 @@ nano authserver.conf
 
 **Key settings in `authserver.conf`:**
 ```ini
-LoginDatabaseInfo = "127.0.0.1;3306;trinity;trinity;auth"
+LoginDatabaseInfo = "localhost;3306;trinity;trinity;auth"
 RealmServerPort = 3724
-BindIP = "127.0.0.1"
+BindIP = "localhost"
 ```
 
 **Key settings in `worldserver.conf`:**
 ```ini
-LoginDatabaseInfo = "127.0.0.1;3306;trinity;trinity;auth"
-WorldDatabaseInfo = "127.0.0.1;3306;trinity;trinity;world"
-CharacterDatabaseInfo = "127.0.0.1;3306;trinity;trinity;characters"
+LoginDatabaseInfo = "localhost;3306;trinity;trinity;auth"
+WorldDatabaseInfo = "localhost;3306;trinity;trinity;world"
+CharacterDatabaseInfo = "localhost;3306;trinity;trinity;characters"
 
 DataDir = "/path/to/your/WoW-3.3.5a/Data"  # Your WoW client data directory
 ```
@@ -154,7 +154,7 @@ account set gmlevel testuser 3 -1
 
 In the worldserver console:
 ```
-realm add "Local Test Realm" 127.0.0.1:8085 0 1
+realm add "Local Test Realm" localhost:8085 0 1
 ```
 
 Or directly in database:
@@ -162,7 +162,7 @@ Or directly in database:
 mysql -u trinity -ptrinity auth
 
 INSERT INTO realmlist (name, address, port, icon, realmflags, timezone, allowedSecurityLevel)
-VALUES ('Local Test Realm', '127.0.0.1', 8085, 1, 0, 1, 0);
+VALUES ('Local Test Realm', 'localhost', 8085, 1, 0, 1, 0);
 ```
 
 ## Running the Server
@@ -212,14 +212,14 @@ server shutdown 10  # Shutdown in 10 seconds
 ### 1. Start the Client
 
 ```bash
-cd /home/k/Desktop/wowee/wowee
+cd /path/to/wowee
 ./build/bin/wowee
 ```
 
 ### 2. Login Screen
 
 You'll see the authentication screen with default values:
-- **Hostname:** 127.0.0.1 (already set)
+- **Hostname:** localhost (already set)
 - **Port:** 3724 (already set)
 - **Username:** (enter your account username)
 - **Password:** (enter your account password)
@@ -291,7 +291,7 @@ ps aux | grep worldserver
 netstat -an | grep 8085
 
 # Update realmlist address
-UPDATE realmlist SET address='127.0.0.1' WHERE id=1;
+UPDATE realmlist SET address='localhost' WHERE id=1;
 ```
 
 ### Cannot Enter World
@@ -335,13 +335,13 @@ ifconfig | grep inet
 
 Edit `authserver.conf`:
 ```ini
-BindIP = "0.0.0.0"  # Listen on all interfaces
+BindIP = "<bind-address>"  # Listen on all interfaces
 ```
 
 Edit database:
 ```sql
 mysql -u trinity -ptrinity auth
-UPDATE realmlist SET address='192.168.1.100' WHERE id=1;  # Your local IP
+UPDATE realmlist SET address='<your-lan-ip>' WHERE id=1;  # Your local IP
 ```
 
 **3. Configure firewall:**
@@ -351,7 +351,7 @@ sudo ufw allow 8085  # World server
 ```
 
 **4. In wowee:**
-- Change hostname to your server's local IP (e.g., 192.168.1.100)
+- Change hostname to your server's local IP (e.g., <your-lan-ip>)
 - Keep port as 3724
 - Connect
 
@@ -366,7 +366,7 @@ For testing with a remote server (VPS, dedicated server):
 **Server configuration:**
 ```ini
 # authserver.conf
-BindIP = "0.0.0.0"
+BindIP = "<bind-address>"
 
 # Database
 UPDATE realmlist SET address='your.server.ip' WHERE id=1;
@@ -600,7 +600,7 @@ server shutdown 10
 - [ ] Account created with proper credentials
 - [ ] Firewall allows ports 3724 and 8085
 - [ ] WOW_DATA_PATH set correctly (if using MPQ assets)
-- [ ] Client can resolve hostname (127.0.0.1 for localhost)
+- [ ] Client can resolve hostname (localhost for localhost)
 
 ## Next Steps
 

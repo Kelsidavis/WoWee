@@ -1,0 +1,137 @@
+name: Security
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: CodeQL (C/C++)
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            build-essential \
+            pkg-config \
+            libsdl2-dev \
+            libglew-dev \
+            libglm-dev \
+            libssl-dev \
+            zlib1g-dev \
+            libavformat-dev \
+            libavcodec-dev \
+            libswscale-dev \
+            libavutil-dev \
+            libunicorn-dev \
+            libx11-dev
+          sudo apt-get install -y libstormlib-dev || true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: cpp
+
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel $(nproc)
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Semgrep
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install semgrep
+
+      - name: Run Semgrep (security + secrets)
+        run: |
+          semgrep scan \
+            --config p/security-audit \
+            --config p/secrets \
+            --error
+
+  sanitizer-build:
+    name: Sanitizer Build (ASan/UBSan)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            build-essential \
+            pkg-config \
+            libsdl2-dev \
+            libglew-dev \
+            libglm-dev \
+            libssl-dev \
+            zlib1g-dev \
+            libavformat-dev \
+            libavcodec-dev \
+            libswscale-dev \
+            libavutil-dev \
+            libunicorn-dev \
+            libx11-dev
+          sudo apt-get install -y libstormlib-dev || true
+
+      - name: Configure (ASan/UBSan)
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DWOWEE_BUILD_TESTS=ON \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Run tests (if present)
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          if [ -f build/CTestTestfile.cmake ] || [ -d build/tests ]; then
+            ctest --test-dir build --output-on-failure
+          else
+            echo "No tests configured; sanitizer build completed."
+          fi

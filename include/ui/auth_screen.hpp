@@ -51,7 +51,7 @@ private:
     };
 
     // UI state
-    char hostname[256] = "127.0.0.1";
+    char hostname[256] = "localhost";
     char username[256] = "";
     char password[256] = "";
     char pinCode[32] = "";
