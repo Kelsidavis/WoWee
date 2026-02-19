@@ -364,7 +364,7 @@ bool Renderer::initialize(core::Window* win) {
 
     // Create WMO renderer
     wmoRenderer = std::make_unique<WMORenderer>();
-    if (!wmoRenderer->initialize()) {
+    if (!wmoRenderer->initialize(assetManager)) {
         LOG_WARNING("Failed to initialize WMO renderer");
         wmoRenderer.reset();
     }
