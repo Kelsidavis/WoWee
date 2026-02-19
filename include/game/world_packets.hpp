@@ -1961,6 +1961,7 @@ struct QuestRewardItem {
     uint32_t itemId = 0;
     uint32_t count = 0;
     uint32_t displayInfoId = 0;
+    uint32_t choiceSlot = 0;  // Original reward slot index from server payload
 };
 
 /** SMSG_QUESTGIVER_REQUEST_ITEMS data (turn-in progress check) */

@@ -1324,6 +1324,48 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
         refocusChatInput = true;
     }
 
+    // Cursor affordance: show hand cursor over interactable game objects.
+    if (!io.WantCaptureMouse) {
+        auto* renderer = core::Application::getInstance().getRenderer();
+        auto* camera = renderer ? renderer->getCamera() : nullptr;
+        auto* window = core::Application::getInstance().getWindow();
+        if (camera && window) {
+            glm::vec2 mousePos = input.getMousePosition();
+            float screenW = static_cast<float>(window->getWidth());
+            float screenH = static_cast<float>(window->getHeight());
+            rendering::Ray ray = camera->screenToWorldRay(mousePos.x, mousePos.y, screenW, screenH);
+            float closestT = 1e30f;
+            bool hoverInteractableGo = false;
+            for (const auto& [guid, entity] : gameHandler.getEntityManager().getEntities()) {
+                if (entity->getType() != game::ObjectType::GAMEOBJECT) continue;
+                auto go = std::static_pointer_cast<game::GameObject>(entity);
+                auto* goInfo = gameHandler.getCachedGameObjectInfo(go->getEntry());
+                uint32_t goType = goInfo ? goInfo->type : 0;
+                if (goType == 5) continue; // decoration/non-interactable generic
+
+                glm::vec3 hitCenter;
+                float hitRadius = 0.0f;
+                bool hasBounds = core::Application::getInstance().getRenderBoundsForGuid(guid, hitCenter, hitRadius);
+                if (!hasBounds) {
+                    hitRadius = 2.5f;
+                    hitCenter = core::coords::canonicalToRender(glm::vec3(entity->getX(), entity->getY(), entity->getZ()));
+                    hitCenter.z += 1.2f;
+                } else {
+                    hitRadius = std::max(hitRadius * 1.1f, 0.8f);
+                }
+
+                float hitT;
+                if (raySphereIntersect(ray, hitCenter, hitRadius, hitT) && hitT < closestT) {
+                    closestT = hitT;
+                    hoverInteractableGo = true;
+                }
+            }
+            if (hoverInteractableGo) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            }
+        }
+    }
+
     // Left-click targeting: only on mouse-up if the mouse didn't drag (camera rotate)
     // Record press position on mouse-down
     if (!io.WantCaptureMouse && input.isMouseButtonJustPressed(SDL_BUTTON_LEFT) && !input.isMouseButtonPressed(SDL_BUTTON_RIGHT)) {
@@ -1356,8 +1398,7 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 for (const auto& [guid, entity] : gameHandler.getEntityManager().getEntities()) {
                     auto t = entity->getType();
                     if (t != game::ObjectType::UNIT &&
-                        t != game::ObjectType::PLAYER &&
-                        t != game::ObjectType::GAMEOBJECT) continue;
+                        t != game::ObjectType::PLAYER) continue;
                     if (guid == myGuid) continue;  // Don't target self
 
                     glm::vec3 hitCenter;
@@ -1374,15 +1415,6 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                                 hitRadius = 0.5f;
                                 heightOffset = 0.3f;
                             }
-                        } else if (t == game::ObjectType::GAMEOBJECT) {
-                            // Check GO type — skip non-interactable decorations
-                            auto go = std::static_pointer_cast<game::GameObject>(entity);
-                            auto* goInfo = gameHandler.getCachedGameObjectInfo(go->getEntry());
-                            uint32_t goType = goInfo ? goInfo->type : 0;
-                            // Type 5 = GENERIC (decorations), skip
-                            if (goType == 5) continue;
-                            hitRadius = 2.5f;
-                            heightOffset = 1.2f;
                         }
                         hitCenter = core::coords::canonicalToRender(glm::vec3(entity->getX(), entity->getY(), entity->getZ()));
                         hitCenter.z += heightOffset;
@@ -1424,6 +1456,7 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 rendering::Ray ray = camera->screenToWorldRay(mousePos.x, mousePos.y, screenW, screenH);
                 float closestT = 1e30f;
                 uint64_t closestGuid = 0;
+                game::ObjectType closestType = game::ObjectType::OBJECT;
                 const uint64_t myGuid = gameHandler.getPlayerGuid();
                 for (const auto& [guid, entity] : gameHandler.getEntityManager().getEntities()) {
                     auto t = entity->getType();
@@ -1464,10 +1497,15 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                         if (hitT < closestT) {
                             closestT = hitT;
                             closestGuid = guid;
+                            closestType = t;
                         }
                     }
                 }
                 if (closestGuid != 0) {
+                    if (closestType == game::ObjectType::GAMEOBJECT) {
+                        gameHandler.interactWithGameObject(closestGuid);
+                        return;
+                    }
                     gameHandler.setTarget(closestGuid);
                 }
             }
@@ -3780,11 +3818,15 @@ void GameScreen::renderCastBar(game::GameHandler& gameHandler) {
 
         char overlay[64];
         uint32_t currentSpellId = gameHandler.getCurrentCastSpellId();
-        const std::string& spellName = gameHandler.getSpellName(currentSpellId);
-        if (!spellName.empty())
-            snprintf(overlay, sizeof(overlay), "%s (%.1fs)", spellName.c_str(), gameHandler.getCastTimeRemaining());
-        else
-            snprintf(overlay, sizeof(overlay), "Casting... (%.1fs)", gameHandler.getCastTimeRemaining());
+        if (gameHandler.isGameObjectInteractionCasting()) {
+            snprintf(overlay, sizeof(overlay), "Opening... (%.1fs)", gameHandler.getCastTimeRemaining());
+        } else {
+            const std::string& spellName = gameHandler.getSpellName(currentSpellId);
+            if (!spellName.empty())
+                snprintf(overlay, sizeof(overlay), "%s (%.1fs)", spellName.c_str(), gameHandler.getCastTimeRemaining());
+            else
+                snprintf(overlay, sizeof(overlay), "Casting... (%.1fs)", gameHandler.getCastTimeRemaining());
+        }
         ImGui::ProgressBar(progress, ImVec2(-1, 20), overlay);
         ImGui::PopStyleColor();
     }
@@ -4870,7 +4912,12 @@ void GameScreen::renderQuestOfferRewardWindow(game::GameHandler& gameHandler) {
         bool canComplete = quest.choiceRewards.empty() || selectedChoice >= 0;
         if (!canComplete) ImGui::BeginDisabled();
         if (ImGui::Button("Complete Quest", ImVec2(buttonW, 0))) {
-            uint32_t rewardIdx = quest.choiceRewards.empty() ? 0 : static_cast<uint32_t>(selectedChoice);
+            uint32_t rewardIdx = 0;
+            if (!quest.choiceRewards.empty() && selectedChoice >= 0 &&
+                selectedChoice < static_cast<int>(quest.choiceRewards.size())) {
+                // Server expects the original slot index from its fixed-size reward array.
+                rewardIdx = quest.choiceRewards[static_cast<size_t>(selectedChoice)].choiceSlot;
+            }
             gameHandler.chooseQuestReward(rewardIdx);
             selectedChoice = -1;
         }

@@ -3219,6 +3219,7 @@ bool QuestOfferRewardParser::parse(network::Packet& packet, QuestOfferRewardData
         item.itemId = packet.readUInt32();
         item.count = packet.readUInt32();
         item.displayInfoId = packet.readUInt32();
+        item.choiceSlot = i;
         if (item.itemId > 0)
             data.choiceRewards.push_back(item);
     }
