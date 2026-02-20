@@ -1054,55 +1054,27 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
         }
 
         if (msg.type == game::ChatType::SYSTEM) {
-            if (!tsPrefix.empty()) {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
-                ImGui::TextWrapped("%s", tsPrefix.c_str());
-                ImGui::PopStyleColor();
-                ImGui::SameLine(0, 0);
-            }
-            renderTextWithLinks(processedMessage, color);
+            renderTextWithLinks(tsPrefix + processedMessage, color);
         } else if (msg.type == game::ChatType::TEXT_EMOTE) {
-            if (!tsPrefix.empty()) {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
-                ImGui::TextWrapped("%s", tsPrefix.c_str());
-                ImGui::PopStyleColor();
-                ImGui::SameLine(0, 0);
-            }
-            renderTextWithLinks(processedMessage, color);
+            renderTextWithLinks(tsPrefix + processedMessage, color);
         } else if (!msg.senderName.empty()) {
             if (msg.type == game::ChatType::MONSTER_SAY || msg.type == game::ChatType::MONSTER_YELL) {
-                std::string prefix = tsPrefix + msg.senderName + " says: ";
-                ImGui::PushStyleColor(ImGuiCol_Text, color);
-                ImGui::TextWrapped("%s", prefix.c_str());
-                ImGui::PopStyleColor();
-                ImGui::SameLine(0, 0);
-                renderTextWithLinks(processedMessage, color);
+                std::string fullMsg = tsPrefix + msg.senderName + " says: " + processedMessage;
+                renderTextWithLinks(fullMsg, color);
             } else if (msg.type == game::ChatType::CHANNEL && !msg.channelName.empty()) {
                 int chIdx = gameHandler.getChannelIndex(msg.channelName);
                 std::string chDisplay = chIdx > 0
                     ? "[" + std::to_string(chIdx) + ". " + msg.channelName + "]"
                     : "[" + msg.channelName + "]";
-                std::string prefix = tsPrefix + chDisplay + " [" + msg.senderName + "]: ";
-                ImGui::PushStyleColor(ImGuiCol_Text, color);
-                ImGui::TextWrapped("%s", prefix.c_str());
-                ImGui::PopStyleColor();
-                ImGui::SameLine(0, 0);
-                renderTextWithLinks(processedMessage, color);
+                std::string fullMsg = tsPrefix + chDisplay + " [" + msg.senderName + "]: " + processedMessage;
+                renderTextWithLinks(fullMsg, color);
             } else {
-                std::string prefix = tsPrefix + "[" + std::string(getChatTypeName(msg.type)) + "] " + msg.senderName + ": ";
-                ImGui::PushStyleColor(ImGuiCol_Text, color);
-                ImGui::TextWrapped("%s", prefix.c_str());
-                ImGui::PopStyleColor();
-                ImGui::SameLine(0, 0);
-                renderTextWithLinks(processedMessage, color);
+                std::string fullMsg = tsPrefix + "[" + std::string(getChatTypeName(msg.type)) + "] " + msg.senderName + ": " + processedMessage;
+                renderTextWithLinks(fullMsg, color);
             }
         } else {
-            std::string prefix = tsPrefix + "[" + std::string(getChatTypeName(msg.type)) + "] ";
-            ImGui::PushStyleColor(ImGuiCol_Text, color);
-            ImGui::TextWrapped("%s", prefix.c_str());
-            ImGui::PopStyleColor();
-            ImGui::SameLine(0, 0);
-            renderTextWithLinks(processedMessage, color);
+            std::string fullMsg = tsPrefix + "[" + std::string(getChatTypeName(msg.type)) + "] " + processedMessage;
+            renderTextWithLinks(fullMsg, color);
         }
     }
 

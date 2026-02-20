@@ -76,7 +76,7 @@ struct SpellCooldownEntry {
 /**
  * Get human-readable spell cast failure reason (WoW 3.3.5a SpellCastResult)
  */
-inline const char* getSpellCastResultString(uint8_t result) {
+inline const char* getSpellCastResultString(uint8_t result, int powerType = -1) {
     // AzerothCore 3.3.5a SpellCastResult enum (SharedDefines.h)
     switch (result) {
         case 0:   return nullptr; // SUCCESS — not a failure
@@ -91,7 +91,7 @@ inline const char* getSpellCastResultString(uint8_t result) {
         case 9:   return "Aura bounced";
         case 10:  return "Autotrack interrupted";
         case 11:  return "Bad implicit targets";
-        case 12:  return "Bad targets";
+        case 12:  return "Invalid target";
         case 13:  return "Can't be charmed";
         case 14:  return "Can't be disenchanted";
         case 15:  return "Can't be disenchanted (skill)";
@@ -126,11 +126,11 @@ inline const char* getSpellCastResultString(uint8_t result) {
         case 44:  return "Item not found";
         case 45:  return "Item not ready";
         case 46:  return "Level requirement";
-        case 47:  return "Line of sight";
+        case 47:  return "Target not in line of sight";
         case 48:  return "Target too low level";
         case 49:  return "Low cast level";
         case 50:  return "Mainhand empty";
-        case 51:  return "Moving";
+        case 51:  return "Can't do that while moving";
         case 52:  return "Need ammo";
         case 53:  return "Need ammo pouch";
         case 54:  return "Need exotic ammo";
@@ -140,7 +140,7 @@ inline const char* getSpellCastResultString(uint8_t result) {
         case 58:  return "Not fishable";
         case 59:  return "Not flying";
         case 60:  return "Not here";
-        case 61:  return "Not in front";
+        case 61:  return "Target needs to be in front of you";
         case 62:  return "Not in control";
         case 63:  return "Not known";
         case 64:  return "Not mounted";
@@ -157,14 +157,21 @@ inline const char* getSpellCastResultString(uint8_t result) {
         case 75:  return "No ammo";
         case 76:  return "No charges remain";
         case 77:  return "No champion";
-        case 78:  return "No combo points";
+        case 78:  return "Not enough combo points";
         case 79:  return "No dueling";
         case 80:  return "No endurance";
         case 81:  return "No fish";
         case 82:  return "No items while shapeshifted";
         case 83:  return "No mounts allowed here";
         case 84:  return "No pet";
-        case 85:  return "Not enough mana";
+        case 85:
+            switch (powerType) {
+                case 1:  return "Not enough rage";
+                case 2:  return "Not enough focus";
+                case 3:  return "Not enough energy";
+                case 6:  return "Not enough runic power";
+                default: return "Not enough mana";
+            }
         case 86:  return "Nothing to dispel";
         case 87:  return "Nothing to steal";
         case 88:  return "Only above water";
@@ -182,8 +189,8 @@ inline const char* getSpellCastResultString(uint8_t result) {
         case 100: return "Reagents required";
         case 101: return "Requires area";
         case 102: return "Requires spell focus";
-        case 103: return "Rooted";
-        case 104: return "Silenced";
+        case 103: return "Can't do that while rooted";
+        case 104: return "Can't do that while silenced";
         case 105: return "Spell in progress";
         case 106: return "Spell learned";
         case 107: return "Spell unavailable";

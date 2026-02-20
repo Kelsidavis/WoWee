@@ -4147,9 +4147,9 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                     constexpr uint32_t UNIT_DYNFLAG_LOOTABLE = 0x0001;
                     bool unitInitiallyDead = false;
                     const uint16_t ufHealth = fieldIndex(UF::UNIT_FIELD_HEALTH);
-                    const uint16_t ufPower = fieldIndex(UF::UNIT_FIELD_POWER1);
+                    const uint16_t ufPowerBase = fieldIndex(UF::UNIT_FIELD_POWER1);
                     const uint16_t ufMaxHealth = fieldIndex(UF::UNIT_FIELD_MAXHEALTH);
-                    const uint16_t ufMaxPower = fieldIndex(UF::UNIT_FIELD_MAXPOWER1);
+                    const uint16_t ufMaxPowerBase = fieldIndex(UF::UNIT_FIELD_MAXPOWER1);
                     const uint16_t ufLevel = fieldIndex(UF::UNIT_FIELD_LEVEL);
                     const uint16_t ufFaction = fieldIndex(UF::UNIT_FIELD_FACTIONTEMPLATE);
                     const uint16_t ufFlags = fieldIndex(UF::UNIT_FIELD_FLAGS);
@@ -4157,6 +4157,7 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                     const uint16_t ufDisplayId = fieldIndex(UF::UNIT_FIELD_DISPLAYID);
                     const uint16_t ufMountDisplayId = fieldIndex(UF::UNIT_FIELD_MOUNTDISPLAYID);
                     const uint16_t ufNpcFlags = fieldIndex(UF::UNIT_NPC_FLAGS);
+                    const uint16_t ufBytes0 = fieldIndex(UF::UNIT_FIELD_BYTES_0);
                     for (const auto& [key, val] : block.fields) {
                         if (key == ufHealth) {
                             unit->setHealth(val);
@@ -4167,9 +4168,14 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                 playerDead_ = true;
                                 LOG_INFO("Player logged in dead");
                             }
-                        } else if (key == ufPower) { unit->setPower(val); }
-                        else if (key == ufMaxHealth) { unit->setMaxHealth(val); }
-                        else if (key == ufMaxPower) { unit->setMaxPower(val); }
+                        } else if (key == ufBytes0) {
+                            unit->setPowerType(static_cast<uint8_t>((val >> 24) & 0xFF));
+                        } else if (key >= ufPowerBase && key < ufPowerBase + 7) {
+                            unit->setPowerByType(static_cast<uint8_t>(key - ufPowerBase), val);
+                        } else if (key == ufMaxHealth) { unit->setMaxHealth(val); }
+                        else if (key >= ufMaxPowerBase && key < ufMaxPowerBase + 7) {
+                            unit->setMaxPowerByType(static_cast<uint8_t>(key - ufMaxPowerBase), val);
+                        }
                         else if (key == ufFaction) { unit->setFactionTemplate(val); }
                         else if (key == ufFlags) { unit->setUnitFlags(val); }
                         else if (key == ufDynFlags) {
@@ -4505,9 +4511,9 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                         bool npcDeathNotified = false;
                         bool npcRespawnNotified = false;
                         const uint16_t ufHealth = fieldIndex(UF::UNIT_FIELD_HEALTH);
-                        const uint16_t ufPower = fieldIndex(UF::UNIT_FIELD_POWER1);
+                        const uint16_t ufPowerBase = fieldIndex(UF::UNIT_FIELD_POWER1);
                         const uint16_t ufMaxHealth = fieldIndex(UF::UNIT_FIELD_MAXHEALTH);
-                        const uint16_t ufMaxPower = fieldIndex(UF::UNIT_FIELD_MAXPOWER1);
+                        const uint16_t ufMaxPowerBase = fieldIndex(UF::UNIT_FIELD_MAXPOWER1);
                         const uint16_t ufLevel = fieldIndex(UF::UNIT_FIELD_LEVEL);
                         const uint16_t ufFaction = fieldIndex(UF::UNIT_FIELD_FACTIONTEMPLATE);
                         const uint16_t ufFlags = fieldIndex(UF::UNIT_FIELD_FLAGS);
@@ -4515,6 +4521,7 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                         const uint16_t ufDisplayId = fieldIndex(UF::UNIT_FIELD_DISPLAYID);
                         const uint16_t ufMountDisplayId = fieldIndex(UF::UNIT_FIELD_MOUNTDISPLAYID);
                         const uint16_t ufNpcFlags = fieldIndex(UF::UNIT_NPC_FLAGS);
+                        const uint16_t ufBytes0 = fieldIndex(UF::UNIT_FIELD_BYTES_0);
                         for (const auto& [key, val] : block.fields) {
                             if (key == ufHealth) {
                                 uint32_t oldHealth = unit->getHealth();
@@ -4548,9 +4555,14 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                         npcRespawnNotified = true;
                                     }
                                 }
-                            } else if (key == ufPower) { unit->setPower(val); }
-                            else if (key == ufMaxHealth) { unit->setMaxHealth(val); }
-                            else if (key == ufMaxPower) { unit->setMaxPower(val); }
+                            } else if (key == ufBytes0) {
+                                unit->setPowerType(static_cast<uint8_t>((val >> 24) & 0xFF));
+                            } else if (key >= ufPowerBase && key < ufPowerBase + 7) {
+                                unit->setPowerByType(static_cast<uint8_t>(key - ufPowerBase), val);
+                            } else if (key == ufMaxHealth) { unit->setMaxHealth(val); }
+                            else if (key >= ufMaxPowerBase && key < ufMaxPowerBase + 7) {
+                                unit->setMaxPowerByType(static_cast<uint8_t>(key - ufMaxPowerBase), val);
+                            }
                             else if (key == ufFlags) { unit->setUnitFlags(val); }
                             else if (key == ufDynFlags) {
                                 uint32_t oldDyn = unit->getDynamicFlags();
@@ -8109,7 +8121,12 @@ void GameHandler::handleCastFailed(network::Packet& packet) {
     castTimeRemaining = 0.0f;
 
     // Add system message about failed cast with readable reason
-    const char* reason = getSpellCastResultString(data.result);
+    int powerType = -1;
+    auto playerEntity = entityManager.getEntity(playerGuid);
+    if (auto playerUnit = std::dynamic_pointer_cast<Unit>(playerEntity)) {
+        powerType = playerUnit->getPowerType();
+    }
+    const char* reason = getSpellCastResultString(data.result, powerType);
     MessageChatData msg;
     msg.type = ChatType::SYSTEM;
     msg.language = ChatLanguage::UNIVERSAL;
