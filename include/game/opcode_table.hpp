@@ -139,8 +139,10 @@ enum class LogicalOpcode : uint16_t {
     MSG_RAID_READY_CHECK,
     MSG_RAID_READY_CHECK_CONFIRM,
 
+    // ---- Items ----
+    SMSG_ITEM_PUSH_RESULT,
+
     // ---- Duel ----
-    CMSG_DUEL_PROPOSED,
     CMSG_DUEL_ACCEPTED,
     CMSG_DUEL_CANCELLED,
     SMSG_DUEL_REQUESTED,
@@ -330,7 +332,7 @@ enum class LogicalOpcode : uint16_t {
     // ---- Taxi / Flight Paths ----
     SMSG_SHOWTAXINODES,
     SMSG_ACTIVATETAXIREPLY,
-    SMSG_ACTIVATETAXIREPLY_ALT,
+    SMSG_STANDSTATE_UPDATE,
     SMSG_NEW_TAXI_PATH,
     CMSG_ACTIVATETAXIEXPRESS,
 

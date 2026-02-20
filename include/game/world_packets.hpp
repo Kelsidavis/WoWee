@@ -1246,7 +1246,7 @@ public:
 // Combat and Trade
 // ============================================================
 
-/** CMSG_DUEL_PROPOSED packet builder */
+/** Duel request packet builder (implemented via CMSG_CAST_SPELL, spell 7266) */
 class DuelProposedPacket {
 public:
     static network::Packet build(uint64_t targetGuid);

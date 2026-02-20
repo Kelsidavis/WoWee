@@ -1229,9 +1229,9 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 handleRandomRoll(packet);
             }
             break;
-        case Opcode::CMSG_DUEL_PROPOSED:
-            // Some servers reuse this wire value for an outbound server packet variant.
-            // Consume safely until we have a concrete parser.
+        case Opcode::SMSG_ITEM_PUSH_RESULT:
+            // Item received notification (new item in bags, loot, quest reward, etc.)
+            // TODO: parse and show "item received" UI notification
             packet.setReadPos(packet.getSize());
             break;
 
@@ -2247,8 +2247,12 @@ void GameHandler::handlePacket(network::Packet& packet) {
             handleShowTaxiNodes(packet);
             break;
         case Opcode::SMSG_ACTIVATETAXIREPLY:
-        case Opcode::SMSG_ACTIVATETAXIREPLY_ALT:
             handleActivateTaxiReply(packet);
+            break;
+        case Opcode::SMSG_STANDSTATE_UPDATE:
+            // Server confirms stand state change (sit/stand/sleep/kneel)
+            // TODO: parse uint8 standState and update player entity
+            packet.setReadPos(packet.getSize());
             break;
         case Opcode::SMSG_NEW_TAXI_PATH:
             // Empty packet - server signals a new flight path was learned

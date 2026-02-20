@@ -1885,9 +1885,11 @@ network::Packet RequestRaidInfoPacket::build() {
 // ============================================================
 
 network::Packet DuelProposedPacket::build(uint64_t targetGuid) {
-    network::Packet packet(wireOpcode(Opcode::CMSG_DUEL_PROPOSED));
-    packet.writeUInt64(targetGuid);
-    LOG_DEBUG("Built CMSG_DUEL_PROPOSED for target: 0x", std::hex, targetGuid, std::dec);
+    // TODO: Duels are initiated via CMSG_CAST_SPELL with spell 7266,
+    // not a dedicated CMSG_DUEL_PROPOSED opcode (which doesn't exist in WoW).
+    // For now, build a cast spell packet targeting the opponent.
+    auto packet = CastSpellPacket::build(7266, targetGuid, 0);
+    LOG_DEBUG("Built duel request (spell 7266) for target: 0x", std::hex, targetGuid, std::dec);
     return packet;
 }
 
