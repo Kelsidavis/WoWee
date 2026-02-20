@@ -1008,6 +1008,9 @@ private:
      */
     void handleMotd(network::Packet& packet);
 
+    /** Handle SMSG_NOTIFICATION (vanilla/classic server notification string) */
+    void handleNotification(network::Packet& packet);
+
     /**
      * Handle SMSG_PONG from server
      */

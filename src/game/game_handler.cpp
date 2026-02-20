@@ -1119,6 +1119,11 @@ void GameHandler::handlePacket(network::Packet& packet) {
             handleMotd(packet);
             break;
 
+        case Opcode::SMSG_NOTIFICATION:
+            // Vanilla/Classic server notification (single string)
+            handleNotification(packet);
+            break;
+
         case Opcode::SMSG_PONG:
             // Can be received at any time after entering world
             handlePong(packet);
@@ -3596,6 +3601,15 @@ void GameHandler::handleMotd(network::Packet& packet) {
             addSystemChatMessage(std::string("MOTD: ") + line);
         }
         LOG_INFO("========================================");
+    }
+}
+
+void GameHandler::handleNotification(network::Packet& packet) {
+    // SMSG_NOTIFICATION: single null-terminated string
+    std::string message = packet.readString();
+    if (!message.empty()) {
+        LOG_INFO("Server notification: ", message);
+        addSystemChatMessage(message);
     }
 }
 

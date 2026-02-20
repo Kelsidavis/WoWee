@@ -60,6 +60,7 @@ enum class LogicalOpcode : uint16_t {
     SMSG_CLIENTCACHE_VERSION,
     SMSG_FEATURE_SYSTEM_STATUS,
     SMSG_MOTD,
+    SMSG_NOTIFICATION,
 
     // ---- Entity/Object updates ----
     SMSG_UPDATE_OBJECT,
