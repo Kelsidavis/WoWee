@@ -7830,12 +7830,12 @@ void GameHandler::handleMonsterMove(network::Packet& packet) {
         }
 
         network::Packet decompPacket(packet.getOpcode(), parseBytes);
-        if (!MonsterMoveParser::parseVanilla(decompPacket, data)) {
+        if (!packetParsers_->parseMonsterMove(decompPacket, data)) {
             LOG_WARNING("Failed to parse vanilla SMSG_MONSTER_MOVE (decompressed ",
                         destLen, " bytes, parseBytes ", parseBytes.size(), " bytes)");
             return;
         }
-    } else if (!MonsterMoveParser::parse(packet, data)) {
+    } else if (!packetParsers_->parseMonsterMove(packet, data)) {
         LOG_WARNING("Failed to parse SMSG_MONSTER_MOVE");
         return;
     }

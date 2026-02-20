@@ -326,6 +326,9 @@ public:
     network::Packet buildQueryQuestPacket(uint64_t npcGuid, uint32_t questId) override;
     bool parseQuestDetails(network::Packet& packet, QuestDetailsData& data) override;
     uint8_t questLogStride() const override { return 3; }
+    bool parseMonsterMove(network::Packet& packet, MonsterMoveData& data) override {
+        return MonsterMoveParser::parseVanilla(packet, data);
+    }
 };
 
 /**
