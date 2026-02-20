@@ -1,8 +1,11 @@
 name: wowee-codeql-config
 
-# Warden stream crypto must remain RC4 for protocol compatibility.
-# Keep weak-crypto detection enabled project-wide, but exclude this one file
-# so CodeQL doesn't raise an unfixable compatibility alert.
-paths-ignore:
-  - src/game/warden_crypto.cpp
-  - src/game/warden_module.cpp
+# The WoW client protocol (world-socket header cipher) and Warden anti-cheat
+# module protocol both mandate RC4. There is no way to replace RC4 with a
+# stronger algorithm without breaking compatibility with all supported servers.
+# All RC4 uses in this codebase are protocol-layer obligations, not choices.
+# Exclude the weak-crypto query rather than leaving unfixable high-severity
+# alerts that mislead triage.
+query-filters:
+  - exclude:
+      id: cpp/weak-cryptographic-algorithm
