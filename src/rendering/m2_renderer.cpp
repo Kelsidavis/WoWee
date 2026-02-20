@@ -1252,6 +1252,20 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
                 }
             }
 
+            // Diagnostic: log batch details for light/lamp models to debug glow rendering
+            if (lowerName.find("light") != std::string::npos ||
+                lowerName.find("lamp") != std::string::npos ||
+                lowerName.find("lantern") != std::string::npos) {
+                LOG_INFO("M2 GLOW DIAG '", model.name, "' batch ", gpuModel.batches.size(),
+                         ": blend=", bgpu.blendMode, " matFlags=0x",
+                         std::hex, bgpu.materialFlags, std::dec,
+                         " colorKey=", bgpu.colorKeyBlack ? "Y" : "N",
+                         " hasAlpha=", bgpu.hasAlpha ? "Y" : "N",
+                         " unlit=", (bgpu.materialFlags & 0x01) ? "Y" : "N",
+                         " glowSize=", bgpu.glowSize,
+                         " tex=", bgpu.texture,
+                         " idxCount=", bgpu.indexCount);
+            }
             gpuModel.batches.push_back(bgpu);
         }
     } else {
@@ -2064,15 +2078,9 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
 
             // Apply per-batch blend mode from M2 material (only if changed)
             // 0=Opaque, 1=AlphaKey, 2=Alpha, 3=Add, 4=Mod, 5=Mod2x, 6=BlendAdd, 7=Screen
-            // Glow textures (colorKeyBlack) are designed for additive blending;
-            // override non-additive modes to prevent black backgrounds.
-            uint16_t effectiveBlend = batch.blendMode;
-            if (batch.colorKeyBlack && effectiveBlend >= 1 && effectiveBlend <= 2) {
-                effectiveBlend = 3; // Force additive for glow textures
-            }
             bool batchTransparent = false;
-            if (effectiveBlend != lastBlendMode) {
-                switch (effectiveBlend) {
+            if (batch.blendMode != lastBlendMode) {
+                switch (batch.blendMode) {
                     case 0: // Opaque
                         glBlendFunc(GL_ONE, GL_ZERO);
                         break;
@@ -2103,11 +2111,11 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
                         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                         break;
                 }
-                lastBlendMode = effectiveBlend;
-                shader->setUniform("uBlendMode", static_cast<int>(effectiveBlend));
+                lastBlendMode = batch.blendMode;
+                shader->setUniform("uBlendMode", static_cast<int>(batch.blendMode));
             } else {
                 // Still need to know if batch is transparent for depth mask logic
-                batchTransparent = (effectiveBlend >= 2);
+                batchTransparent = (batch.blendMode >= 2);
             }
 
             // Disable depth writes for transparent/additive batches
@@ -2946,26 +2954,12 @@ GLuint M2Renderer::loadTexture(const std::string& path, uint32_t texFlags) {
 
     // Track whether the texture actually uses alpha (any pixel with alpha < 255).
     bool hasAlpha = false;
-    // Detect glow-like textures by pixel content: mostly dark with some bright pixels.
-    // These are flame/glow cards where black = transparent (designed for additive blend).
-    uint32_t totalPixels = 0;
-    uint32_t darkPixels = 0;
-    uint32_t brightPixels = 0;
-    for (size_t i = 0; i + 3 < blp.data.size(); i += 4) {
-        uint8_t r = blp.data[i], g = blp.data[i+1], b = blp.data[i+2];
-        if (blp.data[i+3] != 255) hasAlpha = true;
-        uint8_t mx = std::max({r, g, b});
-        totalPixels++;
-        if (mx < 26) darkPixels++;        // near-black (<~0.1)
-        else if (mx > 180) brightPixels++; // bright (>~0.7)
+    for (size_t i = 3; i < blp.data.size(); i += 4) {
+        if (blp.data[i] != 255) {
+            hasAlpha = true;
+            break;
+        }
     }
-    bool glowByContent = false;
-    if (totalPixels > 0) {
-        float darkRatio = static_cast<float>(darkPixels) / totalPixels;
-        // Glow texture: >60% dark pixels with some bright pixels present
-        glowByContent = (darkRatio > 0.60f && brightPixels > 0);
-    }
-    bool colorKeyBlack = colorKeyBlackHint || glowByContent;
 
     GLuint textureID;
     glGenTextures(1, &textureID);
@@ -2990,12 +2984,12 @@ GLuint M2Renderer::loadTexture(const std::string& path, uint32_t texFlags) {
     size_t base = static_cast<size_t>(blp.width) * static_cast<size_t>(blp.height) * 4ull;
     e.approxBytes = base + (base / 3);
     e.hasAlpha = hasAlpha;
-    e.colorKeyBlack = colorKeyBlack;
+    e.colorKeyBlack = colorKeyBlackHint;
     e.lastUse = ++textureCacheCounter_;
     textureCacheBytes_ += e.approxBytes;
     textureCache[key] = e;
     textureHasAlphaById_[textureID] = hasAlpha;
-    textureColorKeyBlackById_[textureID] = colorKeyBlack;
+    textureColorKeyBlackById_[textureID] = colorKeyBlackHint;
     LOG_DEBUG("M2: Loaded texture: ", path, " (", blp.width, "x", blp.height, ")");
 
     return textureID;
