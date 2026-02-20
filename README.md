@@ -88,6 +88,12 @@ sudo pacman -S sdl2 glew glm openssl cmake base-devel \
                  stormlib                # for asset_extract
 ```
 
+### Container build
+You can use podman to build application in separate container.
+- Install podman 
+- Then run `container/build-in-container.sh`
+- Artifacts can be found in `/tmp/wowee.[random value].[commit hash]`
+
 ### Game Data
 
 This project requires WoW client data that you extract from your own legally obtained install.
