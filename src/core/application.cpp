@@ -3155,6 +3155,18 @@ void Application::buildCreatureDisplayLookups() {
 std::string Application::getModelPathForDisplayId(uint32_t displayId) const {
     if (displayId == 30412) return "Creature\\Gryphon\\Gryphon.m2";
     if (displayId == 30413) return "Creature\\Wyvern\\Wyvern.m2";
+
+    // WotLK servers can send display IDs that do not exist in older/local
+    // CreatureDisplayInfo datasets. Keep those creatures visible by falling
+    // back to a close base model instead of dropping spawn entirely.
+    switch (displayId) {
+        case 31048: // Diseased Young Wolf variants (AzerothCore WotLK)
+        case 31049: // Diseased Wolf variants (AzerothCore WotLK)
+            return "Creature\\Wolf\\Wolf.m2";
+        default:
+            break;
+    }
+
     auto itData = displayDataMap_.find(displayId);
     if (itData == displayDataMap_.end()) {
         // Some sources (e.g., taxi nodes) may provide a modelId directly.

@@ -9736,8 +9736,14 @@ void GameHandler::handleQuestDetails(network::Packet& packet) {
 void GameHandler::acceptQuest() {
     if (!questDetailsOpen || state != WorldState::IN_WORLD || !socket) return;
     uint64_t npcGuid = currentQuestDetails.npcGuid;
-    auto packet = QuestgiverAcceptQuestPacket::build(
-        npcGuid, currentQuestDetails.questId);
+    // WotLK/TBC expect an additional trailing flag on CMSG_QUESTGIVER_ACCEPT_QUEST.
+    // Classic/Turtle use the short form (guid + questId only).
+    network::Packet packet(wireOpcode(Opcode::CMSG_QUESTGIVER_ACCEPT_QUEST));
+    packet.writeUInt64(npcGuid);
+    packet.writeUInt32(currentQuestDetails.questId);
+    if (!isActiveExpansion("classic") && !isActiveExpansion("turtle")) {
+        packet.writeUInt8(1); // from-gossip / auto-accept continuation flag
+    }
     socket->send(packet);
 
     // Add to quest log
