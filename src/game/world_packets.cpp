@@ -73,26 +73,57 @@ network::Packet AuthSessionPacket::build(uint32_t build,
     // Authentication hash/digest (20 bytes)
     packet.writeBytes(authHash.data(), authHash.size());
 
-    // Addon info - compressed block with 0 addons
-    // AzerothCore format: uint32 decompressedSize + zlib compressed data
-    // Decompressed format: uint32 addonCount + [addons...] + uint32 clientTime
-    uint8_t addonData[8] = {
-        0, 0, 0, 0,  // addon count = 0
-        0, 0, 0, 0   // client time = 0
-    };
-    uint32_t decompressedSize = 8;
+    // Addon info - compressed block
+    // Format differs between expansions:
+    //   Vanilla/TBC (CMaNGOS): while-loop of {string name, uint8 flags, uint32 modulusCRC, uint32 urlCRC}
+    //   WotLK (AzerothCore): uint32 addonCount + {string name, uint8 enabled, uint32 crc, uint32 unk} + uint32 clientTime
+    std::vector<uint8_t> addonData;
+    if (isTbc) {
+        // Vanilla/TBC: each addon entry = null-terminated name + uint8 flags + uint32 modulusCRC + uint32 urlCRC
+        // Send standard Blizzard addons that CMaNGOS anticheat expects for fingerprinting
+        static const char* vanillaAddons[] = {
+            "Blizzard_AuctionUI", "Blizzard_BattlefieldMinimap", "Blizzard_BindingUI",
+            "Blizzard_CombatText", "Blizzard_CraftUI", "Blizzard_GMSurveyUI",
+            "Blizzard_InspectUI", "Blizzard_MacroUI", "Blizzard_RaidUI",
+            "Blizzard_TalentUI", "Blizzard_TradeSkillUI", "Blizzard_TrainerUI"
+        };
+        static const uint32_t standardModulusCRC = 0x4C1C776D;
+        for (const char* name : vanillaAddons) {
+            // string (null-terminated)
+            size_t len = strlen(name);
+            addonData.insert(addonData.end(), reinterpret_cast<const uint8_t*>(name),
+                             reinterpret_cast<const uint8_t*>(name) + len + 1);
+            // uint8 flags = 1 (enabled)
+            addonData.push_back(0x01);
+            // uint32 modulusCRC (little-endian)
+            addonData.push_back(static_cast<uint8_t>(standardModulusCRC & 0xFF));
+            addonData.push_back(static_cast<uint8_t>((standardModulusCRC >> 8) & 0xFF));
+            addonData.push_back(static_cast<uint8_t>((standardModulusCRC >> 16) & 0xFF));
+            addonData.push_back(static_cast<uint8_t>((standardModulusCRC >> 24) & 0xFF));
+            // uint32 urlCRC = 0
+            addonData.push_back(0); addonData.push_back(0);
+            addonData.push_back(0); addonData.push_back(0);
+        }
+    } else {
+        // WotLK: uint32 addonCount + entries + uint32 clientTime
+        // Send 0 addons
+        addonData = { 0, 0, 0, 0,  // addonCount = 0
+                      0, 0, 0, 0 }; // clientTime = 0
+    }
+    uint32_t decompressedSize = static_cast<uint32_t>(addonData.size());
 
     // Compress with zlib
     uLongf compressedSize = compressBound(decompressedSize);
     std::vector<uint8_t> compressed(compressedSize);
-    int ret = compress(compressed.data(), &compressedSize, addonData, decompressedSize);
+    int ret = compress(compressed.data(), &compressedSize, addonData.data(), decompressedSize);
     if (ret == Z_OK) {
         compressed.resize(compressedSize);
         // Write decompressedSize, then compressed bytes
         packet.writeUInt32(decompressedSize);
         packet.writeBytes(compressed.data(), compressed.size());
         LOG_DEBUG("Addon info: decompressedSize=", decompressedSize,
-                  " compressedSize=", compressedSize);
+                  " compressedSize=", compressedSize, " addons=",
+                  isTbc ? "12 vanilla" : "0 wotlk");
     } else {
         LOG_ERROR("zlib compress failed with code: ", ret);
         packet.writeUInt32(0);
@@ -191,16 +222,22 @@ bool AuthChallengeParser::parse(network::Packet& packet, AuthChallengeData& data
         return false;
     }
 
-    if (packet.getSize() < 8) {
-        // TBC format: just the server seed (4 bytes)
+    if (packet.getSize() <= 4) {
+        // Original vanilla/TBC format: just the server seed (4 bytes)
         data.unknown1 = 0;
         data.serverSeed = packet.readUInt32();
-        LOG_INFO("Parsed SMSG_AUTH_CHALLENGE (TBC format):");
+        LOG_INFO("Parsed SMSG_AUTH_CHALLENGE (TBC format, 4 bytes):");
+    } else if (packet.getSize() < 40) {
+        // Vanilla with encryption seeds (36 bytes): serverSeed + 32 bytes seeds
+        // No "unknown1" prefix — first uint32 IS the server seed
+        data.unknown1 = 0;
+        data.serverSeed = packet.readUInt32();
+        LOG_INFO("Parsed SMSG_AUTH_CHALLENGE (Classic+seeds format, ", packet.getSize(), " bytes):");
     } else {
-        // WotLK format: unknown1 + serverSeed + encryption seeds
+        // WotLK format (40+ bytes): unknown1 + serverSeed + 32 bytes encryption seeds
         data.unknown1 = packet.readUInt32();
         data.serverSeed = packet.readUInt32();
-        LOG_INFO("Parsed SMSG_AUTH_CHALLENGE (WotLK format):");
+        LOG_INFO("Parsed SMSG_AUTH_CHALLENGE (WotLK format, ", packet.getSize(), " bytes):");
         LOG_INFO("  Unknown1: 0x", std::hex, data.unknown1, std::dec);
     }
 

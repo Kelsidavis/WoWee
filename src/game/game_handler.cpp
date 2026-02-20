@@ -3431,12 +3431,12 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         // Lazy-load WoW.exe PE image on first MEM_CHECK
                         if (!wardenMemory_) {
                             wardenMemory_ = std::make_unique<WardenMemory>();
-                            if (!wardenMemory_->load()) {
+                            if (!wardenMemory_->load(static_cast<uint16_t>(build))) {
                                 LOG_WARNING("Warden: Could not load WoW.exe for MEM_CHECK");
                             }
                         }
 
-                        // Read real bytes from PE image (falls back to zeros if unavailable)
+                        // Read bytes from PE image (includes patched runtime globals)
                         std::vector<uint8_t> memBuf(readLen, 0);
                         if (wardenMemory_->isLoaded() && wardenMemory_->readMemory(offset, readLen, memBuf.data())) {
                             LOG_INFO("Warden:   MEM_CHECK served from PE image");
@@ -4161,6 +4161,11 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                     const uint16_t ufNpcFlags = fieldIndex(UF::UNIT_NPC_FLAGS);
                     const uint16_t ufBytes0 = fieldIndex(UF::UNIT_FIELD_BYTES_0);
                     for (const auto& [key, val] : block.fields) {
+                        // Check all specific fields BEFORE power/maxpower range checks.
+                        // In Classic, power indices (23-27) are adjacent to maxHealth (28),
+                        // and maxPower indices (29-33) are adjacent to level (34) and faction (35).
+                        // A range check like "key >= powerBase && key < powerBase+7" would
+                        // incorrectly capture maxHealth/level/faction in Classic's tight layout.
                         if (key == ufHealth) {
                             unit->setHealth(val);
                             if (block.objectType == ObjectType::UNIT && val == 0) {
@@ -4170,16 +4175,15 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                 playerDead_ = true;
                                 LOG_INFO("Player logged in dead");
                             }
-                        } else if (key == ufBytes0) {
-                            unit->setPowerType(static_cast<uint8_t>((val >> 24) & 0xFF));
-                        } else if (key >= ufPowerBase && key < ufPowerBase + 7) {
-                            unit->setPowerByType(static_cast<uint8_t>(key - ufPowerBase), val);
                         } else if (key == ufMaxHealth) { unit->setMaxHealth(val); }
-                        else if (key >= ufMaxPowerBase && key < ufMaxPowerBase + 7) {
-                            unit->setMaxPowerByType(static_cast<uint8_t>(key - ufMaxPowerBase), val);
-                        }
-                        else if (key == ufFaction) { unit->setFactionTemplate(val); }
+                        else if (key == ufLevel) {
+                            unit->setLevel(val);
+                        } else if (key == ufFaction) { unit->setFactionTemplate(val); }
                         else if (key == ufFlags) { unit->setUnitFlags(val); }
+                        else if (key == ufBytes0) {
+                            unit->setPowerType(static_cast<uint8_t>((val >> 24) & 0xFF));
+                        } else if (key == ufDisplayId) { unit->setDisplayId(val); }
+                        else if (key == ufNpcFlags) { unit->setNpcFlags(val); }
                         else if (key == ufDynFlags) {
                             unit->setDynamicFlags(val);
                             if (block.objectType == ObjectType::UNIT &&
@@ -4187,8 +4191,12 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                 unitInitiallyDead = true;
                             }
                         }
-                        else if (key == ufLevel) { unit->setLevel(val); }
-                        else if (key == ufDisplayId) { unit->setDisplayId(val); }
+                        // Power/maxpower range checks AFTER all specific fields
+                        else if (key >= ufPowerBase && key < ufPowerBase + 7) {
+                            unit->setPowerByType(static_cast<uint8_t>(key - ufPowerBase), val);
+                        } else if (key >= ufMaxPowerBase && key < ufMaxPowerBase + 7) {
+                            unit->setMaxPowerByType(static_cast<uint8_t>(key - ufMaxPowerBase), val);
+                        }
                         else if (key == ufMountDisplayId) {
                             if (block.guid == playerGuid) {
                                 uint32_t old = currentMountDisplayId_;
@@ -4557,15 +4565,12 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                         npcRespawnNotified = true;
                                     }
                                 }
-                            } else if (key == ufBytes0) {
-                                unit->setPowerType(static_cast<uint8_t>((val >> 24) & 0xFF));
-                            } else if (key >= ufPowerBase && key < ufPowerBase + 7) {
-                                unit->setPowerByType(static_cast<uint8_t>(key - ufPowerBase), val);
+                            // Specific fields checked BEFORE power/maxpower range checks
+                            // (Classic packs maxHealth/level/faction adjacent to power indices)
                             } else if (key == ufMaxHealth) { unit->setMaxHealth(val); }
-                            else if (key >= ufMaxPowerBase && key < ufMaxPowerBase + 7) {
-                                unit->setMaxPowerByType(static_cast<uint8_t>(key - ufMaxPowerBase), val);
-                            }
-                            else if (key == ufFlags) { unit->setUnitFlags(val); }
+                            else if (key == ufBytes0) {
+                                unit->setPowerType(static_cast<uint8_t>((val >> 24) & 0xFF));
+                            } else if (key == ufFlags) { unit->setUnitFlags(val); }
                             else if (key == ufDynFlags) {
                                 uint32_t oldDyn = unit->getDynamicFlags();
                                 unit->setDynamicFlags(val);
@@ -4648,6 +4653,12 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                 }
                                 unit->setMountDisplayId(val);
                             } else if (key == ufNpcFlags) { unit->setNpcFlags(val); }
+                            // Power/maxpower range checks AFTER all specific fields
+                            else if (key >= ufPowerBase && key < ufPowerBase + 7) {
+                                unit->setPowerByType(static_cast<uint8_t>(key - ufPowerBase), val);
+                            } else if (key >= ufMaxPowerBase && key < ufMaxPowerBase + 7) {
+                                unit->setMaxPowerByType(static_cast<uint8_t>(key - ufMaxPowerBase), val);
+                            }
                         }
 
                         // Some units/players are created without displayId and get it later via VALUES.

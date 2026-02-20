@@ -17,8 +17,9 @@ public:
     WardenMemory();
     ~WardenMemory();
 
-    /** Search standard candidate dirs for WoW.exe and load it. */
-    bool load();
+    /** Search standard candidate dirs for WoW.exe and load it.
+     *  @param build Client build number (e.g. 5875 for Classic 1.12.1) to select the right exe. */
+    bool load(uint16_t build = 0);
 
     /** Load PE image from a specific file path. */
     bool loadFromFile(const std::string& exePath);
@@ -44,7 +45,10 @@ private:
 
     bool parsePE(const std::vector<uint8_t>& fileData);
     void initKuserSharedData();
-    std::string findWowExe() const;
+    void patchRuntimeGlobals();
+    void writeLE32(uint32_t va, uint32_t value);
+    std::string findWowExe(uint16_t build) const;
+    static uint32_t expectedImageSizeForBuild(uint16_t build);
 };
 
 } // namespace game
