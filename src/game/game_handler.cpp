@@ -1777,9 +1777,32 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_ENVIRONMENTALDAMAGELOG:
         case Opcode::SMSG_SET_PROFICIENCY:
         case Opcode::SMSG_ACTION_BUTTONS:
-        case Opcode::SMSG_LEVELUP_INFO:
-        case Opcode::SMSG_LEVELUP_INFO_ALT:
             break;
+
+        case Opcode::SMSG_LEVELUP_INFO:
+        case Opcode::SMSG_LEVELUP_INFO_ALT: {
+            // Server-authoritative level-up event.
+            // First field is always the new level in Classic/TBC/WotLK-era layouts.
+            if (packet.getSize() - packet.getReadPos() >= 4) {
+                uint32_t newLevel = packet.readUInt32();
+                if (newLevel > 0) {
+                    uint32_t oldLevel = serverPlayerLevel_;
+                    serverPlayerLevel_ = std::max(serverPlayerLevel_, newLevel);
+                    for (auto& ch : characters) {
+                        if (ch.guid == playerGuid) {
+                            ch.level = serverPlayerLevel_;
+                            break;
+                        }
+                    }
+                    if (newLevel > oldLevel && levelUpCallback_) {
+                        levelUpCallback_(newLevel);
+                    }
+                }
+            }
+            // Remaining payload (hp/mana/stat deltas) is optional for our client.
+            packet.setReadPos(packet.getSize());
+            break;
+        }
 
         case Opcode::SMSG_PLAY_SOUND:
             if (packet.getSize() - packet.getReadPos() >= 4) {
@@ -5121,7 +5144,6 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                 LOG_INFO("Next level XP updated: ", val);
                             }
                             else if (key == ufPlayerLevel) {
-                                uint32_t oldLevel = serverPlayerLevel_;
                                 serverPlayerLevel_ = val;
                                 LOG_INFO("Level updated: ", val);
                                 for (auto& ch : characters) {
@@ -5129,9 +5151,6 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                         ch.level = val;
                                         break;
                                     }
-                                }
-                                if (val > oldLevel && oldLevel > 0 && levelUpCallback_) {
-                                    levelUpCallback_(val);
                                 }
                             }
                             else if (key == ufCoinage) {
