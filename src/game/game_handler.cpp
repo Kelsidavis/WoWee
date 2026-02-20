@@ -877,10 +877,29 @@ void GameHandler::update(float deltaTime) {
                     LOG_INFO("Left combat: target too far (", dist, " yards)");
                 } else if (state == WorldState::IN_WORLD && socket) {
                     autoAttackResendTimer_ += deltaTime;
+                    autoAttackFacingSyncTimer_ += deltaTime;
                     if (autoAttackResendTimer_ >= 1.0f) {
                         autoAttackResendTimer_ = 0.0f;
                         auto pkt = AttackSwingPacket::build(autoAttackTarget);
                         socket->send(pkt);
+                    }
+                    // Keep server-facing aligned with our current melee target.
+                    // Some vanilla-family realms become strict about front-arc checks unless
+                    // the client sends explicit facing updates while stationary.
+                    if (autoAttackFacingSyncTimer_ >= 0.20f) {
+                        autoAttackFacingSyncTimer_ = 0.0f;
+                        float toTargetX = targetEntity->getX() - movementInfo.x;
+                        float toTargetY = targetEntity->getY() - movementInfo.y;
+                        if (std::abs(toTargetX) > 0.01f || std::abs(toTargetY) > 0.01f) {
+                            float desired = std::atan2(-toTargetY, toTargetX);
+                            float diff = desired - movementInfo.orientation;
+                            while (diff > static_cast<float>(M_PI)) diff -= 2.0f * static_cast<float>(M_PI);
+                            while (diff < -static_cast<float>(M_PI)) diff += 2.0f * static_cast<float>(M_PI);
+                            if (std::abs(diff) > 0.12f) { // ~7 degrees
+                                movementInfo.orientation = desired;
+                                sendMovement(Opcode::MSG_MOVE_SET_FACING);
+                            }
+                        }
                     }
                 }
             }
@@ -1011,11 +1030,34 @@ void GameHandler::handlePacket(network::Packet& packet) {
     uint16_t opcode = packet.getOpcode();
 
     // Vanilla compatibility aliases:
-    // - 0x006B: SMSG_WEATHER (some vanilla-family servers)
+    // - 0x006B: can be SMSG_COMPRESSED_MOVES on some vanilla-family servers
+    //           and SMSG_WEATHER on others
     // - 0x0103: SMSG_PLAY_MUSIC (some vanilla-family servers)
     //
     // We gate these by payload shape so expansion-native mappings remain intact.
     if (opcode == 0x006B) {
+        // Try compressed movement batch first:
+        // [u8 subSize][u16 subOpcode][subPayload...] ...
+        // where subOpcode is typically SMSG_MONSTER_MOVE / SMSG_MONSTER_MOVE_TRANSPORT.
+        const auto& data = packet.getData();
+        if (packet.getReadPos() + 3 <= data.size()) {
+            size_t pos = packet.getReadPos();
+            uint8_t subSize = data[pos];
+            if (subSize >= 2 && pos + 1 + subSize <= data.size()) {
+                uint16_t subOpcode = static_cast<uint16_t>(data[pos + 1]) |
+                                     (static_cast<uint16_t>(data[pos + 2]) << 8);
+                uint16_t monsterMoveWire = wireOpcode(Opcode::SMSG_MONSTER_MOVE);
+                uint16_t monsterMoveTransportWire = wireOpcode(Opcode::SMSG_MONSTER_MOVE_TRANSPORT);
+                if ((monsterMoveWire != 0xFFFF && subOpcode == monsterMoveWire) ||
+                    (monsterMoveTransportWire != 0xFFFF && subOpcode == monsterMoveTransportWire)) {
+                    LOG_INFO("Opcode 0x006B interpreted as SMSG_COMPRESSED_MOVES (subOpcode=0x",
+                             std::hex, subOpcode, std::dec, ")");
+                    handleCompressedMoves(packet);
+                    return;
+                }
+            }
+        }
+
         // Expected weather payload: uint32 weatherType, float intensity, uint8 abrupt
         if (packet.getSize() - packet.getReadPos() >= 9) {
             uint32_t wType = packet.readUInt32();
@@ -1328,6 +1370,11 @@ void GameHandler::handlePacket(network::Packet& packet) {
             }
             break;
         }
+        case Opcode::SMSG_FRIEND_LIST:
+        case Opcode::SMSG_IGNORE_LIST:
+            // Legacy social list variants; CONTACT_LIST is primary in modern flow.
+            packet.setReadPos(packet.getSize());
+            break;
 
         case Opcode::MSG_RANDOM_ROLL:
             if (state == WorldState::IN_WORLD) {
@@ -1363,6 +1410,11 @@ void GameHandler::handlePacket(network::Packet& packet) {
 
         case Opcode::SMSG_INSPECT_TALENT:
             handleInspectResults(packet);
+            break;
+        case Opcode::SMSG_ADDON_INFO:
+        case Opcode::SMSG_EXPECTED_SPAM_RECORDS:
+            // Optional system payloads that are safe to consume.
+            packet.setReadPos(packet.getSize());
             break;
 
         // ---- XP ----
@@ -1408,6 +1460,12 @@ void GameHandler::handlePacket(network::Packet& packet) {
         // ---- Speed Changes ----
         case Opcode::SMSG_FORCE_RUN_SPEED_CHANGE:
             handleForceRunSpeedChange(packet);
+            break;
+        case Opcode::SMSG_FORCE_MOVE_ROOT:
+            handleForceMoveRootState(packet, true);
+            break;
+        case Opcode::SMSG_FORCE_MOVE_UNROOT:
+            handleForceMoveRootState(packet, false);
             break;
         case Opcode::SMSG_CLIENT_CONTROL_UPDATE: {
             // Minimal parse: PackedGuid + uint8 allowMovement.
@@ -7759,6 +7817,7 @@ void GameHandler::startAutoAttack(uint64_t targetGuid) {
     autoAttackTarget = targetGuid;
     autoAttackOutOfRange_ = false;
     autoAttackResendTimer_ = 0.0f;
+    autoAttackFacingSyncTimer_ = 0.0f;
     if (state == WorldState::IN_WORLD && socket) {
         auto packet = AttackSwingPacket::build(targetGuid);
         socket->send(packet);
@@ -7772,6 +7831,7 @@ void GameHandler::stopAutoAttack() {
     autoAttackTarget = 0;
     autoAttackOutOfRange_ = false;
     autoAttackResendTimer_ = 0.0f;
+    autoAttackFacingSyncTimer_ = 0.0f;
     if (state == WorldState::IN_WORLD && socket) {
         auto packet = AttackStopPacket::build();
         socket->send(packet);
@@ -7972,6 +8032,59 @@ void GameHandler::handleForceRunSpeedChange(network::Packet& packet) {
             mountCallback_(0);
         }
     }
+}
+
+void GameHandler::handleForceMoveRootState(network::Packet& packet, bool rooted) {
+    // Packet is server movement control update:
+    // packedGuid + uint32 counter + [optional unknown field(s)].
+    // We always ACK with current movement state, same pattern as speed-change ACKs.
+    if (packet.getSize() - packet.getReadPos() < 2) return;
+    uint64_t guid = UpdateObjectParser::readPackedGuid(packet);
+    if (packet.getSize() - packet.getReadPos() < 4) return;
+    uint32_t counter = packet.readUInt32();
+
+    LOG_INFO(rooted ? "SMSG_FORCE_MOVE_ROOT" : "SMSG_FORCE_MOVE_UNROOT",
+             ": guid=0x", std::hex, guid, std::dec, " counter=", counter);
+
+    if (guid != playerGuid) return;
+
+    // Keep local movement flags aligned with server authoritative root state.
+    if (rooted) {
+        movementInfo.flags |= static_cast<uint32_t>(MovementFlags::ROOT);
+    } else {
+        movementInfo.flags &= ~static_cast<uint32_t>(MovementFlags::ROOT);
+    }
+
+    if (!socket) return;
+    uint16_t ackWire = wireOpcode(rooted ? Opcode::CMSG_FORCE_MOVE_ROOT_ACK
+                                         : Opcode::CMSG_FORCE_MOVE_UNROOT_ACK);
+    if (ackWire == 0xFFFF) return;
+
+    network::Packet ack(ackWire);
+    MovementPacket::writePackedGuid(ack, playerGuid);
+    ack.writeUInt32(counter);
+
+    MovementInfo wire = movementInfo;
+    wire.time = nextMovementTimestampMs();
+    if (wire.hasFlag(MovementFlags::ONTRANSPORT)) {
+        wire.transportTime = wire.time;
+        wire.transportTime2 = wire.time;
+    }
+    glm::vec3 serverPos = core::coords::canonicalToServer(glm::vec3(wire.x, wire.y, wire.z));
+    wire.x = serverPos.x;
+    wire.y = serverPos.y;
+    wire.z = serverPos.z;
+    if (wire.hasFlag(MovementFlags::ONTRANSPORT)) {
+        glm::vec3 serverTransport =
+            core::coords::canonicalToServer(glm::vec3(wire.transportX, wire.transportY, wire.transportZ));
+        wire.transportX = serverTransport.x;
+        wire.transportY = serverTransport.y;
+        wire.transportZ = serverTransport.z;
+    }
+    if (packetParsers_) packetParsers_->writeMovementPayload(ack, wire);
+    else MovementPacket::writeMovementPayload(ack, wire);
+
+    socket->send(ack);
 }
 
 // ============================================================

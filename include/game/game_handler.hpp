@@ -1128,6 +1128,7 @@ private:
 
     // ---- Speed change handler ----
     void handleForceRunSpeedChange(network::Packet& packet);
+    void handleForceMoveRootState(network::Packet& packet, bool rooted);
 
     // ---- Arena / Battleground handlers ----
     void handleBattlefieldStatus(network::Packet& packet);
@@ -1361,6 +1362,7 @@ private:
     uint64_t autoAttackTarget = 0;
     bool autoAttackOutOfRange_ = false;
     float autoAttackResendTimer_ = 0.0f;  // Re-send CMSG_ATTACKSWING every ~1s while attacking
+    float autoAttackFacingSyncTimer_ = 0.0f; // Periodic facing sync while meleeing
     std::unordered_set<uint64_t> hostileAttackers_;
     std::vector<CombatTextEntry> combatText;
 
