@@ -452,8 +452,8 @@ bool TbcPacketParsers::parseUpdateObject(network::Packet& packet, UpdateObjectDa
 
 // ============================================================================
 // TBC parseAuraUpdate - SMSG_AURA_UPDATE doesn't exist in TBC
-// TBC uses inline aura update fields + SMSG_INIT_EXTRA_AURA_INFO (0x3A3) /
-// SMSG_SET_EXTRA_AURA_INFO (0x3A4) instead
+// TBC uses inline aura update fields + SMSG_INIT_EXTRA_AURA_INFO_OBSOLETE (0x3A3) /
+// SMSG_SET_EXTRA_AURA_INFO_OBSOLETE (0x3A4) instead
 // ============================================================================
 bool TbcPacketParsers::parseAuraUpdate(network::Packet& /*packet*/, AuraUpdateData& /*data*/, bool /*isAll*/) {
     LOG_WARNING("[TBC] parseAuraUpdate called but SMSG_AURA_UPDATE does not exist in TBC 2.4.3");

@@ -737,7 +737,7 @@ void Application::update(float deltaTime) {
                                 renderer->getCharacterPosition() = p;
                                 glm::vec3 canonical = core::coords::renderToCanonical(p);
                                 gameHandler->setPosition(canonical.x, canonical.y, canonical.z);
-                                gameHandler->sendMovement(game::Opcode::CMSG_MOVE_HEARTBEAT);
+                                gameHandler->sendMovement(game::Opcode::MSG_MOVE_HEARTBEAT);
                             }
                             taxiLandingClampTimer_ -= deltaTime;
                         }
@@ -878,7 +878,7 @@ void Application::update(float deltaTime) {
                         }
 
                         // Send movement heartbeat so server knows our new position
-                        gameHandler->sendMovement(game::Opcode::CMSG_MOVE_HEARTBEAT);
+                        gameHandler->sendMovement(game::Opcode::MSG_MOVE_HEARTBEAT);
                     }
                 } else {
                     glm::vec3 renderPos = renderer->getCharacterPosition();
@@ -894,7 +894,7 @@ void Application::update(float deltaTime) {
                     float canonicalYaw = core::coords::normalizeAngleRad(glm::radians(180.0f - yawDeg));
                     gameHandler->setOrientation(canonicalYaw);
 
-                    // Send CMSG_MOVE_SET_FACING when the player changes facing direction
+                    // Send MSG_MOVE_SET_FACING when the player changes facing direction
                     // (e.g. via mouse-look). Without this, the server predicts movement in
                     // the old facing and position-corrects on the next heartbeat — the
                     // micro-teleporting the GM observed.
@@ -908,7 +908,7 @@ void Application::update(float deltaTime) {
                     if (!keyboardTurning && facingSendCooldown_ <= 0.0f) {
                         float yawDiff = core::coords::normalizeAngleRad(canonicalYaw - lastSentCanonicalYaw_);
                         if (std::abs(yawDiff) > glm::radians(3.0f)) {
-                            gameHandler->sendMovement(game::Opcode::CMSG_MOVE_SET_FACING);
+                            gameHandler->sendMovement(game::Opcode::MSG_MOVE_SET_FACING);
                             lastSentCanonicalYaw_ = canonicalYaw;
                             facingSendCooldown_ = 0.1f;  // max 10 Hz
                         }
@@ -1191,11 +1191,11 @@ void Application::setupUICallbacks() {
         }
         if (gameHandler) {
             gameHandler->forceClearTaxiAndMovementState();
-            gameHandler->sendMovement(game::Opcode::CMSG_MOVE_STOP);
-            gameHandler->sendMovement(game::Opcode::CMSG_MOVE_STOP_STRAFE);
-            gameHandler->sendMovement(game::Opcode::CMSG_MOVE_STOP_TURN);
-            gameHandler->sendMovement(game::Opcode::CMSG_MOVE_STOP_SWIM);
-            gameHandler->sendMovement(game::Opcode::CMSG_MOVE_HEARTBEAT);
+            gameHandler->sendMovement(game::Opcode::MSG_MOVE_STOP);
+            gameHandler->sendMovement(game::Opcode::MSG_MOVE_STOP_STRAFE);
+            gameHandler->sendMovement(game::Opcode::MSG_MOVE_STOP_TURN);
+            gameHandler->sendMovement(game::Opcode::MSG_MOVE_STOP_SWIM);
+            gameHandler->sendMovement(game::Opcode::MSG_MOVE_HEARTBEAT);
         }
     };
 
@@ -1203,10 +1203,10 @@ void Application::setupUICallbacks() {
         if (!gameHandler) return;
         glm::vec3 canonical = core::coords::renderToCanonical(renderPos);
         gameHandler->setPosition(canonical.x, canonical.y, canonical.z);
-        gameHandler->sendMovement(game::Opcode::CMSG_MOVE_STOP);
-        gameHandler->sendMovement(game::Opcode::CMSG_MOVE_STOP_STRAFE);
-        gameHandler->sendMovement(game::Opcode::CMSG_MOVE_STOP_TURN);
-        gameHandler->sendMovement(game::Opcode::CMSG_MOVE_HEARTBEAT);
+        gameHandler->sendMovement(game::Opcode::MSG_MOVE_STOP);
+        gameHandler->sendMovement(game::Opcode::MSG_MOVE_STOP_STRAFE);
+        gameHandler->sendMovement(game::Opcode::MSG_MOVE_STOP_TURN);
+        gameHandler->sendMovement(game::Opcode::MSG_MOVE_HEARTBEAT);
     };
 
     auto forceServerTeleportCommand = [this](const glm::vec3& renderPos) {
@@ -1425,7 +1425,7 @@ void Application::setupUICallbacks() {
         // Sync canonical orientation to server so it knows we turned
         float canonicalYaw = core::coords::normalizeAngleRad(glm::radians(180.0f - yawDeg));
         gameHandler->setOrientation(canonicalYaw);
-        gameHandler->sendMovement(game::Opcode::CMSG_MOVE_SET_FACING);
+        gameHandler->sendMovement(game::Opcode::MSG_MOVE_SET_FACING);
 
         // Set charge state
         chargeActive_ = true;

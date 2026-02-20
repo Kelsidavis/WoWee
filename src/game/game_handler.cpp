@@ -669,7 +669,7 @@ void GameHandler::update(float deltaTime) {
 
         float heartbeatInterval = (onTaxiFlight_ || taxiActivatePending_ || taxiClientActive_) ? 0.25f : moveHeartbeatInterval_;
         if (timeSinceLastMoveHeartbeat_ >= heartbeatInterval) {
-            sendMovement(Opcode::CMSG_MOVE_HEARTBEAT);
+            sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
             timeSinceLastMoveHeartbeat_ = 0.0f;
         }
 
@@ -759,8 +759,8 @@ void GameHandler::update(float deltaTime) {
                 movementInfo.flags = 0;
                 movementInfo.flags2 = 0;
                 if (socket) {
-                    sendMovement(Opcode::CMSG_MOVE_STOP);
-                    sendMovement(Opcode::CMSG_MOVE_HEARTBEAT);
+                    sendMovement(Opcode::MSG_MOVE_STOP);
+                    sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
                 }
                 LOG_INFO("Taxi flight landed");
             }
@@ -786,8 +786,8 @@ void GameHandler::update(float deltaTime) {
                 movementInfo.flags = 0;
                 movementInfo.flags2 = 0;
                 if (socket) {
-                    sendMovement(Opcode::CMSG_MOVE_STOP);
-                    sendMovement(Opcode::CMSG_MOVE_HEARTBEAT);
+                    sendMovement(Opcode::MSG_MOVE_STOP);
+                    sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
                 }
                 LOG_INFO("Taxi dismount cleanup");
             }
@@ -821,7 +821,7 @@ void GameHandler::update(float deltaTime) {
                 movementInfo.y = taxiRecoverPos_.y;
                 movementInfo.z = taxiRecoverPos_.z;
                 if (socket) {
-                    sendMovement(Opcode::CMSG_MOVE_HEARTBEAT);
+                    sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
                 }
                 taxiRecoverPending_ = false;
                 LOG_INFO("Taxi recovery applied");
@@ -1390,16 +1390,16 @@ void GameHandler::handlePacket(network::Packet& packet) {
             }
             break;
         }
-        case Opcode::SMSG_SPLINE_MOVE_SET_RUN_SPEED:
-        case Opcode::SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED:
-        case Opcode::SMSG_SPLINE_MOVE_SET_SWIM_SPEED: {
+        case Opcode::SMSG_SPLINE_SET_RUN_SPEED:
+        case Opcode::SMSG_SPLINE_SET_RUN_BACK_SPEED:
+        case Opcode::SMSG_SPLINE_SET_SWIM_SPEED: {
             // Minimal parse: PackedGuid + float speed
             if (packet.getSize() - packet.getReadPos() < 5) break;
             uint64_t guid = UpdateObjectParser::readPackedGuid(packet);
             if (packet.getSize() - packet.getReadPos() < 4) break;
             float speed = packet.readFloat();
             if (guid == playerGuid && std::isfinite(speed) && speed > 0.1f && speed < 100.0f &&
-                *logicalOp == Opcode::SMSG_SPLINE_MOVE_SET_RUN_SPEED) {
+                *logicalOp == Opcode::SMSG_SPLINE_SET_RUN_SPEED) {
                 serverRunSpeed_ = speed;
             }
             break;
@@ -1444,10 +1444,10 @@ void GameHandler::handlePacket(network::Packet& packet) {
                                             static_cast<uint32_t>(MovementFlags::STRAFE_RIGHT) |
                                             static_cast<uint32_t>(MovementFlags::TURN_LEFT) |
                                             static_cast<uint32_t>(MovementFlags::TURN_RIGHT));
-                    sendMovement(Opcode::CMSG_MOVE_STOP);
-                    sendMovement(Opcode::CMSG_MOVE_STOP_STRAFE);
-                    sendMovement(Opcode::CMSG_MOVE_STOP_TURN);
-                    sendMovement(Opcode::CMSG_MOVE_STOP_SWIM);
+                    sendMovement(Opcode::MSG_MOVE_STOP);
+                    sendMovement(Opcode::MSG_MOVE_STOP_STRAFE);
+                    sendMovement(Opcode::MSG_MOVE_STOP_TURN);
+                    sendMovement(Opcode::MSG_MOVE_STOP_SWIM);
                     addSystemChatMessage("Movement disabled by server.");
                 } else if (changed && allowMovement) {
                     addSystemChatMessage("Movement re-enabled.");
@@ -1560,6 +1560,22 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_PARTY_COMMAND_RESULT:
             handlePartyCommandResult(packet);
             break;
+        case Opcode::MSG_RAID_READY_CHECK:
+            // Server ready-check prompt (minimal handling for now).
+            packet.setReadPos(packet.getSize());
+            break;
+        case Opcode::MSG_RAID_READY_CHECK_CONFIRM:
+            // Ready-check responses from members.
+            packet.setReadPos(packet.getSize());
+            break;
+        case Opcode::SMSG_RAID_INSTANCE_INFO:
+            // Raid lockout list (not yet surfaced in UI).
+            packet.setReadPos(packet.getSize());
+            break;
+        case Opcode::SMSG_DUEL_REQUESTED:
+            // Duel request UI flow not implemented yet.
+            packet.setReadPos(packet.getSize());
+            break;
         case Opcode::SMSG_PARTYKILLLOG:
             // Classic-era packet: killer GUID + victim GUID.
             // XP and combat state are handled by other packets; consume to avoid warning spam.
@@ -1654,9 +1670,9 @@ void GameHandler::handlePacket(network::Packet& packet) {
             }
             break;
         }
-        case Opcode::SMSG_RESURRECT_CANCEL: {
+        case Opcode::SMSG_TIME_SYNC_REQ: {
             if (packet.getSize() - packet.getReadPos() < 4) {
-                LOG_WARNING("SMSG_RESURRECT_CANCEL too short");
+                LOG_WARNING("SMSG_TIME_SYNC_REQ too short");
                 break;
             }
             uint32_t reason = packet.readUInt32();
@@ -1771,10 +1787,10 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_SET_FLAT_SPELL_MODIFIER:
         case Opcode::SMSG_SET_PCT_SPELL_MODIFIER:
         case Opcode::SMSG_SPELL_DELAYED:
-        case Opcode::SMSG_UPDATE_AURA_DURATION:
+        case Opcode::SMSG_EQUIPMENT_SET_SAVED:
         case Opcode::SMSG_PERIODICAURALOG:
         case Opcode::SMSG_SPELLENERGIZELOG:
-        case Opcode::SMSG_ENVIRONMENTALDAMAGELOG:
+        case Opcode::SMSG_ENVIRONMENTAL_DAMAGE_LOG:
         case Opcode::SMSG_SET_PROFICIENCY:
         case Opcode::SMSG_ACTION_BUTTONS:
             break;
@@ -2411,6 +2427,10 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_BATTLEFIELD_PORT_DENIED:
             addSystemChatMessage("Battlefield port denied.");
             break;
+        case Opcode::MSG_BATTLEGROUND_PLAYER_POSITIONS:
+            // Optional map position updates for BG objectives/players.
+            packet.setReadPos(packet.getSize());
+            break;
         case Opcode::SMSG_REMOVED_FROM_PVP_QUEUE:
             addSystemChatMessage("You have been removed from the PvP queue.");
             break;
@@ -2453,23 +2473,27 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::MSG_INSPECT_ARENA_TEAMS:
             LOG_INFO("Received MSG_INSPECT_ARENA_TEAMS");
             break;
+        case Opcode::MSG_TALENT_WIPE_CONFIRM:
+            // Talent reset confirmation payload is not needed client-side right now.
+            packet.setReadPos(packet.getSize());
+            break;
 
         // ---- MSG_MOVE_* opcodes (server relays other players' movement) ----
-        case Opcode::CMSG_MOVE_START_FORWARD:
-        case Opcode::CMSG_MOVE_START_BACKWARD:
-        case Opcode::CMSG_MOVE_STOP:
-        case Opcode::CMSG_MOVE_START_STRAFE_LEFT:
-        case Opcode::CMSG_MOVE_START_STRAFE_RIGHT:
-        case Opcode::CMSG_MOVE_STOP_STRAFE:
-        case Opcode::CMSG_MOVE_JUMP:
-        case Opcode::CMSG_MOVE_START_TURN_LEFT:
-        case Opcode::CMSG_MOVE_START_TURN_RIGHT:
-        case Opcode::CMSG_MOVE_STOP_TURN:
-        case Opcode::CMSG_MOVE_SET_FACING:
-        case Opcode::CMSG_MOVE_FALL_LAND:
-        case Opcode::CMSG_MOVE_HEARTBEAT:
-        case Opcode::CMSG_MOVE_START_SWIM:
-        case Opcode::CMSG_MOVE_STOP_SWIM:
+        case Opcode::MSG_MOVE_START_FORWARD:
+        case Opcode::MSG_MOVE_START_BACKWARD:
+        case Opcode::MSG_MOVE_STOP:
+        case Opcode::MSG_MOVE_START_STRAFE_LEFT:
+        case Opcode::MSG_MOVE_START_STRAFE_RIGHT:
+        case Opcode::MSG_MOVE_STOP_STRAFE:
+        case Opcode::MSG_MOVE_JUMP:
+        case Opcode::MSG_MOVE_START_TURN_LEFT:
+        case Opcode::MSG_MOVE_START_TURN_RIGHT:
+        case Opcode::MSG_MOVE_STOP_TURN:
+        case Opcode::MSG_MOVE_SET_FACING:
+        case Opcode::MSG_MOVE_FALL_LAND:
+        case Opcode::MSG_MOVE_HEARTBEAT:
+        case Opcode::MSG_MOVE_START_SWIM:
+        case Opcode::MSG_MOVE_STOP_SWIM:
             if (state == WorldState::IN_WORLD) {
                 handleOtherPlayerMovement(packet);
             }
@@ -2490,6 +2514,13 @@ void GameHandler::handlePacket(network::Packet& packet) {
             break;
         case Opcode::MSG_QUERY_NEXT_MAIL_TIME:
             handleQueryNextMailTime(packet);
+            break;
+        case Opcode::SMSG_CHANNEL_LIST:
+            // Channel member listing currently not rendered in UI.
+            packet.setReadPos(packet.getSize());
+            break;
+        case Opcode::SMSG_INSPECT_RESULTS_UPDATE:
+            handleInspectResults(packet);
             break;
 
         // ---- Bank ----
@@ -2521,7 +2552,25 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_AUCTION_COMMAND_RESULT:
             handleAuctionCommandResult(packet);
             break;
-        case Opcode::SMSG_UNKNOWN_319:
+        case Opcode::SMSG_AUCTION_OWNER_NOTIFICATION:
+        case Opcode::SMSG_AUCTION_BIDDER_NOTIFICATION:
+            // Auction notification payloads are informational; ignore until UI support lands.
+            packet.setReadPos(packet.getSize());
+            break;
+        case Opcode::SMSG_TAXINODE_STATUS:
+            // Node status cache not implemented yet.
+            packet.setReadPos(packet.getSize());
+            break;
+        case Opcode::SMSG_INIT_EXTRA_AURA_INFO_OBSOLETE:
+        case Opcode::SMSG_SET_EXTRA_AURA_INFO_OBSOLETE:
+            // Extra aura metadata (icons/durations) not yet consumed by aura UI.
+            packet.setReadPos(packet.getSize());
+            break;
+        case Opcode::MSG_MOVE_WORLDPORT_ACK:
+            // Client uses this outbound; treat inbound variant as no-op for robustness.
+            packet.setReadPos(packet.getSize());
+            break;
+        case Opcode::MSG_MOVE_TIME_SKIPPED:
             // Observed custom server packet (8 bytes). Safe-consume for now.
             packet.setReadPos(packet.getSize());
             break;
@@ -4055,11 +4104,11 @@ void GameHandler::sendMovement(Opcode opcode) {
     // Block manual movement while taxi is active/mounted, but always allow
     // stop/heartbeat opcodes so stuck states can be recovered.
     bool taxiAllowed =
-        (opcode == Opcode::CMSG_MOVE_HEARTBEAT) ||
-        (opcode == Opcode::CMSG_MOVE_STOP) ||
-        (opcode == Opcode::CMSG_MOVE_STOP_STRAFE) ||
-        (opcode == Opcode::CMSG_MOVE_STOP_TURN) ||
-        (opcode == Opcode::CMSG_MOVE_STOP_SWIM);
+        (opcode == Opcode::MSG_MOVE_HEARTBEAT) ||
+        (opcode == Opcode::MSG_MOVE_STOP) ||
+        (opcode == Opcode::MSG_MOVE_STOP_STRAFE) ||
+        (opcode == Opcode::MSG_MOVE_STOP_TURN) ||
+        (opcode == Opcode::MSG_MOVE_STOP_SWIM);
     if (!serverMovementAllowed_ && !taxiAllowed) return;
     if ((onTaxiFlight_ || taxiMountActive_) && !taxiAllowed) return;
     if (resurrectPending_ && !taxiAllowed) return;
@@ -4069,43 +4118,43 @@ void GameHandler::sendMovement(Opcode opcode) {
 
     // Update movement flags based on opcode
     switch (opcode) {
-        case Opcode::CMSG_MOVE_START_FORWARD:
+        case Opcode::MSG_MOVE_START_FORWARD:
             movementInfo.flags |= static_cast<uint32_t>(MovementFlags::FORWARD);
             break;
-        case Opcode::CMSG_MOVE_START_BACKWARD:
+        case Opcode::MSG_MOVE_START_BACKWARD:
             movementInfo.flags |= static_cast<uint32_t>(MovementFlags::BACKWARD);
             break;
-        case Opcode::CMSG_MOVE_STOP:
+        case Opcode::MSG_MOVE_STOP:
             movementInfo.flags &= ~(static_cast<uint32_t>(MovementFlags::FORWARD) |
                                     static_cast<uint32_t>(MovementFlags::BACKWARD));
             break;
-        case Opcode::CMSG_MOVE_START_STRAFE_LEFT:
+        case Opcode::MSG_MOVE_START_STRAFE_LEFT:
             movementInfo.flags |= static_cast<uint32_t>(MovementFlags::STRAFE_LEFT);
             break;
-        case Opcode::CMSG_MOVE_START_STRAFE_RIGHT:
+        case Opcode::MSG_MOVE_START_STRAFE_RIGHT:
             movementInfo.flags |= static_cast<uint32_t>(MovementFlags::STRAFE_RIGHT);
             break;
-        case Opcode::CMSG_MOVE_STOP_STRAFE:
+        case Opcode::MSG_MOVE_STOP_STRAFE:
             movementInfo.flags &= ~(static_cast<uint32_t>(MovementFlags::STRAFE_LEFT) |
                                     static_cast<uint32_t>(MovementFlags::STRAFE_RIGHT));
             break;
-        case Opcode::CMSG_MOVE_JUMP:
+        case Opcode::MSG_MOVE_JUMP:
             movementInfo.flags |= static_cast<uint32_t>(MovementFlags::FALLING);
             break;
-        case Opcode::CMSG_MOVE_START_TURN_LEFT:
+        case Opcode::MSG_MOVE_START_TURN_LEFT:
             movementInfo.flags |= static_cast<uint32_t>(MovementFlags::TURN_LEFT);
             break;
-        case Opcode::CMSG_MOVE_START_TURN_RIGHT:
+        case Opcode::MSG_MOVE_START_TURN_RIGHT:
             movementInfo.flags |= static_cast<uint32_t>(MovementFlags::TURN_RIGHT);
             break;
-        case Opcode::CMSG_MOVE_STOP_TURN:
+        case Opcode::MSG_MOVE_STOP_TURN:
             movementInfo.flags &= ~(static_cast<uint32_t>(MovementFlags::TURN_LEFT) |
                                     static_cast<uint32_t>(MovementFlags::TURN_RIGHT));
             break;
-        case Opcode::CMSG_MOVE_FALL_LAND:
+        case Opcode::MSG_MOVE_FALL_LAND:
             movementInfo.flags &= ~static_cast<uint32_t>(MovementFlags::FALLING);
             break;
-        case Opcode::CMSG_MOVE_HEARTBEAT:
+        case Opcode::MSG_MOVE_HEARTBEAT:
             // No flag changes — just sends current position
             break;
         default:
@@ -4241,11 +4290,11 @@ void GameHandler::forceClearTaxiAndMovementState() {
     clearPlayerTransport();
 
     if (socket && state == WorldState::IN_WORLD) {
-        sendMovement(Opcode::CMSG_MOVE_STOP);
-        sendMovement(Opcode::CMSG_MOVE_STOP_STRAFE);
-        sendMovement(Opcode::CMSG_MOVE_STOP_TURN);
-        sendMovement(Opcode::CMSG_MOVE_STOP_SWIM);
-        sendMovement(Opcode::CMSG_MOVE_HEARTBEAT);
+        sendMovement(Opcode::MSG_MOVE_STOP);
+        sendMovement(Opcode::MSG_MOVE_STOP_STRAFE);
+        sendMovement(Opcode::MSG_MOVE_STOP_TURN);
+        sendMovement(Opcode::MSG_MOVE_STOP_SWIM);
+        sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
     }
 
     LOG_INFO("Force-cleared taxi/movement state");
@@ -8528,7 +8577,7 @@ void GameHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
         // Face the target before sending the cast packet to avoid "not in front" rejection
         float yaw = std::atan2(dy, dx);
         movementInfo.orientation = yaw;
-        sendMovement(Opcode::CMSG_MOVE_SET_FACING);
+        sendMovement(Opcode::MSG_MOVE_SET_FACING);
         if (chargeCallback_) {
             chargeCallback_(target, tx, ty, tz);
         }
@@ -8565,7 +8614,7 @@ void GameHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
                 // Face the target to prevent "not in front" rejection
                 float yaw = std::atan2(dy, dx);
                 movementInfo.orientation = yaw;
-                sendMovement(Opcode::CMSG_MOVE_SET_FACING);
+                sendMovement(Opcode::MSG_MOVE_SET_FACING);
             }
         }
     }
@@ -9355,7 +9404,7 @@ void GameHandler::performGameObjectInteractionNow(uint64_t guid) {
         }
     }
     if (shouldSendLoot) {
-        LOG_INFO("GameObject interaction: sent CMSG_GAMEOBJECT_USE + CMSG_LOOT for guid=0x", std::hex, guid, std::dec,
+        LOG_INFO("GameObject interaction: sent CMSG_GAMEOBJ_USE + CMSG_LOOT for guid=0x", std::hex, guid, std::dec,
                  " mailbox=", (isMailbox ? 1 : 0), " turtle=", (turtleMode ? 1 : 0));
         lootTarget(guid);
         if (turtleMode) {
@@ -11247,8 +11296,8 @@ void GameHandler::updateClientTaxi(float deltaTime) {
             movementInfo.flags = 0;
             movementInfo.flags2 = 0;
             if (socket) {
-                sendMovement(Opcode::CMSG_MOVE_STOP);
-                sendMovement(Opcode::CMSG_MOVE_HEARTBEAT);
+                sendMovement(Opcode::MSG_MOVE_STOP);
+                sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
             }
             LOG_INFO("Taxi flight landed (client path)");
     };
@@ -11394,7 +11443,7 @@ void GameHandler::handleActivateTaxiReply(network::Packet& packet) {
         taxiActivateTimer_ = 0.0f;
         applyTaxiMountForCurrentNode();
         if (socket) {
-            sendMovement(Opcode::CMSG_MOVE_HEARTBEAT);
+            sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
         }
         LOG_INFO("Taxi flight started!");
     } else {
@@ -11569,7 +11618,7 @@ void GameHandler::activateTaxi(uint32_t destNodeId) {
         applyTaxiMountForCurrentNode();
     }
     if (socket) {
-        sendMovement(Opcode::CMSG_MOVE_HEARTBEAT);
+        sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
     }
 
     // Trigger terrain precache immediately (non-blocking).

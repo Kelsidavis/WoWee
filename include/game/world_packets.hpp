@@ -448,7 +448,7 @@ public:
     /**
      * Build a movement packet
      *
-     * @param opcode Movement opcode (CMSG_MOVE_START_FORWARD, etc.)
+     * @param opcode Movement opcode (MSG_MOVE_START_FORWARD, etc.)
      * @param info Movement info
      * @return Packet ready to send
      */
@@ -811,7 +811,7 @@ public:
     static bool parse(network::Packet& packet, QueryTimeResponseData& data);
 };
 
-/** CMSG_REQUEST_PLAYED_TIME packet builder */
+/** CMSG_PLAYED_TIME packet builder */
 class RequestPlayedTimePacket {
 public:
     static network::Packet build(bool sendToChat = true);
@@ -921,7 +921,7 @@ public:
 // Stand State
 // ============================================================
 
-/** CMSG_STAND_STATE_CHANGE packet builder */
+/** CMSG_STANDSTATECHANGE packet builder */
 class StandStateChangePacket {
 public:
     static network::Packet build(uint8_t state);
@@ -963,7 +963,7 @@ public:
     static network::Packet build();
 };
 
-/** CMSG_GUILD_GET_ROSTER packet builder */
+/** CMSG_GUILD_ROSTER packet builder */
 class GuildRosterPacket {
 public:
     static network::Packet build();
@@ -975,13 +975,13 @@ public:
     static network::Packet build(const std::string& motd);
 };
 
-/** CMSG_GUILD_PROMOTE_MEMBER packet builder */
+/** CMSG_GUILD_PROMOTE packet builder */
 class GuildPromotePacket {
 public:
     static network::Packet build(const std::string& playerName);
 };
 
-/** CMSG_GUILD_DEMOTE_MEMBER packet builder */
+/** CMSG_GUILD_DEMOTE packet builder */
 class GuildDemotePacket {
 public:
     static network::Packet build(const std::string& playerName);
@@ -1041,7 +1041,7 @@ public:
     static network::Packet build();
 };
 
-/** CMSG_GUILD_DECLINE_INVITATION packet builder (empty body) */
+/** CMSG_GUILD_DECLINE packet builder (empty body) */
 class GuildDeclineInvitationPacket {
 public:
     static network::Packet build();
@@ -2197,7 +2197,7 @@ public:
     static network::Packet build(uint64_t npcGuid, uint32_t srcNode, uint32_t destNode);
 };
 
-/** CMSG_GAMEOBJECT_USE packet builder */
+/** CMSG_GAMEOBJ_USE packet builder */
 class GameObjectUsePacket {
 public:
     static network::Packet build(uint64_t guid);

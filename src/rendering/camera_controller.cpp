@@ -1313,60 +1313,60 @@ void CameraController::update(float deltaTime) {
     if (movementCallback) {
         // Forward/backward
         if (nowForward && !wasMovingForward) {
-            movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_START_FORWARD));
+            movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_START_FORWARD));
         }
         if (nowBackward && !wasMovingBackward) {
-            movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_START_BACKWARD));
+            movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_START_BACKWARD));
         }
         if ((!nowForward && wasMovingForward) || (!nowBackward && wasMovingBackward)) {
             if (!nowForward && !nowBackward) {
-                movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_STOP));
+                movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_STOP));
             }
         }
 
         // Strafing
         if (nowStrafeLeft && !wasStrafingLeft) {
-            movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_START_STRAFE_LEFT));
+            movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_START_STRAFE_LEFT));
         }
         if (nowStrafeRight && !wasStrafingRight) {
-            movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_START_STRAFE_RIGHT));
+            movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_START_STRAFE_RIGHT));
         }
         if ((!nowStrafeLeft && wasStrafingLeft) || (!nowStrafeRight && wasStrafingRight)) {
             if (!nowStrafeLeft && !nowStrafeRight) {
-                movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_STOP_STRAFE));
+                movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_STOP_STRAFE));
             }
         }
 
         // Turning
         if (nowTurnLeft && !wasTurningLeft) {
-            movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_START_TURN_LEFT));
+            movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_START_TURN_LEFT));
         }
         if (nowTurnRight && !wasTurningRight) {
-            movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_START_TURN_RIGHT));
+            movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_START_TURN_RIGHT));
         }
         if ((!nowTurnLeft && wasTurningLeft) || (!nowTurnRight && wasTurningRight)) {
             if (!nowTurnLeft && !nowTurnRight) {
-                movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_STOP_TURN));
+                movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_STOP_TURN));
             }
         }
 
         // Jump
         if (nowJump && !wasJumping && grounded) {
-            movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_JUMP));
+            movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_JUMP));
         }
 
         // Fall landing
         if (wasFalling && grounded) {
-            movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_FALL_LAND));
+            movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_FALL_LAND));
         }
     }
 
     // Swimming state transitions
     if (movementCallback) {
         if (swimming && !wasSwimming) {
-            movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_START_SWIM));
+            movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_START_SWIM));
         } else if (!swimming && wasSwimming) {
-            movementCallback(static_cast<uint32_t>(game::Opcode::CMSG_MOVE_STOP_SWIM));
+            movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_STOP_SWIM));
         }
     }
 

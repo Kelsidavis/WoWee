@@ -184,7 +184,7 @@ private:
     uint32_t loadedMapId_ = 0xFFFFFFFF;  // Map ID of currently loaded terrain (0xFFFFFFFF = none)
     float taxiLandingClampTimer_ = 0.0f;
     float worldEntryMovementGraceTimer_ = 0.0f;
-    float facingSendCooldown_ = 0.0f;        // Rate-limits CMSG_MOVE_SET_FACING
+    float facingSendCooldown_ = 0.0f;        // Rate-limits MSG_MOVE_SET_FACING
     float lastSentCanonicalYaw_ = 1000.0f;   // Sentinel — triggers first send
     float taxiStreamCooldown_ = 0.0f;
     bool idleYawned_ = false;

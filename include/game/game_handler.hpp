@@ -203,7 +203,7 @@ public:
 
     /**
      * Send a movement packet
-     * @param opcode Movement opcode (CMSG_MOVE_START_FORWARD, etc.)
+     * @param opcode Movement opcode (MSG_MOVE_START_FORWARD, etc.)
      */
     void sendMovement(Opcode opcode);
 

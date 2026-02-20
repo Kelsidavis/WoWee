@@ -1450,9 +1450,9 @@ bool QueryTimeResponseParser::parse(network::Packet& packet, QueryTimeResponseDa
 }
 
 network::Packet RequestPlayedTimePacket::build(bool sendToChat) {
-    network::Packet packet(wireOpcode(Opcode::CMSG_REQUEST_PLAYED_TIME));
+    network::Packet packet(wireOpcode(Opcode::CMSG_PLAYED_TIME));
     packet.writeUInt8(sendToChat ? 1 : 0);
-    LOG_DEBUG("Built CMSG_REQUEST_PLAYED_TIME: sendToChat=", sendToChat);
+    LOG_DEBUG("Built CMSG_PLAYED_TIME: sendToChat=", sendToChat);
     return packet;
 }
 
@@ -1564,9 +1564,9 @@ bool LogoutResponseParser::parse(network::Packet& packet, LogoutResponseData& da
 // ============================================================
 
 network::Packet StandStateChangePacket::build(uint8_t state) {
-    network::Packet packet(wireOpcode(Opcode::CMSG_STAND_STATE_CHANGE));
+    network::Packet packet(wireOpcode(Opcode::CMSG_STANDSTATECHANGE));
     packet.writeUInt32(state);
-    LOG_DEBUG("Built CMSG_STAND_STATE_CHANGE: state=", (int)state);
+    LOG_DEBUG("Built CMSG_STANDSTATECHANGE: state=", (int)state);
     return packet;
 }
 
@@ -1609,8 +1609,8 @@ network::Packet GuildInfoPacket::build() {
 }
 
 network::Packet GuildRosterPacket::build() {
-    network::Packet packet(wireOpcode(Opcode::CMSG_GUILD_GET_ROSTER));
-    LOG_DEBUG("Built CMSG_GUILD_GET_ROSTER");
+    network::Packet packet(wireOpcode(Opcode::CMSG_GUILD_ROSTER));
+    LOG_DEBUG("Built CMSG_GUILD_ROSTER");
     return packet;
 }
 
@@ -1622,16 +1622,16 @@ network::Packet GuildMotdPacket::build(const std::string& motd) {
 }
 
 network::Packet GuildPromotePacket::build(const std::string& playerName) {
-    network::Packet packet(wireOpcode(Opcode::CMSG_GUILD_PROMOTE_MEMBER));
+    network::Packet packet(wireOpcode(Opcode::CMSG_GUILD_PROMOTE));
     packet.writeString(playerName);
-    LOG_DEBUG("Built CMSG_GUILD_PROMOTE_MEMBER: ", playerName);
+    LOG_DEBUG("Built CMSG_GUILD_PROMOTE: ", playerName);
     return packet;
 }
 
 network::Packet GuildDemotePacket::build(const std::string& playerName) {
-    network::Packet packet(wireOpcode(Opcode::CMSG_GUILD_DEMOTE_MEMBER));
+    network::Packet packet(wireOpcode(Opcode::CMSG_GUILD_DEMOTE));
     packet.writeString(playerName);
-    LOG_DEBUG("Built CMSG_GUILD_DEMOTE_MEMBER: ", playerName);
+    LOG_DEBUG("Built CMSG_GUILD_DEMOTE: ", playerName);
     return packet;
 }
 
@@ -1698,8 +1698,8 @@ network::Packet GuildAcceptPacket::build() {
 }
 
 network::Packet GuildDeclineInvitationPacket::build() {
-    network::Packet packet(wireOpcode(Opcode::CMSG_GUILD_DECLINE_INVITATION));
-    LOG_DEBUG("Built CMSG_GUILD_DECLINE_INVITATION");
+    network::Packet packet(wireOpcode(Opcode::CMSG_GUILD_DECLINE));
+    LOG_DEBUG("Built CMSG_GUILD_DECLINE");
     return packet;
 }
 
@@ -3762,7 +3762,7 @@ network::Packet ActivateTaxiPacket::build(uint64_t npcGuid, uint32_t srcNode, ui
 }
 
 network::Packet GameObjectUsePacket::build(uint64_t guid) {
-    network::Packet packet(wireOpcode(Opcode::CMSG_GAMEOBJECT_USE));
+    network::Packet packet(wireOpcode(Opcode::CMSG_GAMEOBJ_USE));
     packet.writeUInt64(guid);
     return packet;
 }
