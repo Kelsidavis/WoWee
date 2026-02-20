@@ -749,6 +749,10 @@ public:
     using LevelUpCallback = std::function<void(uint32_t newLevel)>;
     void setLevelUpCallback(LevelUpCallback cb) { levelUpCallback_ = std::move(cb); }
 
+    // Other player level-up callback — fires when another player gains a level
+    using OtherPlayerLevelUpCallback = std::function<void(uint64_t guid, uint32_t newLevel)>;
+    void setOtherPlayerLevelUpCallback(OtherPlayerLevelUpCallback cb) { otherPlayerLevelUpCallback_ = std::move(cb); }
+
     // Mount state
     using MountCallback = std::function<void(uint32_t mountDisplayId)>;  // 0 = dismount
     void setMountCallback(MountCallback cb) { mountCallback_ = std::move(cb); }
@@ -1650,6 +1654,7 @@ private:
     NpcFarewellCallback npcFarewellCallback_;
     NpcVendorCallback npcVendorCallback_;
     LevelUpCallback levelUpCallback_;
+    OtherPlayerLevelUpCallback otherPlayerLevelUpCallback_;
     MountCallback mountCallback_;
     TaxiPrecacheCallback taxiPrecacheCallback_;
     TaxiOrientationCallback taxiOrientationCallback_;

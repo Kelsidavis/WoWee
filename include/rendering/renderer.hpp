@@ -31,6 +31,7 @@ class LightingManager;
 class SkySystem;
 class SwimEffects;
 class MountDust;
+class LevelUpEffect;
 class CharacterRenderer;
 class WMORenderer;
 class M2Renderer;
@@ -122,6 +123,7 @@ public:
 
     // Emote support
     void playEmote(const std::string& emoteName);
+    void triggerLevelUpEffect(const glm::vec3& position);
     void cancelEmote();
     bool isEmoteActive() const { return emoteActive; }
     static std::string getEmoteText(const std::string& emoteName, const std::string* targetName = nullptr);
@@ -186,6 +188,7 @@ private:
     std::unique_ptr<SkySystem> skySystem;  // Coordinator for sky rendering
     std::unique_ptr<SwimEffects> swimEffects;
     std::unique_ptr<MountDust> mountDust;
+    std::unique_ptr<LevelUpEffect> levelUpEffect;
     std::unique_ptr<CharacterRenderer> characterRenderer;
     std::unique_ptr<WMORenderer> wmoRenderer;
     std::unique_ptr<M2Renderer> m2Renderer;

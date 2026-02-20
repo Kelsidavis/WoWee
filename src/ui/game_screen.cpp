@@ -7493,34 +7493,13 @@ void GameScreen::renderDingEffect() {
     dingTimer_ -= dt;
     if (dingTimer_ < 0.0f) dingTimer_ = 0.0f;
 
-    float progress = 1.0f - (dingTimer_ / DING_DURATION);   // 0→1 over duration
     float alpha    = dingTimer_ < 0.8f ? (dingTimer_ / 0.8f) : 1.0f;  // fade out last 0.8s
 
     ImGuiIO& io = ImGui::GetIO();
     float cx = io.DisplaySize.x * 0.5f;
     float cy = io.DisplaySize.y * 0.5f;
-    float maxR = std::min(cx, cy) * 1.1f;
 
     ImDrawList* draw = ImGui::GetForegroundDrawList();
-
-    // 3 expanding golden rings staggered by 0.12s of phase
-    for (int r = 0; r < 3; r++) {
-        float phase = progress - r * 0.12f;
-        if (phase <= 0.0f || phase >= 1.0f) continue;
-        float ringAlpha = (1.0f - phase) * alpha * 0.9f;
-        float radius    = phase * maxR;
-        float thickness = 10.0f * (1.0f - phase) + 2.0f;
-        draw->AddCircle(ImVec2(cx, cy), radius,
-                        IM_COL32(255, 215, 0, (int)(ringAlpha * 255)),
-                        96, thickness);
-    }
-
-    // Inner golden glow disk (very transparent)
-    if (progress < 0.5f) {
-        float glowAlpha = (1.0f - progress * 2.0f) * alpha * 0.15f;
-        draw->AddCircleFilled(ImVec2(cx, cy), progress * maxR * 0.6f,
-                              IM_COL32(255, 215, 0, (int)(glowAlpha * 255)));
-    }
 
     // "LEVEL X!" text — visible for first 2.2s
     if (dingTimer_ > 0.8f) {

@@ -4594,7 +4594,16 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                         }
                                     }
                                 }
-                            } else if (key == ufLevel) { unit->setLevel(val); }
+                            } else if (key == ufLevel) {
+                                uint32_t oldLvl = unit->getLevel();
+                                unit->setLevel(val);
+                                if (block.guid != playerGuid &&
+                                    entity->getType() == ObjectType::PLAYER &&
+                                    val > oldLvl && oldLvl > 0 &&
+                                    otherPlayerLevelUpCallback_) {
+                                    otherPlayerLevelUpCallback_(block.guid, val);
+                                }
+                            }
                             else if (key == ufFaction) {
                                 unit->setFactionTemplate(val);
                                 unit->setHostile(isHostileFaction(val));

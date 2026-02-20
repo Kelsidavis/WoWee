@@ -16,6 +16,7 @@
 #include "rendering/sky_system.hpp"
 #include "rendering/swim_effects.hpp"
 #include "rendering/mount_dust.hpp"
+#include "rendering/levelup_effect.hpp"
 #include "rendering/character_renderer.hpp"
 #include "rendering/wmo_renderer.hpp"
 #include "rendering/m2_renderer.hpp"
@@ -354,6 +355,9 @@ bool Renderer::initialize(core::Window* win) {
         LOG_WARNING("Failed to initialize mount dust effects");
         mountDust.reset();
     }
+
+    // Create level-up effect (model loaded later via loadLevelUpEffect)
+    levelUpEffect = std::make_unique<LevelUpEffect>();
 
     // Create character renderer
     characterRenderer = std::make_unique<CharacterRenderer>();
@@ -1603,6 +1607,31 @@ void Renderer::cancelEmote() {
     emoteLoop = false;
 }
 
+void Renderer::triggerLevelUpEffect(const glm::vec3& position) {
+    if (!levelUpEffect) return;
+
+    // Lazy-load the M2 model on first trigger
+    if (!levelUpEffect->isModelLoaded() && m2Renderer) {
+        if (!cachedAssetManager) {
+            cachedAssetManager = core::Application::getInstance().getAssetManager();
+        }
+        if (!cachedAssetManager) {
+            LOG_WARNING("LevelUpEffect: no asset manager available");
+        } else {
+            auto m2Data = cachedAssetManager->readFile("Spells\\LevelUp\\LevelUp.m2");
+            auto skinData = cachedAssetManager->readFile("Spells\\LevelUp\\LevelUp00.skin");
+            LOG_INFO("LevelUpEffect: m2Data=", m2Data.size(), " skinData=", skinData.size());
+            if (!m2Data.empty()) {
+                levelUpEffect->loadModel(m2Renderer.get(), m2Data, skinData);
+            } else {
+                LOG_WARNING("LevelUpEffect: failed to read Spell\\LevelUp\\LevelUp.m2");
+            }
+        }
+    }
+
+    levelUpEffect->trigger(position);
+}
+
 void Renderer::triggerMeleeSwing() {
     if (!characterRenderer || characterInstanceId == 0) return;
     if (meleeSwingCooldown > 0.0f) return;
@@ -1975,6 +2004,11 @@ void Renderer::update(float deltaTime) {
             }
         }
     }
+    // Update level-up effect
+    if (levelUpEffect) {
+        levelUpEffect->update(deltaTime);
+    }
+
     auto sky2 = std::chrono::high_resolution_clock::now();
     skyTime += std::chrono::duration<float, std::milli>(sky2 - sky1).count();
 

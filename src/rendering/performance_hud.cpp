@@ -418,7 +418,7 @@ void PerformanceHUD::render(const Renderer* renderer, const Camera* camera) {
         ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "F4: Culling");
         ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "F5: Stats");
         ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "F6: Multi-tile");
-        ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "F7: Streaming");
+        ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "F7: Level-up FX");
         ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "F8: Water");
         ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "F9: Time");
         ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "F10: Sun/Moon");

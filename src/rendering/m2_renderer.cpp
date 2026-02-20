@@ -830,8 +830,10 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
         return true;
     }
 
-    if (model.vertices.empty() || model.indices.empty()) {
-        LOG_WARNING("M2 model has no geometry: ", model.name);
+    bool hasGeometry = !model.vertices.empty() && !model.indices.empty();
+    bool hasParticles = !model.particleEmitters.empty();
+    if (!hasGeometry && !hasParticles) {
+        LOG_WARNING("M2 model has no geometry and no particles: ", model.name);
         return false;
     }
 
@@ -849,11 +851,15 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
     }
     // Use tight bounds from actual vertices for collision/camera occlusion.
     // Header bounds in some M2s are overly conservative.
-    glm::vec3 tightMin( std::numeric_limits<float>::max());
-    glm::vec3 tightMax(-std::numeric_limits<float>::max());
-    for (const auto& v : model.vertices) {
-        tightMin = glm::min(tightMin, v.position);
-        tightMax = glm::max(tightMax, v.position);
+    glm::vec3 tightMin(0.0f);
+    glm::vec3 tightMax(0.0f);
+    if (hasGeometry) {
+        tightMin = glm::vec3(std::numeric_limits<float>::max());
+        tightMax = glm::vec3(-std::numeric_limits<float>::max());
+        for (const auto& v : model.vertices) {
+            tightMin = glm::min(tightMin, v.position);
+            tightMax = glm::max(tightMax, v.position);
+        }
     }
     bool foliageOrTreeLike = false;
     bool chestName = false;
@@ -1021,6 +1027,9 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
         }
     }
     gpuModel.disableAnimation = foliageOrTreeLike || chestName;
+    // Spell effect models: particle-dominated with minimal geometry (e.g. LevelUp.m2)
+    gpuModel.isSpellEffect = hasParticles && model.vertices.size() <= 200 &&
+                              model.particleEmitters.size() >= 3;
 
     // Build collision mesh + spatial grid from M2 bounding geometry
     gpuModel.collision.vertices = model.collisionVertices;
@@ -1046,76 +1055,62 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
         }
     }
 
-    // Create VBO with interleaved vertex data
-    // Format: position (3), normal (3), texcoord0 (2), texcoord1 (2), boneWeights (4), boneIndices (4 as float)
-    const size_t floatsPerVertex = 18;
-    std::vector<float> vertexData;
-    vertexData.reserve(model.vertices.size() * floatsPerVertex);
+    if (hasGeometry) {
+        // Create VBO with interleaved vertex data
+        // Format: position (3), normal (3), texcoord0 (2), texcoord1 (2), boneWeights (4), boneIndices (4 as float)
+        const size_t floatsPerVertex = 18;
+        std::vector<float> vertexData;
+        vertexData.reserve(model.vertices.size() * floatsPerVertex);
 
-    for (const auto& v : model.vertices) {
-        vertexData.push_back(v.position.x);
-        vertexData.push_back(v.position.y);
-        vertexData.push_back(v.position.z);
-        vertexData.push_back(v.normal.x);
-        vertexData.push_back(v.normal.y);
-        vertexData.push_back(v.normal.z);
-        vertexData.push_back(v.texCoords[0].x);
-        vertexData.push_back(v.texCoords[0].y);
-        vertexData.push_back(v.texCoords[1].x);
-        vertexData.push_back(v.texCoords[1].y);
-        // Bone weights (normalized 0-1)
-        float w0 = v.boneWeights[0] / 255.0f;
-        float w1 = v.boneWeights[1] / 255.0f;
-        float w2 = v.boneWeights[2] / 255.0f;
-        float w3 = v.boneWeights[3] / 255.0f;
-        vertexData.push_back(w0);
-        vertexData.push_back(w1);
-        vertexData.push_back(w2);
-        vertexData.push_back(w3);
-        // Bone indices (clamped to max 127 for uniform array)
-        vertexData.push_back(static_cast<float>(std::min(v.boneIndices[0], uint8_t(127))));
-        vertexData.push_back(static_cast<float>(std::min(v.boneIndices[1], uint8_t(127))));
-        vertexData.push_back(static_cast<float>(std::min(v.boneIndices[2], uint8_t(127))));
-        vertexData.push_back(static_cast<float>(std::min(v.boneIndices[3], uint8_t(127))));
+        for (const auto& v : model.vertices) {
+            vertexData.push_back(v.position.x);
+            vertexData.push_back(v.position.y);
+            vertexData.push_back(v.position.z);
+            vertexData.push_back(v.normal.x);
+            vertexData.push_back(v.normal.y);
+            vertexData.push_back(v.normal.z);
+            vertexData.push_back(v.texCoords[0].x);
+            vertexData.push_back(v.texCoords[0].y);
+            vertexData.push_back(v.texCoords[1].x);
+            vertexData.push_back(v.texCoords[1].y);
+            float w0 = v.boneWeights[0] / 255.0f;
+            float w1 = v.boneWeights[1] / 255.0f;
+            float w2 = v.boneWeights[2] / 255.0f;
+            float w3 = v.boneWeights[3] / 255.0f;
+            vertexData.push_back(w0);
+            vertexData.push_back(w1);
+            vertexData.push_back(w2);
+            vertexData.push_back(w3);
+            vertexData.push_back(static_cast<float>(std::min(v.boneIndices[0], uint8_t(127))));
+            vertexData.push_back(static_cast<float>(std::min(v.boneIndices[1], uint8_t(127))));
+            vertexData.push_back(static_cast<float>(std::min(v.boneIndices[2], uint8_t(127))));
+            vertexData.push_back(static_cast<float>(std::min(v.boneIndices[3], uint8_t(127))));
+        }
+
+        glGenBuffers(1, &gpuModel.vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, gpuModel.vbo);
+        glBufferData(GL_ARRAY_BUFFER, vertexData.size() * sizeof(float),
+                     vertexData.data(), GL_STATIC_DRAW);
+
+        glGenBuffers(1, &gpuModel.ebo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gpuModel.ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, model.indices.size() * sizeof(uint16_t),
+                     model.indices.data(), GL_STATIC_DRAW);
+
+        const size_t stride = floatsPerVertex * sizeof(float);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+        glEnableVertexAttribArray(5);
+        glVertexAttribPointer(5, 2, GL_FLOAT, GL_FALSE, stride, (void*)(8 * sizeof(float)));
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, (void*)(10 * sizeof(float)));
+        glEnableVertexAttribArray(4);
+        glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, stride, (void*)(14 * sizeof(float)));
     }
-
-    glGenBuffers(1, &gpuModel.vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, gpuModel.vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertexData.size() * sizeof(float),
-                 vertexData.data(), GL_STATIC_DRAW);
-
-    // Create EBO
-    glGenBuffers(1, &gpuModel.ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gpuModel.ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, model.indices.size() * sizeof(uint16_t),
-                 model.indices.data(), GL_STATIC_DRAW);
-
-    // Set up vertex attributes
-    const size_t stride = floatsPerVertex * sizeof(float);
-
-    // Position
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
-
-    // Normal
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
-
-    // TexCoord0
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
-
-    // TexCoord1
-    glEnableVertexAttribArray(5);
-    glVertexAttribPointer(5, 2, GL_FLOAT, GL_FALSE, stride, (void*)(8 * sizeof(float)));
-
-    // Bone Weights
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, (void*)(10 * sizeof(float)));
-
-    // Bone Indices (as integer attribute)
-    glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, stride, (void*)(14 * sizeof(float)));
 
     glBindVertexArray(0);
 
@@ -2042,6 +2037,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             const bool batchUnlit = (batch.materialFlags & 0x01) != 0;
             const bool shouldUseGlowSprite =
                 !koboldFlameCard &&
+                !model.isSpellEffect &&
                 smallCardLikeBatch &&
                 ((batch.blendMode >= 3) ||
                  (batch.colorKeyBlack && flameLikeModel && batchUnlit && batch.blendMode >= 1));
@@ -2081,8 +2077,13 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             // Apply per-batch blend mode from M2 material (only if changed)
             // 0=Opaque, 1=AlphaKey, 2=Alpha, 3=Add, 4=Mod, 5=Mod2x, 6=BlendAdd, 7=Screen
             bool batchTransparent = false;
-            if (batch.blendMode != lastBlendMode) {
-                switch (batch.blendMode) {
+            // Spell effects: override Mod/Mod2x to Additive for bright glow rendering
+            uint8_t effectiveBlendMode = batch.blendMode;
+            if (model.isSpellEffect && (effectiveBlendMode == 4 || effectiveBlendMode == 5)) {
+                effectiveBlendMode = 3; // Additive
+            }
+            if (effectiveBlendMode != lastBlendMode) {
+                switch (effectiveBlendMode) {
                     case 0: // Opaque
                         glBlendFunc(GL_ONE, GL_ZERO);
                         break;
@@ -2113,11 +2114,11 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
                         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                         break;
                 }
-                lastBlendMode = batch.blendMode;
-                shader->setUniform("uBlendMode", static_cast<int>(batch.blendMode));
+                lastBlendMode = effectiveBlendMode;
+                shader->setUniform("uBlendMode", static_cast<int>(effectiveBlendMode));
             } else {
                 // Still need to know if batch is transparent for depth mask logic
-                batchTransparent = (batch.blendMode >= 2);
+                batchTransparent = (effectiveBlendMode >= 2);
             }
 
             // Disable depth writes for transparent/additive batches
@@ -2142,8 +2143,8 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
                 lastHasTexture = hasTexture;
             }
 
-            bool alphaTest = (batch.blendMode == 1) ||
-                             (batch.blendMode >= 2 && !batch.hasAlpha);
+            bool alphaTest = (effectiveBlendMode == 1) ||
+                             (effectiveBlendMode >= 2 && !batch.hasAlpha);
             if (alphaTest != lastAlphaTest) {
                 shader->setUniform("uAlphaTest", alphaTest);
                 lastAlphaTest = alphaTest;
@@ -2158,7 +2159,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             // the scene, so use a high threshold to remove the dark rectangle.
             if (colorKeyBlack) {
                 float thresh = 0.08f;
-                if (batch.blendMode == 4 || batch.blendMode == 5) {
+                if (effectiveBlendMode == 4 || effectiveBlendMode == 5) {
                     thresh = 0.7f;  // Mod/Mod2x: only keep near-white pixels
                 }
                 shader->setUniform("uColorKeyThreshold", thresh);
@@ -2572,20 +2573,22 @@ void M2Renderer::renderM2Particles(const glm::mat4& view, const glm::mat4& proj)
             float alpha = std::min(interpFBlockFloat(em.particleAlpha, lifeRatio), 1.0f);
             float rawScale = interpFBlockFloat(em.particleScale, lifeRatio);
 
-            // FBlock colors are tint values meant to multiply a bright texture.
-            // Desaturate toward white so particles look like water spray, not neon.
-            color = glm::mix(color, glm::vec3(1.0f), 0.7f);
+            if (!gpu.isSpellEffect) {
+                // FBlock colors are tint values meant to multiply a bright texture.
+                // Desaturate toward white so particles look like water spray, not neon.
+                color = glm::mix(color, glm::vec3(1.0f), 0.7f);
 
-            // Large-scale particles (>2.0) are volume/backdrop effects meant to be
-            // nearly invisible mist. Fade them heavily since we render as point sprites.
-            if (rawScale > 2.0f) {
-                alpha *= 0.02f;
+                // Large-scale particles (>2.0) are volume/backdrop effects meant to be
+                // nearly invisible mist. Fade them heavily since we render as point sprites.
+                if (rawScale > 2.0f) {
+                    alpha *= 0.02f;
+                }
+                // Reduce additive particle intensity to prevent blinding overlap
+                if (em.blendingType == 3 || em.blendingType == 4) {
+                    alpha *= 0.05f;
+                }
             }
-            // Reduce additive particle intensity to prevent blinding overlap
-            if (em.blendingType == 3 || em.blendingType == 4) {
-                alpha *= 0.05f;
-            }
-            float scale = std::min(rawScale, 1.5f);
+            float scale = gpu.isSpellEffect ? rawScale : std::min(rawScale, 1.5f);
 
             GLuint tex = whiteTexture;
             if (p.emitterIndex < static_cast<int>(gpu.particleTextures.size())) {
@@ -3039,7 +3042,7 @@ std::optional<float> M2Renderer::getFloorHeight(float glX, float glY, float glZ,
         if (instance.scale <= 0.001f) continue;
 
         const M2ModelGPU& model = it->second;
-        if (model.collisionNoBlock || model.isInvisibleTrap) continue;
+        if (model.collisionNoBlock || model.isInvisibleTrap || model.isSpellEffect) continue;
 
         // --- Mesh-based floor: vertical ray vs collision triangles ---
         // Does NOT skip the AABB path — both contribute and highest wins.
@@ -3193,7 +3196,7 @@ bool M2Renderer::checkCollision(const glm::vec3& from, const glm::vec3& to,
         if (it == models.end()) continue;
 
         const M2ModelGPU& model = it->second;
-        if (model.collisionNoBlock || model.isInvisibleTrap) continue;
+        if (model.collisionNoBlock || model.isInvisibleTrap || model.isSpellEffect) continue;
         if (instance.scale <= 0.001f) continue;
 
         // --- Mesh-based wall collision: closest-point push ---
@@ -3433,7 +3436,7 @@ float M2Renderer::raycastBoundingBoxes(const glm::vec3& origin, const glm::vec3&
         if (it == models.end()) continue;
 
         const M2ModelGPU& model = it->second;
-        if (model.collisionNoBlock || model.isInvisibleTrap) continue;
+        if (model.collisionNoBlock || model.isInvisibleTrap || model.isSpellEffect) continue;
         glm::vec3 localMin, localMax;
         getTightCollisionBounds(model, localMin, localMax);
         // Skip tiny doodads for camera occlusion; they cause jitter and false hits.

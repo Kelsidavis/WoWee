@@ -300,6 +300,16 @@ void Application::run() {
                         LOG_INFO("Shadows: ", enabled ? "ON" : "OFF");
                     }
                 }
+                // F7: Test level-up effect (ignore key repeat)
+                else if (event.key.keysym.scancode == SDL_SCANCODE_F7 && event.key.repeat == 0) {
+                    if (renderer) {
+                        renderer->triggerLevelUpEffect(renderer->getCharacterPosition());
+                        LOG_INFO("Triggered test level-up effect");
+                    }
+                    if (uiManager) {
+                        uiManager->getGameScreen().triggerDing(99);
+                    }
+                }
             }
         }
 
@@ -1329,10 +1339,37 @@ void Application::setupUICallbacks() {
         despawnOnlineGameObject(guid);
     });
 
-    // Level-up callback — play sound, cheer emote, and trigger UI ding overlay
+    // Level-up callback — play sound, cheer emote, and trigger UI ding overlay + 3D effect
     gameHandler->setLevelUpCallback([this](uint32_t newLevel) {
         if (uiManager) {
             uiManager->getGameScreen().triggerDing(newLevel);
+        }
+        if (renderer) {
+            renderer->triggerLevelUpEffect(renderer->getCharacterPosition());
+        }
+    });
+
+    // Other player level-up callback — trigger 3D effect + chat notification
+    gameHandler->setOtherPlayerLevelUpCallback([this](uint64_t guid, uint32_t newLevel) {
+        if (!gameHandler || !renderer) return;
+
+        // Trigger 3D effect at the other player's position
+        auto entity = gameHandler->getEntityManager().getEntity(guid);
+        if (entity) {
+            glm::vec3 canonical(entity->getX(), entity->getY(), entity->getZ());
+            glm::vec3 renderPos = core::coords::canonicalToRender(canonical);
+            renderer->triggerLevelUpEffect(renderPos);
+        }
+
+        // Show chat message if in group
+        if (gameHandler->isInGroup()) {
+            std::string name = gameHandler->getCachedPlayerName(guid);
+            if (name.empty()) name = "A party member";
+            game::MessageChatData msg;
+            msg.type = game::ChatType::SYSTEM;
+            msg.language = game::ChatLanguage::UNIVERSAL;
+            msg.message = name + " has reached level " + std::to_string(newLevel) + "!";
+            gameHandler->addLocalChatMessage(msg);
         }
     });
 

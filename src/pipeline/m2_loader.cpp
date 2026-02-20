@@ -595,14 +595,13 @@ void parseFBlock(const std::vector<uint8_t>& data, uint32_t offset,
     uint32_t ofsKeys = disk.ofsKeys;
 
     if (valueType == 0) {
-        // Color: CImVector (4 bytes RGBA) per key. We extract RGB, ignore A.
-        if (ofsKeys + nKeys * 4 > data.size()) return;
+        // Color: C3Vector (3 × float per key, values in 0-255 range)
+        if (ofsKeys + nKeys * 12 > data.size()) return;
         fb.vec3Values.reserve(nKeys);
         for (uint32_t i = 0; i < nKeys; i++) {
-            uint8_t r = data[ofsKeys + i * 4 + 0];
-            uint8_t g = data[ofsKeys + i * 4 + 1];
-            uint8_t b = data[ofsKeys + i * 4 + 2];
-            // byte 3 is alpha, handled separately by the alpha FBlock
+            float r = readValue<float>(data, ofsKeys + i * 12 + 0);
+            float g = readValue<float>(data, ofsKeys + i * 12 + 4);
+            float b = readValue<float>(data, ofsKeys + i * 12 + 8);
             fb.vec3Values.emplace_back(r / 255.0f, g / 255.0f, b / 255.0f);
         }
     } else if (valueType == 1) {

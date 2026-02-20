@@ -98,6 +98,7 @@ struct M2ModelGPU {
     std::vector<uint32_t> globalSequenceDurations;  // Loop durations for global sequence tracks
     bool hasAnimation = false;  // True if any bone has keyframes
     bool isSmoke = false;       // True for smoke models (UV scroll animation)
+    bool isSpellEffect = false;  // True for spell effect models (skip particle dampeners)
     bool disableAnimation = false; // Keep foliage/tree doodads visually stable
     bool hasTextureAnimation = false; // True if any batch has UV animation
 
