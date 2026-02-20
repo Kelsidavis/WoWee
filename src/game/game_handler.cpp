@@ -3469,9 +3469,21 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         break;
                     }
                     case CT_MPQ: {
-                        // Request: [1 stringIdx]
-                        if (pos + 1 > checkEnd) { pos = checkEnd; break; }
-                        uint8_t strIdx = decrypted[pos++];
+                        // Request layout differs across client generations.
+                        // Classic commonly carries an extended MPQ check payload.
+                        int mpqReqSize = (build <= 6005) ? 29 : 1;
+                        if (pos + mpqReqSize > checkEnd) {
+                            size_t remaining = checkEnd - pos;
+                            LOG_WARNING("Warden:   MPQ check truncated (remaining=", remaining,
+                                        ", expected=", mpqReqSize, "), consuming remainder");
+                            pos = checkEnd;
+                            // Still return a placeholder result byte+hash to keep response framing stable.
+                            resultData.push_back(0x00);
+                            for (int i = 0; i < 20; i++) resultData.push_back(0x00);
+                            break;
+                        }
+                        uint8_t strIdx = decrypted[pos];
+                        pos += mpqReqSize;
                         LOG_INFO("Warden:   MPQ file=\"",
                                  (strIdx < strings.size() ? strings[strIdx] : "?"), "\"");
                         // Response: [uint8 result=0][20 sha1 zeros]
@@ -3503,9 +3515,17 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         break;
                     }
                     case CT_MODULE: {
-                        // Request: [4 seed][20 sha1]
-                        if (pos + 24 > checkEnd) { pos = checkEnd; break; }
-                        pos += 24;
+                        // Module check request size differs by client generation.
+                        // Classic packets can carry a shorter payload here.
+                        int moduleSize = (build <= 6005) ? 16 : 24;
+                        if (pos + moduleSize > checkEnd) {
+                            size_t remaining = checkEnd - pos;
+                            LOG_WARNING("Warden:   MODULE check truncated (remaining=", remaining,
+                                        ", expected=", moduleSize, "), consuming remainder");
+                            pos = checkEnd;
+                        } else {
+                            pos += moduleSize;
+                        }
                         // Response: [uint8 result=1] (module NOT loaded = clean)
                         resultData.push_back(0x01);
                         break;
