@@ -326,6 +326,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
         uniform bool uHasTexture;
         uniform bool uAlphaTest;
         uniform bool uColorKeyBlack;
+        uniform float uColorKeyThreshold;
         uniform bool uUnlit;
         uniform int uBlendMode;
         uniform float uFadeAlpha;
@@ -358,7 +359,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
             if (uAlphaTest && maxRgb < 0.06) {
                 discard;
             }
-            if (uColorKeyBlack && maxRgb < 0.08) {
+            if (uColorKeyBlack && maxRgb < uColorKeyThreshold) {
                 discard;
             }
             // Additive blend modes (3=Add, 6=BlendAdd): near-black fragments
@@ -1919,6 +1920,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
     glActiveTexture(GL_TEXTURE0);
     shader->setUniform("uTexture", 0);  // Texture unit 0, set once per frame
     shader->setUniform("uColorKeyBlack", false);
+    shader->setUniform("uColorKeyThreshold", 0.08f);
     shader->setUniform("uBlendMode", 0);
 
     // Performance counters
@@ -2150,6 +2152,16 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             if (colorKeyBlack != lastColorKeyBlack) {
                 shader->setUniform("uColorKeyBlack", colorKeyBlack);
                 lastColorKeyBlack = colorKeyBlack;
+            }
+            // ColorKeyBlack textures: discard dark pixels so background shows through.
+            // Mod blend (4) multiplies framebuffer by texture — dark pixels darken
+            // the scene, so use a high threshold to remove the dark rectangle.
+            if (colorKeyBlack) {
+                float thresh = 0.08f;
+                if (batch.blendMode == 4 || batch.blendMode == 5) {
+                    thresh = 0.7f;  // Mod/Mod2x: only keep near-white pixels
+                }
+                shader->setUniform("uColorKeyThreshold", thresh);
             }
 
             // Only bind texture if it changed (texture unit already set to GL_TEXTURE0)
