@@ -856,8 +856,26 @@ void Application::update(float deltaTime) {
                         renderer->getCameraController()->setExternalFollow(false);
                         renderer->getCameraController()->setExternalMoving(false);
 
-                        // Start auto-attack on arrival
+                        // Snap to melee range of target's CURRENT position (it may have moved)
                         if (chargeTargetGuid_ != 0) {
+                            auto targetEntity = gameHandler->getEntityManager().getEntity(chargeTargetGuid_);
+                            if (targetEntity) {
+                                glm::vec3 targetCanonical(targetEntity->getX(), targetEntity->getY(), targetEntity->getZ());
+                                glm::vec3 targetRender = core::coords::canonicalToRender(targetCanonical);
+                                glm::vec3 toTarget = targetRender - renderPos;
+                                float d = glm::length(toTarget);
+                                if (d > 1.5f) {
+                                    // Place us 1.5 units from target (well within 8-unit melee range)
+                                    glm::vec3 snapPos = targetRender - glm::normalize(toTarget) * 1.5f;
+                                    renderer->getCharacterPosition() = snapPos;
+                                    glm::vec3 snapCanonical = core::coords::renderToCanonical(snapPos);
+                                    gameHandler->setPosition(snapCanonical.x, snapCanonical.y, snapCanonical.z);
+                                    if (renderer->getCameraController()) {
+                                        glm::vec3* ft = renderer->getCameraController()->getFollowTargetMutable();
+                                        if (ft) *ft = snapPos;
+                                    }
+                                }
+                            }
                             gameHandler->startAutoAttack(chargeTargetGuid_);
                             renderer->triggerMeleeSwing();
                         }

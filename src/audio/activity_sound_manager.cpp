@@ -408,10 +408,14 @@ void ActivitySoundManager::setCharacterVoiceProfile(const std::string& modelName
     rebuildJumpClipsForProfile(folder, base, male);
     rebuildSwimLoopClipsForProfile(folder, base, male);
     rebuildHardLandClipsForProfile(folder, base, male);
+    rebuildCombatVocalClipsForProfile(folder, base, male);
     core::Logger::getInstance().info("Activity SFX voice profile: ", voiceProfileKey,
                                      " jump clips=", jumpClips.size(),
                                      " swim clips=", swimLoopClips.size(),
-                                     " hardLand clips=", hardLandClips.size());
+                                     " hardLand clips=", hardLandClips.size(),
+                                     " attackGrunt clips=", attackGruntClips.size(),
+                                     " wound clips=", woundClips.size(),
+                                     " death clips=", deathClips.size());
 }
 
 void ActivitySoundManager::playWaterEnter() {
@@ -446,6 +450,115 @@ void ActivitySoundManager::playWaterExit() {
     } else {
         LOG_ERROR("Failed to play water splash exit sound");
     }
+}
+
+void ActivitySoundManager::rebuildCombatVocalClipsForProfile(const std::string& raceFolder, const std::string& raceBase, bool male) {
+    attackGruntClips.clear();
+    woundClips.clear();
+    woundCritClips.clear();
+    deathClips.clear();
+
+    const std::string gender = male ? "Male" : "Female";
+    // WoW MPQ convention: Sound\Character\{Race}{Gender}PC\{Race}{Gender}PC{Type}{Letter}.wav
+    const std::string pcStem = raceBase + gender + "PC";
+    const std::string pcPrefix = "Sound\\Character\\" + pcStem + "\\";
+    // Fallback: Sound\Character\{Race}\{Race}{Gender}{Type}{Letter}.wav
+    const std::string plainPrefix = "Sound\\Character\\" + raceFolder + "\\";
+    const std::string plainStem = raceBase + gender;
+
+    // Attack grunts (A-I covers all races)
+    std::vector<std::string> attackPaths;
+    for (char c = 'A'; c <= 'I'; ++c) {
+        std::string s(1, c);
+        attackPaths.push_back(pcPrefix + pcStem + "Attack" + s + ".wav");
+    }
+    for (char c = 'A'; c <= 'I'; ++c) {
+        std::string s(1, c);
+        attackPaths.push_back(plainPrefix + plainStem + "Attack" + s + ".wav");
+    }
+    // Also try exertion sounds as attack grunts
+    for (char c = 'A'; c <= 'F'; ++c) {
+        std::string s(1, c);
+        attackPaths.push_back(pcPrefix + pcStem + "Exertion" + s + ".wav");
+        attackPaths.push_back(plainPrefix + plainStem + "Exertion" + s + ".wav");
+    }
+    preloadCandidates(attackGruntClips, attackPaths);
+
+    // Wound sounds (A-H covers all races)
+    std::vector<std::string> woundPaths;
+    for (char c = 'A'; c <= 'H'; ++c) {
+        std::string s(1, c);
+        woundPaths.push_back(pcPrefix + pcStem + "Wound" + s + ".wav");
+    }
+    for (char c = 'A'; c <= 'H'; ++c) {
+        std::string s(1, c);
+        woundPaths.push_back(plainPrefix + plainStem + "Wound" + s + ".wav");
+    }
+    preloadCandidates(woundClips, woundPaths);
+
+    // Wound crit sounds (A-C)
+    std::vector<std::string> woundCritPaths;
+    for (char c = 'A'; c <= 'C'; ++c) {
+        std::string s(1, c);
+        woundCritPaths.push_back(pcPrefix + pcStem + "WoundCrit" + s + ".wav");
+        woundCritPaths.push_back(plainPrefix + plainStem + "WoundCrit" + s + ".wav");
+    }
+    preloadCandidates(woundCritClips, woundCritPaths);
+
+    // Death sounds
+    preloadCandidates(deathClips, {
+        pcPrefix + pcStem + "Death.wav",
+        pcPrefix + pcStem + "Death2.wav",
+        pcPrefix + pcStem + "DeathA.wav",
+        pcPrefix + pcStem + "DeathB.wav",
+        plainPrefix + plainStem + "Death.wav",
+        plainPrefix + plainStem + "Death2.wav",
+        plainPrefix + plainStem + "DeathA.wav",
+        plainPrefix + plainStem + "DeathB.wav",
+    });
+}
+
+void ActivitySoundManager::playAttackGrunt() {
+    if (!AudioEngine::instance().isInitialized() || attackGruntClips.empty()) return;
+    auto now = std::chrono::steady_clock::now();
+    if (lastAttackGruntAt.time_since_epoch().count() != 0) {
+        if (std::chrono::duration<float>(now - lastAttackGruntAt).count() < 1.5f) return;
+    }
+    // ~30% chance per swing to grunt (not every hit)
+    std::uniform_int_distribution<int> chance(0, 9);
+    if (chance(rng) > 2) return;
+
+    std::uniform_int_distribution<size_t> dist(0, attackGruntClips.size() - 1);
+    const Sample& sample = attackGruntClips[dist(rng)];
+    std::uniform_real_distribution<float> volDist(0.55f, 0.70f);
+    std::uniform_real_distribution<float> pitchDist(0.96f, 1.04f);
+    if (AudioEngine::instance().playSound2D(sample.data, volDist(rng) * volumeScale, pitchDist(rng))) {
+        lastAttackGruntAt = now;
+    }
+}
+
+void ActivitySoundManager::playWound(bool isCrit) {
+    if (!AudioEngine::instance().isInitialized()) return;
+    auto& clips = (isCrit && !woundCritClips.empty()) ? woundCritClips : woundClips;
+    if (clips.empty()) return;
+    auto now = std::chrono::steady_clock::now();
+    if (lastWoundAt.time_since_epoch().count() != 0) {
+        if (std::chrono::duration<float>(now - lastWoundAt).count() < 0.8f) return;
+    }
+    std::uniform_int_distribution<size_t> dist(0, clips.size() - 1);
+    const Sample& sample = clips[dist(rng)];
+    float vol = isCrit ? 0.80f : 0.65f;
+    std::uniform_real_distribution<float> pitchDist(0.96f, 1.04f);
+    if (AudioEngine::instance().playSound2D(sample.data, vol * volumeScale, pitchDist(rng))) {
+        lastWoundAt = now;
+    }
+}
+
+void ActivitySoundManager::playDeath() {
+    if (!AudioEngine::instance().isInitialized() || deathClips.empty()) return;
+    std::uniform_int_distribution<size_t> dist(0, deathClips.size() - 1);
+    const Sample& sample = deathClips[dist(rng)];
+    AudioEngine::instance().playSound2D(sample.data, 0.85f * volumeScale, 1.0f);
 }
 
 } // namespace audio

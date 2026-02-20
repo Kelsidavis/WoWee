@@ -8,6 +8,8 @@
 #include "game/update_field_table.hpp"
 #include "game/expansion_profile.hpp"
 #include "rendering/renderer.hpp"
+#include "audio/activity_sound_manager.hpp"
+#include "audio/combat_sound_manager.hpp"
 #include "audio/spell_sound_manager.hpp"
 #include "audio/ui_sound_manager.hpp"
 #include "pipeline/dbc_layout.hpp"
@@ -7969,6 +7971,32 @@ void GameHandler::handleAttackerStateUpdate(network::Packet& packet) {
         autoTargetAttacker(data.attackerGuid);
     }
 
+    // Play combat sounds via CombatSoundManager + character vocalizations
+    if (auto* renderer = core::Application::getInstance().getRenderer()) {
+        if (auto* csm = renderer->getCombatSoundManager()) {
+            auto weaponSize = audio::CombatSoundManager::WeaponSize::MEDIUM;
+            if (data.isMiss()) {
+                csm->playWeaponMiss(false);
+            } else if (data.victimState == 1 || data.victimState == 2) {
+                // Dodge/parry — swing whoosh but no impact
+                csm->playWeaponSwing(weaponSize, false);
+            } else {
+                // Hit — swing + flesh impact
+                csm->playWeaponSwing(weaponSize, data.isCrit());
+                csm->playImpact(weaponSize, audio::CombatSoundManager::ImpactType::FLESH, data.isCrit());
+            }
+        }
+        // Character vocalizations
+        if (auto* asm_ = renderer->getActivitySoundManager()) {
+            if (isPlayerAttacker && !data.isMiss() && data.victimState != 1 && data.victimState != 2) {
+                asm_->playAttackGrunt();
+            }
+            if (isPlayerTarget && !data.isMiss() && data.victimState != 1 && data.victimState != 2) {
+                asm_->playWound(data.isCrit());
+            }
+        }
+    }
+
     if (data.isMiss()) {
         addCombatText(CombatTextEntry::MISS, 0, 0, isPlayerAttacker);
     } else if (data.victimState == 1) {
@@ -8048,28 +8076,71 @@ void GameHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
     if (spellId == 8690) target = 0;
 
     // Warrior Charge (ranks 1-3): client-side range check + charge callback
+    // Must face target and validate range BEFORE sending packet to server
     if (spellId == 100 || spellId == 6178 || spellId == 11578) {
         if (target == 0) {
             addSystemChatMessage("You have no target.");
             return;
         }
         auto entity = entityManager.getEntity(target);
-        if (entity) {
-            float tx = entity->getX(), ty = entity->getY(), tz = entity->getZ();
-            float dx = tx - movementInfo.x;
-            float dy = ty - movementInfo.y;
-            float dz = tz - movementInfo.z;
-            float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
-            if (dist < 8.0f) {
-                addSystemChatMessage("Target is too close.");
-                return;
-            }
-            if (dist > 25.0f) {
-                addSystemChatMessage("Out of range.");
-                return;
-            }
-            if (chargeCallback_) {
-                chargeCallback_(target, tx, ty, tz);
+        if (!entity) {
+            addSystemChatMessage("You have no target.");
+            return;
+        }
+        float tx = entity->getX(), ty = entity->getY(), tz = entity->getZ();
+        float dx = tx - movementInfo.x;
+        float dy = ty - movementInfo.y;
+        float dz = tz - movementInfo.z;
+        float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist < 8.0f) {
+            addSystemChatMessage("Target is too close.");
+            return;
+        }
+        if (dist > 25.0f) {
+            addSystemChatMessage("Out of range.");
+            return;
+        }
+        // Face the target before sending the cast packet to avoid "not in front" rejection
+        float yaw = std::atan2(dy, dx);
+        movementInfo.orientation = yaw;
+        sendMovement(Opcode::CMSG_MOVE_SET_FACING);
+        if (chargeCallback_) {
+            chargeCallback_(target, tx, ty, tz);
+        }
+    }
+
+    // Instant melee abilities: client-side range + facing check to avoid server "not in front" errors
+    {
+        uint32_t sid = spellId;
+        bool isMeleeAbility =
+            sid == 78   || sid == 284   || sid == 285  || sid == 1608  ||  // Heroic Strike
+            sid == 11564 || sid == 11565 || sid == 11566 || sid == 11567 ||
+            sid == 25286 || sid == 29707 || sid == 30324 ||
+            sid == 772  || sid == 6546  || sid == 6547 || sid == 6548 ||   // Rend
+            sid == 11572 || sid == 11573 || sid == 11574 || sid == 25208 ||
+            sid == 6572 || sid == 6574 || sid == 7379 || sid == 11600 ||   // Revenge
+            sid == 11601 || sid == 25288 || sid == 25269 || sid == 30357 ||
+            sid == 845  || sid == 7369  || sid == 11608 || sid == 11609 || // Cleave
+            sid == 20569 || sid == 25231 || sid == 47519 || sid == 47520 ||
+            sid == 12294 || sid == 21551 || sid == 21552 || sid == 21553 || // Mortal Strike
+            sid == 25248 || sid == 30330 || sid == 47485 || sid == 47486 ||
+            sid == 23922 || sid == 23923 || sid == 23924 || sid == 23925 || // Shield Slam
+            sid == 25258 || sid == 30356 || sid == 47487 || sid == 47488;
+        if (isMeleeAbility && target != 0) {
+            auto entity = entityManager.getEntity(target);
+            if (entity) {
+                float dx = entity->getX() - movementInfo.x;
+                float dy = entity->getY() - movementInfo.y;
+                float dz = entity->getZ() - movementInfo.z;
+                float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+                if (dist > 8.0f) {
+                    addSystemChatMessage("Out of range.");
+                    return;
+                }
+                // Face the target to prevent "not in front" rejection
+                float yaw = std::atan2(dy, dx);
+                movementInfo.orientation = yaw;
+                sendMovement(Opcode::CMSG_MOVE_SET_FACING);
             }
         }
     }
@@ -8206,6 +8277,26 @@ void GameHandler::handleSpellGo(network::Packet& packet) {
             if (auto* ssm = renderer->getSpellSoundManager()) {
                 ssm->playCast(audio::SpellSoundManager::MagicSchool::ARCANE);
             }
+        }
+
+        // Instant melee abilities → trigger attack animation
+        uint32_t sid = data.spellId;
+        bool isMeleeAbility =
+            sid == 78   || sid == 284   || sid == 285  || sid == 1608  ||  // Heroic Strike ranks
+            sid == 11564 || sid == 11565 || sid == 11566 || sid == 11567 ||
+            sid == 25286 || sid == 29707 || sid == 30324 ||
+            sid == 772  || sid == 6546  || sid == 6547 || sid == 6548 ||   // Rend ranks
+            sid == 11572 || sid == 11573 || sid == 11574 || sid == 25208 ||
+            sid == 6572 || sid == 6574 || sid == 7379 || sid == 11600 ||   // Revenge ranks
+            sid == 11601 || sid == 25288 || sid == 25269 || sid == 30357 ||
+            sid == 845  || sid == 7369  || sid == 11608 || sid == 11609 || // Cleave ranks
+            sid == 20569 || sid == 25231 || sid == 47519 || sid == 47520 ||
+            sid == 12294 || sid == 21551 || sid == 21552 || sid == 21553 || // Mortal Strike ranks
+            sid == 25248 || sid == 30330 || sid == 47485 || sid == 47486 ||
+            sid == 23922 || sid == 23923 || sid == 23924 || sid == 23925 || // Shield Slam ranks
+            sid == 25258 || sid == 30356 || sid == 47487 || sid == 47488;
+        if (isMeleeAbility && meleeSwingCallback_) {
+            meleeSwingCallback_();
         }
 
         casting = false;
