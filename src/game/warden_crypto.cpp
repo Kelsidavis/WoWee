@@ -81,8 +81,8 @@ bool WardenCrypto::initFromSessionKey(const std::vector<uint8_t>& sessionKey) {
     encryptRC4State_.resize(256);
     decryptRC4State_.resize(256);
 
-    initRC4(ek, encryptRC4State_, encryptRC4_i_, encryptRC4_j_);
-    initRC4(dk, decryptRC4State_, decryptRC4_i_, decryptRC4_j_);
+    initRC4(ek, encryptRC4State_, encryptRC4_i_, encryptRC4_j_); // codeql[cpp/weak-cryptographic-algorithm]
+    initRC4(dk, decryptRC4State_, decryptRC4_i_, decryptRC4_j_); // codeql[cpp/weak-cryptographic-algorithm]
 
     // Scrub temporary key material after RC4 state initialization.
     std::fill(ek.begin(), ek.end(), 0);

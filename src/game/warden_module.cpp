@@ -60,11 +60,8 @@ bool WardenModule::load(const std::vector<uint8_t>& moduleData,
     }
     std::cout << "[WardenModule] ✓ MD5 verified" << '\n';
 
-    // Step 2: RC4 decrypt
-    // lgtm [cpp/weak-cryptographic-algorithm]
-    // Warden module payload encryption is legacy RC4 by protocol design.
-    // Changing algorithms here would break interoperability with supported servers.
-    if (!decryptRC4(moduleData, rc4Key, decryptedData_)) {
+    // Step 2: RC4 decrypt (Warden protocol-required legacy RC4; server-mandated, cannot be changed)
+    if (!decryptRC4(moduleData, rc4Key, decryptedData_)) { // codeql[cpp/weak-cryptographic-algorithm]
         std::cerr << "[WardenModule] RC4 decryption failed!" << '\n';
         return false;
     }

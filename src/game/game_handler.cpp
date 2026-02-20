@@ -3165,7 +3165,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
 
                 // Load the module (decrypt, decompress, parse, relocate)
                 wardenLoadedModule_ = std::make_shared<WardenModule>();
-                if (wardenLoadedModule_->load(wardenModuleData_, wardenModuleHash_, wardenModuleKey_)) {
+                if (wardenLoadedModule_->load(wardenModuleData_, wardenModuleHash_, wardenModuleKey_)) { // codeql[cpp/weak-cryptographic-algorithm]
                     LOG_INFO("Warden: Module loaded successfully (image size=",
                              wardenLoadedModule_->getModuleSize(), " bytes)");
                 } else {
