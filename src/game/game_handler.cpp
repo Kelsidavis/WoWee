@@ -3835,8 +3835,18 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                             std::memcpy(reqHash, p + 4, 20);
                             pos += moduleSize;
 
-                            // CMaNGOS sanity check expects kernel32.dll to be found.
-                            bool shouldReportFound = hmacSha1Matches(seedBytes, "kernel32.dll", reqHash);
+                            // CMaNGOS uppercases module names before hashing.
+                            // DB module scans:
+                            //   KERNEL32.DLL (wanted=true)
+                            //   WPESPY.DLL / SPEEDHACK-I386.DLL / TAMIA.DLL (wanted=false)
+                            bool shouldReportFound = false;
+                            if (hmacSha1Matches(seedBytes, "KERNEL32.DLL", reqHash)) {
+                                shouldReportFound = true;
+                            } else if (hmacSha1Matches(seedBytes, "WPESPY.DLL", reqHash) ||
+                                       hmacSha1Matches(seedBytes, "SPEEDHACK-I386.DLL", reqHash) ||
+                                       hmacSha1Matches(seedBytes, "TAMIA.DLL", reqHash)) {
+                                shouldReportFound = false;
+                            }
                             resultData.push_back(shouldReportFound ? 0x4A : 0x01);
                             break;
                         }
