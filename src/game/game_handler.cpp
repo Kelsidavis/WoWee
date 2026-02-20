@@ -39,6 +39,7 @@
 #include <cstring>
 #include <limits>
 #include <openssl/sha.h>
+#include <openssl/hmac.h>
 
 namespace wowee {
 namespace game {
@@ -3485,6 +3486,42 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                 if (decoded == wardenCheckOpcodes_[8]) return CT_TIMING; // CHECK_TIMING_VALUES
                 return CT_UNKNOWN;
             };
+            auto isKnownWantedCodeScan = [&](const uint8_t seedBytes[4], const uint8_t reqHash[20],
+                                            uint32_t offset, uint8_t length) -> bool {
+                auto hashPattern = [&](const uint8_t* pattern, size_t patternLen) {
+                    uint8_t out[SHA_DIGEST_LENGTH];
+                    unsigned int outLen = 0;
+                    HMAC(EVP_sha1(),
+                         seedBytes, 4,
+                         pattern, patternLen,
+                         out, &outLen);
+                    return outLen == SHA_DIGEST_LENGTH && std::memcmp(out, reqHash, SHA_DIGEST_LENGTH) == 0;
+                };
+
+                // DB sanity check: "Warden packet process code search sanity check" (id=85)
+                static const uint8_t kPacketProcessSanityPattern[] = {
+                    0x33, 0xD2, 0x33, 0xC9, 0xE8, 0x87, 0x07, 0x1B, 0x00, 0xE8
+                };
+                if (offset == 13856 && length == sizeof(kPacketProcessSanityPattern) &&
+                    hashPattern(kPacketProcessSanityPattern, sizeof(kPacketProcessSanityPattern))) {
+                    return true;
+                }
+
+                // Scripted sanity check: "Warden Memory Read check" in wardenwin.cpp
+                static const uint8_t kWardenMemoryReadPattern[] = {
+                    0x56, 0x57, 0xFC, 0x8B, 0x54, 0x24, 0x14, 0x8B,
+                    0x74, 0x24, 0x10, 0x8B, 0x44, 0x24, 0x0C, 0x8B,
+                    0xCA, 0x8B, 0xF8, 0xC1, 0xE9, 0x02, 0x74, 0x02,
+                    0xF3, 0xA5, 0xB1, 0x03, 0x23, 0xCA, 0x74, 0x02,
+                    0xF3, 0xA4, 0x5F, 0x5E, 0xC3
+                };
+                if (length == sizeof(kWardenMemoryReadPattern) &&
+                    hashPattern(kWardenMemoryReadPattern, sizeof(kWardenMemoryReadPattern))) {
+                    return true;
+                }
+
+                return false;
+            };
             auto resolveWardenString = [&](uint8_t oneBasedIndex) -> std::string {
                 if (oneBasedIndex == 0) return std::string();
                 size_t idx = static_cast<size_t>(oneBasedIndex - 1);
@@ -3629,9 +3666,23 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                             }
                         }
 
-                        LOG_INFO("Warden:   PAGE_A request bytes=", consume);
+                        uint8_t pageResult = 0x00;
+                        if (consume >= 29) {
+                            const uint8_t* p = decrypted.data() + pos;
+                            uint8_t seedBytes[4] = { p[0], p[1], p[2], p[3] };
+                            uint8_t reqHash[20];
+                            std::memcpy(reqHash, p + 4, 20);
+                            uint32_t off = uint32_t(p[24]) | (uint32_t(p[25]) << 8) |
+                                           (uint32_t(p[26]) << 16) | (uint32_t(p[27]) << 24);
+                            uint8_t len = p[28];
+                            if (isKnownWantedCodeScan(seedBytes, reqHash, off, len)) {
+                                pageResult = 0x4A; // PatternFound
+                            }
+                        }
+                        LOG_INFO("Warden:   PAGE_A request bytes=", consume,
+                                 " result=0x", [&]{char s[4];snprintf(s,4,"%02x",pageResult);return std::string(s);}());
                         pos += consume;
-                        resultData.push_back(0x00);
+                        resultData.push_back(pageResult);
                         break;
                     }
                     case CT_PAGE_B: {
@@ -3654,9 +3705,23 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                             else if (remaining >= kPageBLong) consume = kPageBLong;
                             else { pos = checkEnd; break; }
                         }
-                        LOG_INFO("Warden:   PAGE_B request bytes=", consume);
+                        uint8_t pageResult = 0x00;
+                        if (consume >= 29) {
+                            const uint8_t* p = decrypted.data() + pos;
+                            uint8_t seedBytes[4] = { p[0], p[1], p[2], p[3] };
+                            uint8_t reqHash[20];
+                            std::memcpy(reqHash, p + 4, 20);
+                            uint32_t off = uint32_t(p[24]) | (uint32_t(p[25]) << 8) |
+                                           (uint32_t(p[26]) << 16) | (uint32_t(p[27]) << 24);
+                            uint8_t len = p[28];
+                            if (isKnownWantedCodeScan(seedBytes, reqHash, off, len)) {
+                                pageResult = 0x4A; // PatternFound
+                            }
+                        }
+                        LOG_INFO("Warden:   PAGE_B request bytes=", consume,
+                                 " result=0x", [&]{char s[4];snprintf(s,4,"%02x",pageResult);return std::string(s);}());
                         pos += consume;
-                        resultData.push_back(0x00);
+                        resultData.push_back(pageResult);
                         break;
                     }
                     case CT_MPQ: {
