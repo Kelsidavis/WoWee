@@ -1778,6 +1778,14 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_SET_PROFICIENCY:
         case Opcode::SMSG_ACTION_BUTTONS:
         case Opcode::SMSG_LEVELUP_INFO:
+        case Opcode::SMSG_LEVELUP_INFO_ALT:
+            break;
+
+        case Opcode::SMSG_PLAY_SOUND:
+            if (packet.getSize() - packet.getReadPos() >= 4) {
+                uint32_t soundId = packet.readUInt32();
+                LOG_DEBUG("SMSG_PLAY_SOUND id=", soundId);
+            }
             break;
 
         case Opcode::SMSG_LOOT_MONEY_NOTIFY: {
