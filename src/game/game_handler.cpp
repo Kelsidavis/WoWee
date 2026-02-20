@@ -35,6 +35,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <functional>
+#include <array>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
@@ -204,6 +205,33 @@ std::vector<uint8_t> readFileBinary(const std::string& fsPath) {
     in.read(reinterpret_cast<char*>(data.data()), size);
     if (!in) return {};
     return data;
+}
+
+bool hmacSha1Matches(const uint8_t seedBytes[4], const std::string& text, const uint8_t expected[20]) {
+    uint8_t out[SHA_DIGEST_LENGTH];
+    unsigned int outLen = 0;
+    HMAC(EVP_sha1(),
+         seedBytes, 4,
+         reinterpret_cast<const uint8_t*>(text.data()),
+         static_cast<int>(text.size()),
+         out, &outLen);
+    return outLen == SHA_DIGEST_LENGTH && std::memcmp(out, expected, SHA_DIGEST_LENGTH) == 0;
+}
+
+const std::unordered_map<std::string, std::array<uint8_t, 20>>& knownDoorHashes() {
+    static const std::unordered_map<std::string, std::array<uint8_t, 20>> k = {
+        {"world\\lordaeron\\stratholme\\activedoodads\\doors\\nox_door_plague.m2",
+         {0xB4,0x45,0x2B,0x6D,0x95,0xC9,0x8B,0x18,0x6A,0x70,0xB0,0x08,0xFA,0x07,0xBB,0xAE,0xF3,0x0D,0xF7,0xA2}},
+        {"world\\kalimdor\\onyxiaslair\\doors\\onyxiasgate01.m2",
+         {0x75,0x19,0x5E,0x4A,0xED,0xA0,0xBC,0xAF,0x04,0x8C,0xA0,0xE3,0x4D,0x95,0xA7,0x0D,0x4F,0x53,0xC7,0x46}},
+        {"world\\generic\\human\\activedoodads\\doors\\deadminedoor02.m2",
+         {0x3D,0xFF,0x01,0x1B,0x9A,0xB1,0x34,0xF3,0x7F,0x88,0x50,0x97,0xE6,0x95,0x35,0x1B,0x91,0x95,0x35,0x64}},
+        {"world\\kalimdor\\silithus\\activedoodads\\ahnqirajdoor\\ahnqirajdoor02.m2",
+         {0xDB,0xD4,0xF4,0x07,0xC4,0x68,0xCC,0x36,0x13,0x4E,0x62,0x1D,0x16,0x01,0x78,0xFD,0xA4,0xD0,0xD2,0x49}},
+        {"world\\kalimdor\\diremaul\\activedoodads\\doors\\diremaulsmallinstancedoor.m2",
+         {0x0D,0xC8,0xDB,0x46,0xC8,0x55,0x49,0xC0,0xFF,0x1A,0x60,0x0F,0x6C,0x23,0x63,0x57,0xC3,0x05,0x78,0x1A}},
+    };
+    return k;
 }
 
 bool isReadableQuestText(const std::string& s, size_t minLen, size_t maxLen) {
@@ -3734,8 +3762,16 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         bool found = false;
                         std::vector<uint8_t> hash(20, 0);
                         if (!filePath.empty()) {
+                            std::string normalizedPath = asciiLower(filePath);
+                            std::replace(normalizedPath.begin(), normalizedPath.end(), '/', '\\');
+                            auto knownIt = knownDoorHashes().find(normalizedPath);
+                            if (knownIt != knownDoorHashes().end()) {
+                                found = true;
+                                hash.assign(knownIt->second.begin(), knownIt->second.end());
+                            }
+
                             auto* am = core::Application::getInstance().getAssetManager();
-                            if (am && am->isInitialized()) {
+                            if (am && am->isInitialized() && !found) {
                                 // Use a case-insensitive direct filesystem resolution first.
                                 // Manifest entries may point at uppercase duplicate trees with
                                 // different content/hashes than canonical client files.
@@ -3793,9 +3829,18 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                                         ", expected=", moduleSize, "), consuming remainder");
                             pos = checkEnd;
                         } else {
+                            const uint8_t* p = decrypted.data() + pos;
+                            uint8_t seedBytes[4] = { p[0], p[1], p[2], p[3] };
+                            uint8_t reqHash[20];
+                            std::memcpy(reqHash, p + 4, 20);
                             pos += moduleSize;
+
+                            // CMaNGOS sanity check expects kernel32.dll to be found.
+                            bool shouldReportFound = hmacSha1Matches(seedBytes, "kernel32.dll", reqHash);
+                            resultData.push_back(shouldReportFound ? 0x4A : 0x01);
+                            break;
                         }
-                        // Response: [uint8 result=1] (module NOT loaded = clean)
+                        // Truncated module request fallback: module NOT loaded = clean
                         resultData.push_back(0x01);
                         break;
                     }
