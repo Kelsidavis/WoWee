@@ -1627,16 +1627,19 @@ void GameScreen::renderPlayerFrame(game::GameHandler& gameHandler) {
         ImGui::ProgressBar(pct, ImVec2(-1, 18), overlay);
         ImGui::PopStyleColor();
 
-        // Mana/Power bar (Phase 2)
+        // Mana/Power bar
         if (playerEntity && (playerEntity->getType() == game::ObjectType::PLAYER || playerEntity->getType() == game::ObjectType::UNIT)) {
             auto unit = std::static_pointer_cast<game::Unit>(playerEntity);
+            uint8_t powerType = unit->getPowerType();
             uint32_t power = unit->getPower();
             uint32_t maxPower = unit->getMaxPower();
+            // Rage (1) and Energy (3) always cap at 100 — show bar even if server
+            // hasn't sent UNIT_FIELD_MAXPOWER1 yet (warriors start combat at 0 rage).
+            if (maxPower == 0 && (powerType == 1 || powerType == 3)) maxPower = 100;
             if (maxPower > 0) {
                 float mpPct = static_cast<float>(power) / static_cast<float>(maxPower);
-                // Color by power type
                 ImVec4 powerColor;
-                switch (unit->getPowerType()) {
+                switch (powerType) {
                     case 0: powerColor = ImVec4(0.2f, 0.2f, 0.9f, 1.0f); break; // Mana (blue)
                     case 1: powerColor = ImVec4(0.9f, 0.2f, 0.2f, 1.0f); break; // Rage (red)
                     case 3: powerColor = ImVec4(0.9f, 0.9f, 0.2f, 1.0f); break; // Energy (yellow)
@@ -1645,7 +1648,7 @@ void GameScreen::renderPlayerFrame(game::GameHandler& gameHandler) {
                 ImGui::PushStyleColor(ImGuiCol_PlotHistogram, powerColor);
                 char mpOverlay[64];
                 snprintf(mpOverlay, sizeof(mpOverlay), "%u / %u", power, maxPower);
-                ImGui::ProgressBar(mpPct, ImVec2(-1, 14), mpOverlay);
+                ImGui::ProgressBar(mpPct, ImVec2(-1, 18), mpOverlay);
                 ImGui::PopStyleColor();
             }
         }
@@ -1752,15 +1755,24 @@ void GameScreen::renderTargetFrame(game::GameHandler& gameHandler) {
                 snprintf(overlay, sizeof(overlay), "%u / %u", hp, maxHp);
                 ImGui::ProgressBar(pct, ImVec2(-1, 18), overlay);
                 ImGui::PopStyleColor();
-                // Target mana bar
+                // Target power bar (mana/rage/energy)
+                uint8_t targetPowerType = unit->getPowerType();
                 uint32_t targetPower = unit->getPower();
                 uint32_t targetMaxPower = unit->getMaxPower();
+                if (targetMaxPower == 0 && (targetPowerType == 1 || targetPowerType == 3)) targetMaxPower = 100;
                 if (targetMaxPower > 0) {
                     float mpPct = static_cast<float>(targetPower) / static_cast<float>(targetMaxPower);
-                    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.2f, 0.2f, 0.9f, 1.0f));
+                    ImVec4 targetPowerColor;
+                    switch (targetPowerType) {
+                        case 0: targetPowerColor = ImVec4(0.2f, 0.2f, 0.9f, 1.0f); break; // Mana (blue)
+                        case 1: targetPowerColor = ImVec4(0.9f, 0.2f, 0.2f, 1.0f); break; // Rage (red)
+                        case 3: targetPowerColor = ImVec4(0.9f, 0.9f, 0.2f, 1.0f); break; // Energy (yellow)
+                        default: targetPowerColor = ImVec4(0.2f, 0.2f, 0.9f, 1.0f); break;
+                    }
+                    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, targetPowerColor);
                     char mpOverlay[64];
                     snprintf(mpOverlay, sizeof(mpOverlay), "%u / %u", targetPower, targetMaxPower);
-                    ImGui::ProgressBar(mpPct, ImVec2(-1, 14), mpOverlay);
+                    ImGui::ProgressBar(mpPct, ImVec2(-1, 18), mpOverlay);
                     ImGui::PopStyleColor();
                 }
             } else {
