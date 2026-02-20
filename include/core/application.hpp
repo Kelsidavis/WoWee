@@ -189,6 +189,14 @@ private:
     float taxiStreamCooldown_ = 0.0f;
     bool idleYawned_ = false;
 
+    // Charge rush state
+    bool chargeActive_ = false;
+    float chargeTimer_ = 0.0f;
+    float chargeDuration_ = 0.0f;
+    glm::vec3 chargeStartPos_{0.0f};  // Render coordinates
+    glm::vec3 chargeEndPos_{0.0f};    // Render coordinates
+    uint64_t chargeTargetGuid_ = 0;
+
     // Online gameobject model spawning
     struct GameObjectInstanceInfo {
         uint32_t modelId = 0;

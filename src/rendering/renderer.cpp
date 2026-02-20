@@ -16,6 +16,7 @@
 #include "rendering/sky_system.hpp"
 #include "rendering/swim_effects.hpp"
 #include "rendering/mount_dust.hpp"
+#include "rendering/charge_effect.hpp"
 #include "rendering/levelup_effect.hpp"
 #include "rendering/character_renderer.hpp"
 #include "rendering/wmo_renderer.hpp"
@@ -358,6 +359,13 @@ bool Renderer::initialize(core::Window* win) {
 
     // Create level-up effect (model loaded later via loadLevelUpEffect)
     levelUpEffect = std::make_unique<LevelUpEffect>();
+
+    // Create charge effect (point-sprite particles + optional M2 models)
+    chargeEffect = std::make_unique<ChargeEffect>();
+    if (!chargeEffect->initialize()) {
+        LOG_WARNING("Failed to initialize charge effect");
+        chargeEffect.reset();
+    }
 
     // Create character renderer
     characterRenderer = std::make_unique<CharacterRenderer>();
@@ -1509,10 +1517,18 @@ void Renderer::updateCharacterAnimation() {
                 newState = CharAnimState::IDLE;
             }
             break;
+
+        case CharAnimState::CHARGE:
+            // Stay in CHARGE until charging_ is cleared
+            break;
     }
 
     if (forceMelee) {
         newState = CharAnimState::MELEE_SWING;
+    }
+
+    if (charging_) {
+        newState = CharAnimState::CHARGE;
     }
 
     if (newState != charAnimState) {
@@ -1573,6 +1589,10 @@ void Renderer::updateCharacterAnimation() {
             loop = false;
             break;
         case CharAnimState::MOUNT:      animId = ANIM_MOUNT;      loop = true;  break;
+        case CharAnimState::CHARGE:
+            animId = ANIM_RUN;
+            loop = true;
+            break;
     }
 
     uint32_t currentAnimId = 0;
@@ -1630,6 +1650,34 @@ void Renderer::triggerLevelUpEffect(const glm::vec3& position) {
     }
 
     levelUpEffect->trigger(position);
+}
+
+void Renderer::startChargeEffect(const glm::vec3& position, const glm::vec3& direction) {
+    if (!chargeEffect) return;
+
+    // Lazy-load M2 models on first use
+    if (!chargeEffect->isActive() && m2Renderer) {
+        if (!cachedAssetManager) {
+            cachedAssetManager = core::Application::getInstance().getAssetManager();
+        }
+        if (cachedAssetManager) {
+            chargeEffect->tryLoadM2Models(m2Renderer.get(), cachedAssetManager);
+        }
+    }
+
+    chargeEffect->start(position, direction);
+}
+
+void Renderer::emitChargeEffect(const glm::vec3& position, const glm::vec3& direction) {
+    if (chargeEffect) {
+        chargeEffect->emit(position, direction);
+    }
+}
+
+void Renderer::stopChargeEffect() {
+    if (chargeEffect) {
+        chargeEffect->stop();
+    }
 }
 
 void Renderer::triggerMeleeSwing() {
@@ -2007,6 +2055,10 @@ void Renderer::update(float deltaTime) {
     // Update level-up effect
     if (levelUpEffect) {
         levelUpEffect->update(deltaTime);
+    }
+    // Update charge effect
+    if (chargeEffect) {
+        chargeEffect->update(deltaTime);
     }
 
     auto sky2 = std::chrono::high_resolution_clock::now();
@@ -2683,6 +2735,11 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
     // Render mount dust effects
     if (mountDust && camera) {
         mountDust->render(*camera);
+    }
+
+    // Render charge effect (red haze + dust)
+    if (chargeEffect && camera) {
+        chargeEffect->render(*camera);
     }
 
     // Compute view/projection once for all sub-renderers

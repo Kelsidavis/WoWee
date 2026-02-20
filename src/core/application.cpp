@@ -28,6 +28,7 @@
 #include "audio/music_manager.hpp"
 #include "audio/footstep_manager.hpp"
 #include "audio/activity_sound_manager.hpp"
+#include "audio/audio_engine.hpp"
 #include <imgui.h>
 #include "pipeline/m2_loader.hpp"
 #include "pipeline/wmo_loader.hpp"
@@ -689,7 +690,7 @@ void Application::update(float deltaTime) {
                 worldEntryMovementGraceTimer_ -= deltaTime;
             }
             if (renderer && renderer->getCameraController()) {
-                const bool externallyDrivenMotion = onTaxi || onTransportNow;
+                const bool externallyDrivenMotion = onTaxi || onTransportNow || chargeActive_;
                 // Keep physics frozen (externalFollow) during landing clamp when terrain
                 // hasn't loaded yet — prevents gravity from pulling player through void.
                 bool landingClampActive = !onTaxi && taxiLandingClampTimer_ > 0.0f &&
@@ -816,6 +817,53 @@ void Application::update(float deltaTime) {
                         if (followTarget) {
                             *followTarget = renderPos;
                         }
+                    }
+                } else if (chargeActive_) {
+                    // Warrior Charge: lerp position from start to end using smoothstep
+                    chargeTimer_ += deltaTime;
+                    float t = std::min(chargeTimer_ / chargeDuration_, 1.0f);
+                    // smoothstep for natural acceleration/deceleration
+                    float s = t * t * (3.0f - 2.0f * t);
+                    glm::vec3 renderPos = chargeStartPos_ + (chargeEndPos_ - chargeStartPos_) * s;
+                    renderer->getCharacterPosition() = renderPos;
+
+                    // Keep facing toward target and emit charge effect
+                    glm::vec3 dir = chargeEndPos_ - chargeStartPos_;
+                    if (glm::length(dir) > 0.01f) {
+                        dir = glm::normalize(dir);
+                        float yawDeg = glm::degrees(std::atan2(dir.x, dir.y));
+                        renderer->setCharacterYaw(yawDeg);
+                        renderer->emitChargeEffect(renderPos, dir);
+                    }
+
+                    // Sync to game handler
+                    glm::vec3 canonical = core::coords::renderToCanonical(renderPos);
+                    gameHandler->setPosition(canonical.x, canonical.y, canonical.z);
+
+                    // Update camera follow target
+                    if (renderer->getCameraController()) {
+                        glm::vec3* followTarget = renderer->getCameraController()->getFollowTargetMutable();
+                        if (followTarget) {
+                            *followTarget = renderPos;
+                        }
+                    }
+
+                    // Charge complete
+                    if (t >= 1.0f) {
+                        chargeActive_ = false;
+                        renderer->setCharging(false);
+                        renderer->stopChargeEffect();
+                        renderer->getCameraController()->setExternalFollow(false);
+                        renderer->getCameraController()->setExternalMoving(false);
+
+                        // Start auto-attack on arrival
+                        if (chargeTargetGuid_ != 0) {
+                            gameHandler->startAutoAttack(chargeTargetGuid_);
+                            renderer->triggerMeleeSwing();
+                        }
+
+                        // Send movement heartbeat so server knows our new position
+                        gameHandler->sendMovement(game::Opcode::CMSG_MOVE_HEARTBEAT);
                     }
                 } else {
                     glm::vec3 renderPos = renderer->getCharacterPosition();
@@ -1337,6 +1385,60 @@ void Application::setupUICallbacks() {
     // GameObject despawn callback (online mode) - remove static models
     gameHandler->setGameObjectDespawnCallback([this](uint64_t guid) {
         despawnOnlineGameObject(guid);
+    });
+
+    // Charge callback — warrior rushes toward target
+    gameHandler->setChargeCallback([this](uint64_t targetGuid, float tx, float ty, float tz) {
+        if (!renderer || !renderer->getCameraController() || !gameHandler) return;
+
+        // Get current player position in render coords
+        glm::vec3 startRender = renderer->getCharacterPosition();
+        // Convert target from canonical to render
+        glm::vec3 targetRender = core::coords::canonicalToRender(glm::vec3(tx, ty, tz));
+
+        // Compute direction and stop 2.0 units short (melee reach)
+        glm::vec3 dir = targetRender - startRender;
+        float dist = glm::length(dir);
+        if (dist < 3.0f) return; // Too close, nothing to do
+        glm::vec3 dirNorm = dir / dist;
+        glm::vec3 endRender = targetRender - dirNorm * 2.0f;
+
+        // Face toward target BEFORE starting charge
+        float yawRad = std::atan2(dirNorm.x, dirNorm.y);
+        float yawDeg = glm::degrees(yawRad);
+        renderer->setCharacterYaw(yawDeg);
+        // Sync canonical orientation to server so it knows we turned
+        float canonicalYaw = core::coords::normalizeAngleRad(glm::radians(180.0f - yawDeg));
+        gameHandler->setOrientation(canonicalYaw);
+        gameHandler->sendMovement(game::Opcode::CMSG_MOVE_SET_FACING);
+
+        // Set charge state
+        chargeActive_ = true;
+        chargeTimer_ = 0.0f;
+        chargeDuration_ = std::max(dist / 25.0f, 0.3f); // ~25 units/sec
+        chargeStartPos_ = startRender;
+        chargeEndPos_ = endRender;
+        chargeTargetGuid_ = targetGuid;
+
+        // Disable player input, play charge animation
+        renderer->getCameraController()->setExternalFollow(true);
+        renderer->getCameraController()->clearMovementInputs();
+        renderer->setCharging(true);
+
+        // Start charge visual effect (red haze + dust)
+        glm::vec3 chargeDir = glm::normalize(endRender - startRender);
+        renderer->startChargeEffect(startRender, chargeDir);
+
+        // Play charge whoosh sound (try multiple paths)
+        auto& audio = audio::AudioEngine::instance();
+        if (!audio.playSound2D("Sound\\Spells\\Charge.wav", 0.8f)) {
+            if (!audio.playSound2D("Sound\\Spells\\charge.wav", 0.8f)) {
+                if (!audio.playSound2D("Sound\\Spells\\SpellCharge.wav", 0.8f)) {
+                    // Fallback: weapon whoosh
+                    audio.playSound2D("Sound\\Item\\Weapons\\WeaponSwings\\mWooshLarge1.wav", 0.9f);
+                }
+            }
+        }
     });
 
     // Level-up callback — play sound, cheer emote, and trigger UI ding overlay + 3D effect

@@ -32,6 +32,7 @@ class SkySystem;
 class SwimEffects;
 class MountDust;
 class LevelUpEffect;
+class ChargeEffect;
 class CharacterRenderer;
 class WMORenderer;
 class M2Renderer;
@@ -137,6 +138,11 @@ public:
     bool isMoving() const;
     void triggerMeleeSwing();
     void setEquippedWeaponType(uint32_t inventoryType) { equippedWeaponInvType_ = inventoryType; meleeAnimId = 0; }
+    void setCharging(bool charging) { charging_ = charging; }
+    bool isCharging() const { return charging_; }
+    void startChargeEffect(const glm::vec3& position, const glm::vec3& direction);
+    void emitChargeEffect(const glm::vec3& position, const glm::vec3& direction);
+    void stopChargeEffect();
 
     // Mount rendering
     void setMounted(uint32_t mountInstId, uint32_t mountDisplayId, float heightOffset, const std::string& modelPath = "");
@@ -189,6 +195,7 @@ private:
     std::unique_ptr<SwimEffects> swimEffects;
     std::unique_ptr<MountDust> mountDust;
     std::unique_ptr<LevelUpEffect> levelUpEffect;
+    std::unique_ptr<ChargeEffect> chargeEffect;
     std::unique_ptr<CharacterRenderer> characterRenderer;
     std::unique_ptr<WMORenderer> wmoRenderer;
     std::unique_ptr<M2Renderer> m2Renderer;
@@ -259,7 +266,7 @@ private:
     float characterYaw = 0.0f;
 
     // Character animation state
-    enum class CharAnimState { IDLE, WALK, RUN, JUMP_START, JUMP_MID, JUMP_END, SIT_DOWN, SITTING, EMOTE, SWIM_IDLE, SWIM, MELEE_SWING, MOUNT };
+    enum class CharAnimState { IDLE, WALK, RUN, JUMP_START, JUMP_MID, JUMP_END, SIT_DOWN, SITTING, EMOTE, SWIM_IDLE, SWIM, MELEE_SWING, MOUNT, CHARGE };
     CharAnimState charAnimState = CharAnimState::IDLE;
     void updateCharacterAnimation();
     bool isFootstepAnimationState() const;
@@ -308,6 +315,7 @@ private:
     bool sfxPrevFalling = false;
     bool sfxPrevSwimming = false;
 
+    bool charging_ = false;
     float meleeSwingTimer = 0.0f;
     float meleeSwingCooldown = 0.0f;
     float meleeAnimDurationMs = 0.0f;

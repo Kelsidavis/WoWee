@@ -8046,6 +8046,34 @@ void GameHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
     uint64_t target = targetGuid != 0 ? targetGuid : this->targetGuid;
     // Self-targeted spells like hearthstone should not send a target
     if (spellId == 8690) target = 0;
+
+    // Warrior Charge (ranks 1-3): client-side range check + charge callback
+    if (spellId == 100 || spellId == 6178 || spellId == 11578) {
+        if (target == 0) {
+            addSystemChatMessage("You have no target.");
+            return;
+        }
+        auto entity = entityManager.getEntity(target);
+        if (entity) {
+            float tx = entity->getX(), ty = entity->getY(), tz = entity->getZ();
+            float dx = tx - movementInfo.x;
+            float dy = ty - movementInfo.y;
+            float dz = tz - movementInfo.z;
+            float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+            if (dist < 8.0f) {
+                addSystemChatMessage("Target is too close.");
+                return;
+            }
+            if (dist > 25.0f) {
+                addSystemChatMessage("Out of range.");
+                return;
+            }
+            if (chargeCallback_) {
+                chargeCallback_(target, tx, ty, tz);
+            }
+        }
+    }
+
     auto packet = packetParsers_
         ? packetParsers_->buildCastSpell(spellId, target, ++castCount)
         : CastSpellPacket::build(spellId, target, ++castCount);
