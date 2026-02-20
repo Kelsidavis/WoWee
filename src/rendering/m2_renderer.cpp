@@ -368,6 +368,11 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
             if ((uBlendMode == 3 || uBlendMode == 6) && maxRgb < 0.1) {
                 discard;
             }
+            // Unlit non-opaque batches (glow effects, emissive surfaces) with
+            // near-black pixels: these are glow textures where black = transparent.
+            if (uUnlit && uBlendMode >= 1 && maxRgb < 0.1) {
+                discard;
+            }
 
             // Distance fade - discard nearly invisible fragments
             float finalAlpha = texColor.a * uFadeAlpha;
@@ -2018,10 +2023,12 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             // Replace only likely flame-card submeshes with sprite glow. Keep larger geometry
             // (lantern housings, posts, etc.) authored so the prop itself remains visible.
             const bool smallCardLikeBatch = (batch.glowSize <= 1.35f);
+            const bool batchUnlit = (batch.materialFlags & 0x01) != 0;
             const bool shouldUseGlowSprite =
                 !koboldFlameCard &&
                 smallCardLikeBatch &&
-                ((batch.blendMode >= 3) || (batch.colorKeyBlack && flameLikeModel && batch.blendMode >= 1));
+                ((batch.blendMode >= 3) ||
+                 (batch.colorKeyBlack && flameLikeModel && batchUnlit && batch.blendMode >= 1));
             if (shouldUseGlowSprite) {
                 if (entry.distSq < 180.0f * 180.0f) {
                     glm::vec3 worldPos = glm::vec3(instance.modelMatrix * glm::vec4(batch.center, 1.0f));
