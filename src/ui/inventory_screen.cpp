@@ -1620,6 +1620,12 @@ void InventoryScreen::renderItemTooltip(const game::ItemDef& item, const game::I
         float dps = ((item.damageMin + item.damageMax) * 0.5f) / speed;
         ImGui::Text("%.1f DPS", dps);
     }
+
+    // Armor appears before stat bonuses — matches WoW tooltip order
+    if (item.armor > 0) {
+        ImGui::Text("%d Armor", item.armor);
+    }
+
     auto appendBonus = [](std::string& out, int32_t val, const char* shortName) {
         if (val <= 0) return;
         if (!out.empty()) out += "  ";
@@ -1634,10 +1640,6 @@ void InventoryScreen::renderItemTooltip(const game::ItemDef& item, const game::I
     appendBonus(bonusLine, item.spirit, "Spi");
     if (!bonusLine.empty()) {
         ImGui::TextColored(green, "%s", bonusLine.c_str());
-    }
-
-    if (item.armor > 0) {
-        ImGui::Text("%d Armor", item.armor);
     }
     if (item.sellPrice > 0) {
         uint32_t g = item.sellPrice / 10000;

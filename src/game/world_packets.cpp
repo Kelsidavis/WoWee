@@ -2086,6 +2086,7 @@ bool ItemQueryResponseParser::parse(network::Packet& packet, ItemQueryResponseDa
 
     packet.readUInt32(); // Flags
     packet.readUInt32(); // Flags2
+    packet.readUInt32(); // BuyCount  (WotLK: separate from BuyPrice)
     packet.readUInt32(); // BuyPrice
     data.sellPrice = packet.readUInt32(); // SellPrice
 
