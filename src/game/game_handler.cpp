@@ -2997,7 +2997,11 @@ bool GameHandler::loadWardenCRFile(const std::string& moduleHashHex) {
     crFile.read(reinterpret_cast<char*>(wardenCheckOpcodes_), 9);
     {
         std::string opcHex;
-        const char* names[] = {"MEM","PAGE_A","PAGE_B","MPQ","LUA","DRIVER","TIMING","PROC","MODULE"};
+        // CMaNGOS WindowsScanType order:
+        // 0 READ_MEMORY, 1 FIND_MODULE_BY_NAME, 2 FIND_MEM_IMAGE_CODE_BY_HASH,
+        // 3 FIND_CODE_BY_HASH, 4 HASH_CLIENT_FILE, 5 GET_LUA_VARIABLE,
+        // 6 API_CHECK, 7 FIND_DRIVER_BY_NAME, 8 CHECK_TIMING_VALUES
+        const char* names[] = {"MEM","MODULE","PAGE_A","PAGE_B","MPQ","LUA","PROC","DRIVER","TIMING"};
         for (int i = 0; i < 9; i++) {
             char s[16]; snprintf(s, sizeof(s), "%s=0x%02X ", names[i], wardenCheckOpcodes_[i]); opcHex += s;
         }
@@ -3389,9 +3393,15 @@ void GameHandler::handleWardenData(network::Packet& packet) {
 
             auto decodeCheckType = [&](uint8_t raw) -> CheckType {
                 uint8_t decoded = raw ^ xorByte;
-                for (int i = 0; i < 9; i++) {
-                    if (decoded == wardenCheckOpcodes_[i]) return static_cast<CheckType>(i);
-                }
+                if (decoded == wardenCheckOpcodes_[0]) return CT_MEM;    // READ_MEMORY
+                if (decoded == wardenCheckOpcodes_[1]) return CT_MODULE; // FIND_MODULE_BY_NAME
+                if (decoded == wardenCheckOpcodes_[2]) return CT_PAGE_A; // FIND_MEM_IMAGE_CODE_BY_HASH
+                if (decoded == wardenCheckOpcodes_[3]) return CT_PAGE_B; // FIND_CODE_BY_HASH
+                if (decoded == wardenCheckOpcodes_[4]) return CT_MPQ;    // HASH_CLIENT_FILE
+                if (decoded == wardenCheckOpcodes_[5]) return CT_LUA;    // GET_LUA_VARIABLE
+                if (decoded == wardenCheckOpcodes_[6]) return CT_PROC;   // API_CHECK
+                if (decoded == wardenCheckOpcodes_[7]) return CT_DRIVER; // FIND_DRIVER_BY_NAME
+                if (decoded == wardenCheckOpcodes_[8]) return CT_TIMING; // CHECK_TIMING_VALUES
                 return CT_UNKNOWN;
             };
             auto requestSizes = [&](CheckType ct) {
