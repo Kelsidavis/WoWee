@@ -64,7 +64,7 @@ void UpdateFieldTable::loadWotlkDefaults() {
         {UF::OBJECT_FIELD_ENTRY, 3},
         {UF::UNIT_FIELD_TARGET_LO, 6},
         {UF::UNIT_FIELD_TARGET_HI, 7},
-        {UF::UNIT_FIELD_BYTES_0, 56},
+        {UF::UNIT_FIELD_BYTES_0, 23},
         {UF::UNIT_FIELD_HEALTH, 24},
         {UF::UNIT_FIELD_POWER1, 25},
         {UF::UNIT_FIELD_MAXHEALTH, 32},

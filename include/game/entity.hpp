@@ -205,12 +205,14 @@ public:
     uint32_t getMaxHealth() const { return maxHealth; }
     void setMaxHealth(uint32_t h) { maxHealth = h; }
 
-    // Power (mana/rage/energy)
-    uint32_t getPower() const { return power; }
-    void setPower(uint32_t p) { power = p; }
+    // Power (mana/rage/energy) — indexed by power type (0-6)
+    uint32_t getPower() const { return powers[powerType < 7 ? powerType : 0]; }
+    void setPower(uint32_t p) { powers[powerType < 7 ? powerType : 0] = p; }
+    void setPowerByType(uint8_t type, uint32_t p) { if (type < 7) powers[type] = p; }
 
-    uint32_t getMaxPower() const { return maxPower; }
-    void setMaxPower(uint32_t p) { maxPower = p; }
+    uint32_t getMaxPower() const { return maxPowers[powerType < 7 ? powerType : 0]; }
+    void setMaxPower(uint32_t p) { maxPowers[powerType < 7 ? powerType : 0] = p; }
+    void setMaxPowerByType(uint8_t type, uint32_t p) { if (type < 7) maxPowers[type] = p; }
 
     uint8_t getPowerType() const { return powerType; }
     void setPowerType(uint8_t t) { powerType = t; }
@@ -256,9 +258,9 @@ protected:
     std::string name;
     uint32_t health = 0;
     uint32_t maxHealth = 0;
-    uint32_t power = 0;
-    uint32_t maxPower = 0;
-    uint8_t powerType = 0;   // 0=mana, 1=rage, 2=focus, 3=energy
+    uint32_t powers[7] = {};     // Indexed by power type (0=mana,1=rage,2=focus,3=energy,4=happiness,5=runes,6=runic)
+    uint32_t maxPowers[7] = {};  // Max values per power type
+    uint8_t powerType = 0;       // Active power type
     uint32_t level = 1;
     uint32_t entry = 0;
     uint32_t displayId = 0;
