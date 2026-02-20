@@ -327,6 +327,7 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
         uniform bool uAlphaTest;
         uniform bool uColorKeyBlack;
         uniform bool uUnlit;
+        uniform int uBlendMode;
         uniform float uFadeAlpha;
 
         uniform vec3 uFogColor;
@@ -353,10 +354,18 @@ bool M2Renderer::initialize(pipeline::AssetManager* assets) {
             if (uAlphaTest && texColor.a < 0.5) {
                 discard;
             }
-            if (uAlphaTest && max(texColor.r, max(texColor.g, texColor.b)) < 0.06) {
+            float maxRgb = max(texColor.r, max(texColor.g, texColor.b));
+            if (uAlphaTest && maxRgb < 0.06) {
                 discard;
             }
-            if (uColorKeyBlack && max(texColor.r, max(texColor.g, texColor.b)) < 0.08) {
+            if (uColorKeyBlack && maxRgb < 0.08) {
+                discard;
+            }
+            // Additive blend modes (3=Add, 6=BlendAdd): near-black fragments
+            // contribute nothing visually (add ~0 to framebuffer) but show as
+            // dark rectangles against sky/terrain. Discard them.
+            // Skip Mod(4)/Mod2x(5) since near-black is intentional for those.
+            if ((uBlendMode == 3 || uBlendMode == 6) && maxRgb < 0.1) {
                 discard;
             }
 
@@ -1210,7 +1219,7 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             bgpu.batchOpacity = texFailed ? 0.0f : 1.0f;
 
             // Compute batch center and radius for glow sprite positioning
-            if (bgpu.blendMode >= 3 && batch.indexCount > 0) {
+            if ((bgpu.blendMode >= 3 || bgpu.colorKeyBlack) && batch.indexCount > 0) {
                 glm::vec3 sum(0.0f);
                 uint32_t counted = 0;
                 for (uint32_t j = batch.indexStart; j < batch.indexStart + batch.indexCount; j++) {
@@ -1891,6 +1900,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
     glActiveTexture(GL_TEXTURE0);
     shader->setUniform("uTexture", 0);  // Texture unit 0, set once per frame
     shader->setUniform("uColorKeyBlack", false);
+    shader->setUniform("uBlendMode", 0);
 
     // Performance counters
     uint32_t boneMatrixUploads = 0;
@@ -1984,7 +1994,10 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             (modelKeyLower.find("torch") != std::string::npos) ||
             (modelKeyLower.find("candle") != std::string::npos) ||
             (modelKeyLower.find("flame") != std::string::npos) ||
-            (modelKeyLower.find("fire") != std::string::npos);
+            (modelKeyLower.find("fire") != std::string::npos) ||
+            (modelKeyLower.find("brazier") != std::string::npos) ||
+            (modelKeyLower.find("campfire") != std::string::npos) ||
+            (modelKeyLower.find("bonfire") != std::string::npos);
 
         for (const auto& batch : model.batches) {
             if (batch.indexCount == 0) continue;
@@ -2078,6 +2091,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
                         break;
                 }
                 lastBlendMode = batch.blendMode;
+                shader->setUniform("uBlendMode", static_cast<int>(batch.blendMode));
             } else {
                 // Still need to know if batch is transparent for depth mask logic
                 batchTransparent = (batch.blendMode >= 2);
@@ -2899,7 +2913,14 @@ GLuint M2Renderer::loadTexture(const std::string& path, uint32_t texFlags) {
         containsToken(key, "candle") ||
         containsToken(key, "flame") ||
         containsToken(key, "fire") ||
-        containsToken(key, "torch");
+        containsToken(key, "torch") ||
+        containsToken(key, "lamp") ||
+        containsToken(key, "lantern") ||
+        containsToken(key, "glow") ||
+        containsToken(key, "flare") ||
+        containsToken(key, "brazier") ||
+        containsToken(key, "campfire") ||
+        containsToken(key, "bonfire");
 
     // Load BLP texture
     pipeline::BLPImage blp = assetManager->loadTexture(key);
