@@ -2084,13 +2084,26 @@ bool ItemQueryResponseParser::parse(network::Packet& packet, ItemQueryResponseDa
     data.displayInfoId = packet.readUInt32();
     data.quality = packet.readUInt32();
 
+    // WotLK 3.3.5a (TrinityCore/AzerothCore): Flags, Flags2, BuyCount, BuyPrice, SellPrice
+    // Some server variants omit BuyCount (4 fields instead of 5).
+    // Read 5 fields and validate InventoryType; if it looks implausible, rewind and try 4.
+    const size_t postQualityPos = packet.getReadPos();
     packet.readUInt32(); // Flags
     packet.readUInt32(); // Flags2
-    packet.readUInt32(); // BuyCount  (WotLK: separate from BuyPrice)
+    packet.readUInt32(); // BuyCount
     packet.readUInt32(); // BuyPrice
     data.sellPrice = packet.readUInt32(); // SellPrice
-
     data.inventoryType = packet.readUInt32();
+
+    if (data.inventoryType > 28) {
+        // inventoryType out of range — BuyCount probably not present; rewind and try 4 fields
+        packet.setReadPos(postQualityPos);
+        packet.readUInt32(); // Flags
+        packet.readUInt32(); // Flags2
+        packet.readUInt32(); // BuyPrice
+        data.sellPrice = packet.readUInt32(); // SellPrice
+        data.inventoryType = packet.readUInt32();
+    }
 
     packet.readUInt32(); // AllowableClass
     packet.readUInt32(); // AllowableRace
@@ -2193,10 +2206,10 @@ bool ItemQueryResponseParser::parse(network::Packet& packet, ItemQueryResponseDa
     data.delayMs = chosen->delayMs;
 
     data.valid = !data.name.empty();
-    LOG_DEBUG("Item query response: ", data.name, " (quality=", data.quality,
-             " invType=", data.inventoryType, " stack=", data.maxStack,
-             " class=", data.itemClass, " armor=", data.armor,
-             " dmgEntries=", chosenDamageEntries, ")");
+    LOG_INFO("Item query: '", data.name, "' class=", data.itemClass,
+             " invType=", data.inventoryType, " quality=", data.quality,
+             " armor=", data.armor, " dmgEntries=", chosenDamageEntries,
+             " statsCount=", statsCount, " sellPrice=", data.sellPrice);
     return true;
 }
 
