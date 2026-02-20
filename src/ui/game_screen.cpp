@@ -397,7 +397,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // Update renderer face-target position and selection circle
     auto* renderer = core::Application::getInstance().getRenderer();
     if (renderer) {
-        renderer->setInCombat(gameHandler.isAutoAttacking());
+        renderer->setInCombat(gameHandler.isInCombat());
         static glm::vec3 targetGLPos;
         if (gameHandler.hasTarget()) {
             auto target = gameHandler.getTarget();
@@ -1535,11 +1535,15 @@ void GameScreen::renderPlayerFrame(game::GameHandler& gameHandler) {
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 4.0f);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.1f, 0.85f));
+    const bool inCombatConfirmed = gameHandler.isInCombat();
+    const bool attackIntentOnly = gameHandler.hasAutoAttackIntent() && !inCombatConfirmed;
     ImVec4 playerBorder = isDead
         ? ImVec4(0.5f, 0.5f, 0.5f, 1.0f)
-        : (gameHandler.isAutoAttacking()
+        : (inCombatConfirmed
             ? ImVec4(1.0f, 0.2f, 0.2f, 1.0f)
-            : ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+            : (attackIntentOnly
+                ? ImVec4(1.0f, 0.7f, 0.2f, 1.0f)
+                : ImVec4(0.4f, 0.4f, 0.4f, 1.0f)));
     ImGui::PushStyleColor(ImGuiCol_Border, playerBorder);
 
     if (ImGui::Begin("##PlayerFrame", nullptr, flags)) {
@@ -1678,18 +1682,19 @@ void GameScreen::renderTargetFrame(game::GameHandler& gameHandler) {
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 4.0f);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.1f, 0.85f));
-    bool isHostileTarget = gameHandler.isHostileAttacker(target->getGuid());
-    if (!isHostileTarget && target->getType() == game::ObjectType::UNIT) {
-        auto u = std::static_pointer_cast<game::Unit>(target);
-        isHostileTarget = u->isHostile();
-    }
+    const uint64_t targetGuid = target->getGuid();
+    const bool confirmedCombatWithTarget = gameHandler.isInCombatWith(targetGuid);
+    const bool intentTowardTarget =
+        gameHandler.hasAutoAttackIntent() &&
+        gameHandler.getAutoAttackTargetGuid() == targetGuid &&
+        !confirmedCombatWithTarget;
     ImVec4 borderColor = ImVec4(hostileColor.x * 0.8f, hostileColor.y * 0.8f, hostileColor.z * 0.8f, 1.0f);
-    if (isHostileTarget) {
+    if (confirmedCombatWithTarget) {
         float t = ImGui::GetTime();
         float pulse = (std::fmod(t, 0.6f) < 0.3f) ? 1.0f : 0.0f;
         borderColor = ImVec4(1.0f, 0.1f, 0.1f, pulse);
-    } else if (gameHandler.isAutoAttacking()) {
-        borderColor = ImVec4(1.0f, 0.2f, 0.2f, 1.0f);
+    } else if (intentTowardTarget) {
+        borderColor = ImVec4(1.0f, 0.7f, 0.2f, 1.0f);
     }
     ImGui::PushStyleColor(ImGuiCol_Border, borderColor);
 

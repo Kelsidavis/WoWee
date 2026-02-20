@@ -413,6 +413,14 @@ public:
     void startAutoAttack(uint64_t targetGuid);
     void stopAutoAttack();
     bool isAutoAttacking() const { return autoAttacking; }
+    bool hasAutoAttackIntent() const { return autoAttackRequested_; }
+    bool isInCombat() const { return autoAttacking || !hostileAttackers_.empty(); }
+    bool isInCombatWith(uint64_t guid) const {
+        return guid != 0 &&
+               ((autoAttacking && autoAttackTarget == guid) ||
+                (hostileAttackers_.count(guid) > 0));
+    }
+    uint64_t getAutoAttackTargetGuid() const { return autoAttackTarget; }
     bool isAggressiveTowardPlayer(uint64_t guid) const { return hostileAttackers_.count(guid) > 0; }
     const std::vector<CombatTextEntry>& getCombatText() const { return combatText; }
     void updateCombatText(float deltaTime);
@@ -1359,6 +1367,7 @@ private:
 
     // ---- Phase 2: Combat ----
     bool autoAttacking = false;
+    bool autoAttackRequested_ = false;   // local intent (CMSG_ATTACKSWING sent)
     uint64_t autoAttackTarget = 0;
     bool autoAttackOutOfRange_ = false;
     float autoAttackResendTimer_ = 0.0f;  // Re-send CMSG_ATTACKSWING every ~1s while attacking

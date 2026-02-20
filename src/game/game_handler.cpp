@@ -89,6 +89,10 @@ bool isActiveExpansion(const char* expansionId) {
     return profile->id == expansionId;
 }
 
+bool isClassicLikeExpansion() {
+    return isActiveExpansion("classic") || isActiveExpansion("turtle");
+}
+
 std::string formatCopperAmount(uint32_t amount) {
     uint32_t gold = amount / 10000;
     uint32_t silver = (amount / 100) % 100;
@@ -667,7 +671,11 @@ void GameHandler::update(float deltaTime) {
             timeSinceLastPing = 0.0f;
         }
 
-        float heartbeatInterval = (onTaxiFlight_ || taxiActivatePending_ || taxiClientActive_) ? 0.25f : moveHeartbeatInterval_;
+        const bool classicLikeCombatSync =
+            autoAttackRequested_ && (isClassicLikeExpansion() || isActiveExpansion("tbc"));
+        float heartbeatInterval = (onTaxiFlight_ || taxiActivatePending_ || taxiClientActive_)
+                                      ? 0.25f
+                                      : (classicLikeCombatSync ? 0.05f : moveHeartbeatInterval_);
         if (timeSinceLastMoveHeartbeat_ >= heartbeatInterval) {
             sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
             timeSinceLastMoveHeartbeat_ = 0.0f;
@@ -865,28 +873,37 @@ void GameHandler::update(float deltaTime) {
         auto distanceStart = std::chrono::high_resolution_clock::now();
 
         // Leave combat if auto-attack target is too far away (leash range)
-        // Also re-send CMSG_ATTACKSWING every second to resume after server SMSG_ATTACKSTOP
-        if (autoAttacking && autoAttackTarget != 0) {
+        // and keep melee intent tightly synced while stationary.
+        if (autoAttackRequested_ && autoAttackTarget != 0) {
             auto targetEntity = entityManager.getEntity(autoAttackTarget);
             if (targetEntity) {
                 float dx = movementInfo.x - targetEntity->getX();
                 float dy = movementInfo.y - targetEntity->getY();
                 float dist = std::sqrt(dx * dx + dy * dy);
+                const bool classicLike = isClassicLikeExpansion() || isActiveExpansion("tbc");
                 if (dist > 40.0f) {
                     stopAutoAttack();
                     LOG_INFO("Left combat: target too far (", dist, " yards)");
                 } else if (state == WorldState::IN_WORLD && socket) {
                     autoAttackResendTimer_ += deltaTime;
                     autoAttackFacingSyncTimer_ += deltaTime;
-                    if (autoAttackResendTimer_ >= 1.0f) {
+
+                    // Re-request swing more aggressively until server confirms active loop.
+                    float resendInterval = 1.0f;
+                    if (!autoAttacking || autoAttackOutOfRange_) {
+                        resendInterval = classicLike ? 0.25f : 0.50f;
+                    }
+                    if (autoAttackResendTimer_ >= resendInterval) {
                         autoAttackResendTimer_ = 0.0f;
                         auto pkt = AttackSwingPacket::build(autoAttackTarget);
                         socket->send(pkt);
                     }
+
                     // Keep server-facing aligned with our current melee target.
                     // Some vanilla-family realms become strict about front-arc checks unless
                     // the client sends explicit facing updates while stationary.
-                    if (autoAttackFacingSyncTimer_ >= 0.20f) {
+                    const float facingSyncInterval = classicLike ? 0.10f : 0.20f;
+                    if (autoAttackFacingSyncTimer_ >= facingSyncInterval) {
                         autoAttackFacingSyncTimer_ = 0.0f;
                         float toTargetX = targetEntity->getX() - movementInfo.x;
                         float toTargetY = targetEntity->getY() - movementInfo.y;
@@ -895,10 +912,16 @@ void GameHandler::update(float deltaTime) {
                             float diff = desired - movementInfo.orientation;
                             while (diff > static_cast<float>(M_PI)) diff -= 2.0f * static_cast<float>(M_PI);
                             while (diff < -static_cast<float>(M_PI)) diff += 2.0f * static_cast<float>(M_PI);
-                            if (std::abs(diff) > 0.12f) { // ~7 degrees
+                            const float facingThreshold = classicLike ? 0.035f : 0.12f; // ~2deg / ~7deg
+                            if (std::abs(diff) > facingThreshold) {
                                 movementInfo.orientation = desired;
                                 sendMovement(Opcode::MSG_MOVE_SET_FACING);
+                                // Follow facing update with a heartbeat to tighten server range/facing checks.
+                                sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
                             }
+                        } else if (classicLike) {
+                            // Keep stationary melee position/facing fresh for strict vanilla-family checks.
+                            sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
                         }
                     }
                 }
@@ -1520,6 +1543,35 @@ void GameHandler::handlePacket(network::Packet& packet) {
             break;
         case Opcode::SMSG_ATTACKSTOP:
             handleAttackStop(packet);
+            break;
+        case Opcode::SMSG_ATTACKSWING_NOTINRANGE:
+            autoAttackOutOfRange_ = true;
+            if (autoAttackRequested_ && autoAttackTarget != 0 && socket) {
+                auto pkt = AttackSwingPacket::build(autoAttackTarget);
+                socket->send(pkt);
+            }
+            break;
+        case Opcode::SMSG_ATTACKSWING_BADFACING:
+            if (autoAttackRequested_ && autoAttackTarget != 0) {
+                auto targetEntity = entityManager.getEntity(autoAttackTarget);
+                if (targetEntity) {
+                    float toTargetX = targetEntity->getX() - movementInfo.x;
+                    float toTargetY = targetEntity->getY() - movementInfo.y;
+                    if (std::abs(toTargetX) > 0.01f || std::abs(toTargetY) > 0.01f) {
+                        movementInfo.orientation = std::atan2(-toTargetY, toTargetX);
+                        sendMovement(Opcode::MSG_MOVE_SET_FACING);
+                        sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
+                    }
+                }
+                if (socket) {
+                    auto pkt = AttackSwingPacket::build(autoAttackTarget);
+                    socket->send(pkt);
+                }
+            }
+            break;
+        case Opcode::SMSG_ATTACKSWING_NOTSTANDING:
+        case Opcode::SMSG_ATTACKSWING_CANT_ATTACK:
+            autoAttackOutOfRange_ = false;
             break;
         case Opcode::SMSG_ATTACKERSTATEUPDATE:
             handleAttackerStateUpdate(packet);
@@ -7813,7 +7865,10 @@ void GameHandler::startAutoAttack(uint64_t targetGuid) {
     if (isMounted()) {
         dismount();
     }
-    autoAttacking = true;
+    autoAttackRequested_ = true;
+    // Keep combat animation/state server-authoritative. We only flip autoAttacking
+    // on SMSG_ATTACKSTART where attackerGuid == playerGuid.
+    autoAttacking = false;
     autoAttackTarget = targetGuid;
     autoAttackOutOfRange_ = false;
     autoAttackResendTimer_ = 0.0f;
@@ -7826,7 +7881,8 @@ void GameHandler::startAutoAttack(uint64_t targetGuid) {
 }
 
 void GameHandler::stopAutoAttack() {
-    if (!autoAttacking) return;
+    if (!autoAttacking && !autoAttackRequested_) return;
+    autoAttackRequested_ = false;
     autoAttacking = false;
     autoAttackTarget = 0;
     autoAttackOutOfRange_ = false;
@@ -7871,6 +7927,7 @@ void GameHandler::handleAttackStart(network::Packet& packet) {
     if (!AttackStartParser::parse(packet, data)) return;
 
     if (data.attackerGuid == playerGuid) {
+        autoAttackRequested_ = true;
         autoAttacking = true;
         autoAttackTarget = data.victimGuid;
     } else if (data.victimGuid == playerGuid && data.attackerGuid != 0) {
@@ -7906,12 +7963,16 @@ void GameHandler::handleAttackStop(network::Packet& packet) {
     AttackStopData data;
     if (!AttackStopParser::parse(packet, data)) return;
 
-    // Don't clear autoAttacking on SMSG_ATTACKSTOP - the server sends this
-    // when the attack loop pauses (out of range, etc). The player's intent
-    // to attack persists until target dies or player explicitly cancels.
-    // We'll re-send CMSG_ATTACKSWING periodically in the update loop.
+    // Keep intent, but clear server-confirmed active state until ATTACKSTART resumes.
     if (data.attackerGuid == playerGuid) {
+        autoAttacking = false;
         LOG_DEBUG("SMSG_ATTACKSTOP received (keeping auto-attack intent)");
+        if (autoAttackRequested_ && autoAttackTarget != 0 && socket) {
+            // Classic-family servers may emit transient ATTACKSTOP when range/facing jitters.
+            // Reassert melee intent immediately instead of waiting for periodic resend.
+            auto pkt = AttackSwingPacket::build(autoAttackTarget);
+            socket->send(pkt);
+        }
     } else if (data.victimGuid == playerGuid) {
         hostileAttackers_.erase(data.attackerGuid);
     }
@@ -7982,9 +8043,15 @@ void GameHandler::handleForceRunSpeedChange(network::Packet& packet) {
 
     // Always ACK the speed change to prevent server stall.
     // Packet format mirrors movement packets: packed guid + counter + movement info + new speed.
-    if (socket) {
+    if (socket && !isClassicLikeExpansion()) {
         network::Packet ack(wireOpcode(Opcode::CMSG_FORCE_RUN_SPEED_CHANGE_ACK));
-        MovementPacket::writePackedGuid(ack, playerGuid);
+        const bool legacyGuidAck =
+            isActiveExpansion("classic") || isActiveExpansion("tbc") || isActiveExpansion("turtle");
+        if (legacyGuidAck) {
+            ack.writeUInt64(playerGuid);  // CMaNGOS expects full GUID for force speed ACKs
+        } else {
+            MovementPacket::writePackedGuid(ack, playerGuid);
+        }
         ack.writeUInt32(counter);
 
         MovementInfo wire = movementInfo;
@@ -8055,13 +8122,19 @@ void GameHandler::handleForceMoveRootState(network::Packet& packet, bool rooted)
         movementInfo.flags &= ~static_cast<uint32_t>(MovementFlags::ROOT);
     }
 
-    if (!socket) return;
+    if (!socket || isClassicLikeExpansion()) return;
     uint16_t ackWire = wireOpcode(rooted ? Opcode::CMSG_FORCE_MOVE_ROOT_ACK
                                          : Opcode::CMSG_FORCE_MOVE_UNROOT_ACK);
     if (ackWire == 0xFFFF) return;
 
     network::Packet ack(ackWire);
-    MovementPacket::writePackedGuid(ack, playerGuid);
+    const bool legacyGuidAck =
+        isActiveExpansion("classic") || isActiveExpansion("tbc") || isActiveExpansion("turtle");
+    if (legacyGuidAck) {
+        ack.writeUInt64(playerGuid);  // CMaNGOS expects full GUID for root/unroot ACKs
+    } else {
+        MovementPacket::writePackedGuid(ack, playerGuid);
+    }
     ack.writeUInt32(counter);
 
     MovementInfo wire = movementInfo;
@@ -10927,24 +11000,14 @@ void GameHandler::handleTeleportAck(network::Packet& packet) {
 
     // Send the ack back to the server
     // Client→server MSG_MOVE_TELEPORT_ACK: u64 guid + u32 counter + u32 time
-    if (socket) {
+    if (socket && !isClassicLikeExpansion()) {
         network::Packet ack(wireOpcode(Opcode::MSG_MOVE_TELEPORT_ACK));
-        // Write packed guid
-        uint8_t mask = 0;
-        uint8_t bytes[8];
-        int byteCount = 0;
-        uint64_t g = playerGuid;
-        for (int i = 0; i < 8; i++) {
-            uint8_t b = static_cast<uint8_t>(g & 0xFF);
-            g >>= 8;
-            if (b != 0) {
-                mask |= (1 << i);
-                bytes[byteCount++] = b;
-            }
-        }
-        ack.writeUInt8(mask);
-        for (int i = 0; i < byteCount; i++) {
-            ack.writeUInt8(bytes[i]);
+        const bool legacyGuidAck =
+            isActiveExpansion("classic") || isActiveExpansion("tbc") || isActiveExpansion("turtle");
+        if (legacyGuidAck) {
+            ack.writeUInt64(playerGuid);  // CMaNGOS expects full GUID for teleport ACK
+        } else {
+            MovementPacket::writePackedGuid(ack, playerGuid);
         }
         ack.writeUInt32(counter);
         ack.writeUInt32(moveTime);

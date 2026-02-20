@@ -960,9 +960,11 @@ void Renderer::updateCharacterAnimation() {
     constexpr uint32_t ANIM_SWIM_IDLE  = 41;  // Treading water (SwimIdle)
     constexpr uint32_t ANIM_SWIM       = 42;  // Swimming forward (Swim)
     constexpr uint32_t ANIM_MOUNT      = 91;  // Seated on mount
-    constexpr uint32_t ANIM_READY_UNARMED = 7;   // Combat ready stance (unarmed)
-    constexpr uint32_t ANIM_READY_1H     = 8;   // Combat ready stance (1H weapon)
-    constexpr uint32_t ANIM_READY_2H     = 9;   // Combat ready stance (2H weapon)
+    // Canonical player ready stances (AnimationData.dbc)
+    constexpr uint32_t ANIM_READY_UNARMED = 22;  // ReadyUnarmed
+    constexpr uint32_t ANIM_READY_1H      = 23;  // Ready1H
+    constexpr uint32_t ANIM_READY_2H      = 24;  // Ready2H
+    constexpr uint32_t ANIM_READY_2H_L    = 25;  // Ready2HL (some 2H left-handed rigs)
     constexpr uint32_t ANIM_FLY_IDLE   = 158; // Flying mount idle/hover
     constexpr uint32_t ANIM_FLY_FORWARD = 159; // Flying mount forward
 
@@ -1613,7 +1615,9 @@ void Renderer::updateCharacterAnimation() {
             break;
         case CharAnimState::MOUNT:      animId = ANIM_MOUNT;      loop = true;  break;
         case CharAnimState::COMBAT_IDLE:
-            animId = pickFirstAvailable({ANIM_READY_1H, ANIM_READY_2H, ANIM_READY_UNARMED}, ANIM_STAND);
+            animId = pickFirstAvailable(
+                {ANIM_READY_1H, ANIM_READY_2H, ANIM_READY_2H_L, ANIM_READY_UNARMED},
+                ANIM_STAND);
             loop = true;
             break;
         case CharAnimState::CHARGE:
