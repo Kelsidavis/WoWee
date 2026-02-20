@@ -37,6 +37,7 @@
 #include <functional>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <openssl/sha.h>
 
 namespace wowee {
@@ -122,6 +123,86 @@ bool readCStringAt(const std::vector<uint8_t>& data, size_t start, std::string& 
         out.push_back(static_cast<char>(b));
     }
     return false;
+}
+
+std::string asciiLower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return s;
+}
+
+std::vector<std::string> splitWowPath(const std::string& wowPath) {
+    std::vector<std::string> out;
+    std::string cur;
+    for (char c : wowPath) {
+        if (c == '\\' || c == '/') {
+            if (!cur.empty()) {
+                out.push_back(cur);
+                cur.clear();
+            }
+            continue;
+        }
+        cur.push_back(c);
+    }
+    if (!cur.empty()) out.push_back(cur);
+    return out;
+}
+
+int pathCaseScore(const std::string& name) {
+    int score = 0;
+    for (unsigned char c : name) {
+        if (std::islower(c)) score += 2;
+        else if (std::isupper(c)) score -= 1;
+    }
+    return score;
+}
+
+std::string resolveCaseInsensitiveDataPath(const std::string& dataRoot, const std::string& wowPath) {
+    if (dataRoot.empty() || wowPath.empty()) return std::string();
+    std::filesystem::path cur(dataRoot);
+    std::error_code ec;
+    if (!std::filesystem::exists(cur, ec) || !std::filesystem::is_directory(cur, ec)) {
+        return std::string();
+    }
+
+    for (const std::string& segment : splitWowPath(wowPath)) {
+        std::string wanted = asciiLower(segment);
+        std::filesystem::path bestPath;
+        int bestScore = std::numeric_limits<int>::min();
+        bool found = false;
+
+        for (const auto& entry : std::filesystem::directory_iterator(cur, ec)) {
+            if (ec) break;
+            std::string name = entry.path().filename().string();
+            if (asciiLower(name) != wanted) continue;
+            int score = pathCaseScore(name);
+            if (!found || score > bestScore) {
+                found = true;
+                bestScore = score;
+                bestPath = entry.path();
+            }
+        }
+        if (!found) return std::string();
+        cur = bestPath;
+    }
+
+    if (!std::filesystem::exists(cur, ec) || std::filesystem::is_directory(cur, ec)) {
+        return std::string();
+    }
+    return cur.string();
+}
+
+std::vector<uint8_t> readFileBinary(const std::string& fsPath) {
+    std::ifstream in(fsPath, std::ios::binary);
+    if (!in) return {};
+    in.seekg(0, std::ios::end);
+    std::streamoff size = in.tellg();
+    if (size <= 0) return {};
+    in.seekg(0, std::ios::beg);
+    std::vector<uint8_t> data(static_cast<size_t>(size));
+    in.read(reinterpret_cast<char*>(data.data()), size);
+    if (!in) return {};
+    return data;
 }
 
 bool isReadableQuestText(const std::string& s, size_t minLen, size_t maxLen) {
@@ -3590,7 +3671,19 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         if (!filePath.empty()) {
                             auto* am = core::Application::getInstance().getAssetManager();
                             if (am && am->isInitialized()) {
-                                auto fileData = am->readFile(filePath);
+                                // Use a case-insensitive direct filesystem resolution first.
+                                // Manifest entries may point at uppercase duplicate trees with
+                                // different content/hashes than canonical client files.
+                                std::vector<uint8_t> fileData;
+                                std::string resolvedFsPath =
+                                    resolveCaseInsensitiveDataPath(am->getDataPath(), filePath);
+                                if (!resolvedFsPath.empty()) {
+                                    fileData = readFileBinary(resolvedFsPath);
+                                }
+                                if (fileData.empty()) {
+                                    fileData = am->readFile(filePath);
+                                }
+
                                 if (!fileData.empty()) {
                                     found = true;
                                     hash = auth::Crypto::sha1(fileData);

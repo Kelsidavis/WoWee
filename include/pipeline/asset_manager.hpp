@@ -43,6 +43,7 @@ public:
      * Check if asset manager is initialized
      */
     bool isInitialized() const { return initialized; }
+    const std::string& getDataPath() const { return dataPath; }
 
     /**
      * Load a BLP texture
