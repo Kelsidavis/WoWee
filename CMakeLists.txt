@@ -15,6 +15,23 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(WOWEE_BUILD_TESTS "Build tests" OFF)
 
+# Opcode registry generation/validation
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_custom_target(opcodes-generate
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_opcode_registry.py
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Generating opcode registry include fragments"
+    )
+
+    add_custom_target(opcodes-validate
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/validate_opcode_maps.py --root ${CMAKE_SOURCE_DIR}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        DEPENDS opcodes-generate
+        COMMENT "Validating canonical opcode registry and expansion maps"
+    )
+endif()
+
 # Find required packages
 find_package(SDL2 REQUIRED)
 find_package(OpenGL REQUIRED)
@@ -322,6 +339,9 @@ endif()
 
 # Create executable
 add_executable(wowee ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES})
+if(TARGET opcodes-generate)
+    add_dependencies(wowee opcodes-generate)
+endif()
 
 # Include directories
 target_include_directories(wowee PRIVATE
