@@ -3404,6 +3404,12 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                 if (decoded == wardenCheckOpcodes_[8]) return CT_TIMING; // CHECK_TIMING_VALUES
                 return CT_UNKNOWN;
             };
+            auto resolveWardenString = [&](uint8_t oneBasedIndex) -> std::string {
+                if (oneBasedIndex == 0) return std::string();
+                size_t idx = static_cast<size_t>(oneBasedIndex - 1);
+                if (idx >= strings.size()) return std::string();
+                return strings[idx];
+            };
             auto requestSizes = [&](CheckType ct) {
                 switch (ct) {
                     case CT_TIMING: return std::vector<size_t>{0};
@@ -3479,13 +3485,17 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                     case CT_MEM: {
                         // Request: [1 stringIdx][4 offset][1 length]
                         if (pos + 6 > checkEnd) { pos = checkEnd; break; }
-                        pos++; // stringIdx
+                        uint8_t strIdx = decrypted[pos++];
+                        std::string moduleName = resolveWardenString(strIdx);
                         uint32_t offset = decrypted[pos] | (uint32_t(decrypted[pos+1])<<8)
                                         | (uint32_t(decrypted[pos+2])<<16) | (uint32_t(decrypted[pos+3])<<24);
                         pos += 4;
                         uint8_t readLen = decrypted[pos++];
                         LOG_INFO("Warden:   MEM offset=0x", [&]{char s[12];snprintf(s,12,"%08x",offset);return std::string(s);}(),
                                  " len=", (int)readLen);
+                        if (!moduleName.empty()) {
+                            LOG_INFO("Warden:   MEM module=\"", moduleName, "\"");
+                        }
 
                         // Lazy-load WoW.exe PE image on first MEM_CHECK
                         if (!wardenMemory_) {
@@ -3572,7 +3582,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         // HASH_CLIENT_FILE request: [1 stringIdx]
                         if (pos + 1 > checkEnd) { pos = checkEnd; break; }
                         uint8_t strIdx = decrypted[pos++];
-                        std::string filePath = (strIdx < strings.size()) ? strings[strIdx] : std::string();
+                        std::string filePath = resolveWardenString(strIdx);
                         LOG_INFO("Warden:   MPQ file=\"", (filePath.empty() ? "?" : filePath), "\"");
 
                         bool found = false;
@@ -3598,8 +3608,8 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         // Request: [1 stringIdx]
                         if (pos + 1 > checkEnd) { pos = checkEnd; break; }
                         uint8_t strIdx = decrypted[pos++];
-                        LOG_INFO("Warden:   LUA str=\"",
-                                 (strIdx < strings.size() ? strings[strIdx] : "?"), "\"");
+                        std::string luaVar = resolveWardenString(strIdx);
+                        LOG_INFO("Warden:   LUA str=\"", (luaVar.empty() ? "?" : luaVar), "\"");
                         // Response: [uint8 result=0][uint16 len=0]
                         // Lua string doesn't exist
                         resultData.push_back(0x01); // not found
@@ -3610,8 +3620,8 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         if (pos + 25 > checkEnd) { pos = checkEnd; break; }
                         pos += 24; // skip seed + sha1
                         uint8_t strIdx = decrypted[pos++];
-                        LOG_INFO("Warden:   DRIVER=\"",
-                                 (strIdx < strings.size() ? strings[strIdx] : "?"), "\"");
+                        std::string driverName = resolveWardenString(strIdx);
+                        LOG_INFO("Warden:   DRIVER=\"", (driverName.empty() ? "?" : driverName), "\"");
                         // Response: [uint8 result=1] (driver NOT found = clean)
                         resultData.push_back(0x01);
                         break;
