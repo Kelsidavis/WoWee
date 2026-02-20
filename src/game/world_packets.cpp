@@ -2179,24 +2179,23 @@ bool ItemQueryResponseParser::parse(network::Packet& packet, ItemQueryResponseDa
         return r;
     };
 
-    // Most WotLK/TBC cores use 2 damage entries, but some custom cores still
-    // serialize a 5-entry damage block. Try both and select the plausible one.
+    // All WoW versions (Classic, TBC, WotLK) use exactly 5 damage entries in
+    // SMSG_ITEM_QUERY_SINGLE_RESPONSE. Default to 5. Fall back to 2 only if
+    // the 5-entry parse fails or yields clearly implausible results for weapons.
     DamageParseResult parsed2 = parseDamageBlock(2);
     DamageParseResult parsed5 = parseDamageBlock(5);
 
-    auto looksArmorItem = [&](const DamageParseResult& r) {
-        return (data.itemClass == 4) && (data.inventoryType != 0) && (r.armor > 0);
-    };
     auto looksWeaponItem = [&](const DamageParseResult& r) {
         return (data.itemClass == 2) && (r.damageMax > 0.0f) && (r.delayMs > 0);
     };
 
-    const DamageParseResult* chosen = &parsed2;
-    if (parsed5.ok && !parsed2.ok) {
-        chosen = &parsed5;
-    } else if (parsed2.ok && parsed5.ok) {
-        if (looksArmorItem(parsed5) && !looksArmorItem(parsed2)) chosen = &parsed5;
-        else if (looksWeaponItem(parsed5) && !looksWeaponItem(parsed2)) chosen = &parsed5;
+    const DamageParseResult* chosen = &parsed5;
+    if (parsed5.ok && parsed2.ok) {
+        // Only prefer parsed2 if it identifies as a weapon and parsed5 doesn't.
+        // This handles non-standard 2-entry servers for weapon items.
+        if (looksWeaponItem(parsed2) && !looksWeaponItem(parsed5)) chosen = &parsed2;
+    } else if (!parsed5.ok && parsed2.ok) {
+        chosen = &parsed2;
     }
     int chosenDamageEntries = (chosen == &parsed5) ? 5 : 2;
 
