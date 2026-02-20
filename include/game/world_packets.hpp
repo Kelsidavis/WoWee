@@ -2052,13 +2052,19 @@ public:
 /** CMSG_BUY_ITEM packet builder */
 class BuyItemPacket {
 public:
-    static network::Packet build(uint64_t vendorGuid, uint32_t itemId, uint32_t count);
+    static network::Packet build(uint64_t vendorGuid, uint32_t itemId, uint32_t slot, uint32_t count);
 };
 
 /** CMSG_SELL_ITEM packet builder */
 class SellItemPacket {
 public:
     static network::Packet build(uint64_t vendorGuid, uint64_t itemGuid, uint32_t count);
+};
+
+/** CMSG_BUYBACK_ITEM packet builder */
+class BuybackItemPacket {
+public:
+    static network::Packet build(uint64_t vendorGuid, uint32_t slot);
 };
 
 /** SMSG_LIST_INVENTORY parser */

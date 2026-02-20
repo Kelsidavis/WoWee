@@ -282,6 +282,7 @@ enum class LogicalOpcode : uint16_t {
     CMSG_SELL_ITEM,
     SMSG_SELL_ITEM,
     CMSG_BUY_ITEM,
+    CMSG_BUYBACK_ITEM,
     SMSG_BUY_FAILED,
 
     // ---- Trainer ----

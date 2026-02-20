@@ -3094,11 +3094,9 @@ void GameHandler::handleWardenData(network::Packet& packet) {
             wardenModuleData_.clear();
 
             {
-                std::string hashHex, keyHex;
+                std::string hashHex;
                 for (auto b : wardenModuleHash_) { char s[4]; snprintf(s, 4, "%02x", b); hashHex += s; }
-                for (auto b : wardenModuleKey_) { char s[4]; snprintf(s, 4, "%02x", b); keyHex += s; }
-                LOG_INFO("Warden: MODULE_USE hash=", hashHex,
-                         " key=", keyHex, " size=", wardenModuleSize_);
+                LOG_INFO("Warden: MODULE_USE hash=", hashHex, " size=", wardenModuleSize_);
 
                 // Try to load pre-computed challenge/response entries
                 loadWardenCRFile(hashHex);
@@ -3192,11 +3190,6 @@ void GameHandler::handleWardenData(network::Packet& packet) {
             }
 
             std::vector<uint8_t> seed(decrypted.begin() + 1, decrypted.begin() + 17);
-            {
-                std::string seedHex;
-                for (auto b : seed) { char s[4]; snprintf(s, 4, "%02x", b); seedHex += s; }
-                LOG_INFO("Warden: HASH_REQUEST seed=", seedHex);
-            }
 
             // --- Try CR lookup (pre-computed challenge/response entries) ---
             if (!wardenCREntries_.empty()) {
@@ -3232,12 +3225,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                     std::vector<uint8_t> newDecryptKey(match->serverKey, match->serverKey + 16);
                     wardenCrypto_->replaceKeys(newEncryptKey, newDecryptKey);
 
-                    {
-                        std::string ekHex, dkHex;
-                        for (int i = 0; i < 16; i++) { char s[4]; snprintf(s, 4, "%02x", newEncryptKey[i]); ekHex += s; }
-                        for (int i = 0; i < 16; i++) { char s[4]; snprintf(s, 4, "%02x", newDecryptKey[i]); dkHex += s; }
-                        LOG_INFO("Warden: Switched to CR keys encrypt=", ekHex, " decrypt=", dkHex);
-                    }
+                    LOG_INFO("Warden: Switched to CR key set");
 
                     wardenState_ = WardenState::WAIT_CHECKS;
                     break;
@@ -3349,13 +3337,9 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                 std::vector<uint8_t> ek(newEncryptKey, newEncryptKey + 16);
                 std::vector<uint8_t> dk(newDecryptKey, newDecryptKey + 16);
                 wardenCrypto_->replaceKeys(ek, dk);
-
-                {
-                    std::string ekHex, dkHex;
-                    for (int i = 0; i < 16; i++) { char s[4]; snprintf(s, 4, "%02x", newEncryptKey[i]); ekHex += s; }
-                    for (int i = 0; i < 16; i++) { char s[4]; snprintf(s, 4, "%02x", newDecryptKey[i]); dkHex += s; }
-                    LOG_INFO("Warden: Derived keys from seed: encrypt=", ekHex, " decrypt=", dkHex);
-                }
+                for (auto& b : newEncryptKey) b = 0;
+                for (auto& b : newDecryptKey) b = 0;
+                LOG_INFO("Warden: Derived and applied key update from seed");
             }
 
             wardenState_ = WardenState::WAIT_CHECKS;

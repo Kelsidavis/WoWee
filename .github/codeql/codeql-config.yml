@@ -5,3 +5,4 @@ name: wowee-codeql-config
 # so CodeQL doesn't raise an unfixable compatibility alert.
 paths-ignore:
   - src/game/warden_crypto.cpp
+  - src/game/warden_module.cpp

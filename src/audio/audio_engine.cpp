@@ -7,6 +7,7 @@
 #include "../../extern/miniaudio.h"
 
 #include <cstring>
+#include <cstdlib>
 #include <memory>
 #include <unordered_map>
 
@@ -180,10 +181,10 @@ void AudioEngine::shutdown() {
     // Clean up all active sounds
     for (auto& activeSound : activeSounds_) {
         ma_sound_uninit(activeSound.sound);
-        delete activeSound.sound;
+        std::free(activeSound.sound);
         ma_audio_buffer* buffer = static_cast<ma_audio_buffer*>(activeSound.buffer);
         ma_audio_buffer_uninit(buffer);
-        delete buffer;
+        std::free(buffer);
     }
     activeSounds_.clear();
 
@@ -239,16 +240,22 @@ bool AudioEngine::playSound2D(const std::vector<uint8_t>& wavData, float volume,
     );
     bufferConfig.sampleRate = decoded.sampleRate;  // Critical: preserve original sample rate!
 
-    ma_audio_buffer* audioBuffer = new ma_audio_buffer();
+    ma_audio_buffer* audioBuffer = static_cast<ma_audio_buffer*>(std::malloc(sizeof(ma_audio_buffer)));
+    if (!audioBuffer) return false;
     ma_result result = ma_audio_buffer_init(&bufferConfig, audioBuffer);
     if (result != MA_SUCCESS) {
         LOG_WARNING("Failed to create audio buffer: ", result);
-        delete audioBuffer;
+        std::free(audioBuffer);
         return false;
     }
 
     // Create sound from audio buffer
-    ma_sound* sound = new ma_sound();
+    ma_sound* sound = static_cast<ma_sound*>(std::malloc(sizeof(ma_sound)));
+    if (!sound) {
+        ma_audio_buffer_uninit(audioBuffer);
+        std::free(audioBuffer);
+        return false;
+    }
     result = ma_sound_init_from_data_source(
         engine_,
         audioBuffer,
@@ -260,8 +267,8 @@ bool AudioEngine::playSound2D(const std::vector<uint8_t>& wavData, float volume,
     if (result != MA_SUCCESS) {
         LOG_WARNING("Failed to create sound: ", result);
         ma_audio_buffer_uninit(audioBuffer);
-        delete audioBuffer;
-        delete sound;
+        std::free(audioBuffer);
+        std::free(sound);
         return false;
     }
 
@@ -274,8 +281,8 @@ bool AudioEngine::playSound2D(const std::vector<uint8_t>& wavData, float volume,
         LOG_WARNING("Failed to start sound: ", result);
         ma_sound_uninit(sound);
         ma_audio_buffer_uninit(audioBuffer);
-        delete audioBuffer;
-        delete sound;
+        std::free(audioBuffer);
+        std::free(sound);
         return false;
     }
 
@@ -321,15 +328,21 @@ bool AudioEngine::playSound3D(const std::vector<uint8_t>& wavData, const glm::ve
     );
     bufferConfig.sampleRate = decoded.sampleRate;  // Critical: preserve original sample rate!
 
-    ma_audio_buffer* audioBuffer = new ma_audio_buffer();
+    ma_audio_buffer* audioBuffer = static_cast<ma_audio_buffer*>(std::malloc(sizeof(ma_audio_buffer)));
+    if (!audioBuffer) return false;
     ma_result result = ma_audio_buffer_init(&bufferConfig, audioBuffer);
     if (result != MA_SUCCESS) {
-        delete audioBuffer;
+        std::free(audioBuffer);
         return false;
     }
 
     // Create 3D sound (spatialization enabled, pitch enabled)
-    ma_sound* sound = new ma_sound();
+    ma_sound* sound = static_cast<ma_sound*>(std::malloc(sizeof(ma_sound)));
+    if (!sound) {
+        ma_audio_buffer_uninit(audioBuffer);
+        std::free(audioBuffer);
+        return false;
+    }
     result = ma_sound_init_from_data_source(
         engine_,
         audioBuffer,
@@ -341,8 +354,8 @@ bool AudioEngine::playSound3D(const std::vector<uint8_t>& wavData, const glm::ve
     if (result != MA_SUCCESS) {
         LOG_WARNING("playSound3D: Failed to create sound, error: ", result);
         ma_audio_buffer_uninit(audioBuffer);
-        delete audioBuffer;
-        delete sound;
+        std::free(audioBuffer);
+        std::free(sound);
         return false;
     }
 
@@ -361,8 +374,8 @@ bool AudioEngine::playSound3D(const std::vector<uint8_t>& wavData, const glm::ve
     if (result != MA_SUCCESS) {
         ma_sound_uninit(sound);
         ma_audio_buffer_uninit(audioBuffer);
-        delete audioBuffer;
-        delete sound;
+        std::free(audioBuffer);
+        std::free(sound);
         return false;
     }
 
@@ -423,7 +436,13 @@ bool AudioEngine::playMusic(const std::vector<uint8_t>& musicData, float volume,
     musicDecoder_ = decoder;
 
     // Create streaming sound from decoder
-    musicSound_ = new ma_sound();
+    musicSound_ = static_cast<ma_sound*>(std::malloc(sizeof(ma_sound)));
+    if (!musicSound_) {
+        ma_decoder_uninit(decoder);
+        delete decoder;
+        musicDecoder_ = nullptr;
+        return false;
+    }
     result = ma_sound_init_from_data_source(
         engine_,
         decoder,
@@ -437,7 +456,7 @@ bool AudioEngine::playMusic(const std::vector<uint8_t>& musicData, float volume,
         ma_decoder_uninit(decoder);
         delete decoder;
         musicDecoder_ = nullptr;
-        delete musicSound_;
+        std::free(musicSound_);
         musicSound_ = nullptr;
         return false;
     }
@@ -451,7 +470,7 @@ bool AudioEngine::playMusic(const std::vector<uint8_t>& musicData, float volume,
     if (result != MA_SUCCESS) {
         LOG_ERROR("Failed to start music playback: ", result);
         ma_sound_uninit(musicSound_);
-        delete musicSound_;
+        std::free(musicSound_);
         musicSound_ = nullptr;
         ma_decoder_uninit(decoder);
         delete decoder;
@@ -469,7 +488,7 @@ bool AudioEngine::playMusic(const std::vector<uint8_t>& musicData, float volume,
 void AudioEngine::stopMusic() {
     if (musicSound_) {
         ma_sound_uninit(musicSound_);
-        delete musicSound_;
+        std::free(musicSound_);
         musicSound_ = nullptr;
     }
     if (musicDecoder_) {
@@ -507,10 +526,10 @@ void AudioEngine::update(float deltaTime) {
         if (!ma_sound_is_playing(it->sound)) {
             // Sound finished, clean up
             ma_sound_uninit(it->sound);
-            delete it->sound;
+            std::free(it->sound);
             ma_audio_buffer* buffer = static_cast<ma_audio_buffer*>(it->buffer);
             ma_audio_buffer_uninit(buffer);
-            delete buffer;
+            std::free(buffer);
             it = activeSounds_.erase(it);
         } else {
             ++it;

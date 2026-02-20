@@ -2126,36 +2126,76 @@ bool ItemQueryResponseParser::parse(network::Packet& packet, ItemQueryResponseDa
     packet.readUInt32(); // ScalingStatDistribution
     packet.readUInt32(); // ScalingStatValue
 
-    // 5 damage types
-    bool haveWeaponDamage = false;
-    for (int i = 0; i < 5; i++) {
-        float dmgMin = packet.readFloat();
-        float dmgMax = packet.readFloat();
-        uint32_t damageType = packet.readUInt32();
-        if (!haveWeaponDamage && dmgMax > 0.0f) {
-            // Prefer physical damage when available, otherwise first non-zero entry.
-            if (damageType == 0 || data.damageMax <= 0.0f) {
-                data.damageMin = dmgMin;
-                data.damageMax = dmgMax;
-                haveWeaponDamage = (damageType == 0);
+    const size_t preDamagePos = packet.getReadPos();
+    struct DamageParseResult {
+        float damageMin = 0.0f;
+        float damageMax = 0.0f;
+        int32_t armor = 0;
+        uint32_t delayMs = 0;
+        bool ok = false;
+    };
+    auto parseDamageBlock = [&](int damageEntries) -> DamageParseResult {
+        DamageParseResult r;
+        packet.setReadPos(preDamagePos);
+        bool haveWeaponDamage = false;
+        for (int i = 0; i < damageEntries; i++) {
+            float dmgMin = packet.readFloat();
+            float dmgMax = packet.readFloat();
+            uint32_t damageType = packet.readUInt32();
+            if (!haveWeaponDamage && dmgMax > 0.0f) {
+                if (damageType == 0 || r.damageMax <= 0.0f) {
+                    r.damageMin = dmgMin;
+                    r.damageMax = dmgMax;
+                    haveWeaponDamage = (damageType == 0);
+                }
             }
         }
-    }
 
-    data.armor = static_cast<int32_t>(packet.readUInt32());
-    if (packet.getSize() - packet.getReadPos() >= 28) {
-        packet.readUInt32(); // HolyRes
-        packet.readUInt32(); // FireRes
-        packet.readUInt32(); // NatureRes
-        packet.readUInt32(); // FrostRes
-        packet.readUInt32(); // ShadowRes
-        packet.readUInt32(); // ArcaneRes
-        data.delayMs = packet.readUInt32();
+        r.armor = static_cast<int32_t>(packet.readUInt32());
+        if (packet.getSize() - packet.getReadPos() >= 28) {
+            packet.readUInt32(); // HolyRes
+            packet.readUInt32(); // FireRes
+            packet.readUInt32(); // NatureRes
+            packet.readUInt32(); // FrostRes
+            packet.readUInt32(); // ShadowRes
+            packet.readUInt32(); // ArcaneRes
+            r.delayMs = packet.readUInt32();
+            r.ok = true;
+        }
+        return r;
+    };
+
+    // Most WotLK/TBC cores use 2 damage entries, but some custom cores still
+    // serialize a 5-entry damage block. Try both and select the plausible one.
+    DamageParseResult parsed2 = parseDamageBlock(2);
+    DamageParseResult parsed5 = parseDamageBlock(5);
+
+    auto looksArmorItem = [&](const DamageParseResult& r) {
+        return (data.itemClass == 4) && (data.inventoryType != 0) && (r.armor > 0);
+    };
+    auto looksWeaponItem = [&](const DamageParseResult& r) {
+        return (data.itemClass == 2) && (r.damageMax > 0.0f) && (r.delayMs > 0);
+    };
+
+    const DamageParseResult* chosen = &parsed2;
+    if (parsed5.ok && !parsed2.ok) {
+        chosen = &parsed5;
+    } else if (parsed2.ok && parsed5.ok) {
+        if (looksArmorItem(parsed5) && !looksArmorItem(parsed2)) chosen = &parsed5;
+        else if (looksWeaponItem(parsed5) && !looksWeaponItem(parsed2)) chosen = &parsed5;
     }
+    int chosenDamageEntries = (chosen == &parsed5) ? 5 : 2;
+
+    data.damageMin = chosen->damageMin;
+    data.damageMax = chosen->damageMax;
+    data.armor = chosen->armor;
+    data.delayMs = chosen->delayMs;
 
     data.valid = !data.name.empty();
     LOG_DEBUG("Item query response: ", data.name, " (quality=", data.quality,
-             " invType=", data.inventoryType, " stack=", data.maxStack, ")");
+             " invType=", data.inventoryType, " stack=", data.maxStack,
+             " class=", data.itemClass, " armor=", data.armor,
+             " dmgEntries=", chosenDamageEntries, ")");
     return true;
 }
 
@@ -3118,21 +3158,12 @@ bool QuestRequestItemsParser::parse(network::Packet& packet, QuestRequestItemsDa
         int score = -1;
     };
 
-    auto parseTail = [&](size_t startPos, bool closeFlagIsU32) -> ParsedTail {
+    auto parseTail = [&](size_t startPos, size_t prefixSkip) -> ParsedTail {
         ParsedTail out;
         packet.setReadPos(startPos);
 
-        if (packet.getReadPos() + 8 > packet.getSize()) return out;
-        /*uint32_t emoteDelay =*/ packet.readUInt32();
-        /*uint32_t emoteId    =*/ packet.readUInt32();
-
-        if (closeFlagIsU32) {
-            if (packet.getReadPos() + 4 > packet.getSize()) return out;
-            /*uint32_t closeOnCancel =*/ packet.readUInt32();
-        } else {
-            if (packet.getReadPos() + 1 > packet.getSize()) return out;
-            /*uint8_t autoFinish =*/ packet.readUInt8();
-        }
+        if (packet.getReadPos() + prefixSkip > packet.getSize()) return out;
+        packet.setReadPos(packet.getReadPos() + prefixSkip);
 
         if (packet.getReadPos() + 8 > packet.getSize()) return out;
         out.requiredMoney = packet.readUInt32();
@@ -3157,22 +3188,33 @@ bool QuestRequestItemsParser::parse(network::Packet& packet, QuestRequestItemsDa
         out.score = 0;
         if (requiredItemCount <= 6) out.score += 4;
         if (out.requiredItems.size() == requiredItemCount) out.score += 3;
-        if ((out.completableFlags & ~0x3u) == 0) out.score += 2;
-        if (closeFlagIsU32) out.score += 1;  // classic cores often use 32-bit here
+        if ((out.completableFlags & ~0x3u) == 0) out.score += 5;
+        if (out.requiredMoney == 0) out.score += 4;
+        else if (out.requiredMoney <= 100000) out.score += 2;       // <=10g is common
+        else if (out.requiredMoney >= 1000000) out.score -= 3;      // implausible for most quests
+        if (!out.requiredItems.empty()) out.score += 1;
+        size_t remaining = packet.getSize() - packet.getReadPos();
+        if (remaining <= 16) out.score += 3;
+        else if (remaining <= 32) out.score += 2;
+        else if (remaining <= 64) out.score += 1;
+        if (prefixSkip == 0) out.score += 1;
+        else if (prefixSkip <= 12) out.score += 1;
         return out;
     };
 
     size_t tailStart = packet.getReadPos();
-    ParsedTail parseU8 = parseTail(tailStart, false);
-    ParsedTail parseU32 = parseTail(tailStart, true);
+    std::vector<ParsedTail> candidates;
+    candidates.reserve(25);
+    for (size_t skip = 0; skip <= 24; ++skip) {
+        candidates.push_back(parseTail(tailStart, skip));
+    }
+
     const ParsedTail* chosen = nullptr;
-    if (parseU8.ok && parseU32.ok) {
-        chosen = (parseU32.score >= parseU8.score) ? &parseU32 : &parseU8;
-    } else if (parseU32.ok) {
-        chosen = &parseU32;
-    } else if (parseU8.ok) {
-        chosen = &parseU8;
-    } else {
+    for (const auto& cand : candidates) {
+        if (!cand.ok) continue;
+        if (!chosen || cand.score > chosen->score) chosen = &cand;
+    }
+    if (!chosen) {
         return true;
     }
 
@@ -3197,51 +3239,115 @@ bool QuestOfferRewardParser::parse(network::Packet& packet, QuestOfferRewardData
         return true;
     }
 
-    /*autoFinish*/ packet.readUInt8();
-    /*flags*/ packet.readUInt32();
-    /*suggestedPlayers*/ packet.readUInt32();
+    struct ParsedTail {
+        uint32_t rewardMoney = 0;
+        uint32_t rewardXp = 0;
+        std::vector<QuestRewardItem> choiceRewards;
+        std::vector<QuestRewardItem> fixedRewards;
+        bool ok = false;
+        int score = -1000;
+    };
 
-    // Emotes
-    if (packet.getReadPos() + 4 > packet.getSize()) return true;
-    uint32_t emoteCount = packet.readUInt32();
-    for (uint32_t i = 0; i < emoteCount; ++i) {
-        if (packet.getReadPos() + 8 > packet.getSize()) break;
-        packet.readUInt32(); // delay
-        packet.readUInt32(); // emote
+    auto parseTail = [&](size_t startPos, bool hasFlags, bool fixedArrays) -> ParsedTail {
+        ParsedTail out;
+        packet.setReadPos(startPos);
+
+        if (packet.getReadPos() + 1 > packet.getSize()) return out;
+        /*autoFinish*/ packet.readUInt8();
+        if (hasFlags) {
+            if (packet.getReadPos() + 4 > packet.getSize()) return out;
+            /*flags*/ packet.readUInt32();
+        }
+        if (packet.getReadPos() + 4 > packet.getSize()) return out;
+        /*suggestedPlayers*/ packet.readUInt32();
+
+        if (packet.getReadPos() + 4 > packet.getSize()) return out;
+        uint32_t emoteCount = packet.readUInt32();
+        if (emoteCount > 64) return out;  // guard against misalignment
+        for (uint32_t i = 0; i < emoteCount; ++i) {
+            if (packet.getReadPos() + 8 > packet.getSize()) return out;
+            packet.readUInt32(); // delay
+            packet.readUInt32(); // emote
+        }
+
+        if (packet.getReadPos() + 4 > packet.getSize()) return out;
+        uint32_t choiceCount = packet.readUInt32();
+        if (choiceCount > 6) return out;
+        uint32_t choiceSlots = fixedArrays ? 6u : choiceCount;
+        out.choiceRewards.reserve(choiceCount);
+        uint32_t nonZeroChoice = 0;
+        for (uint32_t i = 0; i < choiceSlots; ++i) {
+            if (packet.getReadPos() + 12 > packet.getSize()) return out;
+            QuestRewardItem item;
+            item.itemId = packet.readUInt32();
+            item.count = packet.readUInt32();
+            item.displayInfoId = packet.readUInt32();
+            item.choiceSlot = i;
+            if (item.itemId > 0) {
+                out.choiceRewards.push_back(item);
+                nonZeroChoice++;
+            }
+        }
+
+        if (packet.getReadPos() + 4 > packet.getSize()) return out;
+        uint32_t rewardCount = packet.readUInt32();
+        if (rewardCount > 4) return out;
+        uint32_t rewardSlots = fixedArrays ? 4u : rewardCount;
+        out.fixedRewards.reserve(rewardCount);
+        uint32_t nonZeroFixed = 0;
+        for (uint32_t i = 0; i < rewardSlots; ++i) {
+            if (packet.getReadPos() + 12 > packet.getSize()) return out;
+            QuestRewardItem item;
+            item.itemId = packet.readUInt32();
+            item.count = packet.readUInt32();
+            item.displayInfoId = packet.readUInt32();
+            if (item.itemId > 0) {
+                out.fixedRewards.push_back(item);
+                nonZeroFixed++;
+            }
+        }
+
+        if (packet.getReadPos() + 4 <= packet.getSize())
+            out.rewardMoney = packet.readUInt32();
+        if (packet.getReadPos() + 4 <= packet.getSize())
+            out.rewardXp = packet.readUInt32();
+
+        out.ok = true;
+        out.score = 0;
+        if (hasFlags) out.score += 1;
+        if (fixedArrays) out.score += 1;
+        if (choiceCount <= 6) out.score += 3;
+        if (rewardCount <= 4) out.score += 3;
+        if (fixedArrays) {
+            if (nonZeroChoice <= choiceCount) out.score += 3;
+            if (nonZeroFixed <= rewardCount) out.score += 3;
+        } else {
+            out.score += 3;  // variable arrays align naturally with count
+        }
+        if (packet.getReadPos() <= packet.getSize()) out.score += 2;
+        size_t remaining = packet.getSize() - packet.getReadPos();
+        if (remaining <= 32) out.score += 2;
+        return out;
+    };
+
+    size_t tailStart = packet.getReadPos();
+    ParsedTail a = parseTail(tailStart, true, true);    // WotLK-like (flags + fixed 6/4 arrays)
+    ParsedTail b = parseTail(tailStart, false, true);   // no flags + fixed 6/4 arrays
+    ParsedTail c = parseTail(tailStart, true, false);   // flags + variable arrays
+    ParsedTail d = parseTail(tailStart, false, false);  // classic-like variable arrays
+
+    const ParsedTail* best = nullptr;
+    for (const ParsedTail* cand : {&a, &b, &c, &d}) {
+        if (!cand->ok) continue;
+        if (!best || cand->score > best->score) best = cand;
     }
 
-    // Choice reward items (pick one): count + 6 * (id, count, displayInfo)
-    if (packet.getReadPos() + 4 > packet.getSize()) return true;
-    /*choiceCount*/ packet.readUInt32();
-    for (uint32_t i = 0; i < 6; ++i) {
-        if (packet.getReadPos() + 12 > packet.getSize()) break;
-        QuestRewardItem item;
-        item.itemId = packet.readUInt32();
-        item.count = packet.readUInt32();
-        item.displayInfoId = packet.readUInt32();
-        item.choiceSlot = i;
-        if (item.itemId > 0)
-            data.choiceRewards.push_back(item);
+    if (best) {
+        data.choiceRewards = best->choiceRewards;
+        data.fixedRewards = best->fixedRewards;
+        data.rewardMoney = best->rewardMoney;
+        data.rewardXp = best->rewardXp;
     }
-
-    // Fixed reward items: count + 4 * (id, count, displayInfo)
-    if (packet.getReadPos() + 4 > packet.getSize()) return true;
-    /*rewardCount*/ packet.readUInt32();
-    for (uint32_t i = 0; i < 4; ++i) {
-        if (packet.getReadPos() + 12 > packet.getSize()) break;
-        QuestRewardItem item;
-        item.itemId = packet.readUInt32();
-        item.count = packet.readUInt32();
-        item.displayInfoId = packet.readUInt32();
-        if (item.itemId > 0)
-            data.fixedRewards.push_back(item);
-    }
-
-    // Money and XP
-    if (packet.getReadPos() + 4 <= packet.getSize())
-        data.rewardMoney = packet.readUInt32();
-    if (packet.getReadPos() + 4 <= packet.getSize())
-        data.rewardXp = packet.readUInt32();
 
     LOG_INFO("Quest offer reward: id=", data.questId, " title='", data.title,
              "' choices=", data.choiceRewards.size(), " fixed=", data.fixedRewards.size());
@@ -3280,11 +3386,14 @@ network::Packet ListInventoryPacket::build(uint64_t npcGuid) {
     return packet;
 }
 
-network::Packet BuyItemPacket::build(uint64_t vendorGuid, uint32_t itemId, uint32_t count) {
+network::Packet BuyItemPacket::build(uint64_t vendorGuid, uint32_t itemId, uint32_t slot, uint32_t count) {
     network::Packet packet(wireOpcode(Opcode::CMSG_BUY_ITEM));
     packet.writeUInt64(vendorGuid);
     packet.writeUInt32(itemId);  // item entry
+    packet.writeUInt32(slot);    // vendor slot index from SMSG_LIST_INVENTORY
     packet.writeUInt32(count);
+    // WotLK/AzerothCore expects a trailing byte on CMSG_BUY_ITEM.
+    packet.writeUInt8(0);
     return packet;
 }
 
@@ -3293,6 +3402,13 @@ network::Packet SellItemPacket::build(uint64_t vendorGuid, uint64_t itemGuid, ui
     packet.writeUInt64(vendorGuid);
     packet.writeUInt64(itemGuid);
     packet.writeUInt32(count);
+    return packet;
+}
+
+network::Packet BuybackItemPacket::build(uint64_t vendorGuid, uint32_t slot) {
+    network::Packet packet(wireOpcode(Opcode::CMSG_BUYBACK_ITEM));
+    packet.writeUInt64(vendorGuid);
+    packet.writeUInt32(slot);
     return packet;
 }
 

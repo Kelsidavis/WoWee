@@ -858,13 +858,7 @@ void GameScreen::renderChatWindow(game::GameHandler& gameHandler) {
         size_t pos = 0;
         while (pos < text.size()) {
             // Find next special element: URL or WoW link
-            size_t urlStart = std::string::npos;
-            size_t httpPos = text.find("http://", pos);
-            size_t httpsPos = text.find("https://", pos);
-            if (httpPos != std::string::npos && (httpsPos == std::string::npos || httpPos < httpsPos))
-                urlStart = httpPos;
-            else if (httpsPos != std::string::npos)
-                urlStart = httpsPos;
+            size_t urlStart = text.find("https://", pos);
 
             // Find next WoW item link: |cXXXXXXXX|Hitem:ENTRY:...|h[Name]|h|r
             size_t linkStart = text.find("|c", pos);

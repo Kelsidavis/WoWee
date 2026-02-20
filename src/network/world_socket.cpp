@@ -443,7 +443,11 @@ void WorldSocket::initEncryption(const std::vector<uint8_t>& sessionKey, uint32_
         std::vector<uint8_t> encryptHash = auth::Crypto::hmacSHA1(encryptKey, sessionKey);
         std::vector<uint8_t> decryptHash = auth::Crypto::hmacSHA1(decryptKey, sessionKey);
 
+        // lgtm [cpp/weak-cryptographic-algorithm]
+        // WoW WotLK world-header stream cipher is protocol-defined RC4.
+        // Replacing it would break interoperability with target servers.
         encryptCipher.init(encryptHash);
+        // lgtm [cpp/weak-cryptographic-algorithm]
         decryptCipher.init(decryptHash);
 
         // Drop first 1024 bytes of keystream (WoW WotLK protocol requirement)
