@@ -7641,15 +7641,23 @@ void GameHandler::handleOtherPlayerMovement(network::Packet& packet) {
     // Convert server coords to canonical
     glm::vec3 canonical = core::coords::serverToCanonical(glm::vec3(info.x, info.y, info.z));
     float canYaw = core::coords::serverToCanonicalYaw(info.orientation);
-    // Smooth movement between client-relayed snapshots so animations can play.
-    uint32_t durationMs = 100;
+    // Compute a smoothed interpolation window for this player.
+    // Using a raw packet delta causes jitter when timing spikes (e.g. 50ms then 300ms).
+    // An exponential moving average of intervals gives a stable playback speed that
+    // dead-reckoning in Entity::updateMovement() can bridge without a visible freeze.
+    uint32_t durationMs = 120;
     auto itPrev = otherPlayerMoveTimeMs_.find(moverGuid);
     if (itPrev != otherPlayerMoveTimeMs_.end()) {
-        uint32_t dt = info.time - itPrev->second; // handles wrap
-        if (dt >= 30 && dt <= 1000) {
-            if (dt < 50) dt = 50;
-            if (dt > 350) dt = 350;
-            durationMs = dt;
+        uint32_t rawDt = info.time - itPrev->second;  // wraps naturally on uint32_t
+        if (rawDt >= 20 && rawDt <= 2000) {
+            float fDt = static_cast<float>(rawDt);
+            // EMA: smooth the interval so single spike packets don't stutter playback.
+            auto& smoothed = otherPlayerSmoothedIntervalMs_[moverGuid];
+            if (smoothed < 1.0f) smoothed = fDt;  // first observation — seed directly
+            smoothed = 0.7f * smoothed + 0.3f * fDt;
+            // Clamp to sane WoW movement rates: ~10 Hz (100ms) normal, up to 2Hz (500ms) slow
+            float clamped = std::max(60.0f, std::min(500.0f, smoothed));
+            durationMs = static_cast<uint32_t>(clamped);
         }
     }
     otherPlayerMoveTimeMs_[moverGuid] = info.time;

@@ -83,6 +83,21 @@ public:
             setPosition(destX, destY, destZ, destO);
             return;
         }
+        // Derive velocity from the displacement this packet implies.
+        // Use the previous destination (not current lerped pos) as the "from" so
+        // variable network timing doesn't inflate/shrink the implied speed.
+        float fromX = isMoving_ ? moveEndX_ : x;
+        float fromY = isMoving_ ? moveEndY_ : y;
+        float fromZ = isMoving_ ? moveEndZ_ : z;
+        float impliedVX = (destX - fromX) / durationSec;
+        float impliedVY = (destY - fromY) / durationSec;
+        float impliedVZ = (destZ - fromZ) / durationSec;
+        // Exponentially smooth velocity so jittery packet timing doesn't snap speed.
+        const float alpha = 0.65f;
+        velX_ = alpha * impliedVX + (1.0f - alpha) * velX_;
+        velY_ = alpha * impliedVY + (1.0f - alpha) * velY_;
+        velZ_ = alpha * impliedVZ + (1.0f - alpha) * velZ_;
+
         moveStartX_ = x; moveStartY_ = y; moveStartZ_ = z;
         moveEndX_ = destX; moveEndY_ = destY; moveEndZ_ = destZ;
         moveDuration_ = durationSec;
@@ -94,14 +109,27 @@ public:
     void updateMovement(float deltaTime) {
         if (!isMoving_) return;
         moveElapsed_ += deltaTime;
-        float t = moveElapsed_ / moveDuration_;
-        if (t >= 1.0f) {
-            x = moveEndX_; y = moveEndY_; z = moveEndZ_;
-            isMoving_ = false;
-        } else {
+        if (moveElapsed_ < moveDuration_) {
+            // Linear interpolation within the packet window
+            float t = moveElapsed_ / moveDuration_;
             x = moveStartX_ + (moveEndX_ - moveStartX_) * t;
             y = moveStartY_ + (moveEndY_ - moveStartY_) * t;
             z = moveStartZ_ + (moveEndZ_ - moveStartZ_) * t;
+        } else {
+            // Past the interpolation window: dead-reckon at the smoothed velocity
+            // rather than freezing in place. Cap to one extra interval so we don't
+            // drift endlessly if the entity stops sending packets.
+            float overrun = moveElapsed_ - moveDuration_;
+            if (overrun < moveDuration_) {
+                x = moveEndX_ + velX_ * overrun;
+                y = moveEndY_ + velY_ * overrun;
+                z = moveEndZ_ + velZ_ * overrun;
+            } else {
+                // Two intervals with no update — entity has probably stopped.
+                x = moveEndX_; y = moveEndY_; z = moveEndZ_;
+                velX_ = 0.0f; velY_ = 0.0f; velZ_ = 0.0f;
+                isMoving_ = false;
+            }
         }
     }
 
@@ -155,6 +183,7 @@ protected:
     float moveEndX_ = 0, moveEndY_ = 0, moveEndZ_ = 0;
     float moveDuration_ = 0;
     float moveElapsed_ = 0;
+    float velX_ = 0, velY_ = 0, velZ_ = 0;  // Smoothed velocity for dead reckoning
 };
 
 /**

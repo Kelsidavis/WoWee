@@ -1330,6 +1330,7 @@ private:
     std::unordered_map<uint64_t, std::array<uint32_t, 19>> otherPlayerVisibleItemEntries_;
     std::unordered_set<uint64_t> otherPlayerVisibleDirty_;
     std::unordered_map<uint64_t, uint32_t> otherPlayerMoveTimeMs_;
+    std::unordered_map<uint64_t, float>    otherPlayerSmoothedIntervalMs_;  // EMA of packet intervals
 
     // Inspect fallback (when visible item fields are missing/unreliable)
     std::unordered_map<uint64_t, std::array<uint32_t, 19>> inspectedPlayerItemEntries_;
