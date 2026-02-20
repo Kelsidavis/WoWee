@@ -954,11 +954,16 @@ void Renderer::updateCharacterAnimation() {
     CharAnimState newState = charAnimState;
 
     bool moving = cameraController->isMoving();
+    bool movingForward = cameraController->isMovingForward();
     bool movingBackward = cameraController->isMovingBackward();
+    bool autoRunning = cameraController->isAutoRunning();
     bool strafeLeft = cameraController->isStrafingLeft();
     bool strafeRight = cameraController->isStrafingRight();
-    bool anyStrafeLeft = strafeLeft && !strafeRight;
-    bool anyStrafeRight = strafeRight && !strafeLeft;
+    // Strafe animation only plays during *pure* strafing (no forward/backward/autorun).
+    // When forward+strafe are both held, the walk/run animation plays — same as the real client.
+    bool pureStrafe = !movingForward && !movingBackward && !autoRunning;
+    bool anyStrafeLeft = strafeLeft && !strafeRight && pureStrafe;
+    bool anyStrafeRight = strafeRight && !strafeLeft && pureStrafe;
     bool grounded = cameraController->isGrounded();
     bool jumping = cameraController->isJumping();
     bool sprinting = cameraController->isSprinting();

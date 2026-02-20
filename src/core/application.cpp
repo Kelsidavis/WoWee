@@ -820,6 +820,26 @@ void Application::update(float deltaTime) {
                     // equivalent canonical yaw is radians(180 - yawDeg).
                     float canonicalYaw = core::coords::normalizeAngleRad(glm::radians(180.0f - yawDeg));
                     gameHandler->setOrientation(canonicalYaw);
+
+                    // Send CMSG_MOVE_SET_FACING when the player changes facing direction
+                    // (e.g. via mouse-look). Without this, the server predicts movement in
+                    // the old facing and position-corrects on the next heartbeat — the
+                    // micro-teleporting the GM observed.
+                    // Skip while keyboard-turning: the server tracks that via TURN_LEFT/RIGHT flags.
+                    facingSendCooldown_ -= deltaTime;
+                    const auto& mi = gameHandler->getMovementInfo();
+                    constexpr uint32_t kTurnFlags =
+                        static_cast<uint32_t>(game::MovementFlags::TURN_LEFT) |
+                        static_cast<uint32_t>(game::MovementFlags::TURN_RIGHT);
+                    bool keyboardTurning = (mi.flags & kTurnFlags) != 0;
+                    if (!keyboardTurning && facingSendCooldown_ <= 0.0f) {
+                        float yawDiff = core::coords::normalizeAngleRad(canonicalYaw - lastSentCanonicalYaw_);
+                        if (std::abs(yawDiff) > glm::radians(3.0f)) {
+                            gameHandler->sendMovement(game::Opcode::CMSG_MOVE_SET_FACING);
+                            lastSentCanonicalYaw_ = canonicalYaw;
+                            facingSendCooldown_ = 0.1f;  // max 10 Hz
+                        }
+                    }
                 }
             }
 

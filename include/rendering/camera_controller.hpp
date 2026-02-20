@@ -74,6 +74,7 @@ public:
     bool isMovingBackward() const { return moveBackwardActive; }
     bool isStrafingLeft() const { return strafeLeftActive; }
     bool isStrafingRight() const { return strafeRightActive; }
+    bool isAutoRunning() const { return autoRunning; }
     bool isRightMouseHeld() const { return rightMouseDown; }
     bool isSitting() const { return sitting; }
     bool isSwimming() const { return swimming; }
