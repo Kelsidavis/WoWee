@@ -266,7 +266,7 @@ private:
     float characterYaw = 0.0f;
 
     // Character animation state
-    enum class CharAnimState { IDLE, WALK, RUN, JUMP_START, JUMP_MID, JUMP_END, SIT_DOWN, SITTING, EMOTE, SWIM_IDLE, SWIM, MELEE_SWING, MOUNT, CHARGE };
+    enum class CharAnimState { IDLE, WALK, RUN, JUMP_START, JUMP_MID, JUMP_END, SIT_DOWN, SITTING, EMOTE, SWIM_IDLE, SWIM, MELEE_SWING, MOUNT, CHARGE, COMBAT_IDLE };
     CharAnimState charAnimState = CharAnimState::IDLE;
     void updateCharacterAnimation();
     bool isFootstepAnimationState() const;

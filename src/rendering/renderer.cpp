@@ -960,6 +960,9 @@ void Renderer::updateCharacterAnimation() {
     constexpr uint32_t ANIM_SWIM_IDLE  = 41;  // Treading water (SwimIdle)
     constexpr uint32_t ANIM_SWIM       = 42;  // Swimming forward (Swim)
     constexpr uint32_t ANIM_MOUNT      = 91;  // Seated on mount
+    constexpr uint32_t ANIM_READY_UNARMED = 7;   // Combat ready stance (unarmed)
+    constexpr uint32_t ANIM_READY_1H     = 8;   // Combat ready stance (1H weapon)
+    constexpr uint32_t ANIM_READY_2H     = 9;   // Combat ready stance (2H weapon)
     constexpr uint32_t ANIM_FLY_IDLE   = 158; // Flying mount idle/hover
     constexpr uint32_t ANIM_FLY_FORWARD = 159; // Flying mount forward
 
@@ -1371,6 +1374,8 @@ void Renderer::updateCharacterAnimation() {
                 newState = CharAnimState::RUN;
             } else if (moving) {
                 newState = CharAnimState::WALK;
+            } else if (inCombat_ && grounded) {
+                newState = CharAnimState::COMBAT_IDLE;
             }
             break;
 
@@ -1493,6 +1498,8 @@ void Renderer::updateCharacterAnimation() {
                 newState = CharAnimState::WALK;
             } else if (sitting) {
                 newState = CharAnimState::SIT_DOWN;
+            } else if (inCombat_) {
+                newState = CharAnimState::COMBAT_IDLE;
             } else {
                 newState = CharAnimState::IDLE;
             }
@@ -1514,6 +1521,22 @@ void Renderer::updateCharacterAnimation() {
             } else if (moving) {
                 newState = CharAnimState::WALK;
             } else {
+                newState = CharAnimState::IDLE;
+            }
+            break;
+
+        case CharAnimState::COMBAT_IDLE:
+            if (swim) {
+                newState = moving ? CharAnimState::SWIM : CharAnimState::SWIM_IDLE;
+            } else if (!grounded && jumping) {
+                newState = CharAnimState::JUMP_START;
+            } else if (!grounded) {
+                newState = CharAnimState::JUMP_MID;
+            } else if (moving && sprinting) {
+                newState = CharAnimState::RUN;
+            } else if (moving) {
+                newState = CharAnimState::WALK;
+            } else if (!inCombat_) {
                 newState = CharAnimState::IDLE;
             }
             break;
@@ -1589,6 +1612,10 @@ void Renderer::updateCharacterAnimation() {
             loop = false;
             break;
         case CharAnimState::MOUNT:      animId = ANIM_MOUNT;      loop = true;  break;
+        case CharAnimState::COMBAT_IDLE:
+            animId = pickFirstAvailable({ANIM_READY_1H, ANIM_READY_2H, ANIM_READY_UNARMED}, ANIM_STAND);
+            loop = true;
+            break;
         case CharAnimState::CHARGE:
             animId = ANIM_RUN;
             loop = true;
