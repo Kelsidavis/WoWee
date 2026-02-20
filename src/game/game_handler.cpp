@@ -1004,7 +1004,7 @@ void GameHandler::update(float deltaTime) {
 
 void GameHandler::handlePacket(network::Packet& packet) {
     if (packet.getSize() < 1) {
-        LOG_WARNING("Received empty packet");
+        LOG_DEBUG("Received empty world packet (ignored)");
         return;
     }
 
@@ -1249,11 +1249,6 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 handleCompressedUpdateObject(packet);
             }
             break;
-        case Opcode::SMSG_UNKNOWN_1F5:
-            // Observed custom server packet (16 bytes). Consume safely for stream alignment.
-            packet.setReadPos(packet.getSize());
-            break;
-
         case Opcode::SMSG_DESTROY_OBJECT:
             // Can be received after entering world
             if (state == WorldState::IN_WORLD) {
@@ -1564,6 +1559,11 @@ void GameHandler::handlePacket(network::Packet& packet) {
             break;
         case Opcode::SMSG_PARTY_COMMAND_RESULT:
             handlePartyCommandResult(packet);
+            break;
+        case Opcode::SMSG_PARTYKILLLOG:
+            // Classic-era packet: killer GUID + victim GUID.
+            // XP and combat state are handled by other packets; consume to avoid warning spam.
+            packet.setReadPos(packet.getSize());
             break;
 
         // ---- Guild ----
@@ -2986,7 +2986,9 @@ void GameHandler::handleLoginVerifyWorld(network::Packet& packet) {
     movementInfo.orientation = core::coords::serverToCanonicalYaw(data.orientation);
     movementInfo.flags = 0;
     movementInfo.flags2 = 0;
-    movementInfo.time = 0;
+    movementClockStart_ = std::chrono::steady_clock::now();
+    lastMovementTimestampMs_ = 0;
+    movementInfo.time = nextMovementTimestampMs();
     resurrectPending_ = false;
     resurrectRequestPending_ = false;
     onTaxiFlight_ = false;
@@ -3991,6 +3993,28 @@ void GameHandler::handlePong(network::Packet& packet) {
     LOG_DEBUG("Heartbeat acknowledged (sequence: ", data.sequence, ")");
 }
 
+uint32_t GameHandler::nextMovementTimestampMs() {
+    auto now = std::chrono::steady_clock::now();
+    uint64_t elapsed = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - movementClockStart_).count()) + 1ULL;
+    if (elapsed > std::numeric_limits<uint32_t>::max()) {
+        movementClockStart_ = now;
+        elapsed = 1ULL;
+    }
+
+    uint32_t candidate = static_cast<uint32_t>(elapsed);
+    if (candidate <= lastMovementTimestampMs_) {
+        candidate = lastMovementTimestampMs_ + 1U;
+        if (candidate == 0) {
+            movementClockStart_ = now;
+            candidate = 1U;
+        }
+    }
+
+    lastMovementTimestampMs_ = candidate;
+    return candidate;
+}
+
 void GameHandler::sendMovement(Opcode opcode) {
     if (state != WorldState::IN_WORLD) {
         LOG_WARNING("Cannot send movement in state: ", (int)state);
@@ -4009,11 +4033,8 @@ void GameHandler::sendMovement(Opcode opcode) {
     if ((onTaxiFlight_ || taxiMountActive_) && !taxiAllowed) return;
     if (resurrectPending_ && !taxiAllowed) return;
 
-    // Use real millisecond timestamp (server validates for anti-cheat)
-    static auto startTime = std::chrono::steady_clock::now();
-    auto now = std::chrono::steady_clock::now();
-    movementInfo.time = static_cast<uint32_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime).count());
+    // Always send a strictly increasing non-zero client movement clock value.
+    movementInfo.time = nextMovementTimestampMs();
 
     // Update movement flags based on opcode
     switch (opcode) {
@@ -7831,6 +7852,11 @@ void GameHandler::handleForceRunSpeedChange(network::Packet& packet) {
         ack.writeUInt32(counter);
 
         MovementInfo wire = movementInfo;
+        wire.time = nextMovementTimestampMs();
+        if (wire.hasFlag(MovementFlags::ONTRANSPORT)) {
+            wire.transportTime = wire.time;
+            wire.transportTime2 = wire.time;
+        }
         glm::vec3 serverPos = core::coords::canonicalToServer(glm::vec3(wire.x, wire.y, wire.z));
         wire.x = serverPos.x;
         wire.y = serverPos.y;
@@ -7842,7 +7868,11 @@ void GameHandler::handleForceRunSpeedChange(network::Packet& packet) {
             wire.transportY = serverTransport.y;
             wire.transportZ = serverTransport.z;
         }
-        MovementPacket::writeMovementPayload(ack, wire);
+        if (packetParsers_) {
+            packetParsers_->writeMovementPayload(ack, wire);
+        } else {
+            MovementPacket::writeMovementPayload(ack, wire);
+        }
 
         ack.writeFloat(newSpeed);
         socket->send(ack);

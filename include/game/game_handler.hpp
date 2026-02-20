@@ -20,6 +20,7 @@
 #include <map>
 #include <optional>
 #include <algorithm>
+#include <chrono>
 
 namespace wowee::game {
     class TransportManager;
@@ -1237,6 +1238,8 @@ private:
     // Movement
     MovementInfo movementInfo;               // Current player movement state
     uint32_t movementTime = 0;               // Movement timestamp counter
+    std::chrono::steady_clock::time_point movementClockStart_ = std::chrono::steady_clock::now();
+    uint32_t lastMovementTimestampMs_ = 0;
     bool serverMovementAllowed_ = true;
 
     // Inventory
@@ -1518,6 +1521,7 @@ private:
     std::unordered_map<uint32_t, uint32_t> taxiCostMap_; // destNodeId -> total cost in copper
     void buildTaxiCostMap();
     void applyTaxiMountForCurrentNode();
+    uint32_t nextMovementTimestampMs();
     void sanitizeMovementForTaxi();
     void startClientTaxiPath(const std::vector<uint32_t>& pathNodes);
     void updateClientTaxi(float deltaTime);

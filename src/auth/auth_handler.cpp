@@ -406,7 +406,7 @@ void AuthHandler::handleRealmListResponse(network::Packet& packet) {
 
 void AuthHandler::handlePacket(network::Packet& packet) {
     if (packet.getSize() < 1) {
-        LOG_WARNING("Received empty packet");
+        LOG_DEBUG("Received empty auth packet (ignored)");
         return;
     }
 
