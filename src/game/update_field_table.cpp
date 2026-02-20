@@ -58,51 +58,6 @@ static const UFNameEntry kUFNames[] = {
 
 static constexpr size_t kUFNameCount = sizeof(kUFNames) / sizeof(kUFNames[0]);
 
-void UpdateFieldTable::loadWotlkDefaults() {
-    fieldMap_.clear();
-    struct { UF field; uint16_t idx; } defaults[] = {
-        {UF::OBJECT_FIELD_ENTRY, 3},
-        {UF::UNIT_FIELD_TARGET_LO, 6},
-        {UF::UNIT_FIELD_TARGET_HI, 7},
-        {UF::UNIT_FIELD_BYTES_0, 23},
-        {UF::UNIT_FIELD_HEALTH, 24},
-        {UF::UNIT_FIELD_POWER1, 25},
-        {UF::UNIT_FIELD_MAXHEALTH, 32},
-        {UF::UNIT_FIELD_MAXPOWER1, 33},
-        {UF::UNIT_FIELD_LEVEL, 54},
-        {UF::UNIT_FIELD_FACTIONTEMPLATE, 55},
-        {UF::UNIT_FIELD_FLAGS, 59},
-        {UF::UNIT_FIELD_FLAGS_2, 60},
-        {UF::UNIT_FIELD_DISPLAYID, 67},
-        {UF::UNIT_FIELD_MOUNTDISPLAYID, 69},
-        {UF::UNIT_NPC_FLAGS, 82},
-        {UF::UNIT_DYNAMIC_FLAGS, 147},
-        {UF::UNIT_FIELD_RESISTANCES, 99},
-        {UF::UNIT_END, 148},
-        {UF::PLAYER_FLAGS, 150},
-        {UF::PLAYER_BYTES, 151},
-        {UF::PLAYER_BYTES_2, 152},
-        {UF::PLAYER_XP, 634},
-        {UF::PLAYER_NEXT_LEVEL_XP, 635},
-        {UF::PLAYER_FIELD_COINAGE, 1170},
-        {UF::PLAYER_QUEST_LOG_START, 158},
-        {UF::PLAYER_FIELD_INV_SLOT_HEAD, 324},
-        {UF::PLAYER_FIELD_PACK_SLOT_1, 370},
-        {UF::PLAYER_FIELD_BANK_SLOT_1, 402},
-        {UF::PLAYER_FIELD_BANKBAG_SLOT_1, 458},
-        {UF::PLAYER_SKILL_INFO_START, 636},
-        {UF::PLAYER_EXPLORED_ZONES_START, 1041},
-        {UF::GAMEOBJECT_DISPLAYID, 8},
-        {UF::ITEM_FIELD_STACK_COUNT, 14},
-        {UF::CONTAINER_FIELD_NUM_SLOTS, 64},  // ITEM_END + 0 for WotLK
-        {UF::CONTAINER_FIELD_SLOT_1, 66},      // ITEM_END + 2 for WotLK
-    };
-    for (auto& d : defaults) {
-        fieldMap_[static_cast<uint16_t>(d.field)] = d.idx;
-    }
-    LOG_INFO("UpdateFieldTable: loaded ", fieldMap_.size(), " WotLK default fields");
-}
-
 bool UpdateFieldTable::loadFromJson(const std::string& path) {
     std::ifstream f(path);
     if (!f.is_open()) {
@@ -112,7 +67,6 @@ bool UpdateFieldTable::loadFromJson(const std::string& path) {
 
     std::string json((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
 
-    auto savedFieldMap = fieldMap_;
     fieldMap_.clear();
     size_t loaded = 0;
     size_t pos = 0;
@@ -158,8 +112,7 @@ bool UpdateFieldTable::loadFromJson(const std::string& path) {
     }
 
     if (loaded == 0) {
-        LOG_WARNING("UpdateFieldTable: no fields loaded from ", path, ", restoring previous table");
-        fieldMap_ = std::move(savedFieldMap);
+        LOG_WARNING("UpdateFieldTable: no fields loaded from ", path);
         return false;
     }
 

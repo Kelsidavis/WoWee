@@ -465,9 +465,6 @@ public:
      */
     bool loadFromJson(const std::string& path);
 
-    /** Load built-in WotLK defaults (hardcoded fallback). */
-    void loadWotlkDefaults();
-
     /** LogicalOpcode → wire value for sending packets. Returns 0xFFFF if unknown. */
     uint16_t toWire(LogicalOpcode op) const;
 

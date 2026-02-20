@@ -33,9 +33,6 @@ public:
     /** Load from JSON file. Returns true if successful. */
     bool loadFromJson(const std::string& path);
 
-    /** Load built-in WotLK 3.3.5a defaults. */
-    void loadWotlkDefaults();
-
     /** Get the field map for a DBC file. Returns nullptr if unknown. */
     const DBCFieldMap* getLayout(const std::string& dbcName) const;
 

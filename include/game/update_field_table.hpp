@@ -72,9 +72,6 @@ public:
     /** Load from JSON file. Returns true if successful. */
     bool loadFromJson(const std::string& path);
 
-    /** Load built-in WotLK 3.3.5a defaults. */
-    void loadWotlkDefaults();
-
     /** Get the wire index for a logical field. Returns 0xFFFF if unknown. */
     uint16_t index(UF field) const;
 

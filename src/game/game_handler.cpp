@@ -242,12 +242,7 @@ QuestQueryTextCandidate pickBestQuestQueryTexts(const std::vector<uint8_t>& data
 GameHandler::GameHandler() {
     LOG_DEBUG("GameHandler created");
 
-    // Initialize opcode table with WotLK defaults (may be overridden from JSON later)
-    opcodeTable_.loadWotlkDefaults();
     setActiveOpcodeTable(&opcodeTable_);
-
-    // Initialize update field table with WotLK defaults (may be overridden from JSON later)
-    updateFieldTable_.loadWotlkDefaults();
     setActiveUpdateFieldTable(&updateFieldTable_);
 
     // Initialize packet parsers (WotLK default, may be replaced for other expansions)

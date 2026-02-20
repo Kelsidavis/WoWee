@@ -146,16 +146,14 @@ bool Application::initialize() {
         if (profile) {
             std::string opcodesPath = profile->dataPath + "/opcodes.json";
             if (!gameHandler->getOpcodeTable().loadFromJson(opcodesPath)) {
-                gameHandler->getOpcodeTable().loadWotlkDefaults();
-                LOG_INFO("Using built-in WotLK opcode defaults");
+                LOG_ERROR("Failed to load opcodes from ", opcodesPath);
             }
             game::setActiveOpcodeTable(&gameHandler->getOpcodeTable());
 
             // Load expansion-specific update field table
             std::string updateFieldsPath = profile->dataPath + "/update_fields.json";
             if (!gameHandler->getUpdateFieldTable().loadFromJson(updateFieldsPath)) {
-                gameHandler->getUpdateFieldTable().loadWotlkDefaults();
-                LOG_INFO("Using built-in WotLK update field defaults");
+                LOG_ERROR("Failed to load update fields from ", updateFieldsPath);
             }
             game::setActiveUpdateFieldTable(&gameHandler->getUpdateFieldTable());
 
@@ -166,8 +164,7 @@ bool Application::initialize() {
             if (dbcLayout_) {
                 std::string dbcLayoutsPath = profile->dataPath + "/dbc_layouts.json";
                 if (!dbcLayout_->loadFromJson(dbcLayoutsPath)) {
-                    dbcLayout_->loadWotlkDefaults();
-                    LOG_INFO("Using built-in WotLK DBC layout defaults");
+                    LOG_ERROR("Failed to load DBC layouts from ", dbcLayoutsPath);
                 }
                 pipeline::setActiveDBCLayout(dbcLayout_.get());
             }
@@ -457,13 +454,13 @@ void Application::reloadExpansionData() {
 
     std::string opcodesPath = profile->dataPath + "/opcodes.json";
     if (!gameHandler->getOpcodeTable().loadFromJson(opcodesPath)) {
-        gameHandler->getOpcodeTable().loadWotlkDefaults();
+        LOG_ERROR("Failed to load opcodes from ", opcodesPath);
     }
     game::setActiveOpcodeTable(&gameHandler->getOpcodeTable());
 
     std::string updateFieldsPath = profile->dataPath + "/update_fields.json";
     if (!gameHandler->getUpdateFieldTable().loadFromJson(updateFieldsPath)) {
-        gameHandler->getUpdateFieldTable().loadWotlkDefaults();
+        LOG_ERROR("Failed to load update fields from ", updateFieldsPath);
     }
     game::setActiveUpdateFieldTable(&gameHandler->getUpdateFieldTable());
 
@@ -472,7 +469,7 @@ void Application::reloadExpansionData() {
     if (dbcLayout_) {
         std::string dbcLayoutsPath = profile->dataPath + "/dbc_layouts.json";
         if (!dbcLayout_->loadFromJson(dbcLayoutsPath)) {
-            dbcLayout_->loadWotlkDefaults();
+            LOG_ERROR("Failed to load DBC layouts from ", dbcLayoutsPath);
         }
         pipeline::setActiveDBCLayout(dbcLayout_.get());
     }
