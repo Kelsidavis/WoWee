@@ -278,6 +278,7 @@ public:
     bool parseCharEnum(network::Packet& packet, CharEnumResponse& response) override;
     bool parseAuraUpdate(network::Packet& packet, AuraUpdateData& data, bool isAll = false) override;
     bool parseNameQueryResponse(network::Packet& packet, NameQueryResponseData& data) override;
+    bool parseItemQueryResponse(network::Packet& packet, ItemQueryResponseData& data) override;
 };
 
 /**

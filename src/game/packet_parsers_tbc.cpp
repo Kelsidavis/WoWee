@@ -533,5 +533,113 @@ bool TbcPacketParsers::parseNameQueryResponse(network::Packet& packet, NameQuery
     return false;
 }
 
+// ============================================================================
+// TBC parseItemQueryResponse - SMSG_ITEM_QUERY_SINGLE_RESPONSE (2.4.3 format)
+//
+// Differences from WotLK (handled by base class ItemQueryResponseParser::parse):
+//   - No Flags2 field (WotLK added a second flags uint32 after Flags)
+//   - No BuyCount field (WotLK added this between Flags2 and BuyPrice)
+//   - Stats: sends exactly statsCount pairs (WotLK always sends 10)
+//   - No ScalingStatDistribution / ScalingStatValue (WotLK-only heirloom scaling)
+//
+// Differences from Classic (ClassicPacketParsers::parseItemQueryResponse):
+//   - Has SoundOverrideSubclass (int32) after subClass (Classic lacks it)
+//   - Has statsCount prefix (Classic reads 10 pairs with no prefix)
+// ============================================================================
+bool TbcPacketParsers::parseItemQueryResponse(network::Packet& packet, ItemQueryResponseData& data) {
+    data.entry = packet.readUInt32();
+    if (data.entry & 0x80000000) {
+        data.entry &= ~0x80000000;
+        return true;
+    }
+
+    uint32_t itemClass = packet.readUInt32();
+    uint32_t subClass  = packet.readUInt32();
+    data.itemClass = itemClass;
+    data.subClass  = subClass;
+    packet.readUInt32(); // SoundOverrideSubclass (int32, -1 = no override)
+    data.subclassName = "";
+
+    // Name strings
+    data.name = packet.readString();
+    packet.readString(); // name2
+    packet.readString(); // name3
+    packet.readString(); // name4
+
+    data.displayInfoId = packet.readUInt32();
+    data.quality       = packet.readUInt32();
+
+    packet.readUInt32(); // Flags  (TBC: 1 flags field only — no Flags2)
+    // TBC: NO Flags2, NO BuyCount
+    packet.readUInt32(); // BuyPrice
+    data.sellPrice = packet.readUInt32();
+
+    data.inventoryType = packet.readUInt32();
+
+    packet.readUInt32(); // AllowableClass
+    packet.readUInt32(); // AllowableRace
+    packet.readUInt32(); // ItemLevel
+    packet.readUInt32(); // RequiredLevel
+    packet.readUInt32(); // RequiredSkill
+    packet.readUInt32(); // RequiredSkillRank
+    packet.readUInt32(); // RequiredSpell
+    packet.readUInt32(); // RequiredHonorRank
+    packet.readUInt32(); // RequiredCityRank
+    packet.readUInt32(); // RequiredReputationFaction
+    packet.readUInt32(); // RequiredReputationRank
+    packet.readUInt32(); // MaxCount
+    data.maxStack       = static_cast<int32_t>(packet.readUInt32()); // Stackable
+    data.containerSlots = packet.readUInt32();
+
+    // TBC: statsCount prefix + exactly statsCount pairs (WotLK always sends 10)
+    uint32_t statsCount = packet.readUInt32();
+    if (statsCount > 10) statsCount = 10; // sanity cap
+    for (uint32_t i = 0; i < statsCount; i++) {
+        uint32_t statType  = packet.readUInt32();
+        int32_t  statValue = static_cast<int32_t>(packet.readUInt32());
+        switch (statType) {
+            case 3: data.agility  = statValue; break;
+            case 4: data.strength = statValue; break;
+            case 5: data.intellect = statValue; break;
+            case 6: data.spirit   = statValue; break;
+            case 7: data.stamina  = statValue; break;
+            default: break;
+        }
+    }
+    // TBC: NO ScalingStatDistribution, NO ScalingStatValue (WotLK-only)
+
+    // 5 damage entries
+    bool haveWeaponDamage = false;
+    for (int i = 0; i < 5; i++) {
+        float    dmgMin     = packet.readFloat();
+        float    dmgMax     = packet.readFloat();
+        uint32_t damageType = packet.readUInt32();
+        if (!haveWeaponDamage && dmgMax > 0.0f) {
+            if (damageType == 0 || data.damageMax <= 0.0f) {
+                data.damageMin = dmgMin;
+                data.damageMax = dmgMax;
+                haveWeaponDamage = (damageType == 0);
+            }
+        }
+    }
+
+    data.armor = static_cast<int32_t>(packet.readUInt32());
+
+    if (packet.getSize() - packet.getReadPos() >= 28) {
+        packet.readUInt32(); // HolyRes
+        packet.readUInt32(); // FireRes
+        packet.readUInt32(); // NatureRes
+        packet.readUInt32(); // FrostRes
+        packet.readUInt32(); // ShadowRes
+        packet.readUInt32(); // ArcaneRes
+        data.delayMs = packet.readUInt32();
+    }
+
+    data.valid = !data.name.empty();
+    LOG_DEBUG("[TBC] Item query: ", data.name, " quality=", data.quality,
+              " invType=", data.inventoryType, " armor=", data.armor);
+    return true;
+}
+
 } // namespace game
 } // namespace wowee
