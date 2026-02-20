@@ -95,6 +95,9 @@ public:
     uint8_t getPurchasedBankBagSlots() const { return purchasedBankBagSlots_; }
     void setPurchasedBankBagSlots(uint8_t count) { purchasedBankBagSlots_ = count; }
 
+    // Swap two bag slots (equip items + contents)
+    void swapBagContents(int bagA, int bagB);
+
     // Utility
     int findFreeBackpackSlot() const;
     bool addItem(const ItemDef& item);

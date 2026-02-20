@@ -360,19 +360,18 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // Set vendor mode before rendering inventory
     inventoryScreen.setVendorMode(gameHandler.isVendorWindowOpen(), &gameHandler);
 
-    // Auto-open bags when vendor window opens
+    // Auto-open bags once when vendor window first opens
     if (gameHandler.isVendorWindowOpen()) {
-        if (inventoryScreen.isSeparateBags()) {
-            if (!inventoryScreen.isBackpackOpen() &&
-                !inventoryScreen.isBagOpen(0) &&
-                !inventoryScreen.isBagOpen(1) &&
-                !inventoryScreen.isBagOpen(2) &&
-                !inventoryScreen.isBagOpen(3)) {
+        if (!vendorBagsOpened_) {
+            vendorBagsOpened_ = true;
+            if (inventoryScreen.isSeparateBags()) {
                 inventoryScreen.openAllBags();
+            } else if (!inventoryScreen.isOpen()) {
+                inventoryScreen.setOpen(true);
             }
-        } else if (!inventoryScreen.isOpen()) {
-            inventoryScreen.setOpen(true);
         }
+    } else {
+        vendorBagsOpened_ = false;
     }
 
     // Bags (B key toggle handled inside)
@@ -3591,6 +3590,10 @@ void GameScreen::renderBagBar(game::GameHandler& gameHandler) {
             }
         }
 
+        // Track bag slot screen rects for drop detection
+        ImVec2 bagSlotMins[4], bagSlotMaxs[4];
+        GLuint bagIcons[4] = {};
+
         // Slots 1-4: Bag slots (leftmost)
         for (int i = 0; i < 4; ++i) {
             if (i > 0) ImGui::SameLine(0, spacing);
@@ -3603,47 +3606,59 @@ void GameScreen::renderBagBar(game::GameHandler& gameHandler) {
             if (!bagItem.empty() && bagItem.item.displayInfoId != 0) {
                 bagIcon = inventoryScreen.getItemIcon(bagItem.item.displayInfoId);
             }
+            bagIcons[i] = bagIcon;
 
+            // Render the slot as an invisible button so we control all interaction
+            ImVec2 cpos = ImGui::GetCursorScreenPos();
+            ImGui::InvisibleButton("##bagSlot", ImVec2(slotSize, slotSize));
+            bagSlotMins[i] = cpos;
+            bagSlotMaxs[i] = ImVec2(cpos.x + slotSize, cpos.y + slotSize);
+
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+
+            // Draw background + icon
             if (bagIcon) {
-                if (ImGui::ImageButton("##bag", (ImTextureID)(uintptr_t)bagIcon,
-                                       ImVec2(slotSize, slotSize),
-                                       ImVec2(0, 0), ImVec2(1, 1),
-                                       ImVec4(0.1f, 0.1f, 0.1f, 0.9f),
-                                       ImVec4(1, 1, 1, 1))) {
-                    if (inventoryScreen.isSeparateBags())
-                        inventoryScreen.toggleBag(i);
-                    else
-                        inventoryScreen.toggle();
-                }
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("%s", bagItem.item.name.c_str());
-                }
+                dl->AddRectFilled(bagSlotMins[i], bagSlotMaxs[i], IM_COL32(25, 25, 25, 230));
+                dl->AddImage((ImTextureID)(uintptr_t)bagIcon, bagSlotMins[i], bagSlotMaxs[i]);
             } else {
-                // Empty bag slot
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.15f, 0.8f));
-                if (ImGui::Button("##empty", ImVec2(slotSize, slotSize))) {
-                    // Empty slot - no bag equipped
-                }
-                ImGui::PopStyleColor();
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("Empty Bag Slot");
-                }
+                dl->AddRectFilled(bagSlotMins[i], bagSlotMaxs[i], IM_COL32(38, 38, 38, 204));
             }
 
-            if (inventoryScreen.isSeparateBags() &&
-                inventoryScreen.isBagOpen(i)) {
-                ImDrawList* dl = ImGui::GetWindowDrawList();
-                ImVec2 r0 = ImGui::GetItemRectMin();
-                ImVec2 r1 = ImGui::GetItemRectMax();
-                dl->AddRect(r0, r1, IM_COL32(255, 255, 255, 255), 3.0f, 0, 2.0f);
+            // Hover highlight
+            bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+            if (hovered && bagBarPickedSlot_ < 0) {
+                dl->AddRect(bagSlotMins[i], bagSlotMaxs[i], IM_COL32(255, 255, 255, 100));
+            }
+
+            // Track which slot was pressed for drag detection
+            if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && bagBarPickedSlot_ < 0 && bagIcon) {
+                bagBarDragSource_ = i;
+            }
+
+            // Click toggles bag open/close (handled in mouse release section below)
+
+            // Dim the slot being dragged
+            if (bagBarPickedSlot_ == i) {
+                dl->AddRectFilled(bagSlotMins[i], bagSlotMaxs[i], IM_COL32(0, 0, 0, 150));
+            }
+
+            // Tooltip
+            if (hovered && bagBarPickedSlot_ < 0) {
+                if (bagIcon)
+                    ImGui::SetTooltip("%s", bagItem.item.name.c_str());
+                else
+                    ImGui::SetTooltip("Empty Bag Slot");
+            }
+
+            // Open bag indicator
+            if (inventoryScreen.isSeparateBags() && inventoryScreen.isBagOpen(i)) {
+                dl->AddRect(bagSlotMins[i], bagSlotMaxs[i], IM_COL32(255, 255, 255, 255), 3.0f, 0, 2.0f);
             }
 
             // Accept dragged item from inventory
-            if (ImGui::IsItemHovered() && inventoryScreen.isHoldingItem()) {
+            if (hovered && inventoryScreen.isHoldingItem()) {
                 const auto& heldItem = inventoryScreen.getHeldItem();
-                // Check if held item is a bag (bagSlots > 0)
                 if (heldItem.bagSlots > 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-                    // Equip the bag to inventory
                     auto& inventory = gameHandler.getInventory();
                     inventory.setEquipSlot(bagSlot, heldItem);
                     inventoryScreen.returnHeldItem(inventory);
@@ -3651,6 +3666,46 @@ void GameScreen::renderBagBar(game::GameHandler& gameHandler) {
             }
 
             ImGui::PopID();
+        }
+
+        // Drag lifecycle: press on a slot sets bagBarDragSource_,
+        // dragging 3+ pixels promotes to bagBarPickedSlot_ (visual drag),
+        // releasing completes swap or click
+        if (bagBarDragSource_ >= 0) {
+            if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 3.0f) && bagBarPickedSlot_ < 0) {
+                // Mouse moved enough — start visual drag
+                bagBarPickedSlot_ = bagBarDragSource_;
+            }
+            if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+                if (bagBarPickedSlot_ >= 0) {
+                    // Was dragging — check for drop target
+                    ImVec2 mousePos = ImGui::GetIO().MousePos;
+                    int dropTarget = -1;
+                    for (int j = 0; j < 4; ++j) {
+                        if (j == bagBarPickedSlot_) continue;
+                        if (mousePos.x >= bagSlotMins[j].x && mousePos.x <= bagSlotMaxs[j].x &&
+                            mousePos.y >= bagSlotMins[j].y && mousePos.y <= bagSlotMaxs[j].y) {
+                            dropTarget = j;
+                            break;
+                        }
+                    }
+                    if (dropTarget >= 0) {
+                        gameHandler.swapBagSlots(bagBarPickedSlot_, dropTarget);
+                    }
+                    bagBarPickedSlot_ = -1;
+                } else {
+                    // Was just a click (no drag) — toggle bag
+                    int slot = bagBarDragSource_;
+                    auto equip = static_cast<game::EquipSlot>(static_cast<int>(game::EquipSlot::BAG1) + slot);
+                    if (!inv.getEquipSlot(equip).empty()) {
+                        if (inventoryScreen.isSeparateBags())
+                            inventoryScreen.toggleBag(slot);
+                        else
+                            inventoryScreen.toggle();
+                    }
+                }
+                bagBarDragSource_ = -1;
+            }
         }
 
         // Backpack (rightmost slot)
@@ -3692,6 +3747,27 @@ void GameScreen::renderBagBar(game::GameHandler& gameHandler) {
 
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(4);
+
+    // Draw dragged bag icon following cursor
+    if (bagBarPickedSlot_ >= 0) {
+        auto& inv2 = gameHandler.getInventory();
+        auto pickedEquip = static_cast<game::EquipSlot>(
+            static_cast<int>(game::EquipSlot::BAG1) + bagBarPickedSlot_);
+        const auto& pickedItem = inv2.getEquipSlot(pickedEquip);
+        GLuint pickedIcon = 0;
+        if (!pickedItem.empty() && pickedItem.item.displayInfoId != 0) {
+            pickedIcon = inventoryScreen.getItemIcon(pickedItem.item.displayInfoId);
+        }
+        if (pickedIcon) {
+            ImVec2 mousePos = ImGui::GetIO().MousePos;
+            float sz = 40.0f;
+            ImVec2 p0(mousePos.x - sz * 0.5f, mousePos.y - sz * 0.5f);
+            ImVec2 p1(mousePos.x + sz * 0.5f, mousePos.y + sz * 0.5f);
+            ImDrawList* fg = ImGui::GetForegroundDrawList();
+            fg->AddImage((ImTextureID)(uintptr_t)pickedIcon, p0, p1);
+            fg->AddRect(p0, p1, IM_COL32(200, 200, 200, 255), 0.0f, 0, 2.0f);
+        }
+    }
 }
 
 // ============================================================

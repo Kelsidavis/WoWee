@@ -1,5 +1,6 @@
 #include "rendering/camera_controller.hpp"
 #include <algorithm>
+#include <imgui.h>
 #include "rendering/terrain_manager.hpp"
 #include "rendering/wmo_renderer.hpp"
 #include "rendering/m2_renderer.hpp"
@@ -1416,14 +1417,17 @@ void CameraController::processMouseButton(const SDL_MouseButtonEvent& event) {
         return;
     }
 
+    // Don't capture mouse when ImGui wants it (hovering UI windows)
+    bool uiWantsMouse = ImGui::GetIO().WantCaptureMouse;
+
     if (event.button == SDL_BUTTON_LEFT) {
-        leftMouseDown = (event.state == SDL_PRESSED);
+        leftMouseDown = (event.state == SDL_PRESSED) && !uiWantsMouse;
         if (event.state == SDL_PRESSED && event.clicks >= 2) {
             autoRunning = false;
         }
     }
     if (event.button == SDL_BUTTON_RIGHT) {
-        rightMouseDown = (event.state == SDL_PRESSED);
+        rightMouseDown = (event.state == SDL_PRESSED) && !uiWantsMouse;
     }
 
     bool anyDown = leftMouseDown || rightMouseDown;

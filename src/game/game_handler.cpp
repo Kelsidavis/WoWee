@@ -9476,6 +9476,33 @@ void GameHandler::swapContainerItems(uint8_t srcBag, uint8_t srcSlot, uint8_t ds
     socket->send(packet);
 }
 
+void GameHandler::swapBagSlots(int srcBagIndex, int dstBagIndex) {
+    if (srcBagIndex < 0 || srcBagIndex > 3 || dstBagIndex < 0 || dstBagIndex > 3) return;
+    if (srcBagIndex == dstBagIndex) return;
+
+    // Local swap for immediate visual feedback
+    auto srcEquip = static_cast<game::EquipSlot>(static_cast<int>(game::EquipSlot::BAG1) + srcBagIndex);
+    auto dstEquip = static_cast<game::EquipSlot>(static_cast<int>(game::EquipSlot::BAG1) + dstBagIndex);
+    auto srcItem = inventory.getEquipSlot(srcEquip).item;
+    auto dstItem = inventory.getEquipSlot(dstEquip).item;
+    inventory.setEquipSlot(srcEquip, dstItem);
+    inventory.setEquipSlot(dstEquip, srcItem);
+
+    // Also swap bag contents locally
+    inventory.swapBagContents(srcBagIndex, dstBagIndex);
+
+    // Send to server using CMSG_SWAP_ITEM with INVENTORY_SLOT_BAG_0 (255)
+    // CMSG_SWAP_INV_ITEM doesn't support bag equip slots (19-22)
+    if (socket && socket->isConnected()) {
+        uint8_t srcSlot = static_cast<uint8_t>(19 + srcBagIndex);
+        uint8_t dstSlot = static_cast<uint8_t>(19 + dstBagIndex);
+        LOG_INFO("swapBagSlots: bag ", srcBagIndex, " (slot ", (int)srcSlot,
+                 ") <-> bag ", dstBagIndex, " (slot ", (int)dstSlot, ")");
+        auto packet = SwapItemPacket::build(255, dstSlot, 255, srcSlot);
+        socket->send(packet);
+    }
+}
+
 void GameHandler::destroyItem(uint8_t bag, uint8_t slot, uint8_t count) {
     if (state != WorldState::IN_WORLD || !socket) return;
     if (count == 0) count = 1;

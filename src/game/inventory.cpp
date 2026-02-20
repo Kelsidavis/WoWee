@@ -115,6 +115,12 @@ void Inventory::setBankBagSize(int bagIndex, int size) {
     bankBags_[bagIndex].size = std::min(size, MAX_BAG_SIZE);
 }
 
+void Inventory::swapBagContents(int bagA, int bagB) {
+    if (bagA < 0 || bagA >= NUM_BAG_SLOTS || bagB < 0 || bagB >= NUM_BAG_SLOTS) return;
+    if (bagA == bagB) return;
+    std::swap(bags[bagA], bags[bagB]);
+}
+
 int Inventory::findFreeBackpackSlot() const {
     for (int i = 0; i < BACKPACK_SLOTS; i++) {
         if (backpack[i].empty()) return i;

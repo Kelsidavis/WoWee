@@ -69,6 +69,7 @@ private:
     bool editingOfficerNote_ = false;
     char guildNoteEditBuffer_[256] = {0};
     bool refocusChatInput = false;
+    bool vendorBagsOpened_ = false;  // Track if bags were auto-opened for current vendor session
     bool chatWindowLocked = true;
     ImVec2 chatWindowPos_ = ImVec2(0.0f, 0.0f);
     bool chatWindowPosInit_ = false;
@@ -223,9 +224,11 @@ private:
     int actionBarDragSlot_ = -1;
     GLuint actionBarDragIcon_ = 0;
 
-    // Bag bar textures
+    // Bag bar state
     GLuint backpackIconTexture_ = 0;
     GLuint emptyBagSlotTexture_ = 0;
+    int bagBarPickedSlot_ = -1;   // Visual drag in progress (-1 = none)
+    int bagBarDragSource_ = -1;   // Mouse pressed on this slot, waiting for drag or click (-1 = none)
 
     // Chat settings
     bool chatShowTimestamps_ = false;
