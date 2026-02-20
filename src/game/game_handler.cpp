@@ -3385,6 +3385,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
             enum CheckType { CT_MEM=0, CT_PAGE_A=1, CT_PAGE_B=2, CT_MPQ=3, CT_LUA=4,
                              CT_DRIVER=5, CT_TIMING=6, CT_PROC=7, CT_MODULE=8, CT_UNKNOWN=9 };
             const char* checkTypeNames[] = {"MEM","PAGE_A","PAGE_B","MPQ","LUA","DRIVER","TIMING","PROC","MODULE","UNKNOWN"};
+            size_t checkEnd = decrypted.size() - 1; // exclude xorByte
 
             auto decodeCheckType = [&](uint8_t raw) -> CheckType {
                 uint8_t decoded = raw ^ xorByte;
@@ -3393,10 +3394,54 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                 }
                 return CT_UNKNOWN;
             };
+            auto requestSizes = [&](CheckType ct) {
+                switch (ct) {
+                    case CT_TIMING: return std::vector<size_t>{0};
+                    case CT_MEM:    return std::vector<size_t>{6};
+                    case CT_PAGE_A: return std::vector<size_t>{24, 29};
+                    case CT_PAGE_B: return std::vector<size_t>{24, 29};
+                    case CT_MPQ:    return std::vector<size_t>{1};
+                    case CT_LUA:    return std::vector<size_t>{1};
+                    case CT_DRIVER: return std::vector<size_t>{25};
+                    case CT_PROC:   return std::vector<size_t>{30};
+                    case CT_MODULE: return std::vector<size_t>{24};
+                    default:        return std::vector<size_t>{};
+                }
+            };
+            std::unordered_map<size_t, bool> parseMemo;
+            std::function<bool(size_t)> canParseFrom = [&](size_t checkPos) -> bool {
+                if (checkPos == checkEnd) return true;
+                if (checkPos > checkEnd) return false;
+                auto it = parseMemo.find(checkPos);
+                if (it != parseMemo.end()) return it->second;
+
+                CheckType ct = decodeCheckType(decrypted[checkPos]);
+                if (ct == CT_UNKNOWN) {
+                    parseMemo[checkPos] = false;
+                    return false;
+                }
+
+                size_t payloadPos = checkPos + 1;
+                for (size_t reqSize : requestSizes(ct)) {
+                    if (payloadPos + reqSize > checkEnd) continue;
+                    if (canParseFrom(payloadPos + reqSize)) {
+                        parseMemo[checkPos] = true;
+                        return true;
+                    }
+                }
+
+                parseMemo[checkPos] = false;
+                return false;
+            };
+            auto isBoundaryAfter = [&](size_t start, size_t consume) -> bool {
+                size_t next = start + consume;
+                if (next == checkEnd) return true;
+                if (next > checkEnd) return false;
+                return decodeCheckType(decrypted[next]) != CT_UNKNOWN;
+            };
 
             // --- Parse check entries and build response ---
             std::vector<uint8_t> resultData;
-            size_t checkEnd = decrypted.size() - 1; // exclude xorByte
             int checkCount = 0;
 
             while (pos < checkEnd) {
@@ -3453,43 +3498,90 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         break;
                     }
                     case CT_PAGE_A: {
-                        // Vanilla: [4 seed][20 sha1] = 24 bytes (no addr+len)
-                        // WotLK:   [4 seed][20 sha1][4 addr][1 length] = 29 bytes
-                        int pageSize = (build <= 6005) ? 24 : 29;
-                        if (pos + pageSize > checkEnd) { pos = checkEnd; break; }
-                        pos += pageSize;
+                        // Classic has seen two PAGE_A layouts in the wild:
+                        // short: [4 seed][20 sha1] = 24 bytes
+                        // long:  [4 seed][20 sha1][4 addr][1 len] = 29 bytes
+                        // Prefer the variant that allows the full remaining stream to parse.
+                        constexpr size_t kPageAShort = 24;
+                        constexpr size_t kPageALong = 29;
+                        size_t consume = 0;
+
+                        if (pos + kPageAShort <= checkEnd && canParseFrom(pos + kPageAShort)) {
+                            consume = kPageAShort;
+                        }
+                        if (pos + kPageALong <= checkEnd && canParseFrom(pos + kPageALong) && consume == 0) {
+                            consume = kPageALong;
+                        }
+                        if (consume == 0 && isBoundaryAfter(pos, kPageAShort)) consume = kPageAShort;
+                        if (consume == 0 && isBoundaryAfter(pos, kPageALong)) consume = kPageALong;
+
+                        if (consume == 0) {
+                            size_t remaining = checkEnd - pos;
+                            if (remaining >= kPageAShort && remaining < kPageALong) consume = kPageAShort;
+                            else if (remaining >= kPageALong) consume = kPageALong;
+                            else {
+                                LOG_WARNING("Warden:   PAGE_A check truncated (remaining=", remaining,
+                                            "), consuming remainder");
+                                pos = checkEnd;
+                                resultData.push_back(0x00);
+                                break;
+                            }
+                        }
+
+                        LOG_INFO("Warden:   PAGE_A request bytes=", consume);
+                        pos += consume;
                         resultData.push_back(0x00);
                         break;
                     }
                     case CT_PAGE_B: {
-                        // PAGE_B always has [4 seed][20 sha1][4 addr][1 length] = 29 bytes
-                        if (pos + 29 > checkEnd) { pos = checkEnd; break; }
-                        pos += 29;
+                        constexpr size_t kPageBShort = 24;
+                        constexpr size_t kPageBLong = 29;
+                        size_t consume = 0;
+
+                        if (pos + kPageBShort <= checkEnd && canParseFrom(pos + kPageBShort)) {
+                            consume = kPageBShort;
+                        }
+                        if (pos + kPageBLong <= checkEnd && canParseFrom(pos + kPageBLong) && consume == 0) {
+                            consume = kPageBLong;
+                        }
+                        if (consume == 0 && isBoundaryAfter(pos, kPageBShort)) consume = kPageBShort;
+                        if (consume == 0 && isBoundaryAfter(pos, kPageBLong)) consume = kPageBLong;
+
+                        if (consume == 0) {
+                            size_t remaining = checkEnd - pos;
+                            if (remaining >= kPageBShort && remaining < kPageBLong) consume = kPageBShort;
+                            else if (remaining >= kPageBLong) consume = kPageBLong;
+                            else { pos = checkEnd; break; }
+                        }
+                        LOG_INFO("Warden:   PAGE_B request bytes=", consume);
+                        pos += consume;
                         resultData.push_back(0x00);
                         break;
                     }
                     case CT_MPQ: {
-                        // Request layout differs across client generations.
-                        // Classic commonly carries an extended MPQ check payload.
-                        int mpqReqSize = (build <= 6005) ? 29 : 1;
-                        if (pos + mpqReqSize > checkEnd) {
-                            size_t remaining = checkEnd - pos;
-                            LOG_WARNING("Warden:   MPQ check truncated (remaining=", remaining,
-                                        ", expected=", mpqReqSize, "), consuming remainder");
-                            pos = checkEnd;
-                            // Still return a placeholder result byte+hash to keep response framing stable.
-                            resultData.push_back(0x00);
-                            for (int i = 0; i < 20; i++) resultData.push_back(0x00);
-                            break;
+                        // HASH_CLIENT_FILE request: [1 stringIdx]
+                        if (pos + 1 > checkEnd) { pos = checkEnd; break; }
+                        uint8_t strIdx = decrypted[pos++];
+                        std::string filePath = (strIdx < strings.size()) ? strings[strIdx] : std::string();
+                        LOG_INFO("Warden:   MPQ file=\"", (filePath.empty() ? "?" : filePath), "\"");
+
+                        bool found = false;
+                        std::vector<uint8_t> hash(20, 0);
+                        if (!filePath.empty()) {
+                            auto* am = core::Application::getInstance().getAssetManager();
+                            if (am && am->isInitialized()) {
+                                auto fileData = am->readFile(filePath);
+                                if (!fileData.empty()) {
+                                    found = true;
+                                    hash = auth::Crypto::sha1(fileData);
+                                }
+                            }
                         }
-                        uint8_t strIdx = decrypted[pos];
-                        pos += mpqReqSize;
-                        LOG_INFO("Warden:   MPQ file=\"",
-                                 (strIdx < strings.size() ? strings[strIdx] : "?"), "\"");
-                        // Response: [uint8 result=0][20 sha1 zeros]
-                        // Pretend file found with zero hash (may fail comparison)
-                        resultData.push_back(0x00);
-                        for (int i = 0; i < 20; i++) resultData.push_back(0x00);
+
+                        // Response: [uint8 result][20 sha1]
+                        // result=0 => found/success, result=1 => not found/failure
+                        resultData.push_back(found ? 0x00 : 0x01);
+                        resultData.insert(resultData.end(), hash.begin(), hash.end());
                         break;
                     }
                     case CT_LUA: {
@@ -3515,9 +3607,8 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         break;
                     }
                     case CT_MODULE: {
-                        // Module check request size differs by client generation.
-                        // Classic packets can carry a shorter payload here.
-                        int moduleSize = (build <= 6005) ? 16 : 24;
+                        // FIND_MODULE_BY_NAME request: [4 seed][20 sha1] = 24 bytes
+                        int moduleSize = 24;
                         if (pos + moduleSize > checkEnd) {
                             size_t remaining = checkEnd - pos;
                             LOG_WARNING("Warden:   MODULE check truncated (remaining=", remaining,
@@ -3531,9 +3622,9 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         break;
                     }
                     case CT_PROC: {
-                        // Vanilla: [4 seed][20 sha1][1 stringIdx] = 25 bytes
-                        // WotLK:   [4 seed][20 sha1][1 stringIdx][1 stringIdx2][4 offset] = 30 bytes
-                        int procSize = (build <= 6005) ? 25 : 30;
+                        // API_CHECK request:
+                        // [4 seed][20 sha1][1 stringIdx][1 stringIdx2][4 offset] = 30 bytes
+                        int procSize = 30;
                         if (pos + procSize > checkEnd) { pos = checkEnd; break; }
                         pos += procSize;
                         // Response: [uint8 result=1] (proc NOT found = clean)
