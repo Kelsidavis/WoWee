@@ -219,7 +219,7 @@ make -j$(nproc)
 
 ## License
 
-This project's source code is licensed under the [Wowee Source License (Entity-Restricted)](LICENSE).
+This project's source code is licensed under the [MIT License](LICENSE).
 
 This project does not include any Blizzard Entertainment proprietary data, assets, or code. World of Warcraft is (c) 2004-2024 Blizzard Entertainment, Inc. All rights reserved.
 
