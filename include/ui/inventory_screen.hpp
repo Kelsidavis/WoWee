@@ -131,7 +131,7 @@ private:
                          int bagIndex, float defaultX, float defaultY, uint64_t moneyCopper);
     void renderEquipmentPanel(game::Inventory& inventory);
     void renderBackpackPanel(game::Inventory& inventory, bool collapseEmptySections = false);
-    void renderStatsPanel(game::Inventory& inventory, uint32_t playerLevel);
+    void renderStatsPanel(game::Inventory& inventory, uint32_t playerLevel, int32_t serverArmor = 0);
 
     // Slot rendering with interaction support
     enum class SlotKind { BACKPACK, EQUIPMENT };

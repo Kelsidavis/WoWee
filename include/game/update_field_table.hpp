@@ -32,6 +32,7 @@ enum class UF : uint16_t {
     UNIT_FIELD_AURAS,           // Start of aura spell ID array (48 consecutive uint32 slots, classic/vanilla only)
     UNIT_NPC_FLAGS,
     UNIT_DYNAMIC_FLAGS,
+    UNIT_FIELD_RESISTANCES,   // Physical armor (index 0 of the resistance array)
     UNIT_END,
 
     // Player fields

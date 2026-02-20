@@ -1066,7 +1066,7 @@ void InventoryScreen::renderCharacterScreen(game::GameHandler& gameHandler) {
 
         if (ImGui::BeginTabItem("Stats")) {
             ImGui::Spacing();
-            renderStatsPanel(inventory, gameHandler.getPlayerLevel());
+            renderStatsPanel(inventory, gameHandler.getPlayerLevel(), gameHandler.getArmorRating());
             ImGui::EndTabItem();
         }
 
@@ -1269,21 +1269,28 @@ void InventoryScreen::renderEquipmentPanel(game::Inventory& inventory) {
 // Stats Panel
 // ============================================================
 
-void InventoryScreen::renderStatsPanel(game::Inventory& inventory, uint32_t playerLevel) {
+void InventoryScreen::renderStatsPanel(game::Inventory& inventory, uint32_t playerLevel, int32_t serverArmor) {
     // Sum equipment stats
-    int32_t totalArmor = 0;
     int32_t totalStr = 0, totalAgi = 0, totalSta = 0, totalInt = 0, totalSpi = 0;
 
     for (int s = 0; s < game::Inventory::NUM_EQUIP_SLOTS; s++) {
         const auto& slot = inventory.getEquipSlot(static_cast<game::EquipSlot>(s));
         if (slot.empty()) continue;
-        totalArmor += slot.item.armor;
         totalStr += slot.item.strength;
         totalAgi += slot.item.agility;
         totalSta += slot.item.stamina;
         totalInt += slot.item.intellect;
         totalSpi += slot.item.spirit;
     }
+
+    // Use server-authoritative armor from UNIT_FIELD_RESISTANCES when available.
+    // Falls back to summing item query armors if server armor wasn't received yet.
+    int32_t itemQueryArmor = 0;
+    for (int s = 0; s < game::Inventory::NUM_EQUIP_SLOTS; s++) {
+        const auto& slot = inventory.getEquipSlot(static_cast<game::EquipSlot>(s));
+        if (!slot.empty()) itemQueryArmor += slot.item.armor;
+    }
+    int32_t totalArmor = (serverArmor > 0) ? serverArmor : itemQueryArmor;
 
     // Base stats: 20 + level
     int32_t baseStat = 20 + static_cast<int32_t>(playerLevel);

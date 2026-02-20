@@ -273,6 +273,9 @@ public:
     // Money (copper)
     uint64_t getMoneyCopper() const { return playerMoneyCopper_; }
 
+    // Server-authoritative armor (UNIT_FIELD_RESISTANCES[0])
+    int32_t getArmorRating() const { return playerArmorRating_; }
+
     // Inventory
     Inventory& getInventory() { return inventory; }
     const Inventory& getInventory() const { return inventory; }
@@ -1435,6 +1438,7 @@ private:
     float pendingLootMoneyNotifyTimer_ = 0.0f;
     std::unordered_map<uint64_t, float> recentLootMoneyAnnounceCooldowns_;
     uint64_t playerMoneyCopper_ = 0;
+    int32_t playerArmorRating_ = 0;
     // Some servers/custom clients shift update field indices. We can auto-detect coinage by correlating
     // money-notify deltas with update-field diffs and then overriding UF::PLAYER_FIELD_COINAGE at runtime.
     uint32_t pendingMoneyDelta_ = 0;

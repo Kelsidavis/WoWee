@@ -2772,6 +2772,7 @@ void GameHandler::selectCharacter(uint64_t characterGuid) {
     lastPlayerFields_.clear();
     onlineEquipDirty_ = false;
     playerMoneyCopper_ = 0;
+    playerArmorRating_ = 0;
     knownSpells.clear();
     spellCooldowns.clear();
     actionBar = {};
@@ -4427,6 +4428,7 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                     const uint16_t ufPlayerNextXp = fieldIndex(UF::PLAYER_NEXT_LEVEL_XP);
                     const uint16_t ufPlayerLevel = fieldIndex(UF::UNIT_FIELD_LEVEL);
                     const uint16_t ufCoinage = fieldIndex(UF::PLAYER_FIELD_COINAGE);
+                    const uint16_t ufArmor = fieldIndex(UF::UNIT_FIELD_RESISTANCES);
                     for (const auto& [key, val] : block.fields) {
                         if (key == ufPlayerXp) { playerXp_ = val; }
                         else if (key == ufPlayerNextXp) { playerNextLevelXp_ = val; }
@@ -4439,6 +4441,10 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                         else if (key == ufCoinage) {
                             playerMoneyCopper_ = val;
                             LOG_INFO("Money set from update fields: ", val, " copper");
+                        }
+                        else if (ufArmor != 0xFFFF && key == ufArmor) {
+                            playerArmorRating_ = static_cast<int32_t>(val);
+                            LOG_INFO("Armor rating from update fields: ", playerArmorRating_);
                         }
                         // Do not synthesize quest-log entries from raw update-field slots.
                         // Slot layouts differ on some classic-family realms and can produce
@@ -4684,6 +4690,7 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                         const uint16_t ufPlayerLevel = fieldIndex(UF::UNIT_FIELD_LEVEL);
                         const uint16_t ufCoinage = fieldIndex(UF::PLAYER_FIELD_COINAGE);
                         const uint16_t ufPlayerFlags = fieldIndex(UF::PLAYER_FLAGS);
+                        const uint16_t ufArmor = fieldIndex(UF::UNIT_FIELD_RESISTANCES);
                         for (const auto& [key, val] : block.fields) {
                             if (key == ufPlayerXp) {
                                 playerXp_ = val;
@@ -4710,6 +4717,9 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                             else if (key == ufCoinage) {
                                 playerMoneyCopper_ = val;
                                 LOG_INFO("Money updated via VALUES: ", val, " copper");
+                            }
+                            else if (ufArmor != 0xFFFF && key == ufArmor) {
+                                playerArmorRating_ = static_cast<int32_t>(val);
                             }
                             else if (key == ufPlayerFlags) {
                                 constexpr uint32_t PLAYER_FLAGS_GHOST = 0x00000010;
