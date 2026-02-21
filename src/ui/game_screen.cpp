@@ -1317,10 +1317,6 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
             bool hoverInteractableGo = false;
             for (const auto& [guid, entity] : gameHandler.getEntityManager().getEntities()) {
                 if (entity->getType() != game::ObjectType::GAMEOBJECT) continue;
-                auto go = std::static_pointer_cast<game::GameObject>(entity);
-                auto* goInfo = gameHandler.getCachedGameObjectInfo(go->getEntry());
-                uint32_t goType = goInfo ? goInfo->type : 0;
-                if (goType == 5) continue; // decoration/non-interactable generic
 
                 glm::vec3 hitCenter;
                 float hitRadius = 0.0f;
@@ -1377,7 +1373,8 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 for (const auto& [guid, entity] : gameHandler.getEntityManager().getEntities()) {
                     auto t = entity->getType();
                     if (t != game::ObjectType::UNIT &&
-                        t != game::ObjectType::PLAYER) continue;
+                        t != game::ObjectType::PLAYER &&
+                        t != game::ObjectType::GAMEOBJECT) continue;
                     if (guid == myGuid) continue;  // Don't target self
 
                     glm::vec3 hitCenter;
@@ -1394,6 +1391,9 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                                 hitRadius = 0.5f;
                                 heightOffset = 0.3f;
                             }
+                        } else if (t == game::ObjectType::GAMEOBJECT) {
+                            hitRadius = 2.5f;
+                            heightOffset = 1.2f;
                         }
                         hitCenter = core::coords::canonicalToRender(glm::vec3(entity->getX(), entity->getY(), entity->getZ()));
                         hitCenter.z += heightOffset;
@@ -1423,6 +1423,17 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
     // Right-click: select NPC (if needed) then interact / loot / auto-attack
     // Suppress when left button is held (both-button run)
     if (!io.WantCaptureMouse && input.isMouseButtonJustPressed(SDL_BUTTON_RIGHT) && !input.isMouseButtonPressed(SDL_BUTTON_LEFT)) {
+        // If a gameobject is already targeted, prioritize interacting with that target
+        // instead of re-picking under cursor (which can hit nearby decorative GOs).
+        if (gameHandler.hasTarget()) {
+            auto target = gameHandler.getTarget();
+            if (target && target->getType() == game::ObjectType::GAMEOBJECT) {
+                gameHandler.setTarget(target->getGuid());
+                gameHandler.interactWithGameObject(target->getGuid());
+                return;
+            }
+        }
+
         // If no target or right-clicking in world, try to pick one under cursor
         {
             auto* renderer = core::Application::getInstance().getRenderer();
@@ -1456,12 +1467,9 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                                 heightOffset = 0.3f;
                             }
                         } else if (t == game::ObjectType::GAMEOBJECT) {
-                            // Check GO type — skip non-interactable decorations
-                            auto go = std::static_pointer_cast<game::GameObject>(entity);
-                            auto* goInfo = gameHandler.getCachedGameObjectInfo(go->getEntry());
-                            uint32_t goType = goInfo ? goInfo->type : 0;
-                            // Type 5 = GENERIC (decorations), skip
-                            if (goType == 5) continue;
+                            // Do not hard-filter by GO type here. Some realms/content
+                            // classify usable objects (including some chests) with types
+                            // that look decorative in cache data.
                             hitRadius = 2.5f;
                             heightOffset = 1.2f;
                         }
@@ -1482,6 +1490,7 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 }
                 if (closestGuid != 0) {
                     if (closestType == game::ObjectType::GAMEOBJECT) {
+                        gameHandler.setTarget(closestGuid);
                         gameHandler.interactWithGameObject(closestGuid);
                         return;
                     }

@@ -616,16 +616,32 @@ void GameHandler::update(float deltaTime) {
         it->timer -= deltaTime;
         if (it->timer <= 0.0f) {
             if (it->remainingRetries > 0 && state == WorldState::IN_WORLD && socket) {
+                // Keep server-side position/facing fresh before retrying GO use.
+                sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
                 auto usePacket = GameObjectUsePacket::build(it->guid);
                 socket->send(usePacket);
-                auto lootPacket = LootPacket::build(it->guid);
-                socket->send(lootPacket);
+                if (it->sendLoot) {
+                    auto lootPacket = LootPacket::build(it->guid);
+                    socket->send(lootPacket);
+                }
                 --it->remainingRetries;
                 it->timer = 0.20f;
             }
         }
         if (it->remainingRetries == 0) {
             it = pendingGameObjectLootRetries_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    for (auto it = pendingGameObjectLootOpens_.begin(); it != pendingGameObjectLootOpens_.end();) {
+        it->timer -= deltaTime;
+        if (it->timer <= 0.0f) {
+            if (state == WorldState::IN_WORLD && socket) {
+                lootTarget(it->guid);
+            }
+            it = pendingGameObjectLootOpens_.erase(it);
         } else {
             ++it;
         }
@@ -712,7 +728,7 @@ void GameHandler::update(float deltaTime) {
 
         // Update cast timer (Phase 3)
         if (pendingGameObjectInteractGuid_ != 0 &&
-            (autoAttacking || !hostileAttackers_.empty())) {
+            (autoAttacking || autoAttackRequested_)) {
             pendingGameObjectInteractGuid_ = 0;
             casting = false;
             currentCastSpellId = 0;
@@ -9671,15 +9687,13 @@ void GameHandler::interactWithNpc(uint64_t guid) {
 void GameHandler::interactWithGameObject(uint64_t guid) {
     if (guid == 0) return;
     if (state != WorldState::IN_WORLD || !socket) return;
-    if (casting && currentCastSpellId != 0) return;  // don't overlap spell cast bar
-    if (autoAttacking) {
-        stopAutoAttack();
-    }
-    pendingGameObjectInteractGuid_ = guid;
-    casting = true;
-    currentCastSpellId = 0;
-    castTimeTotal = 1.5f;
-    castTimeRemaining = castTimeTotal;
+    // Do not overlap an actual spell cast.
+    if (casting && currentCastSpellId != 0) return;
+    // Always clear melee intent before GO interactions.
+    stopAutoAttack();
+    // Interact immediately; server drives any real cast/channel feedback.
+    pendingGameObjectInteractGuid_ = 0;
+    performGameObjectInteractionNow(guid);
 }
 
 void GameHandler::performGameObjectInteractionNow(uint64_t guid) {
@@ -9691,19 +9705,45 @@ void GameHandler::performGameObjectInteractionNow(uint64_t guid) {
     static uint64_t lastInteractGuid = 0;
     static std::chrono::steady_clock::time_point lastInteractTime{};
     auto now = std::chrono::steady_clock::now();
-    int64_t minRepeatMs = turtleMode ? 250 : 1000;
+    // Keep duplicate suppression, but allow quick retry clicks.
+    int64_t minRepeatMs = turtleMode ? 150 : 150;
     if (guid == lastInteractGuid &&
         std::chrono::duration_cast<std::chrono::milliseconds>(now - lastInteractTime).count() < minRepeatMs) {
-        return; // Ignore repeated clicks within 1 second
+        return;
     }
     lastInteractGuid = guid;
     lastInteractTime = now;
 
-    // Ensure chest interaction isn't blocked by our own auto-attack state.
-    if (autoAttacking) {
-        stopAutoAttack();
-    }
+    // Ensure GO interaction isn't blocked by stale or active melee state.
+    stopAutoAttack();
     auto entity = entityManager.getEntity(guid);
+    uint32_t goEntry = 0;
+    uint32_t goType = 0;
+    std::string goName;
+
+    if (entity) {
+        if (entity->getType() == ObjectType::GAMEOBJECT) {
+            auto go = std::static_pointer_cast<GameObject>(entity);
+            goEntry = go->getEntry();
+            goName = go->getName();
+            if (auto* info = getCachedGameObjectInfo(goEntry)) goType = info->type;
+        }
+        // Face object and send heartbeat before use so strict servers don't require
+        // a nudge movement to accept interaction.
+        float dx = entity->getX() - movementInfo.x;
+        float dy = entity->getY() - movementInfo.y;
+        float dz = entity->getZ() - movementInfo.z;
+        float dist3d = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist3d > 6.0f) {
+            addSystemChatMessage("Too far away.");
+            return;
+        }
+        if (std::abs(dx) > 0.01f || std::abs(dy) > 0.01f) {
+            movementInfo.orientation = std::atan2(-dy, dx);
+            sendMovement(Opcode::MSG_MOVE_SET_FACING);
+        }
+        sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
+    }
 
     auto packet = GameObjectUsePacket::build(guid);
     socket->send(packet);
@@ -9712,7 +9752,10 @@ void GameHandler::performGameObjectInteractionNow(uint64_t guid) {
     // In Vanilla/Classic there is no SMSG_SHOW_MAILBOX — the server just sends
     // animation/sound and expects the client to request the mail list.
     bool isMailbox = false;
-    bool shouldSendLoot = (entity == nullptr);
+    bool chestLike = false;
+    // Stock-like behavior: GO use opens GO loot context. Keep eager CMSG_LOOT only
+    // as Classic/Turtle fallback behavior.
+    bool shouldSendLoot = isActiveExpansion("classic") || isActiveExpansion("turtle");
     if (entity && entity->getType() == ObjectType::GAMEOBJECT) {
         auto go = std::static_pointer_cast<GameObject>(entity);
         auto* info = getCachedGameObjectInfo(go->getEntry());
@@ -9726,29 +9769,36 @@ void GameHandler::performGameObjectInteractionNow(uint64_t guid) {
             selectedMailIndex_ = -1;
             showMailCompose_ = false;
             refreshMailList();
-        } else {
-            // Keep non-Turtle behavior constrained to known lootable GO types.
-            if (!turtleMode) {
-                if (info && (info->type == 3 || info->type == 25)) {
-                    shouldSendLoot = true;
-                } else if (info) {
-                    shouldSendLoot = false;
-                } else {
-                    shouldSendLoot = true;
-                }
-            } else {
-                // Turtle compatibility: aggressively pair use+loot for chest-like objects.
-                shouldSendLoot = true;
-            }
+        } else if (info && info->type == 3) {
+            chestLike = true;
+        } else if (turtleMode) {
+            // Turtle compatibility: keep eager loot open behavior.
+            shouldSendLoot = true;
+        }
+    }
+    if (!chestLike && !goName.empty()) {
+        std::string lower = goName;
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        chestLike = (lower.find("chest") != std::string::npos);
+    }
+    // For WotLK chest-like gameobjects, report use but let server open loot.
+    if (!isMailbox && chestLike) {
+        if (isActiveExpansion("wotlk")) {
+            network::Packet reportUse(wireOpcode(Opcode::CMSG_GAMEOBJ_REPORT_USE));
+            reportUse.writeUInt64(guid);
+            socket->send(reportUse);
         }
     }
     if (shouldSendLoot) {
-        LOG_INFO("GameObject interaction: sent CMSG_GAMEOBJ_USE + CMSG_LOOT for guid=0x", std::hex, guid, std::dec,
-                 " mailbox=", (isMailbox ? 1 : 0), " turtle=", (turtleMode ? 1 : 0));
         lootTarget(guid);
-        if (turtleMode) {
-            pendingGameObjectLootRetries_.push_back(PendingLootRetry{guid, 0.20f, 2});
-        }
+    }
+    // Retry use briefly to survive packet loss/order races. Keep loot retries only
+    // when we intentionally use eager loot-open mode.
+    const bool retryLoot = shouldSendLoot && (turtleMode || isActiveExpansion("classic"));
+    const bool retryUse = turtleMode || isActiveExpansion("classic");
+    if (retryUse || retryLoot) {
+        pendingGameObjectLootRetries_.push_back(PendingLootRetry{guid, 0.15f, 2, retryLoot});
     }
 }
 
@@ -9993,14 +10043,11 @@ void GameHandler::acceptQuest() {
         return;
     }
 
-    // WotLK/TBC expect an additional trailing flag on CMSG_QUESTGIVER_ACCEPT_QUEST.
-    // Classic/Turtle use the short form (guid + questId only).
+    // Keep quest accept payload minimal and expansion-safe: guid + questId.
+    // Some server cores reject trailing bytes and throw ByteBufferException.
     network::Packet packet(wireOpcode(Opcode::CMSG_QUESTGIVER_ACCEPT_QUEST));
     packet.writeUInt64(npcGuid);
     packet.writeUInt32(questId);
-    if (!isActiveExpansion("classic") && !isActiveExpansion("turtle")) {
-        packet.writeUInt8(1); // from-gossip / auto-accept continuation flag
-    }
     socket->send(packet);
     pendingQuestAcceptTimeouts_[questId] = 5.0f;
     pendingQuestAcceptNpcGuids_[questId] = npcGuid;
