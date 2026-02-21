@@ -596,6 +596,9 @@ void GameHandler::update(float deltaTime) {
             pendingMoneyDelta_ = 0;
         }
     }
+    if (autoAttackRangeWarnCooldown_ > 0.0f) {
+        autoAttackRangeWarnCooldown_ = std::max(0.0f, autoAttackRangeWarnCooldown_ - deltaTime);
+    }
 
     if (pendingLoginQuestResync_) {
         pendingLoginQuestResyncTimeout_ -= deltaTime;
@@ -903,51 +906,89 @@ void GameHandler::update(float deltaTime) {
         if (autoAttackRequested_ && autoAttackTarget != 0) {
             auto targetEntity = entityManager.getEntity(autoAttackTarget);
             if (targetEntity) {
-                float dx = movementInfo.x - targetEntity->getX();
-                float dy = movementInfo.y - targetEntity->getY();
+                // Use latest server-authoritative target position to avoid stale
+                // interpolation snapshots masking out-of-range states.
+                const float targetX = targetEntity->getLatestX();
+                const float targetY = targetEntity->getLatestY();
+                const float targetZ = targetEntity->getLatestZ();
+                float dx = movementInfo.x - targetX;
+                float dy = movementInfo.y - targetY;
+                float dz = movementInfo.z - targetZ;
                 float dist = std::sqrt(dx * dx + dy * dy);
+                float dist3d = std::sqrt(dx * dx + dy * dy + dz * dz);
                 const bool classicLike = isClassicLikeExpansion() || isActiveExpansion("tbc");
                 if (dist > 40.0f) {
                     stopAutoAttack();
                     LOG_INFO("Left combat: target too far (", dist, " yards)");
                 } else if (state == WorldState::IN_WORLD && socket) {
-                    autoAttackResendTimer_ += deltaTime;
-                    autoAttackFacingSyncTimer_ += deltaTime;
-
-                    // Re-request swing more aggressively until server confirms active loop.
-                    float resendInterval = 1.0f;
-                    if (!autoAttacking || autoAttackOutOfRange_) {
-                        resendInterval = classicLike ? 0.25f : 0.50f;
+                    bool allowResync = true;
+                    const float meleeRange = classicLike ? 5.25f : 5.75f;
+                    if (dist3d > meleeRange) {
+                        autoAttackOutOfRange_ = true;
+                        autoAttackOutOfRangeTime_ += deltaTime;
+                        if (autoAttackRangeWarnCooldown_ <= 0.0f) {
+                            addSystemChatMessage("Target is too far away.");
+                            autoAttackRangeWarnCooldown_ = 1.25f;
+                        }
+                        // Stop chasing stale swings when the target remains out of range.
+                        if (autoAttackOutOfRangeTime_ > 2.0f && dist3d > 9.0f) {
+                            stopAutoAttack();
+                            addSystemChatMessage("Auto-attack stopped: target out of range.");
+                            allowResync = false;
+                        }
+                    } else {
+                        autoAttackOutOfRange_ = false;
+                        autoAttackOutOfRangeTime_ = 0.0f;
                     }
-                    if (autoAttackResendTimer_ >= resendInterval) {
-                        autoAttackResendTimer_ = 0.0f;
-                        auto pkt = AttackSwingPacket::build(autoAttackTarget);
-                        socket->send(pkt);
-                    }
 
-                    // Keep server-facing aligned with our current melee target.
-                    // Some vanilla-family realms become strict about front-arc checks unless
-                    // the client sends explicit facing updates while stationary.
-                    const float facingSyncInterval = classicLike ? 0.10f : 0.20f;
-                    if (autoAttackFacingSyncTimer_ >= facingSyncInterval) {
-                        autoAttackFacingSyncTimer_ = 0.0f;
-                        float toTargetX = targetEntity->getX() - movementInfo.x;
-                        float toTargetY = targetEntity->getY() - movementInfo.y;
-                        if (std::abs(toTargetX) > 0.01f || std::abs(toTargetY) > 0.01f) {
-                            float desired = std::atan2(-toTargetY, toTargetX);
-                            float diff = desired - movementInfo.orientation;
-                            while (diff > static_cast<float>(M_PI)) diff -= 2.0f * static_cast<float>(M_PI);
-                            while (diff < -static_cast<float>(M_PI)) diff += 2.0f * static_cast<float>(M_PI);
-                            const float facingThreshold = classicLike ? 0.035f : 0.12f; // ~2deg / ~7deg
-                            if (std::abs(diff) > facingThreshold) {
-                                movementInfo.orientation = desired;
-                                sendMovement(Opcode::MSG_MOVE_SET_FACING);
-                                // Follow facing update with a heartbeat to tighten server range/facing checks.
+                    if (allowResync) {
+                        autoAttackResendTimer_ += deltaTime;
+                        autoAttackFacingSyncTimer_ += deltaTime;
+
+                        // Re-request swing more aggressively until server confirms active loop.
+                        float resendInterval = 1.0f;
+                        if (!autoAttacking || autoAttackOutOfRange_) {
+                            resendInterval = classicLike ? 0.25f : 0.50f;
+                        }
+                        if (autoAttackResendTimer_ >= resendInterval) {
+                            autoAttackResendTimer_ = 0.0f;
+                            auto pkt = AttackSwingPacket::build(autoAttackTarget);
+                            socket->send(pkt);
+                        }
+
+                        // Keep server-facing aligned with our current melee target.
+                        // Some vanilla-family realms become strict about front-arc checks unless
+                        // the client sends explicit facing updates while stationary.
+                        const float facingSyncInterval = classicLike ? 0.10f : 0.20f;
+                        if (autoAttackFacingSyncTimer_ >= facingSyncInterval) {
+                            autoAttackFacingSyncTimer_ = 0.0f;
+                            float toTargetX = targetX - movementInfo.x;
+                            float toTargetY = targetY - movementInfo.y;
+                            bool sentMovement = false;
+                            if (std::abs(toTargetX) > 0.01f || std::abs(toTargetY) > 0.01f) {
+                                float desired = std::atan2(-toTargetY, toTargetX);
+                                float diff = desired - movementInfo.orientation;
+                                while (diff > static_cast<float>(M_PI)) diff -= 2.0f * static_cast<float>(M_PI);
+                                while (diff < -static_cast<float>(M_PI)) diff += 2.0f * static_cast<float>(M_PI);
+                                const float facingThreshold = classicLike ? 0.035f : 0.12f; // ~2deg / ~7deg
+                                if (std::abs(diff) > facingThreshold) {
+                                    movementInfo.orientation = desired;
+                                    sendMovement(Opcode::MSG_MOVE_SET_FACING);
+                                    // Follow facing update with a heartbeat to tighten server range/facing checks.
+                                    sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
+                                    sentMovement = true;
+                                }
+                            } else if (classicLike) {
+                                // Keep stationary melee position/facing fresh for strict vanilla-family checks.
+                                sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
+                                sentMovement = true;
+                            }
+
+                            // Even when facing is already correct, keep position fresh while
+                            // trying to connect melee hits so servers don't require a step.
+                            if (!sentMovement && (!autoAttacking || autoAttackOutOfRange_)) {
                                 sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
                             }
-                        } else if (classicLike) {
-                            // Keep stationary melee position/facing fresh for strict vanilla-family checks.
-                            sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
                         }
                     }
                 }
@@ -1572,9 +1613,24 @@ void GameHandler::handlePacket(network::Packet& packet) {
             break;
         case Opcode::SMSG_ATTACKSWING_NOTINRANGE:
             autoAttackOutOfRange_ = true;
+            if (autoAttackRangeWarnCooldown_ <= 0.0f) {
+                addSystemChatMessage("Target is too far away.");
+                autoAttackRangeWarnCooldown_ = 1.25f;
+            }
             if (autoAttackRequested_ && autoAttackTarget != 0 && socket) {
-                auto pkt = AttackSwingPacket::build(autoAttackTarget);
-                socket->send(pkt);
+                // Avoid blind immediate resend loops when target is clearly out of melee range.
+                bool likelyInRange = true;
+                if (auto target = entityManager.getEntity(autoAttackTarget)) {
+                    float dx = movementInfo.x - target->getLatestX();
+                    float dy = movementInfo.y - target->getLatestY();
+                    float dz = movementInfo.z - target->getLatestZ();
+                    float dist3d = std::sqrt(dx * dx + dy * dy + dz * dz);
+                    likelyInRange = (dist3d <= 7.5f);
+                }
+                if (likelyInRange) {
+                    auto pkt = AttackSwingPacket::build(autoAttackTarget);
+                    socket->send(pkt);
+                }
             }
             break;
         case Opcode::SMSG_ATTACKSWING_BADFACING:
@@ -1598,6 +1654,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_ATTACKSWING_NOTSTANDING:
         case Opcode::SMSG_ATTACKSWING_CANT_ATTACK:
             autoAttackOutOfRange_ = false;
+            autoAttackOutOfRangeTime_ = 0.0f;
             break;
         case Opcode::SMSG_ATTACKERSTATEUPDATE:
             handleAttackerStateUpdate(packet);
@@ -4204,6 +4261,13 @@ void GameHandler::handleMotd(network::Packet& packet) {
             LOG_INFO(line);
             addSystemChatMessage(std::string("MOTD: ") + line);
         }
+        // Add a visual separator after MOTD block so subsequent messages don't
+        // appear glued to the last MOTD line.
+        MessageChatData spacer;
+        spacer.type = ChatType::SYSTEM;
+        spacer.language = ChatLanguage::UNIVERSAL;
+        spacer.message = "";
+        addLocalChatMessage(spacer);
         LOG_INFO("========================================");
     }
 }
@@ -7929,17 +7993,36 @@ void GameHandler::emitAllOtherPlayerEquipment() {
 void GameHandler::startAutoAttack(uint64_t targetGuid) {
     // Can't attack yourself
     if (targetGuid == playerGuid) return;
+    if (targetGuid == 0) return;
 
     // Dismount when entering combat
     if (isMounted()) {
         dismount();
     }
+
+    // Client-side melee range gate to avoid starting "swing forever" loops when
+    // target is already clearly out of range.
+    if (auto target = entityManager.getEntity(targetGuid)) {
+        float dx = movementInfo.x - target->getLatestX();
+        float dy = movementInfo.y - target->getLatestY();
+        float dz = movementInfo.z - target->getLatestZ();
+        float dist3d = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist3d > 8.0f) {
+            if (autoAttackRangeWarnCooldown_ <= 0.0f) {
+                addSystemChatMessage("Target is too far away.");
+                autoAttackRangeWarnCooldown_ = 1.25f;
+            }
+            return;
+        }
+    }
+
     autoAttackRequested_ = true;
     // Keep combat animation/state server-authoritative. We only flip autoAttacking
     // on SMSG_ATTACKSTART where attackerGuid == playerGuid.
     autoAttacking = false;
     autoAttackTarget = targetGuid;
     autoAttackOutOfRange_ = false;
+    autoAttackOutOfRangeTime_ = 0.0f;
     autoAttackResendTimer_ = 0.0f;
     autoAttackFacingSyncTimer_ = 0.0f;
     if (state == WorldState::IN_WORLD && socket) {
@@ -7955,6 +8038,7 @@ void GameHandler::stopAutoAttack() {
     autoAttacking = false;
     autoAttackTarget = 0;
     autoAttackOutOfRange_ = false;
+    autoAttackOutOfRangeTime_ = 0.0f;
     autoAttackResendTimer_ = 0.0f;
     autoAttackFacingSyncTimer_ = 0.0f;
     if (state == WorldState::IN_WORLD && socket) {
