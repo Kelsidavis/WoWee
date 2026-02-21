@@ -39,6 +39,9 @@ struct M2ModelGPU {
         uint16_t submeshLevel = 0; // LOD level: 0=base, 1=LOD1, 2=LOD2, 3=LOD3
         uint8_t textureUnit = 0;  // UV set index (0=texCoords[0], 1=texCoords[1])
         uint8_t texFlags = 0;     // M2Texture.flags (bit0=WrapS, bit1=WrapT)
+        bool lanternGlowHint = false; // Texture/model hints this batch is a glow-card billboard
+        bool glowCardLike = false; // Batch likely is a flat emissive card that should be sprite-replaced
+        uint8_t glowTint = 0; // 0=warm, 1=cool, 2=red
         float batchOpacity = 1.0f; // Resolved texture weight opacity (0=transparent, skip batch)
         glm::vec3 center = glm::vec3(0.0f); // Center of batch geometry (model space)
         float glowSize = 1.0f;              // Approx radius of batch geometry

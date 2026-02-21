@@ -1148,6 +1148,7 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
     // Such batches are hidden (batchOpacity=0) rather than rendered white.
     std::vector<GLuint> allTextures;
     std::vector<bool> textureLoadFailed;
+    std::vector<std::string> textureKeysLower;
     if (assetManager) {
         for (size_t ti = 0; ti < model.textures.size(); ti++) {
             const auto& tex = model.textures[ti];
@@ -1159,6 +1160,10 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
                 texPath.resize(nul);
             }
             if (!texPath.empty()) {
+                std::string texKey = texPath;
+                std::replace(texKey.begin(), texKey.end(), '/', '\\');
+                std::transform(texKey.begin(), texKey.end(), texKey.begin(),
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
                 GLuint texId = loadTexture(texPath, tex.flags);
                 bool failed = (texId == whiteTexture);
                 if (failed) {
@@ -1169,12 +1174,33 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
                 }
                 allTextures.push_back(texId);
                 textureLoadFailed.push_back(failed);
+                textureKeysLower.push_back(std::move(texKey));
             } else {
                 if (isInvisibleTrap) {
                     LOG_INFO("  InvisibleTrap texture[", ti, "]: EMPTY (using white fallback)");
                 }
                 allTextures.push_back(whiteTexture);
                 textureLoadFailed.push_back(false);  // Empty filename = intentional white (type!=0)
+                textureKeysLower.emplace_back();
+            }
+        }
+    }
+
+    static const bool kGlowDiag = envFlagEnabled("WOWEE_M2_GLOW_DIAG", false);
+    static std::unordered_set<std::string> loggedLanternGlowModels;
+    {
+        std::string lowerName = model.name;
+        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        const bool lanternLike =
+            (lowerName.find("lantern") != std::string::npos) ||
+            (lowerName.find("lamp") != std::string::npos) ||
+            (lowerName.find("light") != std::string::npos);
+        if (lanternLike && (kGlowDiag || loggedLanternGlowModels.insert(lowerName).second)) {
+            for (size_t ti = 0; ti < model.textures.size(); ++ti) {
+                const std::string key = (ti < textureKeysLower.size()) ? textureKeysLower[ti] : std::string();
+                LOG_INFO("M2 GLOW TEX '", model.name, "' tex[", ti, "]='", key, "' flags=0x",
+                         std::hex, model.textures[ti].flags, std::dec);
             }
         }
     }
@@ -1219,11 +1245,15 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             // Resolve texture: batch.textureIndex → textureLookup → allTextures
             GLuint tex = whiteTexture;
             bool texFailed = false;
+            std::string batchTexKeyLower;
             if (batch.textureIndex < model.textureLookup.size()) {
                 uint16_t texIdx = model.textureLookup[batch.textureIndex];
                 if (texIdx < allTextures.size()) {
                     tex = allTextures[texIdx];
                     texFailed = (texIdx < textureLoadFailed.size()) && textureLoadFailed[texIdx];
+                    if (texIdx < textureKeysLower.size()) {
+                        batchTexKeyLower = textureKeysLower[texIdx];
+                    }
                 }
                 if (texIdx < model.textures.size()) {
                     bgpu.texFlags = static_cast<uint8_t>(model.textures[texIdx].flags & 0x3);
@@ -1231,6 +1261,9 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             } else if (!allTextures.empty()) {
                 tex = allTextures[0];
                 texFailed = !textureLoadFailed.empty() && textureLoadFailed[0];
+                if (!textureKeysLower.empty()) {
+                    batchTexKeyLower = textureKeysLower[0];
+                }
             }
 
             if (texFailed && groundDetailModel) {
@@ -1242,6 +1275,60 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
                 }
             }
             bgpu.texture = tex;
+            const bool exactLanternGlowTexture =
+                (batchTexKeyLower == "world\\expansion06\\doodads\\nightelf\\7ne_druid_streetlamp01_light.blp") ||
+                (batchTexKeyLower == "world\\generic\\nightelf\\passive doodads\\lamps\\glowblue32.blp") ||
+                (batchTexKeyLower == "world\\generic\\human\\passive doodads\\stormwind\\t_vfx_glow01_64.blp") ||
+                (batchTexKeyLower == "world\\azeroth\\karazahn\\passivedoodads\\bonfire\\flamelicksmallblue.blp") ||
+                (batchTexKeyLower == "world\\generic\\nightelf\\passive doodads\\magicalimplements\\glow.blp");
+            const bool texHasGlowToken =
+                (batchTexKeyLower.find("glow") != std::string::npos) ||
+                (batchTexKeyLower.find("flare") != std::string::npos) ||
+                (batchTexKeyLower.find("halo") != std::string::npos) ||
+                (batchTexKeyLower.find("light") != std::string::npos);
+            const bool texHasFlameToken =
+                (batchTexKeyLower.find("flame") != std::string::npos) ||
+                (batchTexKeyLower.find("fire") != std::string::npos) ||
+                (batchTexKeyLower.find("flamelick") != std::string::npos) ||
+                (batchTexKeyLower.find("ember") != std::string::npos);
+            const bool texGlowCardToken =
+                (batchTexKeyLower.find("glow") != std::string::npos) ||
+                (batchTexKeyLower.find("flamelick") != std::string::npos) ||
+                (batchTexKeyLower.find("lensflare") != std::string::npos) ||
+                (batchTexKeyLower.find("t_vfx") != std::string::npos) ||
+                (batchTexKeyLower.find("lightbeam") != std::string::npos) ||
+                (batchTexKeyLower.find("glowball") != std::string::npos) ||
+                (batchTexKeyLower.find("genericglow") != std::string::npos);
+            const bool texLikelyFlame =
+                (batchTexKeyLower.find("fire") != std::string::npos) ||
+                (batchTexKeyLower.find("flame") != std::string::npos) ||
+                (batchTexKeyLower.find("torch") != std::string::npos);
+            const bool texLanternFamily =
+                (batchTexKeyLower.find("lantern") != std::string::npos) ||
+                (batchTexKeyLower.find("lamp") != std::string::npos) ||
+                (batchTexKeyLower.find("elf") != std::string::npos) ||
+                (batchTexKeyLower.find("silvermoon") != std::string::npos) ||
+                (batchTexKeyLower.find("quel") != std::string::npos) ||
+                (batchTexKeyLower.find("thalas") != std::string::npos);
+            const bool modelLanternFamily =
+                (lowerName.find("lantern") != std::string::npos) ||
+                (lowerName.find("lamp") != std::string::npos) ||
+                (lowerName.find("light") != std::string::npos);
+            bgpu.lanternGlowHint =
+                exactLanternGlowTexture ||
+                ((texHasGlowToken || (modelLanternFamily && texHasFlameToken)) &&
+                 (texLanternFamily || modelLanternFamily) &&
+                 (!texLikelyFlame || modelLanternFamily));
+            bgpu.glowCardLike = bgpu.lanternGlowHint && texGlowCardToken;
+            const bool texCoolTint =
+                (batchTexKeyLower.find("blue") != std::string::npos) ||
+                (batchTexKeyLower.find("nightelf") != std::string::npos) ||
+                (batchTexKeyLower.find("arcane") != std::string::npos);
+            const bool texRedTint =
+                (batchTexKeyLower.find("red") != std::string::npos) ||
+                (batchTexKeyLower.find("scarlet") != std::string::npos) ||
+                (batchTexKeyLower.find("ruby") != std::string::npos);
+            bgpu.glowTint = texCoolTint ? 1 : (texRedTint ? 2 : 0);
             bool texHasAlpha = false;
             if (tex != 0 && tex != whiteTexture) {
                 auto ait = textureHasAlphaById_.find(tex);
@@ -1295,20 +1382,20 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             }
 
             // Optional diagnostics for glow/light batches (disabled by default).
-            static const bool kGlowDiag = envFlagEnabled("WOWEE_M2_GLOW_DIAG", false);
             if (kGlowDiag &&
                 (lowerName.find("light") != std::string::npos ||
                  lowerName.find("lamp") != std::string::npos ||
                  lowerName.find("lantern") != std::string::npos)) {
-                LOG_DEBUG("M2 GLOW DIAG '", model.name, "' batch ", gpuModel.batches.size(),
-                          ": blend=", bgpu.blendMode, " matFlags=0x",
-                          std::hex, bgpu.materialFlags, std::dec,
-                          " colorKey=", bgpu.colorKeyBlack ? "Y" : "N",
-                          " hasAlpha=", bgpu.hasAlpha ? "Y" : "N",
-                          " unlit=", (bgpu.materialFlags & 0x01) ? "Y" : "N",
-                          " glowSize=", bgpu.glowSize,
-                          " tex=", bgpu.texture,
-                          " idxCount=", bgpu.indexCount);
+                LOG_INFO("M2 GLOW DIAG '", model.name, "' batch ", gpuModel.batches.size(),
+                         ": blend=", bgpu.blendMode, " matFlags=0x",
+                         std::hex, bgpu.materialFlags, std::dec,
+                         " colorKey=", bgpu.colorKeyBlack ? "Y" : "N",
+                         " hasAlpha=", bgpu.hasAlpha ? "Y" : "N",
+                         " unlit=", (bgpu.materialFlags & 0x01) ? "Y" : "N",
+                         " lanternHint=", bgpu.lanternGlowHint ? "Y" : "N",
+                         " glowSize=", bgpu.glowSize,
+                         " tex=", bgpu.texture,
+                         " idxCount=", bgpu.indexCount);
             }
             gpuModel.batches.push_back(bgpu);
         }
@@ -2088,27 +2175,38 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
 
             // Replace only likely flame-card submeshes with sprite glow. Keep larger geometry
             // (lantern housings, posts, etc.) authored so the prop itself remains visible.
-            const bool smallCardLikeBatch = (batch.glowSize <= 1.35f);
+            const bool smallCardLikeBatch =
+                (batch.glowSize <= 1.35f) ||
+                (batch.lanternGlowHint && batch.glowSize <= 6.0f);
             const bool batchUnlit = (batch.materialFlags & 0x01) != 0;
             const bool elvenLikeModel =
                 (modelKeyLower.find("elf") != std::string::npos) ||
                 (modelKeyLower.find("elven") != std::string::npos) ||
                 (modelKeyLower.find("quel") != std::string::npos);
+            const bool lanternLikeModel =
+                (modelKeyLower.find("lantern") != std::string::npos) ||
+                (modelKeyLower.find("lamp") != std::string::npos) ||
+                (modelKeyLower.find("light") != std::string::npos);
             const bool shouldUseGlowSprite =
                 !koboldFlameCard &&
-                elvenLikeModel &&
+                (elvenLikeModel || (lanternLikeModel && batch.lanternGlowHint)) &&
                 !model.isSpellEffect &&
                 smallCardLikeBatch &&
-                ((batch.blendMode >= 3) ||
+                (batch.lanternGlowHint ||
+                 (batch.blendMode >= 3) ||
                  (batch.colorKeyBlack && batchUnlit && batch.blendMode >= 1));
             if (shouldUseGlowSprite) {
                 if (entry.distSq < 180.0f * 180.0f) {
                     glm::vec3 worldPos = glm::vec3(instance.modelMatrix * glm::vec4(batch.center, 1.0f));
                     GlowSprite gs;
                     gs.worldPos = worldPos;
-                    gs.color = elvenLikeModel
-                        ? glm::vec4(0.48f, 0.72f, 1.0f, 1.05f)
-                        : glm::vec4(1.0f, 0.82f, 0.46f, 1.15f);
+                    if (batch.glowTint == 1 || elvenLikeModel) {
+                        gs.color = glm::vec4(0.48f, 0.72f, 1.0f, 1.05f);
+                    } else if (batch.glowTint == 2) {
+                        gs.color = glm::vec4(1.0f, 0.28f, 0.22f, 1.10f);
+                    } else {
+                        gs.color = glm::vec4(1.0f, 0.82f, 0.46f, 1.15f);
+                    }
                     gs.size = batch.glowSize * instance.scale * 1.45f;
                     glowSprites_.push_back(gs);
                     // Add wider, softer halo to avoid hard "disk" look.
@@ -2117,7 +2215,16 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
                     halo.size *= 1.8f;
                     glowSprites_.push_back(halo);
                 }
-                continue;
+                const bool cardLikeSkipMesh =
+                    (batch.blendMode >= 3) ||
+                    batch.colorKeyBlack ||
+                    ((batch.materialFlags & 0x01) != 0);
+                // Keep lantern/light model geometry visible; sprite glow should augment,
+                // not replace, those props.
+                if ((batch.glowCardLike && lanternLikeModel) ||
+                    (cardLikeSkipMesh && !lanternLikeModel)) {
+                    continue;
+                }
             }
 
             // Compute UV offset for texture animation (only set uniform if changed)
