@@ -70,6 +70,7 @@ public:
 
     // Render bounds lookup (for click targeting / selection)
     bool getRenderBoundsForGuid(uint64_t guid, glm::vec3& outCenter, float& outRadius) const;
+    bool getRenderFootZForGuid(uint64_t guid, float& outFootZ) const;
 
     // Character skin composite state (saved at spawn for re-compositing on equipment change)
     const std::string& getBodySkinPath() const { return bodySkinPath_; }

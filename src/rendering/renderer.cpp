@@ -2462,21 +2462,35 @@ void Renderer::update(float deltaTime) {
 void Renderer::initSelectionCircle() {
     if (selCircleVAO) return;
 
-    // Minimal shader: position + uniform MVP + color
+    // Selection effect shader: thin outer ring + inward fade toward center.
     const char* vsSrc = R"(
         #version 330 core
         layout(location = 0) in vec3 aPos;
         uniform mat4 uMVP;
+        out vec2 vLocalPos;
         void main() {
+            vLocalPos = aPos.xy;
             gl_Position = uMVP * vec4(aPos, 1.0);
         }
     )";
     const char* fsSrc = R"(
         #version 330 core
         uniform vec3 uColor;
+        in vec2 vLocalPos;
         out vec4 FragColor;
         void main() {
-            FragColor = vec4(uColor, 0.6);
+            float r = clamp(length(vLocalPos), 0.0, 1.0);
+
+            float ringInner = 0.93;
+            float ringOuter = 1.00;
+            float ring = smoothstep(ringInner - 0.01, ringInner + 0.01, r) *
+                         (1.0 - smoothstep(ringOuter - 0.008, ringOuter + 0.004, r));
+
+            float inward = smoothstep(0.0, ringInner, r);
+            inward = pow(inward, 1.9) * (1.0 - smoothstep(ringInner - 0.015, ringInner + 0.01, r));
+
+            float alpha = max(ring * 0.9, inward * 0.45);
+            FragColor = vec4(uColor, alpha);
         }
     )";
 
@@ -2496,24 +2510,23 @@ void Renderer::initSelectionCircle() {
     glDeleteShader(vs);
     glDeleteShader(fs);
 
-    // Build ring vertices (two concentric circles forming a strip)
+    // Build a unit disc; fragment shader shapes ring+gradient by radius.
     constexpr int SEGMENTS = 48;
-    constexpr float INNER = 0.85f;
-    constexpr float OUTER = 1.0f;
     std::vector<float> verts;
-    for (int i = 0; i <= SEGMENTS; i++) {
+    verts.reserve((SEGMENTS + 2) * 3);
+
+    verts.push_back(0.0f);
+    verts.push_back(0.0f);
+    verts.push_back(0.0f);
+
+    for (int i = 0; i <= SEGMENTS; ++i) {
         float angle = 2.0f * 3.14159265f * static_cast<float>(i) / static_cast<float>(SEGMENTS);
         float c = std::cos(angle), s = std::sin(angle);
-        // Outer vertex
-        verts.push_back(c * OUTER);
-        verts.push_back(s * OUTER);
-        verts.push_back(0.0f);
-        // Inner vertex
-        verts.push_back(c * INNER);
-        verts.push_back(s * INNER);
+        verts.push_back(c);
+        verts.push_back(s);
         verts.push_back(0.0f);
     }
-    selCircleVertCount = static_cast<int>((SEGMENTS + 1) * 2);
+    selCircleVertCount = static_cast<int>(SEGMENTS + 2);
 
     glGenVertexArrays(1, &selCircleVAO);
     glGenBuffers(1, &selCircleVBO);
@@ -2540,9 +2553,24 @@ void Renderer::renderSelectionCircle(const glm::mat4& view, const glm::mat4& pro
     if (!selCircleVisible) return;
     initSelectionCircle();
 
-    // Small Z offset to prevent clipping under terrain
+    // Clamp the circle to the best floor estimate at target XY to avoid clipping into
+    // terrain/WMO/M2 surfaces, then keep a small visual lift above that plane.
+    float floorZ = selCirclePos.z;
+    if (terrainManager) {
+        auto terrainH = terrainManager->getHeightAt(selCirclePos.x, selCirclePos.y);
+        if (terrainH) floorZ = std::max(floorZ, *terrainH);
+    }
+    if (wmoRenderer) {
+        auto wmoH = wmoRenderer->getFloorHeight(selCirclePos.x, selCirclePos.y, selCirclePos.z + 3.0f);
+        if (wmoH) floorZ = std::max(floorZ, *wmoH);
+    }
+    if (m2Renderer) {
+        auto m2H = m2Renderer->getFloorHeight(selCirclePos.x, selCirclePos.y, selCirclePos.z + 2.0f);
+        if (m2H) floorZ = std::max(floorZ, *m2H);
+    }
+
     glm::vec3 raisedPos = selCirclePos;
-    raisedPos.z += 0.15f;
+    raisedPos.z = floorZ + 0.17f;
     glm::mat4 model = glm::translate(glm::mat4(1.0f), raisedPos);
     model = glm::scale(model, glm::vec3(selCircleRadius));
 
@@ -2552,15 +2580,21 @@ void Renderer::renderSelectionCircle(const glm::mat4& view, const glm::mat4& pro
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_FALSE);
+    GLboolean depthTestWasEnabled = glIsEnabled(GL_DEPTH_TEST);
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(-2.0f, -2.0f);
 
     glUseProgram(selCircleShader);
     glUniformMatrix4fv(glGetUniformLocation(selCircleShader, "uMVP"), 1, GL_FALSE, &mvp[0][0]);
     glUniform3fv(glGetUniformLocation(selCircleShader, "uColor"), 1, &selCircleColor[0]);
 
     glBindVertexArray(selCircleVAO);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, selCircleVertCount);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, selCircleVertCount);
     glBindVertexArray(0);
 
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    if (depthTestWasEnabled) glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
     glEnable(GL_CULL_FACE);
 }

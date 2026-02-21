@@ -3288,6 +3288,26 @@ bool Application::getRenderBoundsForGuid(uint64_t guid, glm::vec3& outCenter, fl
     return renderer->getCharacterRenderer()->getInstanceBounds(instanceId, outCenter, outRadius);
 }
 
+bool Application::getRenderFootZForGuid(uint64_t guid, float& outFootZ) const {
+    if (!renderer || !renderer->getCharacterRenderer()) return false;
+    uint32_t instanceId = 0;
+
+    if (gameHandler && guid == gameHandler->getPlayerGuid()) {
+        instanceId = renderer->getCharacterInstanceId();
+    }
+    if (instanceId == 0) {
+        auto pit = playerInstances_.find(guid);
+        if (pit != playerInstances_.end()) instanceId = pit->second;
+    }
+    if (instanceId == 0) {
+        auto it = creatureInstances_.find(guid);
+        if (it != creatureInstances_.end()) instanceId = it->second;
+    }
+    if (instanceId == 0) return false;
+
+    return renderer->getCharacterRenderer()->getInstanceFootZ(instanceId, outFootZ);
+}
+
 void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x, float y, float z, float orientation) {
     if (!renderer || !renderer->getCharacterRenderer() || !assetManager) return;
 
