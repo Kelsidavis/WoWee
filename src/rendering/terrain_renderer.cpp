@@ -457,7 +457,7 @@ void TerrainRenderer::render(const Camera& camera) {
 
     // Shadow map
     shader->setUniform("uShadowEnabled", shadowEnabled ? 1 : 0);
-    shader->setUniform("uShadowStrength", 0.65f);
+    shader->setUniform("uShadowStrength", 0.62f);
     if (shadowEnabled) {
         shader->setUniform("uLightSpaceMatrix", lightSpaceMatrix);
         glActiveTexture(GL_TEXTURE7);

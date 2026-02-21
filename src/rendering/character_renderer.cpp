@@ -1415,7 +1415,7 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
 
     // Shadows
     characterShader->setUniform("uShadowEnabled", shadowEnabled ? 1 : 0);
-    characterShader->setUniform("uShadowStrength", 0.65f);
+    characterShader->setUniform("uShadowStrength", 0.62f);
     characterShader->setUniform("uTexture0", 0);
     characterShader->setUniform("uAlphaTest", 0);
     characterShader->setUniform("uColorKeyBlack", 0);

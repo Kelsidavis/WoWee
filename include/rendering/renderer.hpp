@@ -235,15 +235,15 @@ private:
     void shutdownPostProcess();
 
     // Shadow mapping
-    static constexpr int SHADOW_MAP_SIZE = 1024;
+    static constexpr int SHADOW_MAP_SIZE = 1536;
     uint32_t shadowFBO = 0;
     uint32_t shadowDepthTex = 0;
     uint32_t shadowShaderProgram = 0;
     glm::mat4 lightSpaceMatrix = glm::mat4(1.0f);
     glm::vec3 shadowCenter = glm::vec3(0.0f);
     bool shadowCenterInitialized = false;
-    bool shadowsEnabled = false;
-    int shadowFrameCounter_ = 0;  // throttle: only re-render depth map every 2 frames
+    bool shadowsEnabled = true;
+    int shadowPostMoveFrames_ = 0; // transition marker for movement->idle shadow recenter
 
 public:
     void setShadowsEnabled(bool enabled) { shadowsEnabled = enabled; }

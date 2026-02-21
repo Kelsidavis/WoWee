@@ -1038,7 +1038,7 @@ void WMORenderer::render(const Camera& camera, const glm::mat4& view, const glm:
     shader->setUniform("uFogStart", fogStart);
     shader->setUniform("uFogEnd", fogEnd);
     shader->setUniform("uShadowEnabled", shadowEnabled ? 1 : 0);
-    shader->setUniform("uShadowStrength", 0.65f);
+    shader->setUniform("uShadowStrength", 0.62f);
     if (shadowEnabled) {
         shader->setUniform("uLightSpaceMatrix", lightSpaceMatrix);
         glActiveTexture(GL_TEXTURE7);

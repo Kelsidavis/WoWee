@@ -1050,6 +1050,7 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
         }
     }
     gpuModel.disableAnimation = foliageOrTreeLike || chestName;
+    gpuModel.shadowWindFoliage = foliageOrTreeLike;
     gpuModel.isGroundDetail = groundDetailModel;
     if (groundDetailModel) {
         // Ground clutter (grass/pebbles/detail cards) should never block camera/movement.
@@ -1871,7 +1872,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
     shader->setUniform("uFogEnd", fogEnd);
     bool useShadows = shadowEnabled;
     shader->setUniform("uShadowEnabled", useShadows ? 1 : 0);
-    shader->setUniform("uShadowStrength", 0.65f);
+    shader->setUniform("uShadowStrength", 0.62f);
     if (useShadows) {
         shader->setUniform("uLightSpaceMatrix", lightSpaceMatrix);
         glActiveTexture(GL_TEXTURE7);
@@ -2357,14 +2358,14 @@ void M2Renderer::renderShadow(GLuint shadowShaderProgram, const glm::vec3& shado
     GLint useTexLoc = glGetUniformLocation(shadowShaderProgram, "uUseTexture");
     GLint texLoc = glGetUniformLocation(shadowShaderProgram, "uTexture");
     GLint alphaTestLoc = glGetUniformLocation(shadowShaderProgram, "uAlphaTest");
-    GLint opacityLoc = glGetUniformLocation(shadowShaderProgram, "uShadowOpacity");
+    GLint foliageSwayLoc = glGetUniformLocation(shadowShaderProgram, "uFoliageSway");
     if (modelLoc < 0) {
         return;
     }
 
     if (useTexLoc >= 0) glUniform1i(useTexLoc, 0);
     if (alphaTestLoc >= 0) glUniform1i(alphaTestLoc, 0);
-    if (opacityLoc >= 0) glUniform1f(opacityLoc, 1.0f);
+    if (foliageSwayLoc >= 0) glUniform1i(foliageSwayLoc, 0);
     if (texLoc >= 0) glUniform1i(texLoc, 0);
     glActiveTexture(GL_TEXTURE0);
 
@@ -2388,13 +2389,11 @@ void M2Renderer::renderShadow(GLuint shadowShaderProgram, const glm::vec3& shado
             if (batch.indexCount == 0) continue;
             bool useTexture = (batch.texture != 0);
             bool alphaCutout = batch.hasAlpha;
-
-            // Foliage/leaf cutout batches cast softer shadows than opaque trunk geometry.
-            float shadowOpacity = alphaCutout ? 0.55f : 1.0f;
+            bool foliageSway = model.shadowWindFoliage && alphaCutout;
 
             if (useTexLoc >= 0) glUniform1i(useTexLoc, useTexture ? 1 : 0);
             if (alphaTestLoc >= 0) glUniform1i(alphaTestLoc, alphaCutout ? 1 : 0);
-            if (opacityLoc >= 0) glUniform1f(opacityLoc, shadowOpacity);
+            if (foliageSwayLoc >= 0) glUniform1i(foliageSwayLoc, foliageSway ? 1 : 0);
             if (useTexture) {
                 glBindTexture(GL_TEXTURE_2D, batch.texture);
             }

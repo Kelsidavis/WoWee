@@ -2661,11 +2661,9 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
     lastWMORenderMs = 0.0;
     lastM2RenderMs = 0.0;
 
-    // Shadow pass (before main scene) — throttled to every 2 frames (depth buffer persists)
+    // Shadow pass (before main scene) — update every frame to avoid temporal popping.
     if (shadowsEnabled && shadowFBO && shadowShaderProgram && terrainLoaded) {
-        if (shadowFrameCounter_++ % 2 == 0) {
-            renderShadowPass();
-        }
+        renderShadowPass();
     } else {
         // Clear shadow maps when disabled
         if (terrainRenderer) terrainRenderer->clearShadowMap();
@@ -3495,6 +3493,7 @@ uint32_t Renderer::compileShadowShader() {
         uniform bool uUseBones;
         uniform mat4 uBones[200];
         out vec2 vTexCoord;
+        out vec3 vWorldPos;
         void main() {
             vec3 pos = aPos;
             if (uUseBones) {
@@ -3506,36 +3505,46 @@ uint32_t Renderer::compileShadowShader() {
                 pos = vec3(boneTransform * vec4(aPos, 1.0));
             }
             vTexCoord = aTexCoord;
-            gl_Position = uLightSpaceMatrix * uModel * vec4(pos, 1.0);
+            vec4 worldPos = uModel * vec4(pos, 1.0);
+            vWorldPos = worldPos.xyz;
+            gl_Position = uLightSpaceMatrix * worldPos;
         }
     )";
     const char* fragSrc = R"(
         #version 330 core
         in vec2 vTexCoord;
+        in vec3 vWorldPos;
         uniform bool uUseTexture;
         uniform sampler2D uTexture;
         uniform bool uAlphaTest;
-        uniform float uShadowOpacity;
-
-        float hash12(vec2 p) {
-            vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-            p3 += dot(p3, p3.yzx + 33.33);
-            return fract((p3.x + p3.y) * p3.z);
-        }
+        uniform bool uFoliageSway;
+        uniform float uWindTime;
+        uniform float uFoliageMotionDamp;
 
         void main() {
-            float opacity = clamp(uShadowOpacity, 0.0, 1.0);
             if (uUseTexture) {
-                vec4 tex = texture(uTexture, vTexCoord);
-                if (uAlphaTest && tex.a < 0.5) discard;
-                opacity *= tex.a;
-            }
+                vec2 uv = vTexCoord;
+                vec2 uv2 = vTexCoord;
+                if (uFoliageSway && uAlphaTest) {
+                    // Slow, coherent wind-driven sway for foliage shadow cutouts.
+                    float gust = sin(uWindTime * 0.32 + vWorldPos.x * 0.05 + vWorldPos.y * 0.04);
+                    float flutter = sin(uWindTime * 0.55 + vWorldPos.y * 0.09 + vWorldPos.z * 0.18);
+                    float damp = clamp(uFoliageMotionDamp, 0.2, 1.0);
+                    uv += vec2(gust * 0.0040 * damp, flutter * 0.0022 * damp);
 
-            // Stochastic alpha for soft/translucent shadow casters (foliage).
-            // Use UV-space hash so pattern stays stable with camera movement.
-            if (opacity < 0.999) {
-                float d = hash12(floor(vTexCoord * 4096.0));
-                if (d > opacity) discard;
+                    // Second, phase-shifted sample gives smooth position-to-position
+                    // transitions (less on/off popping during motion).
+                    float gust2 = sin(uWindTime * 0.32 + 1.57 + vWorldPos.x * 0.05 + vWorldPos.y * 0.04);
+                    float flutter2 = sin(uWindTime * 0.55 + 2.17 + vWorldPos.y * 0.09 + vWorldPos.z * 0.18);
+                    uv2 += vec2(gust2 * 0.0040 * damp, flutter2 * 0.0022 * damp);
+                }
+                // Force base mip for alpha-cutout casters to avoid temporal
+                // shadow holes from mip-level transitions on thin foliage cards.
+                vec4 tex = textureLod(uTexture, uv, 0.0);
+                vec4 tex2 = textureLod(uTexture, uv2, 0.0);
+                float alphaCut = 0.5;
+                float alphaVal = (tex.a + tex2.a) * 0.5;
+                if (uAlphaTest && alphaVal < alphaCut) discard;
             }
         }
     )";
@@ -3590,29 +3599,52 @@ glm::mat4 Renderer::computeLightSpaceMatrix() {
     constexpr float kShadowNearPlane = 1.0f;
     constexpr float kShadowFarPlane = 600.0f;
 
-    // Sun direction matching WMO light dir
+    // Fixed sun direction matching current world lighting setup.
     glm::vec3 sunDir = glm::normalize(glm::vec3(-0.3f, -0.7f, -0.6f));
 
-    // Keep a stable shadow focus center and only recentre occasionally.
+    // Keep a stable shadow focus center and move it smoothly toward the player
+    // to avoid visible shadow "state jumps" during movement.
     glm::vec3 desiredCenter = characterPosition;
     if (!shadowCenterInitialized) {
         shadowCenter = desiredCenter;
         shadowCenterInitialized = true;
     } else {
-        constexpr float recenterThreshold = 30.0f; // world units
-        if (std::abs(desiredCenter.x - shadowCenter.x) > recenterThreshold ||
-            std::abs(desiredCenter.y - shadowCenter.y) > recenterThreshold) {
-            shadowCenter.x = desiredCenter.x;
-            shadowCenter.y = desiredCenter.y;
-        }
-        // Avoid vertical jitter from tiny terrain/camera height changes.
-        if (std::abs(desiredCenter.z - shadowCenter.z) > 4.0f) {
-            shadowCenter.z = desiredCenter.z;
+        const bool movingNow = cameraController && cameraController->isMoving();
+        if (movingNow) {
+            // Hold projection center fixed while moving to eliminate
+            // frame-to-frame surface flicker from projection churn.
+            shadowPostMoveFrames_ = 1; // transition marker: was moving last frame
+        } else {
+            if (shadowPostMoveFrames_ == 1) {
+                // First frame after movement: snap once so there's no delayed catch-up.
+                shadowCenter = desiredCenter;
+            } else {
+                // Normal idle smoothing.
+                constexpr float kCenterLerp = 0.12f;
+                constexpr float kMaxHorizontalStep = 1.5f;
+                constexpr float kMaxVerticalStep = 0.6f;
+
+                glm::vec2 deltaXY(desiredCenter.x - shadowCenter.x, desiredCenter.y - shadowCenter.y);
+                float distXY = glm::length(deltaXY);
+                if (distXY > 0.001f) {
+                    float step = std::min(distXY * kCenterLerp, kMaxHorizontalStep);
+                    glm::vec2 move = (deltaXY / distXY) * step;
+                    shadowCenter.x += move.x;
+                    shadowCenter.y += move.y;
+                }
+
+                float deltaZ = desiredCenter.z - shadowCenter.z;
+                if (std::abs(deltaZ) > 0.001f) {
+                    float stepZ = std::clamp(deltaZ * kCenterLerp, -kMaxVerticalStep, kMaxVerticalStep);
+                    shadowCenter.z += stepZ;
+                }
+            }
+            shadowPostMoveFrames_ = 0;
         }
     }
     glm::vec3 center = shadowCenter;
 
-    // Texel snapping: round center to shadow texel boundaries to prevent shimmer
+    // Snap to shadow texel grid to keep projection stable while moving.
     float halfExtent = kShadowHalfExtent;
     float texelWorld = (2.0f * halfExtent) / static_cast<float>(SHADOW_MAP_SIZE);
 
@@ -3624,16 +3656,15 @@ glm::mat4 Renderer::computeLightSpaceMatrix() {
     }
     glm::mat4 lightView = glm::lookAt(center - sunDir * kShadowLightDistance, center, up);
 
-    // Snap center in light space to texel grid
+    // Stable texel snapping in light space removes movement shimmer.
     glm::vec4 centerLS = lightView * glm::vec4(center, 1.0f);
     centerLS.x = std::round(centerLS.x / texelWorld) * texelWorld;
     centerLS.y = std::round(centerLS.y / texelWorld) * texelWorld;
     glm::vec4 snappedCenter = glm::inverse(lightView) * centerLS;
     center = glm::vec3(snappedCenter);
     shadowCenter = center;
-
-    // Rebuild with snapped center
     lightView = glm::lookAt(center - sunDir * kShadowLightDistance, center, up);
+
     glm::mat4 lightProj = glm::ortho(-halfExtent, halfExtent, -halfExtent, halfExtent,
                                      kShadowNearPlane, kShadowFarPlane);
 
@@ -3667,13 +3698,31 @@ void Renderer::renderShadowPass() {
     GLint useTexLoc = glGetUniformLocation(shadowShaderProgram, "uUseTexture");
     GLint texLoc = glGetUniformLocation(shadowShaderProgram, "uTexture");
     GLint alphaTestLoc = glGetUniformLocation(shadowShaderProgram, "uAlphaTest");
-    GLint opacityLoc = glGetUniformLocation(shadowShaderProgram, "uShadowOpacity");
     GLint useBonesLoc = glGetUniformLocation(shadowShaderProgram, "uUseBones");
+    GLint foliageSwayLoc = glGetUniformLocation(shadowShaderProgram, "uFoliageSway");
+    GLint windTimeLoc = glGetUniformLocation(shadowShaderProgram, "uWindTime");
+    GLint foliageDampLoc = glGetUniformLocation(shadowShaderProgram, "uFoliageMotionDamp");
     if (useTexLoc >= 0) glUniform1i(useTexLoc, 0);
     if (alphaTestLoc >= 0) glUniform1i(alphaTestLoc, 0);
-    if (opacityLoc >= 0) glUniform1f(opacityLoc, 1.0f);
     if (useBonesLoc >= 0) glUniform1i(useBonesLoc, 0);
     if (texLoc >= 0) glUniform1i(texLoc, 0);
+    if (foliageSwayLoc >= 0) glUniform1i(foliageSwayLoc, 0);
+    if (foliageDampLoc >= 0) glUniform1f(foliageDampLoc, 1.0f);
+    if (windTimeLoc >= 0) {
+        const auto now = std::chrono::steady_clock::now();
+        static auto prev = now;
+        static float windPhaseSec = 0.0f;
+        float dt = std::chrono::duration<float>(now - prev).count();
+        prev = now;
+        dt = std::clamp(dt, 0.0f, 0.1f);
+        // Match moving and idle foliage evolution speed at 80% of original.
+        float phaseRate = 0.8f;
+        windPhaseSec += dt * phaseRate;
+        glUniform1f(windTimeLoc, windPhaseSec);
+        if (foliageDampLoc >= 0) {
+            glUniform1f(foliageDampLoc, 1.0f);
+        }
+    }
 
     // Render terrain into shadow map (only chunks within shadow frustum)
     if (terrainRenderer) {

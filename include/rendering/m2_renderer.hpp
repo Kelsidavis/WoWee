@@ -101,6 +101,7 @@ struct M2ModelGPU {
     bool isSmoke = false;       // True for smoke models (UV scroll animation)
     bool isSpellEffect = false;  // True for spell effect models (skip particle dampeners)
     bool disableAnimation = false; // Keep foliage/tree doodads visually stable
+    bool shadowWindFoliage = false; // Apply wind sway in shadow pass for foliage/tree cards
     bool hasTextureAnimation = false; // True if any batch has UV animation
 
     // Particle emitter data (kept from M2Model)
