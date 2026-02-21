@@ -395,6 +395,13 @@ game::EquipSlot InventoryScreen::getEquipSlotForType(uint8_t inventoryType, game
         case 26: // Ranged
             return game::EquipSlot::RANGED;
         case 16: return game::EquipSlot::BACK;
+        case 18: {
+            for (int i = 0; i < game::Inventory::NUM_BAG_SLOTS; ++i) {
+                auto slot = static_cast<game::EquipSlot>(static_cast<int>(game::EquipSlot::BAG1) + i);
+                if (inv.getEquipSlot(slot).empty()) return slot;
+            }
+            return game::EquipSlot::BAG1;
+        }
         case 19: return game::EquipSlot::TABARD;
         case 20: return game::EquipSlot::CHEST; // Robe
         default: return game::EquipSlot::NUM_SLOTS;
@@ -518,37 +525,53 @@ void InventoryScreen::placeInBag(game::Inventory& inv, int bagIndex, int slotInd
 
 void InventoryScreen::placeInEquipment(game::Inventory& inv, game::EquipSlot slot) {
     if (!holdingItem) return;
-    if (gameHandler_) {
-        if (heldSource == HeldSource::BACKPACK && heldBackpackIndex >= 0) {
-            gameHandler_->autoEquipItemBySlot(heldBackpackIndex);
-            cancelPickup(inv);
-            return;
-        }
-        if (heldSource == HeldSource::BAG) {
-            gameHandler_->autoEquipItemInBag(heldBagIndex, heldBagSlotIndex);
-            cancelPickup(inv);
-            return;
-        }
-        if (heldSource == HeldSource::EQUIPMENT) {
-            cancelPickup(inv);
-            return;
-        }
-    }
 
     // Validate: check if the held item can go in this slot
     if (heldItem.inventoryType > 0) {
-        game::EquipSlot validSlot = getEquipSlotForType(heldItem.inventoryType, inv);
-        if (validSlot == game::EquipSlot::NUM_SLOTS) return;
+        bool valid = false;
+        if (heldItem.inventoryType == 18) {
+            valid = (slot >= game::EquipSlot::BAG1 && slot <= game::EquipSlot::BAG4);
+        } else {
+            game::EquipSlot validSlot = getEquipSlotForType(heldItem.inventoryType, inv);
+            if (validSlot == game::EquipSlot::NUM_SLOTS) return;
 
-        bool valid = (slot == validSlot);
-        if (!valid) {
-            if (heldItem.inventoryType == 11)
-                valid = (slot == game::EquipSlot::RING1 || slot == game::EquipSlot::RING2);
-            else if (heldItem.inventoryType == 12)
-                valid = (slot == game::EquipSlot::TRINKET1 || slot == game::EquipSlot::TRINKET2);
+            valid = (slot == validSlot);
+            if (!valid) {
+                if (heldItem.inventoryType == 11)
+                    valid = (slot == game::EquipSlot::RING1 || slot == game::EquipSlot::RING2);
+                else if (heldItem.inventoryType == 12)
+                    valid = (slot == game::EquipSlot::TRINKET1 || slot == game::EquipSlot::TRINKET2);
+            }
         }
         if (!valid) return;
     } else {
+        return;
+    }
+
+    if (gameHandler_) {
+        uint8_t dstBag = 0xFF;
+        uint8_t dstSlot = static_cast<uint8_t>(slot);
+        uint8_t srcBag = 0xFF;
+        uint8_t srcSlot = 0;
+        if (heldSource == HeldSource::BACKPACK && heldBackpackIndex >= 0) {
+            srcSlot = static_cast<uint8_t>(23 + heldBackpackIndex);
+        } else if (heldSource == HeldSource::BAG && heldBagIndex >= 0 && heldBagSlotIndex >= 0) {
+            srcBag = static_cast<uint8_t>(19 + heldBagIndex);
+            srcSlot = static_cast<uint8_t>(heldBagSlotIndex);
+        } else if (heldSource == HeldSource::EQUIPMENT && heldEquipSlot != game::EquipSlot::NUM_SLOTS) {
+            srcSlot = static_cast<uint8_t>(heldEquipSlot);
+        } else {
+            cancelPickup(inv);
+            return;
+        }
+
+        if (srcBag == dstBag && srcSlot == dstSlot) {
+            cancelPickup(inv);
+            return;
+        }
+
+        gameHandler_->swapContainerItems(srcBag, srcSlot, dstBag, dstSlot);
+        cancelPickup(inv);
         return;
     }
 
@@ -655,6 +678,20 @@ void InventoryScreen::renderHeldItem() {
         drawList->AddText(ImVec2(pos.x + size - cw - 2.0f, pos.y + size - 14.0f),
                           IM_COL32(255, 255, 255, 220), countStr);
     }
+}
+
+bool InventoryScreen::dropHeldItemToEquipSlot(game::Inventory& inv, game::EquipSlot slot) {
+    if (!holdingItem) return false;
+    placeInEquipment(inv, slot);
+    return !holdingItem;
+}
+
+bool InventoryScreen::beginPickupFromEquipSlot(game::Inventory& inv, game::EquipSlot slot) {
+    if (holdingItem) return false;
+    const auto& eq = inv.getEquipSlot(slot);
+    if (eq.empty()) return false;
+    pickupFromEquipment(inv, slot);
+    return holdingItem;
 }
 
 // ============================================================
@@ -1392,12 +1429,16 @@ void InventoryScreen::renderItemSlot(game::Inventory& inventory, const game::Ite
         if (kind == SlotKind::BACKPACK && (backpackIndex >= 0 || isBagSlot)) {
             validDrop = true;
         } else if (kind == SlotKind::EQUIPMENT && heldItem.inventoryType > 0) {
-            game::EquipSlot validSlot = getEquipSlotForType(heldItem.inventoryType, inventory);
-            validDrop = (equipSlot == validSlot);
-            if (!validDrop && heldItem.inventoryType == 11)
-                validDrop = (equipSlot == game::EquipSlot::RING1 || equipSlot == game::EquipSlot::RING2);
-            if (!validDrop && heldItem.inventoryType == 12)
-                validDrop = (equipSlot == game::EquipSlot::TRINKET1 || equipSlot == game::EquipSlot::TRINKET2);
+            if (heldItem.inventoryType == 18) {
+                validDrop = (equipSlot >= game::EquipSlot::BAG1 && equipSlot <= game::EquipSlot::BAG4);
+            } else {
+                game::EquipSlot validSlot = getEquipSlotForType(heldItem.inventoryType, inventory);
+                validDrop = (equipSlot == validSlot);
+                if (!validDrop && heldItem.inventoryType == 11)
+                    validDrop = (equipSlot == game::EquipSlot::RING1 || equipSlot == game::EquipSlot::RING2);
+                if (!validDrop && heldItem.inventoryType == 12)
+                    validDrop = (equipSlot == game::EquipSlot::TRINKET1 || equipSlot == game::EquipSlot::TRINKET2);
+            }
         }
     }
 

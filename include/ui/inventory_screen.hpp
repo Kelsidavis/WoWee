@@ -166,8 +166,13 @@ public:
     bool isHoldingItem() const { return holdingItem; }
     /// Returns the item being held (only valid when isHoldingItem() is true).
     const game::ItemDef& getHeldItem() const { return heldItem; }
+    /// Begin pickup from an equipment slot (e.g., bag bar slot) into held cursor.
+    bool beginPickupFromEquipSlot(game::Inventory& inv, game::EquipSlot slot);
     /// Cancel the pickup, returning the item to its original slot.
     void returnHeldItem(game::Inventory& inv) { cancelPickup(inv); }
+    /// Drop the currently held item into a specific equipment slot.
+    /// Returns true if the drop was accepted and consumed.
+    bool dropHeldItemToEquipSlot(game::Inventory& inv, game::EquipSlot slot);
 };
 
 } // namespace ui

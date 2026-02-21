@@ -3670,10 +3670,10 @@ void GameScreen::renderBagBar(game::GameHandler& gameHandler) {
             // Accept dragged item from inventory
             if (hovered && inventoryScreen.isHoldingItem()) {
                 const auto& heldItem = inventoryScreen.getHeldItem();
-                if (heldItem.bagSlots > 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+                if ((heldItem.inventoryType == 18 || heldItem.bagSlots > 0) &&
+                    ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
                     auto& inventory = gameHandler.getInventory();
-                    inventory.setEquipSlot(bagSlot, heldItem);
-                    inventoryScreen.returnHeldItem(inventory);
+                    inventoryScreen.dropHeldItemToEquipSlot(inventory, bagSlot);
                 }
             }
 
@@ -3685,8 +3685,20 @@ void GameScreen::renderBagBar(game::GameHandler& gameHandler) {
         // releasing completes swap or click
         if (bagBarDragSource_ >= 0) {
             if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 3.0f) && bagBarPickedSlot_ < 0) {
-                // Mouse moved enough — start visual drag
-                bagBarPickedSlot_ = bagBarDragSource_;
+                // If an inventory window is open, hand off drag to inventory held-item
+                // so the bag can be dropped into backpack/bag slots.
+                if (inventoryScreen.isOpen() || inventoryScreen.isCharacterOpen()) {
+                    auto equip = static_cast<game::EquipSlot>(
+                        static_cast<int>(game::EquipSlot::BAG1) + bagBarDragSource_);
+                    if (inventoryScreen.beginPickupFromEquipSlot(inv, equip)) {
+                        bagBarDragSource_ = -1;
+                    } else {
+                        bagBarPickedSlot_ = bagBarDragSource_;
+                    }
+                } else {
+                    // Mouse moved enough — start visual drag
+                    bagBarPickedSlot_ = bagBarDragSource_;
+                }
             }
             if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
                 if (bagBarPickedSlot_ >= 0) {
