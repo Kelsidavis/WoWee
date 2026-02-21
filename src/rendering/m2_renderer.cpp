@@ -2070,17 +2070,6 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
         std::string modelKeyLower = model.name;
         std::transform(modelKeyLower.begin(), modelKeyLower.end(), modelKeyLower.begin(),
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        const bool flameLikeModel =
-            (modelKeyLower.find("lantern") != std::string::npos) ||
-            (modelKeyLower.find("lamp") != std::string::npos) ||
-            (modelKeyLower.find("torch") != std::string::npos) ||
-            (modelKeyLower.find("candle") != std::string::npos) ||
-            (modelKeyLower.find("flame") != std::string::npos) ||
-            (modelKeyLower.find("fire") != std::string::npos) ||
-            (modelKeyLower.find("brazier") != std::string::npos) ||
-            (modelKeyLower.find("campfire") != std::string::npos) ||
-            (modelKeyLower.find("bonfire") != std::string::npos);
-
         for (const auto& batch : model.batches) {
             if (batch.indexCount == 0) continue;
 
@@ -2101,27 +2090,23 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             // (lantern housings, posts, etc.) authored so the prop itself remains visible.
             const bool smallCardLikeBatch = (batch.glowSize <= 1.35f);
             const bool batchUnlit = (batch.materialFlags & 0x01) != 0;
-            const bool lightEmitterLikeBatch =
-                flameLikeModel &&
-                !model.isSpellEffect &&
-                smallCardLikeBatch &&
-                (batch.blendMode >= 1 || batch.colorKeyBlack || batchUnlit);
+            const bool elvenLikeModel =
+                (modelKeyLower.find("elf") != std::string::npos) ||
+                (modelKeyLower.find("elven") != std::string::npos) ||
+                (modelKeyLower.find("quel") != std::string::npos);
             const bool shouldUseGlowSprite =
                 !koboldFlameCard &&
+                elvenLikeModel &&
+                !model.isSpellEffect &&
+                smallCardLikeBatch &&
                 ((batch.blendMode >= 3) ||
-                 lightEmitterLikeBatch ||
-                 (flameLikeModel && batchUnlit) ||
-                 (batch.colorKeyBlack && flameLikeModel && batchUnlit && batch.blendMode >= 1));
+                 (batch.colorKeyBlack && batchUnlit && batch.blendMode >= 1));
             if (shouldUseGlowSprite) {
                 if (entry.distSq < 180.0f * 180.0f) {
                     glm::vec3 worldPos = glm::vec3(instance.modelMatrix * glm::vec4(batch.center, 1.0f));
                     GlowSprite gs;
                     gs.worldPos = worldPos;
-                    const bool elvenLike =
-                        (modelKeyLower.find("elf") != std::string::npos) ||
-                        (modelKeyLower.find("elven") != std::string::npos) ||
-                        (modelKeyLower.find("quel") != std::string::npos);
-                    gs.color = elvenLike
+                    gs.color = elvenLikeModel
                         ? glm::vec4(0.48f, 0.72f, 1.0f, 1.05f)
                         : glm::vec4(1.0f, 0.82f, 0.46f, 1.15f);
                     gs.size = batch.glowSize * instance.scale * 1.45f;
