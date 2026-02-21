@@ -1368,6 +1368,8 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
 
                 float closestT = 1e30f;
                 uint64_t closestGuid = 0;
+                float closestHostileUnitT = 1e30f;
+                uint64_t closestHostileUnitGuid = 0;
 
                 const uint64_t myGuid = gameHandler.getPlayerGuid();
                 for (const auto& [guid, entity] : gameHandler.getEntityManager().getEntities()) {
@@ -1403,11 +1405,24 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
 
                     float hitT;
                     if (raySphereIntersect(ray, hitCenter, hitRadius, hitT)) {
+                        if (t == game::ObjectType::UNIT) {
+                            auto unit = std::static_pointer_cast<game::Unit>(entity);
+                            bool hostileUnit = unit->isHostile() || gameHandler.isAggressiveTowardPlayer(guid);
+                            if (hostileUnit && hitT < closestHostileUnitT) {
+                                closestHostileUnitT = hitT;
+                                closestHostileUnitGuid = guid;
+                            }
+                        }
                         if (hitT < closestT) {
                             closestT = hitT;
                             closestGuid = guid;
                         }
                     }
+                }
+
+                // Prefer hostile monsters over nearby gameobjects/others when both are hittable.
+                if (closestHostileUnitGuid != 0) {
+                    closestGuid = closestHostileUnitGuid;
                 }
 
                 if (closestGuid != 0) {
@@ -1447,6 +1462,8 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 float closestT = 1e30f;
                 uint64_t closestGuid = 0;
                 game::ObjectType closestType = game::ObjectType::OBJECT;
+                float closestHostileUnitT = 1e30f;
+                uint64_t closestHostileUnitGuid = 0;
                 const uint64_t myGuid = gameHandler.getPlayerGuid();
                 for (const auto& [guid, entity] : gameHandler.getEntityManager().getEntities()) {
                     auto t = entity->getType();
@@ -1481,12 +1498,25 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                     }
                     float hitT;
                     if (raySphereIntersect(ray, hitCenter, hitRadius, hitT)) {
+                        if (t == game::ObjectType::UNIT) {
+                            auto unit = std::static_pointer_cast<game::Unit>(entity);
+                            bool hostileUnit = unit->isHostile() || gameHandler.isAggressiveTowardPlayer(guid);
+                            if (hostileUnit && hitT < closestHostileUnitT) {
+                                closestHostileUnitT = hitT;
+                                closestHostileUnitGuid = guid;
+                            }
+                        }
                         if (hitT < closestT) {
                             closestT = hitT;
                             closestGuid = guid;
                             closestType = t;
                         }
                     }
+                }
+                // Prefer hostile monsters over nearby gameobjects/others when right-click picking.
+                if (closestHostileUnitGuid != 0) {
+                    closestGuid = closestHostileUnitGuid;
+                    closestType = game::ObjectType::UNIT;
                 }
                 if (closestGuid != 0) {
                     if (closestType == game::ObjectType::GAMEOBJECT) {

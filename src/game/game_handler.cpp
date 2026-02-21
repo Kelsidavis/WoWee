@@ -6992,10 +6992,13 @@ void GameHandler::tabTarget(float playerX, float playerY, float playerZ) {
     // Helper: returns true if the entity is a living hostile that can be tab-targeted.
     auto isValidTabTarget = [&](const std::shared_ptr<Entity>& e) -> bool {
         if (!e) return false;
+        const uint64_t guid = e->getGuid();
         auto* unit = dynamic_cast<Unit*>(e.get());
         if (!unit) return false;           // Not a unit (shouldn't happen after type filter)
         if (unit->getHealth() == 0) return false;  // Dead / corpse
-        if (!unit->isHostile()) return false;       // Friendly
+        const bool hostileByFaction = unit->isHostile();
+        const bool hostileByCombat = isAggressiveTowardPlayer(guid);
+        if (!hostileByFaction && !hostileByCombat) return false;
         return true;
     };
 
