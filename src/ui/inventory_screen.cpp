@@ -196,162 +196,20 @@ void InventoryScreen::updatePreview(float deltaTime) {
 }
 
 void InventoryScreen::updatePreviewEquipment(game::Inventory& inventory) {
-    if (!charPreview_ || !charPreview_->isModelLoaded() || !assetManager_) return;
+    if (!charPreview_ || !charPreview_->isModelLoaded()) return;
 
-    auto* charRenderer = charPreview_->getCharacterRenderer();
-    uint32_t instanceId = charPreview_->getInstanceId();
-    if (!charRenderer || instanceId == 0) return;
-
-    // --- Geosets (mirroring GameScreen::updateCharacterGeosets) ---
-    auto displayInfoDbc = assetManager_->loadDBC("ItemDisplayInfo.dbc");
-
-    auto getGeosetGroup = [&](uint32_t displayInfoId, int groupField) -> uint32_t {
-        if (!displayInfoDbc || displayInfoId == 0) return 0;
-        int32_t recIdx = displayInfoDbc->findRecordById(displayInfoId);
-        if (recIdx < 0) return 0;
-        return displayInfoDbc->getUInt32(static_cast<uint32_t>(recIdx), 7 + groupField);
-    };
-
-    auto findEquippedDisplayId = [&](std::initializer_list<uint8_t> types) -> uint32_t {
-        for (int s = 0; s < game::Inventory::NUM_EQUIP_SLOTS; s++) {
-            const auto& slot = inventory.getEquipSlot(static_cast<game::EquipSlot>(s));
-            if (!slot.empty()) {
-                for (uint8_t t : types) {
-                    if (slot.item.inventoryType == t)
-                        return slot.item.displayInfoId;
-                }
-            }
-        }
-        return 0;
-    };
-
-    auto hasEquippedType = [&](std::initializer_list<uint8_t> types) -> bool {
-        for (int s = 0; s < game::Inventory::NUM_EQUIP_SLOTS; s++) {
-            const auto& slot = inventory.getEquipSlot(static_cast<game::EquipSlot>(s));
-            if (!slot.empty()) {
-                for (uint8_t t : types) {
-                    if (slot.item.inventoryType == t) return true;
-                }
-            }
-        }
-        return false;
-    };
-
-    std::unordered_set<uint16_t> geosets;
-    // Body parts (group 0: IDs 0-99, some models use up to 27)
-    for (uint16_t i = 0; i <= 99; i++) geosets.insert(i);
-
-    // Hair geoset: group 1 = 100 + hairStyle + 1
-    geosets.insert(static_cast<uint16_t>(100 + playerHairStyle_ + 1));
-    // Facial hair geoset: group 2 = 200 + facialHair + 1
-    geosets.insert(static_cast<uint16_t>(200 + playerFacialHair_ + 1));
-    geosets.insert(701);  // Ears
-
-    // Chest/Shirt
-    {
-        uint32_t did = findEquippedDisplayId({4, 5, 20});
-        uint32_t gg = getGeosetGroup(did, 0);
-        geosets.insert(static_cast<uint16_t>(gg > 0 ? 501 + gg : 501));
-        uint32_t gg3 = getGeosetGroup(did, 2);
-        if (gg3 > 0) {
-            geosets.insert(static_cast<uint16_t>(1301 + gg3));
-        }
-    }
-
-    // Legs
-    {
-        uint32_t did = findEquippedDisplayId({7});
-        uint32_t gg = getGeosetGroup(did, 0);
-        if (geosets.count(1302) == 0 && geosets.count(1303) == 0) {
-            geosets.insert(static_cast<uint16_t>(gg > 0 ? 1301 + gg : 1301));
-        }
-    }
-
-    // Feet
-    {
-        uint32_t did = findEquippedDisplayId({8});
-        uint32_t gg = getGeosetGroup(did, 0);
-        geosets.insert(static_cast<uint16_t>(gg > 0 ? 401 + gg : 401));
-    }
-
-    // Gloves
-    {
-        uint32_t did = findEquippedDisplayId({10});
-        uint32_t gg = getGeosetGroup(did, 0);
-        geosets.insert(static_cast<uint16_t>(gg > 0 ? 301 + gg : 301));
-    }
-
-    // Cloak
-    geosets.insert(hasEquippedType({16}) ? 1502 : 1501);
-
-    // Tabard
-    if (hasEquippedType({19})) {
-        geosets.insert(1201);
-    }
-
-    charRenderer->setActiveGeosets(instanceId, geosets);
-
-    // --- Textures (mirroring GameScreen::updateCharacterTextures) ---
-    auto& app = core::Application::getInstance();
-    const auto& bodySkinPath = app.getBodySkinPath();
-    const auto& underwearPaths = app.getUnderwearPaths();
-
-    if (bodySkinPath.empty() || !displayInfoDbc) return;
-
-    static const char* componentDirs[] = {
-        "ArmUpperTexture", "ArmLowerTexture", "HandTexture",
-        "TorsoUpperTexture", "TorsoLowerTexture",
-        "LegUpperTexture", "LegLowerTexture", "FootTexture",
-    };
-
-    std::vector<std::pair<int, std::string>> regionLayers;
+    std::vector<game::EquipmentItem> equipped;
+    equipped.reserve(game::Inventory::NUM_EQUIP_SLOTS);
     for (int s = 0; s < game::Inventory::NUM_EQUIP_SLOTS; s++) {
         const auto& slot = inventory.getEquipSlot(static_cast<game::EquipSlot>(s));
         if (slot.empty() || slot.item.displayInfoId == 0) continue;
-
-        int32_t recIdx = displayInfoDbc->findRecordById(slot.item.displayInfoId);
-        if (recIdx < 0) continue;
-
-        for (int region = 0; region < 8; region++) {
-            uint32_t fieldIdx = 14 + region;
-            std::string texName = displayInfoDbc->getString(static_cast<uint32_t>(recIdx), fieldIdx);
-            if (texName.empty()) continue;
-
-            std::string base = "Item\\TextureComponents\\" +
-                std::string(componentDirs[region]) + "\\" + texName;
-            std::string genderSuffix = (playerGender_ == game::Gender::FEMALE) ? "_F.blp" : "_M.blp";
-            std::string genderPath = base + genderSuffix;
-            std::string unisexPath = base + "_U.blp";
-            std::string fullPath;
-            if (assetManager_->fileExists(genderPath)) {
-                fullPath = genderPath;
-            } else if (assetManager_->fileExists(unisexPath)) {
-                fullPath = unisexPath;
-            } else {
-                fullPath = base + ".blp";
-            }
-            regionLayers.emplace_back(region, fullPath);
-        }
+        game::EquipmentItem ei;
+        ei.displayModel = slot.item.displayInfoId;
+        ei.inventoryType = slot.item.inventoryType;
+        ei.enchantment = 0;
+        equipped.push_back(ei);
     }
-
-    // Find the skin texture slot index in the preview model
-    // The preview model uses model ID PREVIEW_MODEL_ID; find slot for type-1 (body skin)
-    const auto* modelData = charRenderer->getModelData(charPreview_->getModelId());
-    uint32_t skinSlot = 0;
-    if (modelData) {
-        for (size_t ti = 0; ti < modelData->textures.size(); ti++) {
-            if (modelData->textures[ti].type == 1) {
-                skinSlot = static_cast<uint32_t>(ti);
-                break;
-            }
-        }
-    }
-
-    GLuint newTex = charRenderer->compositeWithRegions(bodySkinPath, underwearPaths, regionLayers);
-    if (newTex != 0) {
-        charRenderer->setModelTexture(charPreview_->getModelId(), skinSlot, newTex);
-    }
-
+    charPreview_->applyEquipment(equipped);
     previewDirty_ = false;
 }
 

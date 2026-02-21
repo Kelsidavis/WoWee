@@ -8,6 +8,7 @@
 #include "core/logger.hpp"
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 #include <unordered_set>
 
 namespace wowee {
@@ -495,12 +496,15 @@ bool CharacterPreview::applyEquipment(const std::vector<game::EquipmentItem>& eq
             std::string genderPath = base + genderSuffix;
             std::string unisexPath = base + "_U.blp";
             std::string fullPath;
+            std::string basePath = base + ".blp";
             if (assetManager_->fileExists(genderPath)) {
                 fullPath = genderPath;
             } else if (assetManager_->fileExists(unisexPath)) {
                 fullPath = unisexPath;
+            } else if (assetManager_->fileExists(basePath)) {
+                fullPath = basePath;
             } else {
-                fullPath = base + ".blp";
+                continue;
             }
             regionLayers.emplace_back(region, fullPath);
         }
@@ -510,6 +514,91 @@ bool CharacterPreview::applyEquipment(const std::vector<game::EquipmentItem>& eq
         GLuint newTex = charRenderer_->compositeWithRegions(bodySkinPath_, baseLayers_, regionLayers);
         if (newTex != 0) {
             charRenderer_->setModelTexture(PREVIEW_MODEL_ID, skinTextureSlotIndex_, newTex);
+        }
+    }
+
+    // Cloak texture (group 15) is separate from body compositing.
+    if (hasInvType({16})) {
+        uint32_t capeDisplayId = findDisplayId({16});
+        if (capeDisplayId != 0) {
+            int32_t capeRecIdx = displayInfoDbc->findRecordById(capeDisplayId);
+            if (capeRecIdx >= 0) {
+                std::vector<std::string> capeNames;
+                auto addName = [&](const std::string& n) {
+                    if (!n.empty() && std::find(capeNames.begin(), capeNames.end(), n) == capeNames.end()) {
+                        capeNames.push_back(n);
+                    }
+                };
+                std::string leftName = displayInfoDbc->getString(static_cast<uint32_t>(capeRecIdx), 3);
+                std::string rightName = displayInfoDbc->getString(static_cast<uint32_t>(capeRecIdx), 4);
+                if (gender_ == game::Gender::FEMALE) {
+                    addName(rightName);
+                    addName(leftName);
+                } else {
+                    addName(leftName);
+                    addName(rightName);
+                }
+
+                auto hasBlpExt = [](const std::string& p) {
+                    if (p.size() < 4) return false;
+                    std::string ext = p.substr(p.size() - 4);
+                    std::transform(ext.begin(), ext.end(), ext.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    return ext == ".blp";
+                };
+                std::vector<std::string> candidates;
+                auto addCandidate = [&](const std::string& p) {
+                    if (!p.empty() && std::find(candidates.begin(), candidates.end(), p) == candidates.end()) {
+                        candidates.push_back(p);
+                    }
+                };
+                for (const auto& nameRaw : capeNames) {
+                    std::string name = nameRaw;
+                    std::replace(name.begin(), name.end(), '/', '\\');
+                    bool hasDir = (name.find('\\') != std::string::npos);
+                    bool hasExt = hasBlpExt(name);
+                    if (hasDir) {
+                        addCandidate(name);
+                        if (!hasExt) addCandidate(name + ".blp");
+                    } else {
+                        std::string baseObj = "Item\\ObjectComponents\\Cape\\" + name;
+                        std::string baseTex = "Item\\TextureComponents\\Cape\\" + name;
+                        addCandidate(baseObj);
+                        addCandidate(baseTex);
+                        if (!hasExt) {
+                            addCandidate(baseObj + ".blp");
+                            addCandidate(baseTex + ".blp");
+                        }
+                        addCandidate(baseObj + (gender_ == game::Gender::FEMALE ? "_F.blp" : "_M.blp"));
+                        addCandidate(baseObj + "_U.blp");
+                        addCandidate(baseTex + (gender_ == game::Gender::FEMALE ? "_F.blp" : "_M.blp"));
+                        addCandidate(baseTex + "_U.blp");
+                    }
+                }
+                const GLuint whiteTex = charRenderer_->loadTexture("");
+                for (const auto& c : candidates) {
+                    GLuint capeTex = charRenderer_->loadTexture(c);
+                    if (capeTex != 0 && capeTex != whiteTex) {
+                        charRenderer_->setGroupTextureOverride(instanceId_, 15, capeTex);
+                        if (const auto* md = charRenderer_->getModelData(PREVIEW_MODEL_ID)) {
+                            for (size_t ti = 0; ti < md->textures.size(); ti++) {
+                                if (md->textures[ti].type == 2) {
+                                    charRenderer_->setTextureSlotOverride(instanceId_, static_cast<uint16_t>(ti), capeTex);
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    } else {
+        if (const auto* md = charRenderer_->getModelData(PREVIEW_MODEL_ID)) {
+            for (size_t ti = 0; ti < md->textures.size(); ti++) {
+                if (md->textures[ti].type == 2) {
+                    charRenderer_->clearTextureSlotOverride(instanceId_, static_cast<uint16_t>(ti));
+                }
+            }
         }
     }
 

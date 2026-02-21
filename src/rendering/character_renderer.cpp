@@ -1587,6 +1587,11 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
 
 	                // Resolve texture for this batch (prefer hair textures for hair geosets).
 	                GLuint texId = resolveBatchTexture(instance, gpuModel, batch);
+                const uint16_t batchGroup = static_cast<uint16_t>(batch.submeshId / 100);
+                auto groupTexIt = instance.groupTextureOverrides.find(batchGroup);
+                if (groupTexIt != instance.groupTextureOverrides.end() && groupTexIt->second != 0) {
+                    texId = groupTexIt->second;
+                }
 
                 // Respect M2 material blend mode for creature/character submeshes.
                 uint16_t blendMode = 0;
@@ -1611,7 +1616,7 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
                 // Groups that share the body skin atlas: 0=body, 3=gloves, 4=boots, 5=chest,
                 // 8=wristbands, 9=pelvis, 13=pants. Hair (group 1) and facial hair (group 2) do NOT.
                 if (texId == whiteTexture) {
-                    uint16_t group = batch.submeshId / 100;
+                    uint16_t group = batchGroup;
                     bool isSkinGroup = (group == 0 || group == 3 || group == 4 || group == 5 ||
                                         group == 8 || group == 9 || group == 13);
                     if (isSkinGroup) {
@@ -2080,8 +2085,8 @@ bool CharacterRenderer::attachWeapon(uint32_t charInstanceId, uint32_t attachmen
             }
         }
     }
-    // Fallback: scan bones for keyBoneId 26 (right hand) / 27 (left hand)
-    if (!found) {
+    // Fallback to key-bone lookup only for weapon hand attachment IDs.
+    if (!found && (attachmentId == 1 || attachmentId == 2)) {
         int32_t targetKeyBone = (attachmentId == 1) ? 26 : 27;
         for (size_t i = 0; i < charModel.bones.size(); i++) {
             if (charModel.bones[i].keyBoneId == targetKeyBone) {
@@ -2096,7 +2101,7 @@ bool CharacterRenderer::attachWeapon(uint32_t charInstanceId, uint32_t attachmen
     if (found && boneIndex >= charModel.bones.size()) {
         found = false;
     }
-    if (!found) {
+    if (!found && (attachmentId == 1 || attachmentId == 2)) {
         int32_t targetKeyBone = (attachmentId == 1) ? 26 : 27;
         for (size_t i = 0; i < charModel.bones.size(); i++) {
             if (charModel.bones[i].keyBoneId == targetKeyBone) {
@@ -2247,18 +2252,22 @@ bool CharacterRenderer::getAttachmentTransform(uint32_t instanceId, uint32_t att
 
     // Validate bone index; invalid indices bind attachments to origin (looks like weapons at feet).
     if (boneIndex >= model.bones.size()) {
-        // Fallback: key bones (26/27) for hand attachments.
-        int32_t targetKeyBone = (attachmentId == 1) ? 26 : 27;
-        found = false;
-        for (size_t i = 0; i < model.bones.size(); i++) {
-            if (model.bones[i].keyBoneId == targetKeyBone) {
-                boneIndex = static_cast<uint16_t>(i);
-                offset = glm::vec3(0.0f);
-                found = true;
-                break;
+        // Fallback: key bones (26/27) only for hand attachments.
+        if (attachmentId == 1 || attachmentId == 2) {
+            int32_t targetKeyBone = (attachmentId == 1) ? 26 : 27;
+            found = false;
+            for (size_t i = 0; i < model.bones.size(); i++) {
+                if (model.bones[i].keyBoneId == targetKeyBone) {
+                    boneIndex = static_cast<uint16_t>(i);
+                    offset = glm::vec3(0.0f);
+                    found = true;
+                    break;
+                }
             }
+            if (!found) return false;
+        } else {
+            return false;
         }
-        if (!found) return false;
     }
 
     // Get bone matrix
