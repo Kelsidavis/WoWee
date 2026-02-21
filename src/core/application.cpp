@@ -2656,24 +2656,19 @@ bool Application::tryAttachCreatureVirtualWeapons(uint64_t guid, uint32_t instan
 
     auto resolveDisplayInfoId = [&](uint32_t rawId) -> uint32_t {
         if (rawId == 0) return 0;
-        // Prefer interpreting virtual slot value as Item.dbc entry first (AzerothCore style).
+        // AzerothCore uses item entries in UNIT_VIRTUAL_ITEM_SLOT_ID.
+        // Resolve strictly through Item.dbc entry -> DisplayID to avoid
+        // accidental ItemDisplayInfo ID collisions (staff/hilt mismatches).
         if (itemDbc) {
             int32_t itemRec = itemDbc->findRecordById(rawId); // treat as item entry
             if (itemRec >= 0) {
                 const uint32_t dispFieldPrimary = itemL ? (*itemL)["DisplayID"] : 5u;
-                const uint32_t dispFieldFallback = 4u;
                 uint32_t displayIdA = itemDbc->getUInt32(static_cast<uint32_t>(itemRec), dispFieldPrimary);
                 if (displayIdA != 0 && itemDisplayDbc->findRecordById(displayIdA) >= 0) {
                     return displayIdA;
                 }
-                uint32_t displayIdB = itemDbc->getUInt32(static_cast<uint32_t>(itemRec), dispFieldFallback);
-                if (displayIdB != 0 && itemDisplayDbc->findRecordById(displayIdB) >= 0) {
-                    return displayIdB;
-                }
             }
         }
-        // Fallback: some cores can send ItemDisplayInfo IDs directly.
-        if (itemDisplayDbc->findRecordById(rawId) >= 0) return rawId;
         return 0;
     };
 
@@ -4639,6 +4634,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
             uint8_t extraRaceId = 0;
             uint8_t extraSexId = 0;
             uint16_t selectedHairScalp = 1;
+            uint16_t selectedFacial200 = 200;
             uint16_t selectedFacial300 = 300;
             uint16_t selectedFacial300Alt = 300;
             bool wantsFacialHair = false;
@@ -4664,6 +4660,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                     wantsFacialHair = (itExtra->second.facialHairId != 0);
                     auto itFacial = facialHairGeosetMap_.find(facialKey);
                     if (itFacial != facialHairGeosetMap_.end()) {
+                        selectedFacial200 = static_cast<uint16_t>(200 + itFacial->second.geoset200);
                         selectedFacial300 = static_cast<uint16_t>(300 + itFacial->second.geoset300);
                         selectedFacial300Alt = static_cast<uint16_t>(300 + itFacial->second.geoset200);
                     }
@@ -4768,11 +4765,19 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                         }
                     }
                 }
-                // Group 2 carries facial-hair sub-pieces (mustache/chin/side details).
-                // Keep all present group-2 pieces when facial hair is requested to avoid
-                // dropping valid chin meshes due partial geoset mapping differences.
-                if (hasHumanoidExtra && group == 2 && !wantsFacialHair) {
-                    continue;
+                // Group 2 facial variants: keep selected variant; fallback only if missing.
+                if (hasHumanoidExtra && group == 2) {
+                    if (!wantsFacialHair) {
+                        continue;
+                    }
+                    if (sid != selectedFacial200) {
+                        if (sid != 200 && sid != 201) {
+                            continue;
+                        }
+                        if (allGeosets.count(selectedFacial200) > 0) {
+                            continue;
+                        }
+                    }
                 }
                 normalizedGeosets.insert(sid);
             }
