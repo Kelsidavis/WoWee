@@ -51,21 +51,56 @@ bool Celestial::initialize() {
         uniform vec3 celestialColor;
         uniform float intensity;
         uniform float moonPhase;  // 0.0 = new moon, 0.5 = full moon, 1.0 = new moon
+        uniform float uAnimTime;
 
         out vec4 FragColor;
+
+        float hash(vec2 p) {
+            return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+
+        float noise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            float a = hash(i + vec2(0.0, 0.0));
+            float b = hash(i + vec2(1.0, 0.0));
+            float c = hash(i + vec2(0.0, 1.0));
+            float d = hash(i + vec2(1.0, 1.0));
+            return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+        }
 
         void main() {
             // Create circular disc
             vec2 center = vec2(0.5, 0.5);
             float dist = distance(TexCoord, center);
 
-            // Core disc
-            float disc = smoothstep(0.5, 0.4, dist);
+            // Core disc + glow with explicit radial mask to avoid square billboard artifact.
+            float disc = smoothstep(0.50, 0.38, dist);
+            float glow = smoothstep(0.64, 0.00, dist) * 0.24;
+            float radialMask = 1.0 - smoothstep(0.58, 0.70, dist);
 
-            // Glow around disc
-            float glow = smoothstep(0.7, 0.0, dist) * 0.3;
+            float alpha = (disc + glow) * radialMask * intensity;
+            vec3 outColor = celestialColor;
 
-            float alpha = (disc + glow) * intensity;
+            // Very faint animated haze over sun disc/glow (no effect for moon).
+            if (intensity > 0.5) {
+                vec2 uv = (TexCoord - vec2(0.5)) * 3.0;
+                // Slow flow field for atmospheric-like turbulence drift.
+                vec2 flow = vec2(
+                    noise(uv * 0.9 + vec2(uAnimTime * 0.012, -uAnimTime * 0.009)),
+                    noise(uv * 0.9 + vec2(-uAnimTime * 0.010, uAnimTime * 0.011))
+                ) - vec2(0.5);
+                vec2 warped = uv + flow * 0.42;
+                float n1 = noise(warped * 1.7 + vec2(uAnimTime * 0.016, -uAnimTime * 0.013));
+                float n2 = noise(warped * 3.0 + vec2(-uAnimTime * 0.021, uAnimTime * 0.017));
+                float haze = mix(n1, n2, 0.35);
+                float hazeMask = clamp(disc * 0.75 + glow * 0.28, 0.0, 1.0);
+                float hazeMix = hazeMask * 0.55;
+                float lumaMod = mix(1.0, 0.93 + haze * 0.10, hazeMix);
+                outColor *= lumaMod;
+                alpha *= mix(1.0, 0.94 + haze * 0.06, hazeMix);
+            }
 
             // Apply moon phase shadow (only for moon, indicated by low intensity)
             if (intensity < 0.5) {  // Moon has lower intensity than sun
@@ -88,7 +123,7 @@ bool Celestial::initialize() {
 
                 // Apply elliptical terminator for 3D effect
                 float y = (TexCoord.y - 0.5) * 2.0;
-                float ellipse = sqrt(1.0 - y * y);
+                float ellipse = sqrt(max(0.0, 1.0 - y * y));
                 float terminatorX = phasePos / ellipse;
 
                 if (moonPhase < 0.5) {
@@ -101,7 +136,11 @@ bool Celestial::initialize() {
                 alpha *= mix(0.05, 1.0, shadow);
             }
 
-            FragColor = vec4(celestialColor, alpha);
+            if (alpha < 0.01) {
+                discard;
+            }
+
+            FragColor = vec4(outColor, alpha);
         }
     )";
 
@@ -144,8 +183,12 @@ void Celestial::render(const Camera& camera, float timeOfDay,
     // Disable culling - billboards can face either way
     glDisable(GL_CULL_FACE);
 
-    // Render sun and moons (pass lighting parameters)
+    // Render sun with alpha blending (avoids additive white clipping).
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     renderSun(camera, timeOfDay, sunDir, sunColor);
+
+    // Render moons additively for glow.
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     renderMoon(camera, timeOfDay);  // White Lady (primary moon)
 
     if (dualMoonMode_) {
@@ -189,11 +232,15 @@ void Celestial::renderSun(const Camera& camera, float timeOfDay,
 
     // Sun color and intensity (use lighting color if provided)
     glm::vec3 color = sunColor ? *sunColor : getSunColor(timeOfDay);
-    float intensity = getSunIntensity(timeOfDay);
+    // Force strong warm/yellow tint; avoid white blowout.
+    const glm::vec3 warmSun(1.0f, 0.88f, 0.55f);
+    color = glm::mix(color, warmSun, 0.52f);
+    float intensity = getSunIntensity(timeOfDay) * 0.92f;
 
     celestialShader->setUniform("celestialColor", color);
     celestialShader->setUniform("intensity", intensity);
     celestialShader->setUniform("moonPhase", 0.5f);  // Sun doesn't use this, but shader expects it
+    celestialShader->setUniform("uAnimTime", sunHazeTimer_);
 
     // Render quad
     glBindVertexArray(vao);
@@ -242,6 +289,7 @@ void Celestial::renderMoon(const Camera& camera, float timeOfDay) {
     celestialShader->setUniform("celestialColor", color);
     celestialShader->setUniform("intensity", intensity);
     celestialShader->setUniform("moonPhase", whiteLadyPhase_);
+    celestialShader->setUniform("uAnimTime", sunHazeTimer_);
 
     // Render quad
     glBindVertexArray(vao);
@@ -296,6 +344,7 @@ void Celestial::renderBlueChild(const Camera& camera, float timeOfDay) {
     celestialShader->setUniform("celestialColor", color);
     celestialShader->setUniform("intensity", intensity);
     celestialShader->setUniform("moonPhase", blueChildPhase_);
+    celestialShader->setUniform("uAnimTime", sunHazeTimer_);
 
     // Render quad
     glBindVertexArray(vao);
@@ -465,6 +514,8 @@ void Celestial::destroyCelestialQuad() {
 }
 
 void Celestial::update(float deltaTime) {
+    sunHazeTimer_ += deltaTime;
+
     if (!moonPhaseCycling) {
         return;
     }

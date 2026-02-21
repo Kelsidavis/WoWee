@@ -129,6 +129,7 @@ private:
     float blueChildPhase_ = 0.25f;  // 0.0-1.0 (0=new, 0.5=full) - secondary moon
     bool moonPhaseCycling = true;
     float moonPhaseTimer = 0.0f;  // Fallback for deltaTime mode (development)
+    float sunHazeTimer_ = 0.0f;   // Always-running timer for sun haze animation
     bool dualMoonMode_ = true;  // Default: render both moons (Azeroth-specific)
 
     // WoW lunar cycle constants (in game days)
