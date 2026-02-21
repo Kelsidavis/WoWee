@@ -2101,20 +2101,36 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             // (lantern housings, posts, etc.) authored so the prop itself remains visible.
             const bool smallCardLikeBatch = (batch.glowSize <= 1.35f);
             const bool batchUnlit = (batch.materialFlags & 0x01) != 0;
-            const bool shouldUseGlowSprite =
-                !koboldFlameCard &&
+            const bool lightEmitterLikeBatch =
+                flameLikeModel &&
                 !model.isSpellEffect &&
                 smallCardLikeBatch &&
+                (batch.blendMode >= 1 || batch.colorKeyBlack || batchUnlit);
+            const bool shouldUseGlowSprite =
+                !koboldFlameCard &&
                 ((batch.blendMode >= 3) ||
+                 lightEmitterLikeBatch ||
+                 (flameLikeModel && batchUnlit) ||
                  (batch.colorKeyBlack && flameLikeModel && batchUnlit && batch.blendMode >= 1));
             if (shouldUseGlowSprite) {
                 if (entry.distSq < 180.0f * 180.0f) {
                     glm::vec3 worldPos = glm::vec3(instance.modelMatrix * glm::vec4(batch.center, 1.0f));
                     GlowSprite gs;
                     gs.worldPos = worldPos;
-                    gs.color = glm::vec4(1.0f, 0.82f, 0.46f, 1.15f);
+                    const bool elvenLike =
+                        (modelKeyLower.find("elf") != std::string::npos) ||
+                        (modelKeyLower.find("elven") != std::string::npos) ||
+                        (modelKeyLower.find("quel") != std::string::npos);
+                    gs.color = elvenLike
+                        ? glm::vec4(0.48f, 0.72f, 1.0f, 1.05f)
+                        : glm::vec4(1.0f, 0.82f, 0.46f, 1.15f);
                     gs.size = batch.glowSize * instance.scale * 1.45f;
                     glowSprites_.push_back(gs);
+                    // Add wider, softer halo to avoid hard "disk" look.
+                    GlowSprite halo = gs;
+                    halo.color.a *= 0.42f;
+                    halo.size *= 1.8f;
+                    glowSprites_.push_back(halo);
                 }
                 continue;
             }
