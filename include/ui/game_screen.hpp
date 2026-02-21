@@ -97,6 +97,7 @@ private:
     int pendingUiOpacity = 65;
     bool pendingMinimapRotate = false;
     bool pendingMinimapSquare = false;
+    bool pendingMinimapNpcDots = false;
     bool pendingSeparateBags = true;
     bool pendingAutoLoot = false;
     bool pendingUseOriginalSoundtrack = true;
@@ -105,6 +106,7 @@ private:
     float uiOpacity_ = 0.65f;
     bool minimapRotate_ = false;
     bool minimapSquare_ = false;
+    bool minimapNpcDots_ = false;
     bool minimapSettingsApplied_ = false;
     bool volumeSettingsApplied_ = false;  // True once saved volume settings applied to audio managers
 

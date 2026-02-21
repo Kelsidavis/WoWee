@@ -494,6 +494,7 @@ void Application::reloadExpansionData() {
     displayDataMap_.clear();
     humanoidExtraMap_.clear();
     creatureModelIds_.clear();
+    creatureRenderPosCache_.clear();
     buildCreatureDisplayLookups();
 }
 
@@ -1001,7 +1002,27 @@ void Application::update(float deltaTime) {
                         }
                     }
 
-                    charRenderer->setInstancePosition(instanceId, renderPos);
+                    auto posIt = creatureRenderPosCache_.find(guid);
+                    if (posIt == creatureRenderPosCache_.end()) {
+                        charRenderer->setInstancePosition(instanceId, renderPos);
+                        creatureRenderPosCache_[guid] = renderPos;
+                    } else {
+                        const glm::vec3 prevPos = posIt->second;
+                        const glm::vec2 delta2(renderPos.x - prevPos.x, renderPos.y - prevPos.y);
+                        float planarDist = glm::length(delta2);
+                        float dz = std::abs(renderPos.z - prevPos.z);
+
+                        const bool deadOrCorpse = unit->getHealth() == 0;
+                        const bool largeCorrection = (planarDist > 6.0f) || (dz > 3.0f);
+                        if (deadOrCorpse || largeCorrection) {
+                            charRenderer->setInstancePosition(instanceId, renderPos);
+                        } else if (planarDist > 0.03f || dz > 0.08f) {
+                            // Use movement interpolation so step/run animation can play.
+                            float duration = std::clamp(planarDist / 5.5f, 0.05f, 0.22f);
+                            charRenderer->moveInstanceTo(instanceId, renderPos, duration);
+                        }
+                        posIt->second = renderPos;
+                    }
                     float renderYaw = entity->getOrientation() + glm::radians(90.0f);
                     charRenderer->setInstanceRotation(instanceId, glm::vec3(0.0f, 0.0f, renderYaw));
                 }
@@ -4135,6 +4156,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
     // Track instance
     creatureInstances_[guid] = instanceId;
     creatureModelIds_[guid] = modelId;
+    creatureRenderPosCache_[guid] = renderPos;
     LOG_DEBUG("Spawned creature: guid=0x", std::hex, guid, std::dec,
              " displayId=", displayId, " at (", x, ", ", y, ", ", z, ")");
 }
@@ -5307,6 +5329,7 @@ void Application::despawnOnlineCreature(uint64_t guid) {
 
     creatureInstances_.erase(it);
     creatureModelIds_.erase(guid);
+    creatureRenderPosCache_.erase(guid);
 
     LOG_DEBUG("Despawned creature: guid=0x", std::hex, guid, std::dec);
 }

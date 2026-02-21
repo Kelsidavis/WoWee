@@ -5755,6 +5755,7 @@ void GameScreen::renderSettingsWindow() {
         pendingUiOpacity = static_cast<int>(std::lround(uiOpacity_ * 100.0f));
         pendingMinimapRotate = minimapRotate_;
         pendingMinimapSquare = minimapSquare_;
+        pendingMinimapNpcDots = minimapNpcDots_;
         if (renderer) {
             if (auto* minimap = renderer->getMinimap()) {
                 minimap->setRotateWithCamera(minimapRotate_);
@@ -6035,6 +6036,10 @@ void GameScreen::renderSettingsWindow() {
                     }
                     saveSettings();
                 }
+                if (ImGui::Checkbox("Show Nearby NPC Dots", &pendingMinimapNpcDots)) {
+                    minimapNpcDots_ = pendingMinimapNpcDots;
+                    saveSettings();
+                }
                 // Zoom controls
                 ImGui::Text("Minimap Zoom:");
                 ImGui::SameLine();
@@ -6083,11 +6088,13 @@ void GameScreen::renderSettingsWindow() {
                     pendingUiOpacity = 65;
                     pendingMinimapRotate = false;
                     pendingMinimapSquare = false;
+                    pendingMinimapNpcDots = false;
                     pendingSeparateBags = true;
                     inventoryScreen.setSeparateBags(true);
                     uiOpacity_ = 0.65f;
                     minimapRotate_ = false;
                     minimapSquare_ = false;
+                    minimapNpcDots_ = false;
                     if (renderer) {
                         if (auto* cameraController = renderer->getCameraController()) {
                             cameraController->setMouseSensitivity(pendingMouseSensitivity);
@@ -6287,9 +6294,47 @@ void GameScreen::renderMinimapMarkers(game::GameHandler& gameHandler) {
         sinB = std::sin(bearing);
     }
 
-    if (statuses.empty()) return;
-
     auto* drawList = ImGui::GetForegroundDrawList();
+
+    auto projectToMinimap = [&](const glm::vec3& worldRenderPos, float& sx, float& sy) -> bool {
+        float dx = worldRenderPos.x - playerRender.x;
+        float dy = worldRenderPos.y - playerRender.y;
+
+        // Match minimap shader transform exactly.
+        // Render axes: +X=west, +Y=north. Minimap screen axes: +X=right(east), +Y=down(south).
+        float rx = -dx * cosB + dy * sinB;
+        float ry = -dx * sinB - dy * cosB;
+
+        // Scale to minimap pixels
+        float px = rx / viewRadius * mapRadius;
+        float py = ry / viewRadius * mapRadius;
+
+        float distFromCenter = std::sqrt(px * px + py * py);
+        if (distFromCenter > mapRadius - 3.0f) {
+            return false;
+        }
+
+        sx = centerX + px;
+        sy = centerY + py;
+        return true;
+    };
+
+    // Optional base nearby NPC dots (independent of quest status packets).
+    if (minimapNpcDots_) {
+        for (const auto& [guid, entity] : gameHandler.getEntityManager().getEntities()) {
+            if (!entity || entity->getType() != game::ObjectType::UNIT) continue;
+
+            auto unit = std::static_pointer_cast<game::Unit>(entity);
+            if (!unit || unit->getHealth() == 0) continue;
+
+            glm::vec3 npcRender = core::coords::canonicalToRender(glm::vec3(entity->getX(), entity->getY(), entity->getZ()));
+            float sx = 0.0f, sy = 0.0f;
+            if (!projectToMinimap(npcRender, sx, sy)) continue;
+
+            ImU32 baseDot = unit->isHostile() ? IM_COL32(220, 70, 70, 220) : IM_COL32(245, 245, 245, 210);
+            drawList->AddCircleFilled(ImVec2(sx, sy), 1.0f, baseDot);
+        }
+    }
 
     for (const auto& [guid, status] : statuses) {
         ImU32 dotColor;
@@ -6317,28 +6362,8 @@ void GameScreen::renderMinimapMarkers(game::GameHandler& gameHandler) {
         glm::vec3 canonical(entity->getX(), entity->getY(), entity->getZ());
         glm::vec3 npcRender = core::coords::canonicalToRender(canonical);
 
-        // Offset from player in render coords
-        float dx = npcRender.x - playerRender.x;
-        float dy = npcRender.y - playerRender.y;
-
-        // Rotate by camera bearing (minimap north-up rotation)
-        float rx = dx * cosB - dy * sinB;
-        float ry = dx * sinB + dy * cosB;
-
-        // Scale to minimap pixels
-        float px = rx / viewRadius * mapRadius;
-        float py = -ry / viewRadius * mapRadius; // screen Y is inverted
-
-        // Clamp to circle
-        float distFromCenter = std::sqrt(px * px + py * py);
-        if (distFromCenter > mapRadius - 4.0f) {
-            float scale = (mapRadius - 4.0f) / distFromCenter;
-            px *= scale;
-            py *= scale;
-        }
-
-        float sx = centerX + px;
-        float sy = centerY + py;
+        float sx = 0.0f, sy = 0.0f;
+        if (!projectToMinimap(npcRender, sx, sy)) continue;
 
         // Draw dot with marker text
         drawList->AddCircleFilled(ImVec2(sx, sy), 5.0f, dotColor);
@@ -6707,6 +6732,7 @@ void GameScreen::saveSettings() {
     out << "ui_opacity=" << pendingUiOpacity << "\n";
     out << "minimap_rotate=" << (pendingMinimapRotate ? 1 : 0) << "\n";
     out << "minimap_square=" << (pendingMinimapSquare ? 1 : 0) << "\n";
+    out << "minimap_npc_dots=" << (pendingMinimapNpcDots ? 1 : 0) << "\n";
     out << "separate_bags=" << (pendingSeparateBags ? 1 : 0) << "\n";
 
     // Audio
@@ -6772,6 +6798,10 @@ void GameScreen::loadSettings() {
                 int v = std::stoi(val);
                 minimapSquare_ = (v != 0);
                 pendingMinimapSquare = minimapSquare_;
+            } else if (key == "minimap_npc_dots") {
+                int v = std::stoi(val);
+                minimapNpcDots_ = (v != 0);
+                pendingMinimapNpcDots = minimapNpcDots_;
             } else if (key == "separate_bags") {
                 pendingSeparateBags = (std::stoi(val) != 0);
                 inventoryScreen.setSeparateBags(pendingSeparateBags);
