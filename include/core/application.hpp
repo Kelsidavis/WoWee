@@ -184,8 +184,6 @@ private:
     std::unordered_map<uint32_t, uint32_t> displayIdModelCache_; // displayId → modelId (model caching)
     mutable std::unordered_set<uint32_t> warnedMissingDisplayDataIds_; // displayIds already warned
     mutable std::unordered_set<uint32_t> warnedMissingModelPathIds_;   // modelIds/displayIds already warned
-    mutable std::unordered_map<uint32_t, std::string> missingDisplayFallbackPathCache_; // missing displayId -> fallback model path
-    mutable std::unordered_set<uint32_t> warnedMissingDisplayFallbackIds_; // displayIds logged for fallback usage
     uint32_t nextCreatureModelId_ = 5000;  // Model IDs for online creatures
     uint32_t gryphonDisplayId_ = 0;
     uint32_t wyvernDisplayId_ = 0;

@@ -496,8 +496,6 @@ void Application::reloadExpansionData() {
     creatureModelIds_.clear();
     creatureRenderPosCache_.clear();
     nonRenderableCreatureDisplayIds_.clear();
-    missingDisplayFallbackPathCache_.clear();
-    warnedMissingDisplayFallbackIds_.clear();
     buildCreatureDisplayLookups();
 }
 
@@ -512,8 +510,6 @@ void Application::logoutToLogin() {
     wasAutoAttacking_ = false;
     loadedMapId_ = 0xFFFFFFFF;
     nonRenderableCreatureDisplayIds_.clear();
-    missingDisplayFallbackPathCache_.clear();
-    warnedMissingDisplayFallbackIds_.clear();
     world.reset();
     if (renderer) {
         // Remove old player model so it doesn't persist into next session
@@ -3484,15 +3480,6 @@ std::string Application::getModelPathForDisplayId(uint32_t displayId) const {
 
     auto itData = displayDataMap_.find(displayId);
     if (itData == displayDataMap_.end()) {
-        if (displayId > 1000000u) {
-            static uint32_t suspiciousDisplayIdDrops = 0;
-            ++suspiciousDisplayIdDrops;
-            if (suspiciousDisplayIdDrops <= 3 || (suspiciousDisplayIdDrops % 100) == 0) {
-                LOG_WARNING("Skipping suspicious displayId ", displayId,
-                            " (likely malformed movement/update parse)");
-            }
-            return "";
-        }
         // Some sources (e.g., taxi nodes) may provide a modelId directly.
         auto itPath = modelIdToPath_.find(displayId);
         if (itPath != modelIdToPath_.end()) {
@@ -3500,40 +3487,6 @@ std::string Application::getModelPathForDisplayId(uint32_t displayId) const {
         }
         if (displayId == 30412) return "Creature\\Gryphon\\Gryphon.m2";
         if (displayId == 30413) return "Creature\\Wyvern\\Wyvern.m2";
-
-        auto itCachedFallback = missingDisplayFallbackPathCache_.find(displayId);
-        if (itCachedFallback != missingDisplayFallbackPathCache_.end()) {
-            return itCachedFallback->second;
-        }
-
-        uint32_t bestDisplayId = 0;
-        uint32_t bestDelta = std::numeric_limits<uint32_t>::max();
-        std::string bestPath;
-        for (const auto& [candidateDisplayId, candidateData] : displayDataMap_) {
-            auto itCandidatePath = modelIdToPath_.find(candidateData.modelId);
-            if (itCandidatePath == modelIdToPath_.end() || itCandidatePath->second.empty()) {
-                continue;
-            }
-            uint32_t delta = (candidateDisplayId > displayId)
-                ? (candidateDisplayId - displayId)
-                : (displayId - candidateDisplayId);
-            if (delta < bestDelta) {
-                bestDelta = delta;
-                bestDisplayId = candidateDisplayId;
-                bestPath = itCandidatePath->second;
-                if (delta == 0) break;
-            }
-        }
-        if (!bestPath.empty()) {
-            missingDisplayFallbackPathCache_[displayId] = bestPath;
-            if (warnedMissingDisplayFallbackIds_.insert(displayId).second) {
-                LOG_WARNING("No display data for displayId ", displayId,
-                            " — using nearest fallback displayId ", bestDisplayId,
-                            " (delta=", bestDelta, ") path=", bestPath);
-            }
-            return bestPath;
-        }
-
         if (warnedMissingDisplayDataIds_.insert(displayId).second) {
             LOG_WARNING("No display data for displayId ", displayId,
                         " (displayDataMap_ has ", displayDataMap_.size(), " entries)");
