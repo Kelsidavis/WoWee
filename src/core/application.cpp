@@ -3597,6 +3597,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                             idiL ? (*idiL)["TextureFoot"]      : 21u,
                         };
                         const bool npcIsFemale = (extra.sexId == 1);
+                        const bool npcHasArmArmor = (extra.equipDisplayId[7] != 0 || extra.equipDisplayId[8] != 0);
 
                         auto regionAllowedForNpcSlot = [](int eqSlot, int region) -> bool {
                             // Regions: 0 ArmUpper, 1 ArmLower, 2 Hand, 3 TorsoUpper, 4 TorsoLower,
@@ -3615,14 +3616,25 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                                 case 6: // feet
                                     return region == 7;
                                 case 7: // wrist
-                                    return region == 1;
+                                    // Bracer overlays on NPCs often produce bad arm artifacts.
+                                    // Keep disabled until slot-accurate arm compositing is implemented.
+                                    return false;
                                 case 8: // hands
-                                    return region == 0 || region == 1 || region == 2;
+                                    // Keep glove textures to hand region only; arm regions from glove
+                                    // items can produce furry/looping forearm artifacts on some NPCs.
+                                    return region == 2;
                                 case 9: // tabard
                                     return region == 3 || region == 4;
                                 default:
                                     return false;
                             }
+                        };
+                        auto regionAllowedForNpcSlotCtx = [&](int eqSlot, int region) -> bool {
+                            // Avoid painting arm regions from shirt/chest when NPC has no arm armor.
+                            if ((eqSlot == 2 || eqSlot == 3) && !npcHasArmArmor) {
+                                return (region == 3 || region == 4);
+                            }
+                            return regionAllowedForNpcSlot(eqSlot, region);
                         };
 
                         // Iterate all 11 NPC equipment slots; use slot-aware region filtering
@@ -3633,7 +3645,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                             if (recIdx < 0) continue;
 
                             for (int region = 0; region < 8; region++) {
-                                if (!regionAllowedForNpcSlot(eqSlot, region)) continue;
+                                if (!regionAllowedForNpcSlotCtx(eqSlot, region)) continue;
                                 std::string texName = npcItemDisplayDbc->getString(
                                     static_cast<uint32_t>(recIdx), texRegionFields[region]);
                                 if (texName.empty()) continue;
@@ -4434,6 +4446,9 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
     if (const auto* md = charRenderer->getModelData(modelId)) {
         std::unordered_set<uint16_t> allGeosets;
         std::unordered_map<uint16_t, uint16_t> firstByGroup;
+        bool hasGroup3 = false;  // glove/forearm variants
+        bool hasGroup4 = false;  // glove/forearm variants (some models)
+        bool hasGroup8 = false;  // sleeve/wrist variants
         bool hasGroup12 = false; // tabard variants
         bool hasGroup13 = false; // trousers/robe skirt variants
         bool hasGroup15 = false; // cloak variants
@@ -4445,13 +4460,16 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
             if (itFirst == firstByGroup.end() || sid < itFirst->second) {
                 firstByGroup[group] = sid;
             }
+            if (group == 3) hasGroup3 = true;
+            if (group == 4) hasGroup4 = true;
+            if (group == 8) hasGroup8 = true;
             if (group == 12) hasGroup12 = true;
             if (group == 13) hasGroup13 = true;
             if (group == 15) hasGroup15 = true;
         }
 
         // Only apply to humanoid-like clothing models.
-        if (hasGroup12 || hasGroup13 || hasGroup15) {
+        if (hasGroup3 || hasGroup4 || hasGroup8 || hasGroup12 || hasGroup13 || hasGroup15) {
             bool hasRenderableCape = false;
             bool hasEquippedTabard = false;
             if (itDisplayData != displayDataMap_.end() &&
@@ -4459,12 +4477,12 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                 auto itExtra = humanoidExtraMap_.find(itDisplayData->second.extraDisplayId);
                 if (itExtra != humanoidExtraMap_.end()) {
                     hasEquippedTabard = (itExtra->second.equipDisplayId[9] != 0);
+                    auto itemDisplayDbc = assetManager->loadDBC("ItemDisplayInfo.dbc");
+                    const auto* idiL = pipeline::getActiveDBCLayout()
+                        ? pipeline::getActiveDBCLayout()->getLayout("ItemDisplayInfo") : nullptr;
+
                     uint32_t capeDisplayId = itExtra->second.equipDisplayId[10];
-                    if (capeDisplayId != 0) {
-                        auto itemDisplayDbc = assetManager->loadDBC("ItemDisplayInfo.dbc");
-                        const auto* idiL = pipeline::getActiveDBCLayout()
-                            ? pipeline::getActiveDBCLayout()->getLayout("ItemDisplayInfo") : nullptr;
-                        if (itemDisplayDbc) {
+                    if (capeDisplayId != 0 && itemDisplayDbc) {
                             int32_t recIdx = itemDisplayDbc->findRecordById(capeDisplayId);
                             if (recIdx >= 0) {
                                 const uint32_t leftTexField = idiL ? (*idiL)["LeftModelTexture"] : 3u;
@@ -4527,7 +4545,6 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                                     }
                                 }
                             }
-                        }
                     }
                 }
             }
@@ -4535,7 +4552,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
             std::unordered_set<uint16_t> normalizedGeosets;
             for (uint16_t sid : allGeosets) {
                 const uint16_t group = static_cast<uint16_t>(sid / 100);
-                if (group == 12 || group == 13 || group == 15) continue;
+                if (group == 3 || group == 4 || group == 8 || group == 12 || group == 13 || group == 15) continue;
                 // Some humanoid models carry cloak cloth in group 16. Strip this too
                 // when no cape is equipped to avoid "everyone has a cape".
                 if (!hasRenderableCape && group == 16) continue;
@@ -4548,6 +4565,16 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                 if (it != firstByGroup.end()) return it->second;
                 return 0;
             };
+
+            // Intentionally do not add group 3 (glove/forearm accessory meshes).
+            // Even "bare" variants can produce unwanted looped arm geometry on NPCs.
+
+            if (hasGroup4) {
+                uint16_t forearmSid = pickFromGroup(401, 4);
+                if (forearmSid != 0) normalizedGeosets.insert(forearmSid);
+            }
+
+            // Intentionally do not add group 8 (sleeve/wrist accessory meshes).
 
             // Show tabard mesh only when CreatureDisplayInfoExtra equips one.
             if (hasGroup12 && hasEquippedTabard) {
