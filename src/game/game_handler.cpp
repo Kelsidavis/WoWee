@@ -7190,10 +7190,10 @@ void GameHandler::handleGameObjectQueryResponse(network::Packet& packet) {
             uint32_t taxiPathId = data.data[0];
             if (transportManager_->hasTaxiPath(taxiPathId)) {
                 if (transportManager_->assignTaxiPathToTransport(data.entry, taxiPathId)) {
-                    LOG_INFO("MO_TRANSPORT entry=", data.entry, " assigned TaxiPathNode path ", taxiPathId);
+                    LOG_DEBUG("MO_TRANSPORT entry=", data.entry, " assigned TaxiPathNode path ", taxiPathId);
                 }
             } else {
-                LOG_INFO("MO_TRANSPORT entry=", data.entry, " taxiPathId=", taxiPathId,
+                LOG_DEBUG("MO_TRANSPORT entry=", data.entry, " taxiPathId=", taxiPathId,
                          " not found in TaxiPathNode.dbc");
             }
         }

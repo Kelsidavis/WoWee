@@ -215,9 +215,18 @@ std::shared_ptr<DBCFile> AssetManager::loadDBC(const std::string& name) {
 
     std::vector<uint8_t> dbcData;
 
+    // Some visual DBC CSV exports are known to be malformed in community datasets
+    // (string columns shifted, missing numeric ID field). Force binary MPQ data for
+    // these tables to keep model/texture mappings correct.
+    const bool forceBinaryForVisualDbc =
+        (name == "CreatureDisplayInfo.dbc" ||
+         name == "CreatureDisplayInfoExtra.dbc" ||
+         name == "ItemDisplayInfo.dbc" ||
+         name == "CreatureModelData.dbc");
+
     // Try expansion-specific CSV first (e.g. Data/expansions/wotlk/db/Spell.csv)
     bool loadedFromCSV = false;
-    if (!expansionDataPath_.empty()) {
+    if (!forceBinaryForVisualDbc && !expansionDataPath_.empty()) {
         // Derive CSV name from DBC name: "Spell.dbc" -> "Spell.csv"
         std::string baseName = name;
         auto dot = baseName.rfind('.');
@@ -238,6 +247,9 @@ std::shared_ptr<DBCFile> AssetManager::loadDBC(const std::string& name) {
                 }
             }
         }
+    }
+    if (forceBinaryForVisualDbc && !expansionDataPath_.empty()) {
+        LOG_INFO("Skipping CSV override for visual DBC, using binary: ", name);
     }
 
     // Fall back to manifest (binary DBC from extracted MPQs)

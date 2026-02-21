@@ -654,9 +654,9 @@ bool ClassicPacketParsers::parseGameObjectQueryResponse(network::Packet& packet,
     }
 
     if (data.type == 15) { // MO_TRANSPORT
-        LOG_INFO("Classic GO query: MO_TRANSPORT entry=", data.entry,
-                 " name=\"", data.name, "\" displayId=", data.displayId,
-                 " taxiPathId=", data.data[0], " moveSpeed=", data.data[1]);
+        LOG_DEBUG("Classic GO query: MO_TRANSPORT entry=", data.entry,
+                  " name=\"", data.name, "\" displayId=", data.displayId,
+                  " taxiPathId=", data.data[0], " moveSpeed=", data.data[1]);
     } else {
         LOG_DEBUG("Classic GO query: ", data.name, " type=", data.type, " entry=", data.entry);
     }

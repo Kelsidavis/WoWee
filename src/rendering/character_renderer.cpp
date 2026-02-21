@@ -303,6 +303,14 @@ bool CharacterRenderer::initialize() {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, white);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    // Create 1x1 transparent fallback texture for hidden texture slots.
+    uint8_t transparent[] = { 0, 0, 0, 0 };
+    glGenTextures(1, &transparentTexture);
+    glBindTexture(GL_TEXTURE_2D, transparentTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, transparent);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     // Diagnostics-only: cache lifetime is currently tied to renderer lifetime.
@@ -344,6 +352,10 @@ void CharacterRenderer::shutdown() {
     if (whiteTexture) {
         glDeleteTextures(1, &whiteTexture);
         whiteTexture = 0;
+    }
+    if (transparentTexture) {
+        glDeleteTextures(1, &transparentTexture);
+        transparentTexture = 0;
     }
 
     models.clear();

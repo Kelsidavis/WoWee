@@ -216,6 +216,7 @@ public:
 
     /** Load a BLP texture from MPQ and return the GL texture ID (cached). */
     GLuint loadTexture(const std::string& path);
+    GLuint getTransparentTexture() const { return transparentTexture; }
 
     /** Replace a loaded model's texture at the given slot with a new GL texture. */
     void setModelTexture(uint32_t modelId, uint32_t textureSlot, GLuint textureId);
@@ -261,6 +262,7 @@ private:
     uint64_t textureCacheCounter_ = 0;
     size_t textureCacheBudgetBytes_ = 1024ull * 1024 * 1024;  // Default, overridden at init
     GLuint whiteTexture = 0;
+    GLuint transparentTexture = 0;
 
     std::unordered_map<uint32_t, M2ModelGPU> models;
     std::unordered_map<uint32_t, CharacterInstance> instances;

@@ -303,7 +303,7 @@ private:
         float orientation = 0.0f;
     };
     std::vector<PendingTransportDoodadBatch> pendingTransportDoodadBatches_;
-    static constexpr size_t MAX_TRANSPORT_DOODADS_PER_FRAME = 12;
+    static constexpr size_t MAX_TRANSPORT_DOODADS_PER_FRAME = 4;
     void processPendingTransportDoodads();
 
     // Quest marker billboard sprites (above NPCs)

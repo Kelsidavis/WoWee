@@ -15,6 +15,7 @@
 #include <functional>
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <future>
 #include <thread>
@@ -23,6 +24,16 @@ namespace wowee {
 namespace rendering {
 
 namespace {
+
+bool envFlagEnabled(const char* key, bool defaultValue) {
+    const char* raw = std::getenv(key);
+    if (!raw || !*raw) return defaultValue;
+    std::string v(raw);
+    std::transform(v.begin(), v.end(), v.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return !(v == "0" || v == "false" || v == "off" || v == "no");
+}
 
 static constexpr uint32_t kParticleFlagRandomized = 0x40;
 static constexpr uint32_t kParticleFlagTiled = 0x80;
@@ -1248,19 +1259,21 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
                 }
             }
 
-            // Diagnostic: log batch details for light/lamp models to debug glow rendering
-            if (lowerName.find("light") != std::string::npos ||
-                lowerName.find("lamp") != std::string::npos ||
-                lowerName.find("lantern") != std::string::npos) {
-                LOG_INFO("M2 GLOW DIAG '", model.name, "' batch ", gpuModel.batches.size(),
-                         ": blend=", bgpu.blendMode, " matFlags=0x",
-                         std::hex, bgpu.materialFlags, std::dec,
-                         " colorKey=", bgpu.colorKeyBlack ? "Y" : "N",
-                         " hasAlpha=", bgpu.hasAlpha ? "Y" : "N",
-                         " unlit=", (bgpu.materialFlags & 0x01) ? "Y" : "N",
-                         " glowSize=", bgpu.glowSize,
-                         " tex=", bgpu.texture,
-                         " idxCount=", bgpu.indexCount);
+            // Optional diagnostics for glow/light batches (disabled by default).
+            static const bool kGlowDiag = envFlagEnabled("WOWEE_M2_GLOW_DIAG", false);
+            if (kGlowDiag &&
+                (lowerName.find("light") != std::string::npos ||
+                 lowerName.find("lamp") != std::string::npos ||
+                 lowerName.find("lantern") != std::string::npos)) {
+                LOG_DEBUG("M2 GLOW DIAG '", model.name, "' batch ", gpuModel.batches.size(),
+                          ": blend=", bgpu.blendMode, " matFlags=0x",
+                          std::hex, bgpu.materialFlags, std::dec,
+                          " colorKey=", bgpu.colorKeyBlack ? "Y" : "N",
+                          " hasAlpha=", bgpu.hasAlpha ? "Y" : "N",
+                          " unlit=", (bgpu.materialFlags & 0x01) ? "Y" : "N",
+                          " glowSize=", bgpu.glowSize,
+                          " tex=", bgpu.texture,
+                          " idxCount=", bgpu.indexCount);
             }
             gpuModel.batches.push_back(bgpu);
         }

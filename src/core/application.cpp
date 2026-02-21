@@ -774,7 +774,7 @@ void Application::update(float deltaTime) {
                 // Debug: Log transport state changes
                 static bool wasOnTransport = false;
                 if (onTransport != wasOnTransport) {
-                    LOG_INFO("Transport state changed: onTransport=", onTransport,
+                    LOG_DEBUG("Transport state changed: onTransport=", onTransport,
                              " guid=0x", std::hex, gameHandler->getPlayerTransportGuid(), std::dec);
                     wasOnTransport = onTransport;
                 }
@@ -1721,7 +1721,7 @@ void Application::setupUICallbacks() {
         }
 
         uint32_t wmoInstanceId = it->second.instanceId;
-        LOG_INFO("Registering server transport: GUID=0x", std::hex, guid, std::dec,
+        LOG_DEBUG("Registering server transport: GUID=0x", std::hex, guid, std::dec,
                  " entry=", entry, " displayId=", displayId, " wmoInstance=", wmoInstanceId,
                  " pos=(", x, ", ", y, ", ", z, ")");
 
@@ -1730,7 +1730,7 @@ void Application::setupUICallbacks() {
         const bool preferServerData = gameHandler && gameHandler->hasServerTransportUpdate(guid);
 
         bool clientAnim = transportManager->isClientSideAnimation();
-        LOG_INFO("Transport spawn callback: clientAnimation=", clientAnim,
+        LOG_DEBUG("Transport spawn callback: clientAnimation=", clientAnim,
                  " guid=0x", std::hex, guid, std::dec, " entry=", entry, " pathId=", pathId,
                  " preferServer=", preferServerData);
 
@@ -1754,10 +1754,10 @@ void Application::setupUICallbacks() {
             if (!hasUsablePath) {
                 std::vector<glm::vec3> path = { canonicalSpawnPos };
                 transportManager->loadPathFromNodes(pathId, path, false, 0.0f);
-                LOG_INFO("Server-first strict registration: stationary fallback for GUID 0x",
+                LOG_DEBUG("Server-first strict registration: stationary fallback for GUID 0x",
                          std::hex, guid, std::dec, " entry=", entry);
             } else {
-                LOG_INFO("Server-first transport registration: using entry DBC path for entry ", entry);
+                LOG_DEBUG("Server-first transport registration: using entry DBC path for entry ", entry);
             }
         } else if (!hasUsablePath) {
             // Remap/infer path by spawn position when entry doesn't map 1:1 to DBC ids.
@@ -1767,12 +1767,12 @@ void Application::setupUICallbacks() {
                 canonicalSpawnPos, 1200.0f, allowZOnly);
             if (inferredPath != 0) {
                 pathId = inferredPath;
-                LOG_INFO("Using inferred transport path ", pathId, " for entry ", entry);
+                LOG_DEBUG("Using inferred transport path ", pathId, " for entry ", entry);
             } else {
                 uint32_t remappedPath = transportManager->pickFallbackMovingPath(entry, displayId);
                 if (remappedPath != 0) {
                     pathId = remappedPath;
-                    LOG_INFO("Using remapped fallback transport path ", pathId,
+                    LOG_DEBUG("Using remapped fallback transport path ", pathId,
                              " for entry ", entry, " displayId=", displayId,
                              " (usableEntryPath=", transportManager->hasPathForEntry(entry), ")");
                 } else {
@@ -1785,7 +1785,7 @@ void Application::setupUICallbacks() {
                 }
             }
         } else {
-            LOG_INFO("Using real transport path from TransportAnimation.dbc for entry ", entry);
+            LOG_DEBUG("Using real transport path from TransportAnimation.dbc for entry ", entry);
         }
 
         // Register the transport with spawn position (prevents rendering at origin until server update)
@@ -1800,7 +1800,7 @@ void Application::setupUICallbacks() {
         if (pendingIt != pendingTransportMoves_.end()) {
             const PendingTransportMove pending = pendingIt->second;
             transportManager->updateServerTransport(guid, glm::vec3(pending.x, pending.y, pending.z), pending.orientation);
-            LOG_INFO("Replayed queued transport move for GUID=0x", std::hex, guid, std::dec,
+            LOG_DEBUG("Replayed queued transport move for GUID=0x", std::hex, guid, std::dec,
                      " pos=(", pending.x, ", ", pending.y, ", ", pending.z, ") orientation=", pending.orientation);
             pendingTransportMoves_.erase(pendingIt);
         }
@@ -1812,27 +1812,27 @@ void Application::setupUICallbacks() {
                 uint32_t taxiPathId = goData->data[0];
                 if (transportManager->hasTaxiPath(taxiPathId)) {
                     transportManager->assignTaxiPathToTransport(entry, taxiPathId);
-                    LOG_INFO("Assigned cached TaxiPathNode path for MO_TRANSPORT entry=", entry,
+                    LOG_DEBUG("Assigned cached TaxiPathNode path for MO_TRANSPORT entry=", entry,
                              " taxiPathId=", taxiPathId);
                 }
             }
         }
 
         if (auto* tr = transportManager->getTransport(guid); tr) {
-            LOG_INFO("Transport registered: guid=0x", std::hex, guid, std::dec,
+            LOG_DEBUG("Transport registered: guid=0x", std::hex, guid, std::dec,
                      " entry=", entry, " displayId=", displayId,
                      " pathId=", tr->pathId,
                      " mode=", (tr->useClientAnimation ? "client" : "server"),
                      " serverUpdates=", tr->serverUpdateCount);
         } else {
-            LOG_INFO("Transport registered: guid=0x", std::hex, guid, std::dec,
+            LOG_DEBUG("Transport registered: guid=0x", std::hex, guid, std::dec,
                      " entry=", entry, " displayId=", displayId, " (TransportManager instance missing)");
         }
     });
 
     // Transport move callback (online mode) - update transport gameobject positions
     gameHandler->setTransportMoveCallback([this](uint64_t guid, float x, float y, float z, float orientation) {
-        LOG_INFO("Transport move callback: GUID=0x", std::hex, guid, std::dec,
+        LOG_DEBUG("Transport move callback: GUID=0x", std::hex, guid, std::dec,
                  " pos=(", x, ", ", y, ", ", z, ") orientation=", orientation);
 
         auto* transportManager = gameHandler->getTransportManager();
@@ -1843,7 +1843,7 @@ void Application::setupUICallbacks() {
 
         // Check if transport exists - if not, treat this as a late spawn (reconnection/server restart)
         if (!transportManager->getTransport(guid)) {
-            LOG_INFO("Received position update for unregistered transport 0x", std::hex, guid, std::dec,
+            LOG_DEBUG("Received position update for unregistered transport 0x", std::hex, guid, std::dec,
                      " - auto-spawning from position update");
 
             // Get transport info from entity manager
@@ -3574,6 +3574,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                 // Build equipment texture region layers from NPC equipment display IDs
                 // (texture-only compositing — no geoset changes to avoid invisibility bugs)
                 std::vector<std::pair<int, std::string>> npcRegionLayers;
+                std::string npcCapeTexturePath;
                 auto npcItemDisplayDbc = assetManager->loadDBC("ItemDisplayInfo.dbc");
                     if (npcItemDisplayDbc) {
                         static const char* npcComponentDirs[] = {
@@ -3597,7 +3598,31 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                         };
                         const bool npcIsFemale = (extra.sexId == 1);
 
-                        // Iterate all 11 NPC equipment slots; let DBC lookup filter which have textures
+                        auto regionAllowedForNpcSlot = [](int eqSlot, int region) -> bool {
+                            // Regions: 0 ArmUpper, 1 ArmLower, 2 Hand, 3 TorsoUpper, 4 TorsoLower,
+                            //          5 LegUpper, 6 LegLower, 7 Foot
+                            switch (eqSlot) {
+                                case 2: // shirt
+                                case 3: // chest
+                                    return region <= 4;
+                                case 4: // belt
+                                    return region == 4;
+                                case 5: // legs
+                                    return region == 5 || region == 6;
+                                case 6: // feet
+                                    return region == 7;
+                                case 7: // wrist
+                                    return region == 1;
+                                case 8: // hands
+                                    return region == 0 || region == 1 || region == 2;
+                                case 9: // tabard
+                                    return region == 3 || region == 4;
+                                default:
+                                    return false;
+                            }
+                        };
+
+                        // Iterate all 11 NPC equipment slots; use slot-aware region filtering
                         for (int eqSlot = 0; eqSlot < 11; eqSlot++) {
                             uint32_t did = extra.equipDisplayId[eqSlot];
                             if (did == 0) continue;
@@ -3605,6 +3630,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                             if (recIdx < 0) continue;
 
                             for (int region = 0; region < 8; region++) {
+                                if (!regionAllowedForNpcSlot(eqSlot, region)) continue;
                                 std::string texName = npcItemDisplayDbc->getString(
                                     static_cast<uint32_t>(recIdx), texRegionFields[region]);
                                 if (texName.empty()) continue;
@@ -3619,6 +3645,77 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                                 else fullPath = base + ".blp";
 
                                 npcRegionLayers.emplace_back(region, fullPath);
+                            }
+                        }
+
+                        // Cloak/cape texture is separate from the body atlas.
+                        // Read equipped cape displayId (slot 10) and resolve the best cape texture path.
+                        uint32_t capeDisplayId = extra.equipDisplayId[10];
+                        if (capeDisplayId != 0) {
+                            int32_t capeRecIdx = npcItemDisplayDbc->findRecordById(capeDisplayId);
+                            if (capeRecIdx >= 0) {
+                                const uint32_t leftTexField = idiL ? (*idiL)["LeftModelTexture"] : 3u;
+                                const uint32_t rightTexField = leftTexField + 1u; // modelTexture_2 in 3.3.5a
+
+                                std::vector<std::string> capeNames;
+                                auto addName = [&](const std::string& n) {
+                                    if (!n.empty() && std::find(capeNames.begin(), capeNames.end(), n) == capeNames.end()) {
+                                        capeNames.push_back(n);
+                                    }
+                                };
+                                std::string leftName = npcItemDisplayDbc->getString(
+                                    static_cast<uint32_t>(capeRecIdx), leftTexField);
+                                std::string rightName = npcItemDisplayDbc->getString(
+                                    static_cast<uint32_t>(capeRecIdx), rightTexField);
+                                // Female models often prefer modelTexture_2.
+                                if (npcIsFemale) {
+                                    addName(rightName);
+                                    addName(leftName);
+                                } else {
+                                    addName(leftName);
+                                    addName(rightName);
+                                }
+
+                                auto hasBlpExt = [](const std::string& p) {
+                                    if (p.size() < 4) return false;
+                                    std::string ext = p.substr(p.size() - 4);
+                                    std::transform(ext.begin(), ext.end(), ext.begin(),
+                                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                                    return ext == ".blp";
+                                };
+
+                                std::vector<std::string> capeCandidates;
+                                auto addCapeCandidate = [&](const std::string& p) {
+                                    if (p.empty()) return;
+                                    if (std::find(capeCandidates.begin(), capeCandidates.end(), p) == capeCandidates.end()) {
+                                        capeCandidates.push_back(p);
+                                    }
+                                };
+
+                                for (const auto& nameRaw : capeNames) {
+                                    std::string name = nameRaw;
+                                    std::replace(name.begin(), name.end(), '/', '\\');
+                                    bool hasDir = (name.find('\\') != std::string::npos);
+                                    bool hasExt = hasBlpExt(name);
+                                    if (hasDir) {
+                                        addCapeCandidate(name);
+                                        if (!hasExt) addCapeCandidate(name + ".blp");
+                                    } else {
+                                        std::string base = "Item\\ObjectComponents\\Cape\\" + name;
+                                        addCapeCandidate(base);
+                                        if (!hasExt) addCapeCandidate(base + ".blp");
+                                        // Some data sets use gender/unisex suffix variants.
+                                        addCapeCandidate(base + (npcIsFemale ? "_F.blp" : "_M.blp"));
+                                        addCapeCandidate(base + "_U.blp");
+                                    }
+                                }
+
+                                for (const auto& candidate : capeCandidates) {
+                                    if (assetManager->fileExists(candidate)) {
+                                        npcCapeTexturePath = candidate;
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
@@ -3642,8 +3739,8 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                         for (size_t ti = 0; ti < modelData->textures.size(); ti++) {
                             uint32_t texType = modelData->textures[ti].type;
                             // Humanoid NPCs typically use creature-skin texture types (11-13).
-                            // Some models use 1/2 (character skin/object skin) depending on client/content.
-                            if (texType == 1 || texType == 2 || texType == 11 || texType == 12 || texType == 13) {
+                            // Keep type 2 (object skin) untouched so cloak/cape slots do not get face/body textures.
+                            if (texType == 1 || texType == 11 || texType == 12 || texType == 13) {
                                 charRenderer->setModelTexture(modelId, static_cast<uint32_t>(ti), finalTex);
                                 LOG_DEBUG("Applied baked NPC texture to slot ", ti, " (type ", texType, "): ", bakePath);
                                 hasHumanoidTexture = true;
@@ -3718,7 +3815,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                             if (npcSkinTex != 0 && modelData) {
                                 for (size_t ti = 0; ti < modelData->textures.size(); ti++) {
                                     uint32_t texType = modelData->textures[ti].type;
-                                    if (texType == 1 || texType == 2 || texType == 11 || texType == 12 || texType == 13) {
+                                    if (texType == 1 || texType == 11 || texType == 12 || texType == 13) {
                                         charRenderer->setModelTexture(modelId, static_cast<uint32_t>(ti), npcSkinTex);
                                         hasHumanoidTexture = true;
                                     }
@@ -3762,6 +3859,28 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                                     LOG_DEBUG("Applied hair texture to slot ", ti, ": ", hairTexPath);
                                 }
                             }
+                        }
+                    }
+                }
+
+                // Apply cape texture only to object-skin slots (type 2) so body/face
+                // textures never bleed onto cloaks.
+                if (!npcCapeTexturePath.empty() && modelData) {
+                    GLuint capeTex = charRenderer->loadTexture(npcCapeTexturePath);
+                    if (capeTex != 0) {
+                        for (size_t ti = 0; ti < modelData->textures.size(); ti++) {
+                            if (modelData->textures[ti].type == 2) {
+                                charRenderer->setModelTexture(modelId, static_cast<uint32_t>(ti), capeTex);
+                                LOG_DEBUG("Applied NPC cape texture to slot ", ti, ": ", npcCapeTexturePath);
+                            }
+                        }
+                    }
+                } else if (modelData) {
+                    // Hide cloak mesh when no cape texture exists for this NPC.
+                    GLuint hiddenTex = charRenderer->getTransparentTexture();
+                    for (size_t ti = 0; ti < modelData->textures.size(); ti++) {
+                        if (modelData->textures[ti].type == 2) {
+                            charRenderer->setModelTexture(modelId, static_cast<uint32_t>(ti), hiddenTex);
                         }
                     }
                 }
@@ -3876,6 +3995,54 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
     if (instanceId == 0) {
         LOG_WARNING("Failed to create creature instance for guid 0x", std::hex, guid, std::dec);
         return;
+    }
+
+    // Use a safe humanoid geoset mask to avoid rendering conflicting geosets
+    // (e.g. robe skirt + pants simultaneously) when model defaults expose all groups.
+    if (itDisplayData != displayDataMap_.end() &&
+        itDisplayData->second.extraDisplayId != 0) {
+        auto itExtra = humanoidExtraMap_.find(itDisplayData->second.extraDisplayId);
+        if (itExtra != humanoidExtraMap_.end()) {
+            const auto& extra = itExtra->second;
+            std::unordered_set<uint16_t> safeGeosets;
+            for (uint16_t i = 0; i <= 99; i++) safeGeosets.insert(i);
+
+            uint16_t hairGeoset = 1;
+            uint32_t hairKey = (static_cast<uint32_t>(extra.raceId) << 16) |
+                               (static_cast<uint32_t>(extra.sexId) << 8) |
+                               static_cast<uint32_t>(extra.hairStyleId);
+            auto itHairGeo = hairGeosetMap_.find(hairKey);
+            if (itHairGeo != hairGeosetMap_.end() && itHairGeo->second > 0) {
+                hairGeoset = itHairGeo->second;
+            }
+            safeGeosets.insert(hairGeoset > 0 ? hairGeoset : 1);
+            safeGeosets.insert(static_cast<uint16_t>(100 + std::max<uint16_t>(hairGeoset, 1)));
+
+            uint32_t facialKey = (static_cast<uint32_t>(extra.raceId) << 16) |
+                                 (static_cast<uint32_t>(extra.sexId) << 8) |
+                                 static_cast<uint32_t>(extra.facialHairId);
+            auto itFacial = facialHairGeosetMap_.find(facialKey);
+            if (itFacial != facialHairGeosetMap_.end()) {
+                const auto& fhg = itFacial->second;
+                safeGeosets.insert(static_cast<uint16_t>(200 + std::max<uint16_t>(fhg.geoset200, 1)));
+                safeGeosets.insert(static_cast<uint16_t>(300 + std::max<uint16_t>(fhg.geoset300, 1)));
+            } else {
+                safeGeosets.insert(201);
+                safeGeosets.insert(301);
+            }
+
+            // Force pants (1301) and avoid robe skirt variants unless we re-enable full slot-accurate geosets.
+            safeGeosets.insert(401);
+            safeGeosets.insert(502);
+            safeGeosets.insert(701);
+            safeGeosets.insert(801);
+            safeGeosets.insert(902);
+            safeGeosets.insert(1201);
+            safeGeosets.insert(1301);
+            safeGeosets.insert(1502);
+            safeGeosets.insert(2002);
+            charRenderer->setActiveGeosets(instanceId, safeGeosets);
+        }
     }
 
     // NOTE: Custom humanoid NPC geoset/equipment overrides are currently too
@@ -4844,7 +5011,7 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
                 if (doodadTemplates && !doodadTemplates->empty()) {
                     constexpr size_t kMaxTransportDoodads = 192;
                     const size_t doodadBudget = std::min(doodadTemplates->size(), kMaxTransportDoodads);
-                    LOG_INFO("Queueing ", doodadBudget, "/", doodadTemplates->size(),
+                    LOG_DEBUG("Queueing ", doodadBudget, "/", doodadTemplates->size(),
                              " transport doodads for WMO instance ", instanceId);
                     pendingTransportDoodadBatches_.push_back(PendingTransportDoodadBatch{
                         guid,
@@ -4857,8 +5024,8 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
                         orientation
                     });
                 } else {
-                    LOG_INFO("Transport WMO has no doodads or templates not available");
-                }
+                LOG_DEBUG("Transport WMO has no doodads or templates not available");
+            }
             }
 
             // Transport GameObjects are not always named "transport" in their WMO path
@@ -5086,7 +5253,7 @@ void Application::processPendingTransportDoodads() {
 
         if (it->nextIndex >= maxIndex) {
             if (it->spawnedDoodads > 0) {
-                LOG_INFO("Spawned ", it->spawnedDoodads,
+                LOG_DEBUG("Spawned ", it->spawnedDoodads,
                          " transport doodads for WMO instance ", it->instanceId);
                 glm::vec3 renderPos = core::coords::canonicalToRender(glm::vec3(it->x, it->y, it->z));
                 glm::mat4 wmoTransform(1.0f);

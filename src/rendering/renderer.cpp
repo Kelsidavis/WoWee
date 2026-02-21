@@ -57,6 +57,7 @@
 #include <cctype>
 #include <cmath>
 #include <chrono>
+#include <cstdlib>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -79,6 +80,16 @@ struct EmoteInfo {
 static std::unordered_map<std::string, EmoteInfo> EMOTE_TABLE;
 static std::unordered_map<uint32_t, const EmoteInfo*> EMOTE_BY_DBCID; // reverse lookup: dbcId → EmoteInfo*
 static bool emoteTableLoaded = false;
+
+static bool envFlagEnabled(const char* key, bool defaultValue) {
+    const char* raw = std::getenv(key);
+    if (!raw || !*raw) return defaultValue;
+    std::string v(raw);
+    std::transform(v.begin(), v.end(), v.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return !(v == "0" || v == "false" || v == "off" || v == "no");
+}
 
 static std::vector<std::string> parseEmoteCommands(const std::string& raw) {
     std::vector<std::string> out;
@@ -250,6 +261,7 @@ Renderer::~Renderer() = default;
 
 bool Renderer::initialize(core::Window* win) {
     window = win;
+    deferredWorldInitEnabled_ = envFlagEnabled("WOWEE_DEFER_WORLD_SYSTEMS", true);
     LOG_INFO("Initializing renderer");
 
     // Create camera (in front of Stormwind gate, looking north)
@@ -1909,6 +1921,7 @@ void Renderer::update(float deltaTime) {
     if (musicSwitchCooldown_ > 0.0f) {
         musicSwitchCooldown_ = std::max(0.0f, musicSwitchCooldown_ - deltaTime);
     }
+    runDeferredWorldInitStep(deltaTime);
 
     auto updateStart = std::chrono::steady_clock::now();
     lastDeltaTime_ = deltaTime;  // Cache for use in updateCharacterAnimation()
@@ -2453,6 +2466,46 @@ void Renderer::update(float deltaTime) {
     if (++m2ProfileCounter >= 60) {
         m2ProfileCounter = 0;
     }
+}
+
+void Renderer::runDeferredWorldInitStep(float deltaTime) {
+    if (!deferredWorldInitEnabled_ || !deferredWorldInitPending_ || !cachedAssetManager) return;
+    if (deferredWorldInitCooldown_ > 0.0f) {
+        deferredWorldInitCooldown_ = std::max(0.0f, deferredWorldInitCooldown_ - deltaTime);
+        if (deferredWorldInitCooldown_ > 0.0f) return;
+    }
+
+    switch (deferredWorldInitStage_) {
+        case 0:
+            if (ambientSoundManager) {
+                ambientSoundManager->initialize(cachedAssetManager);
+            }
+            if (terrainManager && ambientSoundManager) {
+                terrainManager->setAmbientSoundManager(ambientSoundManager.get());
+            }
+            break;
+        case 1:
+            if (uiSoundManager) uiSoundManager->initialize(cachedAssetManager);
+            break;
+        case 2:
+            if (combatSoundManager) combatSoundManager->initialize(cachedAssetManager);
+            break;
+        case 3:
+            if (spellSoundManager) spellSoundManager->initialize(cachedAssetManager);
+            break;
+        case 4:
+            if (movementSoundManager) movementSoundManager->initialize(cachedAssetManager);
+            break;
+        case 5:
+            if (questMarkerRenderer) questMarkerRenderer->initialize(cachedAssetManager);
+            break;
+        default:
+            deferredWorldInitPending_ = false;
+            return;
+    }
+
+    deferredWorldInitStage_++;
+    deferredWorldInitCooldown_ = 0.12f;
 }
 
 // ============================================================
@@ -3197,39 +3250,46 @@ bool Renderer::loadTestTerrain(pipeline::AssetManager* assetManager, const std::
         if (npcVoiceManager) {
             npcVoiceManager->initialize(assetManager);
         }
-        if (ambientSoundManager) {
-            ambientSoundManager->initialize(assetManager);
-        }
-        if (uiSoundManager) {
-            uiSoundManager->initialize(assetManager);
-        }
-        if (combatSoundManager) {
-            combatSoundManager->initialize(assetManager);
-        }
-        if (spellSoundManager) {
-            spellSoundManager->initialize(assetManager);
-        }
-        if (movementSoundManager) {
-            movementSoundManager->initialize(assetManager);
-        }
-        if (questMarkerRenderer) {
-            questMarkerRenderer->initialize(assetManager);
-        }
-
-        // Prewarm frequently used zone/tavern music so zone transitions don't stall on MPQ I/O.
-        if (zoneManager) {
-            for (const auto& musicPath : zoneManager->getAllMusicPaths()) {
-                musicManager->preloadMusic(musicPath);
+        if (!deferredWorldInitEnabled_) {
+            if (ambientSoundManager) {
+                ambientSoundManager->initialize(assetManager);
             }
-        }
-        static const std::vector<std::string> tavernTracks = {
-            "Sound\\Music\\ZoneMusic\\TavernAlliance\\TavernAlliance01.mp3",
-            "Sound\\Music\\ZoneMusic\\TavernAlliance\\TavernAlliance02.mp3",
-            "Sound\\Music\\ZoneMusic\\TavernHuman\\RA_HumanTavern1A.mp3",
-            "Sound\\Music\\ZoneMusic\\TavernHuman\\RA_HumanTavern2A.mp3",
-        };
-        for (const auto& musicPath : tavernTracks) {
-            musicManager->preloadMusic(musicPath);
+            if (uiSoundManager) {
+                uiSoundManager->initialize(assetManager);
+            }
+            if (combatSoundManager) {
+                combatSoundManager->initialize(assetManager);
+            }
+            if (spellSoundManager) {
+                spellSoundManager->initialize(assetManager);
+            }
+            if (movementSoundManager) {
+                movementSoundManager->initialize(assetManager);
+            }
+            if (questMarkerRenderer) {
+                questMarkerRenderer->initialize(assetManager);
+            }
+
+            if (envFlagEnabled("WOWEE_PREWARM_ZONE_MUSIC", false)) {
+                if (zoneManager) {
+                    for (const auto& musicPath : zoneManager->getAllMusicPaths()) {
+                        musicManager->preloadMusic(musicPath);
+                    }
+                }
+                static const std::vector<std::string> tavernTracks = {
+                    "Sound\\Music\\ZoneMusic\\TavernAlliance\\TavernAlliance01.mp3",
+                    "Sound\\Music\\ZoneMusic\\TavernAlliance\\TavernAlliance02.mp3",
+                    "Sound\\Music\\ZoneMusic\\TavernHuman\\RA_HumanTavern1A.mp3",
+                    "Sound\\Music\\ZoneMusic\\TavernHuman\\RA_HumanTavern2A.mp3",
+                };
+                for (const auto& musicPath : tavernTracks) {
+                    musicManager->preloadMusic(musicPath);
+                }
+            }
+        } else {
+            deferredWorldInitPending_ = true;
+            deferredWorldInitStage_ = 0;
+            deferredWorldInitCooldown_ = 0.25f;
         }
 
         cachedAssetManager = assetManager;
@@ -3316,23 +3376,29 @@ bool Renderer::loadTerrainArea(const std::string& mapName, int centerX, int cent
     if (npcVoiceManager && cachedAssetManager) {
         npcVoiceManager->initialize(cachedAssetManager);
     }
-    if (ambientSoundManager && cachedAssetManager) {
-        ambientSoundManager->initialize(cachedAssetManager);
-    }
-    if (uiSoundManager && cachedAssetManager) {
-        uiSoundManager->initialize(cachedAssetManager);
-    }
-    if (combatSoundManager && cachedAssetManager) {
-        combatSoundManager->initialize(cachedAssetManager);
-    }
-    if (spellSoundManager && cachedAssetManager) {
-        spellSoundManager->initialize(cachedAssetManager);
-    }
-    if (movementSoundManager && cachedAssetManager) {
-        movementSoundManager->initialize(cachedAssetManager);
-    }
-    if (questMarkerRenderer && cachedAssetManager) {
-        questMarkerRenderer->initialize(cachedAssetManager);
+    if (!deferredWorldInitEnabled_) {
+        if (ambientSoundManager && cachedAssetManager) {
+            ambientSoundManager->initialize(cachedAssetManager);
+        }
+        if (uiSoundManager && cachedAssetManager) {
+            uiSoundManager->initialize(cachedAssetManager);
+        }
+        if (combatSoundManager && cachedAssetManager) {
+            combatSoundManager->initialize(cachedAssetManager);
+        }
+        if (spellSoundManager && cachedAssetManager) {
+            spellSoundManager->initialize(cachedAssetManager);
+        }
+        if (movementSoundManager && cachedAssetManager) {
+            movementSoundManager->initialize(cachedAssetManager);
+        }
+        if (questMarkerRenderer && cachedAssetManager) {
+            questMarkerRenderer->initialize(cachedAssetManager);
+        }
+    } else {
+        deferredWorldInitPending_ = true;
+        deferredWorldInitStage_ = 0;
+        deferredWorldInitCooldown_ = 0.1f;
     }
 
     // Wire ambient sound manager to terrain manager for emitter registration

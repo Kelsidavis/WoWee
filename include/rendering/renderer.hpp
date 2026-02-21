@@ -176,6 +176,8 @@ public:
     LightingManager* getLightingManager() { return lightingManager.get(); }
 
 private:
+    void runDeferredWorldInitStep(float deltaTime);
+
     core::Window* window = nullptr;
     std::unique_ptr<Camera> camera;
     std::unique_ptr<CameraController> cameraController;
@@ -259,6 +261,10 @@ private:
     bool inTavern_ = false;
     bool inBlacksmith_ = false;
     float musicSwitchCooldown_ = 0.0f;
+    bool deferredWorldInitEnabled_ = true;
+    bool deferredWorldInitPending_ = false;
+    uint8_t deferredWorldInitStage_ = 0;
+    float deferredWorldInitCooldown_ = 0.0f;
 
     // Third-person character state
     glm::vec3 characterPosition = glm::vec3(0.0f);
