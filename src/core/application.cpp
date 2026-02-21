@@ -495,6 +495,7 @@ void Application::reloadExpansionData() {
     humanoidExtraMap_.clear();
     creatureModelIds_.clear();
     creatureRenderPosCache_.clear();
+    nonRenderableCreatureDisplayIds_.clear();
     buildCreatureDisplayLookups();
 }
 
@@ -508,6 +509,7 @@ void Application::logoutToLogin() {
     weaponsSheathed_ = false;
     wasAutoAttacking_ = false;
     loadedMapId_ = 0xFFFFFFFF;
+    nonRenderableCreatureDisplayIds_.clear();
     world.reset();
     if (renderer) {
         // Remove old player model so it doesn't persist into next session
@@ -3629,10 +3631,16 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
 
     // Skip if already spawned
     if (creatureInstances_.count(guid)) return;
+    if (nonRenderableCreatureDisplayIds_.count(displayId)) {
+        creaturePermanentFailureGuids_.insert(guid);
+        return;
+    }
 
     // Get model path from displayId
     std::string m2Path = getModelPathForDisplayId(displayId);
     if (m2Path.empty()) {
+        nonRenderableCreatureDisplayIds_.insert(displayId);
+        creaturePermanentFailureGuids_.insert(guid);
         return;
     }
     {
@@ -3642,6 +3650,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (lowerPath.find("invisiblestalker") != std::string::npos ||
             lowerPath.find("invisible_stalker") != std::string::npos) {
+            nonRenderableCreatureDisplayIds_.insert(displayId);
             creaturePermanentFailureGuids_.insert(guid);
             return;
         }
@@ -3663,12 +3672,16 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
         auto m2Data = assetManager->readFile(m2Path);
         if (m2Data.empty()) {
             LOG_WARNING("Failed to read creature M2: ", m2Path);
+            nonRenderableCreatureDisplayIds_.insert(displayId);
+            creaturePermanentFailureGuids_.insert(guid);
             return;
         }
 
         pipeline::M2Model model = pipeline::M2Loader::load(m2Data);
         if (model.vertices.empty()) {
             LOG_WARNING("Failed to parse creature M2: ", m2Path);
+            nonRenderableCreatureDisplayIds_.insert(displayId);
+            creaturePermanentFailureGuids_.insert(guid);
             return;
         }
 
@@ -3695,6 +3708,8 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
 
         if (!charRenderer->loadModel(model, modelId)) {
             LOG_WARNING("Failed to load creature model: ", m2Path);
+            nonRenderableCreatureDisplayIds_.insert(displayId);
+            creaturePermanentFailureGuids_.insert(guid);
             return;
         }
 
@@ -5687,6 +5702,14 @@ void Application::processCreatureSpawnQueue() {
            rotationsLeft > 0) {
         PendingCreatureSpawn s = pendingCreatureSpawns_.front();
         pendingCreatureSpawns_.erase(pendingCreatureSpawns_.begin());
+
+        if (nonRenderableCreatureDisplayIds_.count(s.displayId)) {
+            pendingCreatureSpawnGuids_.erase(s.guid);
+            creatureSpawnRetryCounts_.erase(s.guid);
+            processed++;
+            rotationsLeft = pendingCreatureSpawns_.size();
+            continue;
+        }
 
         const bool needsNewModel = (displayIdModelCache_.find(s.displayId) == displayIdModelCache_.end());
         if (needsNewModel && newModelLoads >= MAX_NEW_CREATURE_MODELS_PER_FRAME) {

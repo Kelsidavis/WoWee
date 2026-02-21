@@ -1885,7 +1885,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 break;
             }
             uint32_t reason = packet.readUInt32();
-            LOG_INFO("Resurrect cancel reason: ", reason);
+            LOG_DEBUG("Time sync request reason: ", reason);
             resurrectPending_ = false;
             resurrectRequestPending_ = false;
             break;
@@ -4986,8 +4986,8 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                     }
                 // Trigger creature spawn callback for units/players with displayId
                     if (block.objectType == ObjectType::UNIT && unit->getDisplayId() == 0) {
-                        LOG_INFO("[Spawn] UNIT guid=0x", std::hex, block.guid, std::dec,
-                                 " has displayId=0 — no spawn (entry=", unit->getEntry(), ")");
+                        LOG_DEBUG("[Spawn] UNIT guid=0x", std::hex, block.guid, std::dec,
+                                  " has displayId=0 — no spawn (entry=", unit->getEntry(), ")");
                     }
                     if ((block.objectType == ObjectType::UNIT || block.objectType == ObjectType::PLAYER) && unit->getDisplayId() != 0) {
                         if (block.objectType == ObjectType::PLAYER && block.guid == playerGuid) {
@@ -5004,9 +5004,9 @@ void GameHandler::handleUpdateObject(network::Packet& packet) {
                                 }
                             }
                         } else if (creatureSpawnCallback_) {
-                            LOG_INFO("[Spawn] UNIT guid=0x", std::hex, block.guid, std::dec,
-                                     " displayId=", unit->getDisplayId(), " at (",
-                                     unit->getX(), ",", unit->getY(), ",", unit->getZ(), ")");
+                            LOG_DEBUG("[Spawn] UNIT guid=0x", std::hex, block.guid, std::dec,
+                                      " displayId=", unit->getDisplayId(), " at (",
+                                      unit->getX(), ",", unit->getY(), ",", unit->getZ(), ")");
                             creatureSpawnCallback_(block.guid, unit->getDisplayId(),
                                 unit->getX(), unit->getY(), unit->getZ(), unit->getOrientation());
                             if (unitInitiallyDead && npcDeathCallback_) {
