@@ -4434,6 +4434,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
     if (const auto* md = charRenderer->getModelData(modelId)) {
         std::unordered_set<uint16_t> allGeosets;
         std::unordered_map<uint16_t, uint16_t> firstByGroup;
+        bool hasGroup12 = false; // tabard variants
         bool hasGroup13 = false; // trousers/robe skirt variants
         bool hasGroup15 = false; // cloak variants
         for (const auto& b : md->batches) {
@@ -4444,17 +4445,20 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
             if (itFirst == firstByGroup.end() || sid < itFirst->second) {
                 firstByGroup[group] = sid;
             }
+            if (group == 12) hasGroup12 = true;
             if (group == 13) hasGroup13 = true;
             if (group == 15) hasGroup15 = true;
         }
 
         // Only apply to humanoid-like clothing models.
-        if (hasGroup13 || hasGroup15) {
+        if (hasGroup12 || hasGroup13 || hasGroup15) {
             bool hasRenderableCape = false;
+            bool hasEquippedTabard = false;
             if (itDisplayData != displayDataMap_.end() &&
                 itDisplayData->second.extraDisplayId != 0) {
                 auto itExtra = humanoidExtraMap_.find(itDisplayData->second.extraDisplayId);
                 if (itExtra != humanoidExtraMap_.end()) {
+                    hasEquippedTabard = (itExtra->second.equipDisplayId[9] != 0);
                     uint32_t capeDisplayId = itExtra->second.equipDisplayId[10];
                     if (capeDisplayId != 0) {
                         auto itemDisplayDbc = assetManager->loadDBC("ItemDisplayInfo.dbc");
@@ -4531,7 +4535,7 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
             std::unordered_set<uint16_t> normalizedGeosets;
             for (uint16_t sid : allGeosets) {
                 const uint16_t group = static_cast<uint16_t>(sid / 100);
-                if (group == 13 || group == 15) continue;
+                if (group == 12 || group == 13 || group == 15) continue;
                 // Some humanoid models carry cloak cloth in group 16. Strip this too
                 // when no cape is equipped to avoid "everyone has a cape".
                 if (!hasRenderableCape && group == 16) continue;
@@ -4544,6 +4548,12 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                 if (it != firstByGroup.end()) return it->second;
                 return 0;
             };
+
+            // Show tabard mesh only when CreatureDisplayInfoExtra equips one.
+            if (hasGroup12 && hasEquippedTabard) {
+                uint16_t tabardSid = pickFromGroup(1201, 12);
+                if (tabardSid != 0) normalizedGeosets.insert(tabardSid);
+            }
 
             // Prefer trousers geoset, not robe/kilt overlays.
             if (hasGroup13) {
