@@ -415,6 +415,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                 renderer->setTargetPosition(&targetGLPos);
 
                 // Selection circle color: WoW-canonical level-based colors
+                bool showSelectionCircle = false;
                 glm::vec3 circleColor(1.0f, 1.0f, 0.3f); // default yellow
                 float circleRadius = 1.5f;
                 {
@@ -426,6 +427,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                     }
                 }
                 if (target->getType() == game::ObjectType::UNIT) {
+                    showSelectionCircle = true;
                     auto unit = std::static_pointer_cast<game::Unit>(target);
                     if (unit->getHealth() == 0 && unit->getMaxHealth() > 0) {
                         circleColor = glm::vec3(0.5f, 0.5f, 0.5f); // gray (dead)
@@ -448,9 +450,14 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                         circleColor = glm::vec3(0.3f, 1.0f, 0.3f); // green (friendly)
                     }
                 } else if (target->getType() == game::ObjectType::PLAYER) {
+                    showSelectionCircle = true;
                     circleColor = glm::vec3(0.3f, 1.0f, 0.3f); // green (player)
                 }
-                renderer->setSelectionCircle(targetGLPos, circleRadius, circleColor);
+                if (showSelectionCircle) {
+                    renderer->setSelectionCircle(targetGLPos, circleRadius, circleColor);
+                } else {
+                    renderer->clearSelectionCircle();
+                }
             } else {
                 renderer->setTargetPosition(nullptr);
                 renderer->clearSelectionCircle();
