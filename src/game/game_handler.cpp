@@ -575,11 +575,37 @@ void GameHandler::update(float deltaTime) {
         if (auctionSearchDelayTimer_ < 0.0f) auctionSearchDelayTimer_ = 0.0f;
     }
 
+    for (auto it = pendingQuestAcceptTimeouts_.begin(); it != pendingQuestAcceptTimeouts_.end();) {
+        it->second -= deltaTime;
+        if (it->second <= 0.0f) {
+            const uint32_t questId = it->first;
+            const uint64_t npcGuid = pendingQuestAcceptNpcGuids_.count(questId) != 0
+                ? pendingQuestAcceptNpcGuids_[questId] : 0;
+            triggerQuestAcceptResync(questId, npcGuid, "timeout");
+            it = pendingQuestAcceptTimeouts_.erase(it);
+            pendingQuestAcceptNpcGuids_.erase(questId);
+        } else {
+            ++it;
+        }
+    }
+
     if (pendingMoneyDeltaTimer_ > 0.0f) {
         pendingMoneyDeltaTimer_ -= deltaTime;
         if (pendingMoneyDeltaTimer_ <= 0.0f) {
             pendingMoneyDeltaTimer_ = 0.0f;
             pendingMoneyDelta_ = 0;
+        }
+    }
+
+    if (pendingLoginQuestResync_) {
+        pendingLoginQuestResyncTimeout_ -= deltaTime;
+        if (resyncQuestLogFromServerSlots(true)) {
+            pendingLoginQuestResync_ = false;
+            pendingLoginQuestResyncTimeout_ = 0.0f;
+        } else if (pendingLoginQuestResyncTimeout_ <= 0.0f) {
+            pendingLoginQuestResync_ = false;
+            pendingLoginQuestResyncTimeout_ = 0.0f;
+            LOG_WARNING("Quest login resync timed out waiting for player quest slot fields");
         }
     }
 
@@ -2223,6 +2249,30 @@ void GameHandler::handlePacket(network::Packet& packet) {
                     case 19: reasonStr = "Can't take any more quests"; break;
                 }
                 LOG_WARNING("Quest invalid: reason=", failReason, " (", reasonStr, ")");
+                if (!pendingQuestAcceptTimeouts_.empty()) {
+                    std::vector<uint32_t> pendingQuestIds;
+                    pendingQuestIds.reserve(pendingQuestAcceptTimeouts_.size());
+                    for (const auto& pending : pendingQuestAcceptTimeouts_) {
+                        pendingQuestIds.push_back(pending.first);
+                    }
+                    for (uint32_t questId : pendingQuestIds) {
+                        const uint64_t npcGuid = pendingQuestAcceptNpcGuids_.count(questId) != 0
+                            ? pendingQuestAcceptNpcGuids_[questId] : 0;
+                        if (failReason == 13) {
+                            std::string fallbackTitle = "Quest #" + std::to_string(questId);
+                            std::string fallbackObjectives;
+                            if (currentQuestDetails.questId == questId) {
+                                if (!currentQuestDetails.title.empty()) fallbackTitle = currentQuestDetails.title;
+                                fallbackObjectives = currentQuestDetails.objectives;
+                            }
+                            addQuestToLocalLogIfMissing(questId, fallbackTitle, fallbackObjectives);
+                            triggerQuestAcceptResync(questId, npcGuid, "already-on-quest");
+                        } else if (failReason == 18) {
+                            triggerQuestAcceptResync(questId, npcGuid, "already-completed");
+                        }
+                        clearPendingQuestAccept(questId);
+                    }
+                }
                 // Only show error to user for real errors (not informational messages)
                 if (failReason != 13 && failReason != 18) {  // Don't spam "already on/completed"
                     addSystemChatMessage(std::string("Quest unavailable: ") + reasonStr);
@@ -2268,6 +2318,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
             size_t rem = packet.getSize() - packet.getReadPos();
             if (rem >= 12) {
                 uint32_t questId = packet.readUInt32();
+                clearPendingQuestAccept(questId);
                 uint32_t entry = packet.readUInt32();   // Creature entry
                 uint32_t count = packet.readUInt32();   // Current kills
                 uint32_t reqCount = 0;
@@ -2302,6 +2353,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
             } else if (rem >= 4) {
                 // Swapped mapping fallback: treat as QUESTUPDATE_COMPLETE packet.
                 uint32_t questId = packet.readUInt32();
+                clearPendingQuestAccept(questId);
                 LOG_INFO("Quest objectives completed (compat via ADD_KILL): questId=", questId);
                 for (auto& quest : questLog_) {
                     if (quest.questId == questId) {
@@ -2347,6 +2399,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
             size_t rem = packet.getSize() - packet.getReadPos();
             if (rem >= 12) {
                 uint32_t questId = packet.readUInt32();
+                clearPendingQuestAccept(questId);
                 uint32_t entry = packet.readUInt32();
                 uint32_t count = packet.readUInt32();
                 uint32_t reqCount = 0;
@@ -2364,6 +2417,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 }
             } else if (rem >= 4) {
                 uint32_t questId = packet.readUInt32();
+                clearPendingQuestAccept(questId);
                 LOG_INFO("Quest objectives completed: questId=", questId);
 
                 for (auto& quest : questLog_) {
@@ -2384,6 +2438,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
                 break;
             }
             uint32_t questId = packet.readUInt32();
+            clearPendingQuestAccept(questId);
             pendingQuestQueryIds_.erase(questId);
             if (questId == 0) {
                 // Some servers emit a zero-id variant during world bootstrap.
@@ -3092,6 +3147,10 @@ void GameHandler::selectCharacter(uint64_t characterGuid) {
     playerSkills_.clear();
     questLog_.clear();
     pendingQuestQueryIds_.clear();
+    pendingLoginQuestResync_ = false;
+    pendingLoginQuestResyncTimeout_ = 0.0f;
+    pendingQuestAcceptTimeouts_.clear();
+    pendingQuestAcceptNpcGuids_.clear();
     npcQuestStatus_.clear();
     hostileAttackers_.clear();
     combatText.clear();
@@ -3144,6 +3203,7 @@ void GameHandler::handleLoginSetTimeSpeed(network::Packet& packet) {
 
 void GameHandler::handleLoginVerifyWorld(network::Packet& packet) {
     LOG_INFO("Handling SMSG_LOGIN_VERIFY_WORLD");
+    const bool initialWorldEntry = (state == WorldState::ENTERING_WORLD);
 
     LoginVerifyWorldData data;
     if (!LoginVerifyWorldParser::parse(packet, data)) {
@@ -3231,6 +3291,15 @@ void GameHandler::handleLoginVerifyWorld(network::Packet& packet) {
         } else {
             taxiRecoverPending_ = false;
         }
+    }
+
+    if (initialWorldEntry) {
+        pendingQuestAcceptTimeouts_.clear();
+        pendingQuestAcceptNpcGuids_.clear();
+        pendingQuestQueryIds_.clear();
+        pendingLoginQuestResync_ = true;
+        pendingLoginQuestResyncTimeout_ = 10.0f;
+        LOG_INFO("Queued quest log resync for login (from server quest slots)");
     }
 }
 
@@ -9675,7 +9744,18 @@ void GameHandler::selectGossipQuest(uint32_t questId) {
         }
         return false;
     };
-    const bool activeQuestConfirmedByServer = activeQuest && questInServerLogSlots(questId);
+    const bool questInServerLog = questInServerLogSlots(questId);
+    if (questInServerLog && !activeQuest) {
+        addQuestToLocalLogIfMissing(questId, "Quest #" + std::to_string(questId), "");
+        requestQuestQuery(questId, false);
+        for (const auto& q : questLog_) {
+            if (q.questId == questId) {
+                activeQuest = &q;
+                break;
+            }
+        }
+    }
+    const bool activeQuestConfirmedByServer = questInServerLog;
     // Only trust server quest-log slots for deciding "already accepted" flow.
     // Gossip icon values can differ across cores/expansions and misclassify
     // available quests as active, which blocks acceptance.
@@ -9733,31 +9813,113 @@ void GameHandler::handleQuestDetails(network::Packet& packet) {
     gossipWindowOpen = false;
 }
 
+bool GameHandler::hasQuestInLog(uint32_t questId) const {
+    for (const auto& q : questLog_) {
+        if (q.questId == questId) return true;
+    }
+    return false;
+}
+
+void GameHandler::addQuestToLocalLogIfMissing(uint32_t questId, const std::string& title, const std::string& objectives) {
+    if (questId == 0 || hasQuestInLog(questId)) return;
+    QuestLogEntry entry;
+    entry.questId = questId;
+    entry.title = title.empty() ? ("Quest #" + std::to_string(questId)) : title;
+    entry.objectives = objectives;
+    questLog_.push_back(std::move(entry));
+}
+
+bool GameHandler::resyncQuestLogFromServerSlots(bool forceQueryMetadata) {
+    if (lastPlayerFields_.empty()) return false;
+
+    const uint16_t ufQuestStart = fieldIndex(UF::PLAYER_QUEST_LOG_START);
+    const uint8_t qStride = packetParsers_ ? packetParsers_->questLogStride() : 5;
+    std::unordered_set<uint32_t> serverQuestIds;
+    serverQuestIds.reserve(25);
+    for (uint16_t slot = 0; slot < 25; ++slot) {
+        const uint16_t idField = ufQuestStart + slot * qStride;
+        auto it = lastPlayerFields_.find(idField);
+        if (it == lastPlayerFields_.end()) continue;
+        if (it->second != 0) serverQuestIds.insert(it->second);
+    }
+
+    const size_t localBefore = questLog_.size();
+    std::erase_if(questLog_, [&](const QuestLogEntry& q) {
+        return q.questId == 0 || serverQuestIds.count(q.questId) == 0;
+    });
+    const size_t removed = localBefore - questLog_.size();
+
+    size_t added = 0;
+    for (uint32_t questId : serverQuestIds) {
+        if (hasQuestInLog(questId)) continue;
+        addQuestToLocalLogIfMissing(questId, "Quest #" + std::to_string(questId), "");
+        ++added;
+    }
+
+    if (forceQueryMetadata) {
+        for (uint32_t questId : serverQuestIds) {
+            requestQuestQuery(questId, false);
+        }
+    }
+
+    LOG_INFO("Quest log resync from server slots: server=", serverQuestIds.size(),
+             " localBefore=", localBefore, " removed=", removed, " added=", added);
+    return true;
+}
+
+void GameHandler::clearPendingQuestAccept(uint32_t questId) {
+    pendingQuestAcceptTimeouts_.erase(questId);
+    pendingQuestAcceptNpcGuids_.erase(questId);
+}
+
+void GameHandler::triggerQuestAcceptResync(uint32_t questId, uint64_t npcGuid, const char* reason) {
+    if (questId == 0 || !socket || state != WorldState::IN_WORLD) return;
+
+    LOG_INFO("Quest accept resync: questId=", questId, " reason=", reason ? reason : "unknown");
+    requestQuestQuery(questId, true);
+
+    if (npcGuid != 0) {
+        network::Packet qsPkt(wireOpcode(Opcode::CMSG_QUESTGIVER_STATUS_QUERY));
+        qsPkt.writeUInt64(npcGuid);
+        socket->send(qsPkt);
+
+        auto queryPkt = packetParsers_
+            ? packetParsers_->buildQueryQuestPacket(npcGuid, questId)
+            : QuestgiverQueryQuestPacket::build(npcGuid, questId);
+        socket->send(queryPkt);
+    }
+}
+
 void GameHandler::acceptQuest() {
     if (!questDetailsOpen || state != WorldState::IN_WORLD || !socket) return;
+    const uint32_t questId = currentQuestDetails.questId;
+    if (questId == 0) return;
     uint64_t npcGuid = currentQuestDetails.npcGuid;
+    if (pendingQuestAcceptTimeouts_.count(questId) != 0) {
+        LOG_DEBUG("Ignoring duplicate quest accept while pending: questId=", questId);
+        triggerQuestAcceptResync(questId, npcGuid, "duplicate-accept");
+        questDetailsOpen = false;
+        currentQuestDetails = QuestDetailsData{};
+        return;
+    }
+    if (hasQuestInLog(questId)) {
+        LOG_INFO("Ignoring duplicate quest accept already in local log: questId=", questId);
+        questDetailsOpen = false;
+        currentQuestDetails = QuestDetailsData{};
+        return;
+    }
+
     // WotLK/TBC expect an additional trailing flag on CMSG_QUESTGIVER_ACCEPT_QUEST.
     // Classic/Turtle use the short form (guid + questId only).
     network::Packet packet(wireOpcode(Opcode::CMSG_QUESTGIVER_ACCEPT_QUEST));
     packet.writeUInt64(npcGuid);
-    packet.writeUInt32(currentQuestDetails.questId);
+    packet.writeUInt32(questId);
     if (!isActiveExpansion("classic") && !isActiveExpansion("turtle")) {
         packet.writeUInt8(1); // from-gossip / auto-accept continuation flag
     }
     socket->send(packet);
-
-    // Add to quest log
-    bool alreadyInLog = false;
-    for (const auto& q : questLog_) {
-        if (q.questId == currentQuestDetails.questId) { alreadyInLog = true; break; }
-    }
-    if (!alreadyInLog) {
-        QuestLogEntry entry;
-        entry.questId = currentQuestDetails.questId;
-        entry.title = currentQuestDetails.title;
-        entry.objectives = currentQuestDetails.objectives;
-        questLog_.push_back(entry);
-    }
+    pendingQuestAcceptTimeouts_[questId] = 5.0f;
+    pendingQuestAcceptNpcGuids_[questId] = npcGuid;
 
     questDetailsOpen = false;
     currentQuestDetails = QuestDetailsData{};
@@ -9776,6 +9938,7 @@ void GameHandler::declineQuest() {
 }
 
 void GameHandler::abandonQuest(uint32_t questId) {
+    clearPendingQuestAccept(questId);
     // Find the quest's index in our local log
     for (size_t i = 0; i < questLog_.size(); i++) {
         if (questLog_[i].questId == questId) {
@@ -9798,6 +9961,7 @@ void GameHandler::handleQuestRequestItems(network::Packet& packet) {
         LOG_WARNING("Failed to parse SMSG_QUESTGIVER_REQUEST_ITEMS");
         return;
     }
+    clearPendingQuestAccept(data.questId);
 
     // Expansion-safe fallback: COMPLETE_QUEST is the default flow.
     // If a server echoes REQUEST_ITEMS again while still completable,
@@ -9860,6 +10024,7 @@ void GameHandler::handleQuestOfferReward(network::Packet& packet) {
         LOG_WARNING("Failed to parse SMSG_QUESTGIVER_OFFER_REWARD");
         return;
     }
+    clearPendingQuestAccept(data.questId);
     LOG_INFO("Quest offer reward: questId=", data.questId, " title=\"", data.title, "\"");
     if (pendingTurnInQuestId_ == data.questId) {
         pendingTurnInQuestId_ = 0;

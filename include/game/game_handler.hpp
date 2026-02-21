@@ -1127,6 +1127,11 @@ private:
     void handleQuestDetails(network::Packet& packet);
     void handleQuestRequestItems(network::Packet& packet);
     void handleQuestOfferReward(network::Packet& packet);
+    void clearPendingQuestAccept(uint32_t questId);
+    void triggerQuestAcceptResync(uint32_t questId, uint64_t npcGuid, const char* reason);
+    bool hasQuestInLog(uint32_t questId) const;
+    void addQuestToLocalLogIfMissing(uint32_t questId, const std::string& title, const std::string& objectives);
+    bool resyncQuestLogFromServerSlots(bool forceQueryMetadata);
     void handleListInventory(network::Packet& packet);
     void addMoneyCopper(uint32_t amount);
 
@@ -1487,12 +1492,16 @@ private:
     uint32_t pendingTurnInQuestId_ = 0;
     uint64_t pendingTurnInNpcGuid_ = 0;
     bool pendingTurnInRewardRequest_ = false;
+    std::unordered_map<uint32_t, float> pendingQuestAcceptTimeouts_;
+    std::unordered_map<uint32_t, uint64_t> pendingQuestAcceptNpcGuids_;
     bool questOfferRewardOpen_ = false;
     QuestOfferRewardData currentQuestOfferReward_;
 
     // Quest log
     std::vector<QuestLogEntry> questLog_;
     std::unordered_set<uint32_t> pendingQuestQueryIds_;
+    bool pendingLoginQuestResync_ = false;
+    float pendingLoginQuestResyncTimeout_ = 0.0f;
 
     // Quest giver status per NPC
     std::unordered_map<uint64_t, QuestGiverStatus> npcQuestStatus_;
