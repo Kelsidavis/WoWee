@@ -1578,7 +1578,7 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
 	            // Geoset filtering: skip batches whose submeshId is not in activeGeosets.
 	            // For character models, group 0 (body/scalp) is also filtered so that only
 	            // the correct scalp mesh renders (not all overlapping variants).
-	            for (const auto& batch : gpuModel.data.batches) {
+            for (const auto& batch : gpuModel.data.batches) {
                 if (applyGeosetFilter) {
                     if (instance.activeGeosets.find(batch.submeshId) == instance.activeGeosets.end()) {
                         continue;
@@ -1599,6 +1599,13 @@ void CharacterRenderer::render(const Camera& camera, const glm::mat4& view, cons
                 if (batch.materialIndex < gpuModel.data.materials.size()) {
                     blendMode = gpuModel.data.materials[batch.materialIndex].blendMode;
                     materialFlags = gpuModel.data.materials[batch.materialIndex].flags;
+                }
+
+                // Attached weapon models can include additive FX/card batches that
+                // appear as detached flat quads for some swords. Keep core geometry
+                // and drop FX-style passes for weapon attachments.
+                if (instance.hasOverrideModelMatrix && blendMode >= 3) {
+                    continue;
                 }
                 switch (blendMode) {
                     case 0: glBlendFunc(GL_ONE, GL_ZERO); break;                      // Opaque
