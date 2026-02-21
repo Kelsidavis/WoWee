@@ -450,6 +450,14 @@ bool TbcPacketParsers::parseUpdateObject(network::Packet& packet, UpdateObjectDa
     return true;
 }
 
+network::Packet TbcPacketParsers::buildAcceptQuestPacket(uint64_t npcGuid, uint32_t questId) {
+    network::Packet packet(wireOpcode(Opcode::CMSG_QUESTGIVER_ACCEPT_QUEST));
+    packet.writeUInt64(npcGuid);
+    packet.writeUInt32(questId);
+    // TBC servers generally expect guid + questId only.
+    return packet;
+}
+
 // ============================================================================
 // TBC parseAuraUpdate - SMSG_AURA_UPDATE doesn't exist in TBC
 // TBC uses inline aura update fields + SMSG_INIT_EXTRA_AURA_INFO_OBSOLETE (0x3A3) /

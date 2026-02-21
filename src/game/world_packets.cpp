@@ -14,6 +14,35 @@
 namespace wowee {
 namespace game {
 
+std::string normalizeWowTextTokens(std::string text) {
+    if (text.empty()) return text;
+
+    size_t pos = 0;
+    while ((pos = text.find('$', pos)) != std::string::npos) {
+        if (pos + 1 >= text.size()) break;
+        const char code = text[pos + 1];
+        if (code == 'b' || code == 'B') {
+            text.replace(pos, 2, "\n");
+            ++pos;
+        } else {
+            ++pos;
+        }
+    }
+
+    pos = 0;
+    while ((pos = text.find("|n", pos)) != std::string::npos) {
+        text.replace(pos, 2, "\n");
+        ++pos;
+    }
+    pos = 0;
+    while ((pos = text.find("|N", pos)) != std::string::npos) {
+        text.replace(pos, 2, "\n");
+        ++pos;
+    }
+
+    return text;
+}
+
 network::Packet AuthSessionPacket::build(uint32_t build,
                                           const std::string& accountName,
                                           uint32_t clientSeed,
@@ -3068,6 +3097,7 @@ network::Packet QuestgiverAcceptQuestPacket::build(uint64_t npcGuid, uint32_t qu
     network::Packet packet(wireOpcode(Opcode::CMSG_QUESTGIVER_ACCEPT_QUEST));
     packet.writeUInt64(npcGuid);
     packet.writeUInt32(questId);
+    packet.writeUInt32(0);  // AzerothCore/WotLK expects trailing unk1
     return packet;
 }
 
@@ -3081,15 +3111,15 @@ bool QuestDetailsParser::parse(network::Packet& packet, QuestDetailsData& data) 
     size_t preInform = packet.getReadPos();
     /*informUnit*/ packet.readUInt64();
     data.questId = packet.readUInt32();
-    data.title = packet.readString();
+    data.title = normalizeWowTextTokens(packet.readString());
     if (data.title.empty() || data.questId > 100000) {
         // Likely vanilla format — rewind past informUnit
         packet.setReadPos(preInform);
         data.questId = packet.readUInt32();
-        data.title = packet.readString();
+        data.title = normalizeWowTextTokens(packet.readString());
     }
-    data.details = packet.readString();
-    data.objectives = packet.readString();
+    data.details = normalizeWowTextTokens(packet.readString());
+    data.objectives = normalizeWowTextTokens(packet.readString());
 
     if (packet.getReadPos() + 10 > packet.getSize()) {
         LOG_INFO("Quest details (short): id=", data.questId, " title='", data.title, "'");
@@ -3162,7 +3192,7 @@ bool GossipMessageParser::parse(network::Packet& packet, GossipMessageData& data
         quest.questLevel = static_cast<int32_t>(packet.readUInt32());
         quest.questFlags = packet.readUInt32();
         quest.isRepeatable = packet.readUInt8();
-        quest.title = packet.readString();
+        quest.title = normalizeWowTextTokens(packet.readString());
         data.quests.push_back(quest);
     }
 
@@ -3194,8 +3224,8 @@ bool QuestRequestItemsParser::parse(network::Packet& packet, QuestRequestItemsDa
     if (packet.getSize() - packet.getReadPos() < 20) return false;
     data.npcGuid = packet.readUInt64();
     data.questId = packet.readUInt32();
-    data.title = packet.readString();
-    data.completionText = packet.readString();
+    data.title = normalizeWowTextTokens(packet.readString());
+    data.completionText = normalizeWowTextTokens(packet.readString());
 
     if (packet.getReadPos() + 9 > packet.getSize()) {
         LOG_INFO("Quest request items (short): id=", data.questId, " title='", data.title, "'");
@@ -3283,8 +3313,8 @@ bool QuestOfferRewardParser::parse(network::Packet& packet, QuestOfferRewardData
     if (packet.getSize() - packet.getReadPos() < 20) return false;
     data.npcGuid = packet.readUInt64();
     data.questId = packet.readUInt32();
-    data.title = packet.readString();
-    data.rewardText = packet.readString();
+    data.title = normalizeWowTextTokens(packet.readString());
+    data.rewardText = normalizeWowTextTokens(packet.readString());
 
     if (packet.getReadPos() + 10 > packet.getSize()) {
         LOG_INFO("Quest offer reward (short): id=", data.questId, " title='", data.title, "'");

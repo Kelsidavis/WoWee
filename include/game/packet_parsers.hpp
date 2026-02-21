@@ -156,6 +156,12 @@ public:
         return QuestgiverQueryQuestPacket::build(npcGuid, questId);  // includes unk1
     }
 
+    /** Build CMSG_QUESTGIVER_ACCEPT_QUEST.
+     *  WotLK/AzerothCore expects trailing unk1 uint32; older expansions may not. */
+    virtual network::Packet buildAcceptQuestPacket(uint64_t npcGuid, uint32_t questId) {
+        return QuestgiverAcceptQuestPacket::build(npcGuid, questId);
+    }
+
     /** Parse SMSG_QUESTGIVER_QUEST_DETAILS.
      *  WotLK has an extra informUnit GUID before questId; Vanilla/Classic do not. */
     virtual bool parseQuestDetails(network::Packet& packet, QuestDetailsData& data) {
@@ -279,6 +285,7 @@ public:
     bool parseAuraUpdate(network::Packet& packet, AuraUpdateData& data, bool isAll = false) override;
     bool parseNameQueryResponse(network::Packet& packet, NameQueryResponseData& data) override;
     bool parseItemQueryResponse(network::Packet& packet, ItemQueryResponseData& data) override;
+    network::Packet buildAcceptQuestPacket(uint64_t npcGuid, uint32_t questId) override;
 };
 
 /**
@@ -324,6 +331,7 @@ public:
     bool parseItemQueryResponse(network::Packet& packet, ItemQueryResponseData& data) override;
     uint8_t readQuestGiverStatus(network::Packet& packet) override;
     network::Packet buildQueryQuestPacket(uint64_t npcGuid, uint32_t questId) override;
+    network::Packet buildAcceptQuestPacket(uint64_t npcGuid, uint32_t questId) override;
     bool parseQuestDetails(network::Packet& packet, QuestDetailsData& data) override;
     uint8_t questLogStride() const override { return 3; }
     bool parseMonsterMove(network::Packet& packet, MonsterMoveData& data) override {

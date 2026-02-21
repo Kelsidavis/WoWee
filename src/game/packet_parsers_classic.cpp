@@ -705,7 +705,7 @@ bool ClassicPacketParsers::parseGossipMessage(network::Packet& packet, GossipMes
         // Classic: NO questFlags, NO isRepeatable
         quest.questFlags = 0;
         quest.isRepeatable = 0;
-        quest.title = packet.readString();
+        quest.title = normalizeWowTextTokens(packet.readString());
         data.quests.push_back(quest);
     }
 
@@ -1220,6 +1220,14 @@ network::Packet ClassicPacketParsers::buildQueryQuestPacket(uint64_t npcGuid, ui
     return packet;
 }
 
+network::Packet ClassicPacketParsers::buildAcceptQuestPacket(uint64_t npcGuid, uint32_t questId) {
+    network::Packet packet(wireOpcode(Opcode::CMSG_QUESTGIVER_ACCEPT_QUEST));
+    packet.writeUInt64(npcGuid);
+    packet.writeUInt32(questId);
+    // Classic/Turtle: no trailing unk1 uint32
+    return packet;
+}
+
 // ============================================================================
 // Classic SMSG_QUESTGIVER_QUEST_DETAILS — Vanilla 1.12 format
 // WotLK inserts an informUnit GUID (8 bytes) between npcGuid and questId.
@@ -1231,9 +1239,9 @@ bool ClassicPacketParsers::parseQuestDetails(network::Packet& packet, QuestDetai
     data.npcGuid = packet.readUInt64();
     // Vanilla: questId follows immediately — no informUnit GUID
     data.questId = packet.readUInt32();
-    data.title      = packet.readString();
-    data.details    = packet.readString();
-    data.objectives = packet.readString();
+    data.title      = normalizeWowTextTokens(packet.readString());
+    data.details    = normalizeWowTextTokens(packet.readString());
+    data.objectives = normalizeWowTextTokens(packet.readString());
 
     if (packet.getReadPos() + 5 > packet.getSize()) {
         LOG_INFO("Quest details classic (short): id=", data.questId, " title='", data.title, "'");

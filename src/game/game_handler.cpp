@@ -9957,6 +9957,20 @@ bool GameHandler::hasQuestInLog(uint32_t questId) const {
     return false;
 }
 
+int GameHandler::findQuestLogSlotIndexFromServer(uint32_t questId) const {
+    if (questId == 0 || lastPlayerFields_.empty()) return -1;
+    const uint16_t ufQuestStart = fieldIndex(UF::PLAYER_QUEST_LOG_START);
+    const uint8_t qStride = packetParsers_ ? packetParsers_->questLogStride() : 5;
+    for (uint16_t slot = 0; slot < 25; ++slot) {
+        const uint16_t idField = ufQuestStart + slot * qStride;
+        auto it = lastPlayerFields_.find(idField);
+        if (it != lastPlayerFields_.end() && it->second == questId) {
+            return static_cast<int>(slot);
+        }
+    }
+    return -1;
+}
+
 void GameHandler::addQuestToLocalLogIfMissing(uint32_t questId, const std::string& title, const std::string& objectives) {
     if (questId == 0 || hasQuestInLog(questId)) return;
     QuestLogEntry entry;
@@ -10039,18 +10053,23 @@ void GameHandler::acceptQuest() {
         currentQuestDetails = QuestDetailsData{};
         return;
     }
-    if (hasQuestInLog(questId)) {
-        LOG_INFO("Ignoring duplicate quest accept already in local log: questId=", questId);
+    const bool inLocalLog = hasQuestInLog(questId);
+    const int serverSlot = findQuestLogSlotIndexFromServer(questId);
+    if (serverSlot >= 0) {
+        LOG_INFO("Ignoring duplicate quest accept already in server quest log: questId=", questId,
+                 " slot=", serverSlot);
         questDetailsOpen = false;
         currentQuestDetails = QuestDetailsData{};
         return;
     }
+    if (inLocalLog) {
+        LOG_WARNING("Quest accept local/server mismatch, allowing re-accept: questId=", questId);
+        std::erase_if(questLog_, [&](const QuestLogEntry& q) { return q.questId == questId; });
+    }
 
-    // Keep quest accept payload minimal and expansion-safe: guid + questId.
-    // Some server cores reject trailing bytes and throw ByteBufferException.
-    network::Packet packet(wireOpcode(Opcode::CMSG_QUESTGIVER_ACCEPT_QUEST));
-    packet.writeUInt64(npcGuid);
-    packet.writeUInt32(questId);
+    network::Packet packet = packetParsers_
+        ? packetParsers_->buildAcceptQuestPacket(npcGuid, questId)
+        : QuestgiverAcceptQuestPacket::build(npcGuid, questId);
     socket->send(packet);
     pendingQuestAcceptTimeouts_[questId] = 5.0f;
     pendingQuestAcceptNpcGuids_[questId] = npcGuid;
@@ -10073,19 +10092,33 @@ void GameHandler::declineQuest() {
 
 void GameHandler::abandonQuest(uint32_t questId) {
     clearPendingQuestAccept(questId);
-    // Find the quest's index in our local log
-    for (size_t i = 0; i < questLog_.size(); i++) {
+    int localIndex = -1;
+    for (size_t i = 0; i < questLog_.size(); ++i) {
         if (questLog_[i].questId == questId) {
-            // Tell server to remove it (slot index in server quest log)
-            // We send the local index; server maps it via PLAYER_QUEST_LOG fields
-            if (state == WorldState::IN_WORLD && socket) {
-                network::Packet pkt(wireOpcode(Opcode::CMSG_QUESTLOG_REMOVE_QUEST));
-                pkt.writeUInt8(static_cast<uint8_t>(i));
-                socket->send(pkt);
-            }
-            questLog_.erase(questLog_.begin() + static_cast<ptrdiff_t>(i));
-            return;
+            localIndex = static_cast<int>(i);
+            break;
         }
+    }
+
+    int slotIndex = findQuestLogSlotIndexFromServer(questId);
+    if (slotIndex < 0 && localIndex >= 0) {
+        // Best-effort fallback if update fields are stale/missing.
+        slotIndex = localIndex;
+        LOG_WARNING("Abandon quest using local slot fallback: questId=", questId, " slot=", slotIndex);
+    }
+
+    if (slotIndex >= 0 && slotIndex < 25) {
+        if (state == WorldState::IN_WORLD && socket) {
+            network::Packet pkt(wireOpcode(Opcode::CMSG_QUESTLOG_REMOVE_QUEST));
+            pkt.writeUInt8(static_cast<uint8_t>(slotIndex));
+            socket->send(pkt);
+        }
+    } else {
+        LOG_WARNING("Abandon quest failed: no quest-log slot found for questId=", questId);
+    }
+
+    if (localIndex >= 0) {
+        questLog_.erase(questLog_.begin() + static_cast<ptrdiff_t>(localIndex));
     }
 }
 
@@ -10770,17 +10803,17 @@ void GameHandler::handleQuestgiverQuestList(network::Packet& packet) {
         if (packet.getSize() - packet.getReadPos() >= 5) {
             q.questFlags = packet.readUInt32();
             q.isRepeatable = packet.readUInt8();
-            q.title = packet.readString();
+            q.title = normalizeWowTextTokens(packet.readString());
             if (q.title.empty()) {
                 packet.setReadPos(titlePos);
                 q.questFlags = 0;
                 q.isRepeatable = 0;
-                q.title = packet.readString();
+                q.title = normalizeWowTextTokens(packet.readString());
             }
         } else {
             q.questFlags = 0;
             q.isRepeatable = 0;
-            q.title = packet.readString();
+            q.title = normalizeWowTextTokens(packet.readString());
         }
         if (q.questId != 0) {
             data.quests.push_back(std::move(q));
