@@ -1405,6 +1405,27 @@ public:
     static bool parse(network::Packet& packet, GameObjectQueryResponseData& data);
 };
 
+/** CMSG_PAGE_TEXT_QUERY packet builder */
+class PageTextQueryPacket {
+public:
+    static network::Packet build(uint32_t pageId, uint64_t guid);
+};
+
+/** SMSG_PAGE_TEXT_QUERY_RESPONSE data */
+struct PageTextQueryResponseData {
+    uint32_t pageId = 0;
+    std::string text;
+    uint32_t nextPageId = 0;
+
+    bool isValid() const { return pageId != 0; }
+};
+
+/** SMSG_PAGE_TEXT_QUERY_RESPONSE parser */
+class PageTextQueryResponseParser {
+public:
+    static bool parse(network::Packet& packet, PageTextQueryResponseData& data);
+};
+
 // ============================================================
 // Item Query
 // ============================================================

@@ -1052,6 +1052,8 @@ private:
     void handleNameQueryResponse(network::Packet& packet);
     void handleCreatureQueryResponse(network::Packet& packet);
     void handleGameObjectQueryResponse(network::Packet& packet);
+    void handleGameObjectPageText(network::Packet& packet);
+    void handlePageTextQueryResponse(network::Packet& packet);
     void handleItemQueryResponse(network::Packet& packet);
     void handleInspectResults(network::Packet& packet);
     void queryItemInfo(uint32_t entry, uint64_t guid);

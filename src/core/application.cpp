@@ -1720,7 +1720,7 @@ void Application::setupUICallbacks() {
             if (auto* mr = renderer->getM2Renderer()) {
                 glm::mat4 transform(1.0f);
                 transform = glm::translate(transform, renderPos);
-                transform = glm::rotate(transform, orientation, glm::vec3(0, 0, 1));
+                transform = glm::rotate(transform, orientation - glm::radians(90.0f), glm::vec3(0, 0, 1));
                 mr->setInstanceTransform(info.instanceId, transform);
             }
         }
@@ -5420,7 +5420,9 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
                 if (auto* mr = renderer->getM2Renderer()) {
                     glm::mat4 transform(1.0f);
                     transform = glm::translate(transform, renderPos);
-                    transform = glm::rotate(transform, orientation, glm::vec3(0, 0, 1));
+                    // M2 gameobjects use model-forward alignment like character M2s.
+                    // Apply -90deg in render space to match world-facing orientation.
+                    transform = glm::rotate(transform, orientation - glm::radians(90.0f), glm::vec3(0, 0, 1));
                     mr->setInstanceTransform(info.instanceId, transform);
                 }
             }
@@ -5474,7 +5476,8 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
     bool isWmo = lowerPath.size() >= 4 && lowerPath.substr(lowerPath.size() - 4) == ".wmo";
 
     glm::vec3 renderPos = core::coords::canonicalToRender(glm::vec3(x, y, z));
-    float renderYaw = orientation;
+    const float renderYawWmo = orientation;
+    const float renderYawM2 = orientation - glm::radians(90.0f);
 
     bool loadedAsWmo = false;
     if (isWmo) {
@@ -5545,7 +5548,7 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
 
         if (loadedAsWmo) {
             uint32_t instanceId = wmoRenderer->createInstance(modelId, renderPos,
-                glm::vec3(0.0f, 0.0f, renderYaw), 1.0f);
+                glm::vec3(0.0f, 0.0f, renderYawWmo), 1.0f);
             if (instanceId == 0) {
                 LOG_WARNING("Failed to create gameobject WMO instance for guid 0x", std::hex, guid, std::dec);
                 return;
@@ -5640,7 +5643,7 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
         }
 
         uint32_t instanceId = m2Renderer->createInstance(modelId, renderPos,
-            glm::vec3(0.0f, 0.0f, renderYaw), 1.0f);
+            glm::vec3(0.0f, 0.0f, renderYawM2), 1.0f);
         if (instanceId == 0) {
             LOG_WARNING("Failed to create gameobject instance for guid 0x", std::hex, guid, std::dec);
             return;

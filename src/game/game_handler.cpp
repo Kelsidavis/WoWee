@@ -2281,6 +2281,12 @@ void GameHandler::handlePacket(network::Packet& packet) {
         case Opcode::SMSG_GAMEOBJECT_QUERY_RESPONSE:
             handleGameObjectQueryResponse(packet);
             break;
+        case Opcode::SMSG_GAMEOBJECT_PAGETEXT:
+            handleGameObjectPageText(packet);
+            break;
+        case Opcode::SMSG_PAGE_TEXT_QUERY_RESPONSE:
+            handlePageTextQueryResponse(packet);
+            break;
         case Opcode::SMSG_QUESTGIVER_STATUS: {
             if (packet.getSize() - packet.getReadPos() >= 9) {
                 uint64_t npcGuid = packet.readUInt64();
@@ -7203,6 +7209,60 @@ void GameHandler::handleGameObjectQueryResponse(network::Packet& packet) {
     }
 }
 
+void GameHandler::handleGameObjectPageText(network::Packet& packet) {
+    if (packet.getSize() - packet.getReadPos() < 8) return;
+    uint64_t guid = packet.readUInt64();
+    auto entity = entityManager.getEntity(guid);
+    if (!entity || entity->getType() != ObjectType::GAMEOBJECT) return;
+
+    auto go = std::static_pointer_cast<GameObject>(entity);
+    uint32_t entry = go->getEntry();
+    if (entry == 0) return;
+
+    auto cacheIt = gameObjectInfoCache_.find(entry);
+    if (cacheIt == gameObjectInfoCache_.end()) {
+        queryGameObjectInfo(entry, guid);
+        return;
+    }
+
+    const GameObjectQueryResponseData& info = cacheIt->second;
+    uint32_t pageId = 0;
+    // AzerothCore layout:
+    // type 9 (TEXT): data[0]=pageID
+    // type 10 (GOOBER): data[7]=pageId
+    if (info.type == 9) pageId = info.data[0];
+    else if (info.type == 10) pageId = info.data[7];
+
+    if (pageId != 0 && socket && state == WorldState::IN_WORLD) {
+        auto req = PageTextQueryPacket::build(pageId, guid);
+        socket->send(req);
+        return;
+    }
+
+    if (!info.name.empty()) {
+        addSystemChatMessage(info.name);
+    }
+}
+
+void GameHandler::handlePageTextQueryResponse(network::Packet& packet) {
+    PageTextQueryResponseData data;
+    if (!PageTextQueryResponseParser::parse(packet, data)) return;
+
+    if (!data.text.empty()) {
+        std::istringstream iss(data.text);
+        std::string line;
+        bool wrote = false;
+        while (std::getline(iss, line)) {
+            if (line.empty()) continue;
+            addSystemChatMessage(line);
+            wrote = true;
+        }
+        if (!wrote) {
+            addSystemChatMessage(data.text);
+        }
+    }
+}
+
 // ============================================================
 // Item Query
 // ============================================================
@@ -9730,6 +9790,14 @@ void GameHandler::performGameObjectInteractionNow(uint64_t guid) {
             goEntry = go->getEntry();
             goName = go->getName();
             if (auto* info = getCachedGameObjectInfo(goEntry)) goType = info->type;
+            if (goType == 5 && !goName.empty()) {
+                std::string lower = goName;
+                std::transform(lower.begin(), lower.end(), lower.begin(),
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                if (lower.rfind("doodad_", 0) != 0) {
+                    addSystemChatMessage(goName);
+                }
+            }
         }
         // Face object and send heartbeat before use so strict servers don't require
         // a nudge movement to accept interaction.

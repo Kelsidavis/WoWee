@@ -2089,6 +2089,25 @@ bool GameObjectQueryResponseParser::parse(network::Packet& packet, GameObjectQue
     return true;
 }
 
+network::Packet PageTextQueryPacket::build(uint32_t pageId, uint64_t guid) {
+    network::Packet packet(wireOpcode(Opcode::CMSG_PAGE_TEXT_QUERY));
+    packet.writeUInt32(pageId);
+    packet.writeUInt64(guid);
+    return packet;
+}
+
+bool PageTextQueryResponseParser::parse(network::Packet& packet, PageTextQueryResponseData& data) {
+    if (packet.getSize() - packet.getReadPos() < 4) return false;
+    data.pageId = packet.readUInt32();
+    data.text = normalizeWowTextTokens(packet.readString());
+    if (packet.getSize() - packet.getReadPos() >= 4) {
+        data.nextPageId = packet.readUInt32();
+    } else {
+        data.nextPageId = 0;
+    }
+    return data.isValid();
+}
+
 // ---- Item Query ----
 
 network::Packet ItemQueryPacket::build(uint32_t entry, uint64_t guid) {
