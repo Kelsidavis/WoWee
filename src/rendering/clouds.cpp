@@ -139,24 +139,30 @@ bool Clouds::initialize() {
 
             // Generate two cloud layers
             float clouds1 = fbm(samplePos * 1.0);
-            float clouds2 = fbm(samplePos * 2.0 + vec3(100.0));
+            float clouds2 = fbm(samplePos * 2.8 + vec3(100.0));
 
             // Combine layers
             float cloudPattern = clouds1 * 0.6 + clouds2 * 0.4;
 
-            // Apply density threshold to create cloud shapes
-            float cloudMask = smoothstep(0.4 + (1.0 - uDensity) * 0.3, 0.7, cloudPattern);
+            // Apply density threshold to create cloud shapes with softer transition.
+            float cloudStart = 0.34 + (1.0 - uDensity) * 0.26;
+            float cloudEnd = 0.74;
+            float cloudMask = smoothstep(cloudStart, cloudEnd, cloudPattern);
 
-            // Add some variation to cloud edges
-            float edgeNoise = noise(samplePos * 5.0);
-            cloudMask *= smoothstep(0.3, 0.7, edgeNoise);
+            // Fuzzy edge breakup: only modulate near the silhouette so cloud cores stay stable.
+            float edgeNoise = fbm(samplePos * 7.0 + vec3(41.0));
+            float edgeBand = 1.0 - smoothstep(0.30, 0.72, cloudMask); // 1 near edge, 0 in center
+            float fringe = mix(1.0, smoothstep(0.34, 0.80, edgeNoise), edgeBand * 0.95);
+            cloudMask *= fringe;
 
             // Fade clouds near horizon
             float horizonFade = smoothstep(0.0, 0.3, pos.y);
             cloudMask *= horizonFade;
 
-            // Final alpha
-            float alpha = cloudMask * 0.85;
+            // Reduce edge contrast against skybox: soften + lower opacity.
+            float edgeSoften = smoothstep(0.0, 0.80, cloudMask);
+            edgeSoften = mix(0.45, 1.0, edgeSoften);
+            float alpha = cloudMask * edgeSoften * 0.70;
 
             if (alpha < 0.05) {
                 discard;
