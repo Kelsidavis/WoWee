@@ -215,14 +215,23 @@ void LensFlare::render(const Camera& camera, const glm::vec3& sunPosition, float
         return;
     }
 
+    // Sun billboard rendering is sky-locked (view translation removed), so anchor
+    // flare projection to camera position along sun direction to avoid parallax drift.
+    glm::vec3 sunDir = sunPosition;
+    if (glm::length(sunDir) < 0.0001f) {
+        return;
+    }
+    sunDir = glm::normalize(sunDir);
+    glm::vec3 anchoredSunPos = camera.getPosition() + sunDir * 800.0f;
+
     // Calculate sun visibility
-    float visibility = calculateSunVisibility(camera, sunPosition);
+    float visibility = calculateSunVisibility(camera, anchoredSunPos);
     if (visibility < 0.01f) {
         return;
     }
 
     // Get sun screen position
-    glm::vec2 sunScreen = worldToScreen(camera, sunPosition);
+    glm::vec2 sunScreen = worldToScreen(camera, anchoredSunPos);
     glm::vec2 screenCenter(0.0f, 0.0f);
 
     // Vector from sun to screen center
