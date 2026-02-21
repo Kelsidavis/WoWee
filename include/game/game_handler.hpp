@@ -1375,6 +1375,8 @@ private:
     bool autoAttackRequested_ = false;   // local intent (CMSG_ATTACKSWING sent)
     uint64_t autoAttackTarget = 0;
     bool autoAttackOutOfRange_ = false;
+    float autoAttackOutOfRangeTime_ = 0.0f;
+    float autoAttackRangeWarnCooldown_ = 0.0f;
     float autoAttackResendTimer_ = 0.0f;  // Re-send CMSG_ATTACKSWING every ~1s while attacking
     float autoAttackFacingSyncTimer_ = 0.0f; // Periodic facing sync while meleeing
     std::unordered_set<uint64_t> hostileAttackers_;
