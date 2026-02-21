@@ -4472,11 +4472,47 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
         if (hasGroup3 || hasGroup4 || hasGroup8 || hasGroup12 || hasGroup13 || hasGroup15) {
             bool hasRenderableCape = false;
             bool hasEquippedTabard = false;
+            bool hasHumanoidExtra = false;
+            uint8_t extraRaceId = 0;
+            uint8_t extraSexId = 0;
+            uint16_t selectedHairScalp = 1;
+            uint16_t selectedFacial100 = 101;
+            uint16_t selectedFacial200 = 200;
+            uint16_t selectedFacial300 = 300;
+            bool wantsFacialHair = false;
+            std::unordered_set<uint16_t> hairScalpGeosetsForRaceSex;
             if (itDisplayData != displayDataMap_.end() &&
                 itDisplayData->second.extraDisplayId != 0) {
                 auto itExtra = humanoidExtraMap_.find(itDisplayData->second.extraDisplayId);
                 if (itExtra != humanoidExtraMap_.end()) {
+                    hasHumanoidExtra = true;
+                    extraRaceId = itExtra->second.raceId;
+                    extraSexId = itExtra->second.sexId;
                     hasEquippedTabard = (itExtra->second.equipDisplayId[9] != 0);
+                    uint32_t hairKey = (static_cast<uint32_t>(extraRaceId) << 16) |
+                                       (static_cast<uint32_t>(extraSexId) << 8) |
+                                       static_cast<uint32_t>(itExtra->second.hairStyleId);
+                    auto itHairGeo = hairGeosetMap_.find(hairKey);
+                    if (itHairGeo != hairGeosetMap_.end() && itHairGeo->second > 0) {
+                        selectedHairScalp = itHairGeo->second;
+                    }
+                    uint32_t facialKey = (static_cast<uint32_t>(extraRaceId) << 16) |
+                                         (static_cast<uint32_t>(extraSexId) << 8) |
+                                         static_cast<uint32_t>(itExtra->second.facialHairId);
+                    wantsFacialHair = (itExtra->second.facialHairId != 0);
+                    auto itFacial = facialHairGeosetMap_.find(facialKey);
+                    if (itFacial != facialHairGeosetMap_.end()) {
+                        selectedFacial100 = static_cast<uint16_t>(100 + itFacial->second.geoset100);
+                        selectedFacial200 = static_cast<uint16_t>(200 + itFacial->second.geoset200);
+                        selectedFacial300 = static_cast<uint16_t>(300 + itFacial->second.geoset300);
+                    }
+                    for (const auto& [k, v] : hairGeosetMap_) {
+                        uint8_t race = static_cast<uint8_t>((k >> 16) & 0xFF);
+                        uint8_t sex = static_cast<uint8_t>((k >> 8) & 0xFF);
+                        if (race == extraRaceId && sex == extraSexId && v > 0 && v < 100) {
+                            hairScalpGeosetsForRaceSex.insert(v);
+                        }
+                    }
                     auto itemDisplayDbc = assetManager->loadDBC("ItemDisplayInfo.dbc");
                     const auto* idiL = pipeline::getActiveDBCLayout()
                         ? pipeline::getActiveDBCLayout()->getLayout("ItemDisplayInfo") : nullptr;
@@ -4556,6 +4592,46 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                 // Some humanoid models carry cloak cloth in group 16. Strip this too
                 // when no cape is equipped to avoid "everyone has a cape".
                 if (!hasRenderableCape && group == 16) continue;
+                // Group 0 can contain multiple scalp/hair meshes. Keep only the selected
+                // race/sex/style scalp to avoid overlapping broken hair.
+                if (hasHumanoidExtra && sid < 100 && hairScalpGeosetsForRaceSex.count(sid) > 0 && sid != selectedHairScalp) {
+                    continue;
+                }
+                // Group 1 contains connector variants that mirror scalp style.
+                if (hasHumanoidExtra && group == 1) {
+                    const uint16_t selectedConnector = static_cast<uint16_t>(100 + std::max<uint16_t>(selectedHairScalp, 1));
+                    const bool allowSelectedFacial100 = wantsFacialHair &&
+                        sid == selectedFacial100 && allGeosets.count(selectedFacial100) > 0;
+                    const bool allowFacialFallback = wantsFacialHair && (sid == 100 || sid == 101);
+                    if (allowSelectedFacial100) {
+                        normalizedGeosets.insert(sid);
+                        continue;
+                    }
+                    if (allowFacialFallback) {
+                        normalizedGeosets.insert(sid);
+                        continue;
+                    }
+                    if (sid != selectedConnector) {
+                        // Keep fallback connector only when selected one does not exist on this model.
+                        if (sid != 101 || allGeosets.count(selectedConnector) > 0) {
+                            continue;
+                        }
+                    }
+                }
+                // Group 2 carries facial hair variants.
+                if (hasHumanoidExtra && group == 2) {
+                    const bool allowSelectedFacial200 = wantsFacialHair &&
+                        sid == selectedFacial200 && allGeosets.count(selectedFacial200) > 0;
+                    const bool allowFacial200Fallback = wantsFacialHair && (sid == 200 || sid == 201);
+                    if (!allowSelectedFacial200 && !allowFacial200Fallback) {
+                        continue;
+                    }
+                    // If selected variant exists, do not keep fallback variants.
+                    if (allowFacial200Fallback && allGeosets.count(selectedFacial200) > 0 &&
+                        sid != selectedFacial200) {
+                        continue;
+                    }
+                }
                 normalizedGeosets.insert(sid);
             }
 
@@ -4580,6 +4656,13 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
             if (hasGroup12 && hasEquippedTabard) {
                 uint16_t tabardSid = pickFromGroup(1201, 12);
                 if (tabardSid != 0) normalizedGeosets.insert(tabardSid);
+            }
+
+            // Some mustache/goatee variants are authored in facial group 3xx.
+            // Re-add only the selected facial 3xx geoset (not generic 3xx arm meshes).
+            if (hasHumanoidExtra && wantsFacialHair) {
+                uint16_t facial300Sid = pickFromGroup(selectedFacial300, 3);
+                if (facial300Sid != 0) normalizedGeosets.insert(facial300Sid);
             }
 
             // Prefer trousers geoset, not robe/kilt overlays.
