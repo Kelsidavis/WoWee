@@ -101,6 +101,7 @@ private:
     bool pendingSeparateBags = true;
     bool pendingAutoLoot = false;
     bool pendingUseOriginalSoundtrack = true;
+    int pendingGroundClutterDensity = 100;
 
     // UI element transparency (0.0 = fully transparent, 1.0 = fully opaque)
     float uiOpacity_ = 0.65f;

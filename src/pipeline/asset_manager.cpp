@@ -222,7 +222,9 @@ std::shared_ptr<DBCFile> AssetManager::loadDBC(const std::string& name) {
         (name == "CreatureDisplayInfo.dbc" ||
          name == "CreatureDisplayInfoExtra.dbc" ||
          name == "ItemDisplayInfo.dbc" ||
-         name == "CreatureModelData.dbc");
+         name == "CreatureModelData.dbc" ||
+         name == "GroundEffectTexture.dbc" ||
+         name == "GroundEffectDoodad.dbc");
 
     // Try expansion-specific CSV first (e.g. Data/expansions/wotlk/db/Spell.csv)
     bool loadedFromCSV = false;

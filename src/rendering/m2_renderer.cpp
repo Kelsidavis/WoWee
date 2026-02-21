@@ -38,6 +38,14 @@ bool envFlagEnabled(const char* key, bool defaultValue) {
 static constexpr uint32_t kParticleFlagRandomized = 0x40;
 static constexpr uint32_t kParticleFlagTiled = 0x80;
 
+float computeGroundDetailDownOffset(const M2ModelGPU& model, float scale) {
+    // Keep a tiny sink to avoid hovering, but cap pivot compensation so details
+    // don't get pushed below the terrain on models with large positive boundMin.
+    const float pivotComp = glm::clamp(std::max(0.0f, model.boundMin.z * scale), 0.0f, 0.10f);
+    const float terrainSink = 0.03f;
+    return pivotComp + terrainSink;
+}
+
 void getTightCollisionBounds(const M2ModelGPU& model, glm::vec3& outMin, glm::vec3& outMax) {
     glm::vec3 center = (model.boundMin + model.boundMax) * 0.5f;
     glm::vec3 half = (model.boundMax - model.boundMin) * 0.5f;
@@ -874,6 +882,7 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
     }
     bool foliageOrTreeLike = false;
     bool chestName = false;
+    bool groundDetailModel = false;
     {
         std::string lowerName = model.name;
         std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
@@ -969,6 +978,9 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             (lowerName.find("coral") != std::string::npos);
         bool treeLike = (lowerName.find("tree") != std::string::npos);
         foliageOrTreeLike = (foliageName || treeLike);
+        groundDetailModel =
+            (lowerName.find("\\nodxt\\detail\\") != std::string::npos) ||
+            (lowerName.find("\\detail\\") != std::string::npos);
         bool hardTreePart =
             (lowerName.find("trunk") != std::string::npos) ||
             (lowerName.find("stump") != std::string::npos) ||
@@ -1038,6 +1050,11 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
         }
     }
     gpuModel.disableAnimation = foliageOrTreeLike || chestName;
+    gpuModel.isGroundDetail = groundDetailModel;
+    if (groundDetailModel) {
+        // Ground clutter (grass/pebbles/detail cards) should never block camera/movement.
+        gpuModel.collisionNoBlock = true;
+    }
     // Spell effect models: particle-dominated with minimal geometry (e.g. LevelUp.m2)
     gpuModel.isSpellEffect = hasParticles && model.vertices.size() <= 200 &&
                               model.particleEmitters.size() >= 3;
@@ -1133,14 +1150,21 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
     if (assetManager) {
         for (size_t ti = 0; ti < model.textures.size(); ti++) {
             const auto& tex = model.textures[ti];
-            if (!tex.filename.empty()) {
-                GLuint texId = loadTexture(tex.filename, tex.flags);
+            std::string texPath = tex.filename;
+            // Some extracted M2 texture strings contain embedded NUL + garbage suffix.
+            // Truncate at first NUL so valid paths like "...foo.blp\0junk" still resolve.
+            size_t nul = texPath.find('\0');
+            if (nul != std::string::npos) {
+                texPath.resize(nul);
+            }
+            if (!texPath.empty()) {
+                GLuint texId = loadTexture(texPath, tex.flags);
                 bool failed = (texId == whiteTexture);
                 if (failed) {
-                    LOG_WARNING("M2 model ", model.name, " texture[", ti, "] failed to load: ", tex.filename);
+                    LOG_WARNING("M2 model ", model.name, " texture[", ti, "] failed to load: ", texPath);
                 }
                 if (isInvisibleTrap) {
-                    LOG_INFO("  InvisibleTrap texture[", ti, "]: ", tex.filename, " -> ", (failed ? "WHITE" : "OK"));
+                    LOG_INFO("  InvisibleTrap texture[", ti, "]: ", texPath, " -> ", (failed ? "WHITE" : "OK"));
                 }
                 allTextures.push_back(texId);
                 textureLoadFailed.push_back(failed);
@@ -1207,6 +1231,15 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
                 tex = allTextures[0];
                 texFailed = !textureLoadFailed.empty() && textureLoadFailed[0];
             }
+
+            if (texFailed && groundDetailModel) {
+                static const std::string kDetailFallbackTexture = "World\\NoDXT\\Detail\\8des_detaildoodads01.blp";
+                GLuint fallbackTex = loadTexture(kDetailFallbackTexture, 0);
+                if (fallbackTex != 0 && fallbackTex != whiteTexture) {
+                    tex = fallbackTex;
+                    texFailed = false;
+                }
+            }
             bgpu.texture = tex;
             bool texHasAlpha = false;
             if (tex != 0 && tex != whiteTexture) {
@@ -1228,7 +1261,8 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             // Batch is hidden only when its named texture failed to load (avoids white shell artifacts).
             // Do NOT bake transparency/color animation tracks here — they animate over time and
             // baking the first keyframe value causes legitimate meshes to become invisible.
-            bgpu.batchOpacity = texFailed ? 0.0f : 1.0f;
+            // Keep terrain clutter visible even when source texture paths are malformed.
+            bgpu.batchOpacity = (texFailed && !groundDetailModel) ? 0.0f : 1.0f;
 
             // Compute batch center and radius for glow sprite positioning
             if ((bgpu.blendMode >= 3 || bgpu.colorKeyBlack) && batch.indexCount > 0) {
@@ -1301,7 +1335,8 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
     // Detect particle emitter volume models: box mesh (24 verts, 36 indices)
     // with disproportionately large bounds. These are invisible bounding volumes
     // that only exist to spawn particles — their mesh should never be rendered.
-    if (!isInvisibleTrap && gpuModel.vertexCount <= 24 && gpuModel.indexCount <= 36
+    if (!isInvisibleTrap && !groundDetailModel &&
+        gpuModel.vertexCount <= 24 && gpuModel.indexCount <= 36
         && !model.particleEmitters.empty()) {
         glm::vec3 size = gpuModel.boundMax - gpuModel.boundMin;
         float maxDim = std::max({size.x, size.y, size.z});
@@ -1323,17 +1358,23 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
 
 uint32_t M2Renderer::createInstance(uint32_t modelId, const glm::vec3& position,
                                      const glm::vec3& rotation, float scale) {
-    if (models.find(modelId) == models.end()) {
+    auto modelIt = models.find(modelId);
+    if (modelIt == models.end()) {
         LOG_WARNING("Cannot create instance: model ", modelId, " not loaded");
         return 0;
     }
+    const auto& mdlRef = modelIt->second;
 
-    // Deduplicate: skip if same model already at nearly the same position
-    for (const auto& existing : instances) {
-        if (existing.modelId == modelId) {
-            glm::vec3 d = existing.position - position;
-            if (glm::dot(d, d) < 0.01f) {
-                return existing.id;
+    // Ground clutter is procedurally scattered and high-count; avoid O(N) dedup
+    // scans that can hitch when new tiles stream in.
+    if (!mdlRef.isGroundDetail) {
+        // Deduplicate: skip if same model already at nearly the same position
+        for (const auto& existing : instances) {
+            if (existing.modelId == modelId) {
+                glm::vec3 d = existing.position - position;
+                if (glm::dot(d, d) < 0.01f) {
+                    return existing.id;
+                }
             }
         }
     }
@@ -1342,15 +1383,18 @@ uint32_t M2Renderer::createInstance(uint32_t modelId, const glm::vec3& position,
     instance.id = nextInstanceId++;
     instance.modelId = modelId;
     instance.position = position;
+    if (mdlRef.isGroundDetail) {
+        instance.position.z -= computeGroundDetailDownOffset(mdlRef, scale);
+    }
     instance.rotation = rotation;
     instance.scale = scale;
     instance.updateModelMatrix();
     glm::vec3 localMin, localMax;
-    getTightCollisionBounds(models[modelId], localMin, localMax);
+    getTightCollisionBounds(mdlRef, localMin, localMax);
     transformAABB(instance.modelMatrix, localMin, localMax, instance.worldBoundsMin, instance.worldBoundsMax);
 
     // Initialize animation: play first sequence (usually Stand/Idle)
-    const auto& mdl = models[modelId];
+    const auto& mdl = mdlRef;
     if (mdl.hasAnimation && !mdl.disableAnimation && !mdl.sequences.empty()) {
         instance.currentSequenceIndex = 0;
         instance.idleSequenceIndex = 0;
@@ -1876,6 +1920,10 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
         if (model.disableAnimation) {
             effectiveMaxDistSq *= 2.6f;
         }
+        if (model.isGroundDetail) {
+            // Keep clutter local so distant grass doesn't overdraw the scene.
+            effectiveMaxDistSq *= 0.45f;
+        }
         // Removed aggressive small-object distance caps to prevent city pop-out
         // Small props (barrels, lanterns, etc.) now use same distance as larger objects
         if (distSq > effectiveMaxDistSq) continue;
@@ -1961,8 +2009,12 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
         }
 
         // Always update per-instance uniforms (these change every instance)
+        float instanceFadeAlpha = fadeAlpha;
+        if (model.isGroundDetail) {
+            instanceFadeAlpha *= 0.82f;
+        }
         shader->setUniform("uModel", instance.modelMatrix);
-        shader->setUniform("uFadeAlpha", fadeAlpha);
+        shader->setUniform("uFadeAlpha", instanceFadeAlpha);
 
         // Track interior darken state to avoid redundant updates
         if (insideInterior != lastInteriorDarken) {
@@ -1983,7 +2035,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
         }
 
         // Disable depth writes for fading objects to avoid z-fighting
-        if (fadeAlpha < 1.0f) {
+        if (instanceFadeAlpha < 1.0f) {
             if (depthMaskState) {
                 glDepthMask(GL_FALSE);
                 depthMaskState = false;
@@ -2032,7 +2084,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             if (batch.indexCount == 0) continue;
 
             // Skip batches that don't match target LOD level
-            if (batch.submeshLevel != targetLOD) continue;
+            if (!model.isGroundDetail && batch.submeshLevel != targetLOD) continue;
 
             // Skip batches with zero opacity from texture weight tracks (should be invisible)
             if (batch.batchOpacity < 0.01f) continue;
@@ -2095,6 +2147,10 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             if (model.isSpellEffect && (effectiveBlendMode == 4 || effectiveBlendMode == 5)) {
                 effectiveBlendMode = 3; // Additive
             }
+            if (model.isGroundDetail) {
+                // Use regular alpha blending for detail cards to avoid hard cutout loss.
+                effectiveBlendMode = 2;
+            }
             if (effectiveBlendMode != lastBlendMode) {
                 switch (effectiveBlendMode) {
                     case 0: // Opaque
@@ -2135,7 +2191,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
             }
 
             // Disable depth writes for transparent/additive batches
-            if (batchTransparent && fadeAlpha >= 1.0f) {
+            if (batchTransparent && instanceFadeAlpha >= 1.0f) {
                 if (depthMaskState) {
                     glDepthMask(GL_FALSE);
                     depthMaskState = false;
@@ -2144,6 +2200,10 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
 
             // Unlit: material flag 0x01 (only update if changed)
             bool unlit = (batch.materialFlags & 0x01) != 0;
+            if (model.isGroundDetail) {
+                // Ground clutter should receive scene lighting so it doesn't glow.
+                unlit = false;
+            }
             if (unlit != lastUnlit) {
                 shader->setUniform("uUnlit", unlit);
                 lastUnlit = unlit;
@@ -2158,6 +2218,9 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
 
             bool alphaTest = (effectiveBlendMode == 1) ||
                              (effectiveBlendMode >= 2 && !batch.hasAlpha);
+            if (model.isGroundDetail) {
+                alphaTest = false;
+            }
             if (alphaTest != lastAlphaTest) {
                 shader->setUniform("uAlphaTest", alphaTest);
                 lastAlphaTest = alphaTest;

@@ -5,6 +5,7 @@
 #include "core/spawn_presets.hpp"
 #include "core/input.hpp"
 #include "rendering/renderer.hpp"
+#include "rendering/terrain_manager.hpp"
 #include "rendering/minimap.hpp"
 #include "rendering/character_renderer.hpp"
 #include "rendering/camera.hpp"
@@ -205,6 +206,9 @@ void GameScreen::render(game::GameHandler& gameHandler) {
             }
             if (auto* zm = renderer->getZoneManager()) {
                 zm->setUseOriginalSoundtrack(pendingUseOriginalSoundtrack);
+            }
+            if (auto* tm = renderer->getTerrainManager()) {
+                tm->setGroundClutterDensityScale(static_cast<float>(pendingGroundClutterDensity) / 100.0f);
             }
             // Restore mute state: save actual master volume first, then apply mute
             if (soundMuted_) {
@@ -5774,6 +5778,7 @@ void GameScreen::renderSettingsWindow() {
     constexpr int kDefaultMusicVolume = 30;
     constexpr float kDefaultMouseSensitivity = 0.2f;
     constexpr bool kDefaultInvertMouse = false;
+    constexpr int kDefaultGroundClutterDensity = 100;
 
     int defaultResIndex = 0;
     for (int i = 0; i < kResCount; i++) {
@@ -5853,6 +5858,14 @@ void GameScreen::renderSettingsWindow() {
                     if (renderer) renderer->setShadowsEnabled(pendingShadows);
                     saveSettings();
                 }
+                if (ImGui::SliderInt("Ground Clutter Density", &pendingGroundClutterDensity, 0, 150, "%d%%")) {
+                    if (renderer) {
+                        if (auto* tm = renderer->getTerrainManager()) {
+                            tm->setGroundClutterDensityScale(static_cast<float>(pendingGroundClutterDensity) / 100.0f);
+                        }
+                    }
+                    saveSettings();
+                }
 
                 const char* resLabel = "Resolution";
                 const char* resItems[kResCount];
@@ -5874,11 +5887,17 @@ void GameScreen::renderSettingsWindow() {
                     pendingFullscreen = kDefaultFullscreen;
                     pendingVsync = kDefaultVsync;
                     pendingShadows = kDefaultShadows;
+                    pendingGroundClutterDensity = kDefaultGroundClutterDensity;
                     pendingResIndex = defaultResIndex;
                     window->setFullscreen(pendingFullscreen);
                     window->setVsync(pendingVsync);
                     window->applyResolution(kResolutions[pendingResIndex][0], kResolutions[pendingResIndex][1]);
                     if (renderer) renderer->setShadowsEnabled(pendingShadows);
+                    if (renderer) {
+                        if (auto* tm = renderer->getTerrainManager()) {
+                            tm->setGroundClutterDensityScale(static_cast<float>(pendingGroundClutterDensity) / 100.0f);
+                        }
+                    }
                     saveSettings();
                 }
 
@@ -6803,6 +6822,7 @@ void GameScreen::saveSettings() {
 
     // Gameplay
     out << "auto_loot=" << (pendingAutoLoot ? 1 : 0) << "\n";
+    out << "ground_clutter_density=" << pendingGroundClutterDensity << "\n";
 
     // Controls
     out << "mouse_sensitivity=" << pendingMouseSensitivity << "\n";
@@ -6879,6 +6899,7 @@ void GameScreen::loadSettings() {
             else if (key == "activity_volume") pendingActivityVolume = std::clamp(std::stoi(val), 0, 100);
             // Gameplay
             else if (key == "auto_loot") pendingAutoLoot = (std::stoi(val) != 0);
+            else if (key == "ground_clutter_density") pendingGroundClutterDensity = std::clamp(std::stoi(val), 0, 150);
             // Controls
             else if (key == "mouse_sensitivity") pendingMouseSensitivity = std::clamp(std::stof(val), 0.05f, 1.0f);
             else if (key == "invert_mouse") pendingInvertMouse = (std::stoi(val) != 0);

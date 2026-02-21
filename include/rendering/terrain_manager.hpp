@@ -19,6 +19,7 @@
 #include <condition_variable>
 #include <deque>
 #include <glm/glm.hpp>
+#include <array>
 
 namespace wowee {
 
@@ -191,6 +192,8 @@ public:
     void setStreamingEnabled(bool enabled) { streamingEnabled = enabled; }
     void setUpdateInterval(float seconds) { updateInterval = seconds; }
     void setTaxiStreamingMode(bool enabled) { taxiStreamingMode_ = enabled; }
+    void setGroundClutterDensityScale(float scale) { groundClutterDensityScale_ = glm::clamp(scale, 0.0f, 1.5f); }
+    float getGroundClutterDensityScale() const { return groundClutterDensityScale_; }
     void setWaterRenderer(WaterRenderer* renderer) { waterRenderer = renderer; }
     void setM2Renderer(M2Renderer* renderer) { m2Renderer = renderer; }
     void setWMORenderer(WMORenderer* renderer) { wmoRenderer = renderer; }
@@ -264,6 +267,9 @@ private:
      * Main thread: poll for completed tiles and upload to GPU
      */
     void processReadyTiles();
+    void ensureGroundEffectTablesLoaded();
+    void generateGroundClutterPlacements(std::shared_ptr<PendingTile>& pending,
+                                         std::unordered_set<uint32_t>& preparedModelIds);
 
     pipeline::AssetManager* assetManager = nullptr;
     TerrainRenderer* terrainRenderer = nullptr;
@@ -345,6 +351,16 @@ private:
     static constexpr int MAX_M2_UPLOADS_PER_FRAME = 5;  // Upload up to 5 models per frame
 
     void processM2UploadQueue();
+
+    struct GroundEffectEntry {
+        std::array<uint32_t, 4> doodadIds{{0, 0, 0, 0}};
+        std::array<uint32_t, 4> weights{{0, 0, 0, 0}};
+        uint32_t density = 0;
+    };
+    bool groundEffectsLoaded_ = false;
+    std::unordered_map<uint32_t, GroundEffectEntry> groundEffectById_; // effectId -> config
+    std::unordered_map<uint32_t, std::string> groundDoodadModelById_;  // doodadId -> model path
+    float groundClutterDensityScale_ = 1.0f;
 };
 
 } // namespace rendering

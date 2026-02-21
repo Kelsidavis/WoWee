@@ -2156,7 +2156,7 @@ bool CharacterRenderer::attachWeapon(uint32_t charInstanceId, uint32_t attachmen
     wa.offset = offset;
     charInstance.weaponAttachments.push_back(wa);
 
-    core::Logger::getInstance().info("Attached weapon model ", weaponModelId,
+    core::Logger::getInstance().debug("Attached weapon model ", weaponModelId,
         " to instance ", charInstanceId, " at attachment ", attachmentId,
         " (bone ", boneIndex, ", offset ", offset.x, ",", offset.y, ",", offset.z, ")");
     return true;

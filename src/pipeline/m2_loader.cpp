@@ -368,12 +368,15 @@ std::string readString(const std::vector<uint8_t>& data, uint32_t offset, uint32
         return "";
     }
 
-    // Strip trailing null bytes (M2 nameLength includes \0)
-    while (length > 0 && data[offset + length - 1] == 0) {
-        length--;
+    // M2 string blocks are C-strings. Some extracted files have a valid
+    // string terminated early with embedded NUL and garbage bytes after it.
+    // Respect first NUL within the declared length.
+    uint32_t actualLen = 0;
+    while (actualLen < length && data[offset + actualLen] != 0) {
+        actualLen++;
     }
 
-    return std::string(reinterpret_cast<const char*>(&data[offset]), length);
+    return std::string(reinterpret_cast<const char*>(&data[offset]), actualLen);
 }
 
 enum class TrackType { VEC3, QUAT_COMPRESSED, FLOAT };

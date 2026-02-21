@@ -2645,6 +2645,19 @@ bool Application::tryAttachCreatureVirtualWeapons(uint64_t guid, uint32_t instan
 
     auto entity = gameHandler->getEntityManager().getEntity(guid);
     if (!entity || entity->getType() != game::ObjectType::UNIT) return false;
+    auto unit = std::static_pointer_cast<game::Unit>(entity);
+    if (!unit) return false;
+
+    // Virtual weapons are only appropriate for humanoid-style displays.
+    // Non-humanoids (wolves/boars/etc.) can expose non-zero virtual item fields
+    // and otherwise end up with comedic floating weapons.
+    uint32_t displayId = unit->getDisplayId();
+    auto dIt = displayDataMap_.find(displayId);
+    if (dIt == displayDataMap_.end()) return false;
+    uint32_t extraDisplayId = dIt->second.extraDisplayId;
+    if (extraDisplayId == 0 || humanoidExtraMap_.find(extraDisplayId) == humanoidExtraMap_.end()) {
+        return false;
+    }
 
     auto itemDisplayDbc = assetManager->loadDBC("ItemDisplayInfo.dbc");
     if (!itemDisplayDbc) return false;

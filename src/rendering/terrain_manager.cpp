@@ -82,6 +82,12 @@ bool decodeLayerAlpha(const pipeline::MapChunk& chunk, size_t layerIdx, std::vec
     return false;
 }
 
+std::string toLowerCopy(std::string v) {
+    std::transform(v.begin(), v.end(), v.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return v;
+}
+
 } // namespace
 
 TerrainManager::TerrainManager() {
@@ -255,6 +261,63 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
         return nullptr;
     }
 
+    // WotLK split ADTs can store placements in *_obj0.adt.
+    // Merge object chunks so doodads/WMOs (including ground clutter) are available.
+    std::string objPath = "World\\Maps\\" + mapName + "\\" + mapName + "_" +
+                          std::to_string(coord.x) + "_" + std::to_string(coord.y) + "_obj0.adt";
+    auto objData = assetManager->readFile(objPath);
+    if (!objData.empty()) {
+        pipeline::ADTTerrain objTerrain = pipeline::ADTLoader::load(objData);
+        if (objTerrain.isLoaded()) {
+            const uint32_t doodadNameBase = static_cast<uint32_t>(terrain.doodadNames.size());
+            const uint32_t wmoNameBase = static_cast<uint32_t>(terrain.wmoNames.size());
+
+            terrain.doodadNames.insert(terrain.doodadNames.end(),
+                                       objTerrain.doodadNames.begin(), objTerrain.doodadNames.end());
+            terrain.wmoNames.insert(terrain.wmoNames.end(),
+                                    objTerrain.wmoNames.begin(), objTerrain.wmoNames.end());
+
+            std::unordered_set<uint32_t> existingDoodadUniqueIds;
+            existingDoodadUniqueIds.reserve(terrain.doodadPlacements.size());
+            for (const auto& p : terrain.doodadPlacements) {
+                if (p.uniqueId != 0) existingDoodadUniqueIds.insert(p.uniqueId);
+            }
+
+            size_t mergedDoodads = 0;
+            for (auto placement : objTerrain.doodadPlacements) {
+                if (placement.nameId >= objTerrain.doodadNames.size()) continue;
+                placement.nameId += doodadNameBase;
+                if (placement.uniqueId != 0 && !existingDoodadUniqueIds.insert(placement.uniqueId).second) {
+                    continue;
+                }
+                terrain.doodadPlacements.push_back(placement);
+                mergedDoodads++;
+            }
+
+            std::unordered_set<uint32_t> existingWmoUniqueIds;
+            existingWmoUniqueIds.reserve(terrain.wmoPlacements.size());
+            for (const auto& p : terrain.wmoPlacements) {
+                if (p.uniqueId != 0) existingWmoUniqueIds.insert(p.uniqueId);
+            }
+
+            size_t mergedWmos = 0;
+            for (auto placement : objTerrain.wmoPlacements) {
+                if (placement.nameId >= objTerrain.wmoNames.size()) continue;
+                placement.nameId += wmoNameBase;
+                if (placement.uniqueId != 0 && !existingWmoUniqueIds.insert(placement.uniqueId).second) {
+                    continue;
+                }
+                terrain.wmoPlacements.push_back(placement);
+                mergedWmos++;
+            }
+
+            if (mergedDoodads > 0 || mergedWmos > 0) {
+                LOG_DEBUG("Merged obj0 tile [", x, ",", y, "]: +", mergedDoodads,
+                          " doodads, +", mergedWmos, " WMOs");
+            }
+        }
+    }
+
     // Set tile coordinates so mesh knows where to position this tile in world
     terrain.coord.x = x;
     terrain.coord.y = y;
@@ -271,94 +334,98 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
     pending->terrain = std::move(terrain);
     pending->mesh = std::move(mesh);
 
+    std::unordered_set<uint32_t> preparedModelIds;
+    auto ensureModelPrepared = [&](const std::string& m2Path,
+                                   uint32_t modelId,
+                                   int& skippedFileNotFound,
+                                   int& skippedInvalid,
+                                   int& skippedSkinNotFound) -> bool {
+        if (preparedModelIds.find(modelId) != preparedModelIds.end()) return true;
+
+        std::vector<uint8_t> m2Data = assetManager->readFile(m2Path);
+        if (m2Data.empty()) {
+            skippedFileNotFound++;
+            LOG_WARNING("M2 file not found: ", m2Path);
+            return false;
+        }
+
+        pipeline::M2Model m2Model = pipeline::M2Loader::load(m2Data);
+        if (m2Model.name.empty()) {
+            m2Model.name = m2Path;
+        }
+        std::string skinPath = m2Path.substr(0, m2Path.size() - 3) + "00.skin";
+        std::vector<uint8_t> skinData = assetManager->readFileOptional(skinPath);
+        if (!skinData.empty() && m2Model.version >= 264) {
+            pipeline::M2Loader::loadSkin(skinData, m2Model);
+        } else if (skinData.empty() && m2Model.version >= 264) {
+            skippedSkinNotFound++;
+        }
+
+        if (!m2Model.isValid()) {
+            skippedInvalid++;
+            LOG_DEBUG("M2 model invalid (no verts/indices): ", m2Path);
+            return false;
+        }
+
+        PendingTile::M2Ready ready;
+        ready.modelId = modelId;
+        ready.model = std::move(m2Model);
+        ready.path = m2Path;
+        pending->m2Models.push_back(std::move(ready));
+        preparedModelIds.insert(modelId);
+        return true;
+    };
+
     // Pre-load M2 doodads (CPU: read files, parse models)
-    if (!pending->terrain.doodadPlacements.empty()) {
-        std::unordered_set<uint32_t> preparedModelIds;
+    int skippedNameId = 0, skippedFileNotFound = 0, skippedInvalid = 0, skippedSkinNotFound = 0;
+    for (const auto& placement : pending->terrain.doodadPlacements) {
+        if (placement.nameId >= pending->terrain.doodadNames.size()) {
+            skippedNameId++;
+            continue;
+        }
 
-        int skippedNameId = 0, skippedFileNotFound = 0, skippedInvalid = 0, skippedSkinNotFound = 0;
-
-        for (const auto& placement : pending->terrain.doodadPlacements) {
-            if (placement.nameId >= pending->terrain.doodadNames.size()) {
-                skippedNameId++;
-                continue;
-            }
-
-            std::string m2Path = pending->terrain.doodadNames[placement.nameId];
-
-            // Convert .mdx to .m2 if needed
-            if (m2Path.size() > 4) {
-                std::string ext = m2Path.substr(m2Path.size() - 4);
-                for (char& c : ext) c = std::tolower(c);
-                if (ext == ".mdx") {
-                    m2Path = m2Path.substr(0, m2Path.size() - 4) + ".m2";
-                }
-            }
-
-            // Use path hash as globally unique model ID (nameId is per-tile local)
-            uint32_t modelId = static_cast<uint32_t>(std::hash<std::string>{}(m2Path));
-
-            // Parse model if not already done for this tile
-            if (preparedModelIds.find(modelId) == preparedModelIds.end()) {
-                std::vector<uint8_t> m2Data = assetManager->readFile(m2Path);
-                if (!m2Data.empty()) {
-                    pipeline::M2Model m2Model = pipeline::M2Loader::load(m2Data);
-
-                    // Try to load skin file (only for WotLK M2s - vanilla has embedded skin)
-                    std::string skinPath = m2Path.substr(0, m2Path.size() - 3) + "00.skin";
-                    std::vector<uint8_t> skinData = assetManager->readFile(skinPath);
-                    if (!skinData.empty() && m2Model.version >= 264) {
-                        pipeline::M2Loader::loadSkin(skinData, m2Model);
-                    } else if (skinData.empty() && m2Model.version >= 264) {
-                        skippedSkinNotFound++;
-                        LOG_WARNING("M2 skin not found: ", skinPath);
-                    }
-
-                    if (m2Model.isValid()) {
-                        PendingTile::M2Ready ready;
-                        ready.modelId = modelId;
-                        ready.model = std::move(m2Model);
-                        ready.path = m2Path;
-                        pending->m2Models.push_back(std::move(ready));
-                        preparedModelIds.insert(modelId);
-                    } else {
-                        skippedInvalid++;
-                        LOG_DEBUG("M2 model invalid (no verts/indices): ", m2Path);
-                    }
-                } else {
-                    skippedFileNotFound++;
-                    LOG_WARNING("M2 file not found: ", m2Path);
-                }
-            }
-
-            // Store placement data for instance creation on main thread
-            if (preparedModelIds.count(modelId)) {
-                float wowX = placement.position[0];
-                float wowY = placement.position[1];
-                float wowZ = placement.position[2];
-                glm::vec3 glPos = core::coords::adtToWorld(wowX, wowY, wowZ);
-
-                PendingTile::M2Placement p;
-                p.modelId = modelId;
-                p.uniqueId = placement.uniqueId;
-                p.position = glPos;
-                p.rotation = glm::vec3(
-                    -placement.rotation[2] * 3.14159f / 180.0f,
-                    -placement.rotation[0] * 3.14159f / 180.0f,
-                    (placement.rotation[1] + 180.0f) * 3.14159f / 180.0f
-                );
-                p.scale = placement.scale / 1024.0f;
-                pending->m2Placements.push_back(p);
+        std::string m2Path = pending->terrain.doodadNames[placement.nameId];
+        if (m2Path.size() > 4) {
+            std::string ext = toLowerCopy(m2Path.substr(m2Path.size() - 4));
+            if (ext == ".mdx") {
+                m2Path = m2Path.substr(0, m2Path.size() - 4) + ".m2";
             }
         }
 
-        if (skippedNameId > 0 || skippedFileNotFound > 0 || skippedInvalid > 0) {
-            LOG_DEBUG("Tile [", x, ",", y, "] doodad issues: ",
-                       skippedNameId, " bad nameId, ",
-                       skippedFileNotFound, " file not found, ",
-                       skippedInvalid, " invalid model, ",
-                       skippedSkinNotFound, " skin not found");
+        uint32_t modelId = static_cast<uint32_t>(std::hash<std::string>{}(m2Path));
+        if (!ensureModelPrepared(m2Path, modelId, skippedFileNotFound, skippedInvalid, skippedSkinNotFound)) {
+            continue;
         }
+
+        float wowX = placement.position[0];
+        float wowY = placement.position[1];
+        float wowZ = placement.position[2];
+        glm::vec3 glPos = core::coords::adtToWorld(wowX, wowY, wowZ);
+
+        PendingTile::M2Placement p;
+        p.modelId = modelId;
+        p.uniqueId = placement.uniqueId;
+        p.position = glPos;
+        p.rotation = glm::vec3(
+            -placement.rotation[2] * 3.14159f / 180.0f,
+            -placement.rotation[0] * 3.14159f / 180.0f,
+            (placement.rotation[1] + 180.0f) * 3.14159f / 180.0f
+        );
+        p.scale = placement.scale / 1024.0f;
+        pending->m2Placements.push_back(p);
     }
+
+    if (skippedNameId > 0 || skippedFileNotFound > 0 || skippedInvalid > 0 || skippedSkinNotFound > 0) {
+        LOG_DEBUG("Tile [", x, ",", y, "] doodad issues: ",
+                  skippedNameId, " bad nameId, ",
+                  skippedFileNotFound, " file not found, ",
+                  skippedInvalid, " invalid model, ",
+                  skippedSkinNotFound, " skin not found");
+    }
+
+    // Procedural ground clutter from terrain layer effectId -> GroundEffectTexture/Doodad DBCs.
+    ensureGroundEffectTablesLoaded();
+    generateGroundClutterPlacements(pending, preparedModelIds);
 
     // Pre-load WMOs (CPU: read files, parse models and groups)
     if (!pending->terrain.wmoPlacements.empty()) {
@@ -445,6 +512,9 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
                         if (m2Data.empty()) continue;
 
                         pipeline::M2Model m2Model = pipeline::M2Loader::load(m2Data);
+                        if (m2Model.name.empty()) {
+                            m2Model.name = m2Path;
+                        }
                         std::string skinPath = m2Path.substr(0, m2Path.size() - 3) + "00.skin";
                         std::vector<uint8_t> skinData = assetManager->readFile(skinPath);
                         if (!skinData.empty() && m2Model.version >= 264) {
@@ -675,15 +745,17 @@ void TerrainManager::finalizeTile(const std::shared_ptr<PendingTile>& pending) {
         int skippedDedup = 0;
         for (const auto& p : pending->m2Placements) {
             // Skip if this doodad was already placed by a neighboring tile
-            if (placedDoodadIds.count(p.uniqueId)) {
+            if (p.uniqueId != 0 && placedDoodadIds.count(p.uniqueId)) {
                 skippedDedup++;
                 continue;
             }
             uint32_t instId = m2Renderer->createInstance(p.modelId, p.position, p.rotation, p.scale);
             if (instId) {
                 m2InstanceIds.push_back(instId);
-                placedDoodadIds.insert(p.uniqueId);
-                tileUniqueIds.push_back(p.uniqueId);
+                if (p.uniqueId != 0) {
+                    placedDoodadIds.insert(p.uniqueId);
+                    tileUniqueIds.push_back(p.uniqueId);
+                }
                 loadedDoodads++;
             }
         }
@@ -1146,6 +1218,406 @@ std::string TerrainManager::getADTPath(const TileCoord& coord) const {
     // Format: World\Maps\{MapName}\{MapName}_{X}_{Y}.adt
     return "World\\Maps\\" + mapName + "\\" + mapName + "_" +
            std::to_string(coord.x) + "_" + std::to_string(coord.y) + ".adt";
+}
+
+void TerrainManager::ensureGroundEffectTablesLoaded() {
+    if (groundEffectsLoaded_ || !assetManager) return;
+    groundEffectsLoaded_ = true;
+
+    auto groundEffectTex = assetManager->loadDBC("GroundEffectTexture.dbc");
+    auto groundEffectDoodad = assetManager->loadDBC("GroundEffectDoodad.dbc");
+    if (!groundEffectTex || !groundEffectDoodad) {
+        LOG_WARNING("Ground clutter DBCs missing; skipping procedural ground effects");
+        return;
+    }
+
+    // GroundEffectTexture: id + 4 doodad IDs + 4 weights + density + sound
+    for (uint32_t i = 0; i < groundEffectTex->getRecordCount(); ++i) {
+        uint32_t effectId = groundEffectTex->getUInt32(i, 0);
+        if (effectId == 0) continue;
+
+        GroundEffectEntry e;
+        e.doodadIds[0] = groundEffectTex->getUInt32(i, 1);
+        e.doodadIds[1] = groundEffectTex->getUInt32(i, 2);
+        e.doodadIds[2] = groundEffectTex->getUInt32(i, 3);
+        e.doodadIds[3] = groundEffectTex->getUInt32(i, 4);
+        e.weights[0] = groundEffectTex->getUInt32(i, 5);
+        e.weights[1] = groundEffectTex->getUInt32(i, 6);
+        e.weights[2] = groundEffectTex->getUInt32(i, 7);
+        e.weights[3] = groundEffectTex->getUInt32(i, 8);
+        e.density = groundEffectTex->getUInt32(i, 9);
+        groundEffectById_[effectId] = e;
+    }
+
+    // GroundEffectDoodad: id + modelName(offset) + flags
+    for (uint32_t i = 0; i < groundEffectDoodad->getRecordCount(); ++i) {
+        uint32_t doodadId = groundEffectDoodad->getUInt32(i, 0);
+        std::string modelName = groundEffectDoodad->getString(i, 1);
+        if (doodadId == 0 || modelName.empty()) continue;
+
+        std::string lower = toLowerCopy(modelName);
+        if (lower.size() > 4 && lower.substr(lower.size() - 4) == ".mdl") {
+            lower = lower.substr(0, lower.size() - 4) + ".m2";
+        }
+        if (lower.find('\\') != std::string::npos || lower.find('/') != std::string::npos) {
+            groundDoodadModelById_[doodadId] = lower;
+        } else {
+            groundDoodadModelById_[doodadId] = "World\\NoDXT\\Detail\\" + lower;
+        }
+    }
+
+    LOG_INFO("Ground clutter tables loaded: ", groundEffectById_.size(),
+             " effects, ", groundDoodadModelById_.size(), " doodad models");
+}
+
+void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile>& pending,
+                                                     std::unordered_set<uint32_t>& preparedModelIds) {
+    if (taxiStreamingMode_) return;  // Skip clutter while on taxi flights.
+    if (!pending || groundEffectById_.empty() || groundDoodadModelById_.empty()) return;
+
+    static const std::string kGroundClutterProxyModel = "World\\NoDXT\\Detail\\ElwGra01.m2";
+    static bool loggedProxy = false;
+    if (!loggedProxy) {
+        LOG_INFO("Ground clutter: forcing proxy model ", kGroundClutterProxyModel);
+        loggedProxy = true;
+    }
+
+    size_t modelMissing = 0;
+    size_t modelInvalid = 0;
+    auto ensureModelPrepared = [&](const std::string& m2Path, uint32_t modelId) -> bool {
+        if (preparedModelIds.count(modelId)) return true;
+
+        std::vector<uint8_t> m2Data = assetManager->readFile(m2Path);
+        if (m2Data.empty()) {
+            modelMissing++;
+            return false;
+        }
+
+        pipeline::M2Model m2Model = pipeline::M2Loader::load(m2Data);
+        if (m2Model.name.empty()) {
+            m2Model.name = m2Path;
+        }
+        std::string skinPath = m2Path.substr(0, m2Path.size() - 3) + "00.skin";
+        std::vector<uint8_t> skinData = assetManager->readFileOptional(skinPath);
+        if (!skinData.empty() && m2Model.version >= 264) {
+            pipeline::M2Loader::loadSkin(skinData, m2Model);
+        }
+        if (!m2Model.isValid()) {
+            modelInvalid++;
+            return false;
+        }
+
+        PendingTile::M2Ready ready;
+        ready.modelId = modelId;
+        ready.model = std::move(m2Model);
+        ready.path = m2Path;
+        pending->m2Models.push_back(std::move(ready));
+        preparedModelIds.insert(modelId);
+        return true;
+    };
+
+    constexpr float unitSize = CHUNK_SIZE / 8.0f;
+    constexpr float pi = 3.1415926535f;
+    constexpr size_t kBaseMaxGroundClutterPerTile = 220;
+    constexpr uint32_t kBaseMaxAttemptsPerLayer = 4;
+    const float densityScaleRaw = glm::clamp(groundClutterDensityScale_, 0.0f, 1.5f);
+    // Keep runtime density bounded to avoid large streaming spikes in dense tiles.
+    const float densityScale = std::min(densityScaleRaw, 1.0f);
+    const size_t kMaxGroundClutterPerTile = std::max<size_t>(
+        0, static_cast<size_t>(std::lround(static_cast<float>(kBaseMaxGroundClutterPerTile) * densityScale)));
+    const uint32_t kMaxAttemptsPerLayer = std::max<uint32_t>(
+        1u, static_cast<uint32_t>(std::lround(static_cast<float>(kBaseMaxAttemptsPerLayer) * densityScale)));
+    std::vector<uint8_t> alphaScratch;
+    std::vector<uint8_t> alphaScratchTex;
+    size_t added = 0;
+    size_t attemptsTotal = 0;
+    size_t alphaRejected = 0;
+    size_t roadRejected = 0;
+    size_t noEffectMatch = 0;
+    size_t textureIdFallbackMatch = 0;
+    size_t noDoodadModel = 0;
+    std::array<uint16_t, 256> perChunkAdded{};
+
+    auto isRoadLikeTexture = [](const std::string& texPath) -> bool {
+        std::string t = toLowerCopy(texPath);
+        return (t.find("road") != std::string::npos) ||
+               (t.find("cobble") != std::string::npos) ||
+               (t.find("path") != std::string::npos) ||
+               (t.find("street") != std::string::npos) ||
+               (t.find("pavement") != std::string::npos) ||
+               (t.find("brick") != std::string::npos);
+    };
+
+    auto layerWeightAt = [&](const pipeline::MapChunk& chunk, size_t layerIdx, int alphaIndex) -> int {
+        if (layerIdx >= chunk.layers.size()) return 0;
+        if (layerIdx == 0) {
+            int accum = 0;
+            size_t numLayers = std::min(chunk.layers.size(), static_cast<size_t>(4));
+            for (size_t i = 1; i < numLayers; ++i) {
+                int a = 0;
+                if (decodeLayerAlpha(chunk, i, alphaScratchTex) &&
+                    alphaIndex >= 0 &&
+                    alphaIndex < static_cast<int>(alphaScratchTex.size())) {
+                    a = alphaScratchTex[alphaIndex];
+                }
+                accum += a;
+            }
+            return glm::clamp(255 - accum, 0, 255);
+        }
+        if (decodeLayerAlpha(chunk, layerIdx, alphaScratchTex) &&
+            alphaIndex >= 0 &&
+            alphaIndex < static_cast<int>(alphaScratchTex.size())) {
+            return alphaScratchTex[alphaIndex];
+        }
+        return 0;
+    };
+
+    auto hasRoadLikeTextureAt = [&](const pipeline::MapChunk& chunk, float fracX, float fracY) -> bool {
+        if (chunk.layers.empty()) return false;
+        int alphaX = glm::clamp(static_cast<int>((fracX / 8.0f) * 63.0f), 0, 63);
+        int alphaY = glm::clamp(static_cast<int>((fracY / 8.0f) * 63.0f), 0, 63);
+        int alphaIndex = alphaY * 64 + alphaX;
+
+        size_t numLayers = std::min(chunk.layers.size(), static_cast<size_t>(4));
+        for (size_t layerIdx = 0; layerIdx < numLayers; ++layerIdx) {
+            uint32_t texId = chunk.layers[layerIdx].textureId;
+            if (texId >= pending->terrain.textures.size()) continue;
+            const std::string& texPath = pending->terrain.textures[texId];
+            if (!isRoadLikeTexture(texPath)) continue;
+            // Treat meaningful blend contribution as road occupancy.
+            int w = layerWeightAt(chunk, layerIdx, alphaIndex);
+            if (w >= 24) return true;
+        }
+        return false;
+    };
+
+    for (int cy = 0; cy < 16; ++cy) {
+        if (added >= kMaxGroundClutterPerTile) break;
+        for (int cx = 0; cx < 16; ++cx) {
+            if (added >= kMaxGroundClutterPerTile) break;
+            const auto& chunk = pending->terrain.getChunk(cx, cy);
+            if (!chunk.hasHeightMap() || chunk.layers.empty()) continue;
+
+            for (size_t layerIdx = 0; layerIdx < chunk.layers.size(); ++layerIdx) {
+                if (added >= kMaxGroundClutterPerTile) break;
+                const auto& layer = chunk.layers[layerIdx];
+                if (layer.effectId == 0) continue;
+
+                auto geIt = groundEffectById_.find(layer.effectId);
+                if (geIt == groundEffectById_.end() && layer.textureId != 0) {
+                    geIt = groundEffectById_.find(layer.textureId);
+                    if (geIt != groundEffectById_.end()) {
+                        textureIdFallbackMatch++;
+                    }
+                }
+                if (geIt == groundEffectById_.end()) {
+                    noEffectMatch++;
+                    continue;
+                }
+                const GroundEffectEntry& ge = geIt->second;
+
+                uint32_t totalWeight = ge.weights[0] + ge.weights[1] + ge.weights[2] + ge.weights[3];
+                if (totalWeight == 0) totalWeight = 4;
+
+                uint32_t density = std::min<uint32_t>(ge.density, 16u);
+                density = static_cast<uint32_t>(std::lround(static_cast<float>(density) * densityScale));
+                if (density == 0) continue;
+                uint32_t attempts = std::max<uint32_t>(3u, density * 2u);
+                attempts = std::min<uint32_t>(attempts, kMaxAttemptsPerLayer);
+                attemptsTotal += attempts;
+
+                bool hasAlpha = decodeLayerAlpha(chunk, layerIdx, alphaScratch);
+                uint32_t seed = static_cast<uint32_t>(
+                    ((pending->coord.x & 0xFF) << 24) ^
+                    ((pending->coord.y & 0xFF) << 16) ^
+                    ((cx & 0x1F) << 8) ^
+                    ((cy & 0x1F) << 3) ^
+                    (layerIdx & 0x7));
+                auto nextRand = [&seed]() -> uint32_t {
+                    seed = seed * 1664525u + 1013904223u;
+                    return seed;
+                };
+
+                for (uint32_t a = 0; a < attempts; ++a) {
+                    float fracX = (nextRand() & 0xFFFFu) / 65535.0f * 8.0f;
+                    float fracY = (nextRand() & 0xFFFFu) / 65535.0f * 8.0f;
+
+                    if (hasAlpha && !alphaScratch.empty()) {
+                        int alphaX = glm::clamp(static_cast<int>((fracX / 8.0f) * 63.0f), 0, 63);
+                        int alphaY = glm::clamp(static_cast<int>((fracY / 8.0f) * 63.0f), 0, 63);
+                        int alphaIndex = alphaY * 64 + alphaX;
+                        if (alphaIndex < 0 || alphaIndex >= static_cast<int>(alphaScratch.size())) continue;
+                        if (alphaScratch[alphaIndex] < 64) {
+                            alphaRejected++;
+                            continue;
+                        }
+                    }
+
+                    if (hasRoadLikeTextureAt(chunk, fracX, fracY)) {
+                        roadRejected++;
+                        continue;
+                    }
+
+                    uint32_t roll = nextRand() % totalWeight;
+                    int pick = 0;
+                    uint32_t acc = 0;
+                    for (int i = 0; i < 4; ++i) {
+                        uint32_t w = ge.weights[i] > 0 ? ge.weights[i] : 1;
+                        acc += w;
+                        if (roll < acc) { pick = i; break; }
+                    }
+                    uint32_t doodadId = ge.doodadIds[pick];
+                    if (doodadId == 0) continue;
+
+                    auto doodadIt = groundDoodadModelById_.find(doodadId);
+                    if (doodadIt == groundDoodadModelById_.end()) {
+                        noDoodadModel++;
+                        continue;
+                    }
+                    const std::string& doodadModelPath = doodadIt->second;
+                    uint32_t modelId = static_cast<uint32_t>(std::hash<std::string>{}(doodadModelPath));
+                    if (!ensureModelPrepared(doodadModelPath, modelId)) {
+                        modelId = static_cast<uint32_t>(std::hash<std::string>{}(kGroundClutterProxyModel));
+                        if (!ensureModelPrepared(kGroundClutterProxyModel, modelId)) {
+                            continue;
+                        }
+                    }
+
+                    float worldX = chunk.position[0] - fracY * unitSize;
+                    float worldY = chunk.position[1] - fracX * unitSize;
+
+                    int gx0 = glm::clamp(static_cast<int>(std::floor(fracX)), 0, 8);
+                    int gy0 = glm::clamp(static_cast<int>(std::floor(fracY)), 0, 8);
+                    int gx1 = std::min(gx0 + 1, 8);
+                    int gy1 = std::min(gy0 + 1, 8);
+                    float tx = fracX - static_cast<float>(gx0);
+                    float ty = fracY - static_cast<float>(gy0);
+                    float h00 = chunk.heightMap.getHeight(gx0, gy0);
+                    float h10 = chunk.heightMap.getHeight(gx1, gy0);
+                    float h01 = chunk.heightMap.getHeight(gx0, gy1);
+                    float h11 = chunk.heightMap.getHeight(gx1, gy1);
+                    float worldZ = chunk.position[2] +
+                                 (h00 * (1 - tx) * (1 - ty) +
+                                  h10 * tx * (1 - ty) +
+                                  h01 * (1 - tx) * ty +
+                                  h11 * tx * ty);
+
+                    PendingTile::M2Placement p;
+                    p.modelId = modelId;
+                    p.uniqueId = 0;
+                    // MCNK chunk.position is already in terrain/render world space.
+                    // Do not convert via ADT placement mapping (that is for MDDF/MODF records).
+                    p.rotation = glm::vec3(0.0f, 0.0f, (nextRand() & 0xFFFFu) / 65535.0f * (2.0f * pi));
+                    p.scale = 0.80f + ((nextRand() & 0xFFFFu) / 65535.0f) * 0.35f;
+                    // Snap directly to sampled terrain height.
+                    p.position = glm::vec3(worldX, worldY, worldZ + 0.01f);
+                    pending->m2Placements.push_back(p);
+                    added++;
+                    perChunkAdded[cy * 16 + cx]++;
+                    if (added >= kMaxGroundClutterPerTile) break;
+                }
+            }
+        }
+    }
+
+    size_t fallbackAdded = 0;
+    const size_t kMinGroundClutterPerTile = static_cast<size_t>(std::lround(40.0f * densityScale));
+    size_t fallbackNeeded = (added < kMinGroundClutterPerTile) ? (kMinGroundClutterPerTile - added) : 0;
+    if (fallbackNeeded > 0) {
+        const uint32_t proxyModelId = static_cast<uint32_t>(std::hash<std::string>{}(kGroundClutterProxyModel));
+        if (ensureModelPrepared(kGroundClutterProxyModel, proxyModelId)) {
+            constexpr uint32_t kFallbackPerChunk = 2;
+            for (int cy = 0; cy < 16; ++cy) {
+                for (int cx = 0; cx < 16; ++cx) {
+                    if (fallbackAdded >= fallbackNeeded || added >= kMaxGroundClutterPerTile) break;
+                    const auto& chunk = pending->terrain.getChunk(cx, cy);
+                    if (!chunk.hasHeightMap()) continue;
+
+                    for (uint32_t i = 0; i < kFallbackPerChunk; ++i) {
+                        if (fallbackAdded >= fallbackNeeded || added >= kMaxGroundClutterPerTile) break;
+                        // Deterministic scatter so the tile stays visually stable.
+                        uint32_t seed = static_cast<uint32_t>(
+                            ((pending->coord.x & 0xFF) << 24) ^
+                            ((pending->coord.y & 0xFF) << 16) ^
+                            ((cx & 0x1F) << 8) ^
+                            ((cy & 0x1F) << 3) ^
+                            (i & 0x7));
+                        auto nextRand = [&seed]() -> uint32_t {
+                            seed = seed * 1664525u + 1013904223u;
+                            return seed;
+                        };
+
+                        float fracX = (nextRand() & 0xFFFFu) / 65535.0f * 8.0f;
+                        float fracY = (nextRand() & 0xFFFFu) / 65535.0f * 8.0f;
+                        if (hasRoadLikeTextureAt(chunk, fracX, fracY)) {
+                            roadRejected++;
+                            continue;
+                        }
+                        float worldX = chunk.position[0] - fracY * unitSize;
+                        float worldY = chunk.position[1] - fracX * unitSize;
+
+                        int gx0 = glm::clamp(static_cast<int>(std::floor(fracX)), 0, 8);
+                        int gy0 = glm::clamp(static_cast<int>(std::floor(fracY)), 0, 8);
+                        int gx1 = std::min(gx0 + 1, 8);
+                        int gy1 = std::min(gy0 + 1, 8);
+                        float tx = fracX - static_cast<float>(gx0);
+                        float ty = fracY - static_cast<float>(gy0);
+                        float h00 = chunk.heightMap.getHeight(gx0, gy0);
+                        float h10 = chunk.heightMap.getHeight(gx1, gy0);
+                        float h01 = chunk.heightMap.getHeight(gx0, gy1);
+                        float h11 = chunk.heightMap.getHeight(gx1, gy1);
+                        float worldZ = chunk.position[2] +
+                                     (h00 * (1 - tx) * (1 - ty) +
+                                      h10 * tx * (1 - ty) +
+                                      h01 * (1 - tx) * ty +
+                                      h11 * tx * ty);
+
+                        PendingTile::M2Placement p;
+                        p.modelId = proxyModelId;
+                        p.uniqueId = 0;
+                        p.rotation = glm::vec3(0.0f, 0.0f, (nextRand() & 0xFFFFu) / 65535.0f * (2.0f * pi));
+                        p.scale = 0.75f + ((nextRand() & 0xFFFFu) / 65535.0f) * 0.40f;
+                        p.position = glm::vec3(worldX, worldY, worldZ + 0.01f);
+                        pending->m2Placements.push_back(p);
+                        fallbackAdded++;
+                        added++;
+                        perChunkAdded[cy * 16 + cx]++;
+                    }
+                }
+                if (fallbackAdded >= fallbackNeeded || added >= kMaxGroundClutterPerTile) break;
+            }
+        }
+    }
+
+    // Baseline pass disabled: one-per-chunk fill caused large instance spikes and hitches
+    // when streaming tiles around the player.
+    size_t baselineAdded = 0;
+
+    if (added > 0) {
+        static int clutterLogCount = 0;
+        if (clutterLogCount < 12) {
+            LOG_INFO("Ground clutter tile [", pending->coord.x, ",", pending->coord.y,
+                     "] added=", added, " attempts=", attemptsTotal,
+                     " fallbackAdded=", fallbackAdded,
+                     " baselineAdded=", baselineAdded,
+                     " roadRejected=", roadRejected);
+            clutterLogCount++;
+        }
+    } else {
+        static int noClutterLogCount = 0;
+        if (noClutterLogCount < 8) {
+            LOG_INFO("Ground clutter tile [", pending->coord.x, ",", pending->coord.y,
+                     "] added=0 attempts=", attemptsTotal,
+                     " alphaRejected=", alphaRejected,
+                     " roadRejected=", roadRejected,
+                     " noEffect=", noEffectMatch,
+                     " textureFallback=", textureIdFallbackMatch,
+                     " noDoodadModel=", noDoodadModel,
+                     " modelMissing=", modelMissing,
+                     " modelInvalid=", modelInvalid);
+            noClutterLogCount++;
+        }
+    }
 }
 
 std::optional<float> TerrainManager::getHeightAt(float glX, float glY) const {

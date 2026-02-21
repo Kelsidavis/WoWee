@@ -730,7 +730,7 @@ network::Packet MovementPacket::build(Opcode opcode, const MovementInfo& info, u
             char b[4]; snprintf(b, sizeof(b), "%02x ", raw[i]);
             hex += b;
         }
-        LOG_INFO("MOVEPKT opcode=0x", std::hex, wireOpcode(opcode), std::dec,
+        LOG_DEBUG("MOVEPKT opcode=0x", std::hex, wireOpcode(opcode), std::dec,
                  " guid=0x", std::hex, playerGuid, std::dec,
                  " payload=", raw.size(), " bytes",
                  " flags=0x", std::hex, info.flags, std::dec,
@@ -741,7 +741,7 @@ network::Packet MovementPacket::build(Opcode opcode, const MovementInfo& info, u
                   " ONTRANSPORT guid=0x" + std::to_string(info.transportGuid) +
                   " localPos=(" + std::to_string(info.transportX) + "," +
                   std::to_string(info.transportY) + "," + std::to_string(info.transportZ) + ")" : ""));
-        LOG_INFO("MOVEPKT hex: ", hex);
+        LOG_DEBUG("MOVEPKT hex: ", hex);
     }
 
     return packet;
@@ -780,11 +780,17 @@ bool UpdateObjectParser::parseMovementBlock(network::Packet& packet, UpdateBlock
 
     // Log transport-related flag combinations
     if (updateFlags & 0x0002) { // UPDATEFLAG_TRANSPORT
-        LOG_INFO("  Transport flags detected: 0x", std::hex, updateFlags, std::dec,
-                 " (TRANSPORT=", !!(updateFlags & 0x0002),
-                 ", POSITION=", !!(updateFlags & 0x0100),
-                 ", ROTATION=", !!(updateFlags & 0x0200),
-                 ", STATIONARY=", !!(updateFlags & 0x0040), ")");
+        static int transportFlagLogCount = 0;
+        if (transportFlagLogCount < 12) {
+            LOG_INFO("  Transport flags detected: 0x", std::hex, updateFlags, std::dec,
+                     " (TRANSPORT=", !!(updateFlags & 0x0002),
+                     ", POSITION=", !!(updateFlags & 0x0100),
+                     ", ROTATION=", !!(updateFlags & 0x0200),
+                     ", STATIONARY=", !!(updateFlags & 0x0040), ")");
+            transportFlagLogCount++;
+        } else {
+            LOG_DEBUG("  Transport flags detected: 0x", std::hex, updateFlags, std::dec);
+        }
     }
 
     // UpdateFlags bit meanings:
