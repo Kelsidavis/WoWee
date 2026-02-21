@@ -126,7 +126,12 @@ bool ClassicPacketParsers::parseMovementBlock(network::Packet& packet, UpdateBlo
 
             uint32_t pointCount = packet.readUInt32();
             if (pointCount > 256) {
-                LOG_WARNING("  [Classic] Spline pointCount=", pointCount, " exceeds max, capping");
+                static uint32_t badClassicSplineCount = 0;
+                ++badClassicSplineCount;
+                if (badClassicSplineCount <= 5 || (badClassicSplineCount % 100) == 0) {
+                    LOG_WARNING("  [Classic] Spline pointCount=", pointCount,
+                                " exceeds max, capping (occurrence=", badClassicSplineCount, ")");
+                }
                 pointCount = 0;
             }
             for (uint32_t i = 0; i < pointCount; i++) {
@@ -1135,7 +1140,12 @@ bool TurtlePacketParsers::parseMovementBlock(network::Packet& packet, UpdateBloc
 
             uint32_t pointCount = packet.readUInt32();
             if (pointCount > 256) {
-                LOG_WARNING("  [Turtle] Spline pointCount=", pointCount, " exceeds max, capping");
+                static uint32_t badTurtleSplineCount = 0;
+                ++badTurtleSplineCount;
+                if (badTurtleSplineCount <= 5 || (badTurtleSplineCount % 100) == 0) {
+                    LOG_WARNING("  [Turtle] Spline pointCount=", pointCount,
+                                " exceeds max, capping (occurrence=", badTurtleSplineCount, ")");
+                }
                 pointCount = 0;
             }
             for (uint32_t i = 0; i < pointCount; i++) {

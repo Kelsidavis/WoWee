@@ -140,7 +140,12 @@ bool TbcPacketParsers::parseMovementBlock(network::Packet& packet, UpdateBlock& 
 
             uint32_t pointCount = packet.readUInt32();
             if (pointCount > 256) {
-                LOG_WARNING("  [TBC] Spline pointCount=", pointCount, " exceeds max, capping");
+                static uint32_t badTbcSplineCount = 0;
+                ++badTbcSplineCount;
+                if (badTbcSplineCount <= 5 || (badTbcSplineCount % 100) == 0) {
+                    LOG_WARNING("  [TBC] Spline pointCount=", pointCount,
+                                " exceeds max, capping (occurrence=", badTbcSplineCount, ")");
+                }
                 pointCount = 0;
             }
             for (uint32_t i = 0; i < pointCount; i++) {

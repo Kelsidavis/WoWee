@@ -911,8 +911,14 @@ bool UpdateObjectParser::parseMovementBlock(network::Packet& packet, UpdateBlock
 
             uint32_t pointCount = packet.readUInt32();
             if (pointCount > 256) {
-                LOG_WARNING("  Spline pointCount=", pointCount, " exceeds maximum, capping at 0 (readPos=",
-                            packet.getReadPos(), "/", packet.getSize(), ")");
+                static uint32_t badSplineCount = 0;
+                ++badSplineCount;
+                if (badSplineCount <= 5 || (badSplineCount % 100) == 0) {
+                    LOG_WARNING("  Spline pointCount=", pointCount,
+                                " exceeds maximum, capping at 0 (readPos=",
+                                packet.getReadPos(), "/", packet.getSize(),
+                                ", occurrence=", badSplineCount, ")");
+                }
                 pointCount = 0;
             } else {
                 LOG_DEBUG("  Spline pointCount=", pointCount);

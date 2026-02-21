@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <unordered_set>
 
 #include "stb_image.h"
 
@@ -145,13 +146,19 @@ BLPImage AssetManager::loadTexture(const std::string& path) {
 
     std::vector<uint8_t> blpData = readFile(normalizedPath);
     if (blpData.empty()) {
-        LOG_WARNING("Texture not found: ", normalizedPath);
+        static std::unordered_set<std::string> loggedMissingTextures;
+        if (loggedMissingTextures.insert(normalizedPath).second) {
+            LOG_WARNING("Texture not found: ", normalizedPath);
+        }
         return BLPImage();
     }
 
     BLPImage image = BLPLoader::load(blpData);
     if (!image.isValid()) {
-        LOG_ERROR("Failed to load texture: ", normalizedPath);
+        static std::unordered_set<std::string> loggedDecodeFails;
+        if (loggedDecodeFails.insert(normalizedPath).second) {
+            LOG_ERROR("Failed to load texture: ", normalizedPath);
+        }
         return BLPImage();
     }
 

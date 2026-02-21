@@ -2823,19 +2823,24 @@ void GameHandler::handlePacket(network::Packet& packet) {
             // In pre-world states we need full visibility (char create/login handshakes).
             // In-world we keep de-duplication to avoid heavy log I/O in busy areas.
             if (state != WorldState::IN_WORLD) {
-                LOG_WARNING("Unhandled world opcode: 0x", std::hex, opcode, std::dec,
-                            " state=", static_cast<int>(state),
-                            " size=", packet.getSize());
-                const auto& data = packet.getData();
-                std::string hex;
-                size_t limit = std::min<size_t>(data.size(), 48);
-                hex.reserve(limit * 3);
-                for (size_t i = 0; i < limit; ++i) {
-                    char b[4];
-                    snprintf(b, sizeof(b), "%02x ", data[i]);
-                    hex += b;
+                static std::unordered_set<uint32_t> loggedUnhandledByState;
+                const uint32_t key = (static_cast<uint32_t>(static_cast<uint8_t>(state)) << 16) |
+                                     static_cast<uint32_t>(opcode);
+                if (loggedUnhandledByState.insert(key).second) {
+                    LOG_WARNING("Unhandled world opcode: 0x", std::hex, opcode, std::dec,
+                                " state=", static_cast<int>(state),
+                                " size=", packet.getSize());
+                    const auto& data = packet.getData();
+                    std::string hex;
+                    size_t limit = std::min<size_t>(data.size(), 48);
+                    hex.reserve(limit * 3);
+                    for (size_t i = 0; i < limit; ++i) {
+                        char b[4];
+                        snprintf(b, sizeof(b), "%02x ", data[i]);
+                        hex += b;
+                    }
+                    LOG_INFO("Unhandled opcode payload hex (first ", limit, " bytes): ", hex);
                 }
-                LOG_INFO("Unhandled opcode payload hex (first ", limit, " bytes): ", hex);
             } else {
                 static std::unordered_set<uint16_t> loggedUnhandledOpcodes;
                 if (loggedUnhandledOpcodes.insert(static_cast<uint16_t>(opcode)).second) {

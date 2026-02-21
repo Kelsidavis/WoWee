@@ -1167,7 +1167,11 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
                 GLuint texId = loadTexture(texPath, tex.flags);
                 bool failed = (texId == whiteTexture);
                 if (failed) {
-                    LOG_WARNING("M2 model ", model.name, " texture[", ti, "] failed to load: ", texPath);
+                    static std::unordered_set<std::string> loggedModelTextureFails;
+                    std::string failKey = model.name + "|" + texKey;
+                    if (loggedModelTextureFails.insert(failKey).second) {
+                        LOG_WARNING("M2 model ", model.name, " texture[", ti, "] failed to load: ", texPath);
+                    }
                 }
                 if (isInvisibleTrap) {
                     LOG_INFO("  InvisibleTrap texture[", ti, "]: ", texPath, " -> ", (failed ? "WHITE" : "OK"));
@@ -1187,8 +1191,7 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
     }
 
     static const bool kGlowDiag = envFlagEnabled("WOWEE_M2_GLOW_DIAG", false);
-    static std::unordered_set<std::string> loggedLanternGlowModels;
-    {
+    if (kGlowDiag) {
         std::string lowerName = model.name;
         std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -1196,11 +1199,11 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             (lowerName.find("lantern") != std::string::npos) ||
             (lowerName.find("lamp") != std::string::npos) ||
             (lowerName.find("light") != std::string::npos);
-        if (lanternLike && (kGlowDiag || loggedLanternGlowModels.insert(lowerName).second)) {
+        if (lanternLike) {
             for (size_t ti = 0; ti < model.textures.size(); ++ti) {
                 const std::string key = (ti < textureKeysLower.size()) ? textureKeysLower[ti] : std::string();
-                LOG_INFO("M2 GLOW TEX '", model.name, "' tex[", ti, "]='", key, "' flags=0x",
-                         std::hex, model.textures[ti].flags, std::dec);
+                LOG_DEBUG("M2 GLOW TEX '", model.name, "' tex[", ti, "]='", key, "' flags=0x",
+                          std::hex, model.textures[ti].flags, std::dec);
             }
         }
     }
@@ -1386,16 +1389,16 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
                 (lowerName.find("light") != std::string::npos ||
                  lowerName.find("lamp") != std::string::npos ||
                  lowerName.find("lantern") != std::string::npos)) {
-                LOG_INFO("M2 GLOW DIAG '", model.name, "' batch ", gpuModel.batches.size(),
-                         ": blend=", bgpu.blendMode, " matFlags=0x",
-                         std::hex, bgpu.materialFlags, std::dec,
-                         " colorKey=", bgpu.colorKeyBlack ? "Y" : "N",
-                         " hasAlpha=", bgpu.hasAlpha ? "Y" : "N",
-                         " unlit=", (bgpu.materialFlags & 0x01) ? "Y" : "N",
-                         " lanternHint=", bgpu.lanternGlowHint ? "Y" : "N",
-                         " glowSize=", bgpu.glowSize,
-                         " tex=", bgpu.texture,
-                         " idxCount=", bgpu.indexCount);
+                LOG_DEBUG("M2 GLOW DIAG '", model.name, "' batch ", gpuModel.batches.size(),
+                          ": blend=", bgpu.blendMode, " matFlags=0x",
+                          std::hex, bgpu.materialFlags, std::dec,
+                          " colorKey=", bgpu.colorKeyBlack ? "Y" : "N",
+                          " hasAlpha=", bgpu.hasAlpha ? "Y" : "N",
+                          " unlit=", (bgpu.materialFlags & 0x01) ? "Y" : "N",
+                          " lanternHint=", bgpu.lanternGlowHint ? "Y" : "N",
+                          " glowSize=", bgpu.glowSize,
+                          " tex=", bgpu.texture,
+                          " idxCount=", bgpu.indexCount);
             }
             gpuModel.batches.push_back(bgpu);
         }
@@ -3144,7 +3147,10 @@ GLuint M2Renderer::loadTexture(const std::string& path, uint32_t texFlags) {
     // Load BLP texture
     pipeline::BLPImage blp = assetManager->loadTexture(key);
     if (!blp.isValid()) {
-        LOG_WARNING("M2: Failed to load texture: ", path);
+        static std::unordered_set<std::string> loggedTextureLoadFails;
+        if (loggedTextureLoadFails.insert(key).second) {
+            LOG_WARNING("M2: Failed to load texture: ", path);
+        }
         // Don't cache failures — transient StormLib thread contention can
         // cause reads to fail; next loadModel call will retry.
         return whiteTexture;
