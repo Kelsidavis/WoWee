@@ -3599,8 +3599,24 @@ glm::mat4 Renderer::computeLightSpaceMatrix() {
     constexpr float kShadowNearPlane = 1.0f;
     constexpr float kShadowFarPlane = 600.0f;
 
-    // Fixed sun direction matching current world lighting setup.
+    // Use active lighting direction so shadow projection matches sun/celestial.
     glm::vec3 sunDir = glm::normalize(glm::vec3(-0.3f, -0.7f, -0.6f));
+    if (lightingManager) {
+        const auto& lighting = lightingManager->getLightingParams();
+        if (glm::length(lighting.directionalDir) > 0.001f) {
+            sunDir = glm::normalize(lighting.directionalDir);
+        }
+    }
+    // Shadow camera expects light rays pointing downward in render space (Z up).
+    // Some profiles/opcode paths provide the opposite convention; normalize here.
+    if (sunDir.z > 0.0f) {
+        sunDir = -sunDir;
+    }
+    // Keep a minimum downward component so the frustum doesn't collapse at grazing angles.
+    if (sunDir.z > -0.08f) {
+        sunDir.z = -0.08f;
+        sunDir = glm::normalize(sunDir);
+    }
 
     // Keep a stable shadow focus center and move it smoothly toward the player
     // to avoid visible shadow "state jumps" during movement.
@@ -3738,6 +3754,19 @@ void Renderer::renderShadowPass() {
         // directly by calling renderShadow with the light view/proj split.
         // For simplicity, compute the split:
         glm::vec3 sunDir = glm::normalize(glm::vec3(-0.3f, -0.7f, -0.6f));
+        if (lightingManager) {
+            const auto& lighting = lightingManager->getLightingParams();
+            if (glm::length(lighting.directionalDir) > 0.001f) {
+                sunDir = glm::normalize(lighting.directionalDir);
+            }
+        }
+        if (sunDir.z > 0.0f) {
+            sunDir = -sunDir;
+        }
+        if (sunDir.z > -0.08f) {
+            sunDir.z = -0.08f;
+            sunDir = glm::normalize(sunDir);
+        }
         glm::vec3 center = shadowCenterInitialized ? shadowCenter : characterPosition;
         float halfExtent = kShadowHalfExtent;
         glm::vec3 up(0.0f, 0.0f, 1.0f);

@@ -211,7 +211,13 @@ void Celestial::renderSun(const Camera& camera, float timeOfDay,
 
     celestialShader->use();
 
-    glm::vec3 dir = sunDir ? glm::normalize(*sunDir) : glm::vec3(0.0f, 0.0f, 1.0f);
+    // Prefer opposite of light-ray direction (sun->world), but guard against
+    // profile/convention mismatches that can place the sun below the horizon.
+    glm::vec3 lightDir = sunDir ? glm::normalize(*sunDir) : glm::vec3(0.0f, 0.0f, -1.0f);
+    glm::vec3 dir = -lightDir;
+    if (dir.z < 0.0f) {
+        dir = lightDir;
+    }
 
     // Place sun on sky sphere at fixed distance
     const float sunDistance = 800.0f;

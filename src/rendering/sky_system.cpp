@@ -148,9 +148,13 @@ void SkySystem::render(const Camera& camera, const SkyParams& params) {
 glm::vec3 SkySystem::getSunPosition(const SkyParams& params) const {
     glm::vec3 dir = glm::normalize(params.directionalDir);
     if (glm::length(dir) < 0.0001f) {
-        dir = glm::vec3(0.0f, 0.0f, 1.0f);
+        dir = glm::vec3(0.0f, 0.0f, -1.0f);
     }
-    glm::vec3 pos = dir * 800.0f;
+    glm::vec3 sunDir = -dir;
+    if (sunDir.z < 0.0f) {
+        sunDir = dir;
+    }
+    glm::vec3 pos = sunDir * 800.0f;
     return pos;
 }
 
