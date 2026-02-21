@@ -211,6 +211,14 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
     if (renderer) {
         auto* music = renderer->getMusicManager();
         if (music) {
+            if (!loginMusicVolumeAdjusted_) {
+                savedMusicVolume_ = music->getVolume();
+                int loginVolume = (savedMusicVolume_ * 80) / 100; // reduce auth music by 20%
+                if (loginVolume < 0) loginVolume = 0;
+                if (loginVolume > 100) loginVolume = 100;
+                music->setVolume(loginVolume);
+                loginMusicVolumeAdjusted_ = true;
+            }
             music->update(ImGui::GetIO().DeltaTime);
             if (!music->isPlaying()) {
                 static std::mt19937 rng(std::random_device{}());
@@ -253,7 +261,7 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
                 if (!availableTracks.empty()) {
                     std::uniform_int_distribution<size_t> pick(0, availableTracks.size() - 1);
                     const std::string& path = availableTracks[pick(rng)];
-                    music->playFilePath(path, true);
+                    music->playFilePath(path, true, 1800.0f);
                     LOG_INFO("AuthScreen: Playing login intro track: ", path);
                     musicPlaying = music->isPlaying();
                 } else {
@@ -477,14 +485,19 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
 }
 
 void AuthScreen::stopLoginMusic() {
-    if (!musicPlaying) return;
     auto& app = core::Application::getInstance();
     auto* renderer = app.getRenderer();
     if (!renderer) return;
     auto* music = renderer->getMusicManager();
     if (!music) return;
-    music->stopMusic(500.0f);
-    musicPlaying = false;
+    if (musicPlaying) {
+        music->stopMusic(500.0f);
+        musicPlaying = false;
+    }
+    if (loginMusicVolumeAdjusted_) {
+        music->setVolume(savedMusicVolume_);
+        loginMusicVolumeAdjusted_ = false;
+    }
 }
 
 void AuthScreen::attemptAuth(auth::AuthHandler& authHandler) {

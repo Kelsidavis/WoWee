@@ -109,6 +109,8 @@ private:
 
     bool musicInitAttempted = false;
     bool musicPlaying = false;
+    bool loginMusicVolumeAdjusted_ = false;
+    int savedMusicVolume_ = 30;
 };
 
 }} // namespace wowee::ui

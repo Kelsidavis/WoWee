@@ -2,6 +2,7 @@
 #include "audio/audio_engine.hpp"
 #include "pipeline/asset_manager.hpp"
 #include "core/logger.hpp"
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 
@@ -20,9 +21,21 @@ bool MusicManager::initialize(pipeline::AssetManager* assets) {
     return true;
 }
 
+float MusicManager::effectiveMusicVolume() const {
+    float vol = volumePercent / 100.0f;
+    if (underwaterMode) {
+        vol *= 0.3f;
+    }
+    return vol;
+}
+
 void MusicManager::shutdown() {
     AudioEngine::instance().stopMusic();
     playing = false;
+    fadingIn = false;
+    fadeInTimer = 0.0f;
+    fadeInDuration = 0.0f;
+    fadeInTargetVolume = 0.0f;
     currentTrack.clear();
     musicDataCache_.clear();
 }
@@ -37,7 +50,7 @@ void MusicManager::preloadMusic(const std::string& mpqPath) {
     }
 }
 
-void MusicManager::playMusic(const std::string& mpqPath, bool loop) {
+void MusicManager::playMusic(const std::string& mpqPath, bool loop, float fadeInMs) {
     if (!assetManager) return;
     if (mpqPath == currentTrack && playing) return;
 
@@ -59,9 +72,18 @@ void MusicManager::playMusic(const std::string& mpqPath, bool loop) {
     }
 
     // Play with AudioEngine (non-blocking, streams from memory)
-    float volume = volumePercent / 100.0f;
-    if (AudioEngine::instance().playMusic(cacheIt->second, volume, loop)) {
+    float targetVolume = effectiveMusicVolume();
+    float startVolume = (fadeInMs > 0.0f) ? 0.0f : targetVolume;
+    if (AudioEngine::instance().playMusic(cacheIt->second, startVolume, loop)) {
         playing = true;
+        fadingIn = false;
+        if (fadeInMs > 0.0f) {
+            fadingIn = true;
+            fadeInTimer = 0.0f;
+            fadeInDuration = std::max(0.05f, fadeInMs / 1000.0f);
+            fadeInTargetVolume = targetVolume;
+            AudioEngine::instance().setMusicVolume(0.0f);
+        }
         currentTrack = mpqPath;
         currentTrackIsFile = false;
         LOG_INFO("Music: Playing ", mpqPath);
@@ -70,7 +92,7 @@ void MusicManager::playMusic(const std::string& mpqPath, bool loop) {
     }
 }
 
-void MusicManager::playFilePath(const std::string& filePath, bool loop) {
+void MusicManager::playFilePath(const std::string& filePath, bool loop, float fadeInMs) {
     if (filePath.empty()) return;
     if (filePath == currentTrack && playing) return;
     if (!std::filesystem::exists(filePath)) {
@@ -101,9 +123,18 @@ void MusicManager::playFilePath(const std::string& filePath, bool loop) {
     }
 
     // Play with AudioEngine
-    float volume = volumePercent / 100.0f;
-    if (AudioEngine::instance().playMusic(data, volume, loop)) {
+    float targetVolume = effectiveMusicVolume();
+    float startVolume = (fadeInMs > 0.0f) ? 0.0f : targetVolume;
+    if (AudioEngine::instance().playMusic(data, startVolume, loop)) {
         playing = true;
+        fadingIn = false;
+        if (fadeInMs > 0.0f) {
+            fadingIn = true;
+            fadeInTimer = 0.0f;
+            fadeInDuration = std::max(0.05f, fadeInMs / 1000.0f);
+            fadeInTargetVolume = targetVolume;
+            AudioEngine::instance().setMusicVolume(0.0f);
+        }
         currentTrack = filePath;
         currentTrackIsFile = true;
         LOG_INFO("Music: Playing file ", filePath);
@@ -116,6 +147,10 @@ void MusicManager::stopMusic(float fadeMs) {
     (void)fadeMs;  // Fade not implemented yet
     AudioEngine::instance().stopMusic();
     playing = false;
+    fadingIn = false;
+    fadeInTimer = 0.0f;
+    fadeInDuration = 0.0f;
+    fadeInTargetVolume = 0.0f;
     currentTrack.clear();
     currentTrackIsFile = false;
 }
@@ -127,11 +162,14 @@ void MusicManager::setVolume(int volume) {
     volumePercent = volume;
 
     // Update AudioEngine music volume directly (no restart needed!)
-    float vol = volumePercent / 100.0f;
-    if (underwaterMode) {
-        vol *= 0.3f;  // 30% volume underwater
+    float vol = effectiveMusicVolume();
+    if (fadingIn) {
+        fadeInTargetVolume = vol;
+        float t = std::clamp(fadeInTimer / std::max(fadeInDuration, 0.001f), 0.0f, 1.0f);
+        AudioEngine::instance().setMusicVolume(fadeInTargetVolume * t);
+    } else {
+        AudioEngine::instance().setMusicVolume(vol);
     }
-    AudioEngine::instance().setMusicVolume(vol);
 }
 
 void MusicManager::setUnderwaterMode(bool underwater) {
@@ -139,11 +177,14 @@ void MusicManager::setUnderwaterMode(bool underwater) {
     underwaterMode = underwater;
 
     // Apply volume change immediately
-    float vol = volumePercent / 100.0f;
-    if (underwaterMode) {
-        vol *= 0.3f;  // Fade to 30% underwater
+    float vol = effectiveMusicVolume();
+    if (fadingIn) {
+        fadeInTargetVolume = vol;
+        float t = std::clamp(fadeInTimer / std::max(fadeInDuration, 0.001f), 0.0f, 1.0f);
+        AudioEngine::instance().setMusicVolume(fadeInTargetVolume * t);
+    } else {
+        AudioEngine::instance().setMusicVolume(vol);
     }
-    AudioEngine::instance().setMusicVolume(vol);
 }
 
 void MusicManager::crossfadeTo(const std::string& mpqPath, float fadeMs) {
@@ -181,6 +222,15 @@ void MusicManager::update(float deltaTime) {
     // Check if music is still playing
     if (playing && !AudioEngine::instance().isMusicPlaying()) {
         playing = false;
+    }
+
+    if (fadingIn) {
+        fadeInTimer += deltaTime;
+        float t = std::clamp(fadeInTimer / std::max(fadeInDuration, 0.001f), 0.0f, 1.0f);
+        AudioEngine::instance().setMusicVolume(fadeInTargetVolume * t);
+        if (t >= 1.0f) {
+            fadingIn = false;
+        }
     }
 
     // Handle crossfade

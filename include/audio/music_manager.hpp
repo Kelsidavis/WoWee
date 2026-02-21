@@ -18,8 +18,8 @@ public:
     bool initialize(pipeline::AssetManager* assets);
     void shutdown();
 
-    void playMusic(const std::string& mpqPath, bool loop = true);
-    void playFilePath(const std::string& filePath, bool loop = true);
+    void playMusic(const std::string& mpqPath, bool loop = true, float fadeInMs = 0.0f);
+    void playFilePath(const std::string& filePath, bool loop = true, float fadeInMs = 0.0f);
     void stopMusic(float fadeMs = 2000.0f);
     void crossfadeTo(const std::string& mpqPath, float fadeMs = 3000.0f);
     void crossfadeToFile(const std::string& filePath, float fadeMs = 3000.0f);
@@ -34,6 +34,7 @@ public:
     const std::string& getCurrentTrack() const { return currentTrack; }
 
 private:
+    float effectiveMusicVolume() const;
     pipeline::AssetManager* assetManager = nullptr;
     std::string currentTrack;
     bool currentTrackIsFile = false;
@@ -47,6 +48,10 @@ private:
     bool pendingIsFile = false;
     float fadeTimer = 0.0f;
     float fadeDuration = 0.0f;
+    bool fadingIn = false;
+    float fadeInTimer = 0.0f;
+    float fadeInDuration = 0.0f;
+    float fadeInTargetVolume = 0.0f;
 
     std::unordered_map<std::string, std::vector<uint8_t>> musicDataCache_;
 };
