@@ -2582,8 +2582,6 @@ void Renderer::renderSelectionCircle(const glm::mat4& view, const glm::mat4& pro
     glDepthMask(GL_FALSE);
     GLboolean depthTestWasEnabled = glIsEnabled(GL_DEPTH_TEST);
     glDisable(GL_DEPTH_TEST);
-    glEnable(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(-2.0f, -2.0f);
 
     glUseProgram(selCircleShader);
     glUniformMatrix4fv(glGetUniformLocation(selCircleShader, "uMVP"), 1, GL_FALSE, &mvp[0][0]);
@@ -2593,7 +2591,6 @@ void Renderer::renderSelectionCircle(const glm::mat4& view, const glm::mat4& pro
     glDrawArrays(GL_TRIANGLE_FAN, 0, selCircleVertCount);
     glBindVertexArray(0);
 
-    glDisable(GL_POLYGON_OFFSET_FILL);
     if (depthTestWasEnabled) glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
     glEnable(GL_CULL_FACE);
@@ -2811,13 +2808,14 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
     const glm::mat4& view = camera ? camera->getViewMatrix() : glm::mat4(1.0f);
     const glm::mat4& projection = camera ? camera->getProjectionMatrix() : glm::mat4(1.0f);
 
+    // Render selection circle before model passes: this keeps it visible through terrain
+    // (depth test off in its pass), while characters/WMO/M2 still draw over it.
+    renderSelectionCircle(view, projection);
+
     // Render characters (after weather)
     if (characterRenderer && camera) {
         characterRenderer->render(*camera, view, projection);
     }
-
-    // Render selection circle under targeted creature
-    renderSelectionCircle(view, projection);
 
     // Render WMO buildings (after characters, before UI)
     if (wmoRenderer && camera) {
