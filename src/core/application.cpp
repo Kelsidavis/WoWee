@@ -654,6 +654,7 @@ void Application::update(float deltaTime) {
 
             auto goq1 = std::chrono::high_resolution_clock::now();
             processGameObjectSpawnQueue();
+            processPendingTransportDoodads();
             auto goq2 = std::chrono::high_resolution_clock::now();
             goQTime += std::chrono::duration<float, std::milli>(goq2 - goq1).count();
 
@@ -3086,6 +3087,7 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
             processCreatureSpawnQueue();
             processDeferredEquipmentQueue();
             processGameObjectSpawnQueue();
+            processPendingTransportDoodads();
             processPendingMount();
             updateQuestMarkers();
 
@@ -4842,47 +4844,18 @@ void Application::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t 
                 if (doodadTemplates && !doodadTemplates->empty()) {
                     constexpr size_t kMaxTransportDoodads = 192;
                     const size_t doodadBudget = std::min(doodadTemplates->size(), kMaxTransportDoodads);
-                    LOG_INFO("Spawning ", doodadBudget, "/", doodadTemplates->size(),
-                             " doodads for transport WMO instance ", instanceId);
-                    int spawnedDoodads = 0;
-
-                    for (size_t i = 0; i < doodadBudget; ++i) {
-                        const auto& doodadTemplate = (*doodadTemplates)[i];
-                        // Load M2 model (may be cached)
-                        uint32_t doodadModelId = static_cast<uint32_t>(std::hash<std::string>{}(doodadTemplate.m2Path));
-                        auto m2Data = assetManager->readFile(doodadTemplate.m2Path);
-                        if (m2Data.empty()) continue;
-
-                        pipeline::M2Model m2Model = pipeline::M2Loader::load(m2Data);
-                        std::string skinPath = doodadTemplate.m2Path.substr(0, doodadTemplate.m2Path.size() - 3) + "00.skin";
-                        std::vector<uint8_t> skinData = assetManager->readFile(skinPath);
-                        if (!skinData.empty() && m2Model.version >= 264) {
-                            pipeline::M2Loader::loadSkin(skinData, m2Model);
-                        }
-                        if (!m2Model.isValid()) continue;
-
-                        // Load model to renderer (cached if already loaded)
-                        m2Renderer->loadModel(m2Model, doodadModelId);
-
-                        // Create M2 instance at world origin (transform will be updated by WMO parent)
-                        uint32_t m2InstanceId = m2Renderer->createInstance(doodadModelId, glm::vec3(0.0f), glm::vec3(0.0f), 1.0f);
-                        if (m2InstanceId == 0) continue;
-
-                        // Link doodad to WMO instance
-                        wmoRenderer->addDoodadToInstance(instanceId, m2InstanceId, doodadTemplate.localTransform);
-                        spawnedDoodads++;
-                    }
-
-                    if (spawnedDoodads > 0) {
-                        LOG_INFO("Spawned ", spawnedDoodads, " doodads for transport WMO instance ", instanceId);
-
-                        // Initial transform update to position doodads correctly
-                        // (subsequent updates will happen automatically via setInstanceTransform)
-                        glm::mat4 wmoTransform(1.0f);
-                        wmoTransform = glm::translate(wmoTransform, renderPos);
-                        wmoTransform = glm::rotate(wmoTransform, renderYaw, glm::vec3(0, 0, 1));
-                        wmoRenderer->setInstanceTransform(instanceId, wmoTransform);
-                    }
+                    LOG_INFO("Queueing ", doodadBudget, "/", doodadTemplates->size(),
+                             " transport doodads for WMO instance ", instanceId);
+                    pendingTransportDoodadBatches_.push_back(PendingTransportDoodadBatch{
+                        guid,
+                        modelId,
+                        instanceId,
+                        0,
+                        doodadBudget,
+                        0,
+                        x, y, z,
+                        orientation
+                    });
                 } else {
                     LOG_INFO("Transport WMO has no doodads or templates not available");
                 }
@@ -4962,10 +4935,24 @@ void Application::processCreatureSpawnQueue() {
     }
 
     int processed = 0;
-    while (!pendingCreatureSpawns_.empty() && processed < MAX_SPAWNS_PER_FRAME) {
+    int newModelLoads = 0;
+    size_t rotationsLeft = pendingCreatureSpawns_.size();
+    while (!pendingCreatureSpawns_.empty() &&
+           processed < MAX_SPAWNS_PER_FRAME &&
+           rotationsLeft > 0) {
         PendingCreatureSpawn s = pendingCreatureSpawns_.front();
-        spawnOnlineCreature(s.guid, s.displayId, s.x, s.y, s.z, s.orientation);
         pendingCreatureSpawns_.erase(pendingCreatureSpawns_.begin());
+
+        const bool needsNewModel = (displayIdModelCache_.find(s.displayId) == displayIdModelCache_.end());
+        if (needsNewModel && newModelLoads >= MAX_NEW_CREATURE_MODELS_PER_FRAME) {
+            // Defer additional first-time model/texture loads to later frames so
+            // movement stays responsive in dense areas.
+            pendingCreatureSpawns_.push_back(s);
+            rotationsLeft--;
+            continue;
+        }
+
+        spawnOnlineCreature(s.guid, s.displayId, s.x, s.y, s.z, s.orientation);
         pendingCreatureSpawnGuids_.erase(s.guid);
 
         // If spawn still failed, retry for a limited number of frames.
@@ -4992,6 +4979,10 @@ void Application::processCreatureSpawnQueue() {
         } else {
             creatureSpawnRetryCounts_.erase(s.guid);
         }
+        if (needsNewModel) {
+            newModelLoads++;
+        }
+        rotationsLeft = pendingCreatureSpawns_.size();
         processed++;
     }
 }
@@ -5040,6 +5031,73 @@ void Application::processGameObjectSpawnQueue() {
         spawnOnlineGameObject(s.guid, s.entry, s.displayId, s.x, s.y, s.z, s.orientation);
         pendingGameObjectSpawns_.erase(pendingGameObjectSpawns_.begin());
         spawned++;
+    }
+}
+
+void Application::processPendingTransportDoodads() {
+    if (pendingTransportDoodadBatches_.empty()) return;
+    if (!renderer || !assetManager) return;
+
+    auto* wmoRenderer = renderer->getWMORenderer();
+    auto* m2Renderer = renderer->getM2Renderer();
+    if (!wmoRenderer || !m2Renderer) return;
+
+    size_t budgetLeft = MAX_TRANSPORT_DOODADS_PER_FRAME;
+    for (auto it = pendingTransportDoodadBatches_.begin();
+         it != pendingTransportDoodadBatches_.end() && budgetLeft > 0;) {
+        auto goIt = gameObjectInstances_.find(it->guid);
+        if (goIt == gameObjectInstances_.end() || !goIt->second.isWmo ||
+            goIt->second.instanceId != it->instanceId || goIt->second.modelId != it->modelId) {
+            it = pendingTransportDoodadBatches_.erase(it);
+            continue;
+        }
+
+        const auto* doodadTemplates = wmoRenderer->getDoodadTemplates(it->modelId);
+        if (!doodadTemplates || doodadTemplates->empty()) {
+            it = pendingTransportDoodadBatches_.erase(it);
+            continue;
+        }
+
+        const size_t maxIndex = std::min(it->doodadBudget, doodadTemplates->size());
+        while (it->nextIndex < maxIndex && budgetLeft > 0) {
+            const auto& doodadTemplate = (*doodadTemplates)[it->nextIndex];
+            it->nextIndex++;
+            budgetLeft--;
+
+            uint32_t doodadModelId = static_cast<uint32_t>(std::hash<std::string>{}(doodadTemplate.m2Path));
+            auto m2Data = assetManager->readFile(doodadTemplate.m2Path);
+            if (m2Data.empty()) continue;
+
+            pipeline::M2Model m2Model = pipeline::M2Loader::load(m2Data);
+            std::string skinPath = doodadTemplate.m2Path.substr(0, doodadTemplate.m2Path.size() - 3) + "00.skin";
+            std::vector<uint8_t> skinData = assetManager->readFile(skinPath);
+            if (!skinData.empty() && m2Model.version >= 264) {
+                pipeline::M2Loader::loadSkin(skinData, m2Model);
+            }
+            if (!m2Model.isValid()) continue;
+
+            m2Renderer->loadModel(m2Model, doodadModelId);
+            uint32_t m2InstanceId = m2Renderer->createInstance(doodadModelId, glm::vec3(0.0f), glm::vec3(0.0f), 1.0f);
+            if (m2InstanceId == 0) continue;
+
+            wmoRenderer->addDoodadToInstance(it->instanceId, m2InstanceId, doodadTemplate.localTransform);
+            it->spawnedDoodads++;
+        }
+
+        if (it->nextIndex >= maxIndex) {
+            if (it->spawnedDoodads > 0) {
+                LOG_INFO("Spawned ", it->spawnedDoodads,
+                         " transport doodads for WMO instance ", it->instanceId);
+                glm::vec3 renderPos = core::coords::canonicalToRender(glm::vec3(it->x, it->y, it->z));
+                glm::mat4 wmoTransform(1.0f);
+                wmoTransform = glm::translate(wmoTransform, renderPos);
+                wmoTransform = glm::rotate(wmoTransform, it->orientation, glm::vec3(0, 0, 1));
+                wmoRenderer->setInstanceTransform(it->instanceId, wmoTransform);
+            }
+            it = pendingTransportDoodadBatches_.erase(it);
+        } else {
+            ++it;
+        }
     }
 }
 
@@ -5388,6 +5446,11 @@ void Application::despawnOnlineCreature(uint64_t guid) {
 }
 
 void Application::despawnOnlineGameObject(uint64_t guid) {
+    pendingTransportDoodadBatches_.erase(
+        std::remove_if(pendingTransportDoodadBatches_.begin(), pendingTransportDoodadBatches_.end(),
+                       [guid](const PendingTransportDoodadBatch& b) { return b.guid == guid; }),
+        pendingTransportDoodadBatches_.end());
+
     auto it = gameObjectInstances_.find(guid);
     if (it == gameObjectInstances_.end()) return;
 

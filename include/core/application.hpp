@@ -240,6 +240,7 @@ private:
     };
     std::vector<PendingCreatureSpawn> pendingCreatureSpawns_;
     static constexpr int MAX_SPAWNS_PER_FRAME = 8;
+    static constexpr int MAX_NEW_CREATURE_MODELS_PER_FRAME = 1;
     static constexpr uint16_t MAX_CREATURE_SPAWN_RETRIES = 300;
     std::unordered_set<uint64_t> pendingCreatureSpawnGuids_;
     std::unordered_map<uint64_t, uint16_t> creatureSpawnRetryCounts_;
@@ -289,6 +290,21 @@ private:
     };
     std::vector<PendingGameObjectSpawn> pendingGameObjectSpawns_;
     void processGameObjectSpawnQueue();
+    struct PendingTransportDoodadBatch {
+        uint64_t guid = 0;
+        uint32_t modelId = 0;
+        uint32_t instanceId = 0;
+        size_t nextIndex = 0;
+        size_t doodadBudget = 0;
+        size_t spawnedDoodads = 0;
+        float x = 0.0f;
+        float y = 0.0f;
+        float z = 0.0f;
+        float orientation = 0.0f;
+    };
+    std::vector<PendingTransportDoodadBatch> pendingTransportDoodadBatches_;
+    static constexpr size_t MAX_TRANSPORT_DOODADS_PER_FRAME = 12;
+    void processPendingTransportDoodads();
 
     // Quest marker billboard sprites (above NPCs)
     void loadQuestMarkerModels();  // Now loads BLP textures

@@ -440,7 +440,7 @@ GLuint CharacterRenderer::loadTexture(const std::string& path) {
             textureCacheBytes_ / (1024 * 1024), " MB > ",
             textureCacheBudgetBytes_ / (1024 * 1024), " MB (textures=", textureCache.size(), ")");
     }
-    core::Logger::getInstance().info("Loaded character texture: ", path, " (", blpImage.width, "x", blpImage.height, ")");
+    core::Logger::getInstance().debug("Loaded character texture: ", path, " (", blpImage.width, "x", blpImage.height, ")");
     return texId;
 }
 
