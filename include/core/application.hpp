@@ -91,6 +91,7 @@ private:
     void buildFactionHostilityMap(uint8_t playerRace);
     void spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x, float y, float z, float orientation);
     void despawnOnlineCreature(uint64_t guid);
+    bool tryAttachCreatureVirtualWeapons(uint64_t guid, uint32_t instanceId);
     void spawnOnlinePlayer(uint64_t guid,
                            uint8_t raceId,
                            uint8_t genderId,
@@ -177,6 +178,8 @@ private:
     std::unordered_map<uint64_t, uint32_t> creatureInstances_;  // guid → render instanceId
     std::unordered_map<uint64_t, uint32_t> creatureModelIds_;   // guid → loaded modelId
     std::unordered_map<uint64_t, glm::vec3> creatureRenderPosCache_; // guid -> last synced render position
+    std::unordered_set<uint64_t> creatureWeaponsAttached_;       // guid set when NPC virtual weapons attached
+    std::unordered_map<uint64_t, uint8_t> creatureWeaponAttachAttempts_; // guid -> attach attempts
     std::unordered_set<uint64_t> deadCreatureGuids_;            // GUIDs that should spawn in corpse/death pose
     std::unordered_map<uint32_t, uint32_t> displayIdModelCache_; // displayId → modelId (model caching)
     uint32_t nextCreatureModelId_ = 5000;  // Model IDs for online creatures

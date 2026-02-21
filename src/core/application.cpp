@@ -923,6 +923,10 @@ void Application::update(float deltaTime) {
             // creature models remain at stale spawn positions.
             if (renderer && gameHandler && renderer->getCharacterRenderer()) {
                 auto* charRenderer = renderer->getCharacterRenderer();
+                static float npcWeaponRetryTimer = 0.0f;
+                npcWeaponRetryTimer += deltaTime;
+                const bool npcWeaponRetryTick = (npcWeaponRetryTimer >= 1.0f);
+                if (npcWeaponRetryTick) npcWeaponRetryTimer = 0.0f;
                 glm::vec3 playerPos(0.0f);
                 glm::vec3 playerRenderPos(0.0f);
                 bool havePlayerPos = false;
@@ -941,6 +945,20 @@ void Application::update(float deltaTime) {
                 for (const auto& [guid, instanceId] : creatureInstances_) {
                     auto entity = gameHandler->getEntityManager().getEntity(guid);
                     if (!entity || entity->getType() != game::ObjectType::UNIT) continue;
+
+                    if (npcWeaponRetryTick && !creatureWeaponsAttached_.count(guid)) {
+                        uint8_t attempts = 0;
+                        auto itAttempts = creatureWeaponAttachAttempts_.find(guid);
+                        if (itAttempts != creatureWeaponAttachAttempts_.end()) attempts = itAttempts->second;
+                        if (attempts < 30) {
+                            if (tryAttachCreatureVirtualWeapons(guid, instanceId)) {
+                                creatureWeaponsAttached_.insert(guid);
+                                creatureWeaponAttachAttempts_.erase(guid);
+                            } else {
+                                creatureWeaponAttachAttempts_[guid] = static_cast<uint8_t>(attempts + 1);
+                            }
+                        }
+                    }
 
                     glm::vec3 canonical(entity->getX(), entity->getY(), entity->getZ());
                     if (havePlayerPos) {
@@ -2618,6 +2636,151 @@ void Application::loadEquippedWeapons() {
             LOG_INFO("Equipped weapon: ", m2Path, " at attachment ", ws.attachmentId);
         }
     }
+}
+
+bool Application::tryAttachCreatureVirtualWeapons(uint64_t guid, uint32_t instanceId) {
+    if (!renderer || !renderer->getCharacterRenderer() || !assetManager || !gameHandler) return false;
+    auto* charRenderer = renderer->getCharacterRenderer();
+    if (!charRenderer) return false;
+
+    auto entity = gameHandler->getEntityManager().getEntity(guid);
+    if (!entity || entity->getType() != game::ObjectType::UNIT) return false;
+
+    auto itemDisplayDbc = assetManager->loadDBC("ItemDisplayInfo.dbc");
+    if (!itemDisplayDbc) return false;
+    auto itemDbc = assetManager->loadDBC("Item.dbc");
+    const auto* idiL = pipeline::getActiveDBCLayout()
+        ? pipeline::getActiveDBCLayout()->getLayout("ItemDisplayInfo") : nullptr;
+    const auto* itemL = pipeline::getActiveDBCLayout()
+        ? pipeline::getActiveDBCLayout()->getLayout("Item") : nullptr;
+
+    auto resolveDisplayInfoId = [&](uint32_t rawId) -> uint32_t {
+        if (rawId == 0) return 0;
+        // Prefer interpreting virtual slot value as Item.dbc entry first (AzerothCore style).
+        if (itemDbc) {
+            int32_t itemRec = itemDbc->findRecordById(rawId); // treat as item entry
+            if (itemRec >= 0) {
+                const uint32_t dispFieldPrimary = itemL ? (*itemL)["DisplayID"] : 5u;
+                const uint32_t dispFieldFallback = 4u;
+                uint32_t displayIdA = itemDbc->getUInt32(static_cast<uint32_t>(itemRec), dispFieldPrimary);
+                if (displayIdA != 0 && itemDisplayDbc->findRecordById(displayIdA) >= 0) {
+                    return displayIdA;
+                }
+                uint32_t displayIdB = itemDbc->getUInt32(static_cast<uint32_t>(itemRec), dispFieldFallback);
+                if (displayIdB != 0 && itemDisplayDbc->findRecordById(displayIdB) >= 0) {
+                    return displayIdB;
+                }
+            }
+        }
+        // Fallback: some cores can send ItemDisplayInfo IDs directly.
+        if (itemDisplayDbc->findRecordById(rawId) >= 0) return rawId;
+        return 0;
+    };
+
+    auto attachNpcWeaponDisplay = [&](uint32_t itemDisplayId, uint32_t attachmentId) -> bool {
+        uint32_t resolvedDisplayId = resolveDisplayInfoId(itemDisplayId);
+        if (resolvedDisplayId == 0) return false;
+        int32_t recIdx = itemDisplayDbc->findRecordById(resolvedDisplayId);
+        if (recIdx < 0) return false;
+
+        const uint32_t modelFieldL = idiL ? (*idiL)["LeftModel"] : 1u;
+        const uint32_t modelFieldR = idiL ? (*idiL)["RightModel"] : 2u;
+        const uint32_t texFieldL = idiL ? (*idiL)["LeftModelTexture"] : 3u;
+        const uint32_t texFieldR = idiL ? (*idiL)["RightModelTexture"] : 4u;
+        // Prefer LeftModel (stock player equipment path uses LeftModel and avoids
+        // the "hilt-only" variants seen when forcing RightModel).
+        std::string modelName = itemDisplayDbc->getString(static_cast<uint32_t>(recIdx), modelFieldL);
+        std::string textureName = itemDisplayDbc->getString(static_cast<uint32_t>(recIdx), texFieldL);
+        if (modelName.empty()) {
+            modelName = itemDisplayDbc->getString(static_cast<uint32_t>(recIdx), modelFieldR);
+            textureName = itemDisplayDbc->getString(static_cast<uint32_t>(recIdx), texFieldR);
+        }
+        if (modelName.empty()) return false;
+
+        std::string modelFile = modelName;
+        size_t dotPos = modelFile.rfind('.');
+        if (dotPos != std::string::npos) modelFile = modelFile.substr(0, dotPos);
+        modelFile += ".m2";
+
+        // Main-hand NPC weapon path: only use actual weapon models.
+        // This avoids shields/placeholder hilts being attached incorrectly.
+        std::string m2Path = "Item\\ObjectComponents\\Weapon\\" + modelFile;
+        auto m2Data = assetManager->readFile(m2Path);
+        if (m2Data.empty()) return false;
+
+        auto weaponModel = pipeline::M2Loader::load(m2Data);
+        std::string skinFile = modelFile;
+        size_t skinDot = skinFile.rfind('.');
+        if (skinDot != std::string::npos) skinFile = skinFile.substr(0, skinDot);
+        skinFile += "00.skin";
+        std::string skinDir = m2Path.substr(0, m2Path.rfind('\\') + 1);
+        auto skinData = assetManager->readFile(skinDir + skinFile);
+        if (!skinData.empty() && weaponModel.version >= 264) {
+            pipeline::M2Loader::loadSkin(skinData, weaponModel);
+        }
+        if (!weaponModel.isValid()) return false;
+
+        std::string texturePath;
+        if (!textureName.empty()) {
+            texturePath = "Item\\ObjectComponents\\Weapon\\" + textureName + ".blp";
+            if (!assetManager->fileExists(texturePath)) texturePath.clear();
+        }
+
+        uint32_t weaponModelId = nextWeaponModelId_++;
+        return charRenderer->attachWeapon(instanceId, attachmentId, weaponModel, weaponModelId, texturePath);
+    };
+
+    auto hasResolvableWeaponModel = [&](uint32_t itemDisplayId) -> bool {
+        uint32_t resolvedDisplayId = resolveDisplayInfoId(itemDisplayId);
+        if (resolvedDisplayId == 0) return false;
+        int32_t recIdx = itemDisplayDbc->findRecordById(resolvedDisplayId);
+        if (recIdx < 0) return false;
+        const uint32_t modelFieldL = idiL ? (*idiL)["LeftModel"] : 1u;
+        const uint32_t modelFieldR = idiL ? (*idiL)["RightModel"] : 2u;
+        std::string modelName = itemDisplayDbc->getString(static_cast<uint32_t>(recIdx), modelFieldL);
+        if (modelName.empty()) {
+            modelName = itemDisplayDbc->getString(static_cast<uint32_t>(recIdx), modelFieldR);
+        }
+        if (modelName.empty()) return false;
+        std::string modelFile = modelName;
+        size_t dotPos = modelFile.rfind('.');
+        if (dotPos != std::string::npos) modelFile = modelFile.substr(0, dotPos);
+        modelFile += ".m2";
+        return assetManager->fileExists("Item\\ObjectComponents\\Weapon\\" + modelFile);
+    };
+
+    bool attachedMain = false;
+    bool hadWeaponCandidate = false;
+
+    const uint16_t candidateBases[] = {56, 57, 58, 70, 148, 149, 150, 151, 152};
+    for (uint16_t base : candidateBases) {
+        uint32_t v0 = entity->getField(static_cast<uint16_t>(base + 0));
+        if (v0 != 0) hadWeaponCandidate = true;
+        if (!attachedMain && v0 != 0) attachedMain = attachNpcWeaponDisplay(v0, 1);
+        if (attachedMain) break;
+    }
+
+    uint16_t unitEnd = game::fieldIndex(game::UF::UNIT_END);
+    uint16_t scanLo = 60;
+    uint16_t scanHi = (unitEnd != 0xFFFF) ? static_cast<uint16_t>(unitEnd + 96) : 320;
+    std::map<uint16_t, uint32_t> candidateByIndex;
+    for (const auto& [idx, val] : entity->getFields()) {
+        if (idx < scanLo || idx > scanHi) continue;
+        if (val == 0) continue;
+        if (hasResolvableWeaponModel(val)) {
+            candidateByIndex[idx] = val;
+            hadWeaponCandidate = true;
+        }
+    }
+    for (const auto& [idx, val] : candidateByIndex) {
+        if (!attachedMain) attachedMain = attachNpcWeaponDisplay(val, 1);
+        if (attachedMain) break;
+    }
+
+    // Force off-hand clear in NPC path to avoid incorrect shields/placeholder hilts.
+    charRenderer->detachWeapon(instanceId, 2);
+    // Success if main-hand attached when there was at least one candidate.
+    return hadWeaponCandidate && attachedMain;
 }
 
 void Application::buildFactionHostilityMap(uint8_t playerRace) {
@@ -4476,9 +4639,8 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
             uint8_t extraRaceId = 0;
             uint8_t extraSexId = 0;
             uint16_t selectedHairScalp = 1;
-            uint16_t selectedFacial100 = 101;
-            uint16_t selectedFacial200 = 200;
             uint16_t selectedFacial300 = 300;
+            uint16_t selectedFacial300Alt = 300;
             bool wantsFacialHair = false;
             std::unordered_set<uint16_t> hairScalpGeosetsForRaceSex;
             if (itDisplayData != displayDataMap_.end() &&
@@ -4502,9 +4664,8 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                     wantsFacialHair = (itExtra->second.facialHairId != 0);
                     auto itFacial = facialHairGeosetMap_.find(facialKey);
                     if (itFacial != facialHairGeosetMap_.end()) {
-                        selectedFacial100 = static_cast<uint16_t>(100 + itFacial->second.geoset100);
-                        selectedFacial200 = static_cast<uint16_t>(200 + itFacial->second.geoset200);
                         selectedFacial300 = static_cast<uint16_t>(300 + itFacial->second.geoset300);
+                        selectedFacial300Alt = static_cast<uint16_t>(300 + itFacial->second.geoset200);
                     }
                     for (const auto& [k, v] : hairGeosetMap_) {
                         uint8_t race = static_cast<uint8_t>((k >> 16) & 0xFF);
@@ -4600,17 +4761,6 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                 // Group 1 contains connector variants that mirror scalp style.
                 if (hasHumanoidExtra && group == 1) {
                     const uint16_t selectedConnector = static_cast<uint16_t>(100 + std::max<uint16_t>(selectedHairScalp, 1));
-                    const bool allowSelectedFacial100 = wantsFacialHair &&
-                        sid == selectedFacial100 && allGeosets.count(selectedFacial100) > 0;
-                    const bool allowFacialFallback = wantsFacialHair && (sid == 100 || sid == 101);
-                    if (allowSelectedFacial100) {
-                        normalizedGeosets.insert(sid);
-                        continue;
-                    }
-                    if (allowFacialFallback) {
-                        normalizedGeosets.insert(sid);
-                        continue;
-                    }
                     if (sid != selectedConnector) {
                         // Keep fallback connector only when selected one does not exist on this model.
                         if (sid != 101 || allGeosets.count(selectedConnector) > 0) {
@@ -4618,19 +4768,11 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                         }
                     }
                 }
-                // Group 2 carries facial hair variants.
-                if (hasHumanoidExtra && group == 2) {
-                    const bool allowSelectedFacial200 = wantsFacialHair &&
-                        sid == selectedFacial200 && allGeosets.count(selectedFacial200) > 0;
-                    const bool allowFacial200Fallback = wantsFacialHair && (sid == 200 || sid == 201);
-                    if (!allowSelectedFacial200 && !allowFacial200Fallback) {
-                        continue;
-                    }
-                    // If selected variant exists, do not keep fallback variants.
-                    if (allowFacial200Fallback && allGeosets.count(selectedFacial200) > 0 &&
-                        sid != selectedFacial200) {
-                        continue;
-                    }
+                // Group 2 carries facial-hair sub-pieces (mustache/chin/side details).
+                // Keep all present group-2 pieces when facial hair is requested to avoid
+                // dropping valid chin meshes due partial geoset mapping differences.
+                if (hasHumanoidExtra && group == 2 && !wantsFacialHair) {
+                    continue;
                 }
                 normalizedGeosets.insert(sid);
             }
@@ -4659,10 +4801,16 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
             }
 
             // Some mustache/goatee variants are authored in facial group 3xx.
-            // Re-add only the selected facial 3xx geoset (not generic 3xx arm meshes).
+            // Re-add selected facial 3xx plus low-index facial fallbacks.
             if (hasHumanoidExtra && wantsFacialHair) {
-                uint16_t facial300Sid = pickFromGroup(selectedFacial300, 3);
+                // Prefer alt channel first (often chin-beard), then primary.
+                uint16_t facial300Sid = pickFromGroup(selectedFacial300Alt, 3);
+                if (facial300Sid == 0) facial300Sid = pickFromGroup(selectedFacial300, 3);
                 if (facial300Sid != 0) normalizedGeosets.insert(facial300Sid);
+                if (facial300Sid == 0) {
+                    if (allGeosets.count(300) > 0) normalizedGeosets.insert(300);
+                    else if (allGeosets.count(301) > 0) normalizedGeosets.insert(301);
+                }
             }
 
             // Prefer trousers geoset, not robe/kilt overlays.
@@ -4761,6 +4909,10 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
         }
     }
 
+    // Try attaching NPC held weapons; if update fields are not ready yet,
+    // IN_GAME retry loop will attempt again shortly.
+    bool weaponsAttachedNow = tryAttachCreatureVirtualWeapons(guid, instanceId);
+
     // Spawn in the correct pose. If the server marked this creature dead before
     // the queued spawn was processed, start directly in death animation.
     if (deadCreatureGuids_.count(guid)) {
@@ -4774,6 +4926,13 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
     creatureInstances_[guid] = instanceId;
     creatureModelIds_[guid] = modelId;
     creatureRenderPosCache_[guid] = renderPos;
+    if (weaponsAttachedNow) {
+        creatureWeaponsAttached_.insert(guid);
+        creatureWeaponAttachAttempts_.erase(guid);
+    } else {
+        creatureWeaponsAttached_.erase(guid);
+        creatureWeaponAttachAttempts_[guid] = 1;
+    }
     LOG_DEBUG("Spawned creature: guid=0x", std::hex, guid, std::dec,
              " displayId=", displayId, " at (", x, ", ", y, ", ", z, ")");
 }
@@ -6003,6 +6162,8 @@ void Application::despawnOnlineCreature(uint64_t guid) {
     creatureInstances_.erase(it);
     creatureModelIds_.erase(guid);
     creatureRenderPosCache_.erase(guid);
+    creatureWeaponsAttached_.erase(guid);
+    creatureWeaponAttachAttempts_.erase(guid);
 
     LOG_DEBUG("Despawned creature: guid=0x", std::hex, guid, std::dec);
 }
