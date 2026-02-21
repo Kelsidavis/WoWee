@@ -54,7 +54,7 @@ if [ -d "${OUTPUT_DIR}/expansions" ]; then
 fi
 
 # Quick sanity check: look for any .MPQ files
-if ! ls "$MPQ_DIR"/*.MPQ "$MPQ_DIR"/*.mpq 2>/dev/null | head -1 > /dev/null 2>&1; then
+if ! compgen -G "$MPQ_DIR"/*.MPQ > /dev/null 2>&1 && ! compgen -G "$MPQ_DIR"/*.mpq > /dev/null 2>&1; then
     echo "Error: No .MPQ files found in: $MPQ_DIR"
     echo "Make sure this is the WoW Data/ directory (not the WoW root)."
     exit 1
