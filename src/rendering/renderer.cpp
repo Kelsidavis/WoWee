@@ -2553,20 +2553,26 @@ void Renderer::renderSelectionCircle(const glm::mat4& view, const glm::mat4& pro
     if (!selCircleVisible) return;
     initSelectionCircle();
 
-    // Clamp the circle to the best floor estimate at target XY to avoid clipping into
-    // terrain/WMO/M2 surfaces, then keep a small visual lift above that plane.
-    float floorZ = selCirclePos.z;
+    // Keep circle anchored near target foot Z. Accept nearby floor probes only,
+    // so distant upper/lower WMO planes don't yank the ring away from feet.
+    const float baseZ = selCirclePos.z;
+    float floorZ = baseZ;
+    auto considerFloor = [&](std::optional<float> sample) {
+        if (!sample) return;
+        const float h = *sample;
+        // Ignore unrelated floors/ceilings far from target feet.
+        if (h < baseZ - 1.25f || h > baseZ + 0.85f) return;
+        floorZ = std::max(floorZ, h);
+    };
+
     if (terrainManager) {
-        auto terrainH = terrainManager->getHeightAt(selCirclePos.x, selCirclePos.y);
-        if (terrainH) floorZ = std::max(floorZ, *terrainH);
+        considerFloor(terrainManager->getHeightAt(selCirclePos.x, selCirclePos.y));
     }
     if (wmoRenderer) {
-        auto wmoH = wmoRenderer->getFloorHeight(selCirclePos.x, selCirclePos.y, selCirclePos.z + 3.0f);
-        if (wmoH) floorZ = std::max(floorZ, *wmoH);
+        considerFloor(wmoRenderer->getFloorHeight(selCirclePos.x, selCirclePos.y, selCirclePos.z + 3.0f));
     }
     if (m2Renderer) {
-        auto m2H = m2Renderer->getFloorHeight(selCirclePos.x, selCirclePos.y, selCirclePos.z + 2.0f);
-        if (m2H) floorZ = std::max(floorZ, *m2H);
+        considerFloor(m2Renderer->getFloorHeight(selCirclePos.x, selCirclePos.y, selCirclePos.z + 2.0f));
     }
 
     glm::vec3 raisedPos = selCirclePos;
@@ -2808,21 +2814,21 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
     const glm::mat4& view = camera ? camera->getViewMatrix() : glm::mat4(1.0f);
     const glm::mat4& projection = camera ? camera->getProjectionMatrix() : glm::mat4(1.0f);
 
-    // Render selection circle before model passes: this keeps it visible through terrain
-    // (depth test off in its pass), while characters/WMO/M2 still draw over it.
-    renderSelectionCircle(view, projection);
-
-    // Render characters (after weather)
-    if (characterRenderer && camera) {
-        characterRenderer->render(*camera, view, projection);
-    }
-
-    // Render WMO buildings (after characters, before UI)
+    // Render WMO buildings first so selection circle can be drawn above WMO depth.
     if (wmoRenderer && camera) {
         auto wmoStart = std::chrono::steady_clock::now();
         wmoRenderer->render(*camera, view, projection);
         auto wmoEnd = std::chrono::steady_clock::now();
         lastWMORenderMs = std::chrono::duration<double, std::milli>(wmoEnd - wmoStart).count();
+    }
+
+    // Render selection circle after WMO so interiors/shafts do not hide it.
+    // It remains before character/M2 passes so units still draw over the ring.
+    renderSelectionCircle(view, projection);
+
+    // Render characters (after selection circle)
+    if (characterRenderer && camera) {
+        characterRenderer->render(*camera, view, projection);
     }
 
     // Render M2 doodads (trees, rocks, etc.)
