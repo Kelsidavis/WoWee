@@ -922,10 +922,18 @@ void Application::update(float deltaTime) {
             if (renderer && gameHandler && renderer->getCharacterRenderer()) {
                 auto* charRenderer = renderer->getCharacterRenderer();
                 glm::vec3 playerPos(0.0f);
+                glm::vec3 playerRenderPos(0.0f);
                 bool havePlayerPos = false;
+                float playerCollisionRadius = 0.65f;
                 if (auto playerEntity = gameHandler->getEntityManager().getEntity(gameHandler->getPlayerGuid())) {
                     playerPos = glm::vec3(playerEntity->getX(), playerEntity->getY(), playerEntity->getZ());
+                    playerRenderPos = core::coords::canonicalToRender(playerPos);
                     havePlayerPos = true;
+                    glm::vec3 pc;
+                    float pr = 0.0f;
+                    if (getRenderBoundsForGuid(gameHandler->getPlayerGuid(), pc, pr)) {
+                        playerCollisionRadius = std::clamp(pr * 0.35f, 0.45f, 1.1f);
+                    }
                 }
                 const float syncRadiusSq = 320.0f * 320.0f;
                 for (const auto& [guid, instanceId] : creatureInstances_) {
@@ -939,6 +947,60 @@ void Application::update(float deltaTime) {
                     }
 
                     glm::vec3 renderPos = core::coords::canonicalToRender(canonical);
+
+                    // Visual collision guard: keep hostile melee units from rendering inside the
+                    // player's model while attacking. This is client-side only (no server position change).
+                    auto unit = std::static_pointer_cast<game::Unit>(entity);
+                    const uint64_t currentTargetGuid = gameHandler->hasTarget() ? gameHandler->getTargetGuid() : 0;
+                    const uint64_t autoAttackGuid = gameHandler->getAutoAttackTargetGuid();
+                    const bool isCombatTarget = (guid == currentTargetGuid || guid == autoAttackGuid);
+                    bool clipGuardEligible = havePlayerPos &&
+                                             unit->getHealth() > 0 &&
+                                             (unit->isHostile() ||
+                                              gameHandler->isAggressiveTowardPlayer(guid) ||
+                                              isCombatTarget);
+                    if (clipGuardEligible) {
+                        float creatureCollisionRadius = 0.8f;
+                        glm::vec3 cc;
+                        float cr = 0.0f;
+                        if (getRenderBoundsForGuid(guid, cc, cr)) {
+                            creatureCollisionRadius = std::clamp(cr * 0.45f, 0.65f, 1.9f);
+                        }
+
+                        float minSep = std::max(playerCollisionRadius + creatureCollisionRadius, 1.9f);
+                        if (isCombatTarget) {
+                            // Stronger spacing for the actively engaged attacker to avoid bite-overlap.
+                            minSep = std::max(minSep, 2.2f);
+                        }
+
+                        // Species/model-specific spacing for wolf-like creatures (their lunge anims
+                        // often put head/torso inside the player capsule).
+                        auto mit = creatureModelIds_.find(guid);
+                        if (mit != creatureModelIds_.end()) {
+                            if (const auto* md = charRenderer->getModelData(mit->second)) {
+                                std::string modelName = md->name;
+                                std::transform(modelName.begin(), modelName.end(), modelName.begin(),
+                                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                                if (modelName.find("wolf") != std::string::npos ||
+                                    modelName.find("worg") != std::string::npos) {
+                                    minSep = std::max(minSep, 2.45f);
+                                }
+                            }
+                        }
+
+                        glm::vec2 d2(renderPos.x - playerRenderPos.x, renderPos.y - playerRenderPos.y);
+                        float distSq2 = glm::dot(d2, d2);
+                        if (distSq2 < (minSep * minSep)) {
+                            glm::vec2 dir2(1.0f, 0.0f);
+                            if (distSq2 > 1e-6f) {
+                                dir2 = d2 * (1.0f / std::sqrt(distSq2));
+                            }
+                            glm::vec2 clamped2 = glm::vec2(playerRenderPos.x, playerRenderPos.y) + dir2 * minSep;
+                            renderPos.x = clamped2.x;
+                            renderPos.y = clamped2.y;
+                        }
+                    }
+
                     charRenderer->setInstancePosition(instanceId, renderPos);
                     float renderYaw = entity->getOrientation() + glm::radians(90.0f);
                     charRenderer->setInstanceRotation(instanceId, glm::vec3(0.0f, 0.0f, renderYaw));
@@ -3634,17 +3696,59 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
 
         // Apply creature skin textures (for non-humanoid creatures)
         if (!hasHumanoidTexture && modelData) {
+            auto resolveCreatureSkinPath = [&](const std::string& skinField) -> std::string {
+                if (skinField.empty()) return "";
+
+                std::string raw = skinField;
+                std::replace(raw.begin(), raw.end(), '/', '\\');
+                auto isSpace = [](unsigned char c) { return std::isspace(c) != 0; };
+                raw.erase(raw.begin(), std::find_if(raw.begin(), raw.end(), [&](unsigned char c) { return !isSpace(c); }));
+                raw.erase(std::find_if(raw.rbegin(), raw.rend(), [&](unsigned char c) { return !isSpace(c); }).base(), raw.end());
+                if (raw.empty()) return "";
+
+                auto hasBlpExt = [](const std::string& p) {
+                    if (p.size() < 4) return false;
+                    std::string ext = p.substr(p.size() - 4);
+                    std::transform(ext.begin(), ext.end(), ext.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    return ext == ".blp";
+                };
+                auto addCandidate = [](std::vector<std::string>& out, const std::string& p) {
+                    if (p.empty()) return;
+                    if (std::find(out.begin(), out.end(), p) == out.end()) out.push_back(p);
+                };
+
+                std::vector<std::string> candidates;
+                const bool hasDir = (raw.find('\\') != std::string::npos || raw.find('/') != std::string::npos);
+                const bool hasExt = hasBlpExt(raw);
+
+                if (hasDir) {
+                    addCandidate(candidates, raw);
+                    if (!hasExt) addCandidate(candidates, raw + ".blp");
+                } else {
+                    addCandidate(candidates, modelDir + raw);
+                    if (!hasExt) addCandidate(candidates, modelDir + raw + ".blp");
+                    addCandidate(candidates, raw);
+                    if (!hasExt) addCandidate(candidates, raw + ".blp");
+                }
+
+                for (const auto& c : candidates) {
+                    if (assetManager->fileExists(c)) return c;
+                }
+                return "";
+            };
+
             for (size_t ti = 0; ti < modelData->textures.size(); ti++) {
                 const auto& tex = modelData->textures[ti];
                 std::string skinPath;
 
                 // Creature skin types: 11 = skin1, 12 = skin2, 13 = skin3
                 if (tex.type == 11 && !dispData.skin1.empty()) {
-                    skinPath = modelDir + dispData.skin1 + ".blp";
+                    skinPath = resolveCreatureSkinPath(dispData.skin1);
                 } else if (tex.type == 12 && !dispData.skin2.empty()) {
-                    skinPath = modelDir + dispData.skin2 + ".blp";
+                    skinPath = resolveCreatureSkinPath(dispData.skin2);
                 } else if (tex.type == 13 && !dispData.skin3.empty()) {
-                    skinPath = modelDir + dispData.skin3 + ".blp";
+                    skinPath = resolveCreatureSkinPath(dispData.skin3);
                 }
 
                 if (!skinPath.empty()) {
@@ -3653,6 +3757,13 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
                         charRenderer->setModelTexture(modelId, static_cast<uint32_t>(ti), skinTex);
                         LOG_DEBUG("Applied creature skin texture: ", skinPath, " to slot ", ti);
                     }
+                } else if ((tex.type == 11 && !dispData.skin1.empty()) ||
+                           (tex.type == 12 && !dispData.skin2.empty()) ||
+                           (tex.type == 13 && !dispData.skin3.empty())) {
+                    LOG_WARNING("Creature skin texture not found for displayId ", displayId,
+                                " slot ", ti, " type ", tex.type,
+                                " (skin fields: '", dispData.skin1, "', '",
+                                dispData.skin2, "', '", dispData.skin3, "')");
                 }
             }
         }

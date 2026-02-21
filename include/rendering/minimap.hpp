@@ -39,6 +39,7 @@ public:
 
     void setSquareShape(bool square) { squareShape = square; }
     bool isSquareShape() const { return squareShape; }
+    float getViewRadius() const { return viewRadius; }
 
     void zoomIn() { viewRadius = std::max(100.0f, viewRadius - 50.0f); }
     void zoomOut() { viewRadius = std::min(800.0f, viewRadius + 50.0f); }

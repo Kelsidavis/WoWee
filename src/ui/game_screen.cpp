@@ -1498,7 +1498,8 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                     if (unit->getHealth() == 0 && unit->getMaxHealth() > 0) {
                         gameHandler.lootTarget(target->getGuid());
                     } else {
-                        // Interact with friendly NPCs; hostile units just get targeted
+                        // Interact with service NPCs; otherwise treat non-interactable living units
+                        // as attackable fallback (covers bad faction-template classification).
                         auto isSpiritNpc = [&]() -> bool {
                             constexpr uint32_t NPC_FLAG_SPIRIT_GUIDE = 0x00004000;
                             constexpr uint32_t NPC_FLAG_SPIRIT_HEALER = 0x00008000;
@@ -1512,9 +1513,11 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                                    (name.find("spirit guide") != std::string::npos);
                         };
                         bool allowSpiritInteract = (gameHandler.isPlayerDead() || gameHandler.isPlayerGhost()) && isSpiritNpc();
-                        if (!unit->isHostile() && (unit->isInteractable() || allowSpiritInteract)) {
+                        bool canInteractNpc = unit->isInteractable() || allowSpiritInteract;
+                        bool shouldAttackByFallback = !canInteractNpc;
+                        if (!unit->isHostile() && canInteractNpc) {
                             gameHandler.interactWithNpc(target->getGuid());
-                        } else if (unit->isHostile()) {
+                        } else if (unit->isHostile() || shouldAttackByFallback) {
                             gameHandler.startAutoAttack(target->getGuid());
                         }
                     }
@@ -6265,11 +6268,13 @@ void GameScreen::renderMinimapMarkers(game::GameHandler& gameHandler) {
     float mapRadius = mapSize * 0.5f;
     float centerX = screenW - margin - mapRadius;
     float centerY = margin + mapRadius;
-    float viewRadius = 400.0f;
+    float viewRadius = minimap->getViewRadius();
 
-    // Player position in render coords
-    auto& mi = gameHandler.getMovementInfo();
-    glm::vec3 playerRender = core::coords::canonicalToRender(glm::vec3(mi.x, mi.y, mi.z));
+    // Use the exact same minimap center as Renderer::renderWorld() to keep markers anchored.
+    glm::vec3 playerRender = camera->getPosition();
+    if (renderer->getCharacterInstanceId() != 0) {
+        playerRender = renderer->getCharacterPosition();
+    }
 
     // Camera bearing for minimap rotation
     float bearing = 0.0f;
