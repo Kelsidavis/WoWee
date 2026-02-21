@@ -182,6 +182,8 @@ private:
     std::unordered_map<uint64_t, uint8_t> creatureWeaponAttachAttempts_; // guid -> attach attempts
     std::unordered_set<uint64_t> deadCreatureGuids_;            // GUIDs that should spawn in corpse/death pose
     std::unordered_map<uint32_t, uint32_t> displayIdModelCache_; // displayId → modelId (model caching)
+    mutable std::unordered_set<uint32_t> warnedMissingDisplayDataIds_; // displayIds already warned
+    mutable std::unordered_set<uint32_t> warnedMissingModelPathIds_;   // modelIds/displayIds already warned
     uint32_t nextCreatureModelId_ = 5000;  // Model IDs for online creatures
     uint32_t gryphonDisplayId_ = 0;
     uint32_t wyvernDisplayId_ = 0;

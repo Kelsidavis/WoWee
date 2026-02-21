@@ -3485,16 +3485,20 @@ std::string Application::getModelPathForDisplayId(uint32_t displayId) const {
         }
         if (displayId == 30412) return "Creature\\Gryphon\\Gryphon.m2";
         if (displayId == 30413) return "Creature\\Wyvern\\Wyvern.m2";
-        LOG_WARNING("No display data for displayId ", displayId,
-                    " (displayDataMap_ has ", displayDataMap_.size(), " entries)");
+        if (warnedMissingDisplayDataIds_.insert(displayId).second) {
+            LOG_WARNING("No display data for displayId ", displayId,
+                        " (displayDataMap_ has ", displayDataMap_.size(), " entries)");
+        }
         return "";
     }
 
     auto itPath = modelIdToPath_.find(itData->second.modelId);
     if (itPath == modelIdToPath_.end()) {
-        LOG_WARNING("No model path for modelId ", itData->second.modelId,
-                    " from displayId ", displayId,
-                    " (modelIdToPath_ has ", modelIdToPath_.size(), " entries)");
+        if (warnedMissingModelPathIds_.insert(displayId).second) {
+            LOG_WARNING("No model path for modelId ", itData->second.modelId,
+                        " from displayId ", displayId,
+                        " (modelIdToPath_ has ", modelIdToPath_.size(), " entries)");
+        }
         return "";
     }
 
@@ -3629,7 +3633,6 @@ void Application::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float x
     // Get model path from displayId
     std::string m2Path = getModelPathForDisplayId(displayId);
     if (m2Path.empty()) {
-        LOG_WARNING("No model path for displayId ", displayId, " (guid 0x", std::hex, guid, std::dec, ")");
         return;
     }
     {
