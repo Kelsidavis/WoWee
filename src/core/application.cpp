@@ -1181,8 +1181,8 @@ void Application::setupUICallbacks() {
         if (gameHandler) {
             gameHandler->setActiveCharacterGuid(characterGuid);
         }
-        // Online mode - login will be handled by world entry callback
-        setState(AppState::IN_GAME);
+        // Keep CHARACTER_SELECTION active until world entry is fully loaded.
+        // This avoids exposing pre-load hitching before the loading screen/intro.
     });
 
     // Character create screen callbacks
@@ -2827,7 +2827,6 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
         renderer->getCameraController()->setOnlineMode(true);
         renderer->getCameraController()->setDefaultSpawn(spawnRender, 0.0f, -15.0f);
         renderer->getCameraController()->reset();
-        renderer->getCameraController()->startIntroPan(2.8f, 140.0f);
     }
 
     // Set map name for WMO renderer
@@ -3021,16 +3020,12 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
         renderer->getCameraController()->reset();
     }
 
-    showProgress("Entering world...", 1.0f);
-
-    if (loadingScreenOk) {
-        loadingScreen.shutdown();
-    }
-
     // Set up test transport (development feature)
+    showProgress("Finalizing world...", 0.94f);
     setupTestTransport();
 
     // Set up NPC animation callbacks (for online creatures)
+    showProgress("Preparing creatures...", 0.97f);
     if (gameHandler && renderer && renderer->getCharacterRenderer()) {
         auto* cr = renderer->getCharacterRenderer();
         auto* app = this;
@@ -3057,6 +3052,64 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
                 cr->playAnimation(it->second, 16, false); // animation ID 16 = Attack1
             }
         });
+    }
+
+    // Hide first-login hitch by draining initial world packets/spawn queues before
+    // dropping the loading screen. Keep this bounded so we don't stall indefinitely.
+    {
+        const float kWarmupMaxSeconds = 2.5f;
+        const auto warmupStart = std::chrono::high_resolution_clock::now();
+        while (true) {
+            SDL_Event event;
+            while (SDL_PollEvent(&event)) {
+                if (event.type == SDL_QUIT) {
+                    window->setShouldClose(true);
+                    if (loadingScreenOk) loadingScreen.shutdown();
+                    return;
+                }
+                if (event.type == SDL_WINDOWEVENT &&
+                    event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    int w = event.window.data1;
+                    int h = event.window.data2;
+                    window->setSize(w, h);
+                    glViewport(0, 0, w, h);
+                    if (renderer && renderer->getCamera()) {
+                        renderer->getCamera()->setAspectRatio(static_cast<float>(w) / h);
+                    }
+                }
+            }
+
+            // Drain network and process deferred spawn/composite queues while hidden.
+            if (gameHandler) gameHandler->update(1.0f / 60.0f);
+            if (world) world->update(1.0f / 60.0f);
+            processPlayerSpawnQueue();
+            processCreatureSpawnQueue();
+            processDeferredEquipmentQueue();
+            processGameObjectSpawnQueue();
+            processPendingMount();
+            updateQuestMarkers();
+
+            const auto now = std::chrono::high_resolution_clock::now();
+            const float elapsed = std::chrono::duration<float>(now - warmupStart).count();
+            const float t = std::clamp(elapsed / kWarmupMaxSeconds, 0.0f, 1.0f);
+            showProgress("Finalizing world sync...", 0.97f + t * 0.025f);
+
+            if (elapsed >= kWarmupMaxSeconds) {
+                break;
+            }
+            SDL_Delay(16);
+        }
+    }
+
+    // Start intro pan right before entering gameplay so it's visible after loading.
+    if (renderer->getCameraController()) {
+        renderer->getCameraController()->startIntroPan(2.8f, 140.0f);
+    }
+
+    showProgress("Entering world...", 1.0f);
+
+    if (loadingScreenOk) {
+        loadingScreen.shutdown();
     }
 
     // Set game state
@@ -5458,6 +5511,7 @@ void Application::updateQuestMarkers() {
 }
 
 void Application::setupTestTransport() {
+    if (testTransportSetup_) return;
     if (!gameHandler || !renderer || !assetManager) return;
 
     auto* transportManager = gameHandler->getTransportManager();
@@ -5584,6 +5638,7 @@ void Application::setupTestTransport() {
                                     glm::vec3(-15.0f, -30.0f, 0.0f),
                                     glm::vec3(15.0f, 30.0f, 10.0f));
 
+    testTransportSetup_ = true;
     LOG_INFO("========================================");
     LOG_INFO("Test transport registered:");
     LOG_INFO("  GUID: 0x", std::hex, transportGuid, std::dec);

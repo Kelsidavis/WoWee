@@ -218,6 +218,7 @@ private:
     std::unordered_map<uint64_t, PendingTransportMove> pendingTransportMoves_; // guid -> latest pre-registration move
     uint32_t nextGameObjectModelId_ = 20000;
     uint32_t nextGameObjectWmoModelId_ = 40000;
+    bool testTransportSetup_ = false;
     bool gameObjectLookupsBuilt_ = false;
 
     // Mount model tracking

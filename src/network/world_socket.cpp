@@ -10,6 +10,7 @@
 
 namespace {
 constexpr size_t kMaxReceiveBufferBytes = 8 * 1024 * 1024;
+constexpr int kMaxParsedPacketsPerUpdate = 220;
 
 inline bool isLoginPipelineSmsg(uint16_t opcode) {
     switch (opcode) {
@@ -323,7 +324,8 @@ void WorldSocket::update() {
 
 void WorldSocket::tryParsePackets() {
     // World server packets have 4-byte incoming header: size(2) + opcode(2)
-    while (receiveBuffer.size() >= 4) {
+    int parsedThisTick = 0;
+    while (receiveBuffer.size() >= 4 && parsedThisTick < kMaxParsedPacketsPerUpdate) {
         uint8_t rawHeader[4] = {0, 0, 0, 0};
         std::memcpy(rawHeader, receiveBuffer.data(), 4);
 
@@ -417,6 +419,12 @@ void WorldSocket::tryParsePackets() {
         if (packetCallback) {
             packetCallback(packet);
         }
+        ++parsedThisTick;
+    }
+
+    if (parsedThisTick >= kMaxParsedPacketsPerUpdate && receiveBuffer.size() >= 4) {
+        LOG_DEBUG("World socket parse budget reached (", parsedThisTick,
+                 " packets); deferring remaining buffered data=", receiveBuffer.size(), " bytes");
     }
 }
 
