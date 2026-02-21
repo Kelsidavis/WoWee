@@ -1987,7 +1987,7 @@ void Renderer::update(float deltaTime) {
 
     // Sync character model position/rotation and animation with follow target
     auto charAnim1 = std::chrono::high_resolution_clock::now();
-    if (characterInstanceId > 0 && characterRenderer && cameraController && cameraController->isThirdPerson()) {
+    if (characterInstanceId > 0 && characterRenderer && cameraController) {
         if (meleeSwingCooldown > 0.0f) {
             meleeSwingCooldown = std::max(0.0f, meleeSwingCooldown - deltaTime);
         }

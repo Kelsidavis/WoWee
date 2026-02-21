@@ -1872,7 +1872,7 @@ void M2Renderer::render(const Camera& camera, const glm::mat4& view, const glm::
     shader->setUniform("uFogEnd", fogEnd);
     bool useShadows = shadowEnabled;
     shader->setUniform("uShadowEnabled", useShadows ? 1 : 0);
-    shader->setUniform("uShadowStrength", 0.62f);
+    shader->setUniform("uShadowStrength", 0.68f);
     if (useShadows) {
         shader->setUniform("uLightSpaceMatrix", lightSpaceMatrix);
         glActiveTexture(GL_TEXTURE7);

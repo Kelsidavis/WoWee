@@ -53,7 +53,7 @@ float calcShadow() {
     vec3 lightDir = normalize(-uLightDir);
     float bias = max(0.005 * (1.0 - dot(norm, lightDir)), 0.001);
     // 5-tap PCF tuned for slightly sharper detail while keeping stability.
-    vec2 texel = vec2(1.0 / 1536.0);
+    vec2 texel = vec2(1.0 / 2048.0);
     float ref = proj.z - bias;
     vec2 off = texel * 0.7;
     float shadow = 0.0;

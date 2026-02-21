@@ -235,7 +235,7 @@ private:
     void shutdownPostProcess();
 
     // Shadow mapping
-    static constexpr int SHADOW_MAP_SIZE = 1536;
+    static constexpr int SHADOW_MAP_SIZE = 2048;
     uint32_t shadowFBO = 0;
     uint32_t shadowDepthTex = 0;
     uint32_t shadowShaderProgram = 0;
