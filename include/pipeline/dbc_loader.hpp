@@ -136,6 +136,14 @@ private:
      * Rebuilds the same in-memory layout as binary load.
      */
     bool loadCSV(const std::vector<uint8_t>& csvData);
+
+    /**
+     * Load from plain CSV format with column-name header row.
+     * e.g. "id,raceId,sexId,...\n21,1,0,...\n"
+     * All fields are treated as numeric (uint32 / int32).
+     */
+    bool loadPlainCSV(const std::vector<uint8_t>& csvData);
+
 };
 
 } // namespace pipeline

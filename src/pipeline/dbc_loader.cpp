@@ -32,9 +32,26 @@ bool DBCFile::load(const std::vector<uint8_t>& dbcData) {
         return false;
     }
 
-    // Detect CSV format: starts with '#'
+    // Detect metadata CSV format: starts with '#'
     if (dbcData[0] == '#') {
         return loadCSV(dbcData);
+    }
+
+    // Detect plain CSV format (column-name header row, e.g. "id,raceId,...\n21,1,0\n")
+    // Guard: binary WDBC files start with the four printable bytes "WDBC", so
+    // we must explicitly exclude them before checking for plain-text content.
+    if (std::isalpha(static_cast<unsigned char>(dbcData[0])) &&
+        (dbcData.size() < 4 || std::memcmp(dbcData.data(), "WDBC", 4) != 0)) {
+        bool isPlainText = true;
+        size_t checkLen = std::min(dbcData.size(), size_t(256));
+        for (size_t i = 0; i < checkLen; ++i) {
+            uint8_t c = dbcData[i];
+            if (c == '\n' || c == '\r') break;
+            if (c < 0x20 || c > 0x7E) { isPlainText = false; break; }
+        }
+        if (isPlainText) {
+            return loadPlainCSV(dbcData);
+        }
     }
 
     if (dbcData.size() < sizeof(DBCHeader)) {
@@ -328,6 +345,94 @@ bool DBCFile::loadCSV(const std::vector<uint8_t>& csvData) {
     LOG_DEBUG("Loaded CSV DBC: ", recordCount, " records, ",
               fieldCount, " fields, ", stringCols.size(), " string cols, ",
               stringBlockSize, " string bytes");
+    return true;
+}
+
+bool DBCFile::loadPlainCSV(const std::vector<uint8_t>& csvData) {
+    std::string text(reinterpret_cast<const char*>(csvData.data()), csvData.size());
+    std::istringstream stream(text);
+    std::string line;
+
+    // First line is the column-name header — use it only to count fields.
+    if (!std::getline(stream, line) || line.empty()) {
+        LOG_ERROR("Plain CSV DBC: missing header line");
+        return false;
+    }
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+
+    fieldCount = 1;
+    for (char c : line) {
+        if (c == ',') ++fieldCount;
+    }
+    if (fieldCount == 0) {
+        LOG_ERROR("Plain CSV DBC: invalid field count");
+        return false;
+    }
+
+    recordSize = fieldCount * 4;
+
+    // Build a string block on the fly.  Offset 0 = empty string (always present).
+    std::vector<uint8_t> strBlock(1, 0);
+
+    // Helper: intern a string into strBlock, return its offset.
+    auto internString = [&](const std::string& s) -> uint32_t {
+        if (s.empty()) return 0;
+        uint32_t offset = static_cast<uint32_t>(strBlock.size());
+        for (char c : s) strBlock.push_back(static_cast<uint8_t>(c));
+        strBlock.push_back(0); // null terminator
+        return offset;
+    };
+
+    // Parse data rows.  Non-numeric cells are stored in strBlock.
+    std::vector<std::vector<uint32_t>> rows;
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty()) continue;
+
+        std::vector<uint32_t> row(fieldCount, 0);
+        uint32_t col = 0;
+        size_t pos = 0;
+        while (col < fieldCount && pos <= line.size()) {
+            size_t end = line.find(',', pos);
+            if (end == std::string::npos) end = line.size();
+            std::string tok = trimAscii(line.substr(pos, end - pos));
+            if (!tok.empty()) {
+                bool isNumeric = false;
+                try {
+                    int64_t v = std::stoll(tok);
+                    row[col] = static_cast<uint32_t>(static_cast<int32_t>(v));
+                    isNumeric = true;
+                } catch (...) {}
+                if (!isNumeric) {
+                    // Non-numeric → store as string in the string block.
+                    row[col] = internString(tok);
+                }
+            }
+            pos = (end < line.size()) ? end + 1 : line.size() + 1;
+            ++col;
+        }
+        rows.push_back(std::move(row));
+    }
+
+    stringBlock     = std::move(strBlock);
+    stringBlockSize = static_cast<uint32_t>(stringBlock.size());
+
+    recordCount = static_cast<uint32_t>(rows.size());
+    recordData.resize(static_cast<size_t>(recordCount) * recordSize);
+    for (uint32_t i = 0; i < recordCount; ++i) {
+        uint8_t* dst = recordData.data() + static_cast<size_t>(i) * recordSize;
+        for (uint32_t f = 0; f < fieldCount; ++f) {
+            uint32_t val = rows[i][f];
+            std::memcpy(dst + f * 4, &val, 4);
+        }
+    }
+
+    loaded = true;
+    idCacheBuilt = false;
+    idToIndexCache.clear();
+
+    LOG_DEBUG("Loaded plain CSV DBC: ", recordCount, " records, ", fieldCount,
+              " fields, ", stringBlockSize, " string bytes");
     return true;
 }
 

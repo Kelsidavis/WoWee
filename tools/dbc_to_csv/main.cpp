@@ -44,6 +44,10 @@ std::vector<uint8_t> readFileBytes(const std::string& path) {
 // Check whether offset points to a plausible string in the string block.
 bool isValidStringOffset(const std::vector<uint8_t>& stringBlock, uint32_t offset) {
     if (offset >= stringBlock.size()) return false;
+    // Must be at a string boundary: offset 0 or immediately after a null terminator.
+    // Without this, small integer field values (e.g. modelId=4) coincidentally
+    // land in the middle of an existing string and are falsely flagged as strings.
+    if (offset > 0 && stringBlock[offset - 1] != 0) return false;
     // Must be null-terminated within the block and contain only printable/whitespace bytes.
     for (size_t i = offset; i < stringBlock.size(); ++i) {
         uint8_t c = stringBlock[i];
@@ -75,7 +79,9 @@ std::set<uint32_t> detectStringColumns(const DBCFile& dbc,
     // If no string block (or trivial size), no string columns.
     if (stringBlock.size() <= 1) return stringCols;
 
-    for (uint32_t col = 0; col < fieldCount; ++col) {
+    // Column 0 is always the numeric record ID in WDBC files — never a string,
+    // even if the uint32 value happens to be a valid string-block offset.
+    for (uint32_t col = 1; col < fieldCount; ++col) {
         bool allZeroOrValid = true;
         bool hasNonZero = false;
 

@@ -524,7 +524,7 @@ bool Extractor::enumerateFiles(const Options& opts,
 
     for (auto it = archives.rbegin(); it != archives.rend(); ++it) {
         HANDLE hMpq = nullptr;
-        if (!SFileOpenArchive(it->path.c_str(), 0, 0, &hMpq)) {
+        if (!SFileOpenArchive(it->path.c_str(), 0, MPQ_OPEN_READ_ONLY, &hMpq)) {
             std::cerr << "  Failed to open: " << it->path << "\n";
             continue;
         }
@@ -634,8 +634,10 @@ bool Extractor::run(const Options& opts) {
         std::vector<ThreadArchive> threadHandles;
         for (const auto& ad : archives) {
             HANDLE h = nullptr;
-            if (SFileOpenArchive(ad.path.c_str(), 0, 0, &h)) {
+            if (SFileOpenArchive(ad.path.c_str(), 0, MPQ_OPEN_READ_ONLY, &h)) {
                 threadHandles.push_back({h, ad.priority});
+            } else {
+                std::cerr << "Worker: failed to open " << ad.path << " (err=" << GetLastError() << ")\n";
             }
         }
         if (threadHandles.empty()) {
