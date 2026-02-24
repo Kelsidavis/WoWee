@@ -2,3 +2,7 @@
 	path = extern/imgui
 	url = https://github.com/ocornut/imgui.git
 	shallow = true
+[submodule "extern/vk-bootstrap"]
+	path = extern/vk-bootstrap
+	url = https://github.com/charles-lunarg/vk-bootstrap.git
+	shallow = true

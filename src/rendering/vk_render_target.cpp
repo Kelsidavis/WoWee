@@ -19,7 +19,7 @@ bool VkRenderTarget::create(VkContext& ctx, uint32_t width, uint32_t height,
 
     // Create color image (multisampled if MSAA)
     colorImage_ = createImage(device, allocator, width, height, format,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | (useMSAA ? VkImageUsageFlags(0) : VK_IMAGE_USAGE_SAMPLED_BIT),
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | (useMSAA ? static_cast<VkImageUsageFlags>(0) : static_cast<VkImageUsageFlags>(VK_IMAGE_USAGE_SAMPLED_BIT)),
         msaaSamples);
 
     if (!colorImage_.image) {

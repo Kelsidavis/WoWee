@@ -202,7 +202,6 @@ void TalentScreen::renderTalent(game::GameHandler& gameHandler,
     auto* assetManager = core::Application::getInstance().getAssetManager();
 
     uint8_t currentRank = gameHandler.getTalentRank(talent.talentId);
-    uint8_t nextRank = currentRank + 1;
 
     // Check if can learn
     bool canLearn = currentRank < talent.maxRank &&
@@ -297,7 +296,6 @@ void TalentScreen::renderTalent(game::GameHandler& gameHandler,
 
     // Rank indicator overlay
     if (talent.maxRank > 1) {
-        ImVec2 pMin = ImGui::GetItemRectMin();
         ImVec2 pMax = ImGui::GetItemRectMax();
         auto* drawList = ImGui::GetWindowDrawList();
 

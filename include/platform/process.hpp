@@ -92,8 +92,8 @@ inline ProcessHandle spawnProcess(const std::vector<std::string>& args) {
     if (pid == 0) {
         // Child process
         setpgid(0, 0);
-        freopen("/dev/null", "w", stdout);
-        freopen("/dev/null", "w", stderr);
+        if (!freopen("/dev/null", "w", stdout)) { _exit(1); }
+        if (!freopen("/dev/null", "w", stderr)) { _exit(1); }
 
         // Build argv for exec
         std::vector<const char*> argv;

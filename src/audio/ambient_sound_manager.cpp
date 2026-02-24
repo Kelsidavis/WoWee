@@ -117,10 +117,10 @@ bool AmbientSoundManager::initialize(pipeline::AssetManager* assets) {
     bool forestNightLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\ForestNormalNight.wav", forestNormalNightSounds_[0], assets);
 
     forestSnowDaySounds_.resize(1);
-    bool forestSnowDayLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\ForestSnowDay.wav", forestSnowDaySounds_[0], assets);
+    loadSound("Sound\\Ambience\\ZoneAmbience\\ForestSnowDay.wav", forestSnowDaySounds_[0], assets);
 
     forestSnowNightSounds_.resize(1);
-    bool forestSnowNightLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\ForestSnowNight.wav", forestSnowNightSounds_[0], assets);
+    loadSound("Sound\\Ambience\\ZoneAmbience\\ForestSnowNight.wav", forestSnowNightSounds_[0], assets);
 
     beachDaySounds_.resize(1);
     bool beachDayLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\BeachDay.wav", beachDaySounds_[0], assets);
@@ -129,34 +129,34 @@ bool AmbientSoundManager::initialize(pipeline::AssetManager* assets) {
     bool beachNightLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\BeachNight.wav", beachNightSounds_[0], assets);
 
     grasslandsDaySounds_.resize(1);
-    bool grasslandsDayLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\GrasslandsDay.wav", grasslandsDaySounds_[0], assets);
+    loadSound("Sound\\Ambience\\ZoneAmbience\\GrasslandsDay.wav", grasslandsDaySounds_[0], assets);
 
     grasslandsNightSounds_.resize(1);
-    bool grasslandsNightLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\GrassLandsNight.wav", grasslandsNightSounds_[0], assets);
+    loadSound("Sound\\Ambience\\ZoneAmbience\\GrassLandsNight.wav", grasslandsNightSounds_[0], assets);
 
     jungleDaySounds_.resize(1);
-    bool jungleDayLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\JungleDay.wav", jungleDaySounds_[0], assets);
+    loadSound("Sound\\Ambience\\ZoneAmbience\\JungleDay.wav", jungleDaySounds_[0], assets);
 
     jungleNightSounds_.resize(1);
-    bool jungleNightLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\JungleNight.wav", jungleNightSounds_[0], assets);
+    loadSound("Sound\\Ambience\\ZoneAmbience\\JungleNight.wav", jungleNightSounds_[0], assets);
 
     marshDaySounds_.resize(1);
-    bool marshDayLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\MarshDay.wav", marshDaySounds_[0], assets);
+    loadSound("Sound\\Ambience\\ZoneAmbience\\MarshDay.wav", marshDaySounds_[0], assets);
 
     marshNightSounds_.resize(1);
-    bool marshNightLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\MarshNight.wav", marshNightSounds_[0], assets);
+    loadSound("Sound\\Ambience\\ZoneAmbience\\MarshNight.wav", marshNightSounds_[0], assets);
 
     desertCanyonDaySounds_.resize(1);
     bool desertCanyonDayLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\CanyonDesertDay.wav", desertCanyonDaySounds_[0], assets);
 
     desertCanyonNightSounds_.resize(1);
-    bool desertCanyonNightLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\CanyonDesertNight.wav", desertCanyonNightSounds_[0], assets);
+    loadSound("Sound\\Ambience\\ZoneAmbience\\CanyonDesertNight.wav", desertCanyonNightSounds_[0], assets);
 
     desertPlainsDaySounds_.resize(1);
     bool desertPlainsDayLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\PlainsDesertDay.wav", desertPlainsDaySounds_[0], assets);
 
     desertPlainsNightSounds_.resize(1);
-    bool desertPlainsNightLoaded = loadSound("Sound\\Ambience\\ZoneAmbience\\PlainsDesertNight.wav", desertPlainsNightSounds_[0], assets);
+    loadSound("Sound\\Ambience\\ZoneAmbience\\PlainsDesertNight.wav", desertPlainsNightSounds_[0], assets);
 
     // Load city ambience sounds (day and night where available)
     stormwindDaySounds_.resize(1);
@@ -169,10 +169,10 @@ bool AmbientSoundManager::initialize(pipeline::AssetManager* assets) {
     bool ironforgeLoaded = loadSound("Sound\\Ambience\\WMOAmbience\\Ironforge.wav", ironforgeSounds_[0], assets);
 
     darnassusDaySounds_.resize(1);
-    bool darnassusDayLoaded = loadSound("Sound\\Ambience\\WMOAmbience\\DarnassusDay.wav", darnassusDaySounds_[0], assets);
+    loadSound("Sound\\Ambience\\WMOAmbience\\DarnassusDay.wav", darnassusDaySounds_[0], assets);
 
     darnassusNightSounds_.resize(1);
-    bool darnassusNightLoaded = loadSound("Sound\\Ambience\\WMOAmbience\\DarnassusNight.wav", darnassusNightSounds_[0], assets);
+    loadSound("Sound\\Ambience\\WMOAmbience\\DarnassusNight.wav", darnassusNightSounds_[0], assets);
 
     orgrimmarDaySounds_.resize(1);
     bool orgrimmarDayLoaded = loadSound("Sound\\Ambience\\WMOAmbience\\OrgrimmarDay.wav", orgrimmarDaySounds_[0], assets);
@@ -181,13 +181,13 @@ bool AmbientSoundManager::initialize(pipeline::AssetManager* assets) {
     bool orgrimmarNightLoaded = loadSound("Sound\\Ambience\\WMOAmbience\\OrgrimmarNight.wav", orgrimmarNightSounds_[0], assets);
 
     undercitySounds_.resize(1);
-    bool undercityLoaded = loadSound("Sound\\Ambience\\WMOAmbience\\Undercity.wav", undercitySounds_[0], assets);
+    loadSound("Sound\\Ambience\\WMOAmbience\\Undercity.wav", undercitySounds_[0], assets);
 
     thunderbluffDaySounds_.resize(1);
-    bool thunderbluffDayLoaded = loadSound("Sound\\Ambience\\WMOAmbience\\ThunderBluffDay.wav", thunderbluffDaySounds_[0], assets);
+    loadSound("Sound\\Ambience\\WMOAmbience\\ThunderBluffDay.wav", thunderbluffDaySounds_[0], assets);
 
     thunderbluffNightSounds_.resize(1);
-    bool thunderbluffNightLoaded = loadSound("Sound\\Ambience\\WMOAmbience\\ThunderBluffNight.wav", thunderbluffNightSounds_[0], assets);
+    loadSound("Sound\\Ambience\\WMOAmbience\\ThunderBluffNight.wav", thunderbluffNightSounds_[0], assets);
 
     // Load bell toll sounds
     bellAllianceSounds_.resize(1);

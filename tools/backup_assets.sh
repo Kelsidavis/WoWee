@@ -50,7 +50,8 @@ if command -v zstd &>/dev/null; then
     tar cf - -C "$(dirname "$DATA_DIR")" "$(basename "$DATA_DIR")" | zstd -T0 -3 -o "$ARCHIVE"
 elif command -v pigz &>/dev/null; then
     ARCHIVE="$BACKUP_DIR/wowee_assets_$TIMESTAMP.tar.gz"
-    tar cf - -C "$(dirname "$DATA_DIR")" "$(basename "$DATA_DIR")" | pigz -p "$(nproc)" > "$ARCHIVE"
+    NPROC=$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
+    tar cf - -C "$(dirname "$DATA_DIR")" "$(basename "$DATA_DIR")" | pigz -p "$NPROC" > "$ARCHIVE"
 else
     ARCHIVE="$BACKUP_DIR/wowee_assets_$TIMESTAMP.tar.gz"
     tar czf "$ARCHIVE" -C "$(dirname "$DATA_DIR")" "$(basename "$DATA_DIR")"

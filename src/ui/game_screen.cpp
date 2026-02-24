@@ -3766,7 +3766,6 @@ void GameScreen::renderBagBar(game::GameHandler& gameHandler) {
 
         // Track bag slot screen rects for drop detection
         ImVec2 bagSlotMins[4], bagSlotMaxs[4];
-        VkDescriptorSet bagIcons[4] = {};
 
         // Slots 1-4: Bag slots (leftmost)
         for (int i = 0; i < 4; ++i) {
@@ -3780,8 +3779,6 @@ void GameScreen::renderBagBar(game::GameHandler& gameHandler) {
             if (!bagItem.empty() && bagItem.item.displayInfoId != 0) {
                 bagIcon = inventoryScreen.getItemIcon(bagItem.item.displayInfoId);
             }
-            bagIcons[i] = bagIcon;
-
             // Render the slot as an invisible button so we control all interaction
             ImVec2 cpos = ImGui::GetCursorScreenPos();
             ImGui::InvisibleButton("##bagSlot", ImVec2(slotSize, slotSize));
@@ -7483,7 +7480,6 @@ void GameScreen::renderBankWindow(game::GameHandler& gameHandler) {
         if (slot.empty()) {
             ImGui::Button("##bank", ImVec2(42, 42));
         } else {
-            auto* info = gameHandler.getItemInfo(slot.item.itemId);
             ImVec4 qc = InventoryScreen::getQualityColor(slot.item.quality);
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(qc.x * 0.3f, qc.y * 0.3f, qc.z * 0.3f, 0.8f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(qc.x * 0.5f, qc.y * 0.5f, qc.z * 0.5f, 0.9f));

@@ -1610,7 +1610,7 @@ glm::mat4 CharacterRenderer::getBoneTransform(const pipeline::M2Bone& bone, floa
 
 // --- Rendering ---
 
-void CharacterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const Camera& camera) {
+void CharacterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, [[maybe_unused]] const Camera& camera) {
     if (instances.empty() || !opaquePipeline_) {
         return;
     }

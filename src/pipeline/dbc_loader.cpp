@@ -42,19 +42,20 @@ bool DBCFile::load(const std::vector<uint8_t>& dbcData) {
         return false;
     }
 
-    // Read header
-    const DBCHeader* header = reinterpret_cast<const DBCHeader*>(dbcData.data());
+    // Read header safely (avoid unaligned reinterpret_cast — UB on strict platforms)
+    DBCHeader header;
+    std::memcpy(&header, dbcData.data(), sizeof(DBCHeader));
 
     // Verify magic
-    if (std::memcmp(header->magic, "WDBC", 4) != 0) {
-        LOG_ERROR("Invalid DBC magic: ", std::string(header->magic, 4));
+    if (std::memcmp(header.magic, "WDBC", 4) != 0) {
+        LOG_ERROR("Invalid DBC magic: ", std::string(header.magic, 4));
         return false;
     }
 
-    recordCount = header->recordCount;
-    fieldCount = header->fieldCount;
-    recordSize = header->recordSize;
-    stringBlockSize = header->stringBlockSize;
+    recordCount = header.recordCount;
+    fieldCount = header.fieldCount;
+    recordSize = header.recordSize;
+    stringBlockSize = header.stringBlockSize;
 
     // Validate sizes
     uint32_t expectedSize = sizeof(DBCHeader) + (recordCount * recordSize) + stringBlockSize;
@@ -111,8 +112,9 @@ uint32_t DBCFile::getUInt32(uint32_t recordIndex, uint32_t fieldIndex) const {
         return 0;
     }
 
-    const uint32_t* field = reinterpret_cast<const uint32_t*>(record + (fieldIndex * 4));
-    return *field;
+    uint32_t value;
+    std::memcpy(&value, record + (fieldIndex * 4), sizeof(uint32_t));
+    return value;
 }
 
 int32_t DBCFile::getInt32(uint32_t recordIndex, uint32_t fieldIndex) const {
@@ -129,8 +131,9 @@ float DBCFile::getFloat(uint32_t recordIndex, uint32_t fieldIndex) const {
         return 0.0f;
     }
 
-    const float* field = reinterpret_cast<const float*>(record + (fieldIndex * 4));
-    return *field;
+    float value;
+    std::memcpy(&value, record + (fieldIndex * 4), sizeof(float));
+    return value;
 }
 
 std::string DBCFile::getString(uint32_t recordIndex, uint32_t fieldIndex) const {

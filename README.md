@@ -36,7 +36,7 @@ Protocol Compatible with **Vanilla (Classic) 1.12 + TBC 2.4.3 + WotLK 3.3.5a**.
 ### Asset Pipeline
 - Extracted loose-file **`Data/`** tree indexed by **`manifest.json`** (fast lookup + caching)
 - Optional **overlay layers** for multi-expansion asset deduplication
-- `asset_extract` + `extract_assets.sh` for MPQ extraction (StormLib tooling)
+- `asset_extract` + `extract_assets.sh` (Linux/macOS) / `extract_assets.ps1` (Windows) for MPQ extraction (StormLib tooling)
 - File formats: **BLP** (DXT1/3/5), **ADT**, **M2**, **WMO**, **DBC** (Spell/Item/Faction/etc.)
 
 ### Gameplay Systems
@@ -84,6 +84,14 @@ sudo pacman -S sdl2 glm openssl \
                ffmpeg zlib cmake base-devel libx11 \
                unicorn                    # optional: Warden module execution
                # StormLib: install from AUR for asset_extract tool
+
+# macOS (Homebrew)
+brew install cmake pkg-config sdl2 glew glm openssl@3 zlib ffmpeg \
+             vulkan-loader vulkan-headers shaderc \
+             unicorn \
+             stormlib
+# unicorn is optional (Warden module execution)
+# stormlib is optional (asset_extract tool)
 ```
 
 ### Container build
@@ -98,11 +106,18 @@ This project requires WoW client data that you extract from your own legally obt
 
 Wowee loads assets via an extracted loose-file tree indexed by `manifest.json` (it does not read MPQs at runtime).
 
+For a cross-platform GUI workflow (extraction + texture pack management + active override state), see:
+- [Asset Pipeline GUI](docs/asset-pipeline-gui.md)
+
 #### 1) Extract MPQs into `./Data/`
 
 ```bash
-# WotLK 3.3.5a example
+# Linux / macOS
 ./extract_assets.sh /path/to/WoW/Data wotlk
+
+# Windows (PowerShell)
+.\extract_assets.ps1 "C:\Games\WoW-3.3.5a\Data" wotlk
+# Or double-click extract_assets.bat
 ```
 
 ```
@@ -117,7 +132,7 @@ Data/
 Notes:
 
 - `StormLib` is required to build/run the extractor (`asset_extract`), but the main client does not require StormLib at runtime.
-- `extract_assets.sh` supports `classic`, `tbc`, `wotlk` targets.
+- `extract_assets.sh` / `extract_assets.ps1` support `classic`, `tbc`, `wotlk` targets.
 
 #### 2) Point wowee at the extracted data
 
@@ -184,6 +199,7 @@ make -j$(nproc)
 - [Project Status](docs/status.md) -- Current code state, limitations, and near-term direction
 - [Quick Start](docs/quickstart.md) -- Installation and first steps
 - [Build Instructions](BUILD_INSTRUCTIONS.md) -- Detailed dependency, build, and run guide
+- [Asset Pipeline GUI](docs/asset-pipeline-gui.md) -- Python GUI for extraction, pack installs, ordering, and override rebuilds
 
 ### Technical Documentation
 - [Architecture](docs/architecture.md) -- System design and module overview
@@ -206,7 +222,7 @@ make -j$(nproc)
 
 ## Technical Details
 
-- **Platform**: Linux (primary), C++20, CMake 3.15+
+- **Platform**: Linux (primary), Windows (MSYS2/MSVC), macOS — C++20, CMake 3.15+
 - **Dependencies**: SDL2, Vulkan, GLM, OpenSSL, ImGui, FFmpeg, Unicorn Engine (StormLib for asset extraction tooling)
 - **Architecture**: Modular design with clear separation (core, rendering, networking, game logic, asset pipeline, UI, audio)
 - **Networking**: Non-blocking TCP, SRP6a authentication, RC4 encryption, WoW 3.3.5a protocol

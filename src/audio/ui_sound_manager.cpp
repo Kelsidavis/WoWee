@@ -34,16 +34,16 @@ bool UiSoundManager::initialize(pipeline::AssetManager* assets) {
     bool charSheetCloseLoaded = loadSound("Sound\\Interface\\iAbilitiesCloseA.wav", characterSheetCloseSounds_[0], assets);
 
     auctionOpenSounds_.resize(1);
-    bool auctionOpenLoaded = loadSound("Sound\\Interface\\AuctionWindowOpen.wav", auctionOpenSounds_[0], assets);
+    loadSound("Sound\\Interface\\AuctionWindowOpen.wav", auctionOpenSounds_[0], assets);
 
     auctionCloseSounds_.resize(1);
-    bool auctionCloseLoaded = loadSound("Sound\\Interface\\AuctionWindowClose.wav", auctionCloseSounds_[0], assets);
+    loadSound("Sound\\Interface\\AuctionWindowClose.wav", auctionCloseSounds_[0], assets);
 
     guildBankOpenSounds_.resize(1);
-    bool guildBankOpenLoaded = loadSound("Sound\\Interface\\GuildVaultOpen.wav", guildBankOpenSounds_[0], assets);
+    loadSound("Sound\\Interface\\GuildVaultOpen.wav", guildBankOpenSounds_[0], assets);
 
     guildBankCloseSounds_.resize(1);
-    bool guildBankCloseLoaded = loadSound("Sound\\Interface\\GuildVaultClose.wav", guildBankCloseSounds_[0], assets);
+    loadSound("Sound\\Interface\\GuildVaultClose.wav", guildBankCloseSounds_[0], assets);
 
     // Load button sounds
     buttonClickSounds_.resize(1);
@@ -63,7 +63,7 @@ bool UiSoundManager::initialize(pipeline::AssetManager* assets) {
     bool questFailedLoaded = loadSound("Sound\\Interface\\igQuestFailed.wav", questFailedSounds_[0], assets);
 
     questUpdateSounds_.resize(1);
-    bool questUpdateLoaded = loadSound("Sound\\Interface\\iQuestUpdate.wav", questUpdateSounds_[0], assets);
+    loadSound("Sound\\Interface\\iQuestUpdate.wav", questUpdateSounds_[0], assets);
 
     // Load loot sounds
     lootCoinSmallSounds_.resize(1);
@@ -86,13 +86,13 @@ bool UiSoundManager::initialize(pipeline::AssetManager* assets) {
     bool pickupBookLoaded = loadSound("Sound\\Interface\\PickUp\\PickUpBook.wav", pickupBookSounds_[0], assets);
 
     pickupClothSounds_.resize(1);
-    bool pickupClothLoaded = loadSound("Sound\\Interface\\PickUp\\PickUpCloth_Leather01.wav", pickupClothSounds_[0], assets);
+    loadSound("Sound\\Interface\\PickUp\\PickUpCloth_Leather01.wav", pickupClothSounds_[0], assets);
 
     pickupFoodSounds_.resize(1);
-    bool pickupFoodLoaded = loadSound("Sound\\Interface\\PickUp\\PickUpFoodGeneric.wav", pickupFoodSounds_[0], assets);
+    loadSound("Sound\\Interface\\PickUp\\PickUpFoodGeneric.wav", pickupFoodSounds_[0], assets);
 
     pickupGemSounds_.resize(1);
-    bool pickupGemLoaded = loadSound("Sound\\Interface\\PickUp\\PickUpGems.wav", pickupGemSounds_[0], assets);
+    loadSound("Sound\\Interface\\PickUp\\PickUpGems.wav", pickupGemSounds_[0], assets);
 
     // Load eating/drinking sounds
     eatingSounds_.resize(1);
@@ -107,13 +107,13 @@ bool UiSoundManager::initialize(pipeline::AssetManager* assets) {
 
     // Load error/feedback sounds
     errorSounds_.resize(1);
-    bool errorLoaded = loadSound("Sound\\Interface\\Error.wav", errorSounds_[0], assets);
+    loadSound("Sound\\Interface\\Error.wav", errorSounds_[0], assets);
 
     selectTargetSounds_.resize(1);
-    bool selectTargetLoaded = loadSound("Sound\\Interface\\iSelectTarget.wav", selectTargetSounds_[0], assets);
+    loadSound("Sound\\Interface\\iSelectTarget.wav", selectTargetSounds_[0], assets);
 
     deselectTargetSounds_.resize(1);
-    bool deselectTargetLoaded = loadSound("Sound\\Interface\\iDeselectTarget.wav", deselectTargetSounds_[0], assets);
+    loadSound("Sound\\Interface\\iDeselectTarget.wav", deselectTargetSounds_[0], assets);
 
     LOG_INFO("UISoundManager: Window sounds - Bag: ", (bagOpenLoaded && bagCloseLoaded) ? "YES" : "NO",
              ", QuestLog: ", (questLogOpenLoaded && questLogCloseLoaded) ? "YES" : "NO",

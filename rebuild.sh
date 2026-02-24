@@ -22,8 +22,9 @@ echo "Configuring with CMake..."
 cmake .. -DCMAKE_BUILD_TYPE=Release
 
 # Build with all cores
-echo "Building with $(nproc) cores..."
-cmake --build . --parallel $(nproc)
+NPROC=$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
+echo "Building with $NPROC cores..."
+cmake --build . --parallel "$NPROC"
 
 # Create Data symlink in bin directory
 echo "Creating Data symlink..."

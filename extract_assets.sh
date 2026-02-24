@@ -63,18 +63,39 @@ fi
 # --- Build asset_extract if needed ---
 if [ ! -f "$BINARY" ]; then
     # --- Check for StormLib (only required to build) ---
-    if ! ldconfig -p 2>/dev/null | grep -qi stormlib; then
+    STORMLIB_FOUND=false
+    if ldconfig -p 2>/dev/null | grep -qi stormlib; then
+        STORMLIB_FOUND=true
+    elif pkg-config --exists stormlib 2>/dev/null; then
+        STORMLIB_FOUND=true
+    elif [ -f "$(brew --prefix 2>/dev/null)/lib/libstorm.dylib" ] 2>/dev/null; then
+        STORMLIB_FOUND=true
+    fi
+    if [ "$STORMLIB_FOUND" = false ]; then
         echo "Error: StormLib not found."
-        echo "Install it with: sudo apt install libstormlib-dev"
-        echo "  or build from source: https://github.com/ladislav-zezula/StormLib"
+        echo "  Ubuntu/Debian: sudo apt install libstormlib-dev"
+        echo "  macOS:         brew install stormlib"
+        echo "  From source:   https://github.com/ladislav-zezula/StormLib"
         exit 1
     fi
 
     echo "Building asset_extract..."
     if [ ! -d "$BUILD_DIR" ]; then
-        cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release
+        CMAKE_EXTRA_ARGS=()
+        # On macOS, Homebrew installs to a non-default prefix that CMake
+        # can't find automatically — pass it explicitly.
+        if command -v brew &>/dev/null; then
+            BREW="$(brew --prefix)"
+            CMAKE_EXTRA_ARGS+=(
+                "-DCMAKE_PREFIX_PATH=$BREW"
+                "-DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3)"
+            )
+            export PKG_CONFIG_PATH="$BREW/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig:$(brew --prefix vulkan-loader 2>/dev/null)/lib/pkgconfig:$(brew --prefix shaderc 2>/dev/null)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+        fi
+        cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release "${CMAKE_EXTRA_ARGS[@]}"
     fi
-    cmake --build "$BUILD_DIR" --target asset_extract -- -j"$(nproc)"
+    NPROC=$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
+    cmake --build "$BUILD_DIR" --target asset_extract -- -j"$NPROC"
     echo ""
 fi
 

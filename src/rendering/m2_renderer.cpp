@@ -2381,11 +2381,11 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
                 }
             }
 
-            // Bind material descriptor set (set 1)
-            if (batch.materialSet) {
-                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                        pipelineLayout_, 1, 1, &batch.materialSet, 0, nullptr);
-            }
+            // Bind material descriptor set (set 1) — skip batch if missing
+            // to avoid inheriting a stale descriptor set from a prior renderer
+            if (!batch.materialSet) continue;
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    pipelineLayout_, 1, 1, &batch.materialSet, 0, nullptr);
 
             // Push constants
             M2PushConstants pc;

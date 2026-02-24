@@ -35,7 +35,30 @@ endif()
 
 # Find required packages
 find_package(SDL2 REQUIRED)
-find_package(Vulkan REQUIRED)
+find_package(Vulkan QUIET)
+if(NOT Vulkan_FOUND)
+    # Fallback: some distros / CMake versions need pkg-config to locate Vulkan.
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(VULKAN_PKG vulkan)
+        if(VULKAN_PKG_FOUND)
+            add_library(Vulkan::Vulkan INTERFACE IMPORTED)
+            set_target_properties(Vulkan::Vulkan PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${VULKAN_PKG_INCLUDE_DIRS}"
+                INTERFACE_LINK_LIBRARIES "${VULKAN_PKG_LIBRARIES}"
+            )
+            if(VULKAN_PKG_LIBRARY_DIRS)
+                set_property(TARGET Vulkan::Vulkan APPEND PROPERTY
+                    INTERFACE_LINK_DIRECTORIES "${VULKAN_PKG_LIBRARY_DIRS}")
+            endif()
+            set(Vulkan_FOUND TRUE)
+            message(STATUS "Found Vulkan via pkg-config: ${VULKAN_PKG_LIBRARIES}")
+        endif()
+    endif()
+    if(NOT Vulkan_FOUND)
+        message(FATAL_ERROR "Could not find Vulkan. Install libvulkan-dev (Linux), vulkan-loader (macOS), or the Vulkan SDK (Windows).")
+    endif()
+endif()
 # GL/GLEW kept temporarily for unconverted sub-renderers during Vulkan migration.
 # These files compile against GL types but their code is never called — the Vulkan
 # path is the only active rendering backend. Remove in Phase 7 when all renderers
@@ -445,6 +468,9 @@ endif()
 target_include_directories(wowee PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+# Vendored headers as SYSTEM to suppress third-party warnings
+target_include_directories(wowee SYSTEM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/extern
     ${CMAKE_CURRENT_SOURCE_DIR}/extern/vk-bootstrap/src
 )
@@ -522,7 +548,7 @@ endif()
 if(MSVC)
     target_compile_options(wowee PRIVATE /W4)
 else()
-    target_compile_options(wowee PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(wowee PRIVATE -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
 endif()
 
 # Debug build flags
@@ -594,12 +620,18 @@ add_custom_command(TARGET wowee POST_BUILD
 # which does NOT include System32. Copy vulkan-1.dll into the output directory so
 # SDL_Vulkan_LoadLibrary can locate it without needing a full system PATH search.
 if(WIN32)
-    add_custom_command(TARGET wowee POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$ENV{SystemRoot}/System32/vulkan-1.dll"
-            "$<TARGET_FILE_DIR:wowee>/vulkan-1.dll"
-        COMMENT "Copying vulkan-1.dll to output directory"
-    )
+    find_file(VULKAN_DLL vulkan-1.dll
+        PATHS "$ENV{SystemRoot}/System32" "$ENV{VULKAN_SDK}/Bin"
+        NO_DEFAULT_PATH)
+    if(VULKAN_DLL)
+        add_custom_command(TARGET wowee POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${VULKAN_DLL}" "$<TARGET_FILE_DIR:wowee>/vulkan-1.dll"
+            COMMENT "Copying vulkan-1.dll to output directory"
+        )
+    else()
+        message(STATUS "  vulkan-1.dll not found — skipping copy (MSYS2 provides it via PATH)")
+    endif()
 endif()
 
 # Install targets
@@ -661,7 +693,14 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR)
         Threads::Threads
     )
     if(WIN32)
-        target_link_libraries(asset_extract PRIVATE wininet bz2)
+        find_library(WININET_LIB wininet)
+        find_library(BZ2_LIB bz2)
+        if(WININET_LIB)
+            target_link_libraries(asset_extract PRIVATE ${WININET_LIB})
+        endif()
+        if(BZ2_LIB)
+            target_link_libraries(asset_extract PRIVATE ${BZ2_LIB})
+        endif()
     endif()
     set_target_properties(asset_extract PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin

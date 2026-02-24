@@ -1456,9 +1456,7 @@ bool M2Loader::loadSkin(const std::vector<uint8_t>& skinData, M2Model& model) {
     if (header.nSubmeshes > 0 && header.ofsSubmeshes > 0) {
         submeshes = readArray<M2SkinSubmesh>(skinData, header.ofsSubmeshes, header.nSubmeshes);
         core::Logger::getInstance().debug("  Submeshes: ", submeshes.size());
-        for (size_t i = 0; i < submeshes.size(); i++) {
-            const auto& sm = submeshes[i];
-        }
+        (void)submeshes;
     }
 
     // Read batches with proper submesh references

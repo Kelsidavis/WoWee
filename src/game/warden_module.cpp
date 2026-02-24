@@ -129,7 +129,7 @@ bool WardenModule::load(const std::vector<uint8_t>& moduleData,
 }
 
 bool WardenModule::processCheckRequest(const std::vector<uint8_t>& checkData,
-                                       std::vector<uint8_t>& responseOut) {
+                                       [[maybe_unused]] std::vector<uint8_t>& responseOut) {
     if (!loaded_) {
         std::cerr << "[WardenModule] Module not loaded, cannot process checks" << '\n';
         return false;
@@ -198,7 +198,7 @@ bool WardenModule::processCheckRequest(const std::vector<uint8_t>& checkData,
     return false;
 }
 
-uint32_t WardenModule::tick(uint32_t deltaMs) {
+uint32_t WardenModule::tick([[maybe_unused]] uint32_t deltaMs) {
     if (!loaded_ || !funcList_.tick) {
         return 0; // No tick needed
     }
@@ -209,7 +209,7 @@ uint32_t WardenModule::tick(uint32_t deltaMs) {
     return 0;
 }
 
-void WardenModule::generateRC4Keys(uint8_t* packet) {
+void WardenModule::generateRC4Keys([[maybe_unused]] uint8_t* packet) {
     if (!loaded_ || !funcList_.generateRC4Keys) {
         return;
     }
@@ -633,9 +633,11 @@ bool WardenModule::applyRelocations() {
         currentOffset += delta;
 
         if (currentOffset + 4 <= moduleSize_) {
-            uint32_t* ptr = reinterpret_cast<uint32_t*>(
-                static_cast<uint8_t*>(moduleMemory_) + currentOffset);
-            *ptr += moduleBase_;
+            uint8_t* addr = static_cast<uint8_t*>(moduleMemory_) + currentOffset;
+            uint32_t val;
+            std::memcpy(&val, addr, sizeof(uint32_t));
+            val += moduleBase_;
+            std::memcpy(addr, &val, sizeof(uint32_t));
             relocCount++;
         } else {
             std::cerr << "[WardenModule] Relocation offset " << currentOffset
@@ -755,16 +757,16 @@ bool WardenModule::initializeModule() {
         void (*logMessage)(const char* msg);
     };
 
-    // Setup client callbacks
-    ClientCallbacks callbacks = {};
+    // Setup client callbacks (used when calling module entry point below)
+    [[maybe_unused]] ClientCallbacks callbacks = {};
 
     // Stub callbacks (would need real implementations)
-    callbacks.sendPacket = [](uint8_t* data, size_t len) {
+    callbacks.sendPacket = []([[maybe_unused]] uint8_t* data, size_t len) {
         std::cout << "[WardenModule Callback] sendPacket(" << len << " bytes)" << '\n';
         // TODO: Send CMSG_WARDEN_DATA packet
     };
 
-    callbacks.validateModule = [](uint8_t* hash) {
+    callbacks.validateModule = []([[maybe_unused]] uint8_t* hash) {
         std::cout << "[WardenModule Callback] validateModule()" << '\n';
         // TODO: Validate module hash
     };
@@ -779,7 +781,7 @@ bool WardenModule::initializeModule() {
         free(ptr);
     };
 
-    callbacks.generateRC4 = [](uint8_t* seed) {
+    callbacks.generateRC4 = []([[maybe_unused]] uint8_t* seed) {
         std::cout << "[WardenModule Callback] generateRC4()" << '\n';
         // TODO: Re-key RC4 cipher
     };

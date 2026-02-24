@@ -91,7 +91,7 @@ void ActivitySoundManager::shutdown() {
     assetManager = nullptr;
 }
 
-void ActivitySoundManager::update(float deltaTime) {
+void ActivitySoundManager::update([[maybe_unused]] float deltaTime) {
     reapProcesses();
 
     // Play swimming stroke sounds periodically when swimming and moving
@@ -168,7 +168,7 @@ void ActivitySoundManager::rebuildJumpClipsForProfile(const std::string& raceFol
     }
 }
 
-void ActivitySoundManager::rebuildSwimLoopClipsForProfile(const std::string& raceFolder, const std::string& raceBase, bool male) {
+void ActivitySoundManager::rebuildSwimLoopClipsForProfile([[maybe_unused]] const std::string& raceFolder, [[maybe_unused]] const std::string& raceBase, [[maybe_unused]] bool male) {
     swimLoopClips.clear();
 
     // WoW 3.3.5a doesn't have dedicated swim loop sounds

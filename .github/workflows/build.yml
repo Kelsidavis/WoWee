@@ -46,6 +46,9 @@ jobs:
             libglm-dev \
             libssl-dev \
             zlib1g-dev \
+            libvulkan-dev \
+            vulkan-tools \
+            glslc \
             libavformat-dev \
             libavcodec-dev \
             libswscale-dev \
@@ -89,14 +92,14 @@ jobs:
       - name: Install dependencies
         run: |
           brew install cmake pkg-config sdl2 glew glm openssl@3 zlib ffmpeg unicorn \
-            stormlib dylibbundler || true
+            stormlib vulkan-loader vulkan-headers shaderc dylibbundler || true
           # dylibbundler may not be in all brew mirrors; install separately to not block others
           brew install dylibbundler 2>/dev/null || true
 
       - name: Configure
         run: |
           BREW=$(brew --prefix)
-          export PKG_CONFIG_PATH="$BREW/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig"
+          export PKG_CONFIG_PATH="$BREW/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig:$(brew --prefix vulkan-loader)/lib/pkgconfig:$(brew --prefix shaderc)/lib/pkgconfig"
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$BREW" \
@@ -170,7 +173,7 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: CLANGARM64
-          update: false
+          update: true
           install: >-
             mingw-w64-clang-aarch64-cmake
             mingw-w64-clang-aarch64-clang
@@ -182,7 +185,15 @@ jobs:
             mingw-w64-clang-aarch64-openssl
             mingw-w64-clang-aarch64-zlib
             mingw-w64-clang-aarch64-ffmpeg
+            mingw-w64-clang-aarch64-unicorn
+            mingw-w64-clang-aarch64-vulkan-loader
+            mingw-w64-clang-aarch64-vulkan-headers
+            mingw-w64-clang-aarch64-shaderc
             git
+
+      - name: Install optional packages
+        shell: msys2 {0}
+        run: pacman -S --noconfirm --needed mingw-w64-clang-aarch64-stormlib || true
 
       - name: Configure
         shell: msys2 {0}
@@ -237,8 +248,15 @@ jobs:
             mingw-w64-x86_64-zlib
             mingw-w64-x86_64-ffmpeg
             mingw-w64-x86_64-unicorn
+            mingw-w64-x86_64-vulkan-loader
+            mingw-w64-x86_64-vulkan-headers
+            mingw-w64-x86_64-shaderc
             mingw-w64-x86_64-nsis
             git
+
+      - name: Install optional packages
+        shell: msys2 {0}
+        run: pacman -S --noconfirm --needed mingw-w64-x86_64-stormlib || true
 
       - name: Configure
         shell: msys2 {0}

@@ -4276,6 +4276,7 @@ network::Packet AuctionListItemsPacket::build(
     p.writeUInt32(quality);
     p.writeUInt8(usableOnly);
     p.writeUInt8(0);  // getAll (0 = normal search)
+    p.writeUInt8(exactMatch);
     // Sort columns (0 = none)
     p.writeUInt8(0);
     return p;

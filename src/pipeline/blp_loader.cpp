@@ -30,34 +30,39 @@ BLPImage BLPLoader::load(const std::vector<uint8_t>& blpData) {
 }
 
 BLPImage BLPLoader::loadBLP1(const uint8_t* data, size_t size) {
-    // BLP1 header has all uint32 fields (different layout from BLP2)
-    const BLP1Header* header = reinterpret_cast<const BLP1Header*>(data);
+    // Copy header to stack to avoid unaligned reinterpret_cast (UB on strict platforms)
+    if (size < sizeof(BLP1Header)) {
+        LOG_ERROR("BLP1 data too small for header");
+        return BLPImage();
+    }
+    BLP1Header header;
+    std::memcpy(&header, data, sizeof(BLP1Header));
 
     BLPImage image;
     image.format = BLPFormat::BLP1;
-    image.width = header->width;
-    image.height = header->height;
+    image.width = header.width;
+    image.height = header.height;
     image.channels = 4;
-    image.mipLevels = header->hasMips ? 16 : 1;
+    image.mipLevels = header.hasMips ? 16 : 1;
 
     // BLP1 compression: 0=JPEG (not used in WoW), 1=palette/indexed
     // BLP1 does NOT support DXT — only palette with optional alpha
-    if (header->compression == 1) {
+    if (header.compression == 1) {
         image.compression = BLPCompression::PALETTE;
-    } else if (header->compression == 0) {
+    } else if (header.compression == 0) {
         LOG_WARNING("BLP1 JPEG compression not supported");
         return BLPImage();
     } else {
-        LOG_WARNING("BLP1 unknown compression: ", header->compression);
+        LOG_WARNING("BLP1 unknown compression: ", header.compression);
         return BLPImage();
     }
 
     LOG_DEBUG("Loading BLP1: ", image.width, "x", image.height, " ",
-              getCompressionName(image.compression), " alpha=", header->alphaBits);
+              getCompressionName(image.compression), " alpha=", header.alphaBits);
 
     // Get first mipmap (full resolution)
-    uint32_t offset = header->mipOffsets[0];
-    uint32_t mipSize = header->mipSizes[0];
+    uint32_t offset = header.mipOffsets[0];
+    uint32_t mipSize = header.mipSizes[0];
 
     if (offset + mipSize > size) {
         LOG_ERROR("BLP1 mipmap data out of bounds (offset=", offset, " size=", mipSize, " fileSize=", size, ")");
@@ -70,45 +75,50 @@ BLPImage BLPLoader::loadBLP1(const uint8_t* data, size_t size) {
     int pixelCount = image.width * image.height;
     image.data.resize(pixelCount * 4);  // RGBA8
 
-    decompressPalette(mipData, image.data.data(), header->palette,
-                      image.width, image.height, static_cast<uint8_t>(header->alphaBits));
+    decompressPalette(mipData, image.data.data(), header.palette,
+                      image.width, image.height, static_cast<uint8_t>(header.alphaBits));
 
     return image;
 }
 
 BLPImage BLPLoader::loadBLP2(const uint8_t* data, size_t size) {
-    // BLP2 header has uint8 fields for compression/alpha/encoding
-    const BLP2Header* header = reinterpret_cast<const BLP2Header*>(data);
+    // Copy header to stack to avoid unaligned reinterpret_cast (UB on strict platforms)
+    if (size < sizeof(BLP2Header)) {
+        LOG_ERROR("BLP2 data too small for header");
+        return BLPImage();
+    }
+    BLP2Header header;
+    std::memcpy(&header, data, sizeof(BLP2Header));
 
     BLPImage image;
     image.format = BLPFormat::BLP2;
-    image.width = header->width;
-    image.height = header->height;
+    image.width = header.width;
+    image.height = header.height;
     image.channels = 4;
-    image.mipLevels = header->hasMips ? 16 : 1;
+    image.mipLevels = header.hasMips ? 16 : 1;
 
     // BLP2 compression types:
     //   1 = palette/uncompressed
     //   2 = DXTC (DXT1/DXT3/DXT5 based on alphaDepth + alphaEncoding)
     //   3 = plain A8R8G8B8
-    if (header->compression == 1) {
+    if (header.compression == 1) {
         image.compression = BLPCompression::PALETTE;
-    } else if (header->compression == 2) {
+    } else if (header.compression == 2) {
         // BLP2 DXTC format selection based on alphaDepth + alphaEncoding:
         //   alphaDepth=0                    → DXT1 (no alpha)
         //   alphaDepth>0, alphaEncoding=0   → DXT1 (1-bit alpha)
         //   alphaDepth>0, alphaEncoding=1   → DXT3 (explicit 4-bit alpha)
         //   alphaDepth>0, alphaEncoding=7   → DXT5 (interpolated alpha)
-        if (header->alphaDepth == 0 || header->alphaEncoding == 0) {
+        if (header.alphaDepth == 0 || header.alphaEncoding == 0) {
             image.compression = BLPCompression::DXT1;
-        } else if (header->alphaEncoding == 1) {
+        } else if (header.alphaEncoding == 1) {
             image.compression = BLPCompression::DXT3;
-        } else if (header->alphaEncoding == 7) {
+        } else if (header.alphaEncoding == 7) {
             image.compression = BLPCompression::DXT5;
         } else {
             image.compression = BLPCompression::DXT1;
         }
-    } else if (header->compression == 3) {
+    } else if (header.compression == 3) {
         image.compression = BLPCompression::ARGB8888;
     } else {
         image.compression = BLPCompression::ARGB8888;
@@ -116,13 +126,13 @@ BLPImage BLPLoader::loadBLP2(const uint8_t* data, size_t size) {
 
     LOG_DEBUG("Loading BLP2: ", image.width, "x", image.height, " ",
               getCompressionName(image.compression),
-              " (comp=", (int)header->compression, " alphaDepth=", (int)header->alphaDepth,
-              " alphaEnc=", (int)header->alphaEncoding, " mipOfs=", header->mipOffsets[0],
-              " mipSize=", header->mipSizes[0], ")");
+              " (comp=", (int)header.compression, " alphaDepth=", (int)header.alphaDepth,
+              " alphaEnc=", (int)header.alphaEncoding, " mipOfs=", header.mipOffsets[0],
+              " mipSize=", header.mipSizes[0], ")");
 
     // Get first mipmap (full resolution)
-    uint32_t offset = header->mipOffsets[0];
-    uint32_t mipSize = header->mipSizes[0];
+    uint32_t offset = header.mipOffsets[0];
+    uint32_t mipSize = header.mipSizes[0];
 
     if (offset + mipSize > size) {
         LOG_ERROR("BLP2 mipmap data out of bounds");
@@ -149,8 +159,8 @@ BLPImage BLPLoader::loadBLP2(const uint8_t* data, size_t size) {
             break;
 
         case BLPCompression::PALETTE:
-            decompressPalette(mipData, image.data.data(), header->palette,
-                              image.width, image.height, header->alphaDepth);
+            decompressPalette(mipData, image.data.data(), header.palette,
+                              image.width, image.height, header.alphaDepth);
             break;
 
         case BLPCompression::ARGB8888:

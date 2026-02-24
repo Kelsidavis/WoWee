@@ -295,7 +295,7 @@ void CombatSoundManager::playWeaponMiss(bool twoHanded) {
     }
 }
 
-void CombatSoundManager::playImpact(WeaponSize weaponSize, ImpactType impactType, bool isCrit) {
+void CombatSoundManager::playImpact([[maybe_unused]] WeaponSize weaponSize, ImpactType impactType, bool isCrit) {
     // Select appropriate impact sound library
     const std::vector<CombatSample>* normalLibrary = nullptr;
     const std::vector<CombatSample>* critLibrary = nullptr;

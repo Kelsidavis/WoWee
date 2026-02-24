@@ -48,7 +48,7 @@ AllocatedBuffer uploadBuffer(VkContext& ctx, const void* data, VkDeviceSize size
     VkBufferUsageFlags usage);
 
 // Check VkResult and log on failure
-inline bool vkCheck(VkResult result, const char* msg) {
+inline bool vkCheck(VkResult result, [[maybe_unused]] const char* msg) {
     if (result != VK_SUCCESS) {
         // Caller should log the message
         return false;

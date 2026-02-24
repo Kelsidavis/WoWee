@@ -36,6 +36,9 @@ jobs:
             libglm-dev \
             libssl-dev \
             zlib1g-dev \
+            libvulkan-dev \
+            vulkan-tools \
+            glslc \
             libavformat-dev \
             libavcodec-dev \
             libswscale-dev \
@@ -105,6 +108,9 @@ jobs:
             libglm-dev \
             libssl-dev \
             zlib1g-dev \
+            libvulkan-dev \
+            vulkan-tools \
+            glslc \
             libavformat-dev \
             libavcodec-dev \
             libswscale-dev \

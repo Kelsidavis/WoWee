@@ -122,7 +122,7 @@ bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint3
 
 uint32_t WardenEmulator::hookAPI(const std::string& dllName,
                                  const std::string& functionName,
-                                 std::function<uint32_t(WardenEmulator&, const std::vector<uint32_t>&)> handler) {
+                                 [[maybe_unused]] std::function<uint32_t(WardenEmulator&, const std::vector<uint32_t>&)> handler) {
     // Allocate address for this API stub
     static uint32_t nextStubAddr = API_STUB_BASE;
     uint32_t stubAddr = nextStubAddr;
@@ -239,7 +239,7 @@ std::string WardenEmulator::readString(uint32_t address, size_t maxLen) {
     return std::string(buffer.data());
 }
 
-uint32_t WardenEmulator::allocateMemory(size_t size, uint32_t protection) {
+uint32_t WardenEmulator::allocateMemory(size_t size, [[maybe_unused]] uint32_t protection) {
     // Align to 4KB
     size = (size + 0xFFF) & ~0xFFF;
 
@@ -315,7 +315,7 @@ uint32_t WardenEmulator::apiVirtualFree(WardenEmulator& emu, const std::vector<u
     return emu.freeMemory(lpAddress) ? 1 : 0;
 }
 
-uint32_t WardenEmulator::apiGetTickCount(WardenEmulator& emu, const std::vector<uint32_t>& args) {
+uint32_t WardenEmulator::apiGetTickCount([[maybe_unused]] WardenEmulator& emu, [[maybe_unused]] const std::vector<uint32_t>& args) {
     auto now = std::chrono::steady_clock::now();
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     uint32_t ticks = static_cast<uint32_t>(ms & 0xFFFFFFFF);
@@ -324,7 +324,7 @@ uint32_t WardenEmulator::apiGetTickCount(WardenEmulator& emu, const std::vector<
     return ticks;
 }
 
-uint32_t WardenEmulator::apiSleep(WardenEmulator& emu, const std::vector<uint32_t>& args) {
+uint32_t WardenEmulator::apiSleep([[maybe_unused]] WardenEmulator& emu, const std::vector<uint32_t>& args) {
     if (args.size() < 1) return 0;
     uint32_t dwMilliseconds = args[0];
 
@@ -333,12 +333,12 @@ uint32_t WardenEmulator::apiSleep(WardenEmulator& emu, const std::vector<uint32_
     return 0;
 }
 
-uint32_t WardenEmulator::apiGetCurrentThreadId(WardenEmulator& emu, const std::vector<uint32_t>& args) {
+uint32_t WardenEmulator::apiGetCurrentThreadId([[maybe_unused]] WardenEmulator& emu, [[maybe_unused]] const std::vector<uint32_t>& args) {
     std::cout << "[WinAPI] GetCurrentThreadId() = 1234" << '\n';
     return 1234; // Fake thread ID
 }
 
-uint32_t WardenEmulator::apiGetCurrentProcessId(WardenEmulator& emu, const std::vector<uint32_t>& args) {
+uint32_t WardenEmulator::apiGetCurrentProcessId([[maybe_unused]] WardenEmulator& emu, [[maybe_unused]] const std::vector<uint32_t>& args) {
     std::cout << "[WinAPI] GetCurrentProcessId() = 5678" << '\n';
     return 5678; // Fake process ID
 }
@@ -347,7 +347,7 @@ uint32_t WardenEmulator::apiReadProcessMemory(WardenEmulator& emu, const std::ve
     // ReadProcessMemory(hProcess, lpBaseAddress, lpBuffer, nSize, lpNumberOfBytesRead)
     if (args.size() < 5) return 0;
 
-    uint32_t hProcess = args[0];
+    [[maybe_unused]] uint32_t hProcess = args[0];
     uint32_t lpBaseAddress = args[1];
     uint32_t lpBuffer = args[2];
     uint32_t nSize = args[3];
@@ -377,13 +377,11 @@ uint32_t WardenEmulator::apiReadProcessMemory(WardenEmulator& emu, const std::ve
 // Unicorn Callbacks
 // ============================================================================
 
-void WardenEmulator::hookCode(uc_engine* uc, uint64_t address, uint32_t size, void* userData) {
-    WardenEmulator* emu = static_cast<WardenEmulator*>(userData);
+void WardenEmulator::hookCode([[maybe_unused]] uc_engine* uc, uint64_t address, [[maybe_unused]] uint32_t size, [[maybe_unused]] void* userData) {
     std::cout << "[Trace] 0x" << std::hex << address << std::dec << '\n';
 }
 
-void WardenEmulator::hookMemInvalid(uc_engine* uc, int type, uint64_t address, int size, int64_t value, void* userData) {
-    WardenEmulator* emu = static_cast<WardenEmulator*>(userData);
+void WardenEmulator::hookMemInvalid([[maybe_unused]] uc_engine* uc, int type, uint64_t address, int size, [[maybe_unused]] int64_t value, [[maybe_unused]] void* userData) {
 
     const char* typeStr = "UNKNOWN";
     switch (type) {
