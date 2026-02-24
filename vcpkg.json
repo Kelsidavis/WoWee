@@ -10,6 +10,8 @@
     "glew",
     "glm",
     "zlib",
-    "ffmpeg"
+    "ffmpeg",
+    "unicorn",
+    "vulkan-memory-allocator"
   ]
 }
