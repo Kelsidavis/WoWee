@@ -363,6 +363,8 @@ void QuestMarkerRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSe
     constexpr float MIN_DIST = 4.0f;            // Near clamp
     constexpr float MAX_DIST = 90.0f;           // Far fade-out start
     constexpr float FADE_RANGE = 25.0f;         // Fade-out range
+    constexpr float CULL_DIST = MAX_DIST + FADE_RANGE;
+    constexpr float CULL_DIST_SQ = CULL_DIST * CULL_DIST;
 
     // Get time for bob animation
     float timeSeconds = SDL_GetTicks() / 1000.0f;
@@ -373,6 +375,7 @@ void QuestMarkerRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSe
     // Get camera right and up vectors for billboarding
     glm::vec3 cameraRight = glm::vec3(view[0][0], view[1][0], view[2][0]);
     glm::vec3 cameraUp = glm::vec3(view[0][1], view[1][1], view[2][1]);
+    const glm::vec3 cameraForward = glm::cross(cameraRight, cameraUp);
 
     // Bind pipeline
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
@@ -391,7 +394,9 @@ void QuestMarkerRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSe
 
         // Calculate distance for LOD and culling
         glm::vec3 toCamera = cameraPos - marker.position;
-        float dist = glm::length(toCamera);
+        float distSq = glm::dot(toCamera, toCamera);
+        if (distSq > CULL_DIST_SQ) continue;
+        float dist = std::sqrt(distSq);
 
         // Calculate fade alpha
         float fadeAlpha = 1.0f;
@@ -425,7 +430,7 @@ void QuestMarkerRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSe
         // Billboard: align quad to face camera
         model[0] = glm::vec4(cameraRight * size, 0.0f);
         model[1] = glm::vec4(cameraUp * size, 0.0f);
-        model[2] = glm::vec4(glm::cross(cameraRight, cameraUp), 0.0f);
+        model[2] = glm::vec4(cameraForward, 0.0f);
 
         // Bind material descriptor set (set 1) for this marker's texture
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_,

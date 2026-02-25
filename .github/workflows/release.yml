@@ -59,6 +59,10 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
+      - name: Verify Release Config
+        run: |
+          cmake -LA -N build | grep -E '^CMAKE_BUILD_TYPE:STRING=Release$'
+
       - name: Build
         run: cmake --build build --parallel $(nproc)
 
@@ -122,6 +126,10 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$BREW" \
             -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
+
+      - name: Verify Release Config
+        run: |
+          cmake -LA -N build | grep -E '^CMAKE_BUILD_TYPE:STRING=Release$'
 
       - name: Build
         run: cmake --build build --parallel $(sysctl -n hw.logicalcpu)
@@ -270,6 +278,11 @@ jobs:
       - name: Configure
         shell: msys2 {0}
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Verify Release Config
+        shell: msys2 {0}
+        run: |
+          cmake -LA -N build | grep -E '^CMAKE_BUILD_TYPE:STRING=Release$'
 
       - name: Build
         shell: msys2 {0}

@@ -4,6 +4,8 @@
 #include <ctime>
 #include <filesystem>
 #include <cstdlib>
+#include <algorithm>
+#include <cctype>
 
 namespace wowee {
 namespace core {
@@ -28,20 +30,35 @@ void Logger::ensureFile() {
             flushIntervalMs_ = static_cast<uint32_t>(parsed);
         }
     }
+    if (const char* dedupe = std::getenv("WOWEE_LOG_DEDUPE")) {
+        dedupeEnabled_ = !(dedupe[0] == '0' || dedupe[0] == 'f' || dedupe[0] == 'F' ||
+                           dedupe[0] == 'n' || dedupe[0] == 'N');
+    }
+    if (const char* dedupeMs = std::getenv("WOWEE_LOG_DEDUPE_MS")) {
+        char* end = nullptr;
+        unsigned long parsed = std::strtoul(dedupeMs, &end, 10);
+        if (end != dedupeMs && parsed <= 60000ul) {
+            dedupeWindowMs_ = static_cast<uint32_t>(parsed);
+        }
+    }
+    if (const char* level = std::getenv("WOWEE_LOG_LEVEL")) {
+        std::string v(level);
+        std::transform(v.begin(), v.end(), v.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        if (v == "debug") setLogLevel(LogLevel::DEBUG);
+        else if (v == "info") setLogLevel(LogLevel::INFO);
+        else if (v == "warn" || v == "warning") setLogLevel(LogLevel::WARNING);
+        else if (v == "error") setLogLevel(LogLevel::ERROR);
+        else if (v == "fatal") setLogLevel(LogLevel::FATAL);
+    }
     std::error_code ec;
     std::filesystem::create_directories("logs", ec);
     fileStream.open("logs/wowee.log", std::ios::out | std::ios::trunc);
     lastFlushTime_ = std::chrono::steady_clock::now();
 }
 
-void Logger::log(LogLevel level, const std::string& message) {
-    if (!shouldLog(level)) {
-        return;
-    }
-
-    std::lock_guard<std::mutex> lock(mutex);
-    ensureFile();
-
+void Logger::emitLineLocked(LogLevel level, const std::string& message) {
     // Get current time
     auto now = std::chrono::system_clock::now();
     auto time = std::chrono::system_clock::to_time_t(now);
@@ -90,6 +107,38 @@ void Logger::log(LogLevel level, const std::string& message) {
             fileStream.flush();
         }
     }
+}
+
+void Logger::flushSuppressedLocked() {
+    if (suppressedCount_ == 0) return;
+    emitLineLocked(lastLevel_, "Previous message repeated " + std::to_string(suppressedCount_) + " times");
+    suppressedCount_ = 0;
+}
+
+void Logger::log(LogLevel level, const std::string& message) {
+    if (!shouldLog(level)) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(mutex);
+    ensureFile();
+
+    auto nowSteady = std::chrono::steady_clock::now();
+    if (dedupeEnabled_ && !lastMessage_.empty() &&
+        level == lastLevel_ && message == lastMessage_) {
+        auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(nowSteady - lastMessageTime_).count();
+        if (elapsedMs >= 0 && elapsedMs <= static_cast<long long>(dedupeWindowMs_)) {
+            ++suppressedCount_;
+            lastMessageTime_ = nowSteady;
+            return;
+        }
+    }
+
+    flushSuppressedLocked();
+    emitLineLocked(level, message);
+    lastLevel_ = level;
+    lastMessage_ = message;
+    lastMessageTime_ = nowSteady;
 }
 
 void Logger::setLogLevel(LogLevel level) {

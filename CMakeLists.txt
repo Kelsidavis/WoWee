@@ -6,6 +6,13 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Explicitly tag optimized configs so runtime defaults can enforce low-noise logging.
+add_compile_definitions(
+    $<$<CONFIG:Release>:WOWEE_RELEASE_LOGGING>
+    $<$<CONFIG:RelWithDebInfo>:WOWEE_RELEASE_LOGGING>
+    $<$<CONFIG:MinSizeRel>:WOWEE_RELEASE_LOGGING>
+)
+
 # Output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)

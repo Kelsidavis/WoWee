@@ -1,11 +1,58 @@
 #include "auth/auth_packets.hpp"
 #include "core/logger.hpp"
+#include "network/net_platform.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cstring>
+#include <array>
 
 namespace wowee {
 namespace auth {
+
+namespace {
+bool detectOutboundIPv4(std::array<uint8_t, 4>& outIp) {
+    net::ensureInit();
+
+    socket_t s = ::socket(AF_INET, SOCK_DGRAM, 0);
+    if (s == INVALID_SOCK) {
+        return false;
+    }
+
+    sockaddr_in remote{};
+    remote.sin_family = AF_INET;
+    remote.sin_port = htons(53);
+    if (inet_pton(AF_INET, "1.1.1.1", &remote.sin_addr) != 1) {
+        net::closeSocket(s);
+        return false;
+    }
+
+    if (::connect(s, reinterpret_cast<sockaddr*>(&remote), sizeof(remote)) != 0) {
+        net::closeSocket(s);
+        return false;
+    }
+
+    sockaddr_in local{};
+#ifdef _WIN32
+    int localLen = sizeof(local);
+#else
+    socklen_t localLen = sizeof(local);
+#endif
+    if (::getsockname(s, reinterpret_cast<sockaddr*>(&local), &localLen) != 0) {
+        net::closeSocket(s);
+        return false;
+    }
+
+    net::closeSocket(s);
+
+    const uint32_t ip = ntohl(local.sin_addr.s_addr);
+    outIp[0] = static_cast<uint8_t>((ip >> 24) & 0xFF);
+    outIp[1] = static_cast<uint8_t>((ip >> 16) & 0xFF);
+    outIp[2] = static_cast<uint8_t>((ip >> 8) & 0xFF);
+    outIp[3] = static_cast<uint8_t>(ip & 0xFF);
+
+    return (ip != 0);
+}
+} // namespace
 
 network::Packet LogonChallengePacket::build(const std::string& account, const ClientInfo& info) {
     // Convert account to uppercase
@@ -66,8 +113,20 @@ network::Packet LogonChallengePacket::build(const std::string& account, const Cl
     // Timezone
     packet.writeUInt32(info.timezone);
 
-    // IP address (always 0)
-    packet.writeUInt32(0);
+    // Client IP: use the real outbound local IPv4 when detectable.
+    // Fallback to 0.0.0.0 if detection fails.
+    {
+        std::array<uint8_t, 4> localIp{0, 0, 0, 0};
+        if (detectOutboundIPv4(localIp)) {
+            packet.writeUInt8(localIp[0]);
+            packet.writeUInt8(localIp[1]);
+            packet.writeUInt8(localIp[2]);
+            packet.writeUInt8(localIp[3]);
+        } else {
+            packet.writeUInt32(0);
+            LOG_DEBUG("LOGON_CHALLENGE client IP detection failed; using 0.0.0.0 fallback");
+        }
+    }
 
     // Account length and name
     packet.writeUInt8(static_cast<uint8_t>(upperAccount.length()));

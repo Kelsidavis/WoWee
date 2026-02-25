@@ -95,3 +95,7 @@ asset_pipeline/
 # Local texture dumps / extracted art should never be committed
 assets/textures/
 node_modules/
+
+# Python cache artifacts
+tools/__pycache__/
+*.pyc

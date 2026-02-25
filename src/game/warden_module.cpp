@@ -529,78 +529,165 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
     std::cout << "[WardenModule] Allocated " << moduleSize_ << " bytes of executable memory at "
               << moduleMemory_ << '\n';
 
-    // Parse copy/skip pairs (MaNGOS/TrinityCore format)
-    // Format: repeated [2B copy_count][copy_count bytes data][2B skip_count]
-    // Copy = copy from source to dest, Skip = advance dest pointer (zeros)
-    // Terminates when copy_count == 0
-    size_t pos = 4; // Skip 4-byte size header
-    size_t destOffset = 0;
-    int pairCount = 0;
+    auto readU16LE = [&](size_t at) -> uint16_t {
+        return static_cast<uint16_t>(exeData[at] | (exeData[at + 1] << 8));
+    };
 
-    while (pos + 2 <= exeData.size()) {
-        // Read copy count (2 bytes LE)
-        uint16_t copyCount = exeData[pos] | (exeData[pos + 1] << 8);
-        pos += 2;
+    enum class PairFormat {
+        CopyDataSkip,  // [copy][data][skip]
+        SkipCopyData,  // [skip][copy][data]
+        CopySkipData   // [copy][skip][data]
+    };
 
-        if (copyCount == 0) {
-            break; // End of copy/skip pairs
-        }
+    auto tryParsePairs = [&](PairFormat format,
+                             std::vector<uint8_t>& imageOut,
+                             size_t& relocPosOut,
+                             size_t& finalOffsetOut,
+                             int& pairCountOut) -> bool {
+        imageOut.assign(moduleSize_, 0);
+        size_t pos = 4; // Skip 4-byte final size header
+        size_t destOffset = 0;
+        int pairCount = 0;
 
-        if (copyCount > 0) {
-            if (pos + copyCount > exeData.size()) {
-                std::cerr << "[WardenModule] Copy section extends beyond data bounds" << '\n';
-                #ifdef _WIN32
-                    VirtualFree(moduleMemory_, 0, MEM_RELEASE);
-                #else
-                    munmap(moduleMemory_, moduleSize_);
-                #endif
-                moduleMemory_ = nullptr;
-                return false;
+        while (pos + 2 <= exeData.size()) {
+            uint16_t copyCount = 0;
+            uint16_t skipCount = 0;
+
+            switch (format) {
+                case PairFormat::CopyDataSkip: {
+                    copyCount = readU16LE(pos);
+                    pos += 2;
+                    if (copyCount == 0) {
+                        relocPosOut = pos;
+                        finalOffsetOut = destOffset;
+                        pairCountOut = pairCount;
+                        imageOut.resize(moduleSize_);
+                        return true;
+                    }
+
+                    if (pos + copyCount > exeData.size() || destOffset + copyCount > moduleSize_) {
+                        return false;
+                    }
+
+                    std::memcpy(imageOut.data() + destOffset, exeData.data() + pos, copyCount);
+                    pos += copyCount;
+                    destOffset += copyCount;
+
+                    if (pos + 2 > exeData.size()) {
+                        return false;
+                    }
+                    skipCount = readU16LE(pos);
+                    pos += 2;
+                    break;
+                }
+
+                case PairFormat::SkipCopyData: {
+                    if (pos + 4 > exeData.size()) {
+                        return false;
+                    }
+                    skipCount = readU16LE(pos);
+                    pos += 2;
+                    copyCount = readU16LE(pos);
+                    pos += 2;
+
+                    if (skipCount == 0 && copyCount == 0) {
+                        relocPosOut = pos;
+                        finalOffsetOut = destOffset;
+                        pairCountOut = pairCount;
+                        imageOut.resize(moduleSize_);
+                        return true;
+                    }
+
+                    if (destOffset + skipCount > moduleSize_) {
+                        return false;
+                    }
+                    destOffset += skipCount;
+
+                    if (pos + copyCount > exeData.size() || destOffset + copyCount > moduleSize_) {
+                        return false;
+                    }
+                    std::memcpy(imageOut.data() + destOffset, exeData.data() + pos, copyCount);
+                    pos += copyCount;
+                    destOffset += copyCount;
+                    break;
+                }
+
+                case PairFormat::CopySkipData: {
+                    if (pos + 4 > exeData.size()) {
+                        return false;
+                    }
+                    copyCount = readU16LE(pos);
+                    pos += 2;
+                    skipCount = readU16LE(pos);
+                    pos += 2;
+
+                    if (copyCount == 0 && skipCount == 0) {
+                        relocPosOut = pos;
+                        finalOffsetOut = destOffset;
+                        pairCountOut = pairCount;
+                        imageOut.resize(moduleSize_);
+                        return true;
+                    }
+
+                    if (pos + copyCount > exeData.size() || destOffset + copyCount > moduleSize_) {
+                        return false;
+                    }
+                    std::memcpy(imageOut.data() + destOffset, exeData.data() + pos, copyCount);
+                    pos += copyCount;
+                    destOffset += copyCount;
+                    break;
+                }
             }
 
-            if (destOffset + copyCount > moduleSize_) {
-                std::cerr << "[WardenModule] Copy section exceeds module size" << '\n';
-                #ifdef _WIN32
-                    VirtualFree(moduleMemory_, 0, MEM_RELEASE);
-                #else
-                    munmap(moduleMemory_, moduleSize_);
-                #endif
-                moduleMemory_ = nullptr;
+            if (destOffset + skipCount > moduleSize_) {
                 return false;
             }
-
-            std::memcpy(
-                static_cast<uint8_t*>(moduleMemory_) + destOffset,
-                exeData.data() + pos,
-                copyCount
-            );
-            pos += copyCount;
-            destOffset += copyCount;
+            destOffset += skipCount;
+            pairCount++;
         }
 
-        // Read skip count (2 bytes LE)
-        uint16_t skipCount = 0;
-        if (pos + 2 <= exeData.size()) {
-            skipCount = exeData[pos] | (exeData[pos + 1] << 8);
-            pos += 2;
-        }
+        return false;
+    };
 
-        // Advance dest pointer by skipCount (gaps are zero-filled from memset)
-        destOffset += skipCount;
+    std::vector<uint8_t> parsedImage;
+    size_t parsedRelocPos = 0;
+    size_t parsedFinalOffset = 0;
+    int parsedPairCount = 0;
 
-        pairCount++;
-        std::cout << "[WardenModule]   Pair " << pairCount << ": copy " << copyCount
-                  << ", skip " << skipCount << " (dest offset=" << destOffset << ")" << '\n';
+    PairFormat usedFormat = PairFormat::CopyDataSkip;
+    bool parsed = tryParsePairs(PairFormat::CopyDataSkip, parsedImage, parsedRelocPos, parsedFinalOffset, parsedPairCount);
+    if (!parsed) {
+        usedFormat = PairFormat::SkipCopyData;
+        parsed = tryParsePairs(PairFormat::SkipCopyData, parsedImage, parsedRelocPos, parsedFinalOffset, parsedPairCount);
+    }
+    if (!parsed) {
+        usedFormat = PairFormat::CopySkipData;
+        parsed = tryParsePairs(PairFormat::CopySkipData, parsedImage, parsedRelocPos, parsedFinalOffset, parsedPairCount);
     }
 
-    // Save position — remaining decompressed data contains relocation entries
-    relocDataOffset_ = pos;
+    if (parsed) {
+        std::memcpy(moduleMemory_, parsedImage.data(), parsedImage.size());
+        relocDataOffset_ = parsedRelocPos;
 
-    std::cout << "[WardenModule] Parsed " << pairCount << " skip/copy pairs, final offset: "
-              << destOffset << "/" << finalCodeSize << '\n';
-    std::cout << "[WardenModule] Relocation data starts at decompressed offset " << relocDataOffset_
-              << " (" << (exeData.size() - relocDataOffset_) << " bytes remaining)" << '\n';
+        const char* formatName = "copy/data/skip";
+        if (usedFormat == PairFormat::SkipCopyData) formatName = "skip/copy/data";
+        if (usedFormat == PairFormat::CopySkipData) formatName = "copy/skip/data";
 
+        std::cout << "[WardenModule] Parsed " << parsedPairCount << " pairs using format "
+                  << formatName << ", final offset: " << parsedFinalOffset << "/" << finalCodeSize << '\n';
+        std::cout << "[WardenModule] Relocation data starts at decompressed offset " << relocDataOffset_
+                  << " (" << (exeData.size() - relocDataOffset_) << " bytes remaining)" << '\n';
+        return true;
+    }
+
+    // Fallback: copy raw payload (without the 4-byte size header) into module memory.
+    // This keeps loading alive for servers where packet flow can continue with hash/check fallbacks.
+    if (exeData.size() > 4) {
+        size_t rawCopySize = std::min(moduleSize_, exeData.size() - 4);
+        std::memcpy(moduleMemory_, exeData.data() + 4, rawCopySize);
+    }
+    relocDataOffset_ = 0;
+    std::cerr << "[WardenModule] Could not parse copy/skip pairs (all known layouts failed); using raw payload fallback" << '\n';
     return true;
 }
 

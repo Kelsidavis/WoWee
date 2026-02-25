@@ -1235,7 +1235,7 @@ void GameHandler::handlePacket(network::Packet& packet) {
         ++wardenPacketsAfterGate_;
     }
     if (preLogicalOp && isAuthCharPipelineOpcode(*preLogicalOp)) {
-        LOG_INFO("AUTH/CHAR RX opcode=0x", std::hex, opcode, std::dec,
+        LOG_DEBUG("AUTH/CHAR RX opcode=0x", std::hex, opcode, std::dec,
                  " state=", worldStateName(state),
                  " size=", packet.getSize());
     }
@@ -3462,7 +3462,7 @@ bool GameHandler::loadWardenCRFile(const std::string& moduleHashHex) {
         for (int i = 0; i < 9; i++) {
             char s[16]; snprintf(s, sizeof(s), "%s=0x%02X ", names[i], wardenCheckOpcodes_[i]); opcHex += s;
         }
-        LOG_INFO("Warden: Check opcodes: ", opcHex);
+        LOG_DEBUG("Warden: Check opcodes: ", opcHex);
     }
 
     size_t entryCount = (static_cast<size_t>(fileSize) - CR_HEADER_SIZE) / CR_ENTRY_SIZE;
@@ -3512,17 +3512,20 @@ void GameHandler::handleWardenData(network::Packet& packet) {
     // Decrypt the payload
     std::vector<uint8_t> decrypted = wardenCrypto_->decrypt(data);
 
-    // Log decrypted data
-    {
+    // Avoid expensive hex formatting when DEBUG logs are disabled.
+    if (core::Logger::getInstance().shouldLog(core::LogLevel::DEBUG)) {
         std::string hex;
         size_t logSize = std::min(decrypted.size(), size_t(256));
         hex.reserve(logSize * 3);
         for (size_t i = 0; i < logSize; ++i) {
-            char b[4]; snprintf(b, sizeof(b), "%02x ", decrypted[i]); hex += b;
+            char b[4];
+            snprintf(b, sizeof(b), "%02x ", decrypted[i]);
+            hex += b;
         }
-        if (decrypted.size() > 64)
+        if (decrypted.size() > 64) {
             hex += "... (" + std::to_string(decrypted.size() - 64) + " more)";
-        LOG_INFO("Warden: Decrypted (", decrypted.size(), " bytes): ", hex);
+        }
+        LOG_DEBUG("Warden: Decrypted (", decrypted.size(), " bytes): ", hex);
     }
 
     if (decrypted.empty()) {
@@ -3541,7 +3544,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
         }
         if (socket && socket->isConnected()) {
             socket->send(response);
-            LOG_INFO("Warden: Sent response (", plaintext.size(), " bytes plaintext)");
+            LOG_DEBUG("Warden: Sent response (", plaintext.size(), " bytes plaintext)");
         }
     };
 
@@ -3564,7 +3567,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
             {
                 std::string hashHex;
                 for (auto b : wardenModuleHash_) { char s[4]; snprintf(s, 4, "%02x", b); hashHex += s; }
-                LOG_INFO("Warden: MODULE_USE hash=", hashHex, " size=", wardenModuleSize_);
+                LOG_DEBUG("Warden: MODULE_USE hash=", hashHex, " size=", wardenModuleSize_);
 
                 // Try to load pre-computed challenge/response entries
                 loadWardenCRFile(hashHex);
@@ -3574,7 +3577,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
             std::vector<uint8_t> resp = { 0x00 }; // WARDEN_CMSG_MODULE_MISSING
             sendWardenResponse(resp);
             wardenState_ = WardenState::WAIT_MODULE_CACHE;
-            LOG_INFO("Warden: Sent MODULE_MISSING, waiting for module data chunks");
+            LOG_DEBUG("Warden: Sent MODULE_MISSING, waiting for module data chunks");
             break;
         }
 
@@ -3598,7 +3601,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                                      decrypted.begin() + 3,
                                      decrypted.begin() + 3 + chunkSize);
 
-            LOG_INFO("Warden: MODULE_CACHE chunk ", chunkSize, " bytes, total ",
+            LOG_DEBUG("Warden: MODULE_CACHE chunk ", chunkSize, " bytes, total ",
                      wardenModuleData_.size(), "/", wardenModuleSize_);
 
             // Check if module download is complete
@@ -3627,7 +3630,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                     std::ofstream wf(cachePath, std::ios::binary);
                     if (wf) {
                         wf.write(reinterpret_cast<const char*>(wardenModuleData_.data()), wardenModuleData_.size());
-                        LOG_INFO("Warden: Cached module to ", cachePath);
+                        LOG_DEBUG("Warden: Cached module to ", cachePath);
                     }
                 }
 
@@ -3644,7 +3647,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                 // Send MODULE_OK (opcode 0x01)
                 std::vector<uint8_t> resp = { 0x01 }; // WARDEN_CMSG_MODULE_OK
                 sendWardenResponse(resp);
-                LOG_INFO("Warden: Sent MODULE_OK");
+                LOG_DEBUG("Warden: Sent MODULE_OK");
             }
             // No response for intermediate chunks
             break;
@@ -3670,7 +3673,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                 }
 
                 if (match) {
-                    LOG_INFO("Warden: Found matching CR entry for seed");
+                    LOG_DEBUG("Warden: Found matching CR entry for seed");
 
                     // Log the reply we're sending
                     {
@@ -3678,7 +3681,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         for (int i = 0; i < 20; i++) {
                             char s[4]; snprintf(s, 4, "%02x", match->reply[i]); replyHex += s;
                         }
-                        LOG_INFO("Warden: Sending pre-computed reply=", replyHex);
+                        LOG_DEBUG("Warden: Sending pre-computed reply=", replyHex);
                     }
 
                     // Send HASH_RESULT (opcode 0x04 + 20-byte reply)
@@ -3693,7 +3696,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                     std::vector<uint8_t> newDecryptKey(match->serverKey, match->serverKey + 16);
                     wardenCrypto_->replaceKeys(newEncryptKey, newDecryptKey);
 
-                    LOG_INFO("Warden: Switched to CR key set");
+                    LOG_DEBUG("Warden: Switched to CR key set");
 
                     wardenState_ = WardenState::WAIT_CHECKS;
                     break;
@@ -3721,7 +3724,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                     const auto& firstCR = wardenCREntries_[0];
                     std::string expectedHex;
                     for (int i = 0; i < 20; i++) { char s[4]; snprintf(s, 4, "%02x", firstCR.reply[i]); expectedHex += s; }
-                    LOG_INFO("Warden: Empirical test — expected reply from CR[0]=", expectedHex);
+                    LOG_DEBUG("Warden: Empirical test — expected reply from CR[0]=", expectedHex);
 
                     // Test 1: SHA1(moduleImage)
                     {
@@ -3729,7 +3732,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         auto h = auth::Crypto::sha1(data);
                         bool match = (std::memcmp(h.data(), firstCR.reply, 20) == 0);
                         std::string hex; for (auto b : h) { char s[4]; snprintf(s, 4, "%02x", b); hex += s; }
-                        LOG_INFO("Warden:   SHA1(moduleImage)=", hex, match ? " MATCH!" : "");
+                        LOG_DEBUG("Warden:   SHA1(moduleImage)=", hex, match ? " MATCH!" : "");
                     }
                     // Test 2: SHA1(seed || moduleImage)
                     {
@@ -3739,7 +3742,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         auto h = auth::Crypto::sha1(data);
                         bool match = (std::memcmp(h.data(), firstCR.reply, 20) == 0);
                         std::string hex; for (auto b : h) { char s[4]; snprintf(s, 4, "%02x", b); hex += s; }
-                        LOG_INFO("Warden:   SHA1(seed||image)=", hex, match ? " MATCH!" : "");
+                        LOG_DEBUG("Warden:   SHA1(seed||image)=", hex, match ? " MATCH!" : "");
                     }
                     // Test 3: SHA1(moduleImage || seed)
                     {
@@ -3748,21 +3751,21 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         auto h = auth::Crypto::sha1(data);
                         bool match = (std::memcmp(h.data(), firstCR.reply, 20) == 0);
                         std::string hex; for (auto b : h) { char s[4]; snprintf(s, 4, "%02x", b); hex += s; }
-                        LOG_INFO("Warden:   SHA1(image||seed)=", hex, match ? " MATCH!" : "");
+                        LOG_DEBUG("Warden:   SHA1(image||seed)=", hex, match ? " MATCH!" : "");
                     }
                     // Test 4: SHA1(decompressedData)
                     {
                         auto h = auth::Crypto::sha1(decompressedData);
                         bool match = (std::memcmp(h.data(), firstCR.reply, 20) == 0);
                         std::string hex; for (auto b : h) { char s[4]; snprintf(s, 4, "%02x", b); hex += s; }
-                        LOG_INFO("Warden:   SHA1(decompressed)=", hex, match ? " MATCH!" : "");
+                        LOG_DEBUG("Warden:   SHA1(decompressed)=", hex, match ? " MATCH!" : "");
                     }
                     // Test 5: SHA1(rawModuleData)
                     {
                         auto h = auth::Crypto::sha1(wardenModuleData_);
                         bool match = (std::memcmp(h.data(), firstCR.reply, 20) == 0);
                         std::string hex; for (auto b : h) { char s[4]; snprintf(s, 4, "%02x", b); hex += s; }
-                        LOG_INFO("Warden:   SHA1(rawModule)=", hex, match ? " MATCH!" : "");
+                        LOG_DEBUG("Warden:   SHA1(rawModule)=", hex, match ? " MATCH!" : "");
                     }
                     // Test 6: Check if all CR replies are the same (constant hash)
                     {
@@ -3773,7 +3776,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                                 break;
                             }
                         }
-                        LOG_INFO("Warden:   All ", wardenCREntries_.size(), " CR replies identical? ", allSame ? "YES" : "NO");
+                        LOG_DEBUG("Warden:   All ", wardenCREntries_.size(), " CR replies identical? ", allSame ? "YES" : "NO");
                     }
                 }
 
@@ -3786,7 +3789,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                 {
                     std::string hex;
                     for (auto b : reply) { char s[4]; snprintf(s, 4, "%02x", b); hex += s; }
-                    LOG_INFO("Warden: Sending SHA1(moduleImage)=", hex);
+                    LOG_DEBUG("Warden: Sending SHA1(moduleImage)=", hex);
                 }
 
                 // Send HASH_RESULT (opcode 0x04 + 20-byte hash)
@@ -3807,7 +3810,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                 wardenCrypto_->replaceKeys(ek, dk);
                 for (auto& b : newEncryptKey) b = 0;
                 for (auto& b : newDecryptKey) b = 0;
-                LOG_INFO("Warden: Derived and applied key update from seed");
+                LOG_DEBUG("Warden: Derived and applied key update from seed");
             }
 
             wardenState_ = WardenState::WAIT_CHECKS;
@@ -3815,7 +3818,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
         }
 
         case 0x02: { // WARDEN_SMSG_CHEAT_CHECKS_REQUEST
-            LOG_INFO("Warden: CHEAT_CHECKS_REQUEST (", decrypted.size(), " bytes)");
+            LOG_DEBUG("Warden: CHEAT_CHECKS_REQUEST (", decrypted.size(), " bytes)");
 
             if (decrypted.size() < 3) {
                 LOG_ERROR("Warden: CHEAT_CHECKS_REQUEST too short");
@@ -3833,14 +3836,14 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                 strings.emplace_back(reinterpret_cast<const char*>(decrypted.data() + pos), slen);
                 pos += slen;
             }
-            LOG_INFO("Warden: String table: ", strings.size(), " entries");
+            LOG_DEBUG("Warden: String table: ", strings.size(), " entries");
             for (size_t i = 0; i < strings.size(); i++) {
-                LOG_INFO("Warden:   [", i, "] = \"", strings[i], "\"");
+                LOG_DEBUG("Warden:   [", i, "] = \"", strings[i], "\"");
             }
 
             // XOR byte is the last byte of the packet
             uint8_t xorByte = decrypted.back();
-            LOG_INFO("Warden: XOR byte = 0x", [&]{ char s[4]; snprintf(s,4,"%02x",xorByte); return std::string(s); }());
+            LOG_DEBUG("Warden: XOR byte = 0x", [&]{ char s[4]; snprintf(s,4,"%02x",xorByte); return std::string(s); }());
 
             // Check type enum indices
             enum CheckType { CT_MEM=0, CT_PAGE_A=1, CT_PAGE_B=2, CT_MPQ=3, CT_LUA=4,
@@ -3958,7 +3961,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                 pos++;
                 checkCount++;
 
-                LOG_INFO("Warden: Check #", checkCount, " type=", checkTypeNames[ct],
+                LOG_DEBUG("Warden: Check #", checkCount, " type=", checkTypeNames[ct],
                          " at offset ", pos - 1);
 
                 switch (ct) {
@@ -3984,10 +3987,10 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                                         | (uint32_t(decrypted[pos+2])<<16) | (uint32_t(decrypted[pos+3])<<24);
                         pos += 4;
                         uint8_t readLen = decrypted[pos++];
-                        LOG_INFO("Warden:   MEM offset=0x", [&]{char s[12];snprintf(s,12,"%08x",offset);return std::string(s);}(),
+                        LOG_DEBUG("Warden:   MEM offset=0x", [&]{char s[12];snprintf(s,12,"%08x",offset);return std::string(s);}(),
                                  " len=", (int)readLen);
                         if (!moduleName.empty()) {
-                            LOG_INFO("Warden:   MEM module=\"", moduleName, "\"");
+                            LOG_DEBUG("Warden:   MEM module=\"", moduleName, "\"");
                         }
 
                         // Lazy-load WoW.exe PE image on first MEM_CHECK
@@ -4001,7 +4004,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         // Read bytes from PE image (includes patched runtime globals)
                         std::vector<uint8_t> memBuf(readLen, 0);
                         if (wardenMemory_->isLoaded() && wardenMemory_->readMemory(offset, readLen, memBuf.data())) {
-                            LOG_INFO("Warden:   MEM_CHECK served from PE image");
+                            LOG_DEBUG("Warden:   MEM_CHECK served from PE image");
                         } else {
                             LOG_WARNING("Warden:   MEM_CHECK fallback to zeros for 0x",
                                         [&]{char s[12];snprintf(s,12,"%08x",offset);return std::string(s);}());
@@ -4054,7 +4057,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                                 pageResult = 0x4A; // PatternFound
                             }
                         }
-                        LOG_INFO("Warden:   PAGE_A request bytes=", consume,
+                        LOG_DEBUG("Warden:   PAGE_A request bytes=", consume,
                                  " result=0x", [&]{char s[4];snprintf(s,4,"%02x",pageResult);return std::string(s);}());
                         pos += consume;
                         resultData.push_back(pageResult);
@@ -4093,7 +4096,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                                 pageResult = 0x4A; // PatternFound
                             }
                         }
-                        LOG_INFO("Warden:   PAGE_B request bytes=", consume,
+                        LOG_DEBUG("Warden:   PAGE_B request bytes=", consume,
                                  " result=0x", [&]{char s[4];snprintf(s,4,"%02x",pageResult);return std::string(s);}());
                         pos += consume;
                         resultData.push_back(pageResult);
@@ -4104,7 +4107,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         if (pos + 1 > checkEnd) { pos = checkEnd; break; }
                         uint8_t strIdx = decrypted[pos++];
                         std::string filePath = resolveWardenString(strIdx);
-                        LOG_INFO("Warden:   MPQ file=\"", (filePath.empty() ? "?" : filePath), "\"");
+                        LOG_DEBUG("Warden:   MPQ file=\"", (filePath.empty() ? "?" : filePath), "\"");
 
                         bool found = false;
                         std::vector<uint8_t> hash(20, 0);
@@ -4150,7 +4153,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         if (pos + 1 > checkEnd) { pos = checkEnd; break; }
                         uint8_t strIdx = decrypted[pos++];
                         std::string luaVar = resolveWardenString(strIdx);
-                        LOG_INFO("Warden:   LUA str=\"", (luaVar.empty() ? "?" : luaVar), "\"");
+                        LOG_DEBUG("Warden:   LUA str=\"", (luaVar.empty() ? "?" : luaVar), "\"");
                         // Response: [uint8 result=0][uint16 len=0]
                         // Lua string doesn't exist
                         resultData.push_back(0x01); // not found
@@ -4162,7 +4165,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                         pos += 24; // skip seed + sha1
                         uint8_t strIdx = decrypted[pos++];
                         std::string driverName = resolveWardenString(strIdx);
-                        LOG_INFO("Warden:   DRIVER=\"", (driverName.empty() ? "?" : driverName), "\"");
+                        LOG_DEBUG("Warden:   DRIVER=\"", (driverName.empty() ? "?" : driverName), "\"");
                         // Response: [uint8 result=1] (driver NOT found = clean)
                         resultData.push_back(0x01);
                         break;
@@ -4219,7 +4222,7 @@ void GameHandler::handleWardenData(network::Packet& packet) {
                 }
             }
 
-            LOG_INFO("Warden: Parsed ", checkCount, " checks, result data size=", resultData.size());
+            LOG_DEBUG("Warden: Parsed ", checkCount, " checks, result data size=", resultData.size());
 
             // --- Compute checksum: XOR of 5 uint32s from SHA1(resultData) ---
             auto resultHash = auth::Crypto::sha1(resultData);
@@ -4244,18 +4247,18 @@ void GameHandler::handleWardenData(network::Packet& packet) {
             resp.push_back((checksum >> 24) & 0xFF);
             resp.insert(resp.end(), resultData.begin(), resultData.end());
             sendWardenResponse(resp);
-            LOG_INFO("Warden: Sent CHEAT_CHECKS_RESULT (", resp.size(), " bytes, ",
+            LOG_DEBUG("Warden: Sent CHEAT_CHECKS_RESULT (", resp.size(), " bytes, ",
                      checkCount, " checks, checksum=0x",
                      [&]{char s[12];snprintf(s,12,"%08x",checksum);return std::string(s);}(), ")");
             break;
         }
 
         case 0x03: // WARDEN_SMSG_MODULE_INITIALIZE
-            LOG_INFO("Warden: MODULE_INITIALIZE (", decrypted.size(), " bytes, no response needed)");
+            LOG_DEBUG("Warden: MODULE_INITIALIZE (", decrypted.size(), " bytes, no response needed)");
             break;
 
         default:
-            LOG_INFO("Warden: Unknown opcode 0x", std::hex, (int)wardenOpcode, std::dec,
+            LOG_DEBUG("Warden: Unknown opcode 0x", std::hex, (int)wardenOpcode, std::dec,
                      " (state=", (int)wardenState_, ", size=", decrypted.size(), ")");
             break;
     }

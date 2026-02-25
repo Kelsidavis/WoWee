@@ -238,6 +238,7 @@ private:
     glm::vec3 shadowCenter = glm::vec3(0.0f);
     bool shadowCenterInitialized = false;
     bool shadowsEnabled = true;
+    uint32_t shadowFrameCounter_ = 0;
 
 
 public:

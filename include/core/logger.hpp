@@ -65,6 +65,13 @@ public:
     }
 
 private:
+    static constexpr int kDefaultMinLevelValue =
+#if defined(NDEBUG) || defined(WOWEE_RELEASE_LOGGING)
+        static_cast<int>(LogLevel::WARNING);
+#else
+        static_cast<int>(LogLevel::INFO);
+#endif
+
     Logger() = default;
     ~Logger() = default;
     Logger(const Logger&) = delete;
@@ -77,22 +84,61 @@ private:
         return oss.str();
     }
 
-    std::atomic<int> minLevel_{static_cast<int>(LogLevel::INFO)};
+    std::atomic<int> minLevel_{kDefaultMinLevelValue};
     std::mutex mutex;
     std::ofstream fileStream;
     bool fileReady = false;
     bool echoToStdout_ = true;
     std::chrono::steady_clock::time_point lastFlushTime_{};
     uint32_t flushIntervalMs_ = 250;
+    bool dedupeEnabled_ = true;
+    uint32_t dedupeWindowMs_ = 250;
+    LogLevel lastLevel_ = LogLevel::DEBUG;
+    std::string lastMessage_;
+    std::chrono::steady_clock::time_point lastMessageTime_{};
+    uint64_t suppressedCount_ = 0;
+    void emitLineLocked(LogLevel level, const std::string& message);
+    void flushSuppressedLocked();
     void ensureFile();
 };
 
-// Convenience macros
-#define LOG_DEBUG(...) wowee::core::Logger::getInstance().debug(__VA_ARGS__)
-#define LOG_INFO(...) wowee::core::Logger::getInstance().info(__VA_ARGS__)
-#define LOG_WARNING(...) wowee::core::Logger::getInstance().warning(__VA_ARGS__)
-#define LOG_ERROR(...) wowee::core::Logger::getInstance().error(__VA_ARGS__)
-#define LOG_FATAL(...) wowee::core::Logger::getInstance().fatal(__VA_ARGS__)
+// Convenience macros.
+// Guard calls at the macro site so variadic arguments are not evaluated
+// when the corresponding level is disabled.
+#define LOG_DEBUG(...) do { \
+    auto& _wowee_logger = wowee::core::Logger::getInstance(); \
+    if (_wowee_logger.shouldLog(wowee::core::LogLevel::DEBUG)) { \
+        _wowee_logger.debug(__VA_ARGS__); \
+    } \
+} while (0)
+
+#define LOG_INFO(...) do { \
+    auto& _wowee_logger = wowee::core::Logger::getInstance(); \
+    if (_wowee_logger.shouldLog(wowee::core::LogLevel::INFO)) { \
+        _wowee_logger.info(__VA_ARGS__); \
+    } \
+} while (0)
+
+#define LOG_WARNING(...) do { \
+    auto& _wowee_logger = wowee::core::Logger::getInstance(); \
+    if (_wowee_logger.shouldLog(wowee::core::LogLevel::WARNING)) { \
+        _wowee_logger.warning(__VA_ARGS__); \
+    } \
+} while (0)
+
+#define LOG_ERROR(...) do { \
+    auto& _wowee_logger = wowee::core::Logger::getInstance(); \
+    if (_wowee_logger.shouldLog(wowee::core::LogLevel::ERROR)) { \
+        _wowee_logger.error(__VA_ARGS__); \
+    } \
+} while (0)
+
+#define LOG_FATAL(...) do { \
+    auto& _wowee_logger = wowee::core::Logger::getInstance(); \
+    if (_wowee_logger.shouldLog(wowee::core::LogLevel::FATAL)) { \
+        _wowee_logger.fatal(__VA_ARGS__); \
+    } \
+} while (0)
 
 } // namespace core
 } // namespace wowee

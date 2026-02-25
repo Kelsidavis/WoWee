@@ -171,6 +171,8 @@ private:
     // Cached isInsideWMO result (throttled to avoid per-frame cost)
     bool cachedInsideWMO = false;
     bool cachedInsideInteriorWMO = false;
+    int insideStateCheckCounter_ = 0;
+    glm::vec3 lastInsideStateCheckPos_ = glm::vec3(0.0f);
     int insideWMOCheckCounter = 0;
     glm::vec3 lastInsideWMOCheckPos = glm::vec3(0.0f);
 

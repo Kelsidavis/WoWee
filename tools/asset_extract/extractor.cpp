@@ -548,6 +548,12 @@ bool Extractor::enumerateFiles(const Options& opts,
                     continue;
                 }
 
+                // Verify file actually exists in this archive's hash table
+                // (listfiles can reference files from other archives)
+                if (!SFileHasFile(hMpq, fileName.c_str())) {
+                    continue;
+                }
+
                 std::string norm = normalizeWowPath(fileName);
                 if (opts.onlyUsedDbcs && !wantedDbcs.empty() && !wantedDbcs.contains(norm)) {
                     continue;
@@ -624,24 +630,36 @@ bool Extractor::run(const Options& opts) {
     std::atomic<size_t> fileIndex{0};
     size_t totalFiles = files.size();
 
+    // Open archives ONCE in main thread — StormLib has global state that is not
+    // thread-safe even with separate handles, so we serialize all MPQ reads.
+    struct SharedArchive {
+        HANDLE handle;
+        int priority;
+        std::string path;
+    };
+    std::vector<SharedArchive> sharedHandles;
+    for (const auto& ad : archives) {
+        HANDLE h = nullptr;
+        if (SFileOpenArchive(ad.path.c_str(), 0, 0, &h)) {
+            sharedHandles.push_back({h, ad.priority, ad.path});
+        } else {
+            std::cerr << "  Failed to open archive: " << ad.path << "\n";
+        }
+    }
+    if (sharedHandles.empty()) {
+        std::cerr << "Failed to open any archives for extraction\n";
+        return false;
+    }
+    if (sharedHandles.size() < archives.size()) {
+        std::cerr << "  Opened " << sharedHandles.size()
+                  << "/" << archives.size() << " archives\n";
+    }
+
+    // Mutex protecting all StormLib calls (open/read/close are not thread-safe)
+    std::mutex mpqMutex;
+
     auto workerFn = [&]() {
-        // Each thread opens ALL archives independently (StormLib is not thread-safe per handle).
-        // Sorted highest-priority last, so we iterate in reverse to find the winning version.
-        struct ThreadArchive {
-            HANDLE handle;
-            int priority;
-        };
-        std::vector<ThreadArchive> threadHandles;
-        for (const auto& ad : archives) {
-            HANDLE h = nullptr;
-            if (SFileOpenArchive(ad.path.c_str(), 0, 0, &h)) {
-                threadHandles.push_back({h, ad.priority});
-            }
-        }
-        if (threadHandles.empty()) {
-            std::cerr << "Worker thread: failed to open any archives\n";
-            return;
-        }
+        int failLogCount = 0;
 
         while (true) {
             size_t idx = fileIndex.fetch_add(1);
@@ -654,35 +672,52 @@ bool Extractor::run(const Options& opts) {
             std::string mappedPath = PathMapper::mapPath(wowPath);
             std::string fullOutputPath = effectiveOutputDir + "/" + mappedPath;
 
-            // Search archives in reverse priority order (highest priority first)
-            HANDLE hFile = nullptr;
-            for (auto it = threadHandles.rbegin(); it != threadHandles.rend(); ++it) {
-                if (SFileOpenFileEx(it->handle, wowPath.c_str(), 0, &hFile)) {
-                    break;
+            // Read file data from MPQ under lock
+            std::vector<uint8_t> data;
+            {
+                std::lock_guard<std::mutex> lock(mpqMutex);
+
+                // Search archives in reverse priority order (highest priority first)
+                HANDLE hFile = nullptr;
+                for (auto it = sharedHandles.rbegin(); it != sharedHandles.rend(); ++it) {
+                    if (SFileOpenFileEx(it->handle, wowPath.c_str(), 0, &hFile)) {
+                        break;
+                    }
+                    hFile = nullptr;
                 }
-                hFile = nullptr;
-            }
-            if (!hFile) {
-                stats.filesFailed++;
-                continue;
-            }
+                if (!hFile) {
+                    stats.filesFailed++;
+                    if (failLogCount < 5) {
+                        failLogCount++;
+                        std::cerr << "  FAILED open: " << wowPath
+                                  << " (tried " << sharedHandles.size() << " archives)\n";
+                    }
+                    continue;
+                }
 
-            DWORD fileSize = SFileGetFileSize(hFile, nullptr);
-            if (fileSize == SFILE_INVALID_SIZE || fileSize == 0) {
-                SFileCloseFile(hFile);
-                stats.filesSkipped++;
-                continue;
-            }
+                DWORD fileSize = SFileGetFileSize(hFile, nullptr);
+                if (fileSize == SFILE_INVALID_SIZE || fileSize == 0) {
+                    SFileCloseFile(hFile);
+                    stats.filesSkipped++;
+                    continue;
+                }
 
-            std::vector<uint8_t> data(fileSize);
-            DWORD bytesRead = 0;
-            if (!SFileReadFile(hFile, data.data(), fileSize, &bytesRead, nullptr)) {
+                data.resize(fileSize);
+                DWORD bytesRead = 0;
+                if (!SFileReadFile(hFile, data.data(), fileSize, &bytesRead, nullptr)) {
+                    SFileCloseFile(hFile);
+                    stats.filesFailed++;
+                    if (failLogCount < 5) {
+                        failLogCount++;
+                        std::cerr << "  FAILED read: " << wowPath
+                                  << " (size=" << fileSize << ")\n";
+                    }
+                    continue;
+                }
                 SFileCloseFile(hFile);
-                stats.filesFailed++;
-                continue;
+                data.resize(bytesRead);
             }
-            SFileCloseFile(hFile);
-            data.resize(bytesRead);
+            // Lock released — CRC computation and disk write happen in parallel
 
             // Compute CRC32
             uint32_t crc = ManifestWriter::computeCRC32(data.data(), data.size());
@@ -694,6 +729,11 @@ bool Extractor::run(const Options& opts) {
             std::ofstream out(fullOutputPath, std::ios::binary);
             if (!out.is_open()) {
                 stats.filesFailed++;
+                if (failLogCount < 5) {
+                    failLogCount++;
+                    std::lock_guard<std::mutex> lock(manifestMutex);
+                    std::cerr << "  FAILED write: " << fullOutputPath << "\n";
+                }
                 continue;
             }
             out.write(reinterpret_cast<const char*>(data.data()), data.size());
@@ -721,10 +761,6 @@ bool Extractor::run(const Options& opts) {
                           << std::flush;
             }
         }
-
-        for (auto& th : threadHandles) {
-            SFileCloseArchive(th.handle);
-        }
     };
 
     std::cout << "Extracting " << totalFiles << " files using " << numThreads << " threads...\n";
@@ -737,10 +773,30 @@ bool Extractor::run(const Options& opts) {
         t.join();
     }
 
-    std::cout << "\r  Extracted " << stats.filesExtracted.load() << " files ("
+    // Close archives (opened once in main thread)
+    for (auto& sh : sharedHandles) {
+        SFileCloseArchive(sh.handle);
+    }
+
+    auto extracted = stats.filesExtracted.load();
+    auto failed = stats.filesFailed.load();
+    auto skipped = stats.filesSkipped.load();
+    std::cout << "\n  Extracted " << extracted << " files ("
               << stats.bytesExtracted.load() / (1024 * 1024) << " MB), "
-              << stats.filesSkipped.load() << " skipped, "
-              << stats.filesFailed.load() << " failed\n";
+              << skipped << " skipped, "
+              << failed << " failed\n";
+
+    // If most files failed, print a diagnostic hint
+    if (failed > 0 && failed > extracted * 10) {
+        std::cerr << "\nWARNING: " << failed << " out of " << totalFiles
+                  << " files failed to extract.\n"
+                  << "  This usually means worker threads could not open one or more MPQ archives.\n"
+                  << "  Common causes:\n"
+                  << "    - MPQ files on a network/external drive with access restrictions\n"
+                  << "    - Another program (WoW client, antivirus) has the MPQ files locked\n"
+                  << "    - Too many threads for the OS file-handle limit (try --threads 1)\n"
+                  << "  Re-run with --verbose for detailed diagnostics.\n";
+    }
 
     // Merge with existing manifest so partial extractions don't nuke prior entries
     std::string manifestPath = effectiveOutputDir + "/manifest.json";

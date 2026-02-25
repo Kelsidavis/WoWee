@@ -296,7 +296,8 @@ void AmbientSoundManager::updatePositionalEmitters(float deltaTime, const glm::v
     const int MAX_ACTIVE_WATER = 3;     // Max 3 water sounds at once
 
     for (auto& emitter : emitters_) {
-        float distance = glm::distance(emitter.position, cameraPos);
+        const glm::vec3 delta = emitter.position - cameraPos;
+        const float distSq = glm::dot(delta, delta);
 
         // Determine max distance based on type
         float maxDist = MAX_AMBIENT_DISTANCE;
@@ -317,7 +318,8 @@ void AmbientSoundManager::updatePositionalEmitters(float deltaTime, const glm::v
         }
 
         // Update active state based on distance AND limits
-        bool withinRange = (distance < maxDist);
+        const float maxDistSq = maxDist * maxDist;
+        const bool withinRange = (distSq < maxDistSq);
 
         if (isFire && withinRange && activeFireCount < MAX_ACTIVE_FIRE) {
             emitter.active = true;
@@ -335,6 +337,9 @@ void AmbientSoundManager::updatePositionalEmitters(float deltaTime, const glm::v
 
         // Update play timer
         emitter.lastPlayTime += deltaTime;
+
+        // We only need the true distance for volume attenuation once the emitter is active.
+        const float distance = std::sqrt(distSq);
 
         // Handle different emitter types
         switch (emitter.type) {

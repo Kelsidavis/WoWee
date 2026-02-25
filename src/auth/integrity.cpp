@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <vector>
 
 namespace wowee {
 namespace auth {
@@ -41,39 +42,46 @@ bool computeIntegrityHashWin32WithExe(const std::array<uint8_t, 16>& checksumSal
     // that distribution rather than a stock 1.12.1 client, so when using Turtle's executable we include
     // Turtle-specific DLLs as well.
     const bool isTurtleExe = (exeName == "TurtleWoW.exe");
-    const char* kFilesBase[] = {
-        nullptr, // exeName
-        "fmod.dll",
-        "ijl15.dll",
-        "dbghelp.dll",
-        "unicows.dll",
+    // Some macOS client layouts use FMOD dylib naming instead of fmod.dll.
+    // We accept the first matching filename in each alias group.
+    std::vector<std::vector<std::string>> fileGroups = {
+        { exeName },
+        { "fmod.dll", "fmod.dylib", "libfmod.dylib", "fmodex.dll", "fmodex.dylib", "libfmod.so" },
+        { "ijl15.dll" },
+        { "dbghelp.dll" },
+        { "unicows.dll" },
     };
-    const char* kFilesTurtleExtra[] = {
-        "twloader.dll",
-        "twdiscord.dll",
-    };
-
-    std::vector<std::string> files;
-    files.reserve(1 + 4 + (isTurtleExe ? (sizeof(kFilesTurtleExtra) / sizeof(kFilesTurtleExtra[0])) : 0));
-    for (const char* f : kFilesBase) {
-        files.push_back(f ? std::string(f) : exeName);
-    }
     if (isTurtleExe) {
-        for (const char* f : kFilesTurtleExtra) files.push_back(std::string(f));
+        fileGroups.push_back({ "twloader.dll" });
+        fileGroups.push_back({ "twdiscord.dll" });
     }
 
     std::vector<uint8_t> allFiles;
-    std::string err;
-    for (const auto& nameStr : files) {
-        std::vector<uint8_t> bytes;
-        std::string path = miscDir;
-        if (!path.empty() && path.back() != '/') path += '/';
-        path += nameStr;
-        if (!readWholeFile(path, bytes, err)) {
-            outError = err;
+    for (const auto& group : fileGroups) {
+        bool foundInGroup = false;
+        std::string groupErr;
+
+        for (const auto& nameStr : group) {
+            std::vector<uint8_t> bytes;
+            std::string path = miscDir;
+            if (!path.empty() && path.back() != '/') path += '/';
+            path += nameStr;
+
+            std::string err;
+            if (!readWholeFile(path, bytes, err)) {
+                if (groupErr.empty()) groupErr = err;
+                continue;
+            }
+
+            allFiles.insert(allFiles.end(), bytes.begin(), bytes.end());
+            foundInGroup = true;
+            break;
+        }
+
+        if (!foundInGroup) {
+            outError = groupErr.empty() ? "missing required integrity file group" : groupErr;
             return false;
         }
-        allFiles.insert(allFiles.end(), bytes.begin(), bytes.end());
     }
 
     // HMAC_SHA1(checksumSalt, allFiles)

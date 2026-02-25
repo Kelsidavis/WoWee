@@ -2699,6 +2699,42 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
         }
     };
 
+    // Fast path: current active interior group and its neighbors are usually
+    // the right answer for player-floor queries while moving in cities/buildings.
+    if (activeGroup_.isValid() && activeGroup_.instanceIdx < instances.size()) {
+        const auto& instance = instances[activeGroup_.instanceIdx];
+        auto it = loadedModels.find(instance.modelId);
+        if (it != loadedModels.end() && instance.modelId == activeGroup_.modelId) {
+            const ModelData& model = it->second;
+            glm::vec3 localOrigin = glm::vec3(instance.invModelMatrix * glm::vec4(worldOrigin, 1.0f));
+            glm::vec3 localDir = glm::normalize(glm::vec3(instance.invModelMatrix * glm::vec4(worldDir, 0.0f)));
+
+            auto testGroupIdx = [&](uint32_t gi) {
+                if (gi >= model.groups.size()) return;
+                if (gi < instance.worldGroupBounds.size()) {
+                    const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
+                    if (glX < gMin.x || glX > gMax.x ||
+                        glY < gMin.y || glY > gMax.y ||
+                        glZ - 4.0f > gMax.z) {
+                        return;
+                    }
+                }
+                const auto& group = model.groups[gi];
+                if (!rayIntersectsAABB(localOrigin, localDir, group.boundingBoxMin, group.boundingBoxMax)) {
+                    return;
+                }
+                testGroupFloor(instance, model, group, localOrigin, localDir);
+            };
+
+            if (activeGroup_.groupIdx >= 0) {
+                testGroupIdx(static_cast<uint32_t>(activeGroup_.groupIdx));
+            }
+            for (uint32_t ngi : activeGroup_.neighborGroups) {
+                testGroupIdx(ngi);
+            }
+        }
+    }
+
     // Full scan: test all instances (active group fast path removed to fix
     // bridge clipping where early-return missed other WMO instances)
     glm::vec3 queryMin(glX - 2.0f, glY - 2.0f, glZ - 8.0f);
@@ -2720,6 +2756,9 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
         float zMarginUp = model.isLowPlatform ? 20.0f : 4.0f;
 
         // Broad-phase reject in world space to avoid expensive matrix transforms.
+        if (bestFloor && instance.worldBoundsMax.z <= (*bestFloor + 0.05f)) {
+            continue;
+        }
         if (glX < instance.worldBoundsMin.x || glX > instance.worldBoundsMax.x ||
             glY < instance.worldBoundsMin.y || glY > instance.worldBoundsMax.y ||
             glZ < instance.worldBoundsMin.z - zMarginDown || glZ > instance.worldBoundsMax.z + zMarginUp) {

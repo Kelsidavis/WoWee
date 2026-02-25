@@ -220,50 +220,64 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
             music->update(ImGui::GetIO().DeltaTime);
             if (!music->isPlaying()) {
                 static std::mt19937 rng(std::random_device{}());
-                // Tracks in assets/ root
-                static const std::array<const char*, 1> kRootTracks = {
-                    "Raise the Mug, Sound the Warcry.mp3",
-                };
-                // Tracks in assets/Original Music/
-                static const std::array<const char*, 11> kOriginalTracks = {
-                    "Gold on the Tide in Booty Bay.mp3",
-                    "Lanterns Over Lordaeron.mp3",
-                    "Loot the Dogs.mp3",
-                    "One More Pull.mp3",
-                    "Roll Need Greed.mp3",
-                    "RunBackPolka.mp3",
-                    "The Barrens Has No End.mp3",
-                    "The Bone Collector.mp3",
-                    "Wanderwewill.mp3",
-                    "WHO PULLED_.mp3",
-                    "You No Take Candle!.mp3",
-                };
+                if (!introTracksScanned_) {
+                    introTracksScanned_ = true;
 
-                std::vector<std::string> availableTracks;
-                auto tryAddTrack = [&](const std::filesystem::path& base, const char* track) {
-                    std::filesystem::path p = base / track;
-                    if (std::filesystem::exists(p)) {
-                        availableTracks.push_back(p.string());
+                    // Tracks in assets/ root
+                    static const std::array<const char*, 1> kRootTracks = {
+                        "Raise the Mug, Sound the Warcry.mp3",
+                    };
+                    // Tracks in assets/Original Music/
+                    static const std::array<const char*, 11> kOriginalTracks = {
+                        "Gold on the Tide in Booty Bay.mp3",
+                        "Lanterns Over Lordaeron.mp3",
+                        "Loot the Dogs.mp3",
+                        "One More Pull.mp3",
+                        "Roll Need Greed.mp3",
+                        "RunBackPolka.mp3",
+                        "The Barrens Has No End.mp3",
+                        "The Bone Collector.mp3",
+                        "Wanderwewill.mp3",
+                        "WHO PULLED_.mp3",
+                        "You No Take Candle!.mp3",
+                    };
+
+                    auto tryAddTrack = [&](const std::filesystem::path& base, const char* track) {
+                        std::filesystem::path p = base / track;
+                        if (std::filesystem::exists(p)) {
+                            introTracks_.push_back(p.string());
+                        }
+                    };
+                    for (const char* track : kRootTracks) {
+                        tryAddTrack("assets", track);
+                        if (introTracks_.empty()) {
+                            tryAddTrack(std::filesystem::current_path() / "assets", track);
+                        }
                     }
-                };
-                for (const char* track : kRootTracks) {
-                    tryAddTrack("assets", track);
-                    if (availableTracks.empty())
-                        tryAddTrack(std::filesystem::current_path() / "assets", track);
-                }
-                for (const char* track : kOriginalTracks) {
-                    tryAddTrack(std::filesystem::path("assets") / "Original Music", track);
-                    tryAddTrack(std::filesystem::current_path() / "assets" / "Original Music", track);
+                    for (const char* track : kOriginalTracks) {
+                        tryAddTrack(std::filesystem::path("assets") / "Original Music", track);
+                        tryAddTrack(std::filesystem::current_path() / "assets" / "Original Music", track);
+                    }
+
+                    std::sort(introTracks_.begin(), introTracks_.end());
+                    introTracks_.erase(std::unique(introTracks_.begin(), introTracks_.end()), introTracks_.end());
                 }
 
-                if (!availableTracks.empty()) {
-                    std::uniform_int_distribution<size_t> pick(0, availableTracks.size() - 1);
-                    const std::string& path = availableTracks[pick(rng)];
+                if (!introTracks_.empty()) {
+                    std::uniform_int_distribution<size_t> pick(0, introTracks_.size() - 1);
+                    const size_t idx = pick(rng);
+                    const std::string path = introTracks_[idx];
                     music->playFilePath(path, true, 1800.0f);
-                    LOG_INFO("AuthScreen: Playing login intro track: ", path);
                     musicPlaying = music->isPlaying();
-                } else {
+                    if (musicPlaying) {
+                        LOG_INFO("AuthScreen: Playing login intro track: ", path);
+                    } else {
+                        // Drop bad paths to avoid retrying the same failed file every frame.
+                        introTracks_.erase(introTracks_.begin() + idx);
+                    }
+                } else if (!missingIntroTracksLogged_) {
                     LOG_WARNING("AuthScreen: No login intro tracks found in assets/");
+                    missingIntroTracksLogged_ = true;
                 }
             }
         }

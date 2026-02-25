@@ -99,6 +99,15 @@ static bool envFlagEnabled(const char* key, bool defaultValue) {
     return !(v == "0" || v == "false" || v == "off" || v == "no");
 }
 
+static int envIntOrDefault(const char* key, int defaultValue) {
+    const char* raw = std::getenv(key);
+    if (!raw || !*raw) return defaultValue;
+    char* end = nullptr;
+    long n = std::strtol(raw, &end, 10);
+    if (end == raw) return defaultValue;
+    return static_cast<int>(n);
+}
+
 static std::vector<std::string> parseEmoteCommands(const std::string& raw) {
     std::vector<std::string> out;
     std::string cur;
@@ -2678,15 +2687,19 @@ void Renderer::update(float deltaTime) {
         }
     }
 
+    const bool canQueryWmo = (camera && wmoRenderer);
+    const glm::vec3 camPos = camera ? camera->getPosition() : glm::vec3(0.0f);
+    uint32_t insideWmoId = 0;
+    const bool insideWmo = canQueryWmo &&
+        wmoRenderer->isInsideWMO(camPos.x, camPos.y, camPos.z, &insideWmoId);
+
     // Ambient environmental sounds: fireplaces, water, birds, etc.
     if (ambientSoundManager && camera && wmoRenderer && cameraController) {
-        glm::vec3 camPos = camera->getPosition();
-        uint32_t wmoId = 0;
-        bool isIndoor = wmoRenderer->isInsideWMO(camPos.x, camPos.y, camPos.z, &wmoId);
+        bool isIndoor = insideWmo;
         bool isSwimming = cameraController->isSwimming();
 
         // Check if inside blacksmith (96048 = Goldshire blacksmith)
-        bool isBlacksmith = (wmoId == 96048);
+        bool isBlacksmith = (insideWmoId == 96048);
 
         // Sync weather audio with visual weather system
         if (weather) {
@@ -2747,9 +2760,8 @@ void Renderer::update(float deltaTime) {
 
         // Override with WMO-based detection (e.g., inside Stormwind, taverns, blacksmiths)
         if (wmoRenderer) {
-            glm::vec3 camPos = camera->getPosition();
-            uint32_t wmoModelId = 0;
-            if (wmoRenderer->isInsideWMO(camPos.x, camPos.y, camPos.z, &wmoModelId)) {
+            uint32_t wmoModelId = insideWmoId;
+            if (insideWmo) {
                 // Check if inside Stormwind WMO (model ID 10047)
                 if (wmoModelId == 10047) {
                     zoneId = 1519;  // Stormwind City
@@ -3839,6 +3851,19 @@ void Renderer::renderShadowPass() {
     if (!shadowsEnabled || shadowDepthImage == VK_NULL_HANDLE) return;
     if (currentCmd == VK_NULL_HANDLE) return;
 
+    const int baseInterval = std::max(1, envIntOrDefault("WOWEE_SHADOW_INTERVAL", 1));
+    const int denseInterval = std::max(baseInterval, envIntOrDefault("WOWEE_SHADOW_INTERVAL_DENSE", 3));
+    const uint32_t denseCharThreshold = static_cast<uint32_t>(std::max(1, envIntOrDefault("WOWEE_DENSE_CHAR_THRESHOLD", 120)));
+    const uint32_t denseM2Threshold = static_cast<uint32_t>(std::max(1, envIntOrDefault("WOWEE_DENSE_M2_THRESHOLD", 900)));
+    const bool denseScene =
+        (characterRenderer && characterRenderer->getInstanceCount() >= denseCharThreshold) ||
+        (m2Renderer && m2Renderer->getInstanceCount() >= denseM2Threshold);
+    const int shadowInterval = denseScene ? denseInterval : baseInterval;
+    if (++shadowFrameCounter_ < static_cast<uint32_t>(shadowInterval)) {
+        return;
+    }
+    shadowFrameCounter_ = 0;
+
     // Compute and store light space matrix; write to per-frame UBO
     lightSpaceMatrix = computeLightSpaceMatrix();
     // Zero matrix means character position isn't set yet — skip shadow pass entirely.
@@ -3890,15 +3915,17 @@ void Renderer::renderShadowPass() {
     vkCmdSetScissor(currentCmd, 0, 1, &sc);
 
     // Phase 7/8: render shadow casters
-    constexpr float kShadowCullRadius = 180.0f;  // match kShadowHalfExtent
+    const float baseShadowCullRadius = static_cast<float>(std::max(40, envIntOrDefault("WOWEE_SHADOW_CULL_RADIUS", 180)));
+    const float denseShadowCullRadius = static_cast<float>(std::max(30, envIntOrDefault("WOWEE_SHADOW_CULL_RADIUS_DENSE", 90)));
+    const float shadowCullRadius = denseScene ? std::min(baseShadowCullRadius, denseShadowCullRadius) : baseShadowCullRadius;
     if (wmoRenderer) {
-        wmoRenderer->renderShadow(currentCmd, lightSpaceMatrix, shadowCenter, kShadowCullRadius);
+        wmoRenderer->renderShadow(currentCmd, lightSpaceMatrix, shadowCenter, shadowCullRadius);
     }
     if (m2Renderer) {
-        m2Renderer->renderShadow(currentCmd, lightSpaceMatrix, globalTime, shadowCenter, kShadowCullRadius);
+        m2Renderer->renderShadow(currentCmd, lightSpaceMatrix, globalTime, shadowCenter, shadowCullRadius);
     }
     if (characterRenderer) {
-        characterRenderer->renderShadow(currentCmd, lightSpaceMatrix, shadowCenter, kShadowCullRadius);
+        characterRenderer->renderShadow(currentCmd, lightSpaceMatrix, shadowCenter, shadowCullRadius);
     }
 
     vkCmdEndRenderPass(currentCmd);

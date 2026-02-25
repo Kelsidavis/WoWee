@@ -812,10 +812,10 @@ VkTexture* CharacterRenderer::compositeTextures(const std::vector<std::string>& 
         }
     }
 
-    // Debug: dump composite to /tmp for visual inspection
+    // Debug: dump composite to temp dir for visual inspection
     {
-        std::string dumpPath = "/tmp/wowee_composite_debug_" +
-            std::to_string(width) + "x" + std::to_string(height) + ".raw";
+        std::string dumpPath = (std::filesystem::temp_directory_path() / ("wowee_composite_debug_" +
+            std::to_string(width) + "x" + std::to_string(height) + ".raw")).string();
         std::ofstream dump(dumpPath, std::ios::binary);
         if (dump) {
             dump.write(reinterpret_cast<const char*>(composite.data()),
@@ -1310,8 +1310,9 @@ void CharacterRenderer::playAnimation(uint32_t instanceId, uint32_t animationId,
 }
 
 void CharacterRenderer::update(float deltaTime, const glm::vec3& cameraPos) {
-    // Distance culling for animation updates (150 unit radius)
-    const float animUpdateRadiusSq = 150.0f * 150.0f;
+    // Distance culling for animation updates in dense areas.
+    const float animUpdateRadius = static_cast<float>(envSizeOrDefault("WOWEE_CHAR_ANIM_RADIUS", 120));
+    const float animUpdateRadiusSq = animUpdateRadius * animUpdateRadius;
 
     // Update fade-in opacity
     for (auto& [id, inst] : instances) {
@@ -1404,6 +1405,7 @@ void CharacterRenderer::update(float deltaTime, const glm::vec3& cameraPos) {
     for (auto& pair : instances) {
         auto& instance = pair.second;
         if (instance.weaponAttachments.empty()) continue;
+        if (glm::distance2(instance.position, cameraPos) > animUpdateRadiusSq) continue;
 
         glm::mat4 charModelMat = instance.hasOverrideModelMatrix
             ? instance.overrideModelMatrix
@@ -1614,6 +1616,12 @@ void CharacterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet,
     if (instances.empty() || !opaquePipeline_) {
         return;
     }
+    const float renderRadius = static_cast<float>(envSizeOrDefault("WOWEE_CHAR_RENDER_RADIUS", 130));
+    const float renderRadiusSq = renderRadius * renderRadius;
+    const float nearNoConeCullSq = 16.0f * 16.0f;
+    const float backfaceDotCull = -0.30f;
+    const glm::vec3 camPos = camera.getPosition();
+    const glm::vec3 camForward = camera.getForward();
 
     uint32_t frameIndex = vkCtx_->getCurrentFrame();
     uint32_t frameSlot = frameIndex % 2u;
@@ -1647,6 +1655,18 @@ void CharacterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet,
 
         // Skip invisible instances (e.g., player in first-person mode)
         if (!instance.visible) continue;
+        // Character instance culling: avoid drawing far-away / strongly behind-camera
+        // actors in dense city scenes.
+        if (!instance.hasOverrideModelMatrix) {
+            glm::vec3 toInst = instance.position - camPos;
+            float distSq = glm::dot(toInst, toInst);
+            if (distSq > renderRadiusSq) continue;
+            if (distSq > nearNoConeCullSq) {
+                float invDist = 1.0f / std::sqrt(distSq);
+                float facingDot = glm::dot(toInst, camForward) * invDist;
+                if (facingDot < backfaceDotCull) continue;
+            }
+        }
 
         auto modelIt = models.find(instance.modelId);
         if (modelIt == models.end()) continue;
