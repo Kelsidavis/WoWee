@@ -103,42 +103,19 @@ private:
 };
 
 // Convenience macros.
-// Guard calls at the macro site so variadic arguments are not evaluated
-// when the corresponding level is disabled.
-#define LOG_DEBUG(...) do { \
-    auto& _wowee_logger = wowee::core::Logger::getInstance(); \
-    if (_wowee_logger.shouldLog(wowee::core::LogLevel::DEBUG)) { \
-        _wowee_logger.debug(__VA_ARGS__); \
-    } \
-} while (0)
-
-#define LOG_INFO(...) do { \
-    auto& _wowee_logger = wowee::core::Logger::getInstance(); \
-    if (_wowee_logger.shouldLog(wowee::core::LogLevel::INFO)) { \
-        _wowee_logger.info(__VA_ARGS__); \
-    } \
-} while (0)
-
-#define LOG_WARNING(...) do { \
-    auto& _wowee_logger = wowee::core::Logger::getInstance(); \
-    if (_wowee_logger.shouldLog(wowee::core::LogLevel::WARNING)) { \
-        _wowee_logger.warning(__VA_ARGS__); \
-    } \
-} while (0)
-
-#define LOG_ERROR(...) do { \
-    auto& _wowee_logger = wowee::core::Logger::getInstance(); \
-    if (_wowee_logger.shouldLog(wowee::core::LogLevel::ERROR)) { \
-        _wowee_logger.error(__VA_ARGS__); \
-    } \
-} while (0)
-
-#define LOG_FATAL(...) do { \
-    auto& _wowee_logger = wowee::core::Logger::getInstance(); \
-    if (_wowee_logger.shouldLog(wowee::core::LogLevel::FATAL)) { \
-        _wowee_logger.fatal(__VA_ARGS__); \
-    } \
-} while (0)
+//
+// Each Logger method (debug/info/warning/error/fatal) already guards on
+// shouldLog() internally, so the macros are simple direct calls.
+//
+// IMPORTANT: do NOT reference LogLevel enum values here.  Windows'
+// wingdi.h defines `#define ERROR 0` which would corrupt `LogLevel::ERROR`
+// at any call site compiled after <windows.h>.  Keeping the enum names
+// out of the macro bodies avoids that problem entirely.
+#define LOG_DEBUG(...)   wowee::core::Logger::getInstance().debug(__VA_ARGS__)
+#define LOG_INFO(...)    wowee::core::Logger::getInstance().info(__VA_ARGS__)
+#define LOG_WARNING(...) wowee::core::Logger::getInstance().warning(__VA_ARGS__)
+#define LOG_ERROR(...)   wowee::core::Logger::getInstance().error(__VA_ARGS__)
+#define LOG_FATAL(...)   wowee::core::Logger::getInstance().fatal(__VA_ARGS__)
 
 } // namespace core
 } // namespace wowee

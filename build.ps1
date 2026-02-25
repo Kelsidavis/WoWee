@@ -20,9 +20,26 @@ if (-not (Test-Path "build")) {
 }
 Set-Location "build"
 
+# Locate vcpkg toolchain file
+$vcpkgRoot = $env:VCPKG_ROOT
+if (-not $vcpkgRoot) {
+    foreach ($candidate in @("C:\vcpkg", "C:\dev\vcpkg", "$env:LOCALAPPDATA\vcpkg")) {
+        if (Test-Path "$candidate\scripts\buildsystems\vcpkg.cmake") {
+            $vcpkgRoot = $candidate
+            break
+        }
+    }
+}
+if (-not $vcpkgRoot) {
+    Write-Error "Could not find vcpkg. Set VCPKG_ROOT or install vcpkg to C:\vcpkg."
+    exit 1
+}
+$toolchainFile = "$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
+Write-Host "Using vcpkg toolchain: $toolchainFile"
+
 # Configure with CMake
 Write-Host "Configuring with CMake..."
-& cmake .. -DCMAKE_BUILD_TYPE=Release
+& cmake .. -DCMAKE_BUILD_TYPE=Release "-DCMAKE_TOOLCHAIN_FILE=$toolchainFile" -DVCPKG_TARGET_TRIPLET=x64-windows
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # Build with all cores
