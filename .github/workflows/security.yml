@@ -45,7 +45,7 @@ jobs:
             libavutil-dev \
             libunicorn-dev \
             libx11-dev
-          sudo apt-get install -y libstormlib-dev || true
+          sudo apt-get install -y libstorm-dev || true
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -117,7 +117,7 @@ jobs:
             libavutil-dev \
             libunicorn-dev \
             libx11-dev
-          sudo apt-get install -y libstormlib-dev || true
+          sudo apt-get install -y libstorm-dev || true
 
       - name: Configure (ASan/UBSan)
         run: |

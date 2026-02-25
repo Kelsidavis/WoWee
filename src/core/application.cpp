@@ -55,6 +55,21 @@
 #include <set>
 #include <filesystem>
 
+#include <thread>
+#ifdef __linux__
+#include <sched.h>
+#include <pthread.h>
+#elif defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#include <mach/thread_policy.h>
+#include <pthread.h>
+#endif
+
 namespace wowee {
 namespace core {
 
@@ -230,6 +245,47 @@ bool Application::initialize() {
 
 void Application::run() {
     LOG_INFO("Starting main loop");
+
+    // Pin main thread to a dedicated CPU core to reduce scheduling jitter
+    {
+        int numCores = static_cast<int>(std::thread::hardware_concurrency());
+        if (numCores >= 2) {
+#ifdef __linux__
+            cpu_set_t cpuset;
+            CPU_ZERO(&cpuset);
+            CPU_SET(0, &cpuset);
+            int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+            if (rc == 0) {
+                LOG_INFO("Main thread pinned to CPU core 0 (", numCores, " cores available)");
+            } else {
+                LOG_WARNING("Failed to pin main thread to CPU core 0 (error ", rc, ")");
+            }
+#elif defined(_WIN32)
+            DWORD_PTR mask = 1; // Core 0
+            DWORD_PTR prev = SetThreadAffinityMask(GetCurrentThread(), mask);
+            if (prev != 0) {
+                LOG_INFO("Main thread pinned to CPU core 0 (", numCores, " cores available)");
+            } else {
+                LOG_WARNING("Failed to pin main thread to CPU core 0 (error ", GetLastError(), ")");
+            }
+#elif defined(__APPLE__)
+            // macOS doesn't support hard pinning — use affinity tags to hint
+            // that the main thread should stay on its own core group
+            thread_affinity_policy_data_t policy = { 1 }; // tag 1 = main thread group
+            kern_return_t kr = thread_policy_set(
+                pthread_mach_thread_np(pthread_self()),
+                THREAD_AFFINITY_POLICY,
+                reinterpret_cast<thread_policy_t>(&policy),
+                THREAD_AFFINITY_POLICY_COUNT);
+            if (kr == KERN_SUCCESS) {
+                LOG_INFO("Main thread affinity tag set (", numCores, " cores available)");
+            } else {
+                LOG_WARNING("Failed to set main thread affinity tag (error ", kr, ")");
+            }
+#endif
+        }
+    }
+
     const bool frameProfileEnabled = envFlagEnabled("WOWEE_FRAME_PROFILE", false);
     if (frameProfileEnabled) {
         LOG_INFO("Frame timing profile enabled (WOWEE_FRAME_PROFILE=1)");
@@ -3009,6 +3065,7 @@ void Application::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
     // --- Loading screen for online mode ---
     rendering::LoadingScreen loadingScreen;
     loadingScreen.setVkContext(window->getVkContext());
+    loadingScreen.setSDLWindow(window->getSDLWindow());
     bool loadingScreenOk = loadingScreen.initialize();
 
     auto showProgress = [&](const char* msg, float progress) {

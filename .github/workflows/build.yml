@@ -55,7 +55,7 @@ jobs:
             libavutil-dev \
             libunicorn-dev \
             libx11-dev
-          sudo apt-get install -y libstormlib-dev || true
+          sudo apt-get install -y libstorm-dev || true
 
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -191,9 +191,20 @@ jobs:
             mingw-w64-clang-aarch64-shaderc
             git
 
-      - name: Install optional packages
+      - name: Build StormLib from source
         shell: msys2 {0}
-        run: pacman -S --noconfirm --needed mingw-w64-clang-aarch64-stormlib || true
+        run: |
+          git clone --depth 1 https://github.com/ladislav-zezula/StormLib.git /tmp/StormLib
+          # Disable x86 inline asm in bundled libtomcrypt (bswapl/movl) —
+          # __MINGW32__ is defined on CLANGARM64 which incorrectly enables x86 asm
+          cmake -S /tmp/StormLib -B /tmp/StormLib/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$MINGW_PREFIX" \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_C_FLAGS="-DLTC_NO_BSWAP" \
+            -DCMAKE_CXX_FLAGS="-DLTC_NO_BSWAP"
+          cmake --build /tmp/StormLib/build --parallel $(nproc)
+          cmake --install /tmp/StormLib/build
 
       - name: Configure
         shell: msys2 {0}
@@ -254,9 +265,16 @@ jobs:
             mingw-w64-x86_64-nsis
             git
 
-      - name: Install optional packages
+      - name: Build StormLib from source
         shell: msys2 {0}
-        run: pacman -S --noconfirm --needed mingw-w64-x86_64-stormlib || true
+        run: |
+          git clone --depth 1 https://github.com/ladislav-zezula/StormLib.git /tmp/StormLib
+          cmake -S /tmp/StormLib -B /tmp/StormLib/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$MINGW_PREFIX" \
+            -DBUILD_SHARED_LIBS=OFF
+          cmake --build /tmp/StormLib/build --parallel $(nproc)
+          cmake --install /tmp/StormLib/build
 
       - name: Configure
         shell: msys2 {0}

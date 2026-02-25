@@ -124,6 +124,41 @@ struct PendingTile {
 };
 
 /**
+ * Phases for incremental tile finalization (one bounded unit of work per call)
+ */
+enum class FinalizationPhase {
+    TERRAIN,        // Upload terrain mesh + textures + water
+    M2_MODELS,      // Upload ONE M2 model per call
+    M2_INSTANCES,   // Create all M2 instances (lightweight struct allocation)
+    WMO_MODELS,     // Upload ONE WMO model per call
+    WMO_INSTANCES,  // Create all WMO instances + load WMO liquids
+    WMO_DOODADS,    // Upload ONE WMO doodad M2 per call
+    WATER,          // Generate water ambient emitters
+    AMBIENT,        // Register ambient emitters + commit tile
+    DONE            // Fully finalized
+};
+
+/**
+ * In-progress tile finalization state — tracks progress across frames
+ */
+struct FinalizingTile {
+    std::shared_ptr<PendingTile> pending;
+    FinalizationPhase phase = FinalizationPhase::TERRAIN;
+
+    // Progress indices within current phase
+    size_t m2ModelIndex = 0;       // Next M2 model to upload
+    size_t wmoModelIndex = 0;      // Next WMO model to upload
+    size_t wmoDoodadIndex = 0;     // Next WMO doodad to upload
+
+    // Accumulated results (built up across phases)
+    std::vector<uint32_t> m2InstanceIds;
+    std::vector<uint32_t> wmoInstanceIds;
+    std::vector<uint32_t> tileUniqueIds;
+    std::vector<uint32_t> tileWmoUniqueIds;
+    std::unordered_set<uint32_t> uploadedM2ModelIds;
+};
+
+/**
  * Terrain manager for multi-tile terrain streaming
  *
  * Handles loading and unloading terrain tiles based on camera position
@@ -219,8 +254,8 @@ public:
     int getLoadedTileCount() const { return static_cast<int>(loadedTiles.size()); }
     int getPendingTileCount() const { return static_cast<int>(pendingTiles.size()); }
     int getReadyQueueCount() const { return static_cast<int>(readyQueue.size()); }
-    /** Total unfinished tiles (worker threads + ready queue) */
-    int getRemainingTileCount() const { return static_cast<int>(pendingTiles.size() + readyQueue.size()); }
+    /** Total unfinished tiles (worker threads + ready queue + finalizing) */
+    int getRemainingTileCount() const { return static_cast<int>(pendingTiles.size() + readyQueue.size() + finalizingTiles_.size()); }
     TileCoord getCurrentTile() const { return currentTile; }
 
     /** Process all ready tiles immediately (use during loading screens) */
@@ -254,9 +289,10 @@ private:
     std::shared_ptr<PendingTile> prepareTile(int x, int y);
 
     /**
-     * Main thread: upload prepared tile data to GPU
+     * Advance incremental finalization of a tile (one bounded unit of work).
+     * Returns true when the tile is fully finalized (phase == DONE).
      */
-    void finalizeTile(const std::shared_ptr<PendingTile>& pending);
+    bool advanceFinalization(FinalizingTile& ft);
 
     /**
      * Background worker thread loop
@@ -341,16 +377,8 @@ private:
     // Dedup set for WMO placements across tile boundaries (prevents rendering Stormwind 16x)
     std::unordered_set<uint32_t> placedWmoIds;
 
-    // Progressive M2 upload queue (spread heavy uploads across frames)
-    struct PendingM2Upload {
-        uint32_t modelId;
-        pipeline::M2Model model;
-        std::string path;
-    };
-    std::queue<PendingM2Upload> m2UploadQueue_;
-    static constexpr int MAX_M2_UPLOADS_PER_FRAME = 5;  // Upload up to 5 models per frame
-
-    void processM2UploadQueue();
+    // Tiles currently being incrementally finalized across frames
+    std::deque<FinalizingTile> finalizingTiles_;
 
     struct GroundEffectEntry {
         std::array<uint32_t, 4> doodadIds{{0, 0, 0, 0}};

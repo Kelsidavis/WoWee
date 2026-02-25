@@ -14,6 +14,7 @@
 #include <cstring>
 #include <limits>
 #include <array>
+#include <unordered_map>
 
 namespace wowee {
 namespace rendering {
@@ -555,7 +556,27 @@ void WaterRenderer::loadFromTerrain(const pipeline::ADTTerrain& terrain, bool ap
         clear();
     }
 
-    int totalLayers = 0;
+    // ── Pass 1: collect layers into merge groups keyed by {liquidType, roundedHeight} ──
+    struct ChunkLayerInfo {
+        int chunkX, chunkY;
+        const pipeline::ADTTerrain::WaterLayer* layer;
+    };
+
+    struct MergeKey {
+        uint16_t liquidType;
+        int32_t roundedHeight;  // minHeight * 2, rounded to int
+        bool operator==(const MergeKey& o) const {
+            return liquidType == o.liquidType && roundedHeight == o.roundedHeight;
+        }
+    };
+
+    struct MergeKeyHash {
+        size_t operator()(const MergeKey& k) const {
+            return std::hash<uint64_t>()((uint64_t(k.liquidType) << 32) | uint32_t(k.roundedHeight));
+        }
+    };
+
+    std::unordered_map<MergeKey, std::vector<ChunkLayerInfo>, MergeKeyHash> mergeGroups;
 
     for (int chunkIdx = 0; chunkIdx < 256; chunkIdx++) {
         const auto& chunkWater = terrain.waterData[chunkIdx];
@@ -563,34 +584,146 @@ void WaterRenderer::loadFromTerrain(const pipeline::ADTTerrain& terrain, bool ap
 
         int chunkX = chunkIdx % 16;
         int chunkY = chunkIdx / 16;
-        const auto& terrainChunk = terrain.getChunk(chunkX, chunkY);
 
         for (const auto& layer : chunkWater.layers) {
-            WaterSurface surface;
+            MergeKey key;
+            key.liquidType = layer.liquidType;
+            key.roundedHeight = static_cast<int32_t>(std::round(layer.minHeight * 2.0f));
+            mergeGroups[key].push_back({chunkX, chunkY, &layer});
+        }
+    }
 
-            surface.position = glm::vec3(
-                terrainChunk.position[0],
-                terrainChunk.position[1],
-                layer.minHeight
-            );
-            surface.origin = glm::vec3(
-                surface.position.x - (static_cast<float>(layer.y) * TILE_SIZE),
-                surface.position.y - (static_cast<float>(layer.x) * TILE_SIZE),
-                layer.minHeight
-            );
-            surface.stepX = glm::vec3(0.0f, -TILE_SIZE, 0.0f);
-            surface.stepY = glm::vec3(-TILE_SIZE, 0.0f, 0.0f);
+    // Tile origin = NW corner = chunk(0,0) position
+    const auto& chunk00 = terrain.getChunk(0, 0);
 
-            surface.minHeight = layer.minHeight;
-            surface.maxHeight = layer.maxHeight;
-            surface.liquidType = layer.liquidType;
+    // Stormwind water lowering check
+    bool isStormwindArea = (tileX >= 28 && tileX <= 50 && tileY >= 28 && tileY <= 52);
+    float tileWorldX = 0, tileWorldY = 0;
+    glm::vec2 moonwellPos2D(0.0f);
+    if (isStormwindArea) {
+        tileWorldX = (32.0f - tileX) * 533.33333f;
+        tileWorldY = (32.0f - tileY) * 533.33333f;
+        moonwellPos2D = glm::vec2(-8755.9f, 1108.9f);
+    }
 
-            surface.xOffset = layer.x;
-            surface.yOffset = layer.y;
-            surface.width = layer.width;
-            surface.height = layer.height;
+    int totalSurfaces = 0;
 
-            size_t numVertices = (layer.width + 1) * (layer.height + 1);
+    // Merge threshold: groups with more than this many chunks get merged into
+    // one tile-wide surface.  Small groups (shore, lakes) stay per-chunk so
+    // their original mask / height data is preserved exactly.
+    constexpr size_t MERGE_THRESHOLD = 4;
+
+    // ── Pass 2: create surfaces ──
+    for (auto& [key, chunkLayers] : mergeGroups) {
+
+        // ── Small group → per-chunk surfaces (original code path) ──
+        if (chunkLayers.size() <= MERGE_THRESHOLD) {
+            for (const auto& info : chunkLayers) {
+                const auto& layer = *info.layer;
+                const auto& terrainChunk = terrain.getChunk(info.chunkX, info.chunkY);
+
+                WaterSurface surface;
+                surface.position = glm::vec3(
+                    terrainChunk.position[0],
+                    terrainChunk.position[1],
+                    layer.minHeight
+                );
+                surface.origin = glm::vec3(
+                    surface.position.x - (static_cast<float>(layer.y) * TILE_SIZE),
+                    surface.position.y - (static_cast<float>(layer.x) * TILE_SIZE),
+                    layer.minHeight
+                );
+                surface.stepX = glm::vec3(0.0f, -TILE_SIZE, 0.0f);
+                surface.stepY = glm::vec3(-TILE_SIZE, 0.0f, 0.0f);
+
+                surface.minHeight = layer.minHeight;
+                surface.maxHeight = layer.maxHeight;
+                surface.liquidType = layer.liquidType;
+                surface.xOffset = layer.x;
+                surface.yOffset = layer.y;
+                surface.width = layer.width;
+                surface.height = layer.height;
+
+                size_t numVertices = (layer.width + 1) * (layer.height + 1);
+                bool useFlat = true;
+                if (layer.heights.size() == numVertices) {
+                    bool sane = true;
+                    for (float h : layer.heights) {
+                        if (!std::isfinite(h) || std::abs(h) > 50000.0f) { sane = false; break; }
+                        if (h < layer.minHeight - 8.0f || h > layer.maxHeight + 8.0f) { sane = false; break; }
+                    }
+                    if (sane) { useFlat = false; surface.heights = layer.heights; }
+                }
+                if (useFlat) surface.heights.resize(numVertices, layer.minHeight);
+
+                if (isStormwindArea && layer.minHeight > 94.0f) {
+                    float distToMoonwell = glm::distance(glm::vec2(tileWorldX, tileWorldY), moonwellPos2D);
+                    if (distToMoonwell > 300.0f) {
+                        for (float& h : surface.heights) h -= 1.0f;
+                        surface.minHeight -= 1.0f;
+                        surface.maxHeight -= 1.0f;
+                    }
+                }
+
+                surface.mask = layer.mask;
+                surface.tileX = tileX;
+                surface.tileY = tileY;
+
+                createWaterMesh(surface);
+                if (surface.indexCount > 0 && vkCtx) {
+                    updateMaterialUBO(surface);
+                }
+                surfaces.push_back(std::move(surface));
+                totalSurfaces++;
+            }
+            continue;
+        }
+
+        // ── Large group → merged tile-wide surface ──
+        WaterSurface surface;
+
+        float groupHeight = key.roundedHeight / 2.0f;
+
+        surface.width = 128;
+        surface.height = 128;
+        surface.xOffset = 0;
+        surface.yOffset = 0;
+        surface.liquidType = key.liquidType;
+        surface.tileX = tileX;
+        surface.tileY = tileY;
+
+        // Origin = chunk(0,0) position (NW corner of tile)
+        surface.origin = glm::vec3(chunk00.position[0], chunk00.position[1], groupHeight);
+        surface.position = surface.origin;
+        surface.stepX = glm::vec3(0.0f, -TILE_SIZE, 0.0f);
+        surface.stepY = glm::vec3(-TILE_SIZE, 0.0f, 0.0f);
+
+        surface.minHeight = groupHeight;
+        surface.maxHeight = groupHeight;
+
+        // Initialize height grid (129×129) with group height
+        constexpr int MERGED_W = 128;
+        const int gridW = MERGED_W + 1;  // 129
+        const int gridH = MERGED_W + 1;
+        surface.heights.resize(gridW * gridH, groupHeight);
+
+        // Initialize mask (128×128 sub-tiles, all masked OUT)
+        // Mask uses LSB bit order: tileIndex = row * 128 + col
+        const int maskBytes = (MERGED_W * MERGED_W + 7) / 8;
+        surface.mask.resize(maskBytes, 0);
+
+        // ── Fill from each contributing chunk ──
+        for (const auto& info : chunkLayers) {
+            const auto& layer = *info.layer;
+
+            // Merged grid offset for this chunk
+            // gx = chunkY*8 + layer.x + localX, gy = chunkX*8 + layer.y + localY
+            int baseGx = info.chunkY * 8;
+            int baseGy = info.chunkX * 8;
+
+            // Copy heights
+            int layerGridW = layer.width + 1;
+            size_t numVertices = static_cast<size_t>(layerGridW) * (layer.height + 1);
             bool useFlat = true;
             if (layer.heights.size() == numVertices) {
                 bool sane = true;
@@ -598,39 +731,79 @@ void WaterRenderer::loadFromTerrain(const pipeline::ADTTerrain& terrain, bool ap
                     if (!std::isfinite(h) || std::abs(h) > 50000.0f) { sane = false; break; }
                     if (h < layer.minHeight - 8.0f || h > layer.maxHeight + 8.0f) { sane = false; break; }
                 }
-                if (sane) { useFlat = false; surface.heights = layer.heights; }
+                if (sane) useFlat = false;
             }
-            if (useFlat) surface.heights.resize(numVertices, layer.minHeight);
 
-            // Stormwind water lowering
-            bool isStormwindArea = (tileX >= 28 && tileX <= 50 && tileY >= 28 && tileY <= 52);
-            if (isStormwindArea && layer.minHeight > 94.0f) {
-                float tileWorldX = (32.0f - tileX) * 533.33333f;
-                float tileWorldY = (32.0f - tileY) * 533.33333f;
-                glm::vec3 moonwellPos(-8755.9f, 1108.9f, 96.1f);
-                float distToMoonwell = glm::distance(glm::vec2(tileWorldX, tileWorldY),
-                                                      glm::vec2(moonwellPos.x, moonwellPos.y));
-                if (distToMoonwell > 300.0f) {
-                    for (float& h : surface.heights) h -= 1.0f;
-                    surface.minHeight -= 1.0f;
-                    surface.maxHeight -= 1.0f;
+            for (int ly = 0; ly <= layer.height; ly++) {
+                for (int lx = 0; lx <= layer.width; lx++) {
+                    int mgx = baseGx + layer.x + lx;
+                    int mgy = baseGy + layer.y + ly;
+                    if (mgx >= gridW || mgy >= gridH) continue;
+
+                    float h;
+                    if (!useFlat) {
+                        int layerIdx = ly * layerGridW + lx;
+                        h = layer.heights[layerIdx];
+                    } else {
+                        h = layer.minHeight;
+                    }
+
+                    surface.heights[mgy * gridW + mgx] = h;
+                    if (h < surface.minHeight) surface.minHeight = h;
+                    if (h > surface.maxHeight) surface.maxHeight = h;
                 }
             }
 
-            surface.mask = layer.mask;
-            surface.tileX = tileX;
-            surface.tileY = tileY;
+            // Copy mask — mark contributing sub-tiles as renderable
+            for (int ly = 0; ly < layer.height; ly++) {
+                for (int lx = 0; lx < layer.width; lx++) {
+                    bool render = true;
+                    if (!layer.mask.empty()) {
+                        int cx = layer.x + lx;
+                        int cy = layer.y + ly;
+                        int origTileIdx = cy * 8 + cx;
+                        int origByte = origTileIdx / 8;
+                        int origBit = origTileIdx % 8;
+                        if (origByte < static_cast<int>(layer.mask.size())) {
+                            uint8_t mb = layer.mask[origByte];
+                            render = (mb & (1 << origBit)) || (mb & (1 << (7 - origBit)));
+                        }
+                    }
 
-            createWaterMesh(surface);
-            if (surface.indexCount > 0 && vkCtx) {
-                updateMaterialUBO(surface);
+                    if (render) {
+                        int mx = baseGx + layer.x + lx;
+                        int my = baseGy + layer.y + ly;
+                        if (mx >= MERGED_W || my >= MERGED_W) continue;
+
+                        int mergedTileIdx = my * MERGED_W + mx;
+                        int byteIdx = mergedTileIdx / 8;
+                        int bitIdx = mergedTileIdx % 8;
+                        surface.mask[byteIdx] |= static_cast<uint8_t>(1 << bitIdx);
+                    }
+                }
             }
-            surfaces.push_back(std::move(surface));
-            totalLayers++;
         }
+
+        // Stormwind water lowering
+        if (isStormwindArea && surface.minHeight > 94.0f) {
+            float distToMoonwell = glm::distance(glm::vec2(tileWorldX, tileWorldY), moonwellPos2D);
+            if (distToMoonwell > 300.0f) {
+                for (float& h : surface.heights) h -= 1.0f;
+                surface.minHeight -= 1.0f;
+                surface.maxHeight -= 1.0f;
+            }
+        }
+
+        createWaterMesh(surface);
+        if (surface.indexCount > 0 && vkCtx) {
+            updateMaterialUBO(surface);
+        }
+        surfaces.push_back(std::move(surface));
+        totalSurfaces++;
     }
 
-    LOG_DEBUG("Loaded ", totalLayers, " water layers from MH2O data");
+    LOG_DEBUG("Water: Loaded ", totalSurfaces, " surfaces from tile [", tileX, ",", tileY,
+              "] (", mergeGroups.size(), " groups), total surfaces: ", surfaces.size());
 }
 
 void WaterRenderer::removeTile(int tileX, int tileY) {
@@ -646,7 +819,7 @@ void WaterRenderer::removeTile(int tileX, int tileY) {
         }
     }
     if (removed > 0) {
-        LOG_DEBUG("Removed ", removed, " water surfaces for tile [", tileX, ",", tileY, "]");
+        LOG_DEBUG("Water: Removed ", removed, " surfaces for tile [", tileX, ",", tileY, "], remaining: ", surfaces.size());
     }
 }
 
@@ -948,7 +1121,8 @@ void WaterRenderer::createWaterMesh(WaterSurface& surface) {
             bool renderTile = true;
             if (!surface.mask.empty()) {
                 int tileIndex;
-                if (surface.wmoId == 0 && surface.mask.size() >= 8) {
+                bool isMergedTerrain = (surface.wmoId == 0 && surface.width > 8);
+                if (surface.wmoId == 0 && surface.width <= 8 && surface.mask.size() >= 8) {
                     int cx = static_cast<int>(surface.xOffset) + x;
                     int cy = static_cast<int>(surface.yOffset) + y;
                     tileIndex = cy * 8 + cx;
@@ -959,9 +1133,14 @@ void WaterRenderer::createWaterMesh(WaterSurface& surface) {
                 int bitIndex = tileIndex % 8;
                 if (byteIndex < static_cast<int>(surface.mask.size())) {
                     uint8_t maskByte = surface.mask[byteIndex];
-                    bool lsbOrder = (maskByte & (1 << bitIndex)) != 0;
-                    bool msbOrder = (maskByte & (1 << (7 - bitIndex))) != 0;
-                    renderTile = lsbOrder || msbOrder;
+                    if (isMergedTerrain) {
+                        // Merged surfaces use LSB-only bit order
+                        renderTile = (maskByte & (1 << bitIndex)) != 0;
+                    } else {
+                        bool lsbOrder = (maskByte & (1 << bitIndex)) != 0;
+                        bool msbOrder = (maskByte & (1 << (7 - bitIndex))) != 0;
+                        renderTile = lsbOrder || msbOrder;
+                    }
 
                     if (!renderTile) {
                         for (int dy = -1; dy <= 1; dy++) {
@@ -970,7 +1149,7 @@ void WaterRenderer::createWaterMesh(WaterSurface& surface) {
                                 int nx = x + dx, ny = y + dy;
                                 if (nx < 0 || ny < 0 || nx >= gridWidth-1 || ny >= gridHeight-1) continue;
                                 int neighborIdx;
-                                if (surface.wmoId == 0 && surface.mask.size() >= 8) {
+                                if (surface.wmoId == 0 && surface.width <= 8 && surface.mask.size() >= 8) {
                                     neighborIdx = (static_cast<int>(surface.yOffset) + ny) * 8 +
                                                   (static_cast<int>(surface.xOffset) + nx);
                                 } else {
@@ -980,9 +1159,16 @@ void WaterRenderer::createWaterMesh(WaterSurface& surface) {
                                 int nBitIdx = neighborIdx % 8;
                                 if (nByteIdx < static_cast<int>(surface.mask.size())) {
                                     uint8_t nMask = surface.mask[nByteIdx];
-                                    if ((nMask & (1 << nBitIdx)) || (nMask & (1 << (7 - nBitIdx)))) {
-                                        renderTile = true;
-                                        goto found_neighbor;
+                                    if (isMergedTerrain) {
+                                        if (nMask & (1 << nBitIdx)) {
+                                            renderTile = true;
+                                            goto found_neighbor;
+                                        }
+                                    } else {
+                                        if ((nMask & (1 << nBitIdx)) || (nMask & (1 << (7 - nBitIdx)))) {
+                                            renderTile = true;
+                                            goto found_neighbor;
+                                        }
                                     }
                                 }
                             }
@@ -1100,7 +1286,7 @@ std::optional<float> WaterRenderer::getWaterHeightAt(float glX, float glY) const
 
         if (!surface.mask.empty()) {
             int tileIndex;
-            if (surface.wmoId == 0 && surface.mask.size() >= 8) {
+            if (surface.wmoId == 0 && surface.width <= 8 && surface.mask.size() >= 8) {
                 tileIndex = (static_cast<int>(surface.yOffset) + iy) * 8 +
                             (static_cast<int>(surface.xOffset) + ix);
             } else {
@@ -1110,7 +1296,12 @@ std::optional<float> WaterRenderer::getWaterHeightAt(float glX, float glY) const
             int bitIndex = tileIndex % 8;
             if (byteIndex < static_cast<int>(surface.mask.size())) {
                 uint8_t maskByte = surface.mask[byteIndex];
-                bool renderTile = (maskByte & (1 << bitIndex)) || (maskByte & (1 << (7 - bitIndex)));
+                bool renderTile;
+                if (surface.wmoId == 0 && surface.width > 8) {
+                    renderTile = (maskByte & (1 << bitIndex)) != 0;
+                } else {
+                    renderTile = (maskByte & (1 << bitIndex)) || (maskByte & (1 << (7 - bitIndex)));
+                }
                 if (!renderTile) continue;
             }
         }
@@ -1162,7 +1353,7 @@ std::optional<float> WaterRenderer::getNearestWaterHeightAt(float glX, float glY
 
         if (!surface.mask.empty()) {
             int tileIndex;
-            if (surface.wmoId == 0 && surface.mask.size() >= 8) {
+            if (surface.wmoId == 0 && surface.width <= 8 && surface.mask.size() >= 8) {
                 tileIndex = (static_cast<int>(surface.yOffset) + iy) * 8 +
                             (static_cast<int>(surface.xOffset) + ix);
             } else {
@@ -1172,7 +1363,12 @@ std::optional<float> WaterRenderer::getNearestWaterHeightAt(float glX, float glY
             int bitIndex = tileIndex % 8;
             if (byteIndex < static_cast<int>(surface.mask.size())) {
                 uint8_t maskByte = surface.mask[byteIndex];
-                bool renderTile = (maskByte & (1 << bitIndex)) || (maskByte & (1 << (7 - bitIndex)));
+                bool renderTile;
+                if (surface.wmoId == 0 && surface.width > 8) {
+                    renderTile = (maskByte & (1 << bitIndex)) != 0;
+                } else {
+                    renderTile = (maskByte & (1 << bitIndex)) || (maskByte & (1 << (7 - bitIndex)));
+                }
                 if (!renderTile) continue;
             }
         }
@@ -1228,7 +1424,7 @@ std::optional<uint16_t> WaterRenderer::getWaterTypeAt(float glX, float glY) cons
 
         if (!surface.mask.empty()) {
             int tileIndex;
-            if (surface.wmoId == 0 && surface.mask.size() >= 8) {
+            if (surface.wmoId == 0 && surface.width <= 8 && surface.mask.size() >= 8) {
                 tileIndex = (static_cast<int>(surface.yOffset) + iy) * 8 +
                             (static_cast<int>(surface.xOffset) + ix);
             } else {
@@ -1238,7 +1434,12 @@ std::optional<uint16_t> WaterRenderer::getWaterTypeAt(float glX, float glY) cons
             int bitIndex = tileIndex % 8;
             if (byteIndex < static_cast<int>(surface.mask.size())) {
                 uint8_t maskByte = surface.mask[byteIndex];
-                bool renderTile = (maskByte & (1 << bitIndex)) || (maskByte & (1 << (7 - bitIndex)));
+                bool renderTile;
+                if (surface.wmoId == 0 && surface.width > 8) {
+                    renderTile = (maskByte & (1 << bitIndex)) != 0;
+                } else {
+                    renderTile = (maskByte & (1 << bitIndex)) || (maskByte & (1 << (7 - bitIndex)));
+                }
                 if (!renderTile) continue;
             }
         }

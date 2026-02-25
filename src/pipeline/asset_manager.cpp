@@ -294,10 +294,36 @@ std::shared_ptr<DBCFile> AssetManager::loadDBC(const std::string& name) {
     if (dbcData.empty()) {
         std::string dbcPath = "DBFilesClient\\" + name;
         dbcData = readFile(dbcPath);
-        if (dbcData.empty()) {
-            LOG_WARNING("DBC not found: ", name);
-            return nullptr;
+    }
+
+    // If binary DBC not found and we skipped CSV earlier (forceBinaryForVisualDbc),
+    // try CSV as a last resort — better than no data at all (e.g. Classic expansion
+    // where binary DBCs come from MPQ extraction the user may not have done).
+    if (dbcData.empty() && forceBinaryForVisualDbc && !expansionDataPath_.empty()) {
+        std::string baseName = name;
+        auto dot = baseName.rfind('.');
+        if (dot != std::string::npos) {
+            baseName = baseName.substr(0, dot);
         }
+        std::string csvPath = expansionDataPath_ + "/db/" + baseName + ".csv";
+        if (std::filesystem::exists(csvPath)) {
+            std::ifstream f(csvPath, std::ios::binary | std::ios::ate);
+            if (f) {
+                auto size = f.tellg();
+                if (size > 0) {
+                    f.seekg(0);
+                    dbcData.resize(static_cast<size_t>(size));
+                    f.read(reinterpret_cast<char*>(dbcData.data()), size);
+                    LOG_INFO("Binary DBC not found, using CSV fallback: ", csvPath);
+                    loadedFromCSV = true;
+                }
+            }
+        }
+    }
+
+    if (dbcData.empty()) {
+        LOG_WARNING("DBC not found: ", name);
+        return nullptr;
     }
 
     auto dbc = std::make_shared<DBCFile>();

@@ -17,8 +17,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/build"
-BINARY="${BUILD_DIR}/bin/asset_extract"
 OUTPUT_DIR="${SCRIPT_DIR}/Data"
+
+# Prefer pre-built binary next to this script (release archives), then build dir
+if [ -x "${SCRIPT_DIR}/asset_extract" ]; then
+    BINARY="${SCRIPT_DIR}/asset_extract"
+else
+    BINARY="${BUILD_DIR}/bin/asset_extract"
+fi
 
 # --- Validate arguments ---
 if [ $# -lt 1 ]; then
@@ -73,7 +79,7 @@ if [ ! -f "$BINARY" ]; then
     fi
     if [ "$STORMLIB_FOUND" = false ]; then
         echo "Error: StormLib not found."
-        echo "  Ubuntu/Debian: sudo apt install libstormlib-dev"
+        echo "  Ubuntu/Debian: sudo apt install libstorm-dev"
         echo "  macOS:         brew install stormlib"
         echo "  From source:   https://github.com/ladislav-zezula/StormLib"
         exit 1

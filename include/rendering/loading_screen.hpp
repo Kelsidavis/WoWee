@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+struct SDL_Window;
+
 namespace wowee {
 namespace rendering {
 
@@ -27,11 +29,13 @@ public:
 
     // Must be set before initialize() for Vulkan texture upload
     void setVkContext(VkContext* ctx) { vkCtx = ctx; }
+    void setSDLWindow(SDL_Window* win) { sdlWindow = win; }
 
 private:
     bool loadImage(const std::string& path);
 
     VkContext* vkCtx = nullptr;
+    SDL_Window* sdlWindow = nullptr;
 
     // Vulkan texture for background image
     VkImage bgImage = VK_NULL_HANDLE;

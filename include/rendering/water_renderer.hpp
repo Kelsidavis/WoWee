@@ -160,7 +160,7 @@ private:
     VkDescriptorSetLayout sceneSetLayout = VK_NULL_HANDLE;
     VkDescriptorPool sceneDescPool = VK_NULL_HANDLE;
     VkDescriptorSet sceneSet = VK_NULL_HANDLE;
-    static constexpr uint32_t MAX_WATER_SETS = 2048;
+    static constexpr uint32_t MAX_WATER_SETS = 16384;
 
     VkSampler sceneColorSampler = VK_NULL_HANDLE;
     VkSampler sceneDepthSampler = VK_NULL_HANDLE;

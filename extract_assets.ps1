@@ -29,8 +29,15 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BuildDir  = Join-Path $ScriptDir "build"
-$Binary    = Join-Path $BuildDir "bin\asset_extract.exe"
 $OutputDir = Join-Path $ScriptDir "Data"
+
+# Prefer pre-built binary next to this script (release archives), then build dir
+$BinaryLocal = Join-Path $ScriptDir "asset_extract.exe"
+if (Test-Path $BinaryLocal) {
+    $Binary = $BinaryLocal
+} else {
+    $Binary = Join-Path $BuildDir "bin\asset_extract.exe"
+}
 
 # --- Validate arguments ---
 if (-not (Test-Path $MpqDir -PathType Container)) {

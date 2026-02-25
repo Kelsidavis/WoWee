@@ -5,6 +5,7 @@
 #include <imgui_internal.h>
 #include <imgui_impl_vulkan.h>
 #include <imgui_impl_sdl2.h>
+#include <SDL2/SDL.h>
 #include <random>
 #include <chrono>
 #include <cstdio>
@@ -327,6 +328,15 @@ void LoadingScreen::render() {
 
     // Submit the frame to Vulkan (loading screen runs outside the main render loop)
     if (vkCtx) {
+        // Handle window resize: recreate swapchain before acquiring an image
+        if (vkCtx->isSwapchainDirty() && sdlWindow) {
+            int w = 0, h = 0;
+            SDL_GetWindowSize(sdlWindow, &w, &h);
+            if (w > 0 && h > 0) {
+                vkCtx->recreateSwapchain(w, h);
+            }
+        }
+
         uint32_t imageIndex = 0;
         VkCommandBuffer cmd = vkCtx->beginFrame(imageIndex);
         if (cmd != VK_NULL_HANDLE) {

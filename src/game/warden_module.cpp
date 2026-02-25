@@ -529,33 +529,22 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
     std::cout << "[WardenModule] Allocated " << moduleSize_ << " bytes of executable memory at "
               << moduleMemory_ << '\n';
 
-    // Parse skip/copy pairs
-    // Format: repeated [2B skip_count][2B copy_count][copy_count bytes data]
-    // Skip = advance dest pointer (zeros), Copy = copy from source to dest
-    // Terminates when skip_count == 0
+    // Parse copy/skip pairs (MaNGOS/TrinityCore format)
+    // Format: repeated [2B copy_count][copy_count bytes data][2B skip_count]
+    // Copy = copy from source to dest, Skip = advance dest pointer (zeros)
+    // Terminates when copy_count == 0
     size_t pos = 4; // Skip 4-byte size header
     size_t destOffset = 0;
     int pairCount = 0;
 
     while (pos + 2 <= exeData.size()) {
-        // Read skip count (2 bytes LE)
-        uint16_t skipCount = exeData[pos] | (exeData[pos + 1] << 8);
-        pos += 2;
-
-        if (skipCount == 0) {
-            break; // End of skip/copy pairs
-        }
-
-        // Advance dest pointer by skipCount (gaps are zero-filled from memset)
-        destOffset += skipCount;
-
         // Read copy count (2 bytes LE)
-        if (pos + 2 > exeData.size()) {
-            std::cerr << "[WardenModule] Unexpected end of data reading copy count" << '\n';
-            break;
-        }
         uint16_t copyCount = exeData[pos] | (exeData[pos + 1] << 8);
         pos += 2;
+
+        if (copyCount == 0) {
+            break; // End of copy/skip pairs
+        }
 
         if (copyCount > 0) {
             if (pos + copyCount > exeData.size()) {
@@ -589,9 +578,19 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
             destOffset += copyCount;
         }
 
+        // Read skip count (2 bytes LE)
+        uint16_t skipCount = 0;
+        if (pos + 2 <= exeData.size()) {
+            skipCount = exeData[pos] | (exeData[pos + 1] << 8);
+            pos += 2;
+        }
+
+        // Advance dest pointer by skipCount (gaps are zero-filled from memset)
+        destOffset += skipCount;
+
         pairCount++;
-        std::cout << "[WardenModule]   Pair " << pairCount << ": skip " << skipCount
-                  << ", copy " << copyCount << " (dest offset=" << destOffset << ")" << '\n';
+        std::cout << "[WardenModule]   Pair " << pairCount << ": copy " << copyCount
+                  << ", skip " << skipCount << " (dest offset=" << destOffset << ")" << '\n';
     }
 
     // Save position — remaining decompressed data contains relocation entries
