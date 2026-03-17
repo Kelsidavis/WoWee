@@ -2,6 +2,7 @@
 #include "core/logger.hpp"
 #include <cstring>
 #include <chrono>
+#include <iterator>
 
 #ifdef HAVE_UNICORN
 // Unicorn Engine headers
@@ -46,6 +47,11 @@ bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint3
         LOG_ERROR("WardenEmulator: Already initialized");
         return false;
     }
+    allocations_.clear();
+    freeBlocks_.clear();
+    apiAddresses_.clear();
+    hooks_.clear();
+    nextHeapAddr_ = heapBase_;
 
     {
         char addrBuf[32];
@@ -282,16 +288,42 @@ std::string WardenEmulator::readString(uint32_t address, size_t maxLen) {
 }
 
 uint32_t WardenEmulator::allocateMemory(size_t size, [[maybe_unused]] uint32_t protection) {
+    if (size == 0) {
+        return 0;
+    }
+
     // Align to 4KB
     size = (size + 0xFFF) & ~0xFFF;
+    const uint32_t allocSize = static_cast<uint32_t>(size);
 
-    if (nextHeapAddr_ + size > heapBase_ + heapSize_) {
+    // First-fit from free list so released blocks can be reused.
+    for (auto it = freeBlocks_.begin(); it != freeBlocks_.end(); ++it) {
+        if (it->second < size) {
+            continue;
+        }
+        const uint32_t addr = it->first;
+        const size_t blockSize = it->second;
+        freeBlocks_.erase(it);
+        if (blockSize > size) {
+            freeBlocks_[addr + allocSize] = blockSize - size;
+        }
+        allocations_[addr] = size;
+        {
+            char mBuf[32];
+            std::snprintf(mBuf, sizeof(mBuf), "0x%X", addr);
+            LOG_DEBUG("WardenEmulator: Reused ", size, " bytes at ", mBuf);
+        }
+        return addr;
+    }
+
+    const uint64_t heapEnd = static_cast<uint64_t>(heapBase_) + heapSize_;
+    if (static_cast<uint64_t>(nextHeapAddr_) + size > heapEnd) {
         LOG_ERROR("WardenEmulator: Heap exhausted");
         return 0;
     }
 
     uint32_t addr = nextHeapAddr_;
-    nextHeapAddr_ += size;
+    nextHeapAddr_ += allocSize;
 
     allocations_[addr] = size;
 
@@ -320,7 +352,43 @@ bool WardenEmulator::freeMemory(uint32_t address) {
         std::snprintf(fBuf, sizeof(fBuf), "0x%X", address);
         LOG_DEBUG("WardenEmulator: Freed ", it->second, " bytes at ", fBuf);
     }
+
+    const size_t freedSize = it->second;
     allocations_.erase(it);
+
+    // Insert in free list and coalesce adjacent blocks to limit fragmentation.
+    auto [curr, inserted] = freeBlocks_.emplace(address, freedSize);
+    if (!inserted) {
+        curr->second += freedSize;
+    }
+
+    if (curr != freeBlocks_.begin()) {
+        auto prev = std::prev(curr);
+        if (static_cast<uint64_t>(prev->first) + prev->second == curr->first) {
+            prev->second += curr->second;
+            freeBlocks_.erase(curr);
+            curr = prev;
+        }
+    }
+
+    auto next = std::next(curr);
+    if (next != freeBlocks_.end() &&
+        static_cast<uint64_t>(curr->first) + curr->second == next->first) {
+        curr->second += next->second;
+        freeBlocks_.erase(next);
+    }
+
+    // If the highest free block reaches the bump pointer, roll back the heap top.
+    while (!freeBlocks_.empty()) {
+        auto last = std::prev(freeBlocks_.end());
+        if (static_cast<uint64_t>(last->first) + last->second == nextHeapAddr_) {
+            nextHeapAddr_ = last->first;
+            freeBlocks_.erase(last);
+        } else {
+            break;
+        }
+    }
+
     return true;
 }
 

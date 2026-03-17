@@ -152,6 +152,7 @@ private:
 
     // Memory allocation tracking
     std::map<uint32_t, size_t> allocations_;
+    std::map<uint32_t, size_t> freeBlocks_; // Free-list blocks keyed by base address
     uint32_t nextHeapAddr_;
 
     // Hook handles for cleanup
