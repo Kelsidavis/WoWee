@@ -2,9 +2,9 @@ name: Build
 
 on:
   push:
-    branches: [master]
+    branches: [ master ]
   pull_request:
-    branches: [master]
+    branches: [ master ]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -21,107 +21,107 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - arch: x86-64
-            runner: ubuntu-24.04
-            deb_arch: amd64
-            build_jobs: $(nproc)
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-            deb_arch: arm64
-            build_jobs: 2
+        - arch: x86-64
+          runner: ubuntu-24.04
+          deb_arch: amd64
+          build_jobs: $(nproc)
+        - arch: arm64
+          runner: ubuntu-24.04-arm
+          deb_arch: arm64
+          build_jobs: 2
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
 
-      - name: Cache apt packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-${{ matrix.arch }}-${{ hashFiles('.github/workflows/build.yml') }}
-          restore-keys: apt-${{ matrix.arch }}-
+    - name: Cache apt packages
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt/archives/*.deb
+        key: apt-${{ matrix.arch }}-${{ hashFiles('.github/workflows/build.yml') }}
+        restore-keys: apt-${{ matrix.arch }}-
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            cmake \
-            build-essential \
-            pkg-config \
-            libsdl2-dev \
-            libglew-dev \
-            libglm-dev \
-            libssl-dev \
-            zlib1g-dev \
-            libvulkan-dev \
-            vulkan-tools \
-            glslc \
-            libavformat-dev \
-            libavcodec-dev \
-            libswscale-dev \
-            libavutil-dev \
-            libunicorn-dev \
-            libx11-dev
-          sudo apt-get install -y libstorm-dev || true
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          cmake \
+          build-essential \
+          pkg-config \
+          libsdl2-dev \
+          libglew-dev \
+          libglm-dev \
+          libssl-dev \
+          zlib1g-dev \
+          libvulkan-dev \
+          vulkan-tools \
+          glslc \
+          libavformat-dev \
+          libavcodec-dev \
+          libswscale-dev \
+          libavutil-dev \
+          libunicorn-dev \
+          libx11-dev
+        sudo apt-get install -y libstorm-dev || true
 
-      - name: Fetch AMD FSR2 SDK
-        run: |
-          rm -rf extern/FidelityFX-FSR2
-          git clone --depth 1 --branch "${WOWEE_AMD_FSR2_REF}" "${WOWEE_AMD_FSR2_REPO}" extern/FidelityFX-FSR2
-          rm -rf extern/FidelityFX-SDK
-          git clone --depth 1 --branch "${WOWEE_FFX_SDK_REF}" "${WOWEE_FFX_SDK_REPO}" extern/FidelityFX-SDK
+    - name: Fetch AMD FSR2 SDK
+      run: |
+        rm -rf extern/FidelityFX-FSR2
+        git clone --depth 1 --branch "${WOWEE_AMD_FSR2_REF}" "${WOWEE_AMD_FSR2_REPO}" extern/FidelityFX-FSR2
+        rm -rf extern/FidelityFX-SDK
+        git clone --depth 1 --branch "${WOWEE_FFX_SDK_REF}" "${WOWEE_FFX_SDK_REPO}" extern/FidelityFX-SDK
 
-      - name: Check AMD FSR2 Vulkan permutation headers
-        run: |
-          set -euo pipefail
-          SDK_DIR="$PWD/extern/FidelityFX-FSR2"
-          OUT_DIR="$SDK_DIR/src/ffx-fsr2-api/vk/shaders"
-          if [ -f "$OUT_DIR/ffx_fsr2_accumulate_pass_permutations.h" ]; then
-            echo "AMD FSR2 Vulkan permutation headers detected."
-          else
-            echo "AMD FSR2 Vulkan permutation headers not found in SDK checkout."
-            echo "WoWee CMake will bootstrap vendored headers."
-          fi
+    - name: Check AMD FSR2 Vulkan permutation headers
+      run: |
+        set -euo pipefail
+        SDK_DIR="$PWD/extern/FidelityFX-FSR2"
+        OUT_DIR="$SDK_DIR/src/ffx-fsr2-api/vk/shaders"
+        if [ -f "$OUT_DIR/ffx_fsr2_accumulate_pass_permutations.h" ]; then
+          echo "AMD FSR2 Vulkan permutation headers detected."
+        else
+          echo "AMD FSR2 Vulkan permutation headers not found in SDK checkout."
+          echo "WoWee CMake will bootstrap vendored headers."
+        fi
 
-      - name: Check FidelityFX-SDK Kits framegen headers
-        run: |
-          set -euo pipefail
-          KITS_DIR="$PWD/extern/FidelityFX-SDK/Kits/FidelityFX"
-          test -f "$KITS_DIR/upscalers/fsr3/include/ffx_fsr3upscaler.h"
-          test -f "$KITS_DIR/framegeneration/fsr3/include/ffx_frameinterpolation.h"
-          test -f "$KITS_DIR/framegeneration/fsr3/include/ffx_opticalflow.h"
-          test -f "$KITS_DIR/backend/vk/ffx_vk.h"
-          echo "FidelityFX-SDK Kits framegen headers detected."
+    - name: Check FidelityFX-SDK Kits framegen headers
+      run: |
+        set -euo pipefail
+        KITS_DIR="$PWD/extern/FidelityFX-SDK/Kits/FidelityFX"
+        test -f "$KITS_DIR/upscalers/fsr3/include/ffx_fsr3upscaler.h"
+        test -f "$KITS_DIR/framegeneration/fsr3/include/ffx_frameinterpolation.h"
+        test -f "$KITS_DIR/framegeneration/fsr3/include/ffx_opticalflow.h"
+        test -f "$KITS_DIR/backend/vk/ffx_vk.h"
+        echo "FidelityFX-SDK Kits framegen headers detected."
 
-      - name: Configure (AMD ON)
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DWOWEE_ENABLE_AMD_FSR2=ON
+    - name: Configure (AMD ON)
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DWOWEE_ENABLE_AMD_FSR2=ON
 
-      - name: Assert AMD FSR2 target
-        run: cmake --build build --target wowee_fsr2_amd_vk --parallel ${{ matrix.build_jobs }}
+    - name: Assert AMD FSR2 target
+      run: cmake --build build --target wowee_fsr2_amd_vk --parallel ${{ matrix.build_jobs }}
 
-      - name: Assert AMD FSR3 framegen probe target (if present)
-        run: |
-          set -euo pipefail
-          if cmake --build build --target help | grep -q 'wowee_fsr3_framegen_amd_vk_probe'; then
-            cmake --build build --target wowee_fsr3_framegen_amd_vk_probe --parallel ${{ matrix.build_jobs }}
-          else
-            echo "FSR3 framegen probe target not generated for this SDK layout; continuing."
-          fi
+    - name: Assert AMD FSR3 framegen probe target (if present)
+      run: |
+        set -euo pipefail
+        if cmake --build build --target help | grep -q 'wowee_fsr3_framegen_amd_vk_probe'; then
+          cmake --build build --target wowee_fsr3_framegen_amd_vk_probe --parallel ${{ matrix.build_jobs }}
+        else
+          echo "FSR3 framegen probe target not generated for this SDK layout; continuing."
+        fi
 
-      - name: Build
-        run: cmake --build build --parallel ${{ matrix.build_jobs }}
+    - name: Build
+      run: cmake --build build --parallel ${{ matrix.build_jobs }}
 
-      - name: Package (DEB)
-        run: cd build && cpack -G DEB
+    - name: Package (DEB)
+      run: cd build && cpack -G DEB
 
-      - name: Upload DEB
-        uses: actions/upload-artifact@v4
-        with:
-          name: wowee-linux-${{ matrix.arch }}-deb
-          path: build/wowee-*.deb
-          if-no-files-found: error
+    - name: Upload DEB
+      uses: actions/upload-artifact@v4
+      with:
+        name: wowee-linux-${{ matrix.arch }}-deb
+        path: build/wowee-*.deb
+        if-no-files-found: error
 
   build-macos:
     name: Build (macOS ${{ matrix.arch }})
@@ -130,325 +130,309 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - arch: arm64
-            runner: macos-15
+        - arch: arm64
+          runner: macos-15
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
 
-      - name: Install dependencies
-        run: |
-          brew install cmake pkg-config sdl2 glew glm openssl@3 zlib ffmpeg unicorn \
-            stormlib vulkan-loader vulkan-headers shaderc dylibbundler || true
-          # dylibbundler may not be in all brew mirrors; install separately to not block others
-          brew install dylibbundler 2>/dev/null || true
+    - name: Install dependencies
+      run: |
+        brew install cmake pkg-config sdl2 glew glm openssl@3 zlib ffmpeg unicorn \
+          stormlib vulkan-loader vulkan-headers shaderc dylibbundler || true
+        # dylibbundler may not be in all brew mirrors; install separately to not block others
+        brew install dylibbundler 2>/dev/null || true
 
-      - name: Fetch AMD FSR2 SDK
-        run: |
-          rm -rf extern/FidelityFX-FSR2
-          git clone --depth 1 --branch "${WOWEE_AMD_FSR2_REF}" "${WOWEE_AMD_FSR2_REPO}" extern/FidelityFX-FSR2
-          rm -rf extern/FidelityFX-SDK
-          git clone --depth 1 --branch "${WOWEE_FFX_SDK_REF}" "${WOWEE_FFX_SDK_REPO}" extern/FidelityFX-SDK
+    - name: Fetch AMD FSR2 SDK
+      run: |
+        rm -rf extern/FidelityFX-FSR2
+        git clone --depth 1 --branch "${WOWEE_AMD_FSR2_REF}" "${WOWEE_AMD_FSR2_REPO}" extern/FidelityFX-FSR2
+        rm -rf extern/FidelityFX-SDK
+        git clone --depth 1 --branch "${WOWEE_FFX_SDK_REF}" "${WOWEE_FFX_SDK_REPO}" extern/FidelityFX-SDK
 
-      - name: Configure
-        run: |
-          BREW=$(brew --prefix)
-          export PKG_CONFIG_PATH="$BREW/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig:$(brew --prefix vulkan-loader)/lib/pkgconfig:$(brew --prefix shaderc)/lib/pkgconfig"
-          cmake -S . -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$BREW" \
-            -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" \
-            -DWOWEE_ENABLE_AMD_FSR2=ON
+    - name: Configure
+      run: |
+        BREW=$(brew --prefix)
+        export PKG_CONFIG_PATH="$BREW/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig:$(brew --prefix vulkan-loader)/lib/pkgconfig:$(brew --prefix shaderc)/lib/pkgconfig"
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_PREFIX_PATH="$BREW" \
+          -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" \
+          -DWOWEE_ENABLE_AMD_FSR2=ON
 
-      - name: Assert AMD FSR2 target
-        run: cmake --build build --target wowee_fsr2_amd_vk --parallel $(sysctl -n hw.logicalcpu)
+    - name: Assert AMD FSR2 target
+      run: cmake --build build --target wowee_fsr2_amd_vk --parallel $(sysctl -n hw.logicalcpu)
 
-      - name: Assert AMD FSR3 framegen probe target (if present)
-        run: |
-          if cmake --build build --target help | grep -q 'wowee_fsr3_framegen_amd_vk_probe'; then
-            cmake --build build --target wowee_fsr3_framegen_amd_vk_probe --parallel $(sysctl -n hw.logicalcpu)
-          else
-            echo "FSR3 framegen probe target not generated for this SDK layout; continuing."
+    - name: Assert AMD FSR3 framegen probe target (if present)
+      run: |
+        if cmake --build build --target help | grep -q 'wowee_fsr3_framegen_amd_vk_probe'; then
+          cmake --build build --target wowee_fsr3_framegen_amd_vk_probe --parallel $(sysctl -n hw.logicalcpu)
+        else
+          echo "FSR3 framegen probe target not generated for this SDK layout; continuing."
+        fi
+
+    - name: Build
+      run: cmake --build build --parallel $(sysctl -n hw.logicalcpu)
+
+    - name: Create .app bundle
+      run: |
+        mkdir -p Wowee.app/Contents/{MacOS,Frameworks,Resources}
+
+        # Wrapper launch script — cd to MacOS/ so ./assets/ resolves correctly
+        printf '#!/bin/bash\ncd "$(dirname "$0")"\nexec ./wowee_bin "$@"\n' \
+          > Wowee.app/Contents/MacOS/wowee
+        chmod +x Wowee.app/Contents/MacOS/wowee
+
+        # Actual binary
+        cp build/bin/wowee Wowee.app/Contents/MacOS/wowee_bin
+
+        # Assets (exclude proprietary music)
+        rsync -a --exclude='Original Music' build/bin/assets/ \
+          Wowee.app/Contents/MacOS/assets/
+
+        # Bundle dylibs (if dylibbundler available)
+        if command -v dylibbundler &>/dev/null; then
+          dylibbundler -od -b \
+            -x Wowee.app/Contents/MacOS/wowee_bin \
+            -d Wowee.app/Contents/Frameworks/ \
+            -p @executable_path/../Frameworks/
+        fi
+
+        # dylibbundler may miss Homebrew's Vulkan loader on some runner images.
+        # Copy all vulkan-loader dylib names so wowee_bin can resolve whichever
+        # install_name it was linked against (e.g. libvulkan.1.4.341.dylib).
+        VULKAN_LIB_DIR="$(brew --prefix vulkan-loader)/lib"
+        for lib in "${VULKAN_LIB_DIR}"/libvulkan*.dylib; do
+          [ -e "${lib}" ] || continue
+          cp -f "${lib}" Wowee.app/Contents/Frameworks/
+        done
+
+        if ! ls Wowee.app/Contents/Frameworks/libvulkan*.dylib >/dev/null 2>&1; then
+          echo "Missing Vulkan loader dylib(s) in app bundle Frameworks/" >&2
+          exit 1
+        fi
+
+        # dylibbundler may miss Homebrew's OpenSSL on some runner images.
+        # Copy libssl and libcrypto so wowee_bin can resolve them at runtime.
+        OPENSSL_LIB_DIR="$(brew --prefix openssl@3)/lib"
+        for lib in "${OPENSSL_LIB_DIR}"/libssl*.dylib "${OPENSSL_LIB_DIR}"/libcrypto*.dylib; do
+          [ -e "${lib}" ] || continue
+          cp -f "${lib}" Wowee.app/Contents/Frameworks/
+        done
+
+        if ! ls Wowee.app/Contents/Frameworks/libssl*.dylib >/dev/null 2>&1; then
+          echo "Missing OpenSSL libssl dylib(s) in app bundle Frameworks/" >&2
+          exit 1
+        fi
+
+        # Info.plist
+        cat > Wowee.app/Contents/Info.plist << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+          "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0"><dict>
+          <key>CFBundleExecutable</key><string>wowee</string>
+          <key>CFBundleIdentifier</key><string>com.wowee.app</string>
+          <key>CFBundleName</key><string>Wowee</string>
+          <key>CFBundleVersion</key><string>1.0.0</string>
+          <key>CFBundleShortVersionString</key><string>1.0.0</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+        </dict></plist>
+        EOF
+
+        # Ad-hoc codesign (allows running on the local machine)
+        codesign --force --deep --sign - Wowee.app
+
+    - name: Create DMG
+      run: |
+        set -euo pipefail
+        rm -f Wowee.dmg
+        # CI runners can occasionally leave a mounted volume around; detach if present.
+        if [ -d "/Volumes/Wowee" ]; then
+          hdiutil detach "/Volumes/Wowee" -force || true
+          sleep 2
+        fi
+
+        ok=0
+        for attempt in 1 2 3 4 5; do
+          if hdiutil create -volname Wowee -srcfolder Wowee.app -ov -format UDZO Wowee.dmg; then
+            ok=1
+            break
           fi
-
-      - name: Build
-        run: cmake --build build --parallel $(sysctl -n hw.logicalcpu)
-
-      - name: Create .app bundle
-        run: |
-          mkdir -p Wowee.app/Contents/{MacOS,Frameworks,Resources}
-
-          # Wrapper launch script — cd to MacOS/ so ./assets/ resolves correctly
-          printf '#!/bin/bash\ncd "$(dirname "$0")"\nexec ./wowee_bin "$@"\n' \
-            > Wowee.app/Contents/MacOS/wowee
-          chmod +x Wowee.app/Contents/MacOS/wowee
-
-          # Actual binary
-          cp build/bin/wowee Wowee.app/Contents/MacOS/wowee_bin
-
-          # Assets (exclude proprietary music)
-          rsync -a --exclude='Original Music' build/bin/assets/ \
-            Wowee.app/Contents/MacOS/assets/
-
-          # Bundle dylibs (if dylibbundler available)
-          if command -v dylibbundler &>/dev/null; then
-            dylibbundler -od -b \
-              -x Wowee.app/Contents/MacOS/wowee_bin \
-              -d Wowee.app/Contents/Frameworks/ \
-              -p @executable_path/../Frameworks/
-          fi
-
-          # dylibbundler may miss Homebrew's Vulkan loader on some runner images.
-          # Copy all vulkan-loader dylib names so wowee_bin can resolve whichever
-          # install_name it was linked against (e.g. libvulkan.1.4.341.dylib).
-          VULKAN_LIB_DIR="$(brew --prefix vulkan-loader)/lib"
-          for lib in "${VULKAN_LIB_DIR}"/libvulkan*.dylib; do
-            [ -e "${lib}" ] || continue
-            cp -f "${lib}" Wowee.app/Contents/Frameworks/
-          done
-
-          if ! ls Wowee.app/Contents/Frameworks/libvulkan*.dylib >/dev/null 2>&1; then
-            echo "Missing Vulkan loader dylib(s) in app bundle Frameworks/" >&2
-            exit 1
-          fi
-
-          # Info.plist
-          cat > Wowee.app/Contents/Info.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-            <key>CFBundleExecutable</key><string>wowee</string>
-            <key>CFBundleIdentifier</key><string>com.wowee.app</string>
-            <key>CFBundleName</key><string>Wowee</string>
-            <key>CFBundleVersion</key><string>1.0.0</string>
-            <key>CFBundleShortVersionString</key><string>1.0.0</string>
-            <key>CFBundlePackageType</key><string>APPL</string>
-          </dict></plist>
-          EOF
-
-          # Ad-hoc codesign (allows running on the local machine)
-          codesign --force --deep --sign - Wowee.app
-
-      - name: Create DMG
-        run: |
-          set -euo pipefail
-          rm -f Wowee.dmg
-          # CI runners can occasionally leave a mounted volume around; detach if present.
+          echo "hdiutil create failed on attempt ${attempt}; retrying..."
           if [ -d "/Volumes/Wowee" ]; then
             hdiutil detach "/Volumes/Wowee" -force || true
-            sleep 2
           fi
+          sleep 3
+        done
 
-          ok=0
-          for attempt in 1 2 3 4 5; do
-            if hdiutil create -volname Wowee -srcfolder Wowee.app -ov -format UDZO Wowee.dmg; then
-              ok=1
-              break
-            fi
-            echo "hdiutil create failed on attempt ${attempt}; retrying..."
-            if [ -d "/Volumes/Wowee" ]; then
-              hdiutil detach "/Volumes/Wowee" -force || true
-            fi
-            sleep 3
-          done
+        if [ "$ok" -ne 1 ] || [ ! -f Wowee.dmg ]; then
+          echo "Failed to create Wowee.dmg after retries."
+          exit 1
+        fi
 
-          if [ "$ok" -ne 1 ] || [ ! -f Wowee.dmg ]; then
-            echo "Failed to create Wowee.dmg after retries."
-            exit 1
-          fi
-
-      - name: Upload DMG
-        uses: actions/upload-artifact@v4
-        with:
-          name: wowee-macos-${{ matrix.arch }}-dmg
-          path: Wowee.dmg
-          if-no-files-found: error
+    - name: Upload DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: wowee-macos-${{ matrix.arch }}-dmg
+        path: Wowee.dmg
+        if-no-files-found: error
 
   build-windows-arm:
     name: Build (windows-arm64)
     runs-on: windows-11-arm
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
 
-      - name: Set up MSYS2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: CLANGARM64
-          update: true
-          install: >-
-            mingw-w64-clang-aarch64-cmake
-            mingw-w64-clang-aarch64-clang
-            mingw-w64-clang-aarch64-ninja
-            mingw-w64-clang-aarch64-pkgconf
-            mingw-w64-clang-aarch64-SDL2
-            mingw-w64-clang-aarch64-glew
-            mingw-w64-clang-aarch64-glm
-            mingw-w64-clang-aarch64-openssl
-            mingw-w64-clang-aarch64-zlib
-            mingw-w64-clang-aarch64-ffmpeg
-            mingw-w64-clang-aarch64-unicorn
-            mingw-w64-clang-aarch64-vulkan-loader
-            mingw-w64-clang-aarch64-vulkan-headers
-            mingw-w64-clang-aarch64-shaderc
-            git
+    - name: Set up MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: CLANGARM64
+        update: true
+        install: >-
+          mingw-w64-clang-aarch64-cmake mingw-w64-clang-aarch64-clang mingw-w64-clang-aarch64-ninja mingw-w64-clang-aarch64-pkgconf mingw-w64-clang-aarch64-SDL2 mingw-w64-clang-aarch64-glew mingw-w64-clang-aarch64-glm mingw-w64-clang-aarch64-openssl mingw-w64-clang-aarch64-zlib mingw-w64-clang-aarch64-ffmpeg mingw-w64-clang-aarch64-unicorn mingw-w64-clang-aarch64-vulkan-loader mingw-w64-clang-aarch64-vulkan-headers mingw-w64-clang-aarch64-shaderc git
 
-      - name: Build StormLib from source
-        shell: msys2 {0}
-        run: |
-          git clone --depth 1 https://github.com/ladislav-zezula/StormLib.git /tmp/StormLib
-          # Disable x86 inline asm in bundled libtomcrypt (bswapl/movl) —
-          # __MINGW32__ is defined on CLANGARM64 which incorrectly enables x86 asm
-          cmake -S /tmp/StormLib -B /tmp/StormLib/build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$MINGW_PREFIX" \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_C_FLAGS="-DLTC_NO_BSWAP" \
-            -DCMAKE_CXX_FLAGS="-DLTC_NO_BSWAP"
-          cmake --build /tmp/StormLib/build --parallel $(nproc)
-          cmake --install /tmp/StormLib/build
+    - name: Build StormLib from source
+      shell: msys2 {0}
+      run: |
+        git clone --depth 1 https://github.com/ladislav-zezula/StormLib.git /tmp/StormLib
+        # Disable x86 inline asm in bundled libtomcrypt (bswapl/movl) —
+        # __MINGW32__ is defined on CLANGARM64 which incorrectly enables x86 asm
+        cmake -S /tmp/StormLib -B /tmp/StormLib/build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX="$MINGW_PREFIX" \
+          -DBUILD_SHARED_LIBS=OFF \
+          -DCMAKE_C_FLAGS="-DLTC_NO_BSWAP" \
+          -DCMAKE_CXX_FLAGS="-DLTC_NO_BSWAP"
+        cmake --build /tmp/StormLib/build --parallel $(nproc)
+        cmake --install /tmp/StormLib/build
 
-      - name: Fetch AMD FSR2 SDK
-        shell: msys2 {0}
-        run: |
-          rm -rf extern/FidelityFX-FSR2
-          git clone --depth 1 --branch "${WOWEE_AMD_FSR2_REF}" "${WOWEE_AMD_FSR2_REPO}" extern/FidelityFX-FSR2
-          rm -rf extern/FidelityFX-SDK
-          git clone --depth 1 --branch "${WOWEE_FFX_SDK_REF}" "${WOWEE_FFX_SDK_REPO}" extern/FidelityFX-SDK
+    - name: Fetch AMD FSR2 SDK
+      shell: msys2 {0}
+      run: |
+        rm -rf extern/FidelityFX-FSR2
+        git clone --depth 1 --branch "${WOWEE_AMD_FSR2_REF}" "${WOWEE_AMD_FSR2_REPO}" extern/FidelityFX-FSR2
+        rm -rf extern/FidelityFX-SDK
+        git clone --depth 1 --branch "${WOWEE_FFX_SDK_REF}" "${WOWEE_FFX_SDK_REPO}" extern/FidelityFX-SDK
 
-      - name: Configure
-        shell: msys2 {0}
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DWOWEE_ENABLE_AMD_FSR2=ON
+    - name: Configure
+      shell: msys2 {0}
+      run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DWOWEE_ENABLE_AMD_FSR2=ON
 
-      - name: Assert AMD FSR2 target
-        shell: msys2 {0}
-        run: cmake --build build --target wowee_fsr2_amd_vk --parallel $(nproc)
+    - name: Assert AMD FSR2 target
+      shell: msys2 {0}
+      run: cmake --build build --target wowee_fsr2_amd_vk --parallel $(nproc)
 
-      - name: Assert AMD FSR3 framegen probe target (if present)
-        shell: msys2 {0}
-        run: |
-          if cmake --build build --target help | grep -q 'wowee_fsr3_framegen_amd_vk_probe'; then
-            cmake --build build --target wowee_fsr3_framegen_amd_vk_probe --parallel $(nproc)
-          else
-            echo "FSR3 framegen probe target not generated for this SDK layout; continuing."
-          fi
+    - name: Assert AMD FSR3 framegen probe target (if present)
+      shell: msys2 {0}
+      run: |
+        if cmake --build build --target help | grep -q 'wowee_fsr3_framegen_amd_vk_probe'; then
+          cmake --build build --target wowee_fsr3_framegen_amd_vk_probe --parallel $(nproc)
+        else
+          echo "FSR3 framegen probe target not generated for this SDK layout; continuing."
+        fi
 
-      - name: Build
-        shell: msys2 {0}
-        run: cmake --build build --parallel $(nproc)
+    - name: Build
+      shell: msys2 {0}
+      run: cmake --build build --parallel $(nproc)
 
-      - name: Bundle DLLs
-        shell: msys2 {0}
-        run: |
-          ldd build/bin/wowee.exe \
-            | awk '/=> \// { print $3 }' \
-            | grep -iv '^/c/Windows' \
-            | xargs -I{} sh -c 'cp -n "{}" build/bin/ 2>/dev/null || true'
+    - name: Bundle DLLs
+      shell: msys2 {0}
+      run: |
+        ldd build/bin/wowee.exe \
+          | awk '/=> \// { print $3 }' \
+          | grep -iv '^/c/Windows' \
+          | xargs -I{} sh -c 'cp -n "{}" build/bin/ 2>/dev/null || true'
 
-      - name: Package (ZIP)
-        shell: msys2 {0}
-        run: cd build && cpack -G ZIP
+    - name: Package (ZIP)
+      shell: msys2 {0}
+      run: cd build && cpack -G ZIP
 
-      - name: Upload ZIP
-        uses: actions/upload-artifact@v4
-        with:
-          name: wowee-windows-arm64-zip
-          path: build/wowee-*.zip
-          if-no-files-found: error
+    - name: Upload ZIP
+      uses: actions/upload-artifact@v4
+      with:
+        name: wowee-windows-arm64-zip
+        path: build/wowee-*.zip
+        if-no-files-found: error
 
   build-windows:
     name: Build (windows-x86-64)
     runs-on: windows-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
 
-      - name: Set up MSYS2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: false
-          install: >-
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-ninja
-            mingw-w64-x86_64-pkgconf
-            mingw-w64-x86_64-SDL2
-            mingw-w64-x86_64-glew
-            mingw-w64-x86_64-glm
-            mingw-w64-x86_64-openssl
-            mingw-w64-x86_64-zlib
-            mingw-w64-x86_64-ffmpeg
-            mingw-w64-x86_64-unicorn
-            mingw-w64-x86_64-vulkan-loader
-            mingw-w64-x86_64-vulkan-headers
-            mingw-w64-x86_64-shaderc
-            mingw-w64-x86_64-nsis
-            git
+    - name: Set up MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: false
+        install: >-
+          mingw-w64-x86_64-cmake mingw-w64-x86_64-gcc mingw-w64-x86_64-ninja mingw-w64-x86_64-pkgconf mingw-w64-x86_64-SDL2 mingw-w64-x86_64-glew mingw-w64-x86_64-glm mingw-w64-x86_64-openssl mingw-w64-x86_64-zlib mingw-w64-x86_64-ffmpeg mingw-w64-x86_64-unicorn mingw-w64-x86_64-vulkan-loader mingw-w64-x86_64-vulkan-headers mingw-w64-x86_64-shaderc mingw-w64-x86_64-nsis git
 
-      - name: Build StormLib from source
-        shell: msys2 {0}
-        run: |
-          git clone --depth 1 https://github.com/ladislav-zezula/StormLib.git /tmp/StormLib
-          cmake -S /tmp/StormLib -B /tmp/StormLib/build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$MINGW_PREFIX" \
-            -DBUILD_SHARED_LIBS=OFF
-          cmake --build /tmp/StormLib/build --parallel $(nproc)
-          cmake --install /tmp/StormLib/build
+    - name: Build StormLib from source
+      shell: msys2 {0}
+      run: |
+        git clone --depth 1 https://github.com/ladislav-zezula/StormLib.git /tmp/StormLib
+        cmake -S /tmp/StormLib -B /tmp/StormLib/build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX="$MINGW_PREFIX" \
+          -DBUILD_SHARED_LIBS=OFF
+        cmake --build /tmp/StormLib/build --parallel $(nproc)
+        cmake --install /tmp/StormLib/build
 
-      - name: Fetch AMD FSR2 SDK
-        shell: msys2 {0}
-        run: |
-          rm -rf extern/FidelityFX-FSR2
-          git clone --depth 1 --branch "${WOWEE_AMD_FSR2_REF}" "${WOWEE_AMD_FSR2_REPO}" extern/FidelityFX-FSR2
-          rm -rf extern/FidelityFX-SDK
-          git clone --depth 1 --branch "${WOWEE_FFX_SDK_REF}" "${WOWEE_FFX_SDK_REPO}" extern/FidelityFX-SDK
+    - name: Fetch AMD FSR2 SDK
+      shell: msys2 {0}
+      run: |
+        rm -rf extern/FidelityFX-FSR2
+        git clone --depth 1 --branch "${WOWEE_AMD_FSR2_REF}" "${WOWEE_AMD_FSR2_REPO}" extern/FidelityFX-FSR2
+        rm -rf extern/FidelityFX-SDK
+        git clone --depth 1 --branch "${WOWEE_FFX_SDK_REF}" "${WOWEE_FFX_SDK_REPO}" extern/FidelityFX-SDK
 
-      - name: Configure
-        shell: msys2 {0}
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DWOWEE_ENABLE_AMD_FSR2=ON
+    - name: Configure
+      shell: msys2 {0}
+      run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DWOWEE_ENABLE_AMD_FSR2=ON
 
-      - name: Assert AMD FSR2 target
-        shell: msys2 {0}
-        run: cmake --build build --target wowee_fsr2_amd_vk --parallel $(nproc)
+    - name: Assert AMD FSR2 target
+      shell: msys2 {0}
+      run: cmake --build build --target wowee_fsr2_amd_vk --parallel $(nproc)
 
-      - name: Assert AMD FSR3 framegen probe target (if present)
-        shell: msys2 {0}
-        run: |
-          if cmake --build build --target help | grep -q 'wowee_fsr3_framegen_amd_vk_probe'; then
-            cmake --build build --target wowee_fsr3_framegen_amd_vk_probe --parallel $(nproc)
-          else
-            echo "FSR3 framegen probe target not generated for this SDK layout; continuing."
-          fi
+    - name: Assert AMD FSR3 framegen probe target (if present)
+      shell: msys2 {0}
+      run: |
+        if cmake --build build --target help | grep -q 'wowee_fsr3_framegen_amd_vk_probe'; then
+          cmake --build build --target wowee_fsr3_framegen_amd_vk_probe --parallel $(nproc)
+        else
+          echo "FSR3 framegen probe target not generated for this SDK layout; continuing."
+        fi
 
-      - name: Build
-        shell: msys2 {0}
-        run: cmake --build build --parallel $(nproc)
+    - name: Build
+      shell: msys2 {0}
+      run: cmake --build build --parallel $(nproc)
 
-      - name: Bundle DLLs
-        shell: msys2 {0}
-        run: |
-          ldd build/bin/wowee.exe \
-            | awk '/=> \// { print $3 }' \
-            | grep -iv '^/c/Windows' \
-            | xargs -I{} sh -c 'cp -n "{}" build/bin/ 2>/dev/null || true'
+    - name: Bundle DLLs
+      shell: msys2 {0}
+      run: |
+        ldd build/bin/wowee.exe \
+          | awk '/=> \// { print $3 }' \
+          | grep -iv '^/c/Windows' \
+          | xargs -I{} sh -c 'cp -n "{}" build/bin/ 2>/dev/null || true'
 
-      - name: Package (NSIS)
-        shell: msys2 {0}
-        run: cd build && cpack -G NSIS
+    - name: Package (NSIS)
+      shell: msys2 {0}
+      run: cd build && cpack -G NSIS
 
-      - name: Upload installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: wowee-windows-x86-64-installer
-          path: build/wowee-*.exe
-          if-no-files-found: error
+    - name: Upload installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: wowee-windows-x86-64-installer
+        path: build/wowee-*.exe
+        if-no-files-found: error

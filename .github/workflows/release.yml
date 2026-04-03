@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: [ 'v*' ]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -18,215 +18,228 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - arch: x86-64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
+        - arch: x86-64
+          runner: ubuntu-24.04
+        - arch: arm64
+          runner: ubuntu-24.04-arm
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
 
-      - name: Cache apt packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-${{ matrix.arch }}-${{ hashFiles('.github/workflows/release.yml') }}
-          restore-keys: apt-${{ matrix.arch }}-
+    - name: Cache apt packages
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt/archives/*.deb
+        key: apt-${{ matrix.arch }}-${{ hashFiles('.github/workflows/release.yml') }}
+        restore-keys: apt-${{ matrix.arch }}-
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            cmake \
-            build-essential \
-            pkg-config \
-            libsdl2-dev \
-            libglew-dev \
-            libglm-dev \
-            libssl-dev \
-            zlib1g-dev \
-            libvulkan-dev \
-            vulkan-tools \
-            glslc \
-            libavformat-dev \
-            libavcodec-dev \
-            libswscale-dev \
-            libavutil-dev \
-            libunicorn-dev \
-            libx11-dev
-          sudo apt-get install -y libstorm-dev || true
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          cmake \
+          build-essential \
+          pkg-config \
+          libsdl2-dev \
+          libglew-dev \
+          libglm-dev \
+          libssl-dev \
+          zlib1g-dev \
+          libvulkan-dev \
+          vulkan-tools \
+          glslc \
+          libavformat-dev \
+          libavcodec-dev \
+          libswscale-dev \
+          libavutil-dev \
+          libunicorn-dev \
+          libx11-dev
+        sudo apt-get install -y libstorm-dev || true
 
-      - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    - name: Configure
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
-      - name: Verify Release Config
-        run: |
-          cmake -LA -N build | grep -E '^CMAKE_BUILD_TYPE:STRING=Release$'
+    - name: Verify Release Config
+      run: |
+        cmake -LA -N build | grep -E '^CMAKE_BUILD_TYPE:STRING=Release$'
 
-      - name: Build
-        run: cmake --build build --parallel $(nproc)
+    - name: Build
+      run: cmake --build build --parallel $(nproc)
 
-      - name: Package
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          STAGING="wowee-${TAG}-linux-${{ matrix.arch }}"
-          mkdir -p "${STAGING}"
+    - name: Package
+      run: |
+        TAG="${GITHUB_REF_NAME}"
+        STAGING="wowee-${TAG}-linux-${{ matrix.arch }}"
+        mkdir -p "${STAGING}"
 
-          # Binary
-          cp build/bin/wowee "${STAGING}/"
+        # Binary
+        cp build/bin/wowee "${STAGING}/"
 
-          # Asset extraction tool (if built — requires StormLib)
-          if [ -f build/bin/asset_extract ]; then
-            cp build/bin/asset_extract "${STAGING}/"
-          fi
+        # Asset extraction tool (if built — requires StormLib)
+        if [ -f build/bin/asset_extract ]; then
+          cp build/bin/asset_extract "${STAGING}/"
+        fi
 
-          # Extraction scripts and GUI
-          cp extract_assets.sh "${STAGING}/"
-          cp tools/asset_pipeline_gui.py "${STAGING}/"
+        # Extraction scripts and GUI
+        cp extract_assets.sh "${STAGING}/"
+        cp tools/asset_pipeline_gui.py "${STAGING}/"
 
-          # Assets (exclude proprietary music)
-          rsync -a --exclude='Original Music' build/bin/assets/ "${STAGING}/assets/"
+        # Assets (exclude proprietary music)
+        rsync -a --exclude='Original Music' build/bin/assets/ "${STAGING}/assets/"
 
-          # Data directory (git-tracked files only)
-          git ls-files Data/ | while read -r f; do
-            mkdir -p "${STAGING}/$(dirname "$f")"
-            cp "$f" "${STAGING}/$f"
-          done
+        # Data directory (git-tracked files only)
+        git ls-files Data/ | while read -r f; do
+          mkdir -p "${STAGING}/$(dirname "$f")"
+          cp "$f" "${STAGING}/$f"
+        done
 
-          tar czf "${STAGING}.tar.gz" "${STAGING}"
+        tar czf "${STAGING}.tar.gz" "${STAGING}"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wowee-linux-${{ matrix.arch }}
-          path: wowee-*.tar.gz
-          if-no-files-found: error
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wowee-linux-${{ matrix.arch }}
+        path: wowee-*.tar.gz
+        if-no-files-found: error
 
   build-macos:
     name: Build (macOS arm64)
     runs-on: macos-15
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
 
-      - name: Install dependencies
-        run: |
-          brew install cmake pkg-config sdl2 glew glm openssl@3 zlib ffmpeg unicorn \
-            stormlib vulkan-loader vulkan-headers shaderc dylibbundler || true
-          brew install dylibbundler 2>/dev/null || true
+    - name: Install dependencies
+      run: |
+        brew install cmake pkg-config sdl2 glew glm openssl@3 zlib ffmpeg unicorn \
+          stormlib vulkan-loader vulkan-headers shaderc dylibbundler || true
+        brew install dylibbundler 2>/dev/null || true
 
-      - name: Configure
-        run: |
-          BREW=$(brew --prefix)
-          export PKG_CONFIG_PATH="$BREW/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig:$(brew --prefix vulkan-loader)/lib/pkgconfig:$(brew --prefix shaderc)/lib/pkgconfig"
-          cmake -S . -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$BREW" \
-            -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
+    - name: Configure
+      run: |
+        BREW=$(brew --prefix)
+        export PKG_CONFIG_PATH="$BREW/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig:$(brew --prefix vulkan-loader)/lib/pkgconfig:$(brew --prefix shaderc)/lib/pkgconfig"
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_PREFIX_PATH="$BREW" \
+          -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
 
-      - name: Verify Release Config
-        run: |
-          cmake -LA -N build | grep -E '^CMAKE_BUILD_TYPE:STRING=Release$'
+    - name: Verify Release Config
+      run: |
+        cmake -LA -N build | grep -E '^CMAKE_BUILD_TYPE:STRING=Release$'
 
-      - name: Build
-        run: cmake --build build --parallel $(sysctl -n hw.logicalcpu)
+    - name: Build
+      run: cmake --build build --parallel $(sysctl -n hw.logicalcpu)
 
-      - name: Create .app bundle
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          mkdir -p Wowee.app/Contents/{MacOS,Frameworks,Resources}
+    - name: Create .app bundle
+      run: |
+        TAG="${GITHUB_REF_NAME}"
+        mkdir -p Wowee.app/Contents/{MacOS,Frameworks,Resources}
 
-          # Wrapper launch script
-          printf '#!/bin/bash\ncd "$(dirname "$0")"\nexec ./wowee_bin "$@"\n' \
-            > Wowee.app/Contents/MacOS/wowee
-          chmod +x Wowee.app/Contents/MacOS/wowee
+        # Wrapper launch script
+        printf '#!/bin/bash\ncd "$(dirname "$0")"\nexec ./wowee_bin "$@"\n' \
+          > Wowee.app/Contents/MacOS/wowee
+        chmod +x Wowee.app/Contents/MacOS/wowee
 
-          # Actual binary
-          cp build/bin/wowee Wowee.app/Contents/MacOS/wowee_bin
+        # Actual binary
+        cp build/bin/wowee Wowee.app/Contents/MacOS/wowee_bin
 
-          # Asset extraction tool (if built — requires StormLib)
-          if [ -f build/bin/asset_extract ]; then
-            cp build/bin/asset_extract Wowee.app/Contents/MacOS/
-          fi
+        # Asset extraction tool (if built — requires StormLib)
+        if [ -f build/bin/asset_extract ]; then
+          cp build/bin/asset_extract Wowee.app/Contents/MacOS/
+        fi
 
-          # Extraction scripts and GUI
-          cp extract_assets.sh Wowee.app/Contents/MacOS/
-          cp tools/asset_pipeline_gui.py Wowee.app/Contents/MacOS/
+        # Extraction scripts and GUI
+        cp extract_assets.sh Wowee.app/Contents/MacOS/
+        cp tools/asset_pipeline_gui.py Wowee.app/Contents/MacOS/
 
-          # Assets (exclude proprietary music)
-          rsync -a --exclude='Original Music' build/bin/assets/ \
-            Wowee.app/Contents/MacOS/assets/
+        # Assets (exclude proprietary music)
+        rsync -a --exclude='Original Music' build/bin/assets/ \
+          Wowee.app/Contents/MacOS/assets/
 
-          # Data directory (git-tracked files only)
-          git ls-files Data/ | while read -r f; do
-            mkdir -p "Wowee.app/Contents/MacOS/$(dirname "$f")"
-            cp "$f" "Wowee.app/Contents/MacOS/$f"
-          done
+        # Data directory (git-tracked files only)
+        git ls-files Data/ | while read -r f; do
+          mkdir -p "Wowee.app/Contents/MacOS/$(dirname "$f")"
+          cp "$f" "Wowee.app/Contents/MacOS/$f"
+        done
 
-          # Bundle dylibs
-          if command -v dylibbundler &>/dev/null; then
+        # Bundle dylibs
+        if command -v dylibbundler &>/dev/null; then
+          dylibbundler -od -b \
+            -x Wowee.app/Contents/MacOS/wowee_bin \
+            -d Wowee.app/Contents/Frameworks/ \
+            -p @executable_path/../Frameworks/
+          if [ -f Wowee.app/Contents/MacOS/asset_extract ]; then
             dylibbundler -od -b \
-              -x Wowee.app/Contents/MacOS/wowee_bin \
+              -x Wowee.app/Contents/MacOS/asset_extract \
               -d Wowee.app/Contents/Frameworks/ \
               -p @executable_path/../Frameworks/
-            if [ -f Wowee.app/Contents/MacOS/asset_extract ]; then
-              dylibbundler -od -b \
-                -x Wowee.app/Contents/MacOS/asset_extract \
-                -d Wowee.app/Contents/Frameworks/ \
-                -p @executable_path/../Frameworks/
-            fi
           fi
+        fi
 
-          # dylibbundler may miss Homebrew's Vulkan loader on some runner images.
-          # Copy all vulkan-loader dylib names so wowee_bin can resolve whichever
-          # install_name it was linked against (e.g. libvulkan.1.4.341.dylib).
-          VULKAN_LIB_DIR="$(brew --prefix vulkan-loader)/lib"
-          for lib in "${VULKAN_LIB_DIR}"/libvulkan*.dylib; do
-            [ -e "${lib}" ] || continue
-            cp -f "${lib}" Wowee.app/Contents/Frameworks/
-          done
+        # dylibbundler may miss Homebrew's Vulkan loader on some runner images.
+        # Copy all vulkan-loader dylib names so wowee_bin can resolve whichever
+        # install_name it was linked against (e.g. libvulkan.1.4.341.dylib).
+        VULKAN_LIB_DIR="$(brew --prefix vulkan-loader)/lib"
+        for lib in "${VULKAN_LIB_DIR}"/libvulkan*.dylib; do
+          [ -e "${lib}" ] || continue
+          cp -f "${lib}" Wowee.app/Contents/Frameworks/
+        done
 
-          if ! ls Wowee.app/Contents/Frameworks/libvulkan*.dylib >/dev/null 2>&1; then
-            echo "Missing Vulkan loader dylib(s) in app bundle Frameworks/" >&2
-            exit 1
-          fi
+        if ! ls Wowee.app/Contents/Frameworks/libvulkan*.dylib >/dev/null 2>&1; then
+          echo "Missing Vulkan loader dylib(s) in app bundle Frameworks/" >&2
+          exit 1
+        fi
 
-          # Info.plist
-          cat > Wowee.app/Contents/Info.plist << EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-            <key>CFBundleExecutable</key><string>wowee</string>
-            <key>CFBundleIdentifier</key><string>com.wowee.app</string>
-            <key>CFBundleName</key><string>Wowee</string>
-            <key>CFBundleVersion</key><string>${TAG}</string>
-            <key>CFBundleShortVersionString</key><string>${TAG}</string>
-            <key>CFBundlePackageType</key><string>APPL</string>
-          </dict></plist>
-          EOF
+        # dylibbundler may miss Homebrew's OpenSSL on some runner images.
+        # Copy libssl and libcrypto so wowee_bin can resolve them at runtime.
+        OPENSSL_LIB_DIR="$(brew --prefix openssl@3)/lib"
+        for lib in "${OPENSSL_LIB_DIR}"/libssl*.dylib "${OPENSSL_LIB_DIR}"/libcrypto*.dylib; do
+          [ -e "${lib}" ] || continue
+          cp -f "${lib}" Wowee.app/Contents/Frameworks/
+        done
 
-          # Ad-hoc codesign
-          codesign --force --deep --sign - Wowee.app
+        if ! ls Wowee.app/Contents/Frameworks/libssl*.dylib >/dev/null 2>&1; then
+          echo "Missing OpenSSL libssl dylib(s) in app bundle Frameworks/" >&2
+          exit 1
+        fi
 
-      - name: Create DMG
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          hdiutil create -volname Wowee -srcfolder Wowee.app -ov -format UDZO \
-            "wowee-${TAG}-macos-arm64.dmg"
+        # Info.plist
+        cat > Wowee.app/Contents/Info.plist << EOF
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+          "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0"><dict>
+          <key>CFBundleExecutable</key><string>wowee</string>
+          <key>CFBundleIdentifier</key><string>com.wowee.app</string>
+          <key>CFBundleName</key><string>Wowee</string>
+          <key>CFBundleVersion</key><string>${TAG}</string>
+          <key>CFBundleShortVersionString</key><string>${TAG}</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+        </dict></plist>
+        EOF
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wowee-macos-arm64
-          path: wowee-*.dmg
-          if-no-files-found: error
+        # Ad-hoc codesign
+        codesign --force --deep --sign - Wowee.app
+
+    - name: Create DMG
+      run: |
+        TAG="${GITHUB_REF_NAME}"
+        hdiutil create -volname Wowee -srcfolder Wowee.app -ov -format UDZO \
+          "wowee-${TAG}-macos-arm64.dmg"
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wowee-macos-arm64
+        path: wowee-*.dmg
+        if-no-files-found: error
 
   build-windows:
     name: Build (windows-${{ matrix.arch }})
@@ -235,159 +248,145 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - arch: x86-64
-            runner: windows-latest
-            msystem: MINGW64
-            prefix: mingw-w64-x86_64
-          - arch: arm64
-            runner: windows-11-arm
-            msystem: CLANGARM64
-            prefix: mingw-w64-clang-aarch64
+        - arch: x86-64
+          runner: windows-latest
+          msystem: MINGW64
+          prefix: mingw-w64-x86_64
+        - arch: arm64
+          runner: windows-11-arm
+          msystem: CLANGARM64
+          prefix: mingw-w64-clang-aarch64
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
 
-      - name: Set up MSYS2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: ${{ matrix.msystem }}
-          update: ${{ matrix.arch == 'arm64' }}
-          install: >-
-            ${{ matrix.prefix }}-cmake
-            ${{ matrix.arch == 'x86-64' && format('{0}-gcc', matrix.prefix) || format('{0}-clang', matrix.prefix) }}
-            ${{ matrix.prefix }}-ninja
-            ${{ matrix.prefix }}-pkgconf
-            ${{ matrix.prefix }}-SDL2
-            ${{ matrix.prefix }}-glew
-            ${{ matrix.prefix }}-glm
-            ${{ matrix.prefix }}-openssl
-            ${{ matrix.prefix }}-zlib
-            ${{ matrix.prefix }}-ffmpeg
-            ${{ matrix.prefix }}-unicorn
-            ${{ matrix.prefix }}-vulkan-loader
-            ${{ matrix.prefix }}-vulkan-headers
-            ${{ matrix.prefix }}-shaderc
-            git
+    - name: Set up MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: ${{ matrix.msystem }}
+        update: ${{ matrix.arch == 'arm64' }}
+        install: >-
+          ${{ matrix.prefix }}-cmake ${{ matrix.arch == 'x86-64' && format('{0}-gcc', matrix.prefix) || format('{0}-clang', matrix.prefix) }} ${{ matrix.prefix }}-ninja ${{ matrix.prefix }}-pkgconf ${{ matrix.prefix }}-SDL2 ${{ matrix.prefix }}-glew ${{ matrix.prefix }}-glm ${{ matrix.prefix }}-openssl ${{ matrix.prefix }}-zlib ${{ matrix.prefix }}-ffmpeg ${{ matrix.prefix }}-unicorn ${{ matrix.prefix }}-vulkan-loader ${{ matrix.prefix }}-vulkan-headers ${{ matrix.prefix }}-shaderc git
 
-      - name: Install optional packages
-        shell: msys2 {0}
-        run: |
-          pacman -S --noconfirm --needed zip
+    - name: Install optional packages
+      shell: msys2 {0}
+      run: |
+        pacman -S --noconfirm --needed zip
 
-      - name: Build StormLib from source
-        shell: msys2 {0}
-        run: |
-          git clone --depth 1 https://github.com/ladislav-zezula/StormLib.git /tmp/StormLib
-          # Disable x86 inline asm in bundled libtomcrypt (bswapl/movl) —
-          # __MINGW32__ is defined on CLANGARM64 which incorrectly enables x86 asm
-          cmake -S /tmp/StormLib -B /tmp/StormLib/build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$MINGW_PREFIX" \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_C_FLAGS="-DLTC_NO_BSWAP" \
-            -DCMAKE_CXX_FLAGS="-DLTC_NO_BSWAP"
-          cmake --build /tmp/StormLib/build --parallel $(nproc)
-          cmake --install /tmp/StormLib/build
+    - name: Build StormLib from source
+      shell: msys2 {0}
+      run: |
+        git clone --depth 1 https://github.com/ladislav-zezula/StormLib.git /tmp/StormLib
+        # Disable x86 inline asm in bundled libtomcrypt (bswapl/movl) —
+        # __MINGW32__ is defined on CLANGARM64 which incorrectly enables x86 asm
+        cmake -S /tmp/StormLib -B /tmp/StormLib/build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX="$MINGW_PREFIX" \
+          -DBUILD_SHARED_LIBS=OFF \
+          -DCMAKE_C_FLAGS="-DLTC_NO_BSWAP" \
+          -DCMAKE_CXX_FLAGS="-DLTC_NO_BSWAP"
+        cmake --build /tmp/StormLib/build --parallel $(nproc)
+        cmake --install /tmp/StormLib/build
 
-      - name: Configure
-        shell: msys2 {0}
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+    - name: Configure
+      shell: msys2 {0}
+      run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
-      - name: Verify Release Config
-        shell: msys2 {0}
-        run: |
-          cmake -LA -N build | grep -E '^CMAKE_BUILD_TYPE:STRING=Release$'
+    - name: Verify Release Config
+      shell: msys2 {0}
+      run: |
+        cmake -LA -N build | grep -E '^CMAKE_BUILD_TYPE:STRING=Release$'
 
-      - name: Build
-        shell: msys2 {0}
-        run: cmake --build build --parallel $(nproc)
+    - name: Build
+      shell: msys2 {0}
+      run: cmake --build build --parallel $(nproc)
 
-      - name: Bundle DLLs
-        shell: msys2 {0}
-        run: |
-          for exe in build/bin/wowee.exe build/bin/asset_extract.exe; do
-            [ -f "$exe" ] || continue
-            ldd "$exe" \
-              | awk '/=> \// { print $3 }' \
-              | grep -iv '^/c/Windows' \
-              | xargs -I{} sh -c 'cp -n "{}" build/bin/ 2>/dev/null || true'
-          done
+    - name: Bundle DLLs
+      shell: msys2 {0}
+      run: |
+        for exe in build/bin/wowee.exe build/bin/asset_extract.exe; do
+          [ -f "$exe" ] || continue
+          ldd "$exe" \
+            | awk '/=> \// { print $3 }' \
+            | grep -iv '^/c/Windows' \
+            | xargs -I{} sh -c 'cp -n "{}" build/bin/ 2>/dev/null || true'
+        done
 
-      - name: Package
-        shell: msys2 {0}
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          STAGING="wowee-${TAG}-windows-${{ matrix.arch }}"
-          mkdir -p "${STAGING}"
+    - name: Package
+      shell: msys2 {0}
+      run: |
+        TAG="${GITHUB_REF_NAME}"
+        STAGING="wowee-${TAG}-windows-${{ matrix.arch }}"
+        mkdir -p "${STAGING}"
 
-          # Binary and DLLs
-          cp build/bin/wowee.exe "${STAGING}/"
-          cp build/bin/*.dll "${STAGING}/" 2>/dev/null || true
+        # Binary and DLLs
+        cp build/bin/wowee.exe "${STAGING}/"
+        cp build/bin/*.dll "${STAGING}/" 2>/dev/null || true
 
-          # Asset extraction tool (if built — requires StormLib)
-          if [ -f build/bin/asset_extract.exe ]; then
-            cp build/bin/asset_extract.exe "${STAGING}/"
-          fi
+        # Asset extraction tool (if built — requires StormLib)
+        if [ -f build/bin/asset_extract.exe ]; then
+          cp build/bin/asset_extract.exe "${STAGING}/"
+        fi
 
-          # Extraction scripts and GUI
-          cp extract_assets.ps1 "${STAGING}/"
-          cp extract_assets.bat "${STAGING}/"
-          cp tools/asset_pipeline_gui.py "${STAGING}/"
+        # Extraction scripts and GUI
+        cp extract_assets.ps1 "${STAGING}/"
+        cp extract_assets.bat "${STAGING}/"
+        cp tools/asset_pipeline_gui.py "${STAGING}/"
 
-          # Assets (exclude proprietary music)
-          mkdir -p "${STAGING}/assets"
-          for d in build/bin/assets/*/; do
-            dirname="$(basename "$d")"
-            [ "$dirname" = "Original Music" ] && continue
-            cp -r "$d" "${STAGING}/assets/"
-          done
-          # Copy top-level asset files
-          cp build/bin/assets/* "${STAGING}/assets/" 2>/dev/null || true
+        # Assets (exclude proprietary music)
+        mkdir -p "${STAGING}/assets"
+        for d in build/bin/assets/*/; do
+          dirname="$(basename "$d")"
+          [ "$dirname" = "Original Music" ] && continue
+          cp -r "$d" "${STAGING}/assets/"
+        done
+        # Copy top-level asset files
+        cp build/bin/assets/* "${STAGING}/assets/" 2>/dev/null || true
 
-          # Data directory (git-tracked files only)
-          git ls-files Data/ | while read -r f; do
-            mkdir -p "${STAGING}/$(dirname "$f")"
-            cp "$f" "${STAGING}/$f"
-          done
+        # Data directory (git-tracked files only)
+        git ls-files Data/ | while read -r f; do
+          mkdir -p "${STAGING}/$(dirname "$f")"
+          cp "$f" "${STAGING}/$f"
+        done
 
-          # Create ZIP
-          zip -r "${STAGING}.zip" "${STAGING}"
+        # Create ZIP
+        zip -r "${STAGING}.zip" "${STAGING}"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wowee-windows-${{ matrix.arch }}
-          path: wowee-*.zip
-          if-no-files-found: error
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wowee-windows-${{ matrix.arch }}
+        path: wowee-*.zip
+        if-no-files-found: error
 
   release:
     name: Create Release
-    needs: [build-linux, build-macos, build-windows]
+    needs: [ build-linux, build-macos, build-windows ]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
 
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          TAG="${GITHUB_REF_NAME}"
+    - name: Create GitHub Release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+      run: |
+        TAG="${GITHUB_REF_NAME}"
 
-          # Collect all release files
-          FILES=()
-          for f in artifacts/*/*; do
-            FILES+=("$f")
-          done
+        # Collect all release files
+        FILES=()
+        for f in artifacts/*/*; do
+          FILES+=("$f")
+        done
 
-          gh release create "${TAG}" \
-            --title "Wowee ${TAG}" \
-            --generate-notes \
-            "${FILES[@]}"
+        gh release create "${TAG}" \
+          --title "Wowee ${TAG}" \
+          --generate-notes \
+          "${FILES[@]}"
