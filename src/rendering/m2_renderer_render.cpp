@@ -710,6 +710,19 @@ void M2Renderer::dispatchCullCompute(VkCommandBuffer cmd, uint32_t frameIndex, c
         prevVP_ = vp;
     }
 
+    // Rotate this slot's ID log: the dispatch recorded below replaces the one
+    // whose results render() is about to consume, so the IDs it was built from
+    // become the readable set.  Done before the upload loop overwrites them, and
+    // after the early-out above, so "readable" always describes the last dispatch
+    // actually recorded on this slot.
+    if (frameIndex < 2) {
+        cullReadableIds_[frameIndex].swap(cullSubmittedIds_[frameIndex]);
+        cullSubmittedIds_[frameIndex].clear();
+        cullSubmittedIds_[frameIndex].reserve(numInstances);
+        for (uint32_t i = 0; i < numInstances; i++)
+            cullSubmittedIds_[frameIndex].push_back(instances[i].id);
+    }
+
     // --- Upload per-instance cull data (SSBO, binding 1) ---
     // The per-instance radius math used to be recomputed here every frame; it's
     // now precomputed once by recomputeCachedCullFactors() since it depends only
@@ -734,7 +747,9 @@ void M2Renderer::dispatchCullCompute(VkCommandBuffer cmd, uint32_t frameIndex, c
             // that were NOT rendered last frame (no reliable depth data).
             // Hysteresis: treat as "previously visible" unless culled for
             // 2+ consecutive frames, preventing single-frame false-cull flicker.
-            if (i < prevFrameVisible_.size() && prevFrameVisible_[i] < 2)
+            // The counter lives on the instance, so streaming churn can never
+            // pair it with a different object's history.
+            if (inst.hizPrevCulledFrames < 2)
                 flags |= 8u;
 
             input[i].sphere = glm::vec4(inst.cachedCullCenter, inst.cachedPaddedRadius);
@@ -823,27 +838,51 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
     const uint32_t* visibility = static_cast<const uint32_t*>(cullOutputMapped_[frameIndex]);
     const bool gpuCullAvailable = (cullPipeline_ != VK_NULL_HANDLE && visibility != nullptr);
 
-    // Snapshot the GPU visibility results into prevFrameVisible_ so the NEXT
-    // frame's compute dispatch can set the per-instance `previouslyVisible`
-    // flag (bit 3).  We use a hysteresis counter instead of a binary flag to
-    // prevent a 1-frame-on / 1-frame-off oscillation: an object must be HiZ-
-    // culled for 2 consecutive frames before we stop considering it
-    // "previously visible".  This eliminates doodad flicker near characters
-    // caused by stale depth data from character movement.
+    // Scatter the GPU visibility results back onto the instances they were
+    // computed for.  The results belong to the dispatch recorded on this slot
+    // ~2 frames ago, so they are keyed by that dispatch's instance IDs, never by
+    // the current array index: createInstance() appends and removeInstance()
+    // swap-removes, so a respawned game object lands at the volatile tail of the
+    // array and would otherwise inherit the verdict of whatever transient object
+    // (spell visual, streamed doodad, creature) held that index two frames back
+    // — leaving it culled for as long as the churn continued.
+    //
+    // Instances with no entry in the readable set were created after that
+    // dispatch and keep their defaults: visible, and exempt from the HiZ test.
+    //
+    // hizPrevCulledFrames is a hysteresis counter rather than a binary flag: an
+    // object must be culled for 2 consecutive frames before it stops counting as
+    // "previously visible", which prevents the 1-frame-on / 1-frame-off
+    // oscillation that showed up as doodad flicker near moving characters.
     if (gpuCullAvailable) {
-        prevFrameVisible_.resize(numInstances, 0);
-        for (uint32_t i = 0; i < numInstances; ++i) {
-            if (visibility[i]) {
-                // Visible this frame — reset cull counter.
-                prevFrameVisible_[i] = 0;
+        const auto& ids = cullReadableIds_[frameIndex < 2 ? frameIndex : 0];
+        for (size_t k = 0; k < ids.size(); ++k) {
+            // Fast path: with no churn since that dispatch the ordering still
+            // matches, so skip the hash lookup.
+            M2Instance* inst = nullptr;
+            if (k < instances.size() && instances[k].id == ids[k]) {
+                inst = &instances[k];
             } else {
-                // Culled this frame — increment counter (cap at 3 to avoid overflow).
-                prevFrameVisible_[i] = std::min<uint8_t>(prevFrameVisible_[i] + 1, 3);
+                auto idxIt = instanceIndexById.find(ids[k]);
+                if (idxIt == instanceIndexById.end() || idxIt->second >= instances.size())
+                    continue;  // instance was removed since the dispatch
+                inst = &instances[idxIt->second];
+            }
+            if (visibility[k]) {
+                inst->lastCullVisible = 1;
+                inst->hizPrevCulledFrames = 0;
+            } else {
+                inst->lastCullVisible = 0;
+                inst->hizPrevCulledFrames =
+                    std::min<uint8_t>(inst->hizPrevCulledFrames + 1, 3);
             }
         }
     } else {
-        // No GPU cull data — conservatively mark all as visible (counter = 0).
-        prevFrameVisible_.assign(static_cast<size_t>(instances.size()), 0);
+        // No GPU cull data — conservatively treat everything as visible.
+        for (auto& inst : instances) {
+            inst.lastCullVisible = 1;
+            inst.hizPrevCulledFrames = 0;
+        }
     }
 
     // If GPU culling was not dispatched, fallback: compute distances on CPU
@@ -912,7 +951,10 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
                 distSq = glm::dot(toCam, toCam);
                 effectiveMaxDistSq = maxRenderDistanceSq * instance.cachedEffectiveMaxDistSqFactor;
             } else if (gpuCullAvailable && i < numInstances) {
-                if (!visibility[i]) continue;
+                // Per-instance verdict scattered above — indexing visibility[]
+                // directly here would read the slot of whichever instance held
+                // this array position when the dispatch was recorded.
+                if (!instance.lastCullVisible) continue;
                 glm::vec3 toCam = instance.position - camPos;
                 distSq = glm::dot(toCam, toCam);
                 effectiveMaxDistSq = maxRenderDistanceSq * instance.cachedEffectiveMaxDistSqFactor;

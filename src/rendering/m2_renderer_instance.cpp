@@ -383,6 +383,8 @@ void M2Renderer::clear() {
     spatialGrid.clear();
     instanceIndexById.clear();
     instanceDedupMap_.clear();
+    for (auto& ids : cullSubmittedIds_) ids.clear();
+    for (auto& ids : cullReadableIds_) ids.clear();
     smokeParticles.clear();
     smokeInstanceIndices_.clear();
     portalInstanceIndices_.clear();
@@ -413,6 +415,8 @@ void M2Renderer::clearInstances() {
     spatialGrid.clear();
     instanceIndexById.clear();
     instanceDedupMap_.clear();
+    for (auto& ids : cullSubmittedIds_) ids.clear();
+    for (auto& ids : cullReadableIds_) ids.clear();
     smokeInstanceIndices_.clear();
     portalInstanceIndices_.clear();
     animatedInstanceIndices_.clear();

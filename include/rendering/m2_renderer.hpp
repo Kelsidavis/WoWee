@@ -250,6 +250,18 @@ struct M2Instance {
     float portalSpinAngle = 0.0f;  // Accumulated spin angle for portal rotation
     const M2ModelGPU* cachedModel = nullptr;  // Avoid per-frame hash lookups
 
+    // Result of the most recent GPU cull dispatch that actually covered this
+    // instance, matched back by instance ID (never by array index — see
+    // cullSubmittedIds_).  Defaults to visible so an instance created after the
+    // in-flight dispatch draws immediately instead of waiting ~2 frames for its
+    // first cull result.
+    uint8_t lastCullVisible = 1;
+    // Consecutive frames this instance has been culled (capped at 3), used for
+    // the HiZ `previouslyVisible` hysteresis.  Defaults to 2 ("not recently
+    // visible") so a freshly spawned instance skips the HiZ test rather than
+    // being judged against depth data that never contained it.
+    uint8_t hizPrevCulledFrames = 2;
+
     void recomputeCachedCullFactors();
 
     // Frame-skip optimization (update distant animations less frequently)
@@ -587,11 +599,19 @@ private:
     // as the depth buffer the HiZ pyramid was built from.
     glm::mat4 prevVP_{1.0f};
 
-    // Per-instance visibility from the previous frame.  Used to set the
-    // `previouslyVisible` flag (bit 3) on each CullInstance so the shader
-    // skips the HiZ test for objects that weren't rendered last frame
-    // (their depth data is unreliable).
-    std::vector<uint8_t> prevFrameVisible_;
+    // Instance IDs, in dispatch order, for the cull results a frame slot holds.
+    //
+    // The visibility SSBO is read back one full slot cycle after it is written:
+    // dispatchCullCompute() records a dispatch into this frame's command buffer,
+    // and render() reads the mapped output of the dispatch recorded on the SAME
+    // slot ~2 frames earlier.  Array indices are not stable across that gap —
+    // createInstance() appends and removeInstance() swap-removes, so slot i can
+    // easily describe a different object by the time it is read.  Recording the
+    // IDs lets render() match each result back to the instance it was computed
+    // for.  cullSubmittedIds_ is the dispatch just recorded (results not ready);
+    // cullReadableIds_ is the previous one, matching the mapped data now.
+    std::vector<uint32_t> cullSubmittedIds_[2];
+    std::vector<uint32_t> cullReadableIds_[2];
 
     // Dynamic ribbon vertex buffer (CPU-written triangle strip)
     static constexpr size_t MAX_RIBBON_VERTS = 2048;  // 9 floats each
