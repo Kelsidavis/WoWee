@@ -1730,6 +1730,19 @@ public:
             if (wholeMs == 0) continue;
             t.pendingMs -= static_cast<float>(wholeMs);
             t.value = std::clamp(t.value + t.scale * wholeMs, 0, t.maxValue);
+            // Refilled, so it is over. The server does not say so at this
+            // point: on surfacing it sends one update with a positive scale
+            // and then nothing until its own counter reaches full, which is
+            // several seconds later. Without this the bar climbs to full and
+            // sits there at a hundred percent in the meantime, which is what
+            // "the breath meter will not go away" looks like.
+            //
+            // Only when refilling. A drowning bar reaching zero is not over —
+            // that is when the damage starts, and the server keeps it up.
+            if (t.scale > 0 && t.value >= t.maxValue) {
+                t.active = false;
+                t.pendingMs = 0.0f;
+            }
         }
     }
 
