@@ -201,7 +201,8 @@ void TransportCallbackHandler::setupCallbacks() {
                     glm::vec3 canonicalSpawnPos(x, y, z);
                     const bool isM2Transport = !it->second.isWmo;
                     transportManager->resolveAndRegisterSpawn(guid, entry, displayId, canonicalSpawnPos,
-                                                              wmoInstanceId, isM2Transport, preferServerData);
+                                                              wmoInstanceId, isM2Transport, preferServerData,
+                                                              orientation);
                 } else {
                     entitySpawner_.setTransportPendingMove(guid, x, y, z, orientation);
                     LOG_DEBUG("Cannot auto-spawn transport 0x", std::hex, guid, std::dec,

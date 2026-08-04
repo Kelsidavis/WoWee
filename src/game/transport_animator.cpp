@@ -191,7 +191,16 @@ void TransportAnimator::evaluateAndApply(
     // When the client owns the animation the route tangent is what facing has to
     // follow, because the client owns the phase the server's snapshot knows
     // nothing about.
-    if (transport.hasServerYaw && !transport.useClientAnimation) {
+    if (pathEntry.zOnly) {
+        // A lift travels straight up and down, so its tangent is vertical and
+        // carries no heading at all: atan2 of nothing is zero, and
+        // orientationFromTangent falls into its near-vertical branch and picks
+        // an arbitrary basis. Both were being used, which is why an elevator
+        // stood at right angles to the shaft it runs in. It keeps the yaw it
+        // was placed at, which is the only heading it ever has.
+        transport.rotation =
+            glm::angleAxis(transport.spawnYaw, glm::vec3(0.0f, 0.0f, 1.0f));
+    } else if (transport.hasServerYaw && !transport.useClientAnimation) {
         float effectiveYaw = transport.serverYaw +
             (transport.serverYawFlipped180 ? glm::pi<float>() : 0.0f);
         transport.rotation = glm::angleAxis(effectiveYaw, glm::vec3(0.0f, 0.0f, 1.0f));

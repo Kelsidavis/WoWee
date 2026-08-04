@@ -55,6 +55,11 @@ struct ActiveTransport {
     bool hasServerYaw;              // Whether we've received server yaw
     float dockYaw;                  // Authored server spawn yaw used during route dwell
     bool hasDockYaw;                // Whether dockYaw was captured before client route assignment
+    // The yaw this object was placed at. An elevator never turns, so for a
+    // z-only path this is the heading for its whole life — there is no route
+    // tangent to derive one from, and deriving anyway is how a lift ended up
+    // sideways.
+    float spawnYaw = 0.0f;
     bool serverYawFlipped180;       // Auto-correction when server yaw is consistently opposite movement
     int serverYawAlignmentScore;    // Hysteresis score for yaw flip detection
 
@@ -170,7 +175,8 @@ public:
                            const glm::vec3& spawnWorldPos,
                            uint32_t entry = 0,
                            uint32_t displayId = 0,
-                           bool isM2 = false);
+                           bool isM2 = false,
+                           float spawnOrientation = 0.0f);
     void unregisterTransport(uint64_t guid);
     // Logical transport GUIDs are only unique within the current map. Clear all
     // active instances on map transitions so a reused GUID cannot retain the
@@ -274,7 +280,8 @@ public:
                                  const glm::vec3& canonicalSpawnPos,
                                  uint32_t wmoInstanceId,
                                  bool isM2,
-                                 bool preferServerData);
+                                 bool preferServerData,
+                                 float spawnOrientation = 0.0f);
 
     // Reconnect an existing transport to a newly spawned render instance. Servers can
     // despawn/respawn transports around visibility boundaries while the logical route
