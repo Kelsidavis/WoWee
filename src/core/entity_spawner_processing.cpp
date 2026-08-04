@@ -1,4 +1,5 @@
 #include "core/entity_spawner.hpp"
+#include "game/transport_path_repository.hpp"
 #include "core/coordinates.hpp"
 #include "core/logger.hpp"
 #include "rendering/renderer.hpp"
@@ -930,16 +931,8 @@ void EntitySpawner::processGameObjectSpawnQueue() {
         std::string modelPath;
         if (gameObjectLookupsBuilt_) {
             // Check transport overrides first
-            bool isTransport = gameHandler_ && gameHandler_->isTransportGuid(s.guid);
-            if (isTransport) {
-                if (s.entry == 20808 || s.entry == 176231 || s.entry == 176310)
-                    modelPath = "World\\wmo\\transports\\transport_ship\\transportship.wmo";
-                else if (s.displayId == 807 || s.displayId == 808 || s.displayId == 175080 || s.displayId == 176495 || s.displayId == 164871)
-                    modelPath = "World\\wmo\\transports\\transport_zeppelin\\transport_zeppelin.wmo";
-                else if (s.displayId == 1587)
-                    modelPath = "World\\wmo\\transports\\transport_horde_zeppelin\\Transport_Horde_Zeppelin.wmo";
-                else if (s.displayId == 2454 || s.displayId == 181688 || s.displayId == 190536)
-                    modelPath = "World\\wmo\\transports\\icebreaker\\Transport_Icebreaker_ship.wmo";
+            if (gameHandler_ && gameHandler_->isTransportGuid(s.guid)) {
+                modelPath = transportModelPath(s.entry, s.displayId);
             }
             if (modelPath.empty())
                 modelPath = getGameObjectModelPathForDisplayId(s.displayId);
@@ -1112,10 +1105,12 @@ void EntitySpawner::processPendingTransportRegistrations() {
                  " preferServer=", preferServerData);
 
         glm::vec3 canonicalSpawnPos(pending.x, pending.y, pending.z);
+        // Elevators were in this list too — 807 and 808 are Gnomeregan's
+        // lifts, 2454 the Searing Gorge scaffold cars, 1587 a GO named
+        // "Elevator" — and being taken for a ship means the stricter
+        // "must travel 25 units" check rejects their short vertical path.
         const bool shipOrZeppelinDisplay =
-            (pending.displayId == 3015 || pending.displayId == 3031 || pending.displayId == 7546 ||
-             pending.displayId == 7446 || pending.displayId == 1587 || pending.displayId == 2454 ||
-             pending.displayId == 7087 || pending.displayId == 807 || pending.displayId == 808);
+            game::isVehicleTransportDisplay(pending.displayId);
         bool hasUsablePath = transportManager->hasPathForEntry(pending.entry);
         if (shipOrZeppelinDisplay) {
             hasUsablePath = transportManager->hasUsableMovingPathForEntry(pending.entry, 25.0f);

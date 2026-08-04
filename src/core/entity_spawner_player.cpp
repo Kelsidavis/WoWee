@@ -1024,6 +1024,61 @@ void EntitySpawner::despawnPlayer(uint64_t guid) {
     creatureWasWalking_.erase(guid);
 }
 
+// ---------------------------------------------------------------------------
+// Which hull a transport is drawn with
+//
+// Entry and displayId are different numbering spaces and this table used to mix
+// them, which is how an elevator became a zeppelin. Every ship and zeppelin
+// entry here shares one of five displayIds -- 3015, 3031, 7087, 7446, 7546 --
+// and the numbers that were being compared against displayId were entries:
+// 164871, 175080 and 176495 are the three vanilla zeppelins, and no displayId
+// reaches six figures, so those three could never match.
+//
+// What did match was worse. 807 and 808 are the displayIds of Gnomeregan lifts
+// (the "Vator" and the "Plunger"), 2454 belongs to the Searing Gorge scaffold
+// cars and 1587 to a GameObject named, plainly, "Elevator" -- so every one of
+// them was being drawn as an airship. Elevators are transports too, which is
+// why the caller's guard lets them in.
+//
+// Values verified against gameobject_template.
+std::string EntitySpawner::transportModelPath(uint32_t entry, uint32_t displayId) {
+    struct TransportModel { uint32_t entry; uint32_t displayId; const char* path; };
+    static constexpr const char* kShip     = "World\\wmo\\transports\\transport_ship\\transportship.wmo";
+    static constexpr const char* kZeppelin = "World\\wmo\\transports\\transport_zeppelin\\transport_zeppelin.wmo";
+    static constexpr const char* kHordeZep = "World\\wmo\\transports\\transport_horde_zeppelin\\Transport_Horde_Zeppelin.wmo";
+    static constexpr const char* kIceship  = "World\\wmo\\transports\\icebreaker\\Transport_Icebreaker_ship.wmo";
+    static constexpr TransportModel kTransportModels[] = {
+        // Ships (display 3015)
+        {  20808, 3015, kShip },      // The Maiden's Fancy
+        { 176231, 3015, kShip },      // The Lady Mehley
+        { 176310, 3015, kShip },      // The Bravery
+        // Zeppelins (display 3031)
+        { 164871, 3031, kZeppelin },  // The Thundercaller
+        { 175080, 3031, kZeppelin },  // The Iron Eagle
+        { 176495, 3031, kZeppelin },  // The Purple Princess
+        { 186371, 3031, kZeppelin },
+        { 190549, 3031, kZeppelin },  // The Zephyr
+        // Horde zeppelins (display 7546)
+        { 181689, 7546, kHordeZep },  // Cloudkisser
+        { 186238, 7546, kHordeZep },  // The Mighty Wind
+        { 201834, 7546, kHordeZep },
+        // Icebreakers (display 7446)
+        { 181688, 7446, kIceship },   // Northspear
+        { 190536, 7446, kIceship },   // Stormwind's Pride
+    };
+
+    for (const TransportModel& t : kTransportModels) {
+        if (entry == t.entry || displayId == t.displayId) return t.path;
+    }
+    // The Deeprun Tram car, which is an M2 rather than a WMO and is keyed on a
+    // displayId that is genuinely a displayId: entries 176080-176086 all carry
+    // 3831.
+    if (displayId == 3831) {
+        return "World\\Generic\\Gnome\\Passive Doodads\\Subway\\SubwayCar.m2";
+    }
+    return "";
+}
+
 void EntitySpawner::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_t displayId, float x, float y, float z, float orientation, float scale) {
     if (!renderer_ || !assetManager_) return;
 
@@ -1104,59 +1159,10 @@ void EntitySpawner::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_
 
     std::string modelPath;
 
-    // A preloaded transport can be spawned before its displayId is known, so
-    // the vehicle it is has to be recognised from its GameObject entry as well.
-    //
-    // Entry and displayId are different numbering spaces and this table used to
-    // mix them, which is how an elevator became a zeppelin. Every ship and
-    // zeppelin entry here shares one of five displayIds — 3015, 3031, 7087,
-    // 7446, 7546 — and the numbers that were being compared against displayId
-    // were entries: 164871, 175080 and 176495 are the three vanilla zeppelins,
-    // and no displayId reaches six figures, so those three could never match.
-    //
-    // What did match was worse. 807 and 808 are the displayIds of Gnomeregan's
-    // two lifts (the "Vator" and the "Plunger"), 2454 belongs to the Searing
-    // Gorge scaffold cars and 1587 to a GO named, plainly, "Elevator" — so
-    // every one of them was being drawn as an airship. Elevators are transports
-    // too, which is why the guard above let them in.
-    struct TransportModel { uint32_t entry; uint32_t displayId; const char* path; };
-    static constexpr const char* kShip     = "World\\wmo\\transports\\transport_ship\\transportship.wmo";
-    static constexpr const char* kZeppelin = "World\\wmo\\transports\\transport_zeppelin\\transport_zeppelin.wmo";
-    static constexpr const char* kHordeZep = "World\\wmo\\transports\\transport_horde_zeppelin\\Transport_Horde_Zeppelin.wmo";
-    static constexpr const char* kIceship  = "World\\wmo\\transports\\icebreaker\\Transport_Icebreaker_ship.wmo";
-    static constexpr TransportModel kTransportModels[] = {
-        // Ships (display 3015)
-        {  20808, 3015, kShip },      // The Maiden's Fancy
-        { 176231, 3015, kShip },      // The Lady Mehley
-        { 176310, 3015, kShip },      // The Bravery
-        // Zeppelins (display 3031)
-        { 164871, 3031, kZeppelin },  // The Thundercaller
-        { 175080, 3031, kZeppelin },  // The Iron Eagle
-        { 176495, 3031, kZeppelin },  // The Purple Princess
-        { 186371, 3031, kZeppelin },
-        { 190549, 3031, kZeppelin },  // The Zephyr
-        // Horde zeppelins (display 7546)
-        { 181689, 7546, kHordeZep },  // Cloudkisser
-        { 186238, 7546, kHordeZep },  // The Mighty Wind
-        { 201834, 7546, kHordeZep },
-        // Icebreakers (display 7446)
-        { 181688, 7446, kIceship },   // Northspear
-        { 190536, 7446, kIceship },   // Stormwind's Pride
-    };
-
     if (gameHandler_ && gameHandler_->isTransportGuid(guid)) {
-        for (const TransportModel& t : kTransportModels) {
-            if (entry != t.entry && displayId != t.displayId) continue;
-            modelPath = t.path;
+        modelPath = transportModelPath(entry, displayId);
+        if (!modelPath.empty()) {
             LOG_INFO("Transport entry/display ", entry, "/", displayId, " → ", modelPath);
-            break;
-        }
-        // The Deeprun Tram car, which is an M2 rather than a WMO and is keyed
-        // on a displayId that is genuinely a displayId: entries 176080-176086
-        // all carry 3831.
-        if (modelPath.empty() && displayId == 3831) {
-            modelPath = "World\\Generic\\Gnome\\Passive Doodads\\Subway\\SubwayCar.m2";
-            LOG_INFO("Transport displayId ", displayId, " → SubwayCar.m2");
         }
     }
 

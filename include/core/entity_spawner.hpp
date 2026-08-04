@@ -115,6 +115,17 @@ public:
     bool areGameObjectLookupsBuilt() const { return gameObjectLookupsBuilt_; }
     std::string getModelPathForDisplayId(uint32_t displayId) const;
     std::string getGameObjectModelPathForDisplayId(uint32_t displayId) const;
+
+    /// The hull a transport is drawn with, or "" to use the display lookup.
+    ///
+    /// A preloaded transport can be spawned before its displayId is known, so
+    /// the vehicle has to be recognisable from its GameObject entry too.
+    ///
+    /// One function because there were two copies of this table, in
+    /// entity_spawner_player.cpp and entity_spawner_processing.cpp, and the
+    /// queued path in the second is the one most spawns actually take —
+    /// so fixing the first left the bug on screen.
+    static std::string transportModelPath(uint32_t entry, uint32_t displayId);
     audio::VoiceType detectVoiceTypeFromDisplayId(uint32_t displayId) const;
 
     // Attempts one deferred attachment and owns retry bookkeeping. Returns true
