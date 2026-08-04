@@ -3275,7 +3275,20 @@ void MovementHandler::checkAreaTriggers() {
                     continue;
                 }
 
-                if (!postTransferReturnAreaTriggerSawNear_ && distSq > 1000.0f * 1000.0f) {
+                // Only while the post-transfer window is still open. The
+                // distance test alone never expires: a player who has not been
+                // near the portal and is far from it stays that way, so the
+                // guard held for the rest of the session and that portal could
+                // never be used again.
+                //
+                // Dying inside is exactly that shape. The release teleports the
+                // player to a graveyard nowhere near the portal they came
+                // through, without ever standing at it, so walking back as a
+                // ghost was suppressed every time. The cooldown is ten seconds
+                // and a destination position arrives in one, so anything still
+                // far away after it has genuinely left.
+                if (!postTransferReturnAreaTriggerSawNear_ && distSq > 1000.0f * 1000.0f &&
+                    owner_.areaTriggerCooldownRef() > 0.0f) {
                     // During map transfer there can be a tick where the current
                     // map has switched but movementInfo still contains the old
                     // map's coordinates. That looks thousands of yards away
