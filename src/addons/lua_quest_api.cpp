@@ -1,6 +1,7 @@
 // lua_quest_api.cpp — Quest log, skills, talents, glyphs, and achievements Lua API bindings.
 // Extracted from lua_engine.cpp as part of §5.1 (Tame LuaEngine).
 #include "addons/lua_api_helpers.hpp"
+#include "game/packed_time.hpp"
 
 namespace wowee::addons {
 
@@ -553,10 +554,11 @@ void registerQuestLuaAPI(lua_State* L) {
             uint32_t date = gh->getAchievementDate(id);
             uint32_t points = gh->getAchievementPoints(id);
             const std::string& desc = gh->getAchievementDescription(id);
-            // Parse date: packed as (month << 24 | day << 16 | year)
-            int month = completed ? static_cast<int>((date >> 24) & 0xFF) : 0;
-            int day = completed ? static_cast<int>((date >> 16) & 0xFF) : 0;
-            int year = completed ? static_cast<int>(date & 0xFFFF) : 0;
+            const game::WowDate earned = game::unpackWowPackedTime(date);
+            int month = completed ? earned.month : 0;
+            int day   = completed ? earned.day : 0;
+            // Short form: SHORTDATE is "%2$d/%1$02d/%3$02d".
+            int year  = completed ? earned.yearSince2000 : 0;
             lua_pushnumber(L, id);                 // 1: id
             lua_pushstring(L, name.c_str());       // 2: name
             lua_pushnumber(L, points);             // 3: points

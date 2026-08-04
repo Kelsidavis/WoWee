@@ -1,4 +1,5 @@
 #include "game/world_packets.hpp"
+#include "game/packed_time.hpp"
 #include "game/packet_parsers.hpp"
 #include "game/opcodes.hpp"
 #include "game/character.hpp"
@@ -877,9 +878,14 @@ bool GuildInfoParser::parse(network::Packet& packet, GuildInfoData& data) {
         return false;
     }
     data.guildName = packet.readString();
-    data.creationDay = packet.readUInt32();
-    data.creationMonth = packet.readUInt32();
-    data.creationYear = packet.readUInt32();
+    // One packed uint32, not three. Guild::SendInfo writes the creation date
+    // with AppendPackedTime, so reading a day, a month and a year took twelve
+    // bytes where the server sent four — the date was nonsense and the two
+    // counts after it were read from the wrong offset as well.
+    const WowDate created = unpackWowPackedTime(packet.readUInt32());
+    data.creationDay = static_cast<uint32_t>(created.day);
+    data.creationMonth = static_cast<uint32_t>(created.month);
+    data.creationYear = static_cast<uint32_t>(created.fullYear());
     data.numMembers = packet.readUInt32();
     data.numAccounts = packet.readUInt32();
     LOG_INFO("Parsed SMSG_GUILD_INFO: ", data.guildName, " members=", data.numMembers);

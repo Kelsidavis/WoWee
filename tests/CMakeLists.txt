@@ -358,6 +358,19 @@ endif()
 add_test(NAME frustum COMMAND test_frustum)
 register_test_target(test_frustum)
 
+# ── test_packed_time ─────────────────────────────────────────
+# Header-only domain logic: the one uint32 that carries a whole date, which
+# four separate readers in this tree got wrong in four different ways.
+add_executable(test_packed_time
+    test_packed_time.cpp
+    ${TEST_COMMON_SOURCES}
+)
+target_include_directories(test_packed_time PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_packed_time SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
+target_link_libraries(test_packed_time PRIVATE catch2_main)
+add_test(NAME packed_time COMMAND test_packed_time)
+register_test_target(test_packed_time)
+
 # ── test_animation_ids ───────────────────────────────────────
 add_executable(test_animation_ids
     test_animation_ids.cpp

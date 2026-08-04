@@ -16,6 +16,7 @@
 #include "rendering/vk_context.hpp"
 #include "core/window.hpp"
 #include "game/game_handler.hpp"
+#include "game/packed_time.hpp"
 #include "pipeline/asset_manager.hpp"
 #include "pipeline/dbc_layout.hpp"
 #include "pipeline/blp_loader.hpp"
@@ -4740,14 +4741,11 @@ void WindowManager::renderAchievementWindow(game::GameHandler& gameHandler) {
                         // Earn date
                         uint32_t packed = gameHandler.getAchievementDate(id);
                         if (packed != 0) {
-                            // WoW PackedTime: year[31:25] month[24:21] day[20:17] weekday[16:14] hour[13:9] minute[8:3]
-                            int minute  = (packed >>  3) & 0x3F;
-                            int hour    = (packed >>  9) & 0x1F;
-                            int day     = (packed >> 17) & 0x1F;
-                            int month   = (packed >> 21) & 0x0F;
-                            int year    = ((packed >> 25) & 0x7F) + 2000;
-                            const char* mname = (month >= 1 && month <= 12) ? kMonthAbbrev[month - 1] : "?";
-                            ImGui::TextDisabled("Earned: %s %d, %d  %02d:%02d", mname, day, year, hour, minute);
+                            const game::WowDate d = game::unpackWowPackedTime(packed);
+                            const char* mname = (d.month >= 1 && d.month <= 12)
+                                ? kMonthAbbrev[d.month - 1] : "?";
+                            ImGui::TextDisabled("Earned: %s %d, %d  %02d:%02d",
+                                                mname, d.day, d.fullYear(), d.hour, d.minute);
                         }
                         ImGui::EndTooltip();
                     }
