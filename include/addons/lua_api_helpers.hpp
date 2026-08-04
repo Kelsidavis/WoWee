@@ -13,6 +13,7 @@
 #include "game/entity.hpp"
 #include "game/update_field_table.hpp"
 #include "core/logger.hpp"
+#include "core/app_clock.hpp"
 #include "ui/widget_tree.hpp"
 
 extern "C" {
@@ -34,15 +35,20 @@ inline int luaReturnZero(lua_State* L) { lua_pushnumber(L, 0); return 1; }
 inline int luaReturnFalse(lua_State* L){ lua_pushboolean(L, 0); return 1; }
 
 // ---- Shared GetTime() epoch ----
-// All time-returning functions must use this same origin
-// so that addon calculations like (start + duration - GetTime()) are consistent.
-inline const auto& luaTimeEpoch() {
-    static const auto epoch = std::chrono::steady_clock::now();
-    return epoch;
-}
-
+//
+// The application's clock, not one of its own. Both are steady_clock seconds
+// and both fixed their origin on first call, so they differed by however long
+// separated those two calls — the app's at startup, this one at the first Lua
+// GetTime, which is after the addon system comes up.
+//
+// That gap landed on every cooldown. GetActionCooldown reports a start time on
+// this clock and the widget renderer draws the sweep as
+// appTimeSeconds() - start, so the difference was added to every elapsed: a
+// sweep ran ahead of itself, and one shorter than the gap was already over
+// before it was drawn. Anything else comparing a GetTime value against a
+// widget's stored time had the same offset.
 inline double luaGetTimeNow() {
-    return std::chrono::duration<double>(std::chrono::steady_clock::now() - luaTimeEpoch()).count();
+    return wowee::core::appTimeSeconds();
 }
 
 // ---- Shared WoW class/race/power name tables (indexed by ID, element 0 = unknown) ----
