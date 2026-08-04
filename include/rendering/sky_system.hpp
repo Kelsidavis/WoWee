@@ -38,7 +38,7 @@ struct SkyParams {
 
     // Time
     float timeOfDay = 12.0f;    // 0-24 hours
-    float gameTime = -1.0f;     // Server game time in seconds (-1 = use fallback)
+    float gameTime = -1.0f;     // Server game time, hours since midnight (-1 = use fallback)
 
     // Skybox selection (future: from LightSkybox.dbc)
     uint32_t skyboxModelId = 0;

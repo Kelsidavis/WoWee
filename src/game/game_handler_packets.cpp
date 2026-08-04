@@ -1,4 +1,5 @@
 #include "game/game_handler.hpp"
+#include "game/packed_time.hpp"
 #include "game/protocol_constants.hpp"
 #include "game/game_utils.hpp"
 #include "game/chat_handler.hpp"
@@ -567,17 +568,19 @@ void GameHandler::registerOpcodeHandlers() {
     for (auto op : { Opcode::SMSG_GAMETIME_SET, Opcode::SMSG_GAMETIME_UPDATE }) {
         dispatchTable_[op] = [this](network::Packet& packet) {
             if (packet.hasRemaining(4)) {
-                uint32_t gameTimePacked = packet.readUInt32();
-                gameTime_ = static_cast<float>(gameTimePacked);
+                const WowDate t = unpackWowPackedTime(packet.readUInt32());
+                gameTime_ = static_cast<float>(t.hour) +
+                            static_cast<float>(t.minute) / 60.0f;
             }
             packet.skipAll();
         };
     }
     dispatchTable_[Opcode::SMSG_GAMESPEED_SET] = [this](network::Packet& packet) {
         if (packet.hasRemaining(8)) {
-            uint32_t gameTimePacked = packet.readUInt32();
+            const WowDate t = unpackWowPackedTime(packet.readUInt32());
             float timeSpeed = packet.readFloat();
-            gameTime_ = static_cast<float>(gameTimePacked);
+            gameTime_ = static_cast<float>(t.hour) +
+                        static_cast<float>(t.minute) / 60.0f;
             timeSpeed_ = timeSpeed;
         }
         packet.skipAll();
@@ -2537,12 +2540,14 @@ void GameHandler::registerOpcodeHandlers() {
     // uint32 unixTime — server's current unix timestamp; use to sync gameTime_
     dispatchTable_[Opcode::SMSG_SERVERTIME] = [this](network::Packet& packet) {
         // uint32 unixTime — server's current unix timestamp; use to sync gameTime_
+        // A unix timestamp, which is not a time of day. It used to be stored
+        // in gameTime_ alongside values in three other units, so whichever
+        // packet arrived last decided what the sky thought the hour was.
+        // Logged and dropped: nothing here needs the server's wall clock, and
+        // the game clock has its own opcodes.
         if (packet.hasRemaining(4)) {
-            uint32_t srvTime = packet.readUInt32();
-            if (srvTime > 0) {
-                gameTime_ = static_cast<float>(srvTime);
-                LOG_DEBUG("SMSG_SERVERTIME: serverTime=", srvTime);
-            }
+            const uint32_t srvTime = packet.readUInt32();
+            LOG_DEBUG("SMSG_SERVERTIME: serverTime=", srvTime);
         }
     };
     // uint64 kickerGuid + uint32 kickReasonType + null-terminated reason string

@@ -1,4 +1,5 @@
 #include "game/game_handler.hpp"
+#include "game/packed_time.hpp"
 #include "game/game_utils.hpp"
 #include "game/chat_handler.hpp"
 #include "game/movement_handler.hpp"
@@ -689,23 +690,30 @@ void GameHandler::selectCharacter(uint64_t characterGuid) {
 
 void GameHandler::handleLoginSetTimeSpeed(network::Packet& packet) {
     // SMSG_LOGIN_SETTIMESPEED (0x042)
-    // Structure: uint32 gameTime, float timeScale
-    // gameTime: Game time in seconds since epoch
-    // timeScale: Time speed multiplier (typically 0.0166 for 1 day = 1 hour)
+    // Structure: PackedTime gameTime, float timeScale
+    //
+    // gameTime is a packed bitfield, not a count of seconds — Player.cpp writes
+    // it with AppendPackedTime. It was being stored raw and then divided by
+    // 86400 to get a time of day, which made the sky's clock a number with no
+    // relation to the hour the server sent.
+    //
+    // timeScale: time speed multiplier (typically 0.0166 for 1 day = 1 hour)
 
     if (packet.getSize() < 8) {
         LOG_WARNING("SMSG_LOGIN_SETTIMESPEED: packet too small (", packet.getSize(), " bytes)");
         return;
     }
 
-    uint32_t gameTimePacked = packet.readUInt32();
+    const WowDate now = unpackWowPackedTime(packet.readUInt32());
     float timeScale = packet.readFloat();
 
-    // Store for celestial/sky system use
-    gameTime_ = static_cast<float>(gameTimePacked);
+    // Hours since midnight, which is what GetGameTime already assumed and what
+    // the sky wants. One meaning for this field, written down here.
+    gameTime_ = static_cast<float>(now.hour) + static_cast<float>(now.minute) / 60.0f;
     timeSpeed_ = timeScale;
 
-    LOG_INFO("Server time: gameTime=", gameTime_, "s, timeSpeed=", timeSpeed_);
+    LOG_INFO("Server time: ", now.hour, ":", now.minute, " (gameTime=", gameTime_,
+             "h), timeSpeed=", timeSpeed_);
     LOG_INFO("  (1 game day = ", (1.0f / timeSpeed_) / 60.0f, " real minutes)");
 }
 

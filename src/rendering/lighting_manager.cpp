@@ -269,9 +269,12 @@ void LightingManager::update(const glm::vec3& playerPos, uint32_t mapId, uint32_
     // Update time
     if (!manualTime_) {
         if (gameTime >= 0.0f) {
-            // Use server-sent game time (preferred!)
-            // gameTime is typically seconds since midnight
-            timeOfDay_ = std::fmod(gameTime / 86400.0f, 1.0f);  // 0.0-1.0
+            // Server-sent game time, in hours since midnight. It was being
+            // divided by 86400 as though it were seconds, against a field that
+            // held a raw packed bitfield — so the sky's clock was a number with
+            // no relation to the hour, and it looked plausible because any
+            // value lands somewhere in the day.
+            timeOfDay_ = std::fmod(gameTime / 24.0f, 1.0f);  // 0.0-1.0
         } else {
             // Fallback: use real time for day/night cycle
             std::time_t now = std::time(nullptr);
