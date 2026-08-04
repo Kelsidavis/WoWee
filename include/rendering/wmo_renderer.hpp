@@ -789,9 +789,26 @@ private:
 
     // Rendering state
     bool wireframeMode = false;
-    bool frustumCulling = true;
+    bool frustumCulling = true;  // dead: every instance is included, the group cull does the work
     bool portalCulling = true;   // AABB transform bug fixed; conservative frustum test (no plane-side check) is visually safe
     bool distanceCulling = false;  // Disabled - causes ground to disappear
+
+    /// Master switch, and it is off: no WMO group is dropped for any reason.
+    ///
+    /// Buildings kept disappearing from angles that had no business hiding
+    /// them. Distance culling was turned off years ago for the same complaint
+    /// ("causes ground to disappear") and it did not settle the matter, because
+    /// the distance test below runs whether that flag is set or not — the flag
+    /// only chooses which of two distances to use, so everything past
+    /// viewDistance_ vanished regardless.
+    ///
+    /// The set of instances is already bounded by which tiles are loaded, so
+    /// what this costs is the groups of loaded buildings that are behind the
+    /// camera or too far to matter, not an unbounded scene.
+    ///
+    /// WOWEE_WMO_CULL=1 puts portal and distance culling back, for measuring
+    /// what it costs or for chasing this again.
+    bool cullingEnabled_ = false;
     float maxGroupDistance = 500.0f;
     float maxGroupDistanceSq = 250000.0f;  // maxGroupDistance^2
     float viewDistance_ = 1200.0f;

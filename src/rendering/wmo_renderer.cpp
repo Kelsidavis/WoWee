@@ -71,6 +71,13 @@ bool WMORenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayou
         1, envSizeOrDefault("WOWEE_WMO_CULL_THREADS", defaultCullThreads)));
     core::Logger::getInstance().info("WMO cull threads: ", numCullThreads_);
 
+    // Off unless asked for: a building that is not drawn is a worse fault than
+    // a building drawn when it did not need to be.
+    if (const char* v = std::getenv("WOWEE_WMO_CULL"); v && *v && *v != '0') {
+        cullingEnabled_ = true;
+        core::Logger::getInstance().info("WMO culling enabled by WOWEE_WMO_CULL");
+    }
+
     VkDevice device = vkCtx_->getDevice();
 
     // --- Create material descriptor set layout (set 1) ---
@@ -1594,8 +1601,8 @@ void WMORenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const
     // little too much, it means the building vanishes. Seeding from both is a
     // superset of either, so it can only ever add groups.
     const glm::vec3 portalViewerPos = viewerPos ? *viewerPos : camPos;
-    bool doPortalCull = portalCulling;
-    bool doDistanceCull = distanceCulling;
+    bool doPortalCull = portalCulling && cullingEnabled_;
+    bool doDistanceCull = distanceCulling && cullingEnabled_;
 
     auto cullInstance = [&](size_t instIdx, InstanceDrawList& result) {
         if (instIdx >= instances.size()) return;
@@ -1683,7 +1690,11 @@ void WMORenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const
                 continue;
             }
 
-            if (gi < instance.worldGroupBounds.size()) {
+            // The distance test used to run whether distanceCulling was set or
+            // not — the flag only chose between two distances — so turning that
+            // flag off never stopped anything past viewDistance_ disappearing.
+            // Now nothing is dropped at all unless culling is asked for.
+            if (cullingEnabled_ && gi < instance.worldGroupBounds.size()) {
                 const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
 
                 glm::vec3 closestPoint = glm::clamp(camPos, gMin, gMax);
