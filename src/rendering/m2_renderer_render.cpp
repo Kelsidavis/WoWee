@@ -1249,6 +1249,7 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
 
             // Write base instance data to SSBO (uvOffset=0 — overridden for tex-anim batches)
             uint32_t baseSSBOOffset = instanceDataCount_;
+            size_t writtenInstances = 0;
             for (const auto& p : pending) {
                 if (instanceDataCount_ >= MAX_INSTANCE_DATA) break;
                 auto& inst = instances[p.instanceIdx];
@@ -1261,6 +1262,30 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
                 e.boneCount = static_cast<int32_t>(inst.boneMatrices.size());
                 std::memset(e._pad, 0, sizeof(e._pad));
                 instanceDataCount_++;
+                ++writtenInstances;
+            }
+
+            // Drop what did not fit. The loop above stops writing at the cap,
+            // but the LOD sub-groups below are ranges over `pending` and were
+            // still being drawn in full — groupSSBOOffset then runs past the
+            // end of the buffer and the vertex shader reads instance data that
+            // is not there. That is a real out-of-bounds read on the GPU, not a
+            // missing model: it fires once per instance past the cap, hundreds
+            // of times a frame, and the device is lost seconds later.
+            //
+            // Truncating is safe here precisely because `pending` was sorted by
+            // LOD before the write: the sub-groups are contiguous and in the
+            // same order, so cutting the tail cuts whole instances rather than
+            // splitting a range.
+            if (writtenInstances < pending.size()) {
+                static bool warnedInstanceCap = false;
+                if (!warnedInstanceCap) {
+                    warnedInstanceCap = true;
+                    LOG_WARNING("M2Renderer: instance buffer full at ", MAX_INSTANCE_DATA,
+                                "; dropping ", pending.size() - writtenInstances,
+                                " instances of '", model.name, "' this frame");
+                }
+                pending.resize(writtenInstances);
             }
 
             // Process LOD sub-groups within this model group
