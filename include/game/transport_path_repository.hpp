@@ -16,6 +16,53 @@ namespace wowee::pipeline {
 
 namespace wowee::game {
 
+/// Whether a displayId belongs to a vehicle that travels a route — a ship, a
+/// zeppelin, an icebreaker, a gunship — as opposed to an elevator or a lift.
+///
+/// Both are transports and both animate, but they want opposite treatment: a
+/// vehicle's route is long and mostly horizontal and often comes from the
+/// server, while a lift travels a few metres straight up.
+///
+/// Named because the numbers were being written out at three call sites and
+/// each list had picked up elevator displayIds along the way. 807 and 808 are
+/// Gnomeregan's two lifts, 2454 the Searing Gorge scaffold cars, 1587 a
+/// GameObject named "Elevator" — every one of them was being treated as a ship
+/// or drawn as an airship. Values verified against gameobject_template: these
+/// are the displayIds carried by type 15 (MO_TRANSPORT) rows.
+constexpr bool isVehicleTransportDisplay(uint32_t displayId) {
+    switch (displayId) {
+        case 3015:  // ship
+        case 3031:  // zeppelin
+        case 6637:  // Naxxramas
+        case 7087:  // night elf ship
+        case 7446:  // icebreaker
+        case 7546:  // horde zeppelin
+        case 7570:  // Sister Mercy
+        case 7636:  // turtle
+        case 8253: case 8254:   // Orgrim's Hammer / The Skybreaker
+        case 9001: case 9002:   // gunships
+        case 9150: case 9151:   // Icecrown airships
+            return true;
+        default:
+            return false;
+    }
+}
+
+/// Vehicles whose route is a taxi path the server assigns, rather than a
+/// TransportAnimation.dbc loop. Borrowing an animation path for one of these
+/// sends it underwater, so they stay docked until the route arrives.
+constexpr bool isOceanGoingTransportDisplay(uint32_t displayId) {
+    switch (displayId) {
+        case 3015:  // ship
+        case 7087:  // night elf ship
+        case 7446:  // icebreaker
+        case 7636:  // turtle
+            return true;
+        default:
+            return false;
+    }
+}
+
 /// Metadata + CatmullRomSpline for a transport path.
 struct PathEntry {
     math::CatmullRomSpline spline;

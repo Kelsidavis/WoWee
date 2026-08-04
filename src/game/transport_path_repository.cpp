@@ -167,9 +167,7 @@ uint32_t TransportPathRepository::pickFallbackMovingPath(uint32_t entry, uint32_
     }
 
     // Fallback by display model family.
-    const bool looksLikeShip =
-        (displayId == 3015u || displayId == 2454u || displayId == 7446u ||
-         displayId == 7087u);
+    const bool looksLikeShip = isOceanGoingTransportDisplay(displayId);
     if (looksLikeShip) {
         // Continent-crossing ships are server-driven MO_TRANSPORT objects: their
         // route comes from their taxi path (TaxiPathNode.dbc via GO template data[0]),

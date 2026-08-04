@@ -280,10 +280,11 @@ void TransportManager::resolveAndRegisterSpawn(uint64_t guid,
     uint32_t pathId = entry;
 
     // Check if we have a real usable path, otherwise remap/infer/fall back to stationary.
-    const bool shipOrZeppelinDisplay =
-        (displayId == 3015 || displayId == 3031 || displayId == 7546 ||
-         displayId == 7446 || displayId == 1587 || displayId == 2454 ||
-         displayId == 807 || displayId == 808);
+    // Elevators used to be in this list — 807, 808, 2454 and 1587 are lifts,
+    // not airships — and the stricter "must travel 25 units" check below then
+    // rejected their short vertical path, dropping them into the inference
+    // that borrows a nearby route.
+    const bool shipOrZeppelinDisplay = isVehicleTransportDisplay(displayId);
     bool hasUsablePath = hasPathForEntry(entry);
     if (shipOrZeppelinDisplay) {
         hasUsablePath = hasUsableMovingPathForEntry(entry, 25.0f);
@@ -309,9 +310,7 @@ void TransportManager::resolveAndRegisterSpawn(uint64_t guid,
         // and circle in place until — or unless — its taxi path arrives. The ship
         // guard in pickFallbackMovingPath already returns 0 for these displays; skip
         // inference too so the same guard actually holds, leaving the ship docked.
-        const bool looksLikeShip =
-            (displayId == 3015u || displayId == 2454u || displayId == 7446u ||
-             displayId == 7087u);
+        const bool looksLikeShip = isOceanGoingTransportDisplay(displayId);
         uint32_t inferredPath =
             looksLikeShip ? 0u : inferDbcPathForSpawn(canonicalSpawnPos, 1200.0f, allowZOnly);
         if (inferredPath != 0) {
