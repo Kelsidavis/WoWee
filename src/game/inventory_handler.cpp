@@ -1561,7 +1561,11 @@ void InventoryHandler::readItemInBag(int bagIndex, int slotIndex) {
 
 void InventoryHandler::destroyItem(uint8_t bag, uint8_t slot, uint8_t count) {
     if (owner_.getState() != WorldState::IN_WORLD || !owner_.getSocket()) return;
-    if (count == 0) count = 1;
+    // Zero means the whole stack, and this used to turn it into one.
+    // HandleDestroyItemOpcode branches on exactly this: a count destroys that
+    // many, no count destroys the slot. Coercing it away left no way to say
+    // "all of them" — which is what the confirmation prompt is asking about,
+    // and the only thing a stack larger than 255 could be told to do.
     constexpr uint16_t kCmsgDestroyItem = 0x111;
     network::Packet packet(kCmsgDestroyItem);
     packet.writeUInt8(bag);
