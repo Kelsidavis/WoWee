@@ -2403,6 +2403,17 @@ void GameHandler::interactWithGameObject(uint64_t guid) {
     }
     // Always clear melee intent before GO interactions.
     stopAutoAttack();
+    // And get off the mount. Opening a chest, gathering a node or using very
+    // nearly anything else puts a player on foot in WoW, and staying mounted
+    // through it both looks wrong and leaves the server refusing the actions
+    // that check for it.
+    //
+    // Not on a taxi: the flight's mount is not the player's to dismiss, and
+    // there is nothing to interact with mid-flight anyway.
+    if (isMounted() && !isTaxiMountActive()) {
+        LOG_DEBUG("[GO-DIAG] dismounting before interacting");
+        dismount();
+    }
     // Set the pending GO guid so that:
     // 1. cancelCast() won't send CMSG_CANCEL_CAST for GO-triggered casts
     //    (e.g., "Opening" on a quest chest) — without this, any movement
