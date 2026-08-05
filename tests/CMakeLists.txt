@@ -166,6 +166,15 @@ add_executable(test_chat_types test_chat_types.cpp)
 target_include_directories(test_chat_types PRIVATE ${TEST_INCLUDE_DIRS})
 target_include_directories(test_chat_types SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
 target_link_libraries(test_chat_types PRIVATE catch2_main)
+# world_packets.hpp reaches entity.hpp, which includes math/spline.hpp and so
+# <glm/glm.hpp>. glm arrives with the imported target, not with any directory
+# listed above, so without this the target only builds where glm happens to sit
+# in a default system include path.
+if(TARGET glm::glm-header-only)
+    target_link_libraries(test_chat_types PRIVATE glm::glm-header-only)
+elseif(TARGET glm::glm)
+    target_link_libraries(test_chat_types PRIVATE glm::glm)
+endif()
 add_test(NAME chat_types COMMAND test_chat_types)
 register_test_target(test_chat_types)
 # ── test_equipment_set_packets ───────────────────────────────
