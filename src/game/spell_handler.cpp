@@ -1010,30 +1010,45 @@ void SpellHandler::switchTalentSpec(uint8_t newSpec) {
         LOG_WARNING("Invalid talent spec: ", (int)newSpec);
         return;
     }
-
     if (newSpec == activeTalentSpec_) {
         LOG_INFO("Already on spec ", (int)newSpec);
         return;
     }
+    if (owner_.getState() != WorldState::IN_WORLD || !owner_.getSocket()) return;
 
-    if (owner_.getState() == WorldState::IN_WORLD && owner_.getSocket()) {
-        auto pkt = ActivateTalentGroupPacket::build(static_cast<uint32_t>(newSpec));
-        owner_.getSocket()->send(pkt);
-        LOG_INFO("Sent CMSG_SET_ACTIVE_TALENT_GROUP_OBSOLETE: group=", (int)newSpec);
+    // Switching spec is a spell cast, not a message. AzerothCore lists
+    // CMSG_SET_ACTIVE_TALENT_GROUP_OBSOLETE as Handle_NULL — it reads the
+    // packet and does nothing — and the effect that actually moves a player
+    // between specs is SPELL_EFFECT_TALENT_SPEC_SELECT, cast at themselves.
+    //
+    // This sent that dead opcode and then set the active spec locally anyway.
+    // So the client believed it was on the second spec while the server had
+    // never left the first, and everything the talent frame reads came from
+    // the second spec's slots — which the server never fills, because it keeps
+    // reporting the first. That is both halves of what was seen: a spec that
+    // switched itself, and a first spec that never received the points earned
+    // by levelling.
+    //
+    // Named the way Spell.dbc names them, which is the opposite way round from
+    // how the ids read: 63645 is the primary and 63644 is the secondary.
+    constexpr uint32_t kActivatePrimarySpec = 63645;
+    constexpr uint32_t kActivateSecondarySpec = 63644;
+    const uint32_t spellId = (newSpec == 0) ? kActivatePrimarySpec
+                                            : kActivateSecondarySpec;
+
+    // Both are taught when dual specialisation is bought, so not knowing one
+    // means the character has only the single spec.
+    if (!knownSpells_.count(spellId)) {
+        owner_.addUIError("You have not learned Dual Talent Specialization.");
+        owner_.addSystemChatMessage("You have not learned Dual Talent Specialization.");
+        return;
     }
-    activeTalentSpec_ = newSpec;
 
-    LOG_INFO("Switched to talent spec ", (int)newSpec,
-             " (unspent=", (int)unspentTalentPoints_[newSpec],
-             ", learned=", learnedTalents_[newSpec].size(), ")");
-
-    std::string msg = "Switched to spec " + std::to_string(newSpec + 1);
-    if (unspentTalentPoints_[newSpec] > 0) {
-        msg += " (" + std::to_string(unspentTalentPoints_[newSpec]) + " unspent point";
-        if (unspentTalentPoints_[newSpec] > 1) msg += "s";
-        msg += ")";
-    }
-    owner_.addSystemChatMessage(msg);
+    castSpell(spellId, owner_.getPlayerGuid());
+    LOG_INFO("Activating talent spec ", (int)newSpec, " by casting ", spellId);
+    // Deliberately not set here. The server answers a successful switch with
+    // SMSG_TALENTS_INFO naming the group it moved to, and that is the only
+    // thing that should move this — a local guess is what caused the drift.
 }
 
 void SpellHandler::confirmTalentWipe() {
