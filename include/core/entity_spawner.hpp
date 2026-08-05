@@ -365,6 +365,16 @@ private:
     std::unordered_set<uint64_t> pendingCreatureSpawnGuids_;
     std::unordered_map<uint64_t, std::chrono::steady_clock::time_point>
         creatureSpawnRetryDeadlines_;
+    /// How many retry windows a creature has already used up.
+    ///
+    /// Running out used to abandon the spawn for good, and nothing ever asked
+    /// again: the server does not re-send an object that is already in range,
+    /// so the creature stayed missing until something made it re-send — which
+    /// is what walking out of the zone and back does, and why they "appear
+    /// when I zone again". A window that expires now buys another one, up to
+    /// this many, so a spawn that keeps failing is delayed rather than lost.
+    std::unordered_map<uint64_t, int> creatureSpawnRetryWindowsUsed_;
+    static constexpr int MAX_CREATURE_SPAWN_RETRY_WINDOWS = 6;
     std::unordered_set<uint32_t> nonRenderableCreatureDisplayIds_;
     std::unordered_set<uint64_t> creaturePermanentFailureGuids_;
     void processCreatureSpawnQueue(bool unlimited = false);

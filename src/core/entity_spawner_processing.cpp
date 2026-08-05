@@ -625,12 +625,30 @@ void EntitySpawner::processCreatureSpawnQueue(bool unlimited) {
                 pendingCreatureSpawnGuids_.insert(s.guid);
             } else {
                 creatureSpawnRetryDeadlines_.erase(s.guid);
-                LOG_WARNING("Dropping creature spawn after retry window: guid=0x",
-                            std::hex, s.guid, std::dec,
-                            " displayId=", s.displayId);
+                const int used = ++creatureSpawnRetryWindowsUsed_[s.guid];
+                if (used < MAX_CREATURE_SPAWN_RETRY_WINDOWS) {
+                    // Another window rather than an abandonment. Nothing asks
+                    // again once this queue lets go: the server does not
+                    // re-send an object already in range, so the creature was
+                    // simply missing from then on.
+                    LOG_WARNING("Creature spawn still failing after retry window ",
+                                used, " of ", MAX_CREATURE_SPAWN_RETRY_WINDOWS,
+                                ": guid=0x", std::hex, s.guid, std::dec,
+                                " displayId=", s.displayId, " — retrying");
+                    pendingCreatureSpawns_.push_back(s);
+                    pendingCreatureSpawnGuids_.insert(s.guid);
+                } else {
+                    creatureSpawnRetryWindowsUsed_.erase(s.guid);
+                    LOG_WARNING("Dropping creature spawn after ",
+                                MAX_CREATURE_SPAWN_RETRY_WINDOWS,
+                                " retry windows: guid=0x",
+                                std::hex, s.guid, std::dec,
+                                " displayId=", s.displayId);
+                }
             }
         } else {
             creatureSpawnRetryDeadlines_.erase(s.guid);
+            creatureSpawnRetryWindowsUsed_.erase(s.guid);
         }
         rotationsLeft = pendingCreatureSpawns_.size();
         processed++;
@@ -1902,6 +1920,9 @@ void EntitySpawner::despawnCreature(uint64_t guid) {
     requestedCreatureDisplayIds_.erase(guid);
     creatureActiveEmotes_.erase(guid);
     creatureSpawnRetryDeadlines_.erase(guid);
+    // Cleared with the rest, so the map does not grow and a creature that
+    // comes back into range starts with its full allowance again.
+    creatureSpawnRetryWindowsUsed_.erase(guid);
     creaturePermanentFailureGuids_.erase(guid);
     deadCreatureGuids_.erase(guid);
 
