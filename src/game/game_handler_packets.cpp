@@ -231,7 +231,9 @@ void GameHandler::registerOpcodeHandlers() {
         }
     };
 
-    registerSkipHandler(Opcode::SMSG_PET_NAME_QUERY_RESPONSE);
+    // SMSG_PET_NAME_QUERY_RESPONSE is handled in SpellHandler now, which is
+    // where the request that provokes it is sent. It was skipped because
+    // nothing asked, and nothing asked because it was skipped.
 
     // -----------------------------------------------------------------------
     // Entity delta updates: health / power / world state / combo / timers / PvP

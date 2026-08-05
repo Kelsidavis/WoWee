@@ -293,7 +293,23 @@ public:
     void loadSkillLineAbilityDbc();
     void categorizeTrainerSpells();
 
+    /// Ask the server what the pet is called.
+    ///
+    /// The name a player gave a pet arrives only in answer to
+    /// CMSG_PET_NAME_QUERY. Without it a pet wears its creature template's
+    /// name — "Voidwalker" where the player wrote something else — which is
+    /// what the pet frame, its nameplate and the pet bar's tooltip all show.
+    ///
+    /// The pet number in that request is a key the server echoes back and does
+    /// not look anything up with: SendPetNameQuery finds the pet by guid. So
+    /// this sends a number of its own making and uses it to match the reply to
+    /// the pet it asked about, which is what the field would have been for.
+    void requestPetName(uint64_t petGuid);
+
 private:
+    std::unordered_map<uint32_t, uint64_t> pendingPetNameQueries_;
+    uint32_t nextPetNameQueryKey_ = 1;
+
     // --- Packet handlers ---
     void handleInitialSpells(network::Packet& packet);
     void handleCastFailed(network::Packet& packet);

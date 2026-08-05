@@ -472,7 +472,52 @@ static std::string formatSpellNameList(GameHandler& handler,
 SpellHandler::SpellHandler(GameHandler& owner)
     : owner_(owner) {}
 
+void SpellHandler::requestPetName(uint64_t petGuid) {
+    if (petGuid == 0 || !owner_.getSocket()) return;
+    if (owner_.getState() != WorldState::IN_WORLD) return;
+    const uint32_t key = nextPetNameQueryKey_++;
+    pendingPetNameQueries_[key] = petGuid;
+    network::Packet pkt(wireOpcode(Opcode::CMSG_PET_NAME_QUERY));
+    pkt.writeUInt32(key);
+    pkt.writeUInt64(petGuid);
+    owner_.getSocket()->send(pkt);
+}
+
 void SpellHandler::registerOpcodes(DispatchTable& table) {
+    // The reply, which was read to the end and thrown away — a skip handler
+    // for a message nothing had asked for, since nothing sent the request.
+    //
+    // Shape from AzerothCore's SendPetNameQuery: the key back, the name, and
+    // the timestamp the name was set. A pet it could not find answers a zero
+    // byte where the name would be, which is the empty string and means "keep
+    // what you have" rather than "the pet has no name".
+    table[Opcode::SMSG_PET_NAME_QUERY_RESPONSE] = [this](network::Packet& packet) {
+        if (!packet.hasRemaining(4)) { packet.skipAll(); return; }
+        const uint32_t key = packet.readUInt32();
+        const std::string name = packet.readString();
+        packet.skipAll();
+
+        auto it = pendingPetNameQueries_.find(key);
+        if (it == pendingPetNameQueries_.end()) return;
+        const uint64_t guid = it->second;
+        pendingPetNameQueries_.erase(it);
+        if (name.empty()) return;
+
+        auto entity = owner_.getEntityManager().getEntity(guid);
+        if (!entity) return;
+        auto unit = std::dynamic_pointer_cast<Unit>(entity);
+        if (!unit) return;
+        unit->setName(name);
+        LOG_INFO("Pet name: 0x", std::hex, guid, std::dec, " is '", name, "'");
+        // Both, because the two frames listen for different ones: the pet
+        // frame redraws its name from UNIT_NAME_UPDATE, and the pet bar and
+        // anything else keyed on the pet rebuild from PET_UI_UPDATE.
+        if (guid == owner_.petGuidRef()) {
+            owner_.fireAddonEvent("UNIT_NAME_UPDATE", {"pet"});
+            owner_.fireAddonEvent("PET_UI_UPDATE", {});
+        }
+    };
+
     table[Opcode::SMSG_INITIAL_SPELLS] = [this](network::Packet& packet) { handleInitialSpells(packet); };
     table[Opcode::SMSG_CAST_FAILED] = [this](network::Packet& packet) { handleCastFailed(packet); };
     table[Opcode::SMSG_SPELL_START] = [this](network::Packet& packet) { handleSpellStart(packet); };
@@ -2436,6 +2481,9 @@ void SpellHandler::handlePetSpells(network::Packet& packet) {
     }
 
     owner_.petGuidRef() = packet.readUInt64();
+    // Ask what it is called. Nothing else does, and the name a player gave a
+    // pet comes back in answer to this and nothing else.
+    if (owner_.petGuidRef() != 0) requestPetName(owner_.petGuidRef());
     if (owner_.petGuidRef() == 0) {
         owner_.petSpellListRef().clear();
         owner_.petAutocastSpellsRef().clear();
