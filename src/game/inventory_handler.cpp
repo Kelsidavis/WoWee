@@ -668,18 +668,25 @@ void InventoryHandler::registerOpcodes(DispatchTable& table) {
     table[Opcode::SMSG_AUCTION_COMMAND_RESULT] = [this](network::Packet& packet) { handleAuctionCommandResult(packet); };
 
     table[Opcode::SMSG_AUCTION_OWNER_NOTIFICATION] = [this](network::Packet& packet) {
-        // WotLK format: auctionId(4) + bid(4) + unk(4) + unk2(4) + unk3(4) +
-        // item_template(4) + item_count(4) = 28 bytes. This packet is only sent when
-        // an owned auction SELLS — expiry and outbids arrive via their own opcodes
-        // (SMSG_AUCTION_REMOVED_NOTIFICATION / SMSG_AUCTION_BIDDER_NOTIFICATION).
-        // The item entry lives at offset 20, not 12; reading field 3 (a zero unk)
-        // made every "sold" line say "Item #0".
+        // SendAuctionOwnerNotification writes:
+        //   auctionId(4) bid(4) unk(4) unkGuid(8) item_template(4) unk(4)
+        //   unkTime(float 4) = 32 bytes.
+        // Sent only when an owned auction SELLS — expiry and outbids arrive on
+        // their own opcodes (SMSG_AUCTION_REMOVED_NOTIFICATION /
+        // SMSG_AUCTION_BIDDER_NOTIFICATION).
+        //
+        // The item entry is at offset 20 and reading field 3 made every "sold"
+        // line say "Item #0". That was fixed by counting six uint32s to reach
+        // twenty, which lands in the right place and describes the packet
+        // wrongly: the twelve bytes in the middle are one eight-byte guid and
+        // one word, not three words. Written out properly here so the next
+        // person to add a field does not count from a layout that is not the
+        // one on the wire.
         if (packet.hasRemaining(24)) {
             /*uint32_t auctionId =*/ packet.readUInt32();
             /*uint32_t bid       =*/ packet.readUInt32();
             /*uint32_t unk       =*/ packet.readUInt32();
-            /*uint32_t unk2      =*/ packet.readUInt32();
-            /*uint32_t unk3      =*/ packet.readUInt32();
+            /*uint64_t unkGuid   =*/ packet.readUInt64();
             uint32_t itemEntry = packet.readUInt32();
             owner_.ensureItemInfo(itemEntry);
             auto* info = owner_.getItemInfo(itemEntry);

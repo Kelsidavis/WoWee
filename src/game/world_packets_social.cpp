@@ -1123,9 +1123,15 @@ network::Packet GroupRaidConvertPacket::build() {
 
 network::Packet SetLootMethodPacket::build(uint32_t method, uint32_t threshold, uint64_t masterLooterGuid) {
     network::Packet packet(wireOpcode(Opcode::CMSG_LOOT_METHOD));
+    // Method, master looter, threshold — in that order.
+    // HandleLootMethodOpcode reads `lootMethod >> lootMaster >> lootThreshold`,
+    // and the threshold was being written where the guid goes: the server took
+    // the threshold and the low half of the guid as the master looter, and the
+    // high half as the threshold. Setting master loot named nobody, and every
+    // other method came with a quality threshold in the millions.
     packet.writeUInt32(method);
-    packet.writeUInt32(threshold);
     packet.writeUInt64(masterLooterGuid);
+    packet.writeUInt32(threshold);
     LOG_DEBUG("Built CMSG_LOOT_METHOD: method=", method, " threshold=", threshold,
               " masterLooter=0x", std::hex, masterLooterGuid, std::dec);
     return packet;

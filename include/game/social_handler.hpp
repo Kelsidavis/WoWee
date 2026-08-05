@@ -221,6 +221,8 @@ public:
 
     // Summon request
     void handleSummonRequest(network::Packet& packet);
+    /// CMSG_SUMMON_RESPONSE: the summoner's guid, then yes or no.
+    void sendSummonResponse(bool accept);
     void acceptSummon();
     void declineSummon();
 

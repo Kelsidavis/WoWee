@@ -3213,22 +3213,34 @@ void SocialHandler::handleSummonRequest(network::Packet& packet) {
     owner_.fireAddonEvent("CONFIRM_SUMMON", {});
 }
 
-void SocialHandler::acceptSummon() {
-    if (!owner_.pendingSummonRequestRef() || !owner_.getSocket()) return;
+/// Both answers to a summon: who summoned, then yes or no.
+///
+/// HandleSummonResponseOpcode reads `ObjectGuid summoner_guid` and then a bool,
+/// nine bytes. Both answers were a single byte, so the server had one byte
+/// where it wanted eight, ran off the end of the buffer and dropped the packet
+/// — accepting a summon has never once reached it, and neither has declining
+/// one. The same mistake as the battlefield answers below, made next door.
+///
+/// The guid is the one SMSG_SUMMON_REQUEST arrived with, which is already kept
+/// so the message can name whoever cast it.
+void SocialHandler::sendSummonResponse(bool accept) {
+    if (!owner_.getSocket()) return;
     owner_.pendingSummonRequestRef() = false;
     network::Packet pkt(wireOpcode(Opcode::CMSG_SUMMON_RESPONSE));
-    pkt.writeUInt8(1);  // 1 = accept
+    pkt.writeUInt64(owner_.summonerGuidRef());
+    pkt.writeUInt8(accept ? 1 : 0);
     owner_.getSocket()->send(pkt);
+}
+
+void SocialHandler::acceptSummon() {
+    if (!owner_.pendingSummonRequestRef()) return;
+    sendSummonResponse(true);
     owner_.addSystemChatMessage("Accepting summon...");
     LOG_INFO("Accepted summon from ", owner_.summonerNameRef());
 }
 
 void SocialHandler::declineSummon() {
-    if (!owner_.getSocket()) return;
-    owner_.pendingSummonRequestRef() = false;
-    network::Packet pkt(wireOpcode(Opcode::CMSG_SUMMON_RESPONSE));
-    pkt.writeUInt8(0);  // 0 = decline
-    owner_.getSocket()->send(pkt);
+    sendSummonResponse(false);
     owner_.addSystemChatMessage("Summon declined.");
 }
 
