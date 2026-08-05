@@ -992,7 +992,32 @@ void GameScreen::renderMinimapMarkers(game::GameHandler& gameHandler) {
     // Zone name display — drawn inside the top edge of the minimap circle
     {
         std::string zoneName;
-        const uint32_t zoneId = gameHandler.getWorldStateZoneId();
+        // The live terrain-derived zone first; the server's only if that has
+        // nothing. The server tells us its zone on SMSG_INIT_WORLD_STATES and
+        // at no other time, so preferring it left this label naming the last
+        // zone the server announced rather than the one being walked through.
+        uint32_t zoneId = renderer ? renderer->getCurrentZoneId() : 0u;
+        const uint32_t serverZoneId = gameHandler.getWorldStateZoneId();
+        if (zoneId == 0) zoneId = serverZoneId;
+        // Said once each time the pair changes. The two disagreeing is not by
+        // itself a fault — the server only revises its answer when it notices
+        // a zone change — but a disagreement that persists while standing
+        // still means the server has the player somewhere else, which is also
+        // why no creatures would arrive. This prints both names and the
+        // position, which is what tells those two cases apart.
+        if (serverZoneId != 0 && zoneId != 0 && serverZoneId != zoneId) {
+            static uint64_t lastReported = 0;
+            const uint64_t pair = (static_cast<uint64_t>(serverZoneId) << 32) | zoneId;
+            if (pair != lastReported) {
+                lastReported = pair;
+                const auto& mi = gameHandler.getMovementInfo();
+                LOG_WARNING("Zone disagreement: server says ", serverZoneId, " (",
+                            gameHandler.getWhoAreaName(serverZoneId),
+                            "), terrain under the player says ", zoneId, " (",
+                            gameHandler.getWhoAreaName(zoneId),
+                            ") at canonical ", mi.x, ", ", mi.y, ", ", mi.z);
+            }
+        }
         if (zoneId != 0) {
             zoneName = gameHandler.getWhoAreaName(zoneId);
             if (zoneName.empty()) {
