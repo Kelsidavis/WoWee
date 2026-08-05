@@ -259,8 +259,18 @@ void GameScreen::updateCharacterGeosets(game::Inventory& inventory) {
         }
     }
 
+    // Whether a helm and a cloak are *shown*, which is not the same question as
+    // whether one is worn. Both toggles hide the model and neither was reaching
+    // the geosets, so turning the cloak off left the cloak's own body geoset on
+    // and turning the helm off left the player bald under nothing.
+    bool helmShown = true, cloakShown = true;
+    if (auto* gh = app.getGameHandler()) {
+        helmShown = gh->isHelmVisible();
+        cloakShown = gh->isCloakVisible();
+    }
+
     // Back/Cloak: inventoryType 16 → group 15
-    geosets.insert(hasEquippedType({16}) ? 1502 : 1501);
+    geosets.insert((hasEquippedType({16}) && cloakShown) ? 1502 : 1501);
 
     // Tabard: inventoryType 19 → group 12
     if (hasEquippedType({19})) {
@@ -271,7 +281,10 @@ void GameScreen::updateCharacterGeosets(game::Inventory& inventory) {
     // Group 0 holds the body plus one scalp; 0 itself is the body and stays.
     // The other-player path has always done this, so a helm covered their hair
     // and not yours.
-    if (hasEquippedType({1})) {
+    // Only while it is actually on the head. The show-helm toggle takes the
+    // model away and left this branch running, so hiding a helm hid the hair
+    // with it and the player stood there bald wearing nothing.
+    if (hasEquippedType({1}) && helmShown) {
         const uint32_t headDisplayId = findEquippedDisplayId({1});
         uint8_t genderId = 0;
         if (auto* gh = app.getGameHandler()) {
