@@ -2501,9 +2501,18 @@ void LuaEngine::registerCoreAPI() {
         "NUM_PET_ACTION_SLOTS = 10\n"
         // Common WoW constants used by many addons
         "MAX_TALENT_TABS = 3\n"
-        "MAX_NUM_TALENTS = 100\n"
-        "BOOKTYPE_SPELL = 0\n"
-        "BOOKTYPE_PET = 1\n"
+        // Values as 3.3.5 has them. These are pre-set so an addon has them
+        // before anything else runs, and on this branch the original interface
+        // is not loaded at all — so these are the only values there are, and a
+        // wrong one is wrong for good.
+        //
+        // Both book types were numbers where the game uses strings, which is
+        // the quietest kind of wrong: every comparison against them is false
+        // rather than an error, so an addon asking "is this the pet book"
+        // always heard no and nothing said why.
+        "MAX_NUM_TALENTS = 40\n"
+        "BOOKTYPE_SPELL = 'spell'\n"
+        "BOOKTYPE_PET = 'pet'\n"
         "MAX_PARTY_MEMBERS = 4\n"
         "MAX_RAID_MEMBERS = 40\n"
         "MAX_ARENA_TEAMS = 3\n"
@@ -2511,7 +2520,9 @@ void LuaEngine::registerCoreAPI() {
         "INVSLOT_LAST_EQUIPPED = 19\n"
         "NUM_BAG_SLOTS = 4\n"
         "NUM_BANKBAGSLOTS = 7\n"
-        "CONTAINER_BAG_OFFSET = 0\n"
+        // What a bag index is offset by to name its container, which is what
+        // PutItemInBag adds. Zero made that arithmetic name the backpack.
+        "CONTAINER_BAG_OFFSET = 19\n"
         "MAX_SKILLLINE_TABS = 8\n"
         "TRADE_ENCHANT_SLOT = 7\n"
         "function GetPetActionInfo(slot) return nil end\n"
