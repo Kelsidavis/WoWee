@@ -1,5 +1,24 @@
 # Changelog
 
+## [v2.0.38-preview] — 2026-08-05
+
+### Fixed
+- **The battleground scoreboard read a row no server sends.** A battleground's per-player row and an arena's are two different shapes written by two different overrides, and the type byte at the top of the packet says which follows — this read one that was neither, taking a team byte from the arena shape and then the battleground's four counters. Everything after the guid was off by a byte, and damage and healing were skipped entirely, which is why both always read zero. The end-of-match flag and the winner were also read *after* the player rows, where there is nothing left to read them from. A battleground row carries no team at all, so the scoreboard no longer groups or colours by a field nobody fills — it used to be filled by this same misread, which is what made it look as though it worked
+- **Accepting a summon sent one byte where the server reads nine.** The reply carries the summoner's guid and the accept flag; sending the flag alone left the packet short, and the server discarded it — so accepting a summon did nothing and the offer expired
+- **Every guid in the equipment-set family was read and written flat.** All twenty-one of them: the server packs a guid as a mask byte followed by only its non-zero bytes, and reading eight raw bytes instead put every field after the first guid at the wrong offset. Saving, equipping and deleting an equipment set all sent packets the server could not parse
+- **An achievement's progress counter is a packed guid too**, and reading it as a plain 64-bit value left every counter wrong and no criterion drawing a progress bar
+- **The quest log and the quest-giver marks survived a character switch.** Logging out to the character list and back in on someone else kept the previous character's quest log, the quests still pending a query, and the exclamation and question marks over every NPC
+- **Ten chat types the client could not name.** The event name is built from the type byte, so a value missing from the enum is a line of chat that never appears — no error and nothing in the log. The whole run between LOOT and the battleground block was absent
+- **O opened the social window and would not close it again.** The guard read `WantCaptureKeyboard`, which is true whenever any ImGui window wants the keyboard — and opening this window is what gives it focus, so the key that opened it could never close it. Every other toggle key gates on text focus alone
+
+### Added
+- **The pet's name is asked for**, rather than left to whatever the creature template calls it
+- **`-DWOWEE_SYSTEM_LUA=ON` links an installed Lua 5.1** instead of the vendored copy, which is what a distribution package usually wants. Off by default, so which interpreter a build links does not depend on what happens to be installed. It must be 5.1: configuring stops with a message rather than linking a later one, which is not redundant with the version handed to `find_package` — that is a minimum, and CMake's own `FindLua` reports a 5.4 install as satisfying it
+
+### Changed
+- **The top-level `CMakeLists.txt` is 1428 lines rather than 2134.** The command-line tools and the packaging rules moved to `cmake/Tools.cmake` and `cmake/Packaging.cmake`, verbatim and included from the same scope; both trees generate the same 2190 targets
+- **glm is linked once, on the target every test links.** There were thirty copies of the same per-target block, each added because one platform's CI broke — glm's include path arrives with an imported target rather than any directory the tests file lists, so a test that reaches `<glm/glm.hpp>` through a chain of headers compiles anyway on Linux and fails on macOS. Twenty-six of the thirty also checked only `glm::glm`, with no branch for the header-only target GLM 1.0 exposes
+
 ## [v2.0.37-preview] — 2026-08-02
 
 ### Fixed
