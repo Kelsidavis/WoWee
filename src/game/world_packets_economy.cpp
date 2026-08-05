@@ -136,16 +136,29 @@ bool ActivateTaxiReplyParser::parse(network::Packet& packet, ActivateTaxiReplyDa
     return true;
 }
 
-network::Packet ActivateTaxiExpressPacket::build(uint64_t npcGuid, uint32_t totalCost, const std::vector<uint32_t>& pathNodes) {
+network::Packet ActivateTaxiExpressPacket::build(uint64_t npcGuid,
+                                                const std::vector<uint32_t>& pathNodes) {
+    // guid, node count, then the nodes. That is all of it.
+    //
+    // A total cost was being written between the guid and the count, and
+    // HandleActivateTaxiExpressOpcode does not read one — so the server took
+    // the cost as the number of nodes to expect. What followed was read as the
+    // first node: the client's own count, a small number that is no taxi node
+    // anyone has visited, which the server answers with ERR_TAXINOTVISITED and
+    // rfinish. So a multi-hop flight was refused for a flight point the player
+    // had certainly been to, and with a large enough cost the server ran off
+    // the end of the buffer and dropped the packet instead.
+    //
+    // Every multi-hop route goes this way, which is why single hops worked and
+    // nothing longer ever did.
     network::Packet packet(wireOpcode(Opcode::CMSG_ACTIVATETAXIEXPRESS));
     packet.writeUInt64(npcGuid);
-    packet.writeUInt32(totalCost);
     packet.writeUInt32(static_cast<uint32_t>(pathNodes.size()));
     for (uint32_t nodeId : pathNodes) {
         packet.writeUInt32(nodeId);
     }
     LOG_INFO("ActivateTaxiExpress: npc=0x", std::hex, npcGuid, std::dec,
-             " cost=", totalCost, " nodes=", pathNodes.size());
+             " nodes=", pathNodes.size());
     return packet;
 }
 

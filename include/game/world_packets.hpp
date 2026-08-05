@@ -2586,7 +2586,9 @@ public:
 /** CMSG_ACTIVATETAXIEXPRESS packet builder */
 class ActivateTaxiExpressPacket {
 public:
-    static network::Packet build(uint64_t npcGuid, uint32_t totalCost, const std::vector<uint32_t>& pathNodes);
+    /// No cost field. HandleActivateTaxiExpressOpcode reads a guid and then
+    /// straight into the node count, and one was being written between them.
+    static network::Packet build(uint64_t npcGuid, const std::vector<uint32_t>& pathNodes);
 };
 
 /** CMSG_ACTIVATETAXI packet builder */

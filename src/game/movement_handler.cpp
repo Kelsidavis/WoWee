@@ -2979,7 +2979,7 @@ void MovementHandler::activateTaxi(uint32_t destNodeId) {
     // everything further did not.
     if (path.size() > 2) {
         auto expressPkt =
-            ActivateTaxiExpressPacket::build(taxiNpcGuid_, totalCost, path);
+            ActivateTaxiExpressPacket::build(taxiNpcGuid_, path);
         owner_.getSocket()->send(expressPkt);
         LOG_WARNING("Taxi activate: sent EXPRESS for ", path.size(),
                     " nodes (a multi-hop route has no single path to ask for)");
