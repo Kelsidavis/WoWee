@@ -991,8 +991,13 @@ void SocialPanel::renderBossFrames(game::GameHandler& gameHandler,
 void SocialPanel::renderGuildRoster(game::GameHandler& gameHandler,
                                        ChatPanel& chatPanel) {
     // Guild Roster toggle (customizable keybind)
+    // Chat and text fields, not WantCaptureKeyboard. That flag is true whenever
+    // any ImGui window wants the keyboard at all, and opening this window is
+    // what gives it focus — so the key that opened it could not close it again.
+    // Every other toggle key in the client gates on text focus alone, and
+    // game_screen says why where it does it: a window having focus is not a
+    // reason for its own toggle to stop working.
     if (!chatPanel.isChatInputActive() && !ImGui::GetIO().WantTextInput &&
-        !ImGui::GetIO().WantCaptureKeyboard &&
         KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_GUILD_ROSTER)) {
         showGuildRoster_ = !showGuildRoster_;
         if (showGuildRoster_) {
