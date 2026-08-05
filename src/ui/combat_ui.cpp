@@ -1941,14 +1941,22 @@ void CombatUI::renderBgScoreboard(game::GameHandler& gameHandler) {
             ImGui::TableSetupColumn(col.c_str(), ImGuiTableColumnFlags_WidthFixed, 52.0f);
         ImGui::TableHeadersRow();
 
-        // Sort: Alliance first, then Horde; within each team by KB desc
+        // Sort: Alliance first, then Horde; within each team by KB desc.
+        //
+        // Only an arena row carries a team. A battleground's does not — the
+        // server writes killing blows, honourable kills, deaths, bonus honour,
+        // damage and healing, and nothing else — so grouping one by team is
+        // grouping it by a field nobody filled. It used to be filled by a
+        // misread of the row, which is why this looked as though it worked.
         std::vector<const game::GameHandler::BgPlayerScore*> sorted;
         sorted.reserve(data->players.size());
         for (const auto& ps : data->players) sorted.push_back(&ps);
         std::stable_sort(sorted.begin(), sorted.end(),
             [](const game::GameHandler::BgPlayerScore* a,
                const game::GameHandler::BgPlayerScore* b) {
-                if (a->team != b->team) return a->team > b->team;  // Alliance(1) first
+                if (a->hasTeam && b->hasTeam && a->team != b->team) {
+                    return a->team > b->team;  // Alliance(1) first
+                }
                 return a->killingBlows > b->killingBlows;
             });
 
@@ -1956,9 +1964,13 @@ void CombatUI::renderBgScoreboard(game::GameHandler& gameHandler) {
         for (const auto* ps : sorted) {
             ImGui::TableNextRow();
 
-            // Team
+            // Team, where the row has one. A dash rather than a guess: naming
+            // every player Horde because the field defaulted to zero is worse
+            // than saying the packet did not carry it.
             ImGui::TableNextColumn();
-            if (ps->team == 1)
+            if (!ps->hasTeam)
+                ImGui::TextUnformatted("-");
+            else if (ps->team == 1)
                 ImGui::TextColored(colors::kLightBlue, "Alliance");
             else
                 ImGui::TextColored(colors::kHostileRed, "Horde");

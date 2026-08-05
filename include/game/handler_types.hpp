@@ -140,6 +140,17 @@ struct BgPlayerScore {
     uint32_t    deaths          = 0;
     uint32_t    honorableKills  = 0;
     uint32_t    bonusHonor      = 0;
+    /// Both are on the wire and both were being skipped, which is why the
+    /// scoreboard showed two columns of zeros.
+    uint32_t    damageDone      = 0;
+    uint32_t    healingDone     = 0;
+    /// Whether the team above came from the packet. Arenas carry a team byte
+    /// and battlegrounds do not, so a battleground row has no faction to give
+    /// and saying so is better than answering zero as though it meant Horde.
+    bool        hasTeam         = false;
+    /// The objective values, in the order the battleground writes them. The
+    /// names are not on the wire — this used to read one before each value and
+    /// took every value after the first from the wrong offset.
     std::vector<std::pair<std::string, uint32_t>> bgStats;
 };
 

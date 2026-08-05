@@ -2981,6 +2981,13 @@ void SocialHandler::handleArenaError(network::Packet& packet) {
 void SocialHandler::handlePvpLogData(network::Packet& packet) {
     auto remaining = [&]() { return packet.getRemainingSize(); };
     if (remaining() < 1) return;
+    // The layout is settled and the dump that asked about it is gone.
+    //
+    // The question it existed to answer — whether there is a team byte after
+    // the guid — is answered by the source rather than by a byte count, and the
+    // answer is "in an arena, yes; in a battleground, no". They are two
+    // different rows written by two different overrides, and the type byte at
+    // the top of this packet says which one follows.
     bgScoreboard_ = BgScoreboardData{};
     bgScoreboard_.isArena = (packet.readUInt8() != 0);
     if (bgScoreboard_.isArena) {
@@ -2992,31 +2999,73 @@ void SocialHandler::handlePvpLogData(network::Packet& packet) {
             bgScoreboard_.arenaTeams[t].teamName = remaining() > 0 ? packet.readString() : "";
         }
     }
+    // Ended, and the winner, BEFORE the player count. This was read after the
+    // players, where there is nothing left to read it from.
+    if (remaining() < 1) return;
+    bgScoreboard_.hasWinner = (packet.readUInt8() != 0);
+    if (bgScoreboard_.hasWinner) {
+        if (remaining() < 1) return;
+        bgScoreboard_.winner = packet.readUInt8();
+    }
+
     if (remaining() < 4) return;
     uint32_t playerCount = packet.readUInt32();
     bgScoreboard_.players.reserve(playerCount);
-    for (uint32_t i = 0; i < playerCount && remaining() >= 13; ++i) {
+    for (uint32_t i = 0; i < playerCount && remaining() >= 12; ++i) {
         BgPlayerScore ps;
-        ps.guid = packet.readUInt64(); ps.team = packet.readUInt8();
-        ps.killingBlows = packet.readUInt32(); ps.honorableKills = packet.readUInt32();
-        ps.deaths = packet.readUInt32(); ps.bonusHonor = packet.readUInt32();
+        ps.guid = packet.readUInt64();
+        // Two different rows, and the type byte at the top says which.
+        //
+        // BattlegroundScore::AppendToPacket — killing blows, honourable kills,
+        // deaths, bonus honour, damage, healing. No team.
+        // ArenaScore::AppendToPacket — killing blows, a team BYTE, damage,
+        // healing. No honourable kills, deaths or honour at all.
+        //
+        // This read one row that was neither: a team byte from the arena
+        // shape followed by the battleground's four counters, then a stat block
+        // with null-terminated names that no core writes. Everything after the
+        // guid was off by a byte, and damage and healing were skipped entirely
+        // — which is why GetBattlefieldScore answered zero for both.
+        ps.killingBlows = packet.readUInt32();
+        if (bgScoreboard_.isArena) {
+            if (remaining() < 1) { bgScoreboard_.players.push_back(std::move(ps)); break; }
+            ps.team = packet.readUInt8();
+            ps.hasTeam = true;
+        } else {
+            if (remaining() < 12) { bgScoreboard_.players.push_back(std::move(ps)); break; }
+            ps.honorableKills = packet.readUInt32();
+            ps.deaths         = packet.readUInt32();
+            ps.bonusHonor     = packet.readUInt32();
+            // No team on the wire for a battleground. The byte that used to
+            // fill this was the low byte of the killing blows, so the faction
+            // tabs were already filtering on nothing; leaving it unset is the
+            // same amount of information, honestly labelled.
+        }
+        if (remaining() < 8) { bgScoreboard_.players.push_back(std::move(ps)); break; }
+        ps.damageDone  = packet.readUInt32();
+        ps.healingDone = packet.readUInt32();
+
         { auto ent = owner_.getEntityManager().getEntity(ps.guid);
           if (ent && (ent->getType() == game::ObjectType::PLAYER || ent->getType() == game::ObjectType::UNIT))
               { auto u = std::static_pointer_cast<game::Unit>(ent); if (!u->getName().empty()) ps.name = u->getName(); } }
-        if (remaining() < 4) { bgScoreboard_.players.push_back(std::move(ps)); break; }
-        uint32_t statCount = packet.readUInt32();
-        for (uint32_t s = 0; s < statCount && remaining() >= 5; ++s) {
-            std::string fieldName;
-            while (remaining() > 0) { char c = static_cast<char>(packet.readUInt8()); if (c == '\0') break; fieldName += c; }
-            uint32_t val = (remaining() >= 4) ? packet.readUInt32() : 0;
-            ps.bgStats.emplace_back(std::move(fieldName), val);
+
+        // BuildObjectivesBlock: a count and that many bare values. The names
+        // this used to read are not on the wire — BattlegroundWS writes
+        // uint32(2) and two numbers — so every value past the first came from
+        // the wrong offset.
+        if (remaining() >= 4) {
+            uint32_t statCount = packet.readUInt32();
+            for (uint32_t st = 0; st < statCount && remaining() >= 4; ++st) {
+                ps.bgStats.emplace_back(std::string(), packet.readUInt32());
+            }
         }
         bgScoreboard_.players.push_back(std::move(ps));
     }
-    if (remaining() >= 1) {
-        bgScoreboard_.hasWinner = (packet.readUInt8() != 0);
-        if (bgScoreboard_.hasWinner && remaining() >= 1) bgScoreboard_.winner = packet.readUInt8();
-    }
+    // The scoreboard is drawn from this and asked for it by name —
+    // RequestBattlefieldScoreData sends the query, UPDATE_BATTLEFIELD_SCORE is
+    // the answer arriving. Every row, every column and the winner were parsed
+    // and stored, and the frame that displays them was never told.
+    if (owner_.addonEventCallbackRef()) owner_.addonEventCallbackRef()("UPDATE_BATTLEFIELD_SCORE", {});
 }
 
 void SocialHandler::updateLogoutCountdown(float deltaTime) {
