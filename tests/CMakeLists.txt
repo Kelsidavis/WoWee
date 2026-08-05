@@ -158,6 +158,51 @@ target_link_libraries(test_opcode_table PRIVATE catch2_main)
 add_test(NAME opcode_table COMMAND test_opcode_table)
 register_test_target(test_opcode_table)
 
+# ── test_chat_types ─────────────────────────────────────────────
+# A chat type is a byte off the wire and the event name is built from it, so a
+# value missing from the enum is a line of chat that never appears — no error,
+# no log. The whole run between LOOT and the battleground block was absent once.
+add_executable(test_chat_types test_chat_types.cpp)
+target_include_directories(test_chat_types PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_chat_types SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
+target_link_libraries(test_chat_types PRIVATE catch2_main)
+add_test(NAME chat_types COMMAND test_chat_types)
+register_test_target(test_chat_types)
+
+# ── test_taxi_packets ────────────────────────────────────────
+# The multi-hop flight request. A field the server does not read was being
+# written between the guid and the node count, so the count was read as a node
+# and every route longer than one hop was refused.
+add_executable(test_taxi_packets
+    test_taxi_packets.cpp
+    ${TEST_COMMON_SOURCES}
+    ${CMAKE_SOURCE_DIR}/src/network/packet.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/opcode_table.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/expansion_profile.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/character.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/spline_packet.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/world_packets.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/world_packets_world.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/world_packets_entity.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/world_packets_social.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/world_packets_economy.cpp
+    ${CMAKE_SOURCE_DIR}/src/auth/crypto.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/packet_parsers_classic.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/packet_parsers_tbc.cpp
+)
+target_include_directories(test_taxi_packets PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_taxi_packets SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
+target_link_libraries(test_taxi_packets PRIVATE catch2_main SDL2::SDL2 ZLIB::ZLIB
+                                                OpenSSL::SSL OpenSSL::Crypto)
+if(TARGET glm::glm)
+    target_link_libraries(test_taxi_packets PRIVATE glm::glm)
+endif()
+if(TARGET Vulkan::Vulkan)
+    target_link_libraries(test_taxi_packets PRIVATE Vulkan::Vulkan)
+endif()
+add_test(NAME taxi_packets COMMAND test_taxi_packets)
+register_test_target(test_taxi_packets)
+
 # ── test_use_item_packet ─────────────────────────────────────
 add_executable(test_use_item_packet
     test_use_item_packet.cpp
