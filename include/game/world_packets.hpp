@@ -613,6 +613,22 @@ enum class ChatType : uint8_t {
     IGNORED = 0x19,
     SKILL = 0x1A,
     LOOT = 0x1B,
+    // 0x1C–0x23: the messages the game narrates rather than a player sending
+    // them — loot, money, experience, honour, reputation.
+    //
+    // Absent, every one of these fell to the default in getChatTypeString and
+    // was named UNKNOWN, so the addon event fired was CHAT_MSG_UNKNOWN and
+    // anything listening for the real name heard nothing. Values from
+    // AzerothCore's SharedDefines; they fill the run between LOOT and the BG
+    // block exactly.
+    MONEY = 0x1C,
+    OPENING = 0x1D,
+    TRADESKILLS = 0x1E,
+    PET_INFO = 0x1F,
+    COMBAT_MISC_INFO = 0x20,
+    COMBAT_XP_GAIN = 0x21,
+    COMBAT_HONOR_GAIN = 0x22,
+    COMBAT_FACTION_CHANGE = 0x23,
     // 0x24–0x26: BG system messages
     BG_SYSTEM_NEUTRAL  = 0x24,
     BG_SYSTEM_ALLIANCE = 0x25,
@@ -621,8 +637,10 @@ enum class ChatType : uint8_t {
     RAID_WARNING = 0x28,
     RAID_BOSS_EMOTE = 0x29,
     RAID_BOSS_WHISPER = 0x2A,
+    FILTERED = 0x2B,
     BATTLEGROUND = 0x2C,
     BATTLEGROUND_LEADER = 0x2D,
+    RESTRICTED = 0x2E,
     ACHIEVEMENT = 0x30,
     GUILD_ACHIEVEMENT = 0x31,
     PARTY_LEADER = 0x33,

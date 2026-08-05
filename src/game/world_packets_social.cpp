@@ -269,6 +269,16 @@ const char* getChatTypeString(ChatType type) {
         case ChatType::RAID_BOSS_WHISPER: return "RAID_BOSS_WHISPER";
         case ChatType::BATTLEGROUND: return "BATTLEGROUND";
         case ChatType::BATTLEGROUND_LEADER: return "BATTLEGROUND_LEADER";
+        case ChatType::MONEY: return "MONEY";
+        case ChatType::OPENING: return "OPENING";
+        case ChatType::TRADESKILLS: return "TRADESKILLS";
+        case ChatType::PET_INFO: return "PET_INFO";
+        case ChatType::COMBAT_MISC_INFO: return "COMBAT_MISC_INFO";
+        case ChatType::COMBAT_XP_GAIN: return "COMBAT_XP_GAIN";
+        case ChatType::COMBAT_HONOR_GAIN: return "COMBAT_HONOR_GAIN";
+        case ChatType::COMBAT_FACTION_CHANGE: return "COMBAT_FACTION_CHANGE";
+        case ChatType::FILTERED: return "FILTERED";
+        case ChatType::RESTRICTED: return "RESTRICTED";
         case ChatType::ACHIEVEMENT: return "ACHIEVEMENT";
         case ChatType::GUILD_ACHIEVEMENT: return "GUILD_ACHIEVEMENT";
         case ChatType::PARTY_LEADER: return "PARTY_LEADER";
