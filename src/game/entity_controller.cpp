@@ -2025,6 +2025,47 @@ void EntityController::applyTransportRouteClock(const UpdateBlock& block) {
 // Update type handlers
 // ============================================================
 
+void EntityController::resyncPlayerIfFarFromServer(const glm::vec3& serverCanonicalPos) {
+    // The client owns its own position and the server echoes it back, so these
+    // agree to within a step and this does nothing almost always. What it
+    // catches is the case where they stop agreeing at all.
+    //
+    // Only the orientation was ever taken from these blocks. The position went
+    // onto the player's entity and never into movementInfo, which is what the
+    // client moves by and sends — so once the two diverged there was no way
+    // back: the client kept walking from where it thought it was, the server
+    // kept answering about where it thought the player was, and a relog put
+    // the player wherever the server had them. Creatures arrive around the
+    // server's position, which is why none of them are where the player is
+    // standing.
+    //
+    // Far enough that ordinary lag cannot reach it: fifty yards is seven
+    // seconds of running. Snapping on a smaller gap would fight the client's
+    // own movement and rubber-band.
+    constexpr float kResyncDistance = 50.0f;
+    if (owner_.isOnTransport()) return;
+    if (auto* movement = owner_.getMovementHandler()) {
+        if (movement->isOnTaxiFlight()) return;
+    }
+    auto& mi = owner_.movementInfoRef();
+    const glm::vec3 clientPos(mi.x, mi.y, mi.z);
+    const float gap = glm::length(serverCanonicalPos - clientPos);
+    if (gap <= kResyncDistance) return;
+
+    LOG_WARNING("Player position desync: the server places the player ", gap,
+                " yards away, at canonical ", serverCanonicalPos.x, ", ",
+                serverCanonicalPos.y, ", ", serverCanonicalPos.z,
+                " rather than ", clientPos.x, ", ", clientPos.y, ", ",
+                clientPos.z, " — taking the server's");
+    mi.x = serverCanonicalPos.x;
+    mi.y = serverCanonicalPos.y;
+    mi.z = serverCanonicalPos.z;
+    if (owner_.playerPositionCorrectionCallbackRef()) {
+        owner_.playerPositionCorrectionCallbackRef()(
+            serverCanonicalPos.x, serverCanonicalPos.y, serverCanonicalPos.z);
+    }
+}
+
 void EntityController::handleCreateObject(const UpdateBlock& block, bool& newItemCreated) {
     trackActiveCritter(block);
     pendingEvents_.clear();
@@ -2127,6 +2168,7 @@ void EntityController::handleMovementUpdate(const UpdateBlock& block) {
                 // 3b: Track player-on-transport state from MOVEMENT updates
                 if (block.guid == owner_.getPlayerGuid()) {
                     owner_.movementInfoRef().orientation = oCanonical;
+                    resyncPlayerIfFarFromServer(pos);
                     applyPlayerTransportState(block, entity, pos, oCanonical, true);
                 }
 

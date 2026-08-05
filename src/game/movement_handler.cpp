@@ -1839,25 +1839,51 @@ void MovementHandler::handleTeleportAck(network::Packet& packet) {
 
     glm::vec3 canonical = core::coords::serverToCanonical(glm::vec3(serverX, serverY, serverZ));
 
-    // Reject teleports to a near-origin position on Eastern Kingdoms (map 0).
-    // No legitimate gameplay sends the player there; in this codebase it has
-    // only ever been an area-trigger-destination misfire on the server side.
-    // Refusing it (no ACK, no position update, no world reload) keeps the
-    // client at its current position. Heartbeats from the real position will
-    // eventually convince the server's anti-cheat to update its record.
-    if (owner_.getCurrentMapId() == 0 &&
-        std::abs(canonical.x) < 1000.0f && std::abs(canonical.y) < 1000.0f) {
-        LOG_WARNING("REJECTED MSG_MOVE_TELEPORT to near-origin canonical=(",
-                    canonical.x, ", ", canonical.y, ", ", canonical.z, ")"
-                    " — keeping current position");
-        return;
-    }
+    // A destination that is the map origin itself, which is a server-side
+    // area-trigger misfire rather than anywhere anyone goes.
+    //
+    // This used to be a two-thousand-yard box — |x| and |y| under a thousand
+    // on map 0 — and returned from here without acknowledging. Both halves
+    // were wrong, and together they are what desynced the player from the
+    // server for the rest of the session.
+    //
+    // The box: canonical swaps x and y off the wire, so that test was a square
+    // two thousand yards on a side centred on the origin of Eastern Kingdoms,
+    // and Hillsbrad Foothills sits on it. AzerothCore's own game_tele puts
+    // Southshore at -853, -533 — inside it. So the hearthstone to the
+    // Southshore inn, the Southshore graveyard and the inn's own tavern
+    // trigger were all "near-origin misfires".
+    //
+    // The silence: the server sets a teleport semaphore when it sends this and
+    // clears it when the acknowledgement comes back. Until then
+    // WorldSession::HandleMovementOpcodes returns at its first line and throws
+    // away every movement packet we send. So the note this replaces — that
+    // heartbeats from the real position would eventually convince the server —
+    // had it exactly backwards: no heartbeat could be heard at all. The client
+    // walked on from where it thought it was, the server kept the player where
+    // it had put them, no creatures arrived anywhere near the player, and a
+    // relog put them back at the server's copy.
+    //
+    // The acknowledgement is now unconditional. Only the position is refused,
+    // and only for a destination within a few yards of the origin, which no
+    // legitimate teleport is.
+    constexpr float kOriginMisfireRadius = 50.0f;
+    const bool originMisfire = owner_.getCurrentMapId() == 0 &&
+        std::abs(canonical.x) < kOriginMisfireRadius &&
+        std::abs(canonical.y) < kOriginMisfireRadius;
 
-    movementInfo.x = canonical.x;
-    movementInfo.y = canonical.y;
-    movementInfo.z = canonical.z;
-    movementInfo.orientation = core::coords::serverToCanonicalYaw(orientation);
-    movementInfo.flags = 0;
+    if (originMisfire) {
+        LOG_WARNING("MSG_MOVE_TELEPORT to the map origin canonical=(",
+                    canonical.x, ", ", canonical.y, ", ", canonical.z,
+                    ") — acknowledging so the server stops discarding our "
+                    "movement, then telling it where we really are");
+    } else {
+        movementInfo.x = canonical.x;
+        movementInfo.y = canonical.y;
+        movementInfo.z = canonical.z;
+        movementInfo.orientation = core::coords::serverToCanonicalYaw(orientation);
+        movementInfo.flags = 0;
+    }
 
     // Clear cast bar on teleport — SpellHandler owns the casting_ flag
     if (owner_.getSpellHandler()) owner_.getSpellHandler()->resetCastState();
@@ -1893,7 +1919,9 @@ void MovementHandler::handleTeleportAck(network::Packet& packet) {
         sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
     }
 
-    if (owner_.worldEntryCallbackRef()) {
+    // Only where the destination was taken. A misfire leaves the player where
+    // they are, so there is no world entry to announce.
+    if (!originMisfire && owner_.worldEntryCallbackRef()) {
         owner_.worldEntryCallbackRef()(owner_.currentMapIdRef(), serverX, serverY, serverZ, false);
     }
 }
@@ -2564,9 +2592,9 @@ void MovementHandler::finishClientTaxiFlight(bool snapToFinalWaypoint) {
         // is true (see its "Sync character render position" block) - by the time
         // this function returns, onTaxiFlight_/taxiMountActive_ are already false,
         // so that sync won't pick up this correction. Push it to the renderer
-        // directly instead - see taxiLandingPositionCallbackRef()'s comment.
-        if (owner_.taxiLandingPositionCallbackRef()) {
-            owner_.taxiLandingPositionCallbackRef()(landingPos.x, landingPos.y, landingPos.z);
+        // directly instead - see playerPositionCorrectionCallbackRef()'s comment.
+        if (owner_.playerPositionCorrectionCallbackRef()) {
+            owner_.playerPositionCorrectionCallbackRef()(landingPos.x, landingPos.y, landingPos.z);
         }
         LOG_INFO("Taxi landing: snapped to final waypoint (",
                  landingPos.x, ", ", landingPos.y, ", ", landingPos.z, ")");

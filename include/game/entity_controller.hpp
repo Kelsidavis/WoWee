@@ -211,6 +211,11 @@ private:
     // Entity factory — creates the correct Entity subclass for the given block.
     std::shared_ptr<Entity> createEntityFromBlock(const UpdateBlock& block);
     // Track player-on-transport state from movement blocks.
+    /// Take the server's position for the player when the two have diverged
+    /// beyond anything lag can explain. Does nothing in the ordinary case,
+    /// where the client owns its position and the server echoes it back.
+    void resyncPlayerIfFarFromServer(const glm::vec3& serverCanonicalPos);
+
     void applyPlayerTransportState(const UpdateBlock& block,
                                     const std::shared_ptr<Entity>& entity,
                                     const glm::vec3& canonicalPos, float oCanonical,

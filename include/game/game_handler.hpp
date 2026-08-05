@@ -2120,8 +2120,8 @@ public:
     // callback lets MovementHandler push the corrected position straight to the
     // renderer at the same moment, without MovementHandler needing direct access
     // to rendering types.
-    using TaxiLandingPositionCallback = std::function<void(float x, float y, float z)>;
-    void setTaxiLandingPositionCallback(TaxiLandingPositionCallback cb) { taxiLandingPositionCallback_ = std::move(cb); }
+    using PlayerPositionCorrectionCallback = std::function<void(float x, float y, float z)>;
+    void setPlayerPositionCorrectionCallback(PlayerPositionCorrectionCallback cb) { playerPositionCorrectionCallback_ = std::move(cb); }
 
     // Callback for when taxi flight is about to start (after mounting delay, before movement begins)
     using TaxiFlightStartCallback = std::function<void()>;
@@ -2739,7 +2739,7 @@ public:
     auto& stunStateCallbackRef() { return stunStateCallback_; }
     auto& taxiFlightStartCallbackRef() { return taxiFlightStartCallback_; }
     auto& taxiOrientationCallbackRef() { return taxiOrientationCallback_; }
-    auto& taxiLandingPositionCallbackRef() { return taxiLandingPositionCallback_; }
+    auto& playerPositionCorrectionCallbackRef() { return playerPositionCorrectionCallback_; }
     auto& taxiPrecacheCallbackRef() { return taxiPrecacheCallback_; }
     auto& transportMoveCallbackRef() { return transportMoveCallback_; }
     auto& unitAnimHintCallbackRef() { return unitAnimHintCallback_; }
@@ -3835,7 +3835,7 @@ private:
     MountCallback mountCallback_;
     TaxiPrecacheCallback taxiPrecacheCallback_;
     TaxiOrientationCallback taxiOrientationCallback_;
-    TaxiLandingPositionCallback taxiLandingPositionCallback_;
+    PlayerPositionCorrectionCallback playerPositionCorrectionCallback_;
     TaxiFlightStartCallback taxiFlightStartCallback_;
     OpenLfgCallback openLfgCallback_;
     uint32_t currentMountDisplayId_ = 0;
