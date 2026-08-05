@@ -654,15 +654,16 @@ void GameHandler::selectCharacter(uint64_t characterGuid) {
     std::fill(playerExploredZones_.begin(), playerExploredZones_.end(), 0u);
     hasPlayerExploredZones_ = false;
     playerSkills_.clear();
-    questLog_.clear();
-    pendingQuestQueryIds_.clear();
+    // The handler's, not this class's same-named members — every reader
+    // forwards there, so clearing the copies here cleared nothing anyone
+    // looks at and the previous character's quests stayed in the log.
+    if (questHandler_) questHandler_->clearQuestStateForCharacterSwitch();
     pendingLoginQuestResync_ = false;
     pendingLoginQuestResyncTimeout_ = 0.0f;
     if (questHandler_) {
         questHandler_->pendingQuestAcceptTimeoutsRef().clear();
         questHandler_->pendingQuestAcceptNpcGuidsRef().clear();
     }
-    npcQuestStatus_.clear();
     if (combatHandler_) combatHandler_->resetAllCombatState();
     // resetCastState() already called inside resetAllState() above
     pendingGameObjectInteractGuid_ = 0;

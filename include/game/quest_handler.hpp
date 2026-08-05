@@ -158,6 +158,18 @@ public:
     GossipMessageData& currentGossipRef() { return currentGossip_; }
     std::unordered_map<uint64_t, QuestGiverStatus>& npcQuestStatusRef() { return npcQuestStatus_; }
 
+    /// Everything this handler holds about the character that is leaving.
+    ///
+    /// The reset path used to clear GameHandler's same-named members, which
+    /// are dead: every reader forwards here. So a character switch left the
+    /// previous character's quest log and quest-giver marks in place until the
+    /// server happened to overwrite them.
+    void clearQuestStateForCharacterSwitch() {
+        questLog_.clear();
+        pendingQuestQueryIds_.clear();
+        npcQuestStatus_.clear();
+    }
+
     // Drives the quest-giver status requery cooldown; called once per frame by
     // GameHandler::update alongside the other quest bookkeeping.
     void tickQuestGiverStatusRequery(float deltaTime);
