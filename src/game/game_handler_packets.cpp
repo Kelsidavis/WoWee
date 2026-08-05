@@ -1,4 +1,5 @@
 #include "game/game_handler.hpp"
+#include "game/achievement_criteria.hpp"
 #include "game/packed_time.hpp"
 #include "game/protocol_constants.hpp"
 #include "game/game_utils.hpp"
@@ -1272,20 +1273,24 @@ void GameHandler::registerOpcodeHandlers() {
 
     // ---- SMSG_CRITERIA_UPDATE ----
     dispatchTable_[Opcode::SMSG_CRITERIA_UPDATE] = [this](network::Packet& packet) {
-        // uint32 criteriaId + uint64 progress + uint32 elapsedTime + uint32 creationTime
-        if (packet.hasRemaining(20)) {
-            uint32_t criteriaId    = packet.readUInt32();
-            uint64_t progress      = packet.readUInt64();
-            packet.readUInt32(); // elapsedTime
-            packet.readUInt32(); // creationTime
-            uint64_t oldProgress = 0;
-            auto cpit = criteriaProgress_.find(criteriaId);
-            if (cpit != criteriaProgress_.end()) oldProgress = cpit->second;
-            criteriaProgress_[criteriaId] = progress;
-            LOG_DEBUG("SMSG_CRITERIA_UPDATE: id=", criteriaId, " progress=", progress);
-            // Fire addon event for achievement tracking addons
-            if (progress != oldProgress)
-                fireAddonEvent("CRITERIA_UPDATE", {std::to_string(criteriaId), std::to_string(progress)});
+        // The record's shape is in readCriteriaProgressTail, shared with the
+        // criteria half of SMSG_ALL_ACHIEVEMENT_DATA.
+        if (packet.hasRemaining(4)) {
+            uint32_t criteriaId = packet.readUInt32();
+            CriteriaProgressRecord rec;
+            if (readCriteriaProgressTail(packet, rec)) {
+                // A timed criteria whose window ran out reads as zero, which is
+                // what the server means by the flag and what the panel shows.
+                const uint64_t progress = (rec.flags == 1) ? 0 : rec.counter;
+                uint64_t oldProgress = 0;
+                auto cpit = criteriaProgress_.find(criteriaId);
+                if (cpit != criteriaProgress_.end()) oldProgress = cpit->second;
+                criteriaProgress_[criteriaId] = progress;
+                LOG_DEBUG("SMSG_CRITERIA_UPDATE: id=", criteriaId, " progress=", progress);
+                // Fire addon event for achievement tracking addons
+                if (progress != oldProgress)
+                    fireAddonEvent("CRITERIA_UPDATE", {std::to_string(criteriaId), std::to_string(progress)});
+            }
         }
     };
 

@@ -1,4 +1,5 @@
 #include "game/game_handler.hpp"
+#include "game/achievement_criteria.hpp"
 #include "game/game_utils.hpp"
 #include "game/chat_handler.hpp"
 #include "game/movement_handler.hpp"
@@ -2103,17 +2104,16 @@ void GameHandler::handleAllAchievementData(network::Packet& packet) {
         achievementDates_[id] = date;
     }
 
-    // Parse criteria block: id + uint64 counter + uint32 date + uint32 flags, sentinel 0xFFFFFFFF
+    // Parse the criteria block: records until an id of -1. The record's shape
+    // is in readCriteriaProgressTail, which SMSG_CRITERIA_UPDATE reads with too
+    // — the server builds both from the same lines.
     criteriaProgress_.clear();
     while (packet.hasRemaining(4)) {
         uint32_t id = packet.readUInt32();
         if (id == 0xFFFFFFFF) break;
-        // counter(8) + date(4) + unknown(4) = 16 bytes
-        if (!packet.hasRemaining(16)) break;
-        uint64_t counter = packet.readUInt64();
-        packet.readUInt32();  // date
-        packet.readUInt32();  // unknown / flags
-        criteriaProgress_[id] = counter;
+        CriteriaProgressRecord rec;
+        if (!readCriteriaProgressTail(packet, rec)) break;
+        criteriaProgress_[id] = rec.counter;
     }
 
     LOG_INFO("SMSG_ALL_ACHIEVEMENT_DATA: loaded ", earnedAchievements_.size(),

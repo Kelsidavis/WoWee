@@ -1958,7 +1958,14 @@ void SocialHandler::handleGuildRoster(network::Packet& packet) {
     if (!owner_.getPacketParsers()->parseGuildRoster(packet, data)) return;
     guildRoster_ = std::move(data);
     hasGuildRoster_ = true;
-    if (owner_.addonEventCallbackRef()) owner_.addonEventCallbackRef()("GUILD_ROSTER_UPDATE", {});
+    // No argument, which reaches Lua as nil. GUILD_ROSTER_UPDATE's first
+    // argument means "you may request a roster", and an addon answers it with
+    // `if arg1 then GuildRoster() end` — that is what Blizzard's own guild,
+    // guild bank and calendar panels do with it. The roster in hand is the
+    // fresh one, so the answer here is no; sending yes would have each reader
+    // request a roster whose reply fires this again, forever.
+    if (owner_.addonEventCallbackRef())
+        owner_.addonEventCallbackRef()("GUILD_ROSTER_UPDATE", {});
 }
 
 void SocialHandler::handleGuildQueryResponse(network::Packet& packet) {
@@ -2065,6 +2072,21 @@ void SocialHandler::handleGuildEvent(network::Packet& packet) {
         owner_.addLocalChatMessage(chatMsg);
     }
 
+    // Whether this client is about to ask for a fresh roster itself, which is
+    // the switch at the end of this function. The event's argument is the
+    // negation: "nobody has asked, so you may". Working it out once and using
+    // it in both places is the point — a reader that requests when the client
+    // already has costs a second roster for a large guild, and a reader that
+    // does not when the client has not leaves every guild panel drawing from a
+    // copy that no longer says who is online.
+    const bool clientWillRequest = hasGuildRoster_ && (
+        data.eventType == GuildEvent::PROMOTION ||
+        data.eventType == GuildEvent::DEMOTION ||
+        data.eventType == GuildEvent::JOINED ||
+        data.eventType == GuildEvent::LEFT ||
+        data.eventType == GuildEvent::REMOVED ||
+        data.eventType == GuildEvent::LEADER_CHANGED);
+
     if (owner_.addonEventCallbackRef()) {
         switch (data.eventType) {
             case GuildEvent::MOTD:
@@ -2075,20 +2097,23 @@ void SocialHandler::handleGuildEvent(network::Packet& packet) {
             case GuildEvent::JOINED: case GuildEvent::LEFT:
             case GuildEvent::REMOVED: case GuildEvent::LEADER_CHANGED:
             case GuildEvent::DISBANDED:
-                owner_.addonEventCallbackRef()("GUILD_ROSTER_UPDATE", {});
+                // Somebody joined, left, was promoted or signed on, and the
+                // roster this client holds no longer says so. The server sends
+                // the event and not a new roster, so the request has to come
+                // from somewhere. Signing on and off is the case nothing
+                // covered: the switch below does not request for those, so a
+                // member who had just come online stayed grey until something
+                // else asked.
+                if (clientWillRequest)
+                    owner_.addonEventCallbackRef()("GUILD_ROSTER_UPDATE", {});
+                else
+                    owner_.addonEventCallbackRef()("GUILD_ROSTER_UPDATE", {"1"});
                 break;
             default: break;
         }
     }
 
-    switch (data.eventType) {
-        case GuildEvent::PROMOTION: case GuildEvent::DEMOTION:
-        case GuildEvent::JOINED: case GuildEvent::LEFT:
-        case GuildEvent::REMOVED: case GuildEvent::LEADER_CHANGED:
-            if (hasGuildRoster_) requestGuildRoster();
-            break;
-        default: break;
-    }
+    if (clientWillRequest) requestGuildRoster();
 }
 
 void SocialHandler::handleGuildInvite(network::Packet& packet) {
