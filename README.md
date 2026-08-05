@@ -144,6 +144,12 @@ The optional `build.sh` and `build.ps1` helpers fetch supported AMD SDK sources
 when needed. A plain CMake build works without them and uses the internal
 fallback when optional SDK components are unavailable.
 
+Lua 5.1 is vendored and built in, so nothing needs installing for it. To link
+an installed one instead — which is what a distribution package usually wants —
+configure with `-DWOWEE_SYSTEM_LUA=ON`. It must be 5.1: the interface this
+client runs is written for that version, and configuring stops with a message
+rather than linking a 5.2 or later.
+
 ### 3. Extract game data
 
 WoWee does not read MPQs at runtime. Extract a legally obtained client into a

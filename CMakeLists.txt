@@ -26,6 +26,7 @@ endif()
 # Options
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(WOWEE_BUILD_TESTS "Build tests" ON)
+option(WOWEE_SYSTEM_LUA "Link against an installed Lua 5.1 instead of the vendored copy" OFF)
 option(WOWEE_ENABLE_ASAN "Enable AddressSanitizer + UBSan (applied to all build configs; pairs well with Debug)" OFF)
 option(WOWEE_ENABLE_TRACY "Enable Tracy profiler instrumentation" OFF)
 option(WOWEE_ENABLE_AMD_FSR2 "Enable AMD FidelityFX FSR2 backend when SDK is present" ON)
@@ -1054,6 +1055,39 @@ if(WIN32)
     list(APPEND WOWEE_PLATFORM_SOURCES resources/wowee.rc)
 endif()
 
+# ---- Lua 5.1 ----
+#
+# Vendored by default and system-provided on request, and the target the rest of
+# this file links against is called lua51 either way.
+#
+# Off by default rather than "use it if it happens to be installed": which Lua a
+# build linked would otherwise depend on what was lying around on the machine,
+# and the interface this client runs is a large body of Lua whose behaviour is
+# the thing under test. A distribution packaging this wants the system copy and
+# can say so; everyone else gets the same interpreter as CI.
+#
+# 5.1 exactly. The addon and FrameXML code this runs is written for it — 5.2
+# removed setfenv and the arg table, 5.3 changed integer division and string
+# coercion — so a 5.4 found under the name "Lua" is not a substitute, and a
+# wrong-version link fails at configure time rather than at the first addon.
+#
+# The check is not redundant with the version given to find_package: that is a
+# minimum, and CMake's own FindLua reports a 5.4 install as satisfying it. Asked
+# for 5.1 on a machine carrying only 5.4, find_package succeeds and says so.
+if(WOWEE_SYSTEM_LUA)
+    find_package(Lua 5.1 REQUIRED)
+    if(NOT LUA_VERSION_STRING MATCHES "^5\\.1")
+        message(FATAL_ERROR
+            "WOWEE_SYSTEM_LUA is on and the Lua found is ${LUA_VERSION_STRING}. "
+            "This client needs 5.1 (Debian and Ubuntu call it liblua5.1-0-dev), "
+            "or turn the option off to build the vendored copy.")
+    endif()
+    add_library(lua51 INTERFACE)
+    target_include_directories(lua51 SYSTEM INTERFACE ${LUA_INCLUDE_DIR})
+    target_link_libraries(lua51 INTERFACE ${LUA_LIBRARIES})
+    message(STATUS "Lua: system ${LUA_VERSION_STRING} (${LUA_LIBRARIES})")
+else()
+
 # ---- Lua 5.1.5 (vendored, static library) ----
 set(LUA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/extern/lua-5.1.5/src)
 set(LUA_SOURCES
@@ -1073,6 +1107,9 @@ set_target_properties(lua51 PROPERTIES LINKER_LANGUAGE C C_STANDARD 99 POSITION_
 target_include_directories(lua51 PUBLIC ${LUA_DIR})
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(lua51 PRIVATE -w)
+endif()
+message(STATUS "Lua: vendored 5.1.5 (set WOWEE_SYSTEM_LUA=ON to link an installed one)")
+
 endif()
 
 # Create executable
