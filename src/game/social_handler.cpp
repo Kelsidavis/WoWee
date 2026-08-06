@@ -1718,6 +1718,25 @@ void SocialHandler::handleGroupInvite(network::Packet& packet) {
     GroupInviteResponseData data;
     const bool hasCanAccept = !isPreWotlk();
     if (!GroupInviteResponseParser::parse(packet, data, hasCanAccept)) return;
+
+    // The leading byte is not decoration: AzerothCore sends this same opcode
+    // with a zero in it to say "you were invited and it could not be offered,
+    // because you are already in a group" — its own comment beside the write,
+    // and the interface carries Blizzard's sentence for exactly that case
+    // (ERR_INVITED_ALREADY_IN_GROUP_SS).
+    //
+    // It was read off the wire and then ignored, so that refusal raised the
+    // accept/decline popup, played the invitation sound and left an invite
+    // pending that the server would never honour. Answering it is a refusal,
+    // not an offer.
+    if (!data.canAccept) {
+        owner_.addSystemChatMessage(
+            "|Hplayer:" + data.inviterName + "|h[" + data.inviterName +
+            "]|h invited you to a group, but you could not accept because you "
+            "are already in a group.");
+        return;
+    }
+
     pendingGroupInvite = true;
     pendingInviterName = data.inviterName;
     owner_.addSystemChatMessage(data.inviterName + " has invited you to a group.");
