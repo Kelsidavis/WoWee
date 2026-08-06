@@ -226,6 +226,17 @@ void MovementHandler::registerOpcodes(DispatchTable& table) {
                      Opcode::MSG_MOVE_START_DESCEND, Opcode::MSG_MOVE_SET_PITCH,
                      Opcode::MSG_MOVE_GRAVITY_CHNG, Opcode::MSG_MOVE_UPDATE_CAN_FLY,
                      Opcode::MSG_MOVE_UPDATE_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY,
+                     // The three that were left out of this list while their
+                     // siblings were in it. AzerothCore answers a force-move
+                     // ack by broadcasting the mover's movement info to
+                     // everyone but the mover — MiscHandler's switch turns
+                     // CMSG_MOVE_HOVER_ACK into MSG_MOVE_HOVER and so on — so
+                     // these carry another player's position and flags at the
+                     // moment they start hovering, feather-falling or walking
+                     // on water, and dropping them left that player where they
+                     // were last seen until their next heartbeat.
+                     Opcode::MSG_MOVE_HOVER, Opcode::MSG_MOVE_FEATHER_FALL,
+                     Opcode::MSG_MOVE_WATER_WALK,
                      Opcode::MSG_MOVE_ROOT, Opcode::MSG_MOVE_UNROOT }) {
         table[op] = [this](network::Packet& packet) {
             if (owner_.getState() == WorldState::IN_WORLD) handleOtherPlayerMovement(packet);

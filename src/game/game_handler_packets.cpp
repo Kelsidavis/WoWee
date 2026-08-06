@@ -2680,6 +2680,13 @@ void GameHandler::registerOpcodeHandlers() {
     registerSkipHandler(Opcode::SMSG_LOOT_LIST);
     // Same format as LOCKOUT_ADDED; consume
     registerSkipHandler(Opcode::SMSG_CALENDAR_RAID_LOCKOUT_UPDATED);
+    // Sent one line before SMSG_DESTROY_OBJECT and carrying the same guid, and
+    // only inside an arena — Object::DestroyForPlayer writes both. The unit is
+    // removed by the second one whatever happens here, so this is a decision
+    // rather than a gap: the real client uses it to tell an arena opponent who
+    // died from one who merely went out of range, and nothing here draws that
+    // distinction.
+    registerSkipHandler(Opcode::SMSG_ARENA_UNIT_DESTROYED);
     // Consume — remaining server notifications not yet parsed
     for (auto op : {
         Opcode::SMSG_AFK_MONITOR_INFO_RESPONSE,
