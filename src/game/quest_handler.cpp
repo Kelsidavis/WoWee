@@ -1581,7 +1581,33 @@ bool QuestHandler::resyncQuestLogFromServerSlots(bool forceQueryMetadata) {
     if (owner_.lastPlayerFieldsRef().empty()) return false;
 
     const uint16_t ufQuestStart = fieldIndex(UF::PLAYER_QUEST_LOG_START);
+    // Unmapped for this build's field table. applyQuestStateFromFields checks
+    // this and this did not, so the slot arithmetic below ran from 0xFFFF and
+    // every lookup missed — which reaches the same erase with an empty set.
+    if (ufQuestStart == 0xFFFF) return false;
     const uint8_t qStride = owner_.getPacketParsers() ? owner_.getPacketParsers()->questLogStride() : 5;
+
+    // Whether the quest area of the player's fields has arrived at all, which
+    // is a different question from whether any player field has.
+    //
+    // This used to answer "done" on the first frame the field map was
+    // non-empty, and the erase below then measured the local log against an
+    // empty set and emptied it — a partial update block carrying a health or a
+    // position change was enough. The resync runs once, so there was no second
+    // chance: the quest log stayed empty for the session and the tracker with
+    // it.
+    //
+    // Any key inside the quest slot range counts, including a zero one: a slot
+    // written as zero is the server saying that slot is empty, which is real
+    // information. Only the absence of every one of them means the block has
+    // not come yet.
+    const uint32_t questAreaEnd = static_cast<uint32_t>(ufQuestStart) + 25u * qStride;
+    bool sawQuestArea = false;
+    for (const auto& [key, value] : owner_.lastPlayerFieldsRef()) {
+        (void)value;
+        if (key >= ufQuestStart && key < questAreaEnd) { sawQuestArea = true; break; }
+    }
+    if (!sawQuestArea) return false;
 
     std::unordered_map<uint32_t, bool> serverQuestComplete;
     serverQuestComplete.reserve(25);
