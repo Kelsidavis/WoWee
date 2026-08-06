@@ -1117,10 +1117,24 @@ void SpellHandler::confirmPetUnlearn() {
     petUnlearnPending_ = false;
     if (owner_.getState() != WorldState::IN_WORLD || !owner_.getSocket()) return;
 
+    // Sent, and this server throws it away: CMSG_PET_UNLEARN_TALENTS is
+    // Handle_NULL in AzerothCore's opcode table, and pet talents are only ever
+    // reset there through the AT_LOGIN_RESET_PET_TALENTS flag at the next
+    // login. Kept rather than dropped, because the request is correct and a
+    // server that implements it would act on it — but the line that followed
+    // said "Pet talent reset confirmed", which is a claim about what happened
+    // rather than about what was asked, and nothing was going to happen.
+    //
+    // The talent reset beside this one is the contrast worth keeping: it goes
+    // out on MSG_TALENT_WIPE_CONFIRM, which the server does implement, and its
+    // line already says the server will update the talents rather than that it
+    // has.
     network::Packet pkt(wireOpcode(Opcode::CMSG_PET_UNLEARN_TALENTS));
     owner_.getSocket()->send(pkt);
     LOG_INFO("confirmPetUnlearn: sent CMSG_PET_UNLEARN_TALENTS");
-    owner_.addSystemChatMessage("Pet talent reset confirmed.");
+    owner_.addSystemChatMessage(
+        "Pet talent reset requested. This server resets pet talents at the "
+        "next login rather than on request.");
     petUnlearnGuid_ = 0;
     petUnlearnCost_ = 0;
 }
