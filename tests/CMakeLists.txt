@@ -24,11 +24,17 @@ target_compile_features(catch2_main PUBLIC cxx_std_17)
 # and a new test cannot be written without it.
 #
 # GLM 1.0 may build glm::glm as a real library and put the headers on
-# glm::glm-header-only, so both spellings are tried.
+# glm::glm-header-only, so both spellings are tried. Some distributions export
+# neither target and only set GLM_INCLUDE_DIRS, and there both branches fall
+# through silently — the configure step succeeds and the compile fails on
+# glm/glm.hpp, which is how this was reported from a platform none of the CI
+# runners cover. The third rung takes the include path directly.
 if(TARGET glm::glm-header-only)
     target_link_libraries(catch2_main PUBLIC glm::glm-header-only)
 elseif(TARGET glm::glm)
     target_link_libraries(catch2_main PUBLIC glm::glm)
+elseif(glm_FOUND)
+    target_include_directories(catch2_main PUBLIC ${GLM_INCLUDE_DIRS})
 endif()
 
 # ── ASAN / UBSan propagation ────────────────────────────────
