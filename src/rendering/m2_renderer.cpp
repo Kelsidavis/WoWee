@@ -52,10 +52,26 @@ void M2Instance::updateModelMatrix() {
     modelMatrix = glm::mat4(1.0f);
     modelMatrix = glm::translate(modelMatrix, position);
 
-    // Rotation in radians
-    modelMatrix = glm::rotate(modelMatrix, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-    modelMatrix = glm::rotate(modelMatrix, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+    // Rotation in radians, applied Z then Y then X.
+    //
+    // The order is not free: euler rotations do not commute, and this was
+    // X then Y then Z — the exact reverse of what the WMO placements beside it
+    // use, for records that carry the same rotation in the same encoding. MDDF
+    // and MODF both store (rotX, rotY, rotZ) degrees and mean the same thing
+    // by them, so two orders cannot both be right.
+    //
+    // Z-Y-X is the one that matches the file. WoW places a doodad by turning
+    // it about the vertical axis, then about the two horizontal ones, which in
+    // this render space — where the ADT's up axis maps to Z — is Z, then Y,
+    // then X. That is what the WMO path already did.
+    //
+    // Only a placement with more than one non-zero component could tell the
+    // difference, which is why this survived: anything standing straight up on
+    // flat ground is yaw alone, and yaw alone is order-independent. A gravestone
+    // set at a slight lean has two, and came out leaning the wrong way.
     modelMatrix = glm::rotate(modelMatrix, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+    modelMatrix = glm::rotate(modelMatrix, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+    modelMatrix = glm::rotate(modelMatrix, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
 
     modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
     invModelMatrix = glm::inverse(modelMatrix);
