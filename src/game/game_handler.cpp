@@ -803,14 +803,17 @@ void GameHandler::update(float deltaTime) {
         }
     }
 
-    // Detect combat state transitions → fire PLAYER_REGEN_DISABLED / PLAYER_REGEN_ENABLED
-    {
-        bool combatNow = isInCombat();
-        if (combatNow != wasCombat_) {
-            wasCombat_ = combatNow;
-                fireAddonEvent(combatNow ? "PLAYER_REGEN_DISABLED" : "PLAYER_REGEN_ENABLED", {});
-        }
-    }
+    // Entering and leaving combat is fired from the update block that carries
+    // UNIT_FLAG_IN_COMBAT, in EntityController — not from here.
+    //
+    // Both places used to fire it, so every fight announced itself twice: the
+    // combat text showed "Entering Combat" and then "Entering Combat" again,
+    // and the same on the way out. The two do not even agree on the question.
+    // This one asked isInCombat(), which is `autoAttacking_ ||
+    // !hostileAttackers_.empty()` — the client's own inference from what it has
+    // seen swing — while the other reads the flag the *server* sets, which is
+    // what PLAYER_REGEN_DISABLED means in WoW and what decides whether a panel
+    // may be changed. Two sources, two edges, at slightly different moments.
 
     updateTimers(deltaTime);
 
