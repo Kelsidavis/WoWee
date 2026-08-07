@@ -411,6 +411,11 @@ void registerSocialLuaAPI(lua_State* L) {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const auto& opts = gh->getCurrentGossip().options;
+            // Two values per option, and the option count is the server's.
+            // Lua guarantees a binding only a small slack above its arguments,
+            // and pushing past the top corrupts the heap rather than raising —
+            // so the room is asked for before any of it is used.
+            if (!lua_checkstack(L, static_cast<int>(opts.size()) * 2 + 1)) return 0;
             int n = 0;
             static constexpr const char* kIcons[] = {"gossip","vendor","taxi","trainer","spiritguide","innkeeper","banker","petition","tabard","battlemaster","auctioneer"};
             for (const auto& o : opts) {
