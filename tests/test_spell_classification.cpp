@@ -121,6 +121,15 @@ TEST_CASE("Only restoration food and drink spells use the seated consumption loo
     REQUIRE(classifyRestChannel("Food (TEST)") == RestChannelKind::NONE);
     REQUIRE(classifyRestChannel("") == RestChannelKind::NONE);
 
+    // The undead racial is the same kind of thing and neither of the two
+    // shapes above: it stays standing, so the seated food path is wrong for
+    // it, and it channels, so the single swig a potion gets is wrong too. It
+    // has its own kind so the call site can tell all three apart.
+    REQUIRE(classifyRestChannel("Cannibalize") == RestChannelKind::CANNIBALIZE);
+    // And nothing else drifts into it on a prefix.
+    REQUIRE(classifyRestChannel("Cannibalize Corpse") == RestChannelKind::NONE);
+    REQUIRE(classifyRestChannel("Cannibal") == RestChannelKind::NONE);
+
     const uint32_t alcoholEffects[3] = {0, 100, 0};
     const uint32_t ordinaryEffects[3] = {6, 10, 0};
     REQUIRE(hasInebriateEffect(alcoholEffects, 3));

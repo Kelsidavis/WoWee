@@ -94,12 +94,18 @@ enum class RestChannelKind {
     FOOD,
     DRINK,
     POTION,
-    ALCOHOL
+    ALCOHOL,
+    /// The undead racial. Grouped here because it is the same kind of thing —
+    /// a channel whose whole visible content is the eating animation — but it
+    /// is neither seated nor a single swig: the character stays standing over
+    /// the corpse and eats for the length of the channel.
+    CANNIBALIZE
 };
 
 inline RestChannelKind classifyRestChannel(const std::string& spellName) {
     if (spellName == "Food") return RestChannelKind::FOOD;
     if (spellName == "Drink") return RestChannelKind::DRINK;
+    if (spellName == "Cannibalize") return RestChannelKind::CANNIBALIZE;
     constexpr const char* potionSuffix = "Potion";
     if (spellName.size() >= 6 &&
         spellName.compare(spellName.size() - 6, 6, potionSuffix) == 0 &&

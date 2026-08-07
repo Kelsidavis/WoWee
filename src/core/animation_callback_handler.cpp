@@ -474,7 +474,20 @@ void AnimationCallbackHandler::setupCallbacks() {
 
             if (restChannel != game::spellclass::RestChannelKind::NONE) {
                 if (auto* ac = renderer_.getAnimationController()) {
-                    if (restChannel == game::spellclass::RestChannelKind::POTION ||
+                    if (restChannel == game::spellclass::RestChannelKind::CANNIBALIZE) {
+                        // Standing, and looping for the length of the channel.
+                        //
+                        // Not the food path: that seats the player and swaps
+                        // the seated idle, and cannibalize does not sit — the
+                        // character stays on their feet over the corpse. Not
+                        // the potion path either, which is one swig and done,
+                        // where this runs until the channel ends.
+                        uint32_t eatAnim = pickFirst({rendering::anim::EMOTE_EAT,
+                                                      rendering::anim::EATING_LOOP});
+                        if (eatAnim != 0) {
+                            ac->startSpellCast(0, eatAnim, /*castLoop=*/true, 0);
+                        }
+                    } else if (restChannel == game::spellclass::RestChannelKind::POTION ||
                         restChannel == game::spellclass::RestChannelKind::ALCOHOL) {
                         // Potions/alcohol are drunk standing: one EmoteEat swig.
                         uint32_t swigAnim = pickFirst({rendering::anim::EMOTE_EAT});
