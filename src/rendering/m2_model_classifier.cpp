@@ -225,7 +225,14 @@ M2ClassificationResult classifyM2Model(
         "okra",       "onion",
         "palm",       "pepper",     "pinecone",   "potato",     "pumpkin",
         "reed",       "root",
-        "sapling",    "seaweed",    "seedling",   "shrub",      "sprout",
+        "sapling",    "seaweed",    "seedling",   "shrub",
+        // Blizzard's own misspelling, and it is the only spelling those models
+        // have: WETLANDSSHURB09.M2 and its siblings. Reported as grass with
+        // cobwebs that could not be walked through, and no amount of reading
+        // the token list would have found it — the name had to come off the
+        // model. The client names what blocks it now for exactly this reason.
+        "shurb",
+        "sprout",
         "squash",     "stalk",      "thorn",      "thistle",    "toadstool",
         "tomato",     "turnip",
         "underbrush", "vine",       "watermelon", "weed",       "wheat",

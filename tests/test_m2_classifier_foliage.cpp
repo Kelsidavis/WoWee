@@ -133,3 +133,19 @@ TEST_CASE("only an actual forge is treated as forge fire", "[m2][classifier][for
         CHECK_FALSE(classify("UL_ForgeLava").isForge);
     }
 }
+
+TEST_CASE("Blizzard's own misspellings are foliage too", "[m2][classifier]") {
+    // WETLANDSSHURB09.M2 is a real path — "shurb", not "shrub" — and it is the
+    // only spelling those models have. Reported as grass with cobwebs on it
+    // that the player could not walk through.
+    //
+    // The correct spelling stays covered beside it, because adding the typo is
+    // the kind of change that invites someone to "fix" the list later.
+    for (const char* path : {
+             "WORLD\\KHAZMODAN\\WETLANDS\\PASSIVEDOODADS\\BUSHES\\WETLANDSSHURB09.M2",
+             "WORLD\\AZEROTH\\ELWYNN\\PASSIVEDOODADS\\BUSHES\\ELWYNNSHRUB01.M2"}) {
+        const auto cls = classify(path);
+        INFO(path);
+        CHECK(cls.collisionNoBlock);
+    }
+}
