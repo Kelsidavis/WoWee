@@ -58,7 +58,18 @@ void Logger::ensureFile() {
     }
     std::error_code ec;
     std::filesystem::create_directories("logs", ec);
-    fileStream.open("logs/wowee.log", std::ios::out | std::ios::trunc);
+    // WOWEE_LOG_FILE names the file, so a tool run beside the client does not
+    // destroy the log the client wrote.
+    //
+    // This opens with trunc, and every process using this logger opened the
+    // same path — so running framexml_run from the repository root wiped the
+    // session log of the client that had just been played, which is the one
+    // file anyone diagnosing a report needs. It was found the only way it
+    // could be: by being asked to read a log and finding my own run in it.
+    const char* logName = std::getenv("WOWEE_LOG_FILE");
+    const std::string logPath =
+        std::string("logs/") + ((logName && *logName) ? logName : "wowee.log");
+    fileStream.open(logPath, std::ios::out | std::ios::trunc);
     lastFlushTime_ = std::chrono::steady_clock::now();
 }
 

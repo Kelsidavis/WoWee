@@ -64,6 +64,16 @@ std::string getExecutableDir() {
 
 std::string getConfigRoot() {
     std::error_code ec;
+    // An explicit root wins over everything.
+    //
+    // The tools write here too — the missing-API list and the Lua error list
+    // are both rewritten on exit — so a headless run beside a real session
+    // overwrote the two files a bug report is read from. A harness needs its
+    // own corner rather than the player's.
+    if (const char* root = std::getenv("WOWEE_CONFIG_ROOT"); root && *root) {
+        fs::create_directories(root, ec);
+        return root;
+    }
     const std::string exeDir = getExecutableDir();
     if (!exeDir.empty()) {
         const fs::path portableMarker = fs::path(exeDir) / "portable.txt";
