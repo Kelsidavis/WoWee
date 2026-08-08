@@ -1104,6 +1104,12 @@ void WMORenderer::setInstancePosition(uint32_t instanceId, const glm::vec3& posi
     rebuildSpatialIndex();
 }
 
+void WMORenderer::setInstanceIsTransport(uint32_t instanceId, bool isTransport) {
+    auto idxIt = instanceIndexById.find(instanceId);
+    if (idxIt == instanceIndexById.end()) return;
+    instances[idxIt->second].isTransport = isTransport;
+}
+
 void WMORenderer::setInstanceTransform(uint32_t instanceId, const glm::mat4& transform) {
     auto idxIt = instanceIndexById.find(instanceId);
     if (idxIt == instanceIndexById.end()) return;
@@ -3281,7 +3287,11 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
     if (activeGroup_.isValid() && activeGroup_.instanceIdx < instances.size()) {
         const auto& instance = instances[activeGroup_.instanceIdx];
         auto it = loadedModels.find(instance.modelId);
-        if (it != loadedModels.end() && instance.modelId == activeGroup_.modelId) {
+        // A transport deck is never the static-world floor (it reaches a rider
+        // through getInstanceFloorHeight); skip it here so a moving elevator or
+        // ship hull cannot become the ground under someone on the fixed floor.
+        if (!instance.isTransport &&
+            it != loadedModels.end() && instance.modelId == activeGroup_.modelId) {
             const ModelData& model = it->second;
             glm::vec3 localOrigin = glm::vec3(instance.invModelMatrix * glm::vec4(worldOrigin, 1.0f));
             glm::vec3 localDir = glm::normalize(glm::vec3(instance.invModelMatrix * glm::vec4(worldDir, 0.0f)));
@@ -3320,6 +3330,14 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
 
     for (size_t idx : tl_candidateScratch) {
         const auto& instance = instances[idx];
+        // Moving transport (elevator, ship hull): excluded from the static-world
+        // floor query. Its deck only belongs to a rider, through the dedicated
+        // getInstanceFloorHeight path — otherwise it sweeps through the floor of
+        // anyone standing nearby on the fixed ground (the Undercity elevator
+        // yo-yo, firing at the elevator's cycle).
+        if (instance.isTransport) {
+            continue;
+        }
         if (collisionFocusEnabled &&
             pointAABBDistanceSq(collisionFocusPos, instance.worldBoundsMin, instance.worldBoundsMax) > collisionFocusRadiusSq) {
             continue;

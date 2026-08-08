@@ -130,6 +130,11 @@ public:
      */
     void setInstanceTransform(uint32_t instanceId, const glm::mat4& transform);
 
+    /// Mark an instance as a moving transport so the static-world floor query
+    /// (getFloorHeight) skips it — its deck reaches a rider only through the
+    /// dedicated getInstanceFloorHeight path. Idempotent; safe on every register.
+    void setInstanceIsTransport(uint32_t instanceId, bool isTransport);
+
     /**
      * Add doodad (child M2) to WMO instance
      * @param instanceId WMO instance to add doodad to
@@ -612,6 +617,13 @@ private:
             glm::mat4 localTransform;    // Local transform relative to WMO origin
         };
         std::vector<DoodadInfo> doodads;
+
+        // A moving transport (ship hull, elevator). Its collision belongs to the
+        // rider through the dedicated getInstanceFloorHeight path, NOT to the
+        // ordinary static-world floor query — otherwise the moving deck sweeps
+        // through the floor pick of anyone standing on the fixed ground nearby,
+        // which is the Undercity elevator yo-yo.
+        bool isTransport = false;
 
         void updateModelMatrix();
     };

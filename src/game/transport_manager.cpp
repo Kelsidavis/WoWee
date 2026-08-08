@@ -564,7 +564,13 @@ void TransportManager::pushTransform(ActiveTransport& transport) {
     if (transport.isM2) {
         if (m2Renderer_) m2Renderer_->setInstanceTransform(transport.wmoInstanceId, transport.transform);
     } else {
-        if (wmoRenderer_) wmoRenderer_->setInstanceTransform(transport.wmoInstanceId, transport.transform);
+        if (wmoRenderer_) {
+            wmoRenderer_->setInstanceTransform(transport.wmoInstanceId, transport.transform);
+            // Keep this WMO instance out of the static-world floor query. Set
+            // here rather than once at register so it survives an instance
+            // rebuild from streaming — the call is idempotent and cheap.
+            wmoRenderer_->setInstanceIsTransport(transport.wmoInstanceId, true);
+        }
     }
 }
 
