@@ -57,6 +57,7 @@
 #include "ui/ui_services.hpp"
 #include "auth/auth_handler.hpp"
 #include "game/game_handler.hpp"
+#include "game/chat_handler.hpp"
 #include "game/faction_hostility.hpp"
 #include "game/transport_manager.hpp"
 #include "game/world.hpp"
@@ -369,7 +370,7 @@ bool Application::initialize() {
                 if (gh) gh->addScriptError(err);
             });
             // Wire chat messages to addon event dispatch
-            gameHandler->setAddonChatCallback([this](const game::MessageChatData& msg) {
+            gameHandler->setAddonChatCallback([this, gh = gameHandler.get()](const game::MessageChatData& msg) {
                 if (!addonManager_ || !addonsLoaded_) return;
                 // Map ChatType to WoW event name
                 const char* eventName = nullptr;
@@ -409,7 +410,39 @@ bool Application::initialize() {
                     default: break;
                 }
                 if (eventName) {
-                    addonManager_->fireEvent(eventName, {msg.message, msg.senderName});
+                    if (msg.type == game::ChatType::CHANNEL) {
+                        // CHAT_MSG_CHANNEL is read positionally by the chat frame,
+                        // and firing only message+sender left arg8 — the channel
+                        // index — nil, so GetColoredName's "CHANNEL"..arg8 raised
+                        // and every channel line tore its handler down. The frame
+                        // also reads arg4 (name, for its length), arg7 (zone id),
+                        // arg9 (base name, matched against the joined list), and
+                        // compares arg10 and concatenates arg11 — so the numeric
+                        // slots must arrive as numbers (pushEventArg coerces a
+                        // canonical "0") and cannot be left nil, or the fix would
+                        // trade one raise for another. arg12 is the guid; "" skips
+                        // the class-colour lookup cleanly rather than passing nil.
+                        // The index is a lookup by name in the channels the client
+                        // already tracks as joined.
+                        const int idx = (gh && gh->getChatHandler())
+                            ? gh->getChatHandler()->getChannelIndex(msg.channelName) : 0;
+                        addonManager_->fireEvent(eventName, {
+                            msg.message,                 // arg1 message
+                            msg.senderName,              // arg2 author
+                            "",                          // arg3 language
+                            msg.channelName,             // arg4 channel name
+                            "",                          // arg5 target
+                            "",                          // arg6 flags
+                            "0",                         // arg7 zone id (→ 0; name match covers it)
+                            std::to_string(idx),         // arg8 channel index
+                            msg.channelName,             // arg9 base name
+                            "0",                         // arg10 repeat counter (→ 0)
+                            "0",                         // arg11 line id (→ 0)
+                            ""                           // arg12 guid (→ skip class colour)
+                        });
+                    } else {
+                        addonManager_->fireEvent(eventName, {msg.message, msg.senderName});
+                    }
                 }
             });
             // Wire generic game events to addon dispatch
