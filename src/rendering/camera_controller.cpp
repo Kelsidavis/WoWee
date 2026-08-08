@@ -1188,6 +1188,17 @@ void CameraController::update(float deltaTime) {
                         wmoH = std::nullopt;
                         centerWmoH = std::nullopt;
                     }
+                    // Inside an interior WMO group — Undercity's halls, a
+                    // building's rooms — the outdoor heightfield is the roof far
+                    // overhead, never the floor. Veto it so that when the WMO
+                    // floor query briefly finds nothing at a spot, the pick does
+                    // not fall back to terrain and kick the player up to the
+                    // surface. Interior containment is false at entrances/seams,
+                    // which the atTunnelSeam path below handles.
+                    if (cachedInsideInteriorWMO) {
+                        terrainH = std::nullopt;
+                    }
+
                     centerTerrainH = terrainH;
                     centerWmoH = wmoH;
                     centerM2H = m2H;
