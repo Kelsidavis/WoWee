@@ -2491,6 +2491,63 @@ std::optional<float> TerrainManager::getHeightAt(float glX, float glY) const {
     return std::nullopt;
 }
 
+bool TerrainManager::isHoleAt(float glX, float glY) const {
+    const float unitSize = CHUNK_SIZE / 8.0f;
+
+    auto tileHole = [&](const TerrainTile* tile) -> std::optional<bool> {
+        if (!tile || !tile->loaded) return std::nullopt;
+
+        auto chunkHole = [&](int cx, int cy) -> std::optional<bool> {
+            if (cx < 0 || cx >= 16 || cy < 0 || cy >= 16) return std::nullopt;
+            const auto& chunk = tile->terrain.getChunk(cx, cy);
+            if (!chunk.hasHeightMap()) return std::nullopt;
+
+            const float chunkMaxX = chunk.position[0];
+            const float chunkMinX = chunk.position[0] - 8.0f * unitSize;
+            const float chunkMaxY = chunk.position[1];
+            const float chunkMinY = chunk.position[1] - 8.0f * unitSize;
+            if (glX < chunkMinX || glX > chunkMaxX ||
+                glY < chunkMinY || glY > chunkMaxY) {
+                return std::nullopt;
+            }
+            if (chunk.holes == 0) return false;
+
+            // The same two fractions getHeightAt derives its height from, and
+            // the same order the mesh builder passes to isHole — it walks
+            // `for y { for x { if (chunk.isHole(y, x)) continue; ... } }` over
+            // vertices at `y * 17 + x`, which is the grid getHeightAt samples
+            // as `heights[gy * 17 + gx]`. Answering the quad from the same two
+            // numbers is what keeps the surface the player stands on and the
+            // surface drawn from disagreeing about which quads exist.
+            const float fracY = (chunk.position[0] - glX) / unitSize;
+            const float fracX = (chunk.position[1] - glY) / unitSize;
+            const int qy = glm::clamp(static_cast<int>(std::floor(fracY)), 0, 7);
+            const int qx = glm::clamp(static_cast<int>(std::floor(fracX)), 0, 7);
+            return chunk.isHole(qy, qx);
+        };
+
+        int guessCy = glm::clamp(static_cast<int>(std::floor((tile->maxX - glX) / CHUNK_SIZE)), 0, 15);
+        int guessCx = glm::clamp(static_cast<int>(std::floor((tile->maxY - glY) / CHUNK_SIZE)), 0, 15);
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (auto r = chunkHole(guessCx + dx, guessCy + dy)) return r;
+            }
+        }
+        return std::nullopt;
+    };
+
+    const TileCoord tc = worldToTile(glX, glY);
+    auto it = loadedTiles.find(tc);
+    if (it != loadedTiles.end()) {
+        if (auto r = tileHole(it->second.get())) return *r;
+    }
+    for (const auto& [coord, tile] : loadedTiles) {
+        if (coord == tc) continue;
+        if (auto r = tileHole(tile.get())) return *r;
+    }
+    return false;
+}
+
 bool TerrainManager::chunkHasHoles(float glX, float glY) const {
     const float unitSize = CHUNK_SIZE / 8.0f;
     (void)unitSize;

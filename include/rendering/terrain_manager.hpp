@@ -276,6 +276,15 @@ public:
      */
     bool chunkHasHoles(float glX, float glY) const;
 
+    /**
+     * True when the single terrain quad under this position is cut away.
+     * chunkHasHoles answers for a whole 33x33-yard chunk, which is far too
+     * coarse to decide whether the player is standing on ground: a chunk
+     * containing one cave mouth would report every yard of it as empty. This
+     * is the per-quad question, matched to the quads the mesh builder skips.
+     */
+    bool isHoleAt(float glX, float glY) const;
+
     /** Get the precise MCNK AreaTable ID at a world position. */
     std::optional<uint32_t> getAreaIdAt(float glX, float glY) const;
 

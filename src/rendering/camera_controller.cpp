@@ -1202,6 +1202,28 @@ void CameraController::update(float deltaTime) {
                         m2H = std::nullopt;
                     }
 
+                    // A terrain hole is the artist saying there is no ground
+                    // here — it is how cave mouths and sunken entrances get
+                    // opened up, and the mesh builder already skips those
+                    // quads, so nothing is drawn over them. getHeightAt does
+                    // not ask: it interpolates straight across the gap and
+                    // reports a surface right at the player's feet, which then
+                    // wins the floor selection against the real floor below.
+                    // At Gadgetzan's auction house that put the player out over
+                    // the stairwell on ground that is not there, unable to walk
+                    // down the steps and looking into a hole they were standing
+                    // on. Every seam guard below is downstream of this and none
+                    // of them could see it, because to them the terrain sample
+                    // was real.
+                    //
+                    // Only ever hand the floor to the building underneath — a
+                    // hole with nothing below it keeps the heightfield it has
+                    // always had, so this cannot open a pit anywhere new.
+                    if (terrainH && wmoH && terrainManager &&
+                        terrainManager->isHoleAt(targetPos.x, targetPos.y)) {
+                        terrainH = std::nullopt;
+                    }
+
                     // Inside an interior WMO group — Undercity's halls, a
                     // building's rooms — the outdoor heightfield is the roof far
                     // overhead, never the floor. Veto it so that when the WMO
