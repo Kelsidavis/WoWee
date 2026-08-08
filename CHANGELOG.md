@@ -1,5 +1,20 @@
 # Changelog
 
+## [v2.0.40] — 2026-08-08
+
+Non-interface fixes — floor collision, chat, and liquid rendering — with no
+dependency on the original-interface work. Most are backported from the
+`framexml-ui-transition` branch; the slime rendering fix is new here.
+
+### Fixed
+- **Undercity's slime stopped moving in squares.** The magma/slime surface drove its flowing motion from value noise — one scalar per integer grid point — whose features sit square on the world grid, so up close the canal ooze churned in visible tiles. It now flows on gradient (Perlin) noise with each octave rotated so no two lattices align: a fractal swirl instead of a grid. Same scales and speeds, so the colour and glow are unchanged
+- **Channel chat crashed on every line.** `CHAT_MSG_CHANNEL` was fired with only the message and sender, but a channel line is read positionally and `GetColoredName` builds `"CHANNEL"..arg8` — the nil channel index raised and tore the handler down, so nothing in the channel drew. The event now carries the full positional vector: the index looked up in the joined-channel list, numeric slots as numbers so a comparison does not raise, and the guid slot empty so class-colouring skips cleanly
+- **The player model no longer flickers on and off every frame in Undercity.** The camera hid the player when the collision-squeezed distance dropped under the first-person threshold, and the renderer's visibility hardening forced it visible again in third person — the two wrote opposite values every frame, churning the model and its attached weapons. Hide on first-person *intent* (the zoom target), not the squeezed distance
+- **An Undercity elevator no longer drags the player between two heights.** A WMO transport is registered as an ordinary instance so it renders and a rider stands on its deck, and the floor query iterated every instance — so as the elevator swept through the player's position its deck kept entering and leaving the floor candidates, at the elevator's own cycle. Transports are now skipped in the static-world floor query; the deck still reaches a rider through the dedicated instance query
+- **The player is no longer kicked up to terrain height inside a building.** When the WMO floor query briefly found nothing, the pick fell back to the outdoor heightfield — the roof far overhead. Inside an interior WMO group the heightfield is meaningless and is now vetoed, so a momentary gap holds near the last floor instead of teleporting the player to the surface
+- **An M2 doodad no longer drops the player through the floor.** An M2 collision surface well below a valid WMO floor is *beneath* that floor — a decoration or base under the walkway — but it won the pick and dropped the player ~6m. When a WMO floor is present, an M2 floor more than 1.5m below it is rejected
+- **The player no longer walks out over terrain the artist cut away.** The Gadgetzan stairwell — and cave mouths, sunken entrances — is a hole marked in the terrain and skipped by the mesh builder, but `getHeightAt` interpolated straight across it and returned a surface at the player's feet that beat the real floor below. The hole is answered per quad now, dropping the terrain sample only when a WMO floor is underneath to take its place
+
 ## [v2.0.38-preview] — 2026-08-05
 
 ### Fixed
