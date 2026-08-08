@@ -151,6 +151,43 @@ float fbmNoise(vec2 p, float time) {
     return v;
 }
 
+// ============================================================
+// Gradient (Perlin) noise + rotated fractal — for the magma/slime flow
+// ============================================================
+// Value noise (noiseValue above) samples a scalar per lattice point and
+// interpolates it, so its features sit square on the integer grid and read as
+// axis-aligned blocks up close — which is what made the slime motion look like
+// tiles. Gradient noise instead interpolates a random gradient that is zero at
+// each lattice point, so neighbouring cells blend through zero without the flat
+// plateaus, and rotating every octave keeps the separate lattices from ever
+// lining up. The result is a fractal flow rather than a grid of squares.
+vec2 gradHash(vec2 p) {
+    p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+    return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+}
+
+float gradNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    float a = dot(gradHash(i + vec2(0.0, 0.0)), f - vec2(0.0, 0.0));
+    float b = dot(gradHash(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0));
+    float c = dot(gradHash(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0));
+    float d = dot(gradHash(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0));
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y) * 0.5 + 0.5;
+}
+
+// Same octave structure and value range as fbmNoise, but on gradient noise and
+// with a small rotation between octaves so no two lattices align.
+float fbmGrad(vec2 p, float time) {
+    const mat2 R = mat2(0.80, -0.60, 0.60, 0.80);   // ~37° per octave
+    float v = 0.0;
+    v += gradNoise(p * 3.0 + time * 0.3) * 0.5;   p = R * p;
+    v += gradNoise(p * 6.0 - time * 0.5) * 0.25;  p = R * p;
+    v += gradNoise(p * 12.0 + time * 0.7) * 0.125;
+    return v;
+}
+
 // Voronoi-like cellular noise for foam particles
 // jitter parameter controls how much cell points deviate from grid centers
 // (0.0 = regular grid, 1.0 = fully random within cell)
@@ -186,10 +223,13 @@ void main() {
 
         bool isMagma = basicType < 2.5;
 
-        // Multi-octave flowing noise for organic lava look
-        float n1 = fbmNoise(flowUV * 0.06 + vec2(time * 0.02, time * 0.03), time * 0.4);
-        float n2 = fbmNoise(flowUV * 0.10 + vec2(-time * 0.015, time * 0.025), time * 0.3);
-        float n3 = noiseValue(flowUV * 0.25 + vec2(time * 0.04, -time * 0.02));
+        // Multi-octave flowing noise for organic lava/slime look. Gradient-noise
+        // fractal (fbmGrad/gradNoise) rather than value noise (fbmNoise/
+        // noiseValue): same scales, weights and scroll, but the flow reads as a
+        // fractal instead of the axis-aligned squares the grid basis produced.
+        float n1 = fbmGrad(flowUV * 0.06 + vec2(time * 0.02, time * 0.03), time * 0.4);
+        float n2 = fbmGrad(flowUV * 0.10 + vec2(-time * 0.015, time * 0.025), time * 0.3);
+        float n3 = gradNoise(flowUV * 0.25 + vec2(time * 0.04, -time * 0.02));
         float flow = n1 * 0.45 + n2 * 0.35 + n3 * 0.20;
 
         // Dark crust vs bright molten core
