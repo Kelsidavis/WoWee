@@ -1485,6 +1485,23 @@ ImGuiKey imGuiKeyFromWow(const std::string& name) {
 
 /// Tells the client what a command is bound to now, for the commands it acts
 /// on. Silent for the rest, which are listed and saved but not yet answered.
+/// Hand a binding to the client's own keybinding manager, if it answers that
+/// command at all.
+///
+/// Two things do not survive this, both worth knowing before chasing either as
+/// a bug.
+///
+/// A second key for one command is accepted, works for the session and is gone
+/// at the next start. The interface allows two per command and this manager
+/// holds one per action, so what is pushed here is keys[0] - the primary - and
+/// the other lives only in the Lua map above, which nothing saves. Setting a
+/// primary does persist: rebinding the bags from B to N writes toggle_bags=N
+/// and comes back as N. Making the second key stick means the manager holding
+/// two, which is a change to what a binding is here rather than a repair.
+///
+/// A binding for a command not in kLiveBindings does not reach the client at
+/// all, and is not saved either. That is the intended half of this: those are
+/// the commands the interface answers for itself.
 void pushBindingToClient(const std::string& command, const std::string& key) {
     for (const auto& live : kLiveBindings) {
         if (command != live.command) continue;
