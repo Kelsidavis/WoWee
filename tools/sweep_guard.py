@@ -1047,6 +1047,12 @@ SENTENCES = [
     # storedCVarValue answers the client where the setting is used. Both are
     # individually reasonable and both sides work; a difference only shows on
     # screen, as healing numbers over an unticked box. Canaried by moving one.
+    # And the same defaults against the game's own tables, which declare one
+    # beside each CVar their panels drive. Two differ on purpose and are named
+    # in the script with the reason; this is for a third nobody decided on.
+    ("cvar_default_vs_blizzard.py",
+     "matches the game's own, but for",
+     "a default differing from the game's own with no reason recorded"),
     ("cvar_default_agreement.py",
      "answers the interface the same way",
      "a CVar meaning one thing to the options panel and another to the client"),
