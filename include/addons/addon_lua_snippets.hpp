@@ -604,10 +604,12 @@ WOWEE_SETTINGS_ELSEWHERE = {
     -- game's panel calls it gamma, this client's own window calls it
     -- brightness, and SetGamma is what both of them end up in. A player who
     -- knows it by either word finds it.
-    { panel = "Video",             names = { "resolution", "view distance", "ground clutter",
+    { panel = "Video",             names = { "resolution", "view distance",
+                                             "ground clutter (grass)",
                                              "gamma (brightness)" } },
     { panel = "Sound",             names = { "enable sound", "master volume", "sound effects" } },
-    { panel = "Interface",         names = { "mouse look speed", "the minimap clock",
+    { panel = "Interface",         names = { "mouse look speed (sensitivity)",
+                                             "the minimap clock",
                                              "friendly nameplates" } },
     { panel = "Interface, Social", names = { "chat timestamps" } },
     { panel = "Key Bindings",      names = { "every key" } },
@@ -699,9 +701,15 @@ local function runSearch(query)
     local heading = ""
     for _, setting in ipairs(list) do
         if setting.section and setting.section ~= "" then heading = setting.section end
+        -- The tooltip counts too. It is the sentence saying what the setting
+        -- does, it is already in the schema, and it is where the words a
+        -- player reaches for live when the label is the client's word for the
+        -- thing: FXAA is found by "edges" because its own description says it
+        -- smooths them.
         if lower(setting.label):find(query, 1, true) or
            lower(setting.key):find(query, 1, true) or
-           lower(heading):find(query, 1, true) then
+           lower(heading):find(query, 1, true) or
+           lower(setting.tooltip or ""):find(query, 1, true) then
             found = found + 1
             -- Five is what fits between the box and the next heading; the
             -- count below says how many more rather than pretending these are
