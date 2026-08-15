@@ -1164,7 +1164,12 @@ struct ClientCVarBinding {
 
 constexpr ClientCVarBinding kClientCVars[] = {
     {"farclip",              "viewdistance"},
-    {"mousespeed",           "mousespeed"},
+    // Blizzard's slider is a multiplier around 1.0 and runs 0.5 to 1.5. This
+    // client's sensitivity is an amount, runs 0.05 to 1.0 and sits at 0.2 - so
+    // one of theirs is 0.2 of ours, which puts their normal on our default.
+    // Passed straight through, their slowest setting was two and a half times
+    // our default and their fastest was above our own ceiling.
+    {"mousespeed",           "mousespeed", 0.2},
     {"showclock",            "minimapclock"},
     {"nameplateshowfriends", "friendlyplates"},
     // Deliberately not gxWindow. It is answered further down, from the store
