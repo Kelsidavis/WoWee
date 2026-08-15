@@ -2069,7 +2069,11 @@ void GameScreen::loadSettings() {
                 questTrackerPosInit_ = true;
             }
             else if (key == "quest_tracker_y") {
-                questTrackerPos_.y = std::stof(val);
+                // Only the near end can be held here. The far end is the screen
+                // height, and this runs from the constructor where there is no
+                // screen to ask - so the tracker's own drawing holds it, every
+                // frame, the way it recomputes x from the right edge.
+                questTrackerPos_.y = std::max(0.0f, std::stof(val));
                 questTrackerPosInit_ = true;
             }
             else if (key == "quest_tracker_w") {
