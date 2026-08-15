@@ -2022,7 +2022,13 @@ uint64_t GameHandler::getInteractNpcGuid() const {
         if (const uint64_t peer = inventoryHandler_->getTradePeerGuid()) return peer;
         if (const uint64_t vendor = getVendorGuid()) return vendor;
     }
-    if (taxiNpcGuid_ != 0 && taxiWindowOpen_) return taxiNpcGuid_;
+    // From the movement handler, which owns both. GameHandler kept members of
+    // the same two names that the decomposition left behind unwritten, so this
+    // read false forever and the flight master had no portrait in the taxi
+    // frame.
+    if (movementHandler_ && movementHandler_->isTaxiWindowOpen()) {
+        if (const uint64_t taxiNpc = movementHandler_->getTaxiNpcGuid()) return taxiNpc;
+    }
     if (questHandler_) {
         if (const uint64_t gossip = questHandler_->getCurrentGossip().npcGuid) return gossip;
     }

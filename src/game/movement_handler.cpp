@@ -3070,7 +3070,16 @@ void MovementHandler::activateTaxi(uint32_t destNodeId) {
         owner_.getSocket()->send(basicPkt);
     }
 
+    // The window closes on the request, not on the reply, and FrameXML's taxi
+    // frame only hides on the event. Clearing the flag alone closes this
+    // client's own map and node list, which poll it, and leaves TaxiFrame up
+    // for the whole flight - the reply's own send of this event cannot cover it,
+    // because its guard reads the flag this line has already cleared.
+    const bool taxiWasOpen = taxiWindowOpen_;
     taxiWindowOpen_ = false;
+    if (taxiWasOpen && owner_.addonEventCallbackRef()) {
+        owner_.addonEventCallbackRef()("TAXIMAP_CLOSED", {});
+    }
     taxiActivatePending_ = true;
     taxiActivateTimer_ = 0.0f;
     // Do NOT mount, set onTaxiFlight_, or activate the client spline here.

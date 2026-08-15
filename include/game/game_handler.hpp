@@ -4534,8 +4534,8 @@ private:
     std::vector<TaxiPathEdge> taxiPathEdges_;
     std::unordered_map<uint32_t, std::vector<TaxiPathNode>> taxiPathNodes_;  // pathId -> ordered waypoints
     bool taxiDbcLoaded_ = false;
-    bool taxiWindowOpen_ = false;
-    uint64_t taxiNpcGuid_ = 0;
+    // No taxiWindowOpen_ or taxiNpcGuid_ here: the movement handler owns both,
+    // and the copies this class kept were never written after the split.
     bool onTaxiFlight_ = false;
     bool taxiMountActive_ = false;
     uint32_t taxiMountDisplayId_ = 0;

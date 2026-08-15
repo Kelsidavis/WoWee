@@ -207,6 +207,7 @@ public:
     uint32_t* knownTaxiMaskPtr() { return knownTaxiMask_; }
     bool& taxiMaskInitializedRef() { return taxiMaskInitialized_; }
     uint64_t& taxiNpcGuidRef() { return taxiNpcGuid_; }
+    uint64_t getTaxiNpcGuid() const { return taxiNpcGuid_; }
 
     // Other-player movement timing (for cleanup on despawn etc.)
     std::unordered_map<uint64_t, uint32_t>& otherPlayerMoveTimeMsRef() { return otherPlayerMoveTimeMs_; }

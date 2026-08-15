@@ -862,7 +862,13 @@ void GameHandler::update(float deltaTime) {
         };
         closeIfTooFar(isVendorWindowOpen(), getVendorItems().vendorGuid, [this]{ closeVendor(); }, "Vendor");
         closeIfTooFar(isGossipWindowOpen(), getCurrentGossip().npcGuid, [this]{ closeGossip(); }, "Gossip");
-        closeIfTooFar(isTaxiWindowOpen(), taxiNpcGuid_, [this]{ closeTaxi(); }, "Taxi window");
+        // The movement handler's guid, not a copy of it: the one this class
+        // kept was never assigned, so this asked about guid 0, found no NPC and
+        // returned - the only one of these four windows that stayed open when
+        // the player walked away from it.
+        closeIfTooFar(isTaxiWindowOpen(),
+                      movementHandler_ ? movementHandler_->getTaxiNpcGuid() : 0,
+                      [this]{ closeTaxi(); }, "Taxi window");
         closeIfTooFar(isTrainerWindowOpen(), getTrainerSpells().trainerGuid, [this]{ closeTrainer(); }, "Trainer");
 
         updateEntityInterpolation(deltaTime);
