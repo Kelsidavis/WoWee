@@ -481,8 +481,15 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                     cr->setNormalMapStrength(settingsPanel_.pendingNormalMapStrength);
                     cr->setPOMEnabled(settingsPanel_.pendingPOM);
                     cr->setPOMQuality(settingsPanel_.pendingPOMQuality);
+                    // Both told before this is done with. The two renderers are
+                    // built one after the other in the same function today, so
+                    // the character one is never missing while the WMO one is
+                    // here - but marking it applied from inside the outer guard
+                    // meant that if it ever were, characters would keep the
+                    // defaults and nothing would try again. Re-telling the WMO
+                    // renderer on a later frame costs four setters.
+                    settingsPanel_.normalMapSettingsApplied_ = true;
                 }
-                settingsPanel_.normalMapSettingsApplied_ = true;
             }
         }
     }
