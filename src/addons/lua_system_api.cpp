@@ -1164,20 +1164,15 @@ struct ClientCVarBinding {
 
 constexpr ClientCVarBinding kClientCVars[] = {
     {"farclip",              "viewdistance"},
-    // Blizzard's slider is a multiplier around 1.0 and runs 0.5 to 1.5. This
-    // client's sensitivity is an amount, runs 0.05 to 1.0 and sits at 0.2 - so
-    // one of theirs is 0.2 of ours, which puts their normal on our default.
-    // Passed straight through, their slowest setting was two and a half times
-    // our default and their fastest was above our own ceiling.
-    //
-    // The two ranges do not cover each other, and that is the right way round
-    // rather than something to even up. Their slider reaches 0.1 to 0.3 of
-    // ours; this client's own goes to 1.0, so a sensitivity set here that they
-    // cannot express shows their slider pinned at its end. Mapping our whole
-    // range onto theirs instead would put their normal at 0.67 - three times
-    // this client's default - which trades a slider that reads oddly at the
-    // extremes for one that is wrong in the middle.
-    {"mousespeed",           "mousespeed", 0.2},
+    // Mouse Sensitivity. Its shipped range is 0.5 to 1.5, a multiplier around
+    // 1.0, and this client's sensitivity is an amount that runs 0.05 to 1.0 -
+    // so passed through unchanged the slowest setting that slider offered was
+    // two and a half times this client's default. Its range is redefined in
+    // kCVarRanges rather than converted here, which is what farclip and
+    // cameraYawMoveSpeed do, and it has to be: Mouse Look Speed writes this
+    // same setting through that route, so a scale on this one alone would have
+    // the two sliders disagree about the value they share.
+    {"mousespeed",           "mousespeed"},
     {"showclock",            "minimapclock"},
     {"nameplateshowfriends", "friendlyplates"},
     // Deliberately not gxWindow. It is answered further down, from the store
@@ -4452,6 +4447,10 @@ constexpr CVarRange kCVarRanges[] = {
     {"farclip", 400.0f, 2400.0f},
     // Mouse Look Speed, over the range this client's own mouse slider uses.
     {"camerayawmovespeed", 0.05f, 1.0f},
+    // Mouse Sensitivity, which writes the same setting as Mouse Look Speed
+    // above and so has to offer the same range. Shipped as 0.5 to 1.5, a
+    // multiplier around 1.0, against a setting that sits at 0.2 and stops at 1.
+    {"mousespeed", 0.05f, 1.0f},
     // Camera Following Speed. Not the shipped range: see the note in
     // applyCVarSideEffects - these are the bounds the camera itself clamps to,
     // so every position on the slider is a speed this client can actually run.

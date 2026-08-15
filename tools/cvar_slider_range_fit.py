@@ -91,6 +91,22 @@ def sliderRanges():
             name, hi = m.group(1).lower(), float(m.group(2))
             lo = out.get(name, (hi, hi))[0]
             out[name] = (lo, hi)
+
+    # And kCVarRanges, which is the third and the strongest: the options panels
+    # ask GetCVarMin and GetCVarMax for any control that names a cvar, so a row
+    # here is the range the slider is actually drawn with. It is how this client
+    # answers a shipped range that does not fit - view distance stopping at the
+    # number the original renderer could reach, mouse sensitivity shipped as a
+    # multiplier against a setting that is an amount.
+    text = API.read_text()
+    at = text.find("kCVarRanges[] = {")
+    if at != -1:
+        body = text[at:text.find("};", at)]
+        for m in re.finditer(r'\{"([a-z0-9_]+)",\s*([-\d.]+)f?\s*,\s*([-\d.]+)f?\s*\}', body):
+            try:
+                out[m.group(1).lower()] = (float(m.group(2)), float(m.group(3)))
+            except ValueError:
+                pass
     return out
 
 
