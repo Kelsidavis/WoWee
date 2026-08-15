@@ -1047,6 +1047,15 @@ SENTENCES = [
     # storedCVarValue answers the client where the setting is used. Both are
     # individually reasonable and both sides work; a difference only shows on
     # screen, as healing numbers over an unticked box. Canaried by moving one.
+    # The only check here that restarts. Everything else watches a setting
+    # inside one run, and coming back is the whole of what a setting is for:
+    # two runs over one config root, the first setting them and the second
+    # reading its config from disk the way the client does. Canaried by taking
+    # out the write-back to the CVar store, which brings all four back on their
+    # defaults.
+    ("settings_survive_restart.py",
+     "still there in the next",
+     "a setting that does not survive a restart"),
     # Blizzard's sliders against the room the settings behind them have. Two
     # handed over numbers their setting could not hold: Ground Density counts
     # doodads against a proportion, and Mouse Sensitivity is a multiplier
