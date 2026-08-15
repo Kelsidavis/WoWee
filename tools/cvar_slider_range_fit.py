@@ -60,11 +60,13 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import settings_config_parse  # noqa: E402  (a sibling, not a package)
+
 ROOT = Path(__file__).resolve().parent.parent
 FRAMEXML = ROOT / "Data/interface/framexml"
 API = ROOT / "src/addons/lua_system_api.cpp"
 PANEL = ROOT / "src/ui/settings_panel.cpp"
-LOADER = ROOT / "src/ui/game_screen_minimap.cpp"
 
 
 def sliderRanges():
@@ -148,16 +150,6 @@ def fields():
     return out
 
 
-def clamps():
-    """member -> (lo, hi), as the config loader holds it."""
-    text = LOADER.read_text()
-    out = {}
-    for m in re.finditer(
-            r'settingsPanel_\.(\w+)\s*=\s*std::clamp\([^,]+,\s*([-\d.]+)f?\s*,\s*([-\d.]+)f?\s*\)',
-            text):
-        out.setdefault(m.group(1), (float(m.group(2)), float(m.group(3))))
-    return out
-
 
 def sharedSettings():
     """setting -> the CVars that write it, where more than one does.
@@ -189,7 +181,8 @@ def main():
         print("the extracted interface is missing - no slider was compared.")
         return 0
 
-    ranges, binds, flds, clmp = sliderRanges(), bindings(), fields(), clamps()
+    ranges, binds, flds = sliderRanges(), bindings(), fields()
+    clmp = settings_config_parse.rangesByMember()
     if not binds or not flds or not clmp:
         print("kClientCVars, the binding table or the loader could not be read - "
               "nothing compared.")

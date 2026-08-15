@@ -32,32 +32,20 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import settings_config_parse  # noqa: E402  (a sibling, not a package)
+
 ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "build" / "bin" / "framexml_run"
 DATA = ROOT / "Data"
 INTERFACE = ROOT / "Data/interface"
 CONFIG_ROOT = ROOT / "logs/settings_round_trip_config"
-LOADER = ROOT / "src/ui/game_screen_minimap.cpp"
 
 # Read and deliberately dropped, so every run starts north-up. It dates from a
 # commit about correcting the minimap's orientation, and the note where it is
 # dropped says so.
 EXPECTED_TO_DROP = {"minimap_rotate"}
 
-
-def loaderRanges():
-    """config key -> (lo, hi), from the clamp the loader applies to it."""
-    text = LOADER.read_text()
-    out = {}
-    # The gap must not cross another `key ==`, or a key with no clamp of its own
-    # takes the next one's - which put a tracker's height on a scale's range and
-    # reported six settings lost that had been held to their bounds correctly.
-    # The same cross-entry match cost a pass once already.
-    for m in re.finditer(
-            r'key == "([a-z0-9_]+)"(?:(?!key ==)[\s\S]){0,300}?std::clamp\([^,]+,\s*([-\d.]+)f?\s*,\s*([-\d.]+)f?\s*\)',
-            text):
-        out.setdefault(m.group(1), (float(m.group(2)), float(m.group(3))))
-    return out
 
 
 def run():
@@ -109,7 +97,7 @@ def main():
             print("the run wrote no settings file - nothing to check.")
             return 1
 
-        ranges = loaderRanges()
+        ranges = settings_config_parse.rangesByKey()
         lines, wanted = [], {}
         for line in settings.read_text().splitlines():
             if not line.strip() or line.startswith("["):
