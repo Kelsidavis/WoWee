@@ -1047,6 +1047,16 @@ SENTENCES = [
     # storedCVarValue answers the client where the setting is used. Both are
     # individually reasonable and both sides work; a difference only shows on
     # screen, as healing numbers over an unticked box. Canaried by moving one.
+    # Blizzard's sliders against the room the settings behind them have. Two
+    # handed over numbers their setting could not hold: Ground Density counts
+    # doodads against a proportion, and Mouse Sensitivity is a multiplier
+    # against an amount. Neither read as a slider doing nothing - each position
+    # wrote a different number - so this follows the whole chain, the declared
+    # range through the binding's scale to the loader's clamp. Canaried by
+    # taking either scale back off, which names that slider and its numbers.
+    ("cvar_slider_range_fit.py",
+     "lands inside the range its setting holds",
+     "a Blizzard slider handing over a number its setting has no room for"),
     # And the same defaults against the game's own tables, which declare one
     # beside each CVar their panels drive. Two differ on purpose and are named
     # in the script with the reason; this is for a third nobody decided on.
