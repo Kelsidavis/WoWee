@@ -1850,11 +1850,19 @@ void GameScreen::loadSettings() {
         InventoryScreen::recommendedBagScale(currentDisplayHeight);
     inventoryScreen.setBagScale(settingsPanel_.pendingBagScale);
     settingsPanel_.pendingWindowUiScale =
-        SettingsPanel::recommendedWindowScale(currentDisplayHeight);
+        SettingsPanel::recommendedPixelScale(currentDisplayHeight);
+    // The action bar's slots are 48 pixels times this, and nothing else moves
+    // them - the buff bar beside them scales itself with the screen height, and
+    // the bars did not. Only the default: a saved value still wins, so nobody's
+    // bars move under them. Scaling inside the panel the way the buff bar does
+    // would be the better shape and would change what an existing 1.0 means.
+    settingsPanel_.pendingActionBarScale =
+        SettingsPanel::recommendedPixelScale(currentDisplayHeight);
     if (!in.is_open()) return;
 
     bool bagScaleLoaded = false;
     bool windowScaleLoaded = false;
+    bool actionBarScaleLoaded = false;
     std::string line;
     while (std::getline(in, line)) {
         size_t eq = line.find('=');
@@ -1939,6 +1947,7 @@ void GameScreen::loadSettings() {
                 settingsPanel_.pendingBuffBarScale = std::clamp(std::stof(val), 0.75f, 1.5f);
             } else if (key == "action_bar_scale") {
                 settingsPanel_.pendingActionBarScale = std::clamp(std::stof(val), 0.5f, 1.5f);
+                actionBarScaleLoaded = true;
             } else if (key == "nameplate_scale") {
                 settingsPanel_.nameplateScale_ = std::clamp(std::stof(val), 0.5f, 2.0f);
             } else if (key == "show_friendly_nameplates") {
@@ -2094,7 +2103,7 @@ void GameScreen::loadSettings() {
         } catch (...) {}
     }
 
-    if (!bagScaleLoaded || !windowScaleLoaded) {
+    if (!bagScaleLoaded || !windowScaleLoaded || !actionBarScaleLoaded) {
         // The height the file turned out to hold, now that it has been read -
         // this runs from the constructor, where there is no display to ask.
         const float defaultHeight = settingsPanel_.displaySettingsLoaded_
@@ -2106,7 +2115,11 @@ void GameScreen::loadSettings() {
         }
         if (!windowScaleLoaded) {
             settingsPanel_.pendingWindowUiScale =
-                SettingsPanel::recommendedWindowScale(defaultHeight);
+                SettingsPanel::recommendedPixelScale(defaultHeight);
+        }
+        if (!actionBarScaleLoaded) {
+            settingsPanel_.pendingActionBarScale =
+                SettingsPanel::recommendedPixelScale(defaultHeight);
         }
     }
 

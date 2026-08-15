@@ -95,15 +95,18 @@ public:
     int pendingUiOpacity = 65;
     float pendingWindowUiScale = 1.0f;
 
-    /// What this client's own windows should be scaled to on a screen of a
+    /// What something drawn in pixels should be scaled to on a screen of a
     /// given height, before the player says otherwise.
     ///
-    /// The same steps the bags already use, and for the same reason: nothing
-    /// else scales what this client draws with the display. The interface's own
-    /// frames are laid out in a fixed canvas and scaled to fit, so they follow
-    /// a tall screen by themselves; these windows are drawn in pixels and do
-    /// not, which on a 2160-line screen left everything but the bags small.
-    static float recommendedWindowScale(float displayHeight) {
+    /// The interface's own frames are laid out in a fixed canvas and scaled to
+    /// fit, so they follow a tall screen by themselves. What this client draws
+    /// itself is in pixels and does not: on a 2160-line screen it comes up at
+    /// the size it would have on a 768-line one.
+    ///
+    /// The bags have picked their default this way for a while and the buff bar
+    /// scales itself with the screen height directly. These are the same steps,
+    /// used now by this client's own windows and by the action bars.
+    static float recommendedPixelScale(float displayHeight) {
         if (displayHeight >= 2000.0f) return 1.20f;
         if (displayHeight >= 1300.0f) return 1.10f;
         return 1.00f;
