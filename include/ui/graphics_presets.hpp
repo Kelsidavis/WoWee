@@ -19,6 +19,16 @@ namespace ui {
 
 /// What each quality preset means, in the order Low, Medium, High, Ultra.
 ///
+/// That order is what the config file holds. graphics_preset is written as an
+/// index - 0 for Custom, then one per row here - so a preset added at the front
+/// or in the middle changes what every saved file means, and a player who chose
+/// Ultra comes back on High. Add at the end, or migrate the stored value.
+///
+/// The same is true of the antiAliasing and parallaxQuality columns below: each
+/// is an index into a dropdown whose order is also persisted, so a row here can
+/// be wrong in two directions at once if either list is reordered. See the note
+/// on SettingDesc::choices.
+///
 /// One row per preset, where there used to be a block per preset - the same
 /// ten settings assigned and then pushed at the renderer four times over. The
 /// blocks had drifted apart, as four copies of one fact do:
