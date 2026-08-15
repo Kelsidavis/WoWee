@@ -1031,12 +1031,21 @@ SENTENCES = [
     # The other one that builds rather than reads. A schema row can be right in
     # every static check and still draw a dropdown whose text belongs to a
     # different index - both halves correct, the mapping between them wrong,
-    # which is what the login screen's parallax control did. Canaried: with the
-    # panel's label pick moved one along, all twenty-six index and label pairs
-    # report wrong.
+    # which is what the login screen's parallax control did.
+    #
+    # It covers what a panel promises a player: a control shows the value it
+    # holds, a dropdown shows the label its index names and writes that index
+    # when chosen, moving a control writes the setting, Defaults puts every
+    # setting back, Cancel leaves the panel as it was found while Okay keeps a
+    # change against a Cancel after it, a quality preset moves what it covers
+    # without asking for less than the one below, a value past the end of a row
+    # is held to it, and a CVar a Blizzard control writes reaches its setting.
+    #
+    # Each was canaried against a fault this codebase had. The report names
+    # which promise broke and for which setting.
     ("framexml_settings_control_check.py",
      "every control shows the value it is given",
-     "a settings control showing something other than the value it was given"),
+     "a settings control not keeping one of the promises its panel makes"),
 ]
 
 
