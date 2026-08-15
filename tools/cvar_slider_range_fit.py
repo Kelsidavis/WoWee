@@ -33,6 +33,14 @@ the same field, in machine-readable form, for settings that have no schema row -
 which these are, the six with no row being exactly the ones a Blizzard control
 drives.
 
+The declared range is not always the offered one. `kOptionRangeFixesLua`
+rewrites some of these tables at start-up, because a slider can ship on a scale
+this client does not measure in - the gamma slider offers -0.5 to 0.5 where
+GetGamma answers 1 for a neutral screen, so every position on it asked for a
+nearly black picture, which is this same fault in a control that is not bound
+through kClientCVars. The overrides are read too, or this would compare against
+numbers the client never uses.
+
 Canaried by taking the scale off either binding, which reports that slider's
 ends landing outside what the setting holds.
 
@@ -52,7 +60,15 @@ LOADER = ROOT / "src/ui/game_screen_minimap.cpp"
 
 
 def sliderRanges():
-    """cvar -> (min, max), from the tables the option panels are built from."""
+    """cvar -> (min, max), as the client actually offers them.
+
+    The shipped tables are not the last word. kOptionRangeFixesLua rewrites some
+    of them at start-up, because a slider can ship on a scale this client does
+    not measure in - the gamma slider offers -0.5 to 0.5 where GetGamma answers
+    1 for a neutral screen, so every position on it asked for a nearly black
+    picture. Reading the .lua files alone would compare against numbers the
+    client never uses.
+    """
     out = {}
     for path in sorted(FRAMEXML.glob("*.lua")):
         text = path.read_text(errors="ignore")
@@ -63,6 +79,18 @@ def sliderRanges():
                 out.setdefault(m.group(1).lower(), (float(m.group(2)), float(m.group(3))))
             except ValueError:
                 pass
+
+    snippets = ROOT / "include/addons/addon_lua_snippets.hpp"
+    if snippets.is_file():
+        text = snippets.read_text()
+        for m in re.finditer(r'\w+\.(\w+)\.minValue\s*=\s*([-\d.]+)', text):
+            name, lo = m.group(1).lower(), float(m.group(2))
+            hi = out.get(name, (lo, lo))[1]
+            out[name] = (lo, hi)
+        for m in re.finditer(r'\w+\.(\w+)\.maxValue\s*=\s*([-\d.]+)', text):
+            name, hi = m.group(1).lower(), float(m.group(2))
+            lo = out.get(name, (hi, hi))[0]
+            out[name] = (lo, hi)
     return out
 
 
