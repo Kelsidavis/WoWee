@@ -53,9 +53,23 @@ WANTED = {
     "mousespeed": 0.4,
     "viewdistance": 1700,
     "effectsvolume": 0.35,
+    # The bools too. They travel the same chain and are where its arithmetic is
+    # least like the numbers': a bool cannot hold half of anything, and the
+    # store has to carry the value the setting actually took rather than the one
+    # it was offered. Each of these is the opposite of its default, so a setting
+    # that quietly went back to it is the failure.
+    "minimapclock": 1,
+    "friendlyplates": 0,
+    "invertmouse": 1,
+    "autoloot": 1,
+    "vsync": 0,
 }
 
-FIRST = "".join(f'WoweeSetSetting("{k}", "{v}") ' for k, v in WANTED.items())
+FIRST = ('local before = {} ' +
+         "".join(f'before[#before+1] = "{k}=" .. tostring(WoweeGetSetting("{k}")) '
+                 for k in WANTED) +
+         "".join(f'WoweeSetSetting("{k}", "{v}") ' for k, v in WANTED.items()) +
+         'error("QQ" .. "BEFORE " .. table.concat(before, " "))')
 SECOND = ('local out = {} ' +
           "".join(f'out[#out+1] = "{k}=" .. tostring(WoweeGetSetting("{k}")) '
                   for k in WANTED) +
@@ -79,11 +93,37 @@ def main():
     CONFIG_ROOT.mkdir(parents=True, exist_ok=True)
 
     try:
-        run(FIRST)
+        first = run(FIRST)
         second = run(SECOND)
     except subprocess.TimeoutExpired:
         print("the runner did not finish - no restart was made.")
         return 1
+
+    # What they were before the first run set them. A wanted value that is
+    # already the default would come back whether anything persisted or not:
+    # friendlyplates was written here as 1 and defaults to 1, so that one key
+    # was passing on a value it had never moved off.
+    started = {}
+    for line in (first.stdout + first.stderr).splitlines():
+        at = line.find("QQ" + "BEFORE ")
+        if at != -1:
+            for item in line[at + len("QQBEFORE "):].split():
+                name, _, value = item.partition("=")
+                started[name] = value
+            break
+
+    stuck = []
+    for key, want in WANTED.items():
+        was = started.get(key)
+        if was is None:
+            continue
+        try:
+            same = abs(float(was) - float(want)) <= 0.001
+        except ValueError:
+            same = was == str(want)
+        if same:
+            stuck.append(f"{key}: asked for {want}, which is what it already was - "
+                         "this one would come back whether anything persisted or not")
 
     payload = None
     for line in (second.stdout + second.stderr).splitlines():
@@ -113,6 +153,7 @@ def main():
         if not near:
             lost.append(f"{key}: set to {want} and came back as {got}")
 
+    lost.extend(stuck)
     print(f"{len(WANTED)} settings set in one run and read in the next.\n")
     for entry in lost:
         print(f"  {entry}")
