@@ -41,8 +41,16 @@ nearly black picture, which is this same fault in a control that is not bound
 through kClientCVars. The overrides are read too, or this would compare against
 numbers the client never uses.
 
-Canaried by taking the scale off either binding, which reports that slider's
-ends landing outside what the setting holds.
+It also checks that two sliders over one value offer the same range. One
+setting has two: Mouse Sensitivity and Mouse Look Speed both write this client's
+mouse sensitivity. Fixing the first with a scale while the second passed its
+number through left them disagreeing - one read 1.0 where the other read 0.2,
+and moving either put the other somewhere it could not show. That was a fix for
+this file's own first finding, and it is the reason the check is here.
+
+Canaried two ways: taking the scale off a binding reports that slider's ends
+landing outside what the setting holds, and scaling one of a shared pair without
+redefining its range reports the pair as disagreeing.
 
 Data/interface is not in the repository, so this skips rather than fails when it
 is absent.
@@ -151,6 +159,31 @@ def clamps():
     return out
 
 
+def sharedSettings():
+    """setting -> the CVars that write it, where more than one does.
+
+    Both the binding table and the branches in applyCVarSideEffects can write a
+    client setting, and one setting is written by both: Mouse Sensitivity and
+    Mouse Look Speed are two sliders over one value.
+
+    A branch is taken as passing its number through unchanged, which is what
+    the one that exists does. A branch that converted would need reading here -
+    weatherDensity divides by three, but it drives a renderer rather than a
+    setting, so it is not in this list.
+    """
+    text = API.read_text()
+    out = {}
+    at = text.find("kClientCVars[] = {")
+    if at != -1:
+        body = text[at:text.find("};", at)]
+        for m in re.finditer(r'\{"([a-z0-9_]+)",\s*"([a-z0-9_]+)"', body):
+            out.setdefault(m.group(2), []).append(m.group(1))
+    for m in re.finditer(r'key == "([a-z0-9_]+)"[\s\S]{0,400}?setClientSetting\(\s*"([a-z0-9_]+)"',
+                         text):
+        out.setdefault(m.group(2), []).append(m.group(1))
+    return {k: sorted(set(v)) for k, v in out.items() if len(set(v)) > 1}
+
+
 def main():
     if not FRAMEXML.is_dir():
         print("the extracted interface is missing - no slider was compared.")
@@ -188,7 +221,31 @@ def main():
                 f"{landed[0]:g} to {landed[1]:g}, and the client holds that field "
                 f"to {room[0]:g} to {room[1]:g}")
 
-    print(f"{compared} of Blizzard's sliders drive a setting with a range of its own.\n")
+    # Two sliders over one value have to offer the same range, or moving either
+    # puts the other somewhere it cannot show. This is the fault that came of
+    # scaling Mouse Sensitivity while Mouse Look Speed passed its number
+    # through: one read 1.0 where the other read 0.2.
+    shared = 0
+    for key, cvars in sorted(sharedSettings().items()):
+        offered = {}
+        for cvar in cvars:
+            if cvar not in ranges:
+                continue
+            scale = binds.get(cvar, (None, 1.0))[1] or 1.0
+            lo, hi = ranges[cvar]
+            offered[cvar] = (round(lo * scale, 4), round(hi * scale, 4))
+        if len(offered) < 2:
+            continue
+        shared += 1
+        spans = set(offered.values())
+        if len(spans) > 1:
+            described = ", ".join(f"{c} offers {v[0]:g} to {v[1]:g}"
+                                  for c, v in sorted(offered.items()))
+            bad.append(f"{key} is written by {len(offered)} sliders and they do not "
+                       f"agree: {described}")
+
+    print(f"{compared} of Blizzard's sliders drive a setting with a range of its own, "
+          f"and {shared} setting(s) are written by more than one.\n")
     for entry in bad:
         print(f"  {entry}")
 
