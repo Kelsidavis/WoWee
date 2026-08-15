@@ -227,7 +227,11 @@ constexpr SettingDesc kSchema[] = {
      "Show your position below the map.", "", 0},
 
     // ------------------------------------------------------------- Action Bars
-    {"actionbarscale", "Action bar scale", SettingKind::Float, 0.5f, 1.5f, 0.05f,
+    // Up to 2, not 1.5: a slot is 48 pixels times this, and the scale a
+    // 2160-line screen wants is 2. Stopping at 1.5 meant the control could not
+    // ask for what the display needed, and the bars sat smaller than the buff
+    // bar beside them however far it was dragged.
+    {"actionbarscale", "Action bar scale", SettingKind::Float, 0.5f, 2.0f, 0.05f,
      "Action Bars", "Scale", "Size of every action bar slot.", "", 1},
     {"buffbarscale", "Buff bar scale", SettingKind::Float, 0.75f, 1.5f, 0.05f,
      "Action Bars", "", "Size of the buff and debuff icons, on top of the automatic scaling\n"

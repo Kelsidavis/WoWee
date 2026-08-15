@@ -150,7 +150,8 @@ void SettingsPanel::renderSettingsGameplayTab(std::function<void()> saveCallback
         // on a large screen, which is what the recommendation exists to avoid.
         pendingMouseSensitivity = 0.2f;
         applySettingSideEffects("mousespeed");
-        pendingBagScale = InventoryScreen::recommendedBagScale(ImGui::GetIO().DisplaySize.y);
+        pendingBagScale =
+            recommendedPixelScale(ImGui::GetIO().DisplaySize.y, 0.75f, 1.5f);
         applySettingSideEffects("bagscale");
         saveCallback();
     }

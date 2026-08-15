@@ -1847,17 +1847,17 @@ void GameScreen::loadSettings() {
         currentDisplayHeight = ImGui::GetIO().DisplaySize.y;
     }
     settingsPanel_.pendingBagScale =
-        InventoryScreen::recommendedBagScale(currentDisplayHeight);
+        SettingsPanel::recommendedPixelScale(currentDisplayHeight, 0.75f, 1.5f);
     inventoryScreen.setBagScale(settingsPanel_.pendingBagScale);
     settingsPanel_.pendingWindowUiScale =
-        SettingsPanel::recommendedPixelScale(currentDisplayHeight);
+        SettingsPanel::recommendedPixelScale(currentDisplayHeight, 0.75f, 1.5f);
     // The action bar's slots are 48 pixels times this, and nothing else moves
     // them - the buff bar beside them scales itself with the screen height, and
     // the bars did not. Only the default: a saved value still wins, so nobody's
     // bars move under them. Scaling inside the panel the way the buff bar does
     // would be the better shape and would change what an existing 1.0 means.
     settingsPanel_.pendingActionBarScale =
-        SettingsPanel::recommendedPixelScale(currentDisplayHeight);
+        SettingsPanel::recommendedPixelScale(currentDisplayHeight, 0.5f, 2.0f);
     if (!in.is_open()) return;
 
     bool bagScaleLoaded = false;
@@ -1946,7 +1946,7 @@ void GameScreen::loadSettings() {
             } else if (key == "buff_bar_scale") {
                 settingsPanel_.pendingBuffBarScale = std::clamp(std::stof(val), 0.75f, 1.5f);
             } else if (key == "action_bar_scale") {
-                settingsPanel_.pendingActionBarScale = std::clamp(std::stof(val), 0.5f, 1.5f);
+                settingsPanel_.pendingActionBarScale = std::clamp(std::stof(val), 0.5f, 2.0f);
                 actionBarScaleLoaded = true;
             } else if (key == "nameplate_scale") {
                 settingsPanel_.nameplateScale_ = std::clamp(std::stof(val), 0.5f, 2.0f);
@@ -2110,16 +2110,17 @@ void GameScreen::loadSettings() {
             ? static_cast<float>(settingsPanel_.pendingResolutionHeight)
             : currentDisplayHeight;
         if (!bagScaleLoaded) {
-            settingsPanel_.pendingBagScale = InventoryScreen::recommendedBagScale(defaultHeight);
+            settingsPanel_.pendingBagScale =
+                SettingsPanel::recommendedPixelScale(defaultHeight, 0.75f, 1.5f);
             inventoryScreen.setBagScale(settingsPanel_.pendingBagScale);
         }
         if (!windowScaleLoaded) {
             settingsPanel_.pendingWindowUiScale =
-                SettingsPanel::recommendedPixelScale(defaultHeight);
+                SettingsPanel::recommendedPixelScale(defaultHeight, 0.75f, 1.5f);
         }
         if (!actionBarScaleLoaded) {
             settingsPanel_.pendingActionBarScale =
-                SettingsPanel::recommendedPixelScale(defaultHeight);
+                SettingsPanel::recommendedPixelScale(defaultHeight, 0.5f, 2.0f);
         }
     }
 

@@ -1,8 +1,10 @@
 #pragma once
 
+#include "ui/buff_bar_layout.hpp"
 #include "ui/graphics_defaults.hpp"
 #include "ui/ui_services.hpp"
 #include <vulkan/vulkan.h>
+#include <algorithm>
 #include <string>
 #include <functional>
 #include <cstdint>
@@ -103,13 +105,29 @@ public:
     /// itself is in pixels and does not: on a 2160-line screen it comes up at
     /// the size it would have on a 768-line one.
     ///
-    /// The bags have picked their default this way for a while and the buff bar
-    /// scales itself with the screen height directly. These are the same steps,
-    /// used now by this client's own windows and by the action bars.
+    /// The buff bar's rule, which is the one that keeps the HUD's proportions:
+    /// the height over the reference height, held between the same bounds. The
+    /// bags used steps of their own - 1.1 above 1300 lines, 1.2 above 2000 -
+    /// and the two disagreed by more the further from 1080 the screen was. On a
+    /// 2160-line screen the buff bar came up at 2.0 and everything beside it at
+    /// 1.2, which is two neighbouring parts of one HUD at different sizes.
+    ///
+    /// The constants come from BuffBarMetrics rather than being written again,
+    /// so there is one rule here and not a third curve.
     static float recommendedPixelScale(float displayHeight) {
-        if (displayHeight >= 2000.0f) return 1.20f;
-        if (displayHeight >= 1300.0f) return 1.10f;
-        return 1.00f;
+        return std::clamp(displayHeight / BuffBarMetrics::kReferenceHeight,
+                          BuffBarMetrics::kMinAutoScale,
+                          BuffBarMetrics::kMaxAutoScale);
+    }
+
+    /// The same, held to what one setting's own row will accept.
+    ///
+    /// A default is assigned straight to the field rather than going through
+    /// setSettingValue, so nothing clamps it on the way: the window scale came
+    /// out at 2 on a tall screen where its row stops at 1.5, and sat outside
+    /// its own control until something else happened to clamp it.
+    static float recommendedPixelScale(float displayHeight, float lo, float hi) {
+        return std::clamp(recommendedPixelScale(displayHeight), lo, hi);
     }
     bool pendingMinimapRotate = false;
     bool pendingMinimapSquare = false;
