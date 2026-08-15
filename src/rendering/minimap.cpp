@@ -535,6 +535,29 @@ void Minimap::render(VkCommandBuffer cmd, const Camera& playerCamera,
 
     float zoomRadius = viewRadius / (TILE_SIZE * 3.0f);
 
+    // Rotating with the camera is off everywhere: the saved setting is read and
+    // dropped in loadSettings, since "Stabilize transports and correct minimap
+    // orientation". This is why, as far as it can be worked out without the
+    // client on screen.
+    //
+    // The two modes disagree by half a turn. Take the heading where
+    // atan2(-fwd.x, fwd.y) is 0. North-up draws the arrow at pi - that same
+    // expression, which is pi: pointing down, so that heading renders as south.
+    // Rotating mode turns the map by the expression itself, which is 0 - no
+    // rotation at all - while pinning the arrow up. So the map says the player
+    // faces north and the arrow agrees, and both are half a turn from where
+    // north-up puts them.
+    //
+    // North-up is the mode that has been looked at, so its arrow is the one to
+    // trust: the map wants turning by the negative of where that arrow points,
+    // not by the expression the arrow is built from.
+    //
+    // The direction is a second question and not settled here. What the shader
+    // does with this angle is a mirror as well as a turn - the matrix it builds
+    // has determinant -1 - so the map may also rotate the wrong way once the
+    // half turn is accounted for. That mirror is right for north-up, where the
+    // angle is zero, which is what makes this hard to reason about and easy to
+    // check by turning it on and walking north.
     float rotation = 0.0f;
     if (rotateWithCamera) {
         glm::vec3 fwd = playerCamera.getForward();
