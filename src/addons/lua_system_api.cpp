@@ -1169,6 +1169,14 @@ constexpr ClientCVarBinding kClientCVars[] = {
     // one of theirs is 0.2 of ours, which puts their normal on our default.
     // Passed straight through, their slowest setting was two and a half times
     // our default and their fastest was above our own ceiling.
+    //
+    // The two ranges do not cover each other, and that is the right way round
+    // rather than something to even up. Their slider reaches 0.1 to 0.3 of
+    // ours; this client's own goes to 1.0, so a sensitivity set here that they
+    // cannot express shows their slider pinned at its end. Mapping our whole
+    // range onto theirs instead would put their normal at 0.67 - three times
+    // this client's default - which trades a slider that reads oddly at the
+    // extremes for one that is wrong in the middle.
     {"mousespeed",           "mousespeed", 0.2},
     {"showclock",            "minimapclock"},
     {"nameplateshowfriends", "friendlyplates"},
