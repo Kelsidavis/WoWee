@@ -32,6 +32,11 @@ Then it opens a panel, changes a control and presses Cancel. Cancel snapshots
 on refresh, which is what opening a panel does, so the panel has to be opened
 before the change or Cancel is being asked to undo something it never saw.
 
+Then the quality preset, the one setting that sets others. Choosing it has to
+move the nine it covers, and each step up has to ask for at least as much as
+the one below - a column that goes backwards is a preset that improves
+something by turning it down.
+
 Last the dropdowns, which are the one control the move above cannot reach - a
 menu's buttons are built when it opens. Their menus are built by hand and what
 a click calls is called, because the index conversion in there is the fault
@@ -45,7 +50,14 @@ sliders report the setting unmoved; with the Defaults write taken out, all
 seventy-two report themselves left where they were; with Cancel's restore taken
 out, all thirty-five keep the change; with the menu's `- 1` taken off, all
 twenty-six choices write an index one too high, which is the parallax fault
-itself. Rebuild after putting any of
+itself; with High's shadow distance dropped below Medium's, the preset step
+reports it.
+
+It is backed by a real SettingsPanel rather than a map of strings. A map answers
+and stores, which is enough to draw a control and read it back and not enough to
+be the client: setSettingValue clamps, finds the field through the binding
+table, runs the side effects, and for the quality preset assigns nine other
+settings. Asking a map whether a preset moves anything asks the harness. Rebuild after putting any of
 them back. A restored header and a stale binary reported every dropdown off by
 one, convincingly, for a fault that was no longer in the source.
 
@@ -282,8 +294,44 @@ do
   UIDropDownMenu_AddButton = realAdd
 end
 
-error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s",
-                            controls, checked, written, restored, cancelled, chosen,
+-- The quality preset, which is the one setting that sets others. Choosing it
+-- has to move the nine it has an opinion about, and each step up has to ask for
+-- at least as much as the one below.
+local presets = 0
+do
+  local watched = {"viewdistance", "shadowdistance", "antialiasing", "parallaxquality",
+                   "groundclutter"}
+  local previous
+  for index = 1, 4 do
+    WoweeSetSetting("graphicspreset", tostring(index))
+    presets = presets + 1
+    if WoweeGetSetting("graphicspreset") ~= tostring(index) then
+      bad[#bad+1] = "graphicspreset: choosing " .. index .. " left it at " ..
+                    tostring(WoweeGetSetting("graphicspreset"))
+    end
+    local now = {}
+    for _, k in ipairs(watched) do now[k] = tonumber(WoweeGetSetting(k)) end
+    if previous then
+      local moved = false
+      for _, k in ipairs(watched) do
+        if now[k] and previous[k] then
+          if now[k] ~= previous[k] then moved = true end
+          if now[k] < previous[k] then
+            bad[#bad+1] = string.format("preset %d asks for less %s than preset %d (%s against %s)",
+                                        index, k, index - 1, tostring(now[k]), tostring(previous[k]))
+          end
+        end
+      end
+      if not moved then
+        bad[#bad+1] = "preset " .. index .. " changed none of the settings it covers"
+      end
+    end
+    previous = now
+  end
+end
+
+error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s",
+                            controls, checked, written, restored, cancelled, chosen, presets,
                             table.concat(bad, " ~ ")))
 '''
 
@@ -319,11 +367,13 @@ def main():
     restored, _, rest = rest.partition(" ~ ")
     cancelled, _, rest = rest.partition(" ~ ")
     chosen, _, rest = rest.partition(" ~ ")
+    presets, _, rest = rest.partition(" ~ ")
     bad = [b.strip() for b in rest.split(" ~ ") if b.strip()]
 
     print(f"{controls} controls built, {checked} values shown and read back, "
           f"{written} changed at the control, {restored} restored by Defaults, "
-          f"{cancelled} put back by Cancel, {chosen} chosen from a menu.\n")
+          f"{cancelled} put back by Cancel, {chosen} chosen from a menu, "
+          f"{presets} quality presets applied.\n")
     for entry in bad:
         print(f"  {entry}")
 
@@ -340,7 +390,8 @@ def main():
     print("every control shows the value it is given, every dropdown shows the "
           "label its index names, moving one writes the setting, Defaults puts "
           "every setting back, Cancel leaves the panel as it was found, and "
-          "choosing from a menu writes the index it names.")
+          "choosing from a menu writes the index it names, and each quality "
+          "preset moves what it covers without asking for less than the one below.")
     return 0
 
 

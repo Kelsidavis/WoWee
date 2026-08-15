@@ -54,6 +54,8 @@
 #include "addons/addon_manager.hpp"
 #include "addons/lua_services.hpp"
 #include "ui/settings_schema.hpp"
+#include "ui/settings_panel.hpp"
+#include "ui/chat/chat_settings.hpp"
 #include "core/app_clock.hpp"
 #include "ui/widget_renderer.hpp"
 #include "pipeline/asset_manager.hpp"
@@ -118,21 +120,35 @@ int main(int argc, char** argv) {
     // setLuaServices call after it replaced the lot - setAddOnEnabled with
     // them - and the load-on-demand panels stopped loading. The calendar came
     // back NOFRAME.
-    static std::map<std::string, std::string> settingValues;
+    // A real SettingsPanel rather than a map of strings.
+    //
+    // A map answers and stores, which is enough to draw a control and read it
+    // back - and not enough to be the client. setSettingValue clamps, finds the
+    // field through the binding table, runs the side effects, and for the
+    // quality preset assigns nine other settings and re-reads the panel. None
+    // of that happens in a map, so a check that a preset moves what it claims
+    // to move would have been asking the harness, not the client.
+    //
+    // Safe with no renderer: every side effect reaches its target through
+    // services_.renderer, which is null here, and each is guarded.
+    static wowee::ui::SettingsPanel settingsPanel;
+    static wowee::ui::ChatSettings chatSettings;
+    settingsPanel.setChatSettings(&chatSettings);
     {
+        // The defaults, the way a fresh install starts.
         std::size_t count = 0;
         const wowee::ui::SettingDesc* schema = wowee::ui::clientSettingsSchema(count);
         for (std::size_t i = 0; i < count; ++i) {
-            settingValues[schema[i].key] = wowee::ui::settingNumberText(schema[i].defaultValue);
+            settingsPanel.setSettingValue(schema[i].key,
+                                          wowee::ui::settingNumberText(schema[i].defaultValue));
         }
     }
     wowee::addons::LuaServices settingServices;
     settingServices.getClientSetting = [](const std::string& key) -> std::string {
-        const auto it = settingValues.find(key);
-        return it == settingValues.end() ? std::string() : it->second;
+        return settingsPanel.settingValue(key);
     };
     settingServices.setClientSetting = [](const std::string& key, const std::string& value) {
-        settingValues[key] = value;
+        settingsPanel.setSettingValue(key, value);
     };
     wowee::addons::AddonManager mgr;
     if (!mgr.initialize(nullptr, settingServices)) {
