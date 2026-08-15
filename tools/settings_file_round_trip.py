@@ -18,6 +18,13 @@ what each field will hold: a first version of this set every scale to zero and
 reported five settings as lost when all five had been held to their minimum
 exactly as intended.
 
+The keybindings at the end of the file are moved too, onto keys the manager can
+put a name to - it writes F1 through F12, single letters and a few named keys,
+and nothing else - and that nothing is bound to. Not onto W, A, S, D, Q or E:
+those are reserved so they cannot become UI shortcuts, and a binding onto one is
+refused. Both of those cost a run to find, each looking like the file losing
+bindings.
+
 One key is expected not to survive and is named below rather than tolerated
 silently.
 
@@ -55,12 +62,34 @@ def run():
                           capture_output=True, text=True, timeout=900, env=env)
 
 
-def moved(key, value, ranges):
+# Keys nothing is bound to by default, for moving a binding onto without
+# taking one off something else - a key belongs to one action at a time, so
+# reusing one would be checking the conflict rule rather than the file.
+# Keys the manager can put a name to - it writes F1 through F12 and single
+# letters, and nothing else - which nothing is bound to by default. A key
+# belongs to one action at a time, so reusing a bound one would be checking the
+# conflict rule rather than the file. F13 upwards were the first choice and are
+# not names this client has: twelve bindings came back on their defaults because
+# what was written could not be read, which reads exactly like the file losing
+# them.
+# Not W, A, S, D, Q or E: the manager reserves the movement keys so they cannot
+# become UI shortcuts, and refuses a binding onto one. Six of these came back on
+# their defaults with those in the pool, which reads as the file losing them and
+# is the client declining to do something it should decline to do.
+SPARE_KEYS = ["G", "H", "R", "T", "U", "X", "Z",
+              "F5", "F6", "F7", "F9", "F10", "F11", "F12", "Home"]
+
+
+def moved(key, value, ranges, spare=None):
     """Another value this key will accept, or None to leave it alone."""
     try:
         now = float(value)
     except ValueError:
-        return None  # a name or a key combination
+        # A binding: the section holds a key name rather than a number, and it
+        # is the last part of this file nothing else watches through a change.
+        if spare:
+            return spare.pop()
+        return None
     lo, hi = ranges.get(key, (None, None))
     if lo is None and value in ("0", "1"):
         # A bool, as far as anything here can tell. Only when the key has no
@@ -99,12 +128,14 @@ def main():
 
         ranges = settings_config_parse.rangesByKey()
         lines, wanted = [], {}
+        spare, inBindings = list(SPARE_KEYS), False
         for line in settings.read_text().splitlines():
             if not line.strip() or line.startswith("["):
+                inBindings = line.strip() == "[Keybindings]"
                 lines.append(line)
                 continue
             key, _, value = line.partition("=")
-            want = moved(key, value.strip(), ranges)
+            want = moved(key, value.strip(), ranges, spare if inBindings else None)
             if want is None or want == value.strip():
                 lines.append(line)
                 continue
@@ -152,8 +183,8 @@ def main():
     #
     # If a setting was removed on purpose, lower this in the same commit and say
     # which. If one was added, raise it.
-    if len(wanted) < 106:
-        print(f"\n{len(wanted)} values were moved where 106 were expected - a key "
+    if len(wanted) < 121:
+        print(f"\n{len(wanted)} values were moved where 121 were expected - a key "
               "has stopped being written to the file, so nothing here is checking "
               "it any more.")
         return 1
