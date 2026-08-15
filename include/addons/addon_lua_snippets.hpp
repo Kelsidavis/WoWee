@@ -688,7 +688,7 @@ local function runSearch(query)
         searchResults:SetText("")
         return
     end
-    local found, shown = 0, {}
+    local found, shown, byName = 0, {}, 0
     -- The heading a row sits under counts as a name for it. "Anti-aliasing" is
     -- how the setting is spelled everywhere except in this client, where the
     -- control is called Multisampling and the key has no hyphen - so the term a
@@ -706,18 +706,24 @@ local function runSearch(query)
         -- player reaches for live when the label is the client's word for the
         -- thing: FXAA is found by "edges" because its own description says it
         -- smooths them.
-        if lower(setting.label):find(query, 1, true) or
-           lower(setting.key):find(query, 1, true) or
-           lower(heading):find(query, 1, true) or
-           lower(setting.tooltip or ""):find(query, 1, true) then
+        local named = lower(setting.label):find(query, 1, true) or
+                      lower(setting.key):find(query, 1, true) or
+                      lower(heading):find(query, 1, true)
+        local described = not named and lower(setting.tooltip or ""):find(query, 1, true)
+        if named or described then
             found = found + 1
-            -- Five is what fits between the box and the next heading; the
-            -- count below says how many more rather than pretending these are
-            -- all of them. Eight was the first guess and it ran the results
-            -- straight through the two blocks under it.
-            if found <= 5 then
-                shown[#shown + 1] = "|cffffd100" .. setting.label ..
-                                    "|r  in  " .. setting.category
+            -- Named before described, because only five are shown and they are
+            -- shown in the order the schema has them - so without this a
+            -- setting called what was typed could sit below five whose
+            -- descriptions merely mention it, and not be shown at all. Reading
+            -- the descriptions is what made that possible: "the" matched almost
+            -- nothing before and matches forty-five settings now.
+            local line = "|cffffd100" .. setting.label .. "|r  in  " .. setting.category
+            if named then
+                byName = byName + 1
+                table.insert(shown, byName, line)
+            else
+                shown[#shown + 1] = line
             end
         end
     end
@@ -735,6 +741,11 @@ local function runSearch(query)
             end
         end
     end
+
+    -- Trimmed here rather than while collecting, because the ones named after
+    -- what was typed are put in front of the ones that only mention it - and
+    -- which those are is not known until the walk is done.
+    while #shown > 5 do table.remove(shown) end
 
     if found == 0 then
         searchResults:SetText("|cff909090No setting matches that.|r")
