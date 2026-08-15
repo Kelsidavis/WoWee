@@ -28,7 +28,12 @@ default. That button was a function that did nothing here once, before the
 schema carried a default at all, and what that looked like is exactly what a
 broken one looks like now: the panel redraws and every value stays put.
 
-Then it opens a panel, changes a control and presses Cancel. Cancel snapshots
+Then Okay and Cancel, which are halves of one promise: Cancel leaves the panel
+as it was found, and Okay re-takes the snapshot so a Cancel afterwards has
+nothing to undo. Without the second, accepting a change and cancelling anything
+later would put the accepted change back.
+
+It opens a panel, changes a control and presses Cancel. Cancel snapshots
 on refresh, which is what opening a panel does, so the panel has to be opened
 before the change or Cancel is being asked to undo something it never saw.
 
@@ -48,7 +53,8 @@ pick moved one along - `choices[selected() + 1]` - all twenty-six index and
 label pairs report wrong; with the slider's write taken out, all thirty-one
 sliders report the setting unmoved; with the Defaults write taken out, all
 seventy-two report themselves left where they were; with Cancel's restore taken
-out, all thirty-five keep the change; with the menu's `- 1` taken off, all
+out, all thirty-five keep the change; with Okay's snapshot taken out, all
+thirty-five have the accepted change undone by the next Cancel; with the menu's `- 1` taken off, all
 twenty-six choices write an index one too high, which is the parallax fault
 itself; with High's shadow distance dropped below Medium's, the preset step
 reports it.
@@ -330,6 +336,29 @@ do
   end
 end
 
+-- Okay, which is Cancel's other half. It re-takes the snapshot, so a Cancel
+-- afterwards has nothing to undo: without that, accepting a change and then
+-- cancelling anything later would put the accepted change back.
+local committed = 0
+for _, r in ipairs(WoweeSettingList()) do
+  local base = panelOf(r.category)
+  local panel, ctrl = _G[base], _G[base .. r.key]
+  if panel and ctrl and r.kind == "bool" and ctrl.Click and panel.okay and panel.cancel then
+    local opened = (tostring(r.default) == "1") and "1" or "0"
+    WoweeSetSetting(r.key, opened)
+    if panel.refresh then panel:refresh() end
+    ctrl:Click()
+    local accepted = WoweeGetSetting(r.key)
+    panel:okay()
+    panel:cancel()
+    committed = committed + 1
+    if WoweeGetSetting(r.key) ~= accepted then
+      bad[#bad+1] = string.format("%s: accepted %s with Okay, a later Cancel put it back to %s",
+                                  r.key, accepted, tostring(WoweeGetSetting(r.key)))
+    end
+  end
+end
+
 -- The range in the row, honoured by the one path nothing bounded. The sliders
 -- are built from it and the config loader clamps to it; setSettingValue, which
 -- is what these panels and any addon calling WoweeSetSetting go through, took
@@ -351,9 +380,9 @@ for _, r in ipairs(WoweeSettingList()) do
   end
 end
 
-error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s",
+error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s",
                             controls, checked, written, restored, cancelled, chosen, presets,
-                            bounded, table.concat(bad, " ~ ")))
+                            bounded, committed, table.concat(bad, " ~ ")))
 '''
 
 
@@ -390,13 +419,14 @@ def main():
     chosen, _, rest = rest.partition(" ~ ")
     presets, _, rest = rest.partition(" ~ ")
     bounded, _, rest = rest.partition(" ~ ")
+    committed, _, rest = rest.partition(" ~ ")
     bad = [b.strip() for b in rest.split(" ~ ") if b.strip()]
 
     print(f"{controls} controls built, {checked} values shown and read back, "
           f"{written} changed at the control, {restored} restored by Defaults, "
           f"{cancelled} put back by Cancel, {chosen} chosen from a menu, "
           f"{presets} quality presets applied, {bounded} out-of-range values "
-          f"held to the row.\n")
+          f"held to the row, {committed} kept by Okay against a later Cancel.\n")
     for entry in bad:
         print(f"  {entry}")
 
@@ -410,12 +440,17 @@ def main():
               "the walk stopped matching rather than finding nothing wrong.")
         return 1
 
-    print("every control shows the value it is given, every dropdown shows the "
-          "label its index names, moving one writes the setting, Defaults puts "
-          "every setting back, Cancel leaves the panel as it was found, and "
-          "choosing from a menu writes the index it names, and each quality "
-          "preset moves what it covers without asking for less than the one "
-          "below, and a value past the end of a row is held to it.")
+    # sweep_guard matches the first clause, so the rest is free to be a list.
+    print("every control shows the value it is given, and:\n"
+          "  a dropdown shows the label its index names, and writes that index "
+          "when it is chosen\n"
+          "  moving a control writes the setting behind it\n"
+          "  Defaults puts every setting back\n"
+          "  Cancel leaves the panel as it was found, and Okay keeps a change "
+          "against a Cancel after it\n"
+          "  a quality preset moves what it covers, and never asks for less "
+          "than the one below\n"
+          "  a value past the end of a row is held to it")
     return 0
 
 
