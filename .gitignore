@@ -130,8 +130,10 @@ AGENTS.md
 codex-loop.sh
 
 # The headless runner keeps its config here so it cannot overwrite the
-# player's missing-API and Lua-error lists.
-logs/framexml_run_config/
+# player's missing-API and Lua-error lists. One root per check that drives it,
+# so a run cannot read a store some other check left: the runner loads the CVar
+# store at start-up, and a shared root made a result depend on run order.
+logs/*_config/
 
 # Canary builds: deliberately broken binaries for watching a check fail.
 # Kept out of build/ because that is what the player runs.
