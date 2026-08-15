@@ -23,12 +23,18 @@ audit spent itself on - it reads correctly, it saves correctly, and it changes
 nothing. Sixty-six of the seventy-two can be driven that way; the dropdowns are
 left out, their menu buttons being built on being opened.
 
-Canaried against both faults it was written for: with the panel's label pick
-moved one along - `choices[selected() + 1]` - all twenty-six index and label
-pairs report wrong; with the slider's write taken out, all thirty-one sliders
-report the setting unmoved. Rebuild after putting either back. A restored header
-and a stale binary reported every dropdown off by one, convincingly, for a fault
-that was no longer in the source.
+Last it presses Defaults on every panel with every setting moved off its
+default. That button was a function that did nothing here once, before the
+schema carried a default at all, and what that looked like is exactly what a
+broken one looks like now: the panel redraws and every value stays put.
+
+Canaried against all three faults it was written for: with the panel's label
+pick moved one along - `choices[selected() + 1]` - all twenty-six index and
+label pairs report wrong; with the slider's write taken out, all thirty-one
+sliders report the setting unmoved; with the Defaults write taken out, all
+seventy-two report themselves left where they were. Rebuild after putting any of
+them back. A restored header and a stale binary reported every dropdown off by
+one, convincingly, for a fault that was no longer in the source.
 
 Two things it does not do, on purpose. It does not compare the labels against a
 list of its own: the point is whether the panel and the schema agree, and a
@@ -157,7 +163,46 @@ end
 -- The sentinel is built rather than written, because the runner echoes the
 -- expression it was given: a literal here matches in the echo before the
 -- result, and what comes back is this script's own source.
-error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %s", controls, checked, written, table.concat(bad, " ~ ")))
+-- And the button the game puts on every one of its panels. It was a function
+-- that did nothing here once, before the schema carried a default at all, so
+-- what it looks like when it is broken is exactly what it looked like then:
+-- the panel redraws and every value stays where it was.
+local restored = 0
+do
+  local away = {}
+  for _, r in ipairs(WoweeSettingList()) do
+    local off
+    if r.kind == "bool" then off = (tostring(r.default) == "1") and "0" or "1"
+    elseif r.kind == "enum" then off = tostring((tonumber(r.default) == 0) and 1 or 0)
+    else off = tostring(r.default == r.min and r.max or r.min) end
+    away[r.key] = off
+    WoweeSetSetting(r.key, off)
+  end
+
+  local pressed = {}
+  for _, r in ipairs(WoweeSettingList()) do
+    local base = panelOf(r.category)
+    if not pressed[base] then
+      pressed[base] = true
+      local p = _G[base]
+      if p and p.default then p:default() end
+    end
+  end
+
+  for _, r in ipairs(WoweeSettingList()) do
+    local now, want = WoweeGetSetting(r.key), tostring(r.default)
+    local same = (tonumber(now) and tonumber(want)
+                  and math.abs(tonumber(now) - tonumber(want)) <= 0.001) or now == want
+    restored = restored + 1
+    if not same then
+      bad[#bad+1] = string.format("%s: Defaults left it at %s, the schema says %s",
+                                  r.key, tostring(now), want)
+    end
+  end
+end
+
+error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %s",
+                            controls, checked, written, restored, table.concat(bad, " ~ ")))
 '''
 
 
@@ -189,10 +234,11 @@ def main():
     controls, _, rest = payload.partition(" ~ ")
     checked, _, rest = rest.partition(" ~ ")
     written, _, rest = rest.partition(" ~ ")
+    restored, _, rest = rest.partition(" ~ ")
     bad = [b.strip() for b in rest.split(" ~ ") if b.strip()]
 
     print(f"{controls} controls built, {checked} values shown and read back, "
-          f"{written} changed at the control.\n")
+          f"{written} changed at the control, {restored} restored by Defaults.\n")
     for entry in bad:
         print(f"  {entry}")
 
@@ -201,13 +247,14 @@ def main():
         return 0
 
     # A sweep that matched nothing reports the same silence as a clean one.
-    if int(checked or 0) < 20 or int(written or 0) < 20:
+    if int(checked or 0) < 20 or int(written or 0) < 20 or int(restored or 0) < 20:
         print("\nfewer values were checked than any build has settings - "
               "the walk stopped matching rather than finding nothing wrong.")
         return 1
 
     print("every control shows the value it is given, every dropdown shows the "
-          "label its index names, and moving one writes the setting.")
+          "label its index names, moving one writes the setting, and Defaults "
+          "puts every setting back.")
     return 0
 
 
