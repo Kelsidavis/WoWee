@@ -303,3 +303,51 @@ TEST_CASE("no row inherits a heading from a conditional one", "[settings][schema
          " the #ifndef parse has probably stopped matching");
     CHECK(sawConditional);
 }
+
+// ---------------------------------------------------------------------------
+// That the schema still holds the settings it is supposed to.
+//
+// Every check above reads the schema and asks whether what is there is
+// consistent. None of them notices what is not there: rows deleted, or a whole
+// category gone, leave a smaller schema that is perfectly consistent with
+// itself, and each check passes on what remains.
+//
+// That is the shape of every derived check here - the control sweep builds its
+// probe from WoweeSettingList, the apply check builds its from the binding
+// table - and the answer is the same in each: something has to pin the count.
+
+TEST_CASE("the schema has not lost rows", "[settings][schema]") {
+    // 74 in a debug build, 72 in a release one: fsrjittersign is behind
+    // ifndef NDEBUG and framegen behind the AMD backend being present. The
+    // floor is under both, and well over the handful a gutted schema leaves.
+    const auto rows = schema();
+    INFO("the schema has " << rows.size() << " rows where at least 70 are"
+                              " expected. If settings were removed on purpose -"
+                              " a vestigial one taken out is a good change -"
+                              " lower this number in the same commit and say"
+                              " which. It is here so that losing rows is a"
+                              " deliberate act rather than a quieter schema"
+                              " that every other check still passes");
+    CHECK(rows.size() >= 70);
+}
+
+TEST_CASE("every panel the client offers still has settings on it", "[settings][schema]") {
+    // A category disappearing is a whole panel disappearing. The rows left
+    // behind stay consistent, the panels that remain still draw, and nothing
+    // else here would say a word.
+    std::set<std::string> present;
+    for (const auto& d : schema()) present.insert(d.category);
+
+    for (const char* category : {"Graphics", "Upscaling", "Display", "Camera",
+                                 "Interface", "Minimap", "Action Bars",
+                                 "Combat & HUD", "Sound", "Chat", "Gameplay"}) {
+        INFO("no setting names the category " << category
+             << " any more, so that panel is empty or gone");
+        CHECK(present.count(category) == 1);
+    }
+
+    // And nothing has appeared that this list does not know about, which would
+    // mean a panel nobody named here is being drawn.
+    INFO("the schema names " << present.size() << " categories where eleven are expected");
+    CHECK(present.size() == 11);
+}
