@@ -1047,6 +1047,14 @@ SENTENCES = [
     # storedCVarValue answers the client where the setting is used. Both are
     # individually reasonable and both sides work; a difference only shows on
     # screen, as healing numbers over an unticked box. Canaried by moving one.
+    # What this client draws itself, scaled to the screen. Four things pick a
+    # default from the height and they have to pick the same, or neighbouring
+    # parts of one HUD come up at different sizes - the buff bar was at 2.0 on a
+    # 2160-line screen with everything beside it at 1.2. Canaried by putting one
+    # back on the steps it used.
+    ("settings_display_scale.py",
+     "follows the screen the same way",
+     "a default that does not scale with the screen the way the buff bar does"),
     # The file itself, moved value by value and read back. The restart check
     # drives settings through Lua, which cannot reach where the quest tracker
     # sits or how big the chat window is - and those are in the same file. The
