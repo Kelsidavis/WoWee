@@ -45,9 +45,15 @@ DATA = ROOT / "Data"
 INTERFACE = ROOT / "Data/interface"
 CONFIG_ROOT = ROOT / "logs/settings_restart_config"
 
-# Set in the first run, expected back in the second. Chosen to be inside every
-# range involved and not equal to any default, so a setting that quietly went
-# back to its default is visible.
+# The six a Blizzard control drives that have no schema row of their own - they
+# are driven by that control instead, which is why they have none. Set in the
+# first run and expected back in the second, on values inside every range
+# involved and different from the defaults, so a setting that quietly went back
+# to one is visible.
+#
+# Only those six. invertmouse, autoloot and vsync are driven by a CVar and are
+# schema rows as well, so the walk below sets them after this does and these
+# expectations would be of a value that had since moved on.
 WANTED = {
     "groundclutter": 1.0,
     "mousespeed": 0.4,
@@ -60,19 +66,49 @@ WANTED = {
     # that quietly went back to it is the failure.
     "minimapclock": 1,
     "friendlyplates": 0,
-    "invertmouse": 1,
-    "autoloot": 1,
-    "vsync": 0,
 }
+
+# Every row of the schema as well, moved off whatever it holds. The nine above
+# ride the CVar store; these live in settings.cfg, which is the file the client
+# writes when it closes and reads when it opens.
+SCHEMA_LUA = r"""
+local moved = {}
+for _, r in ipairs(WoweeSettingList()) do
+  local now = tonumber(WoweeGetSetting(r.key))
+  local want
+  if r.kind == "bool" then
+    want = (now == 1) and 0 or 1
+  elseif r.kind == "enum" then
+    want = (now == 0) and 1 or 0
+  else
+    -- A step off the end it is not already sitting on, so the value is inside
+    -- the row and is not the one it started at.
+    want = (now == r.min) and r.max or r.min
+  end
+  WoweeSetSetting(r.key, tostring(want))
+end
+
+-- What everything holds once the walk is done, not what each was set to as it
+-- went past. Choosing a quality preset sets nine other settings, and changing
+-- any of those moves the preset to Custom - so graphicspreset was recorded as
+-- Low and was Custom by the end, through no fault of the saving.
+for _, r in ipairs(WoweeSettingList()) do
+  moved[#moved+1] = r.key .. "=" .. tostring(WoweeGetSetting(r.key))
+end
+"""
 
 FIRST = ('local before = {} ' +
          "".join(f'before[#before+1] = "{k}=" .. tostring(WoweeGetSetting("{k}")) '
                  for k in WANTED) +
          "".join(f'WoweeSetSetting("{k}", "{v}") ' for k, v in WANTED.items()) +
-         'error("QQ" .. "BEFORE " .. table.concat(before, " "))')
+         SCHEMA_LUA +
+         'error("QQ" .. "BEFORE " .. table.concat(before, " ") .. " ~ " .. '
+         'table.concat(moved, " "))')
 SECOND = ('local out = {} ' +
           "".join(f'out[#out+1] = "{k}=" .. tostring(WoweeGetSetting("{k}")) '
                   for k in WANTED) +
+          'for _, r in ipairs(WoweeSettingList()) do '
+          'out[#out+1] = r.key .. "=" .. tostring(WoweeGetSetting(r.key)) end ' +
           'error("QQ" .. "RESTART " .. table.concat(out, " "))')
 
 
@@ -103,13 +139,17 @@ def main():
     # already the default would come back whether anything persisted or not:
     # friendlyplates was written here as 1 and defaults to 1, so that one key
     # was passing on a value it had never moved off.
-    started = {}
+    started, schemaLeft = {}, {}
     for line in (first.stdout + first.stderr).splitlines():
         at = line.find("QQ" + "BEFORE ")
         if at != -1:
-            for item in line[at + len("QQBEFORE "):].split():
+            head, _, tail = line[at + len("QQBEFORE "):].partition(" ~ ")
+            for item in head.split():
                 name, _, value = item.partition("=")
                 started[name] = value
+            for item in tail.split():
+                name, _, value = item.partition("=")
+                schemaLeft[name] = value
             break
 
     stuck = []
@@ -153,8 +193,22 @@ def main():
         if not near:
             lost.append(f"{key}: set to {want} and came back as {got}")
 
+    # And every schema row, against what the first run left it on.
+    for key, left in sorted(schemaLeft.items()):
+        got = came.get(key)
+        if got is None:
+            lost.append(f"{key}: the second run had no value for it")
+            continue
+        try:
+            near = abs(float(got) - float(left)) <= max(0.02, abs(float(left)) * 0.01)
+        except ValueError:
+            near = got == left
+        if not near:
+            lost.append(f"{key}: left on {left} and came back as {got}")
+
     lost.extend(stuck)
-    print(f"{len(WANTED)} settings set in one run and read in the next.\n")
+    print(f"{len(WANTED)} settings a Blizzard control drives and "
+          f"{len(schemaLeft)} rows of the schema, set in one run and read in the next.\n")
     for entry in lost:
         print(f"  {entry}")
 

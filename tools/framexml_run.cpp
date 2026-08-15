@@ -55,6 +55,7 @@
 #include "addons/lua_services.hpp"
 #include "ui/settings_schema.hpp"
 #include "ui/settings_panel.hpp"
+#include "ui/game_screen.hpp"
 #include "ui/chat/chat_settings.hpp"
 #include "core/app_clock.hpp"
 #include "ui/widget_renderer.hpp"
@@ -131,9 +132,24 @@ int main(int argc, char** argv) {
     //
     // Safe with no renderer: every side effect reaches its target through
     // services_.renderer, which is null here, and each is guarded.
-    static wowee::ui::SettingsPanel settingsPanel;
-    static wowee::ui::ChatSettings chatSettings;
-    settingsPanel.setChatSettings(&chatSettings);
+    // A GameScreen rather than a bare SettingsPanel, for the two things only it
+    // has: its constructor reads settings.cfg and saveSettings writes it. Nine
+    // of the settings ride the CVar store and could be watched across a restart
+    // without this; the other sixty-five live in that file and could not be
+    // watched at all.
+    //
+    // Its constructor is loadSettings and nothing else, and every member is a
+    // value - no renderer, no window, no ImGui context is touched by building
+    // one.
+    static wowee::ui::GameScreen gameScreen;
+    // Its own wiring, not a hand-made copy of half of it. setServices is what
+    // points the settings panel at the chat panel's settings, among other
+    // things, and every service in it is null here - each use is guarded. A
+    // standalone ChatSettings looked equivalent and was not: the five chat
+    // channels were written to it and saved from the chat panel's, so they read
+    // back as whatever they had always been.
+    gameScreen.setServices(wowee::ui::UIServices{});
+    wowee::ui::SettingsPanel& settingsPanel = gameScreen.getSettingsPanel();
     // No seeding of the defaults. The panel's fields already hold them - the
     // schema's default and the member's initialiser are checked against each
     // other in settings_apply_on_load - and setting them here went through
@@ -147,10 +163,10 @@ int main(int argc, char** argv) {
     // thing the harness exists to watch.
     wowee::addons::LuaServices settingServices;
     settingServices.getClientSetting = [](const std::string& key) -> std::string {
-        return settingsPanel.settingValue(key);
+        return gameScreen.getSettingsPanel().settingValue(key);
     };
     settingServices.setClientSetting = [](const std::string& key, const std::string& value) {
-        settingsPanel.setSettingValue(key, value);
+        gameScreen.getSettingsPanel().setSettingValue(key, value);
     };
     wowee::addons::AddonManager mgr;
     if (!mgr.initialize(nullptr, settingServices)) {
@@ -1075,5 +1091,12 @@ int main(int argc, char** argv) {
             }
         }
     }
+
+    // The settings, written the way the client writes them when it closes.
+    // Without this a run's changes live only in memory and every run starts on
+    // the defaults, so nothing about a setting surviving could be watched here -
+    // which is the one thing a settings file is for.
+    gameScreen.saveSettings();
+
     return raised > 100 ? 100 : raised;
 }
