@@ -1043,6 +1043,13 @@ SENTENCES = [
     #
     # Each was canaried against a fault this codebase had. The report names
     # which promise broke and for which setting.
+    # What an unset CVar reads as, said twice: GetCVar answers the interface,
+    # storedCVarValue answers the client where the setting is used. Both are
+    # individually reasonable and both sides work; a difference only shows on
+    # screen, as healing numbers over an unticked box. Canaried by moving one.
+    ("cvar_default_agreement.py",
+     "answers the interface the same way",
+     "a CVar meaning one thing to the options panel and another to the client"),
     ("framexml_settings_control_check.py",
      "every control shows the value it is given",
      "a settings control not keeping one of the promises its panel makes"),
