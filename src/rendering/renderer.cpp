@@ -562,6 +562,15 @@ bool Renderer::initialize(core::Window* win) {
     // after this, and by then the shadow map exists at whatever size it was
     // given here. See Renderer::SHADOW_MAP_SIZE.
     {
+        // The top two levels are the same size on purpose, and it is worth
+        // saying why before someone raises the last one to 8192 as an easy win
+        // for modern hardware. Each level doubles the side, so it quadruples
+        // the image: at 4096 a depth map is 64 MB and there are two of them,
+        // one per frame in flight, which is 128 MB. 8192 would be 512 MB of
+        // VRAM for shadows alone - not a step a machine that can run this is
+        // certain to have spare, and the allocation failing at start-up is not
+        // a path this renderer handles gently. setShadowMapSize clamps to 4096
+        // for the same reason.
         constexpr uint32_t kShadowSideForLevel[] = {512, 1024, 2048, 4096, 4096};
         const int level = std::clamp(
             std::atoi(addons::storedCVarValue("extShadowQuality", "3").c_str()), 0, 4);
