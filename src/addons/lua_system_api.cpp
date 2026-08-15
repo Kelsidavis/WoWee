@@ -1148,6 +1148,18 @@ static void pushCvarDefault(lua_State* L, const std::string& n) {
 struct ClientCVarBinding {
     const char* cvar;      ///< lower case, as both sides fold it
     const char* setting;   ///< the key Application's bridge answers to
+    /// What the setting reads when the CVar reads one, where the two are not
+    /// counting the same thing.
+    ///
+    /// Almost always they are: a volume is 0 to 1 on both sides, a checkbox is
+    /// 0 or 1. Ground clutter is not. Blizzard's Ground Density slider counts
+    /// doodads and runs 16 to 64; this client's setting is a proportion and
+    /// runs 0 to 1.5. Handing one straight to the other put 64 into a field
+    /// that stops at 1.5, so every position of that slider - all seven of them
+    /// - came out as the most clutter the client will draw, and stayed there:
+    /// the value written to the config was clamped back down on the next load,
+    /// which made it permanent.
+    double scale = 1.0;
 };
 
 constexpr ClientCVarBinding kClientCVars[] = {
@@ -1161,7 +1173,9 @@ constexpr ClientCVarBinding kClientCVars[] = {
     // is the truth and the window is still showing the old state. A binding
     // here would sit above the store and hand RestartGx back what it was about
     // to set.
-    {"groundeffectdensity",  "groundclutter"},
+    // 64 doodads is the most Blizzard's slider asks for and 1.5 is the most
+    // this client draws, so one of theirs is 1.5/64 of ours.
+    {"groundeffectdensity",  "groundclutter", 1.5 / 64.0},
     {"sound_sfxvolume",      "effectsvolume"},
     // Three that were each written out four times over - a getter and a setter
     // on LuaServices, a lambda in Application, and a branch in each of GetCVar
@@ -1276,7 +1290,18 @@ static int lua_GetCVar(lua_State* L) {
     if (const auto* binding = findClientCVar(n)) {
         if (auto* svc = getLuaServices(L); svc && svc->getClientSetting) {
             const std::string v = svc->getClientSetting(binding->setting);
-            if (!v.empty()) { lua_pushstring(L, v.c_str()); return 1; }
+            if (!v.empty()) {
+                // Back into the units the slider is built in. Left alone when
+                // the two count the same thing, so a "1" stays "1" rather than
+                // becoming "1.000000" on its way through a double.
+                if (binding->scale != 1.0) {
+                    lua_pushstring(L, ui::settingNumberText(std::atof(v.c_str()) /
+                                                           binding->scale).c_str());
+                } else {
+                    lua_pushstring(L, v.c_str());
+                }
+                return 1;
+            }
         }
     }
     if (auto it = cvarStore().find(n); it != cvarStore().end()) {
@@ -1510,7 +1535,13 @@ static void applyCVarSideEffects(lua_State* L, const std::string& key,
     // The table first: these are settings the client owns and the panels drive.
     if (const auto* binding = findClientCVar(key)) {
         if (auto* svc = getLuaServices(L); svc && svc->setClientSetting) {
-            svc->setClientSetting(binding->setting, value);
+            if (binding->scale != 1.0) {
+                svc->setClientSetting(binding->setting,
+                                      ui::settingNumberText(std::atof(value.c_str()) *
+                                                            binding->scale));
+            } else {
+                svc->setClientSetting(binding->setting, value);
+            }
         }
     }
     // The four the client owns go to its settings, which then apply and save.

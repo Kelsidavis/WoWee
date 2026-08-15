@@ -346,17 +346,21 @@ end
 
 -- Every CVar a Blizzard control writes, and the setting it is meant to reach.
 for _, pair in ipairs(CLIENT_CVARS) do
-  local cvar, key = pair[1], pair[2]
+  local cvar, key, scale = pair[1], pair[2], pair[3]
   local before = WoweeGetSetting(key)
   for _, probe in ipairs({"1", "0"}) do
     SetCVar(cvar, probe)
     cvarsReached = cvarsReached + 1
     local got = WoweeGetSetting(key)
-    local same = (tonumber(got) and math.abs(tonumber(got) - tonumber(probe)) < 0.001)
-                 or tostring(got) == probe
+    -- What the setting should read is the CVar's value in the setting's units.
+    -- The two count the same thing for every pair but ground density, where a
+    -- doodad count meets a proportion.
+    local want = tonumber(probe) * scale
+    local same = (tonumber(got) and math.abs(tonumber(got) - want) < 0.02)
+                 or (scale == 1 and tostring(got) == probe)
     if not same then
-      bad[#bad+1] = string.format("%s: setting the CVar to %s left %s reading %s",
-                                  cvar, probe, key, tostring(got))
+      bad[#bad+1] = string.format("%s: setting the CVar to %s left %s reading %s, wanted %s",
+                                  cvar, probe, key, tostring(got), tostring(want))
     end
   end
   WoweeSetSetting(key, before)
@@ -419,7 +423,19 @@ def clientCVarPairs():
     if at == -1:
         return []
     body = source[at:source.find("};", at)]
-    return re.findall(r'\{"([a-z0-9_]+)",\s*"([a-z0-9_]+)"\}', body)
+    # A row may carry a third field, the scale between the CVar's units and the
+    # setting's, for the pair that do not count the same thing: Blizzard's
+    # Ground Density counts doodads and this client's setting is a proportion.
+    out = []
+    for row in re.finditer(r'\{"([a-z0-9_]+)",\s*"([a-z0-9_]+)"\s*(?:,\s*([^}]+?))?\s*\}', body):
+        scale = 1.0
+        if row.group(3):
+            try:
+                scale = eval(row.group(3), {"__builtins__": {}}, {})  # a literal like 1.5 / 64.0
+            except Exception:
+                scale = None  # unreadable: reported rather than guessed at
+        out.append((row.group(1), row.group(2), scale))
+    return out
 
 
 def main():
@@ -436,8 +452,14 @@ def main():
         print(f"kClientCVars has {len(pairs)} rows where it had nine - a binding "
               "was removed, and a Blizzard control now writes a CVar nothing reads.")
         return 1
+    unreadable = [c for c, _, scale in pairs if scale is None]
+    if unreadable:
+        print("the scale on these kClientCVars rows could not be read, so what "
+              f"they should answer is unknown: {', '.join(unreadable)}")
+        return 1
     lua = LUA.replace("--[[PAIRS]]",
-                      ", ".join('{"%s", "%s"}' % (c, k) for c, k in pairs))
+                      ", ".join('{"%s", "%s", %r}' % (c, k, scale)
+                                for c, k, scale in pairs))
 
     try:
         run = subprocess.run([str(RUNNER), str(DATA), lua],
