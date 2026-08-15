@@ -970,6 +970,12 @@ void GameScreen::renderQuestObjectiveTracker(game::GameHandler& gameHandler) {
     // narrow screen is - and x comes out negative, off the left edge, with
     // nothing to take hold of. The offset itself is left alone: it is where the
     // player put it on that screen, and it is right again when they go back.
+    // Sized to the screen before the position is held to it, or a tracker
+    // saved wider than the display pins x at zero and covers everything.
+    questTrackerSize_.x = std::clamp(questTrackerSize_.x, 100.0f, std::max(100.0f, screenW));
+    questTrackerSize_.y = std::clamp(questTrackerSize_.y, 60.0f, std::max(60.0f, screenH));
+
+    const ImVec2 trackerPosBeforeHold = questTrackerPos_;
     questTrackerPos_.x = std::clamp(questTrackerPos_.x, 0.0f,
                                     std::max(0.0f, screenW - questTrackerSize_.x));
     // And hold Y on the screen, every frame for the same reason. It is stored
@@ -1030,9 +1036,18 @@ void GameScreen::renderQuestObjectiveTracker(game::GameHandler& gameHandler) {
     // what nailed the tracker down.
     const bool screenResized = (questTrackerLastScreenW_ != screenW);
     questTrackerLastScreenW_ = screenW;
+    // Holding the value on screen does nothing unless it is handed over. This
+    // was pushed on a width change alone, so a display that got shorter without
+    // getting narrower left the tracker where it was - below the bottom, with
+    // the corrected position sitting in a field nothing read.
+    const bool heldOnScreen =
+        std::abs(trackerPosBeforeHold.x - questTrackerPos_.x) > 0.5f ||
+        std::abs(trackerPosBeforeHold.y - questTrackerPos_.y) > 0.5f;
     ImGui::SetNextWindowPos(questTrackerPos_,
-                            screenResized ? ImGuiCond_Always : ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(questTrackerSize_, ImGuiCond_FirstUseEver);
+                            (screenResized || heldOnScreen) ? ImGuiCond_Always
+                                                            : ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(questTrackerSize_,
+                             heldOnScreen ? ImGuiCond_Always : ImGuiCond_FirstUseEver);
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
                              ImGuiWindowFlags_NoCollapse |
