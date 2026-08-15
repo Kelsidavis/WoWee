@@ -1207,6 +1207,15 @@ std::string cvarValueOr(lua_State* L, const char* name, const char* fallback) {
     return fallback;
 }
 
+/// Set while a CVar is being applied to the setting it drives.
+///
+/// The store already holds the value in that direction, and echoing it back
+/// rewrites it with whatever survives the trip: ground clutter is kept as a
+/// whole percent, so a Ground Density of 24 came back as 23.893333 and the
+/// store no longer said what the player picked - nor any position that slider
+/// can be put in.
+static bool g_applyingCVarToSetting = false;
+
 const ClientCVarBinding* findClientCVar(const std::string& lowerName) {
     for (const auto& b : kClientCVars) {
         if (lowerName == b.cvar) return &b;
@@ -1543,6 +1552,9 @@ static void applyCVarSideEffects(lua_State* L, const std::string& key,
     // The table first: these are settings the client owns and the panels drive.
     if (const auto* binding = findClientCVar(key)) {
         if (auto* svc = getLuaServices(L); svc && svc->setClientSetting) {
+            // The store is the source here, so what the setting does with the
+            // value must not come back and overwrite it.
+            g_applyingCVarToSetting = true;
             if (binding->scale != 1.0) {
                 svc->setClientSetting(binding->setting,
                                       ui::settingNumberText(std::atof(value.c_str()) *
@@ -1550,6 +1562,7 @@ static void applyCVarSideEffects(lua_State* L, const std::string& key,
             } else {
                 svc->setClientSetting(binding->setting, value);
             }
+            g_applyingCVarToSetting = false;
         }
     }
     // The four the client owns go to its settings, which then apply and save.
@@ -1615,6 +1628,7 @@ std::string storedCVarValue(const std::string& key, const std::string& fallback)
 }
 
 void noteClientSettingChanged(const std::string& settingKey, const std::string& value) {
+    if (g_applyingCVarToSetting) return;
     for (const auto& binding : kClientCVars) {
         if (settingKey != binding.setting) continue;
         // Back into the CVar's own units, the same conversion GetCVar makes.
