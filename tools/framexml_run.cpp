@@ -134,15 +134,17 @@ int main(int argc, char** argv) {
     static wowee::ui::SettingsPanel settingsPanel;
     static wowee::ui::ChatSettings chatSettings;
     settingsPanel.setChatSettings(&chatSettings);
-    {
-        // The defaults, the way a fresh install starts.
-        std::size_t count = 0;
-        const wowee::ui::SettingDesc* schema = wowee::ui::clientSettingsSchema(count);
-        for (std::size_t i = 0; i < count; ++i) {
-            settingsPanel.setSettingValue(schema[i].key,
-                                          wowee::ui::settingNumberText(schema[i].defaultValue));
-        }
-    }
+    // No seeding of the defaults. The panel's fields already hold them - the
+    // schema's default and the member's initialiser are checked against each
+    // other in settings_apply_on_load - and setting them here went through
+    // setSettingValue, which tells the CVar store that a setting has changed.
+    //
+    // That wrote the defaults over the store at start-up, before the stored
+    // values were applied from it: two runs sharing a config root, which is
+    // what a restart is, came back on the defaults with the file emptied of
+    // what the first run had saved. The client does not do this - loadSettings
+    // assigns the pending fields directly - so it was the harness undoing the
+    // thing the harness exists to watch.
     wowee::addons::LuaServices settingServices;
     settingServices.getClientSetting = [](const std::string& key) -> std::string {
         return settingsPanel.settingValue(key);
