@@ -52,6 +52,8 @@
 // script can ask "did this one still work" without reading the output.
 
 #include "addons/addon_manager.hpp"
+#include "addons/lua_services.hpp"
+#include "ui/settings_schema.hpp"
 #include "core/app_clock.hpp"
 #include "ui/widget_renderer.hpp"
 #include "pipeline/asset_manager.hpp"
@@ -102,8 +104,38 @@ int main(int argc, char** argv) {
     // side being tested. Set before anything reads it.
     wowee::core::setEnvVar("WOWEE_FRAMEXML_UI", "all", false);
 
+    // The client's settings, so the panels the schema generates have values to
+    // show. Without this every control was built against a nil: WoweeGetSetting
+    // goes through LuaServices, nothing here set any, and all seventy-one keys
+    // answered empty - which reads as the settings being broken rather than as
+    // the harness never having been given them.
+    //
+    // Backed by the schema's own defaults rather than by a SettingsPanel. The
+    // panel wants a renderer and a window; the panels only want the numbers.
+    //
+    // Handed to initialize rather than set afterwards. AddonManager adds its
+    // own callbacks to whatever it is given and installs the result, so a
+    // setLuaServices call after it replaced the lot - setAddOnEnabled with
+    // them - and the load-on-demand panels stopped loading. The calendar came
+    // back NOFRAME.
+    static std::map<std::string, std::string> settingValues;
+    {
+        std::size_t count = 0;
+        const wowee::ui::SettingDesc* schema = wowee::ui::clientSettingsSchema(count);
+        for (std::size_t i = 0; i < count; ++i) {
+            settingValues[schema[i].key] = wowee::ui::settingNumberText(schema[i].defaultValue);
+        }
+    }
+    wowee::addons::LuaServices settingServices;
+    settingServices.getClientSetting = [](const std::string& key) -> std::string {
+        const auto it = settingValues.find(key);
+        return it == settingValues.end() ? std::string() : it->second;
+    };
+    settingServices.setClientSetting = [](const std::string& key, const std::string& value) {
+        settingValues[key] = value;
+    };
     wowee::addons::AddonManager mgr;
-    if (!mgr.initialize(nullptr)) {
+    if (!mgr.initialize(nullptr, settingServices)) {
         std::fprintf(stderr, "framexml_run: Lua would not initialise\n");
         return 2;
     }
