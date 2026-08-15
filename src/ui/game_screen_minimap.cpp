@@ -2065,7 +2065,10 @@ void GameScreen::loadSettings() {
                 (void)val;
             }
             else if (key == "quest_tracker_right_offset") {
-                questTrackerRightOffset_ = std::stof(val);
+                // Negative would put the tracker off the right edge instead.
+                // The far end is the screen width and belongs where the drawing
+                // knows it, as with the y above.
+                questTrackerRightOffset_ = std::max(0.0f, std::stof(val));
                 questTrackerPosInit_ = true;
             }
             else if (key == "quest_tracker_y") {

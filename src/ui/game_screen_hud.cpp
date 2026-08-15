@@ -964,6 +964,14 @@ void GameScreen::renderQuestObjectiveTracker(game::GameHandler& gameHandler) {
     }
     // Recompute X from right offset every frame (handles window resize)
     questTrackerPos_.x = screenW - questTrackerRightOffset_;
+    // Recomputing it is not the same as bounding it. The offset is saved as
+    // pixels from the right edge and taken from wherever the tracker was
+    // dragged, so one set near the left of a wide screen is larger than a
+    // narrow screen is - and x comes out negative, off the left edge, with
+    // nothing to take hold of. The offset itself is left alone: it is where the
+    // player put it on that screen, and it is right again when they go back.
+    questTrackerPos_.x = std::clamp(questTrackerPos_.x, 0.0f,
+                                    std::max(0.0f, screenW - questTrackerSize_.x));
     // And hold Y on the screen, every frame for the same reason. It is stored
     // as a plain pixel offset from the top, so a position saved on a tall
     // display puts the tracker past the bottom of a shorter one - where it is
