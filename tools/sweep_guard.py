@@ -1047,6 +1047,14 @@ SENTENCES = [
     # storedCVarValue answers the client where the setting is used. Both are
     # individually reasonable and both sides work; a difference only shows on
     # screen, as healing numbers over an unticked box. Canaried by moving one.
+    # The file itself, moved value by value and read back. The restart check
+    # drives settings through Lua, which cannot reach where the quest tracker
+    # sits or how big the chat window is - and those are in the same file. The
+    # count is pinned because the values come from the file being checked: a key
+    # that stops being written is one fewer thing checked, not a failure.
+    ("settings_file_round_trip.py",
+     "is there when it is read back",
+     "a value that does not survive being written to the settings file and read"),
     # The only check here that restarts. Everything else watches a setting
     # inside one run, and coming back is the whole of what a setting is for:
     # two runs over one config root, the first setting them and the second
