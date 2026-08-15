@@ -1863,6 +1863,7 @@ void GameScreen::loadSettings() {
     bool bagScaleLoaded = false;
     bool windowScaleLoaded = false;
     bool actionBarScaleLoaded = false;
+    bool trackerSizeLoaded = false;
     std::string line;
     while (std::getline(in, line)) {
         size_t eq = line.find('=');
@@ -2076,9 +2077,11 @@ void GameScreen::loadSettings() {
             }
             else if (key == "quest_tracker_w") {
                 questTrackerSize_.x = std::max(100.0f, std::stof(val));
+                trackerSizeLoaded = true;
             }
             else if (key == "quest_tracker_h") {
                 questTrackerSize_.y = std::max(60.0f, std::stof(val));
+                trackerSizeLoaded = true;
             }
             else if (key == "quest_tracker_filter") {
                 questTrackerFilter_ = std::clamp(std::stoi(val), 0, 3);
@@ -2121,6 +2124,17 @@ void GameScreen::loadSettings() {
         if (!actionBarScaleLoaded) {
             settingsPanel_.pendingActionBarScale =
                 SettingsPanel::recommendedPixelScale(defaultHeight, 0.5f, 2.0f);
+        }
+        if (!trackerSizeLoaded) {
+            // The box this client draws the tracked quests in, which is a
+            // number of pixels and so does not follow a tall screen - while the
+            // text inside it does, the fonts being scaled by the window scale
+            // that now follows the screen itself. Left alone, a 2160-line
+            // display drew bigger words in the same small box.
+            const float scale = SettingsPanel::recommendedPixelScale(defaultHeight,
+                                                                     0.75f, 1.5f);
+            questTrackerSize_.x *= scale;
+            questTrackerSize_.y *= scale;
         }
     }
 
