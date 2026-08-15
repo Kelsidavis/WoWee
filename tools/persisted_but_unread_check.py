@@ -26,6 +26,15 @@ faithfully every run.
 The existing dead_setting_check covers the other side of this: a CVar an options
 panel control names that nothing reads. Between them, a setting has to be acted
 on somewhere whichever file it lives in.
+
+The mirror of this - state something writes and nothing keeps - was looked for
+and is not worth a check. Eight toggles write a member the settings file never
+holds, and all eight are view filters: the auction house's Usable and Buyout
+only, the trainer's unavailable spells, the tradeskill window's Have reagents,
+the reputation list's inactive factions, the combat log's auto-scroll. Those are
+session-scoped on purpose and in the real client too, and telling a filter from
+a setting is a judgement no pattern here can make. Anything that should persist
+has a row in the schema, and the schema's own checks cover those.
 """
 
 import re
