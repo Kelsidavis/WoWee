@@ -23,16 +23,21 @@ audit spent itself on - it reads correctly, it saves correctly, and it changes
 nothing. Sixty-six of the seventy-two can be driven that way; the dropdowns are
 left out, their menu buttons being built on being opened.
 
-Last it presses Defaults on every panel with every setting moved off its
+Then it presses Defaults on every panel with every setting moved off its
 default. That button was a function that did nothing here once, before the
 schema carried a default at all, and what that looked like is exactly what a
 broken one looks like now: the panel redraws and every value stays put.
+
+Last it opens a panel, changes a control and presses Cancel. Cancel snapshots
+on refresh, which is what opening a panel does, so the panel has to be opened
+before the change or Cancel is being asked to undo something it never saw.
 
 Canaried against all three faults it was written for: with the panel's label
 pick moved one along - `choices[selected() + 1]` - all twenty-six index and
 label pairs report wrong; with the slider's write taken out, all thirty-one
 sliders report the setting unmoved; with the Defaults write taken out, all
-seventy-two report themselves left where they were. Rebuild after putting any of
+seventy-two report themselves left where they were; with Cancel's restore taken
+out, all thirty-five keep the change. Rebuild after putting any of
 them back. A restored header and a stale binary reported every dropdown off by
 one, convincingly, for a fault that was no longer in the source.
 
@@ -201,8 +206,31 @@ do
   end
 end
 
-error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %s",
-                            controls, checked, written, restored, table.concat(bad, " ~ ")))
+-- And Cancel, which promises the panel is left as it was found. It snapshots
+-- on refresh, which is what opening a panel does, so the test has to open one
+-- before changing anything or it is asking Cancel to undo a change it never
+-- saw.
+local cancelled = 0
+for _, r in ipairs(WoweeSettingList()) do
+  local base = panelOf(r.category)
+  local panel, ctrl = _G[base], _G[base .. r.key]
+  if panel and ctrl and r.kind == "bool" and ctrl.Click and panel.cancel then
+    local opened = (tostring(r.default) == "1") and "1" or "0"
+    WoweeSetSetting(r.key, opened)
+    if panel.refresh then panel:refresh() end
+    ctrl:Click()
+    panel:cancel()
+    cancelled = cancelled + 1
+    if WoweeGetSetting(r.key) ~= opened then
+      bad[#bad+1] = string.format("%s: Cancel left it at %s, it was %s when the panel opened",
+                                  r.key, tostring(WoweeGetSetting(r.key)), opened)
+    end
+  end
+end
+
+error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %s",
+                            controls, checked, written, restored, cancelled,
+                            table.concat(bad, " ~ ")))
 '''
 
 
@@ -235,10 +263,12 @@ def main():
     checked, _, rest = rest.partition(" ~ ")
     written, _, rest = rest.partition(" ~ ")
     restored, _, rest = rest.partition(" ~ ")
+    cancelled, _, rest = rest.partition(" ~ ")
     bad = [b.strip() for b in rest.split(" ~ ") if b.strip()]
 
     print(f"{controls} controls built, {checked} values shown and read back, "
-          f"{written} changed at the control, {restored} restored by Defaults.\n")
+          f"{written} changed at the control, {restored} restored by Defaults, "
+          f"{cancelled} put back by Cancel.\n")
     for entry in bad:
         print(f"  {entry}")
 
@@ -247,14 +277,14 @@ def main():
         return 0
 
     # A sweep that matched nothing reports the same silence as a clean one.
-    if int(checked or 0) < 20 or int(written or 0) < 20 or int(restored or 0) < 20:
+    if int(checked or 0) < 20 or int(written or 0) < 20 or int(restored or 0) < 20 or int(cancelled or 0) < 20:
         print("\nfewer values were checked than any build has settings - "
               "the walk stopped matching rather than finding nothing wrong.")
         return 1
 
     print("every control shows the value it is given, every dropdown shows the "
-          "label its index names, moving one writes the setting, and Defaults "
-          "puts every setting back.")
+          "label its index names, moving one writes the setting, Defaults puts "
+          "every setting back, and Cancel leaves the panel as it was found.")
     return 0
 
 
