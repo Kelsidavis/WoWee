@@ -27,6 +27,20 @@ void applyStoredCVarSideEffects(lua_State* L);
 /// is long before the interface loads. Returns the fallback when the file has
 /// no such key, so a fresh install gets the default rather than nothing.
 std::string storedCVarValue(const std::string& key, const std::string& fallback);
+
+/// Tell the CVar store that a setting it drives has been changed elsewhere.
+///
+/// Six settings are driven by a Blizzard control through kClientCVars, and
+/// three of those also have a control in this client's own settings window.
+/// The store is applied over the settings file at start-up - it is the record
+/// of what the player last set - so a change made in this client's window and
+/// saved to settings.cfg was undone at the next start by a CVar nobody had
+/// touched since.
+///
+/// Does nothing for a setting no CVar drives, and writes only when the value
+/// actually moves: the settings window applies on every frame of a slider drag,
+/// and saving the store means writing a file.
+void noteClientSettingChanged(const std::string& settingKey, const std::string& value);
 void registerActionLuaAPI(lua_State* L);
 
 /// Whether this client performs a binding command itself, without the

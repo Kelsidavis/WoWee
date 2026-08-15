@@ -7,6 +7,7 @@
 #include "ui/graphics_presets.hpp"
 #include "ui/settings_panel.hpp"
 #include "ui/settings_schema.hpp"
+#include "addons/lua_api_registrations.hpp"
 #include "ui/display_modes.hpp"
 #include "ui/inventory_screen.hpp"
 #include "ui/chat_panel.hpp"
@@ -1305,6 +1306,10 @@ bool SettingsPanel::setSettingValue(const std::string& key, const std::string& v
         this->*(b->asFloat) = static_cast<float>(clampedToSchema(key, b->fraction ? v * 100.0 : v));
     }
     applySettingSideEffects(key);
+    // And the CVar store, for the settings a Blizzard control also drives. It
+    // is applied over the settings file at start-up, so without this a change
+    // made here was undone at the next start by a CVar nobody had touched.
+    addons::noteClientSettingChanged(key, settingValue(key));
     // Anything a preset covers, changed by hand, means these settings are no
     // longer that preset. applyGraphicsPreset does not come through here - it
     // assigns the fields itself - so there is nothing for this to fight with.

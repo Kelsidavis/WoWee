@@ -1614,6 +1614,22 @@ std::string storedCVarValue(const std::string& key, const std::string& fallback)
     return fallback;
 }
 
+void noteClientSettingChanged(const std::string& settingKey, const std::string& value) {
+    for (const auto& binding : kClientCVars) {
+        if (settingKey != binding.setting) continue;
+        // Back into the CVar's own units, the same conversion GetCVar makes.
+        const std::string text =
+            binding.scale != 1.0
+                ? ui::settingNumberText(std::atof(value.c_str()) / binding.scale)
+                : value;
+        auto it = cvarStore().find(binding.cvar);
+        if (it != cvarStore().end() && it->second == text) return;
+        cvarStore()[binding.cvar] = text;
+        saveStoredCVars();
+        return;
+    }
+}
+
 void applyStoredCVarSideEffects(lua_State* L) {
     for (const auto& [key, value] : cvarStore()) {
         applyCVarSideEffects(L, key, value);
