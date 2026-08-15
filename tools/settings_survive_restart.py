@@ -28,6 +28,14 @@ takes, so the defaults were written over the store before the stored values were
 read from it: both runs came back on the defaults and the file was emptied of
 what the first had saved. That looked exactly like the client losing settings.
 
+The comparison is exact rather than near, because every one of them is: a
+setting that came back a little different would come back a little different
+again on the next restart, and a value that walks is worse than one that jumps.
+Ground clutter is the one that has to travel furthest to stay put - 1.0 here is
+42.666667 in the units Blizzard's slider counts in - and it still returns
+exactly. Canaried by making one setting drift half a degree per save, which is
+reported by name.
+
 Needs build/bin/framexml_run and an extracted interface, and skips rather than
 fails without them.
 """
@@ -187,7 +195,7 @@ def main():
             lost.append(f"{key}: the second run had no value for it at all")
             continue
         try:
-            near = abs(float(got) - float(want)) <= max(0.02, abs(want) * 0.01)
+            near = abs(float(got) - float(want)) <= 0.0001
         except ValueError:
             near = False
         if not near:
@@ -200,7 +208,7 @@ def main():
             lost.append(f"{key}: the second run had no value for it")
             continue
         try:
-            near = abs(float(got) - float(left)) <= max(0.02, abs(float(left)) * 0.01)
+            near = abs(float(got) - float(left)) <= 0.0001
         except ValueError:
             near = got == left
         if not near:
