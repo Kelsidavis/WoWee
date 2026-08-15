@@ -78,6 +78,7 @@ interface, and skips rather than fails when either is absent - the same rule
 sweep_guard uses for the runner.
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -86,6 +87,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "build" / "bin" / "framexml_run"
 DATA = ROOT / "Data"
+CONFIG_ROOT = ROOT / "logs/settings_control_check_config"
 # Data/expansions and Data/opcodes are tracked, so a checkout with no extracted
 # interface still has a Data directory. Testing for that one runs the sweep
 # against an interface that is not there and calls the silence a pass.
@@ -410,9 +412,38 @@ for _, r in ipairs(WoweeSettingList()) do
   end
 end
 
-error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s",
+-- Last, and left last on purpose: what the CVar store is holding when the run
+-- ends. The store is applied over the settings file at start-up, so a setting a
+-- Blizzard control drives has to reach it when it is changed here - otherwise
+-- the change is saved, and undone at the next start by a CVar nobody touched.
+--
+-- It cannot be read back through GetCVar, which answers from the setting for
+-- exactly these keys and would agree with itself whatever the store held. What
+-- the store has is what it writes to disk, so the file is the check, and these
+-- values are the ones looked for there.
+local expected = {}
+for _, pair in ipairs(CLIENT_CVARS) do
+  local cvar, key, scale = pair[1], pair[2], pair[3]
+  local probe = tonumber(WoweeGetSetting(key))
+  if probe then
+    -- Half of what it holds, so a store left on the old value is visible. The
+    -- bridge check above called SetCVar for every one of these, so the store
+    -- already has all their names: it is the value that says whether the
+    -- setting reached it, not the key being present.
+    WoweeSetSetting(key, tostring(probe * 0.5))
+    -- What it holds afterwards, not what it was asked for. Half of a bool's 1
+    -- is 0.5, which a bool cannot hold - it keeps 1, and the store is right to
+    -- keep 1 with it. Reading back makes the expectation the setting's own
+    -- value whatever its kind, which is the thing the store has to match.
+    local actual = tonumber(WoweeGetSetting(key)) or 0
+    expected[#expected+1] = cvar .. "=" .. tostring(actual / scale)
+  end
+end
+
+error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s ~ %s",
                             controls, checked, written, restored, cancelled, chosen, presets,
-                            bounded, committed, cvarsReached, table.concat(bad, " ~ ")))
+                            bounded, committed, cvarsReached, table.concat(expected, " "),
+                            table.concat(bad, " ~ ")))
 '''
 
 
@@ -461,9 +492,18 @@ def main():
                       ", ".join('{"%s", "%s", %r}' % (c, k, scale)
                                 for c, k, scale in pairs))
 
+    # A config root of this sweep's own. The runner defaults to one shared with
+    # every other sweep that drives it, and the addon-open check drives it too -
+    # so the store this reads was whichever of them wrote last. It passed alone
+    # and failed under sweep_guard, which is the only place they run together.
+    env = dict(os.environ)
+    env["WOWEE_CONFIG_ROOT"] = str(CONFIG_ROOT)
+    CONFIG_ROOT.mkdir(parents=True, exist_ok=True)
+    (CONFIG_ROOT / "cvars.cfg").unlink(missing_ok=True)
+
     try:
         run = subprocess.run([str(RUNNER), str(DATA), lua],
-                             capture_output=True, text=True, timeout=900)
+                             capture_output=True, text=True, timeout=900, env=env)
     except subprocess.TimeoutExpired:
         print("the runner did not finish - no control was built.")
         return 1
@@ -491,14 +531,38 @@ def main():
     bounded, _, rest = rest.partition(" ~ ")
     committed, _, rest = rest.partition(" ~ ")
     cvars, _, rest = rest.partition(" ~ ")
+    wanted, _, rest = rest.partition(" ~ ")
     bad = [b.strip() for b in rest.split(" ~ ") if b.strip()]
+
+    # What the store kept. The runner writes it to its own config root, and the
+    # Lua above left every CVar-driven setting on a value of its own choosing.
+    store = CONFIG_ROOT / "cvars.cfg"
+    kept = {}
+    if store.is_file():
+        for line in store.read_text().splitlines():
+            name, _, value = line.partition("=")
+            kept[name.strip().lower()] = value.strip()
+    storeChecked = 0
+    for item in wanted.split():
+        name, _, value = item.partition("=")
+        storeChecked += 1
+        held = kept.get(name.lower())
+        if held is None:
+            bad.append(f"the CVar store never heard of {name}")
+        elif abs(float(held) - float(value)) > 0.02:
+            bad.append(
+                f"{name}: the setting behind it was left at a value that is {value} "
+                f"in this CVar's units, and the store kept {held} - a change made in "
+                "this client's own window is saved to settings.cfg and undone at the "
+                "next start by the CVar")
 
     print(f"{controls} controls built, {checked} values shown and read back, "
           f"{written} changed at the control, {restored} restored by Defaults, "
           f"{cancelled} put back by Cancel, {chosen} chosen from a menu, "
           f"{presets} quality presets applied, {bounded} out-of-range values "
           f"held to the row, {committed} kept by Okay against a later Cancel, "
-          f"{cvars} CVar writes followed to their setting.\n")
+          f"{cvars} CVar writes followed to their setting, "
+          f"{storeChecked} settings followed back to the CVar store.\n")
     for entry in bad:
         print(f"  {entry}")
 
@@ -523,7 +587,8 @@ def main():
           "  a quality preset moves what it covers, and never asks for less "
           "than the one below\n"
           "  a value past the end of a row is held to it\n"
-          "  a CVar a Blizzard control writes reaches the setting behind it")
+          "  a CVar a Blizzard control writes reaches the setting behind it, and "
+          "a change to that setting reaches the store")
     return 0
 
 
