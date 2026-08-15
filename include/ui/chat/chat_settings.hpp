@@ -29,12 +29,13 @@ struct ChatSettings {
     bool autoJoinLFG          = true;
     bool autoJoinLocal        = true;
 
-    // Window state
-    bool windowLocked = true;
-    // Persisted chat window size (0 = use responsive default). Captured while the
-    // window is unlocked so a resized chat window keeps its size, even after locking.
-    float windowWidth  = 0.0f;
-    float windowHeight = 0.0f;
+    // No window state here. This client drew its own chat window once and kept
+    // three fields for it - whether it was locked, and the size a resize left
+    // it. FrameXML draws chat now, chat_panel.cpp sets no window size at all,
+    // and nothing had read any of the three for a long time: the width and
+    // height were written to the config every run and read back into fields
+    // nobody asked. The comment on them described capturing a resize, which
+    // nothing did.
 
     /** Reset all chat settings to defaults. */
     void restoreDefaults();

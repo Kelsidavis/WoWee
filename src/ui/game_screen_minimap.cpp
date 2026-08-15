@@ -1821,8 +1821,6 @@ void GameScreen::saveSettings() {
     out << "chat_timestamps=" << (chatPanel_.chatShowTimestamps ? 1 : 0) << "\n";
     out << "chat_font_size=" << chatPanel_.chatFontSize << "\n";
     out << "chat_bg_alpha=" << chatPanel_.settings.backgroundAlpha << "\n";
-    out << "chat_window_w=" << chatPanel_.settings.windowWidth << "\n";
-    out << "chat_window_h=" << chatPanel_.settings.windowHeight << "\n";
     out << "chat_fade_messages=" << (chatPanel_.settings.fadeMessages ? 1 : 0) << "\n";
     out << "chat_fade_time=" << chatPanel_.settings.messageFadeTime << "\n";
     out << "chat_autojoin_general=" << (chatPanel_.chatAutoJoinGeneral ? 1 : 0) << "\n";
@@ -2094,8 +2092,6 @@ void GameScreen::loadSettings() {
             else if (key == "chat_timestamps") chatPanel_.chatShowTimestamps = (std::stoi(val) != 0);
             else if (key == "chat_font_size") chatPanel_.chatFontSize = std::clamp(std::stoi(val), 0, 2);
             else if (key == "chat_bg_alpha") chatPanel_.settings.backgroundAlpha = std::clamp(std::stof(val), 0.0f, 1.0f);
-            else if (key == "chat_window_w") chatPanel_.settings.windowWidth = std::max(0.0f, std::stof(val));
-            else if (key == "chat_window_h") chatPanel_.settings.windowHeight = std::max(0.0f, std::stof(val));
             else if (key == "chat_fade_messages") chatPanel_.settings.fadeMessages = (std::stoi(val) != 0);
             else if (key == "chat_fade_time") chatPanel_.settings.messageFadeTime = std::clamp(std::stof(val), 5.0f, 120.0f);
             else if (key == "chat_autojoin_general") chatPanel_.chatAutoJoinGeneral = (std::stoi(val) != 0);

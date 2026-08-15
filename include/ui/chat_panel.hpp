@@ -215,9 +215,6 @@ private:
     // Mention notification
 
 
-    // ---- Chat window visual state ----
-    // windowLocked is in settings.windowLocked (kept in sync via reference)
-
     // ---- Chat bubbles (delegated to ChatBubbleManager) ----
     ChatBubbleManager bubbleManager_;
 public:
