@@ -176,6 +176,25 @@ private:
 
     // Local copies of the settings keys we expose in the login popup.
     // Loaded on first open; saved on Apply.
+    /// The graphics the login screen offers, kept apart from SettingsPanel's
+    /// fields on purpose.
+    ///
+    /// It mirrors eighteen of them, and that mirroring caused four bugs: a
+    /// parallax dropdown offering two entries of a three-entry scale, a preset
+    /// table that had drifted from the panel's in four of ten columns, four
+    /// keys with no clamp and a fifth clamped to a different floor, and a set
+    /// of defaults that disagreed with the schema's. Every one of them is fixed
+    /// by the two sides reading one thing rather than by this struct going
+    /// away: the scale, the preset table, the ranges and the defaults are all
+    /// shared now, and settings_apply_on_load fails if any of them drifts
+    /// again.
+    ///
+    /// What is left is eighteen fields of plain state and a loader that clamps
+    /// them, which is what this screen needs before a SettingsPanel exists to
+    /// hold anything - it runs before the game screen does. Collapsing it means
+    /// reworking the first screen every player sees, for a mirror whose every
+    /// known failure is already held by a check. That is a trade worth
+    /// declining until something here drifts that the checks do not catch.
     struct LoginGraphicsState {
         int  preset          = 2;   // 0=Custom 1=Low 2=Medium 3=High 4=Ultra
         bool shadows         = true;
