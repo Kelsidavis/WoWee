@@ -28,16 +28,24 @@ default. That button was a function that did nothing here once, before the
 schema carried a default at all, and what that looked like is exactly what a
 broken one looks like now: the panel redraws and every value stays put.
 
-Last it opens a panel, changes a control and presses Cancel. Cancel snapshots
+Then it opens a panel, changes a control and presses Cancel. Cancel snapshots
 on refresh, which is what opening a panel does, so the panel has to be opened
 before the change or Cancel is being asked to undo something it never saw.
+
+Last the dropdowns, which are the one control the move above cannot reach - a
+menu's buttons are built when it opens. Their menus are built by hand and what
+a click calls is called, because the index conversion in there is the fault
+this file exists for: a menu button is 1-based and the setting is 0-based, and
+`button.value` where `button.value - 1` belongs writes every choice one along.
 
 Canaried against all three faults it was written for: with the panel's label
 pick moved one along - `choices[selected() + 1]` - all twenty-six index and
 label pairs report wrong; with the slider's write taken out, all thirty-one
 sliders report the setting unmoved; with the Defaults write taken out, all
 seventy-two report themselves left where they were; with Cancel's restore taken
-out, all thirty-five keep the change. Rebuild after putting any of
+out, all thirty-five keep the change; with the menu's `- 1` taken off, all
+twenty-six choices write an index one too high, which is the parallax fault
+itself. Rebuild after putting any of
 them back. A restored header and a stale binary reported every dropdown off by
 one, convincingly, for a fault that was no longer in the source.
 
@@ -228,8 +236,54 @@ for _, r in ipairs(WoweeSettingList()) do
   end
 end
 
-error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %s",
-                            controls, checked, written, restored, cancelled,
+-- The dropdowns, which are the one control the write check above cannot move:
+-- their buttons are built when the menu opens. Building them by hand and
+-- calling what a click calls is the only way to see the index conversion, and
+-- the index conversion is where the fault this file exists for lived.
+--
+-- The infos are copied rather than held: UIDropDownMenu_CreateInfo hands back
+-- one recycled table, so a list of references to it is a list of the last
+-- button built, and every choice appears to write the last index.
+local chosen = 0
+do
+  local captured
+  local realAdd = UIDropDownMenu_AddButton
+  UIDropDownMenu_AddButton = function(info, level)
+    if captured then
+      captured[#captured + 1] = {value = info.value, func = info.func, text = info.text}
+    end
+    return realAdd(info, level)
+  end
+
+  for _, r in ipairs(WoweeSettingList()) do
+    if r.kind == "enum" then
+      local dd = _G[panelOf(r.category) .. r.key]
+      if dd and dd.initialize then
+        captured = {}
+        dd:initialize(1)
+        local infos = captured
+        captured = nil
+        for i, info in ipairs(infos) do
+          if info.func then
+            info.func({value = info.value})
+            chosen = chosen + 1
+            local got = WoweeGetSetting(r.key)
+            if tostring(got) ~= tostring(i - 1) then
+              bad[#bad+1] = string.format("%s: choosing %q wrote %s, the index is %d",
+                                          r.key, tostring(info.text), tostring(got), i - 1)
+            end
+          end
+        end
+      else
+        bad[#bad+1] = r.key .. ": a dropdown with nothing to build its menu"
+      end
+    end
+  end
+  UIDropDownMenu_AddButton = realAdd
+end
+
+error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s",
+                            controls, checked, written, restored, cancelled, chosen,
                             table.concat(bad, " ~ ")))
 '''
 
@@ -264,11 +318,12 @@ def main():
     written, _, rest = rest.partition(" ~ ")
     restored, _, rest = rest.partition(" ~ ")
     cancelled, _, rest = rest.partition(" ~ ")
+    chosen, _, rest = rest.partition(" ~ ")
     bad = [b.strip() for b in rest.split(" ~ ") if b.strip()]
 
     print(f"{controls} controls built, {checked} values shown and read back, "
           f"{written} changed at the control, {restored} restored by Defaults, "
-          f"{cancelled} put back by Cancel.\n")
+          f"{cancelled} put back by Cancel, {chosen} chosen from a menu.\n")
     for entry in bad:
         print(f"  {entry}")
 
@@ -277,14 +332,15 @@ def main():
         return 0
 
     # A sweep that matched nothing reports the same silence as a clean one.
-    if int(checked or 0) < 20 or int(written or 0) < 20 or int(restored or 0) < 20 or int(cancelled or 0) < 20:
+    if int(checked or 0) < 20 or int(written or 0) < 20 or int(restored or 0) < 20 or int(cancelled or 0) < 20 or int(chosen or 0) < 20:
         print("\nfewer values were checked than any build has settings - "
               "the walk stopped matching rather than finding nothing wrong.")
         return 1
 
     print("every control shows the value it is given, every dropdown shows the "
           "label its index names, moving one writes the setting, Defaults puts "
-          "every setting back, and Cancel leaves the panel as it was found.")
+          "every setting back, Cancel leaves the panel as it was found, and "
+          "choosing from a menu writes the index it names.")
     return 0
 
 
