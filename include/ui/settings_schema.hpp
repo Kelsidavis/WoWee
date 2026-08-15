@@ -48,7 +48,18 @@ struct SettingDesc {
     const char* category;  ///< which panel it belongs on
     const char* section;   ///< the heading above it on that panel; "" continues the last
     const char* tooltip;   ///< one or two lines shown on hover; "" for none
-    const char* choices;   ///< Enum only: the labels, separated by '|', index order
+    /// Enum only: the labels, separated by '|', in index order.
+    ///
+    /// The index is what is written to the config file, not the label - so this
+    /// list can be added to at the end and not reordered or inserted into. Put
+    /// a 165 between the frame cap's 144 and 240 and every player who had
+    /// chosen 240 has chosen 165, silently, at their next start. Nothing here
+    /// would notice: the count still matches the range, every label is still
+    /// non-empty, and the control still shows what the file now means.
+    ///
+    /// Renaming a label is safe, its index not having moved. Retiring one is
+    /// not, and wants the value migrated on load rather than the row deleted.
+    const char* choices;
     /// What this setting is when nobody has chosen. 0 or 1 for a Bool, the
     /// chosen index for an Enum.
     ///
