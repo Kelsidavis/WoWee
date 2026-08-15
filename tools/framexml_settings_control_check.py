@@ -17,9 +17,18 @@ schema; for each dropdown it sets every index the row allows, refreshes the
 panel, and reads the text the control is showing. For each checkbox and slider
 it sets a value the row allows and reads back what the control holds.
 
-Canaried against the fault it was written for: with the panel's label pick moved
-one along - `choices[selected() + 1]` - all twenty-six index and label pairs
-report wrong, and putting it back reports none.
+Then it goes the other way and moves the control, because a control that shows
+the right value and writes nothing when it is used is the shape the options
+audit spent itself on - it reads correctly, it saves correctly, and it changes
+nothing. Sixty-six of the seventy-two can be driven that way; the dropdowns are
+left out, their menu buttons being built on being opened.
+
+Canaried against both faults it was written for: with the panel's label pick
+moved one along - `choices[selected() + 1]` - all twenty-six index and label
+pairs report wrong; with the slider's write taken out, all thirty-one sliders
+report the setting unmoved. Rebuild after putting either back. A restored header
+and a stale binary reported every dropdown off by one, convincingly, for a fault
+that was no longer in the source.
 
 Two things it does not do, on purpose. It does not compare the labels against a
 list of its own: the point is whether the panel and the schema agree, and a
@@ -50,7 +59,7 @@ INTERFACE = ROOT / "Data/interface"
 # that again with "Text".
 LUA = r'''
 local function panelOf(cat) return "WoweeOptions" .. cat:gsub("[^%w]", "") end
-local bad, checked, controls = {}, 0, 0
+local bad, checked, controls, written = {}, 0, 0, 0
 
 for _, r in ipairs(WoweeSettingList()) do
   local base = panelOf(r.category)
@@ -114,6 +123,32 @@ for _, r in ipairs(WoweeSettingList()) do
       end
     end
 
+    -- And the other way. A control that shows the right value and writes
+    -- nothing when it is moved is the shape the options audit spent itself on:
+    -- it reads correctly, it saves correctly, and it never changes anything.
+    if r.kind == "bool" and ctrl.Click then
+      WoweeSetSetting(r.key, "0")
+      if panel.refresh then panel:refresh() end
+      ctrl:Click()
+      written = written + 1
+      if WoweeGetSetting(r.key) ~= "1" then
+        bad[#bad+1] = r.key .. ": ticking the box left the setting at " ..
+                      tostring(WoweeGetSetting(r.key))
+      end
+    elseif r.kind ~= "enum" and r.kind ~= "bool" and ctrl.SetValue then
+      local target = r.min + (r.max - r.min) / 2
+      if r.step and r.step > 0 then target = r.min + math.floor((target - r.min) / r.step) * r.step end
+      WoweeSetSetting(r.key, tostring(r.min))
+      if panel.refresh then panel:refresh() end
+      ctrl:SetValue(target)
+      written = written + 1
+      local got = tonumber(WoweeGetSetting(r.key))
+      if not got or math.abs(got - target) > math.max(0.01, r.step or 0) then
+        bad[#bad+1] = string.format("%s: moving the slider to %s left the setting at %s",
+                                    r.key, tostring(target), tostring(WoweeGetSetting(r.key)))
+      end
+    end
+
     WoweeSetSetting(r.key, before)
     if panel.refresh then panel:refresh() end
   end
@@ -122,7 +157,7 @@ end
 -- The sentinel is built rather than written, because the runner echoes the
 -- expression it was given: a literal here matches in the echo before the
 -- result, and what comes back is this script's own source.
-error("QQ" .. string.format("SETTINGS %d ~ %d ~ %s", controls, checked, table.concat(bad, " ~ ")))
+error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %s", controls, checked, written, table.concat(bad, " ~ ")))
 '''
 
 
@@ -153,9 +188,11 @@ def main():
 
     controls, _, rest = payload.partition(" ~ ")
     checked, _, rest = rest.partition(" ~ ")
+    written, _, rest = rest.partition(" ~ ")
     bad = [b.strip() for b in rest.split(" ~ ") if b.strip()]
 
-    print(f"{controls} controls built, {checked} values shown and read back.\n")
+    print(f"{controls} controls built, {checked} values shown and read back, "
+          f"{written} changed at the control.\n")
     for entry in bad:
         print(f"  {entry}")
 
@@ -164,13 +201,13 @@ def main():
         return 0
 
     # A sweep that matched nothing reports the same silence as a clean one.
-    if int(checked or 0) < 20:
+    if int(checked or 0) < 20 or int(written or 0) < 20:
         print("\nfewer values were checked than any build has settings - "
               "the walk stopped matching rather than finding nothing wrong.")
         return 1
 
-    print("every control shows the value it is given, and every dropdown shows "
-          "the label its index names.")
+    print("every control shows the value it is given, every dropdown shows the "
+          "label its index names, and moving one writes the setting.")
     return 0
 
 
