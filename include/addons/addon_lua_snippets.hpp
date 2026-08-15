@@ -600,7 +600,12 @@ elsewhereText:SetJustifyV("TOP")
 -- reach the same values through getAudioSetting, which is what stops the two
 -- disagreeing - not their being left out of here.
 WOWEE_SETTINGS_ELSEWHERE = {
-    { panel = "Video",             names = { "resolution", "view distance", "ground clutter" } },
+    -- "gamma (brightness)" because it is one control with two names: the
+    -- game's panel calls it gamma, this client's own window calls it
+    -- brightness, and SetGamma is what both of them end up in. A player who
+    -- knows it by either word finds it.
+    { panel = "Video",             names = { "resolution", "view distance", "ground clutter",
+                                             "gamma (brightness)" } },
     { panel = "Sound",             names = { "enable sound", "master volume", "sound effects" } },
     { panel = "Interface",         names = { "mouse look speed", "the minimap clock",
                                              "friendly nameplates" } },
@@ -682,9 +687,21 @@ local function runSearch(query)
         return
     end
     local found, shown = 0, {}
+    -- The heading a row sits under counts as a name for it. "Anti-aliasing" is
+    -- how the setting is spelled everywhere except in this client, where the
+    -- control is called Multisampling and the key has no hyphen - so the term a
+    -- player actually types matched neither, and the row above the one they
+    -- wanted was the one that answered.
+    --
+    -- An empty section continues the one above, so the heading is tracked down
+    -- the list rather than read off each row: FXAA has no section of its own
+    -- and is still found by searching for anti-aliasing.
+    local heading = ""
     for _, setting in ipairs(list) do
+        if setting.section and setting.section ~= "" then heading = setting.section end
         if lower(setting.label):find(query, 1, true) or
-           lower(setting.key):find(query, 1, true) then
+           lower(setting.key):find(query, 1, true) or
+           lower(heading):find(query, 1, true) then
             found = found + 1
             -- Five is what fits between the box and the next heading; the
             -- count below says how many more rather than pretending these are
