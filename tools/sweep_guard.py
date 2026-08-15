@@ -1121,6 +1121,15 @@ SELF_CANARYING = {"bounded_log_check.py", "copy_paste_axis_check.py"}
 #: What each tool printed to stdout, kept apart from stderr for the population
 #: rule below: a traceback carries line numbers, and counting those would let a
 #: sweep that crashed satisfy a check meant to prove it looked at something.
+# Where the runner keeps its config for these checks.
+#
+# It reads the CVar store at start-up, so a run inherits whatever the last one
+# left - and the checks below drive it from several places, as do two of the
+# scripts in TOOLS. Setting it here gives this guard's own runs one root; a
+# script that wants its own overrides it in the environment it passes on. The
+# alternative is a check whose result depends on which other check ran first.
+os.environ.setdefault("WOWEE_CONFIG_ROOT", str(ROOT / "logs/sweep_guard_config"))
+
 STDOUT = {}
 
 

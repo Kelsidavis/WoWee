@@ -39,6 +39,7 @@ Needs `build/bin/framexml_run` and a `Data` directory, and skips rather than
 fails when either is absent - the same rule sweep_guard uses for the runner.
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -112,9 +113,16 @@ def main():
     # Four seconds of frames with everything open. Long enough for the timers
     # FrameXML drives in seconds - fades, flashes, combat text ageing out - to
     # run to completion rather than only to start.
+    # A config root of this check's own. The runner reads the CVar store at
+    # start-up, so a run inherits whatever the last one wrote there - and three
+    # checks drive this runner. A panel that opens differently because another
+    # check left a CVar behind is a failure nobody can reproduce alone.
+    env = dict(os.environ)
+    env["WOWEE_CONFIG_ROOT"] = str(ROOT / "logs/addon_open_check_config")
+
     try:
         run = subprocess.run([str(RUNNER), str(DATA), " ".join(lua), "--tick:240"],
-                             capture_output=True, text=True, timeout=900)
+                             capture_output=True, text=True, timeout=900, env=env)
     except subprocess.TimeoutExpired:
         print("the runner did not finish - nothing opened.")
         return 1
