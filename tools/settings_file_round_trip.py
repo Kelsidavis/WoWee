@@ -183,11 +183,13 @@ def main():
     #
     # If a setting was removed on purpose, lower this in the same commit and say
     # which. If one was added, raise it.
-    # 121 until the chat window's width and height went. They were written and
+    # 121 until the chat window's width and height went, and 119 until which
+    # chat tab was open went after them - the same shape, found by the check
+    # written from the first two. They were written and
     # read every run into fields nothing else touched: this client drew its own
     # chat window once, FrameXML draws it now, and the two numbers outlived it.
-    if len(wanted) < 119:
-        print(f"\n{len(wanted)} values were moved where 119 were expected - a key "
+    if len(wanted) < 118:
+        print(f"\n{len(wanted)} values were moved where 118 were expected - a key "
               "has stopped being written to the file, so nothing here is checking "
               "it any more.")
         return 1

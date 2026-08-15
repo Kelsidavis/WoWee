@@ -1817,7 +1817,6 @@ void GameScreen::saveSettings() {
     out << "quest_tracker_collapsed=" << (questTrackerCollapsed_ ? 1 : 0) << "\n";
 
     // Chat
-    out << "chat_active_tab=" << chatPanel_.activeChatTab << "\n";
     out << "chat_timestamps=" << (chatPanel_.chatShowTimestamps ? 1 : 0) << "\n";
     out << "chat_font_size=" << chatPanel_.chatFontSize << "\n";
     out << "chat_bg_alpha=" << chatPanel_.settings.backgroundAlpha << "\n";
@@ -2088,7 +2087,6 @@ void GameScreen::loadSettings() {
                 questTrackerCollapsed_ = (std::stoi(val) != 0);
             }
             // Chat
-            else if (key == "chat_active_tab") chatPanel_.activeChatTab = std::clamp(std::stoi(val), 0, 3);
             else if (key == "chat_timestamps") chatPanel_.chatShowTimestamps = (std::stoi(val) != 0);
             else if (key == "chat_font_size") chatPanel_.chatFontSize = std::clamp(std::stoi(val), 0, 2);
             else if (key == "chat_bg_alpha") chatPanel_.settings.backgroundAlpha = std::clamp(std::stof(val), 0.0f, 1.0f);

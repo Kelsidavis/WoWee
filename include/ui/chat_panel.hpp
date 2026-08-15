@@ -112,7 +112,6 @@ public:
     // ---- Chat settings (delegated to ChatSettings) ----
 
     ChatSettings settings;
-    int   activeChatTab       = 0;
 
     // Legacy accessors - forward to settings struct for external code
     // (GameScreen save/load reads these directly)

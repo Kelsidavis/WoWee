@@ -1047,6 +1047,14 @@ SENTENCES = [
     # storedCVarValue answers the client where the setting is used. Both are
     # individually reasonable and both sides work; a difference only shows on
     # screen, as healing numbers over an unticked box. Canaried by moving one.
+    # Settings kept in the config and acted on by nothing. A value written and
+    # read back looks like a working setting from every angle: the key is there,
+    # it survives a restart, the field holds what the file said. None of that
+    # asks whether anything acts on it, and three fields from the chat window
+    # this client no longer draws were kept that way for a long time.
+    ("persisted_but_unread_check.py",
+     "is read by something that uses it",
+     "a setting kept in the config file that nothing acts on"),
     # What this client draws itself, scaled to the screen. Four things pick a
     # default from the height and they have to pick the same, or neighbouring
     # parts of one HUD come up at different sizes - the buff bar was at 2.0 on a
