@@ -1028,6 +1028,15 @@ SENTENCES = [
     ("bootstrap_chunk_check.py",
      "every local they use is declared in the chunk that uses it",
      "a bootstrap chunk using a local another chunk declared"),
+    # The other one that builds rather than reads. A schema row can be right in
+    # every static check and still draw a dropdown whose text belongs to a
+    # different index - both halves correct, the mapping between them wrong,
+    # which is what the login screen's parallax control did. Canaried: with the
+    # panel's label pick moved one along, all twenty-six index and label pairs
+    # report wrong.
+    ("framexml_settings_control_check.py",
+     "every control shows the value it is given",
+     "a settings control showing something other than the value it was given"),
 ]
 
 
