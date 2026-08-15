@@ -330,9 +330,30 @@ do
   end
 end
 
-error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s",
+-- The range in the row, honoured by the one path nothing bounded. The sliders
+-- are built from it and the config loader clamps to it; setSettingValue, which
+-- is what these panels and any addon calling WoweeSetSetting go through, took
+-- whatever it was handed.
+local bounded = 0
+for _, r in ipairs(WoweeSettingList()) do
+  if r.kind ~= "bool" then
+    local before = WoweeGetSetting(r.key)
+    for _, probe in ipairs({{r.max + 1000, r.max}, {r.min - 1000, r.min}}) do
+      WoweeSetSetting(r.key, tostring(probe[1]))
+      bounded = bounded + 1
+      local got = tonumber(WoweeGetSetting(r.key))
+      if not got or math.abs(got - probe[2]) > 0.001 then
+        bad[#bad+1] = string.format("%s: given %s, kept %s, the row stops at %s",
+                                    r.key, tostring(probe[1]), tostring(got), tostring(probe[2]))
+      end
+    end
+    WoweeSetSetting(r.key, before)
+  end
+end
+
+error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s",
                             controls, checked, written, restored, cancelled, chosen, presets,
-                            table.concat(bad, " ~ ")))
+                            bounded, table.concat(bad, " ~ ")))
 '''
 
 
@@ -368,12 +389,14 @@ def main():
     cancelled, _, rest = rest.partition(" ~ ")
     chosen, _, rest = rest.partition(" ~ ")
     presets, _, rest = rest.partition(" ~ ")
+    bounded, _, rest = rest.partition(" ~ ")
     bad = [b.strip() for b in rest.split(" ~ ") if b.strip()]
 
     print(f"{controls} controls built, {checked} values shown and read back, "
           f"{written} changed at the control, {restored} restored by Defaults, "
           f"{cancelled} put back by Cancel, {chosen} chosen from a menu, "
-          f"{presets} quality presets applied.\n")
+          f"{presets} quality presets applied, {bounded} out-of-range values "
+          f"held to the row.\n")
     for entry in bad:
         print(f"  {entry}")
 
@@ -391,7 +414,8 @@ def main():
           "label its index names, moving one writes the setting, Defaults puts "
           "every setting back, Cancel leaves the panel as it was found, and "
           "choosing from a menu writes the index it names, and each quality "
-          "preset moves what it covers without asking for less than the one below.")
+          "preset moves what it covers without asking for less than the one "
+          "below, and a value past the end of a row is held to it.")
     return 0
 
 

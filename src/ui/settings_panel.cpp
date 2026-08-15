@@ -1251,6 +1251,35 @@ std::string SettingsPanel::settingValue(const std::string& key) const {
     return settingNumberText(b->fraction ? v / 100.0f : v);
 }
 
+namespace {
+
+/// A value held to the range its schema row declares.
+///
+/// The sliders are built from that range and the config loader clamps to it, so
+/// the one way past it was the one nothing bounded: setSettingValue, which is
+/// what FrameXML's panels and any addon calling WoweeSetSetting go through. It
+/// took whatever it was handed - a field of view of 500, a nameplate scale of
+/// -40, an interface opacity of 1000 - stored it, showed it on the control and
+/// wrote it to the config, where the loader clamped it on the way back in next
+/// time. The consumers that clamp for themselves, like the multisampling table,
+/// were what kept it from being worse than wrong.
+///
+/// Keys with no schema row are returned untouched: six settings are bound to a
+/// CVar instead and have no row to declare a range.
+double clampedToSchema(const std::string& key, double value) {
+    std::size_t count = 0;
+    const SettingDesc* schema = clientSettingsSchema(count);
+    for (std::size_t i = 0; i < count; ++i) {
+        if (key != schema[i].key) continue;
+        if (schema[i].kind == SettingKind::Bool) return value;
+        return std::clamp(value, static_cast<double>(schema[i].minValue),
+                          static_cast<double>(schema[i].maxValue));
+    }
+    return value;
+}
+
+}  // namespace
+
 bool SettingsPanel::setSettingValue(const std::string& key, const std::string& value) {
     const double v = std::atof(value.c_str());
     const bool on = settingIsOn(value);
@@ -1271,9 +1300,9 @@ bool SettingsPanel::setSettingValue(const std::string& key, const std::string& v
     if (b->asBool) {
         this->*(b->asBool) = on;
     } else if (b->asInt) {
-        this->*(b->asInt) = static_cast<int>((b->fraction ? v * 100.0 : v) + 0.5);
+        this->*(b->asInt) = static_cast<int>(clampedToSchema(key, b->fraction ? v * 100.0 : v) + 0.5);
     } else {
-        this->*(b->asFloat) = static_cast<float>(b->fraction ? v * 100.0 : v);
+        this->*(b->asFloat) = static_cast<float>(clampedToSchema(key, b->fraction ? v * 100.0 : v));
     }
     applySettingSideEffects(key);
     // Anything a preset covers, changed by hand, means these settings are no
