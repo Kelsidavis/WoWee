@@ -591,16 +591,31 @@ elsewhereText:SetPoint("TOPLEFT", 16, -268) -- needs 84
 elsewhereText:SetWidth(560)
 elsewhereText:SetJustifyH("LEFT")
 elsewhereText:SetJustifyV("TOP")
-elsewhereText:SetText(
+-- As data rather than only as a sentence, because the search box above reads
+-- it too. Typing "view distance" used to answer "No setting matches that" on a
+-- panel that says two inches lower where view distance is.
+--
+-- Music and ambience were on this list and should not have been: they are rows
+-- in the schema, drawn on our own Sound panel. The game's controls for them
+-- reach the same values through getAudioSetting, which is what stops the two
+-- disagreeing - not their being left out of here.
+WOWEE_SETTINGS_ELSEWHERE = {
+    { panel = "Video",             names = { "resolution", "view distance", "ground clutter" } },
+    { panel = "Sound",             names = { "enable sound", "master volume", "sound effects" } },
+    { panel = "Interface",         names = { "mouse look speed", "the minimap clock",
+                                             "friendly nameplates" } },
+    { panel = "Interface, Social", names = { "chat timestamps" } },
+    { panel = "Key Bindings",      names = { "every key" } },
+}
+
+local elsewhereLines = {
     "Some settings are driven by the game's own controls rather than repeated "
-    .. "here, so that the two cannot disagree:\n\n"
-    .. "|cffffd100Video|r  ..  resolution, view distance, ground clutter\n"
-    .. "|cffffd100Sound|r  ..  enable sound, master, music, ambience, "
-    .. "sound effects\n"
-    .. "|cffffd100Interface|r  ..  mouse look speed, the minimap clock, "
-    .. "friendly nameplates\n"
-    .. "|cffffd100Interface, Social|r  ..  chat timestamps\n"
-    .. "|cffffd100Key Bindings|r  ..  every key")
+    .. "here, so that the two cannot disagree:", "" }
+for _, group in ipairs(WOWEE_SETTINGS_ELSEWHERE) do
+    elsewhereLines[#elsewhereLines + 1] =
+        "|cffffd100" .. group.panel .. "|r  ..  " .. table.concat(group.names, ", ")
+end
+elsewhereText:SetText(table.concat(elsewhereLines, "\n"))
 
 -- What this build is. The version comes from the client rather than being
 -- written here, where it would go stale the first time a tag was cut.
@@ -681,6 +696,21 @@ local function runSearch(query)
             end
         end
     end
+    -- The ones the game's own panels drive, from the same list the block below
+    -- is built from. A player who types "view distance" is told where it is
+    -- rather than that it does not exist.
+    for _, group in ipairs(WOWEE_SETTINGS_ELSEWHERE or {}) do
+        for _, name in ipairs(group.names) do
+            if lower(name):find(query, 1, true) then
+                found = found + 1
+                if found <= 5 then
+                    shown[#shown + 1] = "|cffffd100" .. name ..
+                                        "|r  in the game's own  " .. group.panel .. "  panel"
+                end
+            end
+        end
+    end
+
     if found == 0 then
         searchResults:SetText("|cff909090No setting matches that.|r")
     elseif found > 5 then
