@@ -78,6 +78,7 @@ interface, and skips rather than fails when either is absent - the same rule
 sweep_guard uses for the runner.
 """
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -96,6 +97,13 @@ INTERFACE = ROOT / "Data/interface"
 # that again with "Text".
 LUA = r'''
 local function panelOf(cat) return "WoweeOptions" .. cat:gsub("[^%w]", "") end
+
+-- cvar -> client setting, read out of kClientCVars rather than written again
+-- here. Six settings have no schema row because a Blizzard control drives them
+-- through one of these, so a binding that stops working is one of the game's
+-- own controls going quietly dead - which is the fault the options audit was.
+local CLIENT_CVARS = { --[[PAIRS]] }
+local cvarsReached = 0
 local bad, checked, controls, written = {}, 0, 0, 0
 
 for _, r in ipairs(WoweeSettingList()) do
@@ -336,6 +344,24 @@ do
   end
 end
 
+-- Every CVar a Blizzard control writes, and the setting it is meant to reach.
+for _, pair in ipairs(CLIENT_CVARS) do
+  local cvar, key = pair[1], pair[2]
+  local before = WoweeGetSetting(key)
+  for _, probe in ipairs({"1", "0"}) do
+    SetCVar(cvar, probe)
+    cvarsReached = cvarsReached + 1
+    local got = WoweeGetSetting(key)
+    local same = (tonumber(got) and math.abs(tonumber(got) - tonumber(probe)) < 0.001)
+                 or tostring(got) == probe
+    if not same then
+      bad[#bad+1] = string.format("%s: setting the CVar to %s left %s reading %s",
+                                  cvar, probe, key, tostring(got))
+    end
+  end
+  WoweeSetSetting(key, before)
+end
+
 -- Okay, which is Cancel's other half. It re-takes the snapshot, so a Cancel
 -- afterwards has nothing to undo: without that, accepting a change and then
 -- cancelling anything later would put the accepted change back.
@@ -380,10 +406,20 @@ for _, r in ipairs(WoweeSettingList()) do
   end
 end
 
-error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s",
+error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s",
                             controls, checked, written, restored, cancelled, chosen, presets,
-                            bounded, committed, table.concat(bad, " ~ ")))
+                            bounded, committed, cvarsReached, table.concat(bad, " ~ ")))
 '''
+
+
+def clientCVarPairs():
+    """The cvar -> setting rows of kClientCVars, so the probe is not a copy."""
+    source = (ROOT / "src/addons/lua_system_api.cpp").read_text()
+    at = source.find("kClientCVars[] = {")
+    if at == -1:
+        return []
+    body = source[at:source.find("};", at)]
+    return re.findall(r'\{"([a-z0-9_]+)",\s*"([a-z0-9_]+)"\}', body)
 
 
 def main():
@@ -391,8 +427,20 @@ def main():
         print("framexml_run or an extracted interface is missing - no control was built.")
         return 0
 
+    # The probe is built from the table it checks, which means a row deleted
+    # from kClientCVars is one fewer check rather than a failure. The floor is
+    # what catches that: nine is what the table has, and six of them are the
+    # settings with no schema row at all, whose only control is Blizzard's.
+    pairs = clientCVarPairs()
+    if len(pairs) < 9:
+        print(f"kClientCVars has {len(pairs)} rows where it had nine - a binding "
+              "was removed, and a Blizzard control now writes a CVar nothing reads.")
+        return 1
+    lua = LUA.replace("--[[PAIRS]]",
+                      ", ".join('{"%s", "%s"}' % (c, k) for c, k in pairs))
+
     try:
-        run = subprocess.run([str(RUNNER), str(DATA), LUA],
+        run = subprocess.run([str(RUNNER), str(DATA), lua],
                              capture_output=True, text=True, timeout=900)
     except subprocess.TimeoutExpired:
         print("the runner did not finish - no control was built.")
@@ -420,13 +468,15 @@ def main():
     presets, _, rest = rest.partition(" ~ ")
     bounded, _, rest = rest.partition(" ~ ")
     committed, _, rest = rest.partition(" ~ ")
+    cvars, _, rest = rest.partition(" ~ ")
     bad = [b.strip() for b in rest.split(" ~ ") if b.strip()]
 
     print(f"{controls} controls built, {checked} values shown and read back, "
           f"{written} changed at the control, {restored} restored by Defaults, "
           f"{cancelled} put back by Cancel, {chosen} chosen from a menu, "
           f"{presets} quality presets applied, {bounded} out-of-range values "
-          f"held to the row, {committed} kept by Okay against a later Cancel.\n")
+          f"held to the row, {committed} kept by Okay against a later Cancel, "
+          f"{cvars} CVar writes followed to their setting.\n")
     for entry in bad:
         print(f"  {entry}")
 
@@ -450,7 +500,8 @@ def main():
           "against a Cancel after it\n"
           "  a quality preset moves what it covers, and never asks for less "
           "than the one below\n"
-          "  a value past the end of a row is held to it")
+          "  a value past the end of a row is held to it\n"
+          "  a CVar a Blizzard control writes reaches the setting behind it")
     return 0
 
 
