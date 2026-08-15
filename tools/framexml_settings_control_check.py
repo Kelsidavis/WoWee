@@ -310,6 +310,71 @@ do
   UIDropDownMenu_AddButton = realAdd
 end
 
+-- The search box on the root panel, which is how a player finds any of this
+-- when they do not already know which panel it is on. Each of these is a fix
+-- that cost a pass, and none of them was guarded by anything.
+local searches = 0
+do
+  local box, results = WoweeOptionsSearchBox, WoweeOptionsSearchResults
+  local asked = {
+    -- The heading above a control names it too: this client calls the control
+    -- Multisampling and the key has no hyphen, so the word everyone else uses
+    -- matched neither.
+    {"anti-aliasing", "Multisampling"},
+    -- Settings the game's own panels drive are not in the schema, and the
+    -- search only read the schema - so it said no setting matched, two inches
+    -- above a block naming where that setting is.
+    {"view distance", "Video"},
+    -- One control with two names, in both directions.
+    {"sensitivity", "sensitivity"},
+    {"grass", "grass"},
+    -- The description is searched as well as the name.
+    {"fps", "Frame rate limit"},
+    {"edges", "FXAA"},
+  }
+  -- Ranking is about which comes first, so it has to be checked as first. The
+  -- version of this that asked only whether the setting appeared passed with
+  -- the ranking taken out: Upscaling led on a description match and the three
+  -- settings with "scale" in their names were still on the list behind it.
+  local mustLead = {{"scale", "Window scale"}, {"volume", "Music"}}
+  if box and results and box.SetText then
+    for _, pair in ipairs(asked) do
+      box:SetText(pair[1])
+      local handler = box:GetScript("OnTextChanged")
+      if handler then handler(box) end
+      searches = searches + 1
+      local text = tostring(results:GetText() or "")
+      if not text:find(pair[2], 1, true) then
+        bad[#bad+1] = string.format("searching %q does not find %q: %s",
+                                    pair[1], pair[2], text:gsub("\n", " / "):sub(1, 90))
+      end
+    end
+    for _, pair in ipairs(mustLead) do
+      box:SetText(pair[1])
+      local handler = box:GetScript("OnTextChanged")
+      if handler then handler(box) end
+      searches = searches + 1
+      local text = tostring(results:GetText() or "")
+      local first = text:match("^[^\n]*") or ""
+      if not first:find(pair[2], 1, true) then
+        bad[#bad+1] = string.format("searching %q leads with %q rather than %q",
+                                    pair[1], first:gsub("|c%x%x%x%x%x%x%x%x", "")
+                                                  :gsub("|r", ""):sub(1, 44), pair[2])
+      end
+    end
+
+    -- And something that is not a setting still says so, or the checks above
+    -- would pass on a box that answers everything with everything.
+    box:SetText("zzznotasetting")
+    local handler = box:GetScript("OnTextChanged")
+    if handler then handler(box) end
+    searches = searches + 1
+    if not tostring(results:GetText() or ""):find("No setting matches", 1, true) then
+      bad[#bad+1] = "a search for nothing in particular does not say so"
+    end
+  end
+end
+
 -- The quality preset, which is the one setting that sets others. Choosing it
 -- has to move the nine it has an opinion about, and each step up has to ask for
 -- at least as much as the one below.
@@ -440,9 +505,9 @@ for _, pair in ipairs(CLIENT_CVARS) do
   end
 end
 
-error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s ~ %s",
+error("QQ" .. string.format("SETTINGS %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %d ~ %s ~ %s",
                             controls, checked, written, restored, cancelled, chosen, presets,
-                            bounded, committed, cvarsReached, table.concat(expected, " "),
+                            bounded, committed, cvarsReached, searches, table.concat(expected, " "),
                             table.concat(bad, " ~ ")))
 '''
 
@@ -531,6 +596,7 @@ def main():
     bounded, _, rest = rest.partition(" ~ ")
     committed, _, rest = rest.partition(" ~ ")
     cvars, _, rest = rest.partition(" ~ ")
+    searches, _, rest = rest.partition(" ~ ")
     wanted, _, rest = rest.partition(" ~ ")
     bad = [b.strip() for b in rest.split(" ~ ") if b.strip()]
 
@@ -562,7 +628,8 @@ def main():
           f"{presets} quality presets applied, {bounded} out-of-range values "
           f"held to the row, {committed} kept by Okay against a later Cancel, "
           f"{cvars} CVar writes followed to their setting, "
-          f"{storeChecked} settings followed back to the CVar store.\n")
+          f"{storeChecked} settings followed back to the CVar store, "
+          f"{searches} searches asked and answered.\n")
     for entry in bad:
         print(f"  {entry}")
 
@@ -588,7 +655,8 @@ def main():
           "than the one below\n"
           "  a value past the end of a row is held to it\n"
           "  a CVar a Blizzard control writes reaches the setting behind it, and "
-          "a change to that setting reaches the store")
+          "a change to that setting reaches the store\n"
+          "  the search finds a setting by the word a player would type for it")
     return 0
 
 
