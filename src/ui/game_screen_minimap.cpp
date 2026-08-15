@@ -1849,9 +1849,12 @@ void GameScreen::loadSettings() {
     settingsPanel_.pendingBagScale =
         InventoryScreen::recommendedBagScale(currentDisplayHeight);
     inventoryScreen.setBagScale(settingsPanel_.pendingBagScale);
+    settingsPanel_.pendingWindowUiScale =
+        SettingsPanel::recommendedWindowScale(currentDisplayHeight);
     if (!in.is_open()) return;
 
     bool bagScaleLoaded = false;
+    bool windowScaleLoaded = false;
     std::string line;
     while (std::getline(in, line)) {
         size_t eq = line.find('=');
@@ -1869,6 +1872,7 @@ void GameScreen::loadSettings() {
                 }
             } else if (key == "window_ui_scale") {
                 settingsPanel_.pendingWindowUiScale = std::clamp(std::stof(val), 0.75f, 1.5f);
+                windowScaleLoaded = true;
             } else if (key == "minimap_rotate") {
                 // Deliberately not honoured: the saved value is read and
                 // dropped, and every run starts north-up.
@@ -2090,12 +2094,20 @@ void GameScreen::loadSettings() {
         } catch (...) {}
     }
 
-    if (!bagScaleLoaded) {
+    if (!bagScaleLoaded || !windowScaleLoaded) {
+        // The height the file turned out to hold, now that it has been read -
+        // this runs from the constructor, where there is no display to ask.
         const float defaultHeight = settingsPanel_.displaySettingsLoaded_
             ? static_cast<float>(settingsPanel_.pendingResolutionHeight)
             : currentDisplayHeight;
-        settingsPanel_.pendingBagScale = InventoryScreen::recommendedBagScale(defaultHeight);
-        inventoryScreen.setBagScale(settingsPanel_.pendingBagScale);
+        if (!bagScaleLoaded) {
+            settingsPanel_.pendingBagScale = InventoryScreen::recommendedBagScale(defaultHeight);
+            inventoryScreen.setBagScale(settingsPanel_.pendingBagScale);
+        }
+        if (!windowScaleLoaded) {
+            settingsPanel_.pendingWindowUiScale =
+                SettingsPanel::recommendedWindowScale(defaultHeight);
+        }
     }
 
     // Load keybindings from the same config file
