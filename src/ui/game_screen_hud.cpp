@@ -968,10 +968,13 @@ void GameScreen::renderQuestObjectiveTracker(game::GameHandler& gameHandler) {
     // as a plain pixel offset from the top, so a position saved on a tall
     // display puts the tracker past the bottom of a shorter one - where it is
     // drawn, invisible, and cannot be dragged back because there is nothing to
-    // take hold of. A strip of it stays reachable.
-    constexpr float kGrabStrip = 40.0f;
+    // take hold of.
+    //
+    // The whole of it is kept on, not a strip: the damage meter beside it has
+    // done that since it was made draggable, and a list of quests half off the
+    // bottom is not much better than one entirely off it.
     questTrackerPos_.y = std::clamp(questTrackerPos_.y, 0.0f,
-                                    std::max(0.0f, screenH - kGrabStrip));
+                                    std::max(0.0f, screenH - questTrackerSize_.y));
 
     // Collapsed: draw a small draggable bubble at the tracker anchor instead;
     // click (without dragging) to expand back to the full tracker
