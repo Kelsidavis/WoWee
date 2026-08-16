@@ -73,7 +73,6 @@ public:
     float& autoAttackOutOfRangeTimeRef() { return autoAttackOutOfRangeTime_; }
     float& autoAttackRangeWarnCooldownRef() { return autoAttackRangeWarnCooldown_; }
     float& autoAttackResendTimerRef() { return autoAttackResendTimer_; }
-    float& autoAttackFacingSyncTimerRef() { return autoAttackFacingSyncTimer_; }
     bool& autoAttackRetryPendingRef() { return autoAttackRetryPending_; }
 
     // Combat text creation (used by other handlers, e.g. spell handler for periodic damage)
@@ -204,7 +203,6 @@ private:
     float autoAttackOutOfRangeTime_ = 0.0f;
     float autoAttackRangeWarnCooldown_ = 0.0f;
     float autoAttackResendTimer_ = 0.0f;
-    float autoAttackFacingSyncTimer_ = 0.0f;
     std::unordered_set<uint64_t> hostileAttackers_;
     std::vector<CombatTextEntry> combatText_;
     static constexpr size_t MAX_COMBAT_LOG = 500;

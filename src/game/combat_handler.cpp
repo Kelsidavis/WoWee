@@ -342,7 +342,20 @@ void CombatHandler::startAutoAttack(uint64_t targetGuid) {
     autoAttackOutOfRange_ = false;
     autoAttackOutOfRangeTime_ = 0.0f;
     autoAttackResendTimer_ = 0.0f;
-    autoAttackFacingSyncTimer_ = 0.0f;
+    // Face the target, once, on the command to attack it - the same turn the
+    // real client makes when an attack is ordered on something behind the
+    // player. This is the only place combat turns the player: it used to be
+    // re-aimed every fifth of a second for as long as the attack lasted.
+    if (auto target = owner_.getEntityManager().getEntity(targetGuid)) {
+        const float toTargetX = target->getLatestX() - owner_.movementInfoRef().x;
+        const float toTargetY = target->getLatestY() - owner_.movementInfoRef().y;
+        if (std::abs(toTargetX) > 0.01f || std::abs(toTargetY) > 0.01f) {
+            owner_.movementInfoRef().orientation = std::atan2(-toTargetY, toTargetX);
+            if (owner_.getState() == WorldState::IN_WORLD && owner_.getSocket()) {
+                owner_.sendMovement(Opcode::MSG_MOVE_SET_FACING);
+            }
+        }
+    }
     if (owner_.getState() == WorldState::IN_WORLD && owner_.getSocket()) {
         auto packet = AttackSwingPacket::build(targetGuid);
         owner_.getSocket()->send(packet);
@@ -359,7 +372,6 @@ void CombatHandler::stopAutoAttack() {
     autoAttackOutOfRange_ = false;
     autoAttackOutOfRangeTime_ = 0.0f;
     autoAttackResendTimer_ = 0.0f;
-    autoAttackFacingSyncTimer_ = 0.0f;
     if (owner_.getState() == WorldState::IN_WORLD && owner_.getSocket()) {
         auto packet = AttackStopPacket::build();
         owner_.getSocket()->send(packet);
@@ -847,7 +859,6 @@ void CombatHandler::updateAutoAttack(float deltaTime) {
 
                 if (allowResync) {
                     autoAttackResendTimer_ += deltaTime;
-                    autoAttackFacingSyncTimer_ += deltaTime;
 
                     // Classic/Turtle servers do not tolerate steady attack-start
                     // reissues well. Only retry once after local start or an
@@ -861,26 +872,14 @@ void CombatHandler::updateAutoAttack(float deltaTime) {
                         owner_.getSocket()->send(pkt);
                     }
 
-                    // Keep server-facing aligned while trying to acquire melee.
-                    const float facingSyncInterval = classicLike ? 0.25f : 0.20f;
-                    const bool allowPeriodicFacingSync = !classicLike || !autoAttacking_;
-                    if (allowPeriodicFacingSync &&
-                        autoAttackFacingSyncTimer_ >= facingSyncInterval) {
-                        autoAttackFacingSyncTimer_ = 0.0f;
-                        float toTargetX = targetX - owner_.movementInfoRef().x;
-                        float toTargetY = targetY - owner_.movementInfoRef().y;
-                        if (std::abs(toTargetX) > 0.01f || std::abs(toTargetY) > 0.01f) {
-                            float desired = std::atan2(-toTargetY, toTargetX);
-                            float diff = desired - owner_.movementInfoRef().orientation;
-                            while (diff > static_cast<float>(M_PI)) diff -= 2.0f * static_cast<float>(M_PI);
-                            while (diff < -static_cast<float>(M_PI)) diff += 2.0f * static_cast<float>(M_PI);
-                            const float facingThreshold = classicLike ? 0.035f : 0.12f;
-                            if (std::abs(diff) > facingThreshold) {
-                                owner_.movementInfoRef().orientation = desired;
-                                owner_.sendMovement(Opcode::MSG_MOVE_SET_FACING);
-                            }
-                        }
-                    }
+                    // No periodic facing sync. The player is turned to face the
+                    // target once, where the attack is commanded, and after
+                    // that their facing is theirs: turning away mid-fight
+                    // means the swing misses, which is what it means in the
+                    // real client. Re-aiming them every fifth of a second so
+                    // the server would accept the swing fought the mouse for
+                    // the whole fight and made it impossible to back away from
+                    // something while attacked by it.
                 }
             }
         }
@@ -914,7 +913,6 @@ void CombatHandler::resetAllCombatState() {
     autoAttackOutOfRangeTime_ = 0.0f;
     autoAttackRangeWarnCooldown_ = 0.0f;
     autoAttackResendTimer_ = 0.0f;
-    autoAttackFacingSyncTimer_ = 0.0f;
     lastMeleeSwingMs_ = 0;
 }
 
