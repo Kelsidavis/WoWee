@@ -1,10 +1,14 @@
 # Build directories
 build/
 build_asan/
+build-asan/
 build-debug/
 build-sanitize/
 bin/
 lib/
+
+# ctest writes its transcript here when run from the repo root.
+Testing/
 
 # CMake
 CMakeCache.txt
