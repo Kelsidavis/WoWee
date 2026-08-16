@@ -503,10 +503,10 @@ void M2Renderer::renderM2Ribbons(VkCommandBuffer cmd, VkDescriptorSet perFrameSe
             size_t spellRibbonVerts = 0;
             for (const auto& inst : instances) {
                 if (!inst.cachedModel || !inst.cachedModel->isSpellEffect) continue;
-                for (size_t ri = 0; ri < inst.ribbonEdges.size(); ri++) {
-                    if (inst.ribbonEdges[ri].size() >= 2) {
+                for (const auto& ribbonEdge : inst.ribbonEdges) {
+                    if (ribbonEdge.size() >= 2) {
                         spellRibbonDraws++;
-                        spellRibbonVerts += inst.ribbonEdges[ri].size() * 2;
+                        spellRibbonVerts += ribbonEdge.size() * 2;
                     }
                 }
             }

@@ -62,9 +62,9 @@ void ExplorationState::update(const std::vector<Zone>& zones,
             for (int oi = 0; oi < static_cast<int>(curZoneData.overlays.size()); oi++) {
                 const auto& ov = curZoneData.overlays[oi];
                 bool revealed = false;
-                for (int a = 0; a < 4; a++) {
-                    if (ov.areaIDs[a] == 0) continue;
-                    auto flagIt = exploreFlagByAreaId.find(ov.areaIDs[a]);
+                for (unsigned int areaID : ov.areaIDs) {
+                    if (areaID == 0) continue;
+                    auto flagIt = exploreFlagByAreaId.find(areaID);
                     if (flagIt != exploreFlagByAreaId.end() && isBitSet(flagIt->second)) {
                         revealed = true;
                         break;

@@ -190,8 +190,7 @@ void DataRepository::loadZones(const std::string& mapName,
     }
 
     // Derive continent bounds from child zones if missing
-    for (int ci = 0; ci < static_cast<int>(zones_.size()); ci++) {
-        auto& cont = zones_[ci];
+    for (auto& cont : zones_) {
         if (cont.areaID != 0) continue;
         if (std::abs(cont.bounds.locLeft) > 0.001f || std::abs(cont.bounds.locRight) > 0.001f ||
             std::abs(cont.bounds.locTop) > 0.001f || std::abs(cont.bounds.locBottom) > 0.001f)
@@ -450,8 +449,8 @@ int DataRepository::zoneIndexForAreaId(uint32_t areaId) const {
     // For now, iterate zones looking for one whose overlays reference this areaId.
     for (int i = 0; i < static_cast<int>(zones_.size()); i++) {
         for (const auto& ov : zones_[i].overlays) {
-            for (int j = 0; j < 4; j++) {
-                if (ov.areaIDs[j] == areaId) return i;
+            for (uint32_t ovAreaId : ov.areaIDs) {
+                if (ovAreaId == areaId) return i;
             }
         }
     }

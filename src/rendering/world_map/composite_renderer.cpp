@@ -98,14 +98,14 @@ bool CompositeRenderer::initialize(VkContext* ctx, pipeline::AssetManager* am) {
     vkAllocateDescriptorSets(device, &allocInfo, allSets.data());
 
     uint32_t si = 0;
-    for (int f = 0; f < 2; f++)
+    for (auto& tileRow : tileDescSets)
         for (int t = 0; t < 12; t++)
-            tileDescSets[f][t] = allSets[si++];
+            tileRow[t] = allSets[si++];
     imguiDisplaySet = allSets[si++];
     fogDescSet_ = allSets[si++];
-    for (int f = 0; f < 2; f++)
+    for (auto& overlayRow : overlayDescSets_)
         for (uint32_t t = 0; t < MAX_OVERLAY_TILES; t++)
-            overlayDescSets_[f][t] = allSets[si++];
+            overlayRow[t] = allSets[si++];
 
     // --- Write display descriptor set → composite render target ---
     VkDescriptorImageInfo compositeImgInfo = compositeTarget->descriptorInfo();
@@ -376,8 +376,8 @@ bool CompositeRenderer::hasAnyTile(int zoneIdx) const {
     if (zoneIdx < 0 || zoneIdx >= static_cast<int>(zoneTextureSlots_.size()))
         return false;
     const auto& slots = zoneTextureSlots_[zoneIdx];
-    for (int i = 0; i < 12; i++) {
-        if (slots.tileTextures[i] != nullptr) return true;
+    for (auto tileTexture : slots.tileTextures) {
+        if (tileTexture != nullptr) return true;
     }
     return false;
 }

@@ -345,7 +345,7 @@ bool Renderer::createPerFrameResources() {
         reflPerFrameUBOMapped = mapInfo.pMappedData;
 
         VkDescriptorSetLayout layouts[MAX_FRAMES];
-        for (uint32_t i = 0; i < MAX_FRAMES; i++) layouts[i] = perFrameSetLayout;
+        for (auto& layout : layouts) layout = perFrameSetLayout;
 
         VkDescriptorSetAllocateInfo setAlloc{};
         setAlloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -3073,10 +3073,10 @@ void Renderer::destroySecondaryCommandResources() {
     vkDeviceWaitIdle(device);
 
     // Secondary buffers are freed when their pool is destroyed
-    for (uint32_t w = 0; w < NUM_WORKERS; ++w) {
-        if (workerCmdPools_[w]) {
-            vkDestroyCommandPool(device, workerCmdPools_[w], nullptr);
-            workerCmdPools_[w] = VK_NULL_HANDLE;
+    for (auto& workerCmdPool : workerCmdPools_) {
+        if (workerCmdPool) {
+            vkDestroyCommandPool(device, workerCmdPool, nullptr);
+            workerCmdPool = VK_NULL_HANDLE;
         }
     }
     if (mainSecondaryCmdPool_) {

@@ -387,7 +387,7 @@ bool CharacterRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFram
     // --- Descriptor pools ---
     // Material descriptors are transient and allocated every draw; keep per-frame
     // pools so we can reset safely each frame slot without exhausting descriptors.
-    for (int i = 0; i < 2; i++) {
+    for (auto& materialDescPool : materialDescPools_) {
         VkDescriptorPoolSize sizes[] = {
             {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = MAX_MATERIAL_SETS * 2},  // diffuse + normal/height
             {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .descriptorCount = MAX_MATERIAL_SETS},
@@ -397,7 +397,7 @@ bool CharacterRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFram
         ci.poolSizeCount = 2;
         ci.pPoolSizes = sizes;
         ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-        vkCreateDescriptorPool(device, &ci, nullptr, &materialDescPools_[i]);
+        vkCreateDescriptorPool(device, &ci, nullptr, &materialDescPool);
     }
     {
         VkDescriptorPoolSize sizes[] = {
@@ -566,8 +566,8 @@ void CharacterRenderer::shutdown() {
     }
 
     // Destroy descriptor pools and layouts
-    for (int i = 0; i < 2; i++) {
-        destroy(device, materialDescPools_[i]);
+    for (auto& materialDescPool : materialDescPools_) {
+        destroy(device, materialDescPool);
     }
     if (boneDescPool_) {
         if (boneDescPoolGeneration_) boneDescPoolGeneration_->fetch_add(1, std::memory_order_relaxed);
@@ -653,14 +653,14 @@ void CharacterRenderer::clear() {
     instances.clear();
 
     // Reset material ring buffer offsets (buffers persist, just reset write position)
-    for (int i = 0; i < 2; i++) {
-        materialRingOffset_[i] = 0;
+    for (uint32_t& offset : materialRingOffset_) {
+        offset = 0;
     }
 
     // Reset descriptor pools (don't destroy - reuse for new allocations)
-    for (int i = 0; i < 2; i++) {
-        if (materialDescPools_[i]) {
-            vkResetDescriptorPool(device, materialDescPools_[i], 0);
+    for (auto& materialDescPool : materialDescPools_) {
+        if (materialDescPool) {
+            vkResetDescriptorPool(device, materialDescPool, 0);
         }
     }
     if (boneDescPool_) {

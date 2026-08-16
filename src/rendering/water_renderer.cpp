@@ -279,8 +279,7 @@ void WaterRenderer::setRefractionEnabled(bool enabled) {
     // detects "no data" and uses the non-refraction path.
     if (!enabled && vkCtx) {
         vkCtx->immediateSubmit([&](VkCommandBuffer cmd) {
-            for (uint32_t f = 0; f < SCENE_HISTORY_FRAMES; f++) {
-                auto& sh = sceneHistory[f];
+            for (auto& sh : sceneHistory) {
                 if (!sh.colorImage) continue;
 
                 VkImageMemoryBarrier toTransfer{};
@@ -544,19 +543,19 @@ void WaterRenderer::createSceneHistoryResources(VkExtent2D extent, VkFormat colo
     // Initialize all per-frame history images to shader-read layout
     vkCtx->immediateSubmit([&](VkCommandBuffer cmd) {
         std::vector<VkImageMemoryBarrier> barriers;
-        for (uint32_t f = 0; f < SCENE_HISTORY_FRAMES; f++) {
+        for (auto& sh : sceneHistory) {
             VkImageMemoryBarrier b{};
             b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             b.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             b.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            b.image = sceneHistory[f].colorImage;
+            b.image = sh.colorImage;
             b.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
             b.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             barriers.push_back(b);
 
-            b.image = sceneHistory[f].depthImage;
+            b.image = sh.depthImage;
             b.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
             barriers.push_back(b);
         }

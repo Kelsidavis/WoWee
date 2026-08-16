@@ -55,22 +55,20 @@ static constexpr MapFolderEntry kMapFolders[] = {
     { 724, "TheRubySanctum",       "Ruby Sanctum"              },
 };
 
-static constexpr int kMapFolderCount = sizeof(kMapFolders) / sizeof(kMapFolders[0]);
-
 // ── Map folder lookup functions ──────────────────────────────
 
 const char* mapIdToFolder(uint32_t mapId) {
-    for (int i = 0; i < kMapFolderCount; i++) {
-        if (kMapFolders[i].mapId == mapId)
-            return kMapFolders[i].folder;
+    for (const auto& mapFolder : kMapFolders) {
+        if (mapFolder.mapId == mapId)
+            return mapFolder.folder;
     }
     return "";
 }
 
 int folderToMapId(const std::string& folder) {
-    for (int i = 0; i < kMapFolderCount; i++) {
+    for (const auto& mapFolder : kMapFolders) {
         // Case-insensitive compare
-        const char* entry = kMapFolders[i].folder;
+        const char* entry = mapFolder.folder;
         if (folder.size() != std::char_traits<char>::length(entry)) continue;
         bool match = true;
         for (size_t j = 0; j < folder.size(); j++) {
@@ -80,15 +78,15 @@ int folderToMapId(const std::string& folder) {
                 break;
             }
         }
-        if (match) return static_cast<int>(kMapFolders[i].mapId);
+        if (match) return static_cast<int>(mapFolder.mapId);
     }
     return -1;
 }
 
 const char* mapDisplayName(uint32_t mapId) {
-    for (int i = 0; i < kMapFolderCount; i++) {
-        if (kMapFolders[i].mapId == mapId)
-            return kMapFolders[i].displayName;
+    for (const auto& mapFolder : kMapFolders) {
+        if (mapFolder.mapId == mapId)
+            return mapFolder.displayName;
     }
     return nullptr;
 }

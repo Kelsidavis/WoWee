@@ -63,10 +63,10 @@ void SubzoneTooltipLayer::render(const LayerContext& ctx) {
         if (area < bestArea) {
             bestArea = area;
             // Find display name from the first valid area ID
-            for (int a = 0; a < 4; a++) {
-                if (ov.areaIDs[a] == 0) continue;
+            for (unsigned int areaID : ov.areaIDs) {
+                if (areaID == 0) continue;
                 if (ctx.areaNameByAreaId) {
-                    auto nameIt = ctx.areaNameByAreaId->find(ov.areaIDs[a]);
+                    auto nameIt = ctx.areaNameByAreaId->find(areaID);
                     if (nameIt != ctx.areaNameByAreaId->end()) {
                         hoveredName = nameIt->second;
                         break;

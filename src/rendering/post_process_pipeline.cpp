@@ -1316,7 +1316,7 @@ void PostProcessPipeline::destroyFSR2Resources() {
     fsr2_.nearestSampler = VK_NULL_HANDLE; // Owned by VkContext sampler cache
 
     destroyImage(device, alloc, fsr2_.motionVectors);
-    for (int i = 0; i < 2; i++) destroyImage(device, alloc, fsr2_.history[i]);
+    for (auto& img : fsr2_.history) destroyImage(device, alloc, img);
     destroyImage(device, alloc, fsr2_.framegenOutput);
     destroyImage(device, alloc, fsr2_.sceneDepth);
     destroyImage(device, alloc, fsr2_.sceneColor);
@@ -1719,7 +1719,7 @@ bool PostProcessPipeline::initFXAAResources() {
     vkCreateDescriptorPool(device, &poolInfo, nullptr, &fxaa_.descPool);
 
     VkDescriptorSetLayout layouts[setCount];
-    for (uint32_t i = 0; i < setCount; i++) layouts[i] = fxaa_.descSetLayout;
+    for (auto& layout : layouts) layout = fxaa_.descSetLayout;
     VkDescriptorSetAllocateInfo dsAllocInfo{};
     dsAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     dsAllocInfo.descriptorPool = fxaa_.descPool;
@@ -1732,10 +1732,10 @@ bool PostProcessPipeline::initFXAAResources() {
     imgInfo.sampler = fxaa_.sceneSampler;
     imgInfo.imageView = fxaa_.sceneColor.imageView;
     imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    for (uint32_t i = 0; i < setCount; i++) {
+    for (auto& descSet : fxaa_.descSet) {
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = fxaa_.descSet[i];
+        write.dstSet = descSet;
         write.dstBinding = 0;
         write.descriptorCount = 1;
         write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

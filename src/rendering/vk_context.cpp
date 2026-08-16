@@ -124,9 +124,9 @@ void VkContext::shutdown() {
     // vkFreeDescriptorSets on invalid pools.  vkDestroyDevice reclaims all
     // device-child resources anyway.
     size_t droppedCleanups = 0;
-    for (uint32_t fi = 0; fi < MAX_FRAMES_IN_FLIGHT; fi++) {
-        droppedCleanups += deferredCleanup_[fi].size();
-        deferredCleanup_[fi].clear();
+    for (auto& cleanups : deferredCleanup_) {
+        droppedCleanups += cleanups.size();
+        cleanups.clear();
     }
     // Said out loud, because these are exactly the objects vkDestroyDevice then
     // reports as leaked, and without the count there is no way to tell that
@@ -294,8 +294,8 @@ void VkContext::deferAfterAllFrameFences(std::function<void()>&& fn) {
     // after the LAST slot has been fenced.
     auto counter  = std::make_shared<uint32_t>(MAX_FRAMES_IN_FLIGHT);
     auto sharedFn = std::make_shared<std::function<void()>>(std::move(fn));
-    for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        deferredCleanup_[i].emplace_back([counter, sharedFn]() {
+    for (auto& cleanups : deferredCleanup_) {
+        cleanups.emplace_back([counter, sharedFn]() {
             if (--(*counter) == 0) {
                 (*sharedFn)();
             }
