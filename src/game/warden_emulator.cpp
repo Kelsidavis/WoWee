@@ -594,7 +594,6 @@ bool WardenEmulator::writeMemory(uint32_t, const void*, size_t) { return false; 
 std::string WardenEmulator::readString(uint32_t, size_t) { return {}; }
 uint32_t WardenEmulator::allocateMemory(size_t, uint32_t) { return 0; }
 bool WardenEmulator::freeMemory(uint32_t) { return false; }
-uint32_t WardenEmulator::getRegister(int) { return 0; }
 void WardenEmulator::setupCommonAPIHooks() {}
 uint32_t WardenEmulator::getAPIAddress(const std::string&, const std::string&) const { return 0; }
 uint32_t WardenEmulator::writeData(const void*, size_t) { return 0; }
