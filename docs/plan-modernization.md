@@ -1,6 +1,6 @@
 # Codebase Modernization — Phased Plan
 
-**Status:** Phases 0–1 complete and on `master`. Next: Phase 2.
+**Status:** Phases 0–2 complete (Phase 2 cancelled on evidence). Next: Phase 3 (`std::span`).
 **Branch:** `master`. Phase 1 was done on `chore/modernization` and pushed to `master` as
 `7b9d4a93d..2b5628a0f`; later phases continue directly on `master`.
 **Scope:** code quality and modernity, codebase-wide. Not a performance effort. Where a phase
@@ -117,12 +117,26 @@ project-specific — a PCH pulling in `game_handler.hpp` would make incremental 
 
 **Exit:** clean-build wall time recorded before/after in §5. Revert if it does not improve.
 
-### Phase 2 — Split the compile-time anchors
-`game_handler.hpp` (5013 lines, 57 includers) and `world_packets.hpp` (3387). Split by concern,
-move implementation detail out of headers, forward-declare where possible. Purely mechanical, no
-behaviour change, guarded by 89 test suites.
+### Phase 2 — ~~Split the compile-time anchors~~ **CANCELLED — measured, not worth it**
+The original plan was to split `game_handler.hpp` (5013 lines, 57 includers) and
+`world_packets.hpp` (3387) to cut compile time. Measuring preprocessed output killed it:
 
-**Exit:** both under ~1500 lines, incremental rebuild time after touching each recorded in §5.
+| translation unit | preprocessed lines |
+|---|---|
+| includes `game_handler.hpp` | 133,121 |
+| the stdlib + glm it includes, alone | 115,278 |
+| **all 19 project headers, combined** | **17,843 (13%)** |
+
+Splitting 5000 lines of declarations chases 13% of the cost, and the declarations still have to
+exist somewhere. The 87% is the standard library, which a PCH removes for free — done in
+`d938a41b0`.
+
+Line count was the wrong metric. `wc -l` on a header says nothing about what it costs to compile;
+`c++ -E` does. **If a future phase proposes splitting a header for build speed, measure first.**
+
+Splitting `game_handler.hpp` may still be worth doing for *readability* — a 5000-line class is
+hard to reason about — but that is a decomposition argument, not a compile-time one, and it should
+be justified on its own terms.
 
 ### Phase 3 — `std::span` across buffer and packet boundaries
 The highest safety-per-line item here. Replace `(ptr, length)` parameter pairs with `std::span`,
@@ -277,3 +291,28 @@ Written down so they are not re-proposed every time someone reads a blog post.
     redundancy can be invisible until the representation under it changes.
   - Checking a *running* build's log for `error:` proves nothing — it returned 0 at 29% and at
     92% of a build that failed at 98%. Gate on the exit code, never on a grep of a live log.
+
+- **Phase 1b / Phase 2** — Done: `d938a41b0` (measured PCH), `23e4048fd` (sanitizer coverage).
+  Phase 2 as written was **cancelled on evidence** — see above.
+
+  Cumulative against the pre-work baseline:
+
+  | | baseline | now |
+  |---|---|---|
+  | clean build, wall | 1:56.61 | **1:31.05** (−22%) |
+  | clean build, user CPU | 1229.51 s | **941.23 s** (−23%) |
+  | tests | 156/156 | 156/156 |
+
+  Findings:
+  - The first PCH list was picked by counting include-list appearances and missed every one of
+    the expensive headers. `<chrono>` alone is 89k preprocessed lines; glm 89k; `<future>` 87k.
+    Adding them took user CPU 969.1 s → 945.2 s.
+  - A PCH on the **test** targets was tried and removed: ~140 executables each generating their
+    own PCH cost slightly more than it saved (950.8 s vs 945.2 s). The main target wins because
+    it is one target over 413 objects; the tests are the opposite shape. Measured, reverted,
+    and recorded in the file so it is not re-attempted.
+  - **Bug found: `./test.sh --asan` was sanitizing only two thirds of the suite.** The ASAN
+    block iterates `ALL_TEST_TARGETS` from mid-file, and 47 tests are declared below it. Those
+    built uninstrumented and reported as passing. Any CMake loop over a list that is still being
+    appended to belongs at the end of the file — the same positional bug could recur with any
+    future `foreach` over that list.
