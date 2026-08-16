@@ -1,4 +1,6 @@
 #include "network/packet.hpp"
+
+#include <bit>
 #include <cstring>
 #include <utility>
 
@@ -35,9 +37,7 @@ void Packet::writeUInt64(uint64_t value) {
 }
 
 void Packet::writeFloat(float value) {
-    uint32_t bits = 0;
-    std::memcpy(&bits, &value, sizeof(float));
-    writeUInt32(bits);
+    writeUInt32(std::bit_cast<uint32_t>(value));
 }
 
 void Packet::writeString(const std::string& value) {
@@ -79,11 +79,7 @@ uint64_t Packet::readUInt64() {
 }
 
 float Packet::readFloat() {
-    // Read as uint32 and reinterpret as float
-    uint32_t bits = readUInt32();
-    float value;
-    std::memcpy(&value, &bits, sizeof(float));
-    return value;
+    return std::bit_cast<float>(readUInt32());
 }
 
 uint64_t Packet::readPackedGuid() {

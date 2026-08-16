@@ -15,6 +15,7 @@
 #include "network/world_socket.hpp"
 #include "rendering/animation_controller.hpp"
 #include <algorithm>
+#include <bit>
 #include <cstring>
 #include <zlib.h>
 
@@ -652,12 +653,11 @@ void EntityController::detectPlayerMountChange(uint32_t newMountDisplayId,
 }
 
 namespace {
-/// A float field arrives as the raw uint32 its bits spell. The same memcpy the
-/// scale fields use, named once rather than written out at each of them.
+/// A float field arrives as the raw uint32 its bits spell. Named once rather
+/// than written out at each of the scale fields -- which two of them still
+/// did, in memcpy form, until this was pointed at them.
 float bitsToFloat(uint32_t raw) {
-    float f = 0.0f;
-    std::memcpy(&f, &raw, sizeof(f));
-    return f;
+    return std::bit_cast<float>(raw);
 }
 }  // namespace
 
@@ -1626,7 +1626,7 @@ void EntityController::dispatchEntitySpawn(uint64_t guid, ObjectType objectType,
             // Keep the default 1.0f rather than setting scale to 0 and making the entity invisible.
             uint32_t raw = entity->getField(scaleIdx);
             if (raw != 0) {
-                std::memcpy(&unitScale, &raw, sizeof(float));
+                unitScale = bitsToFloat(raw);
                 if (unitScale <= 0.01f || unitScale > 100.0f) unitScale = 1.0f;
             }
         }
@@ -2114,7 +2114,7 @@ void EntityController::onCreateGameObject(const UpdateBlock& block, std::shared_
             if (scaleIdx != 0xFFFF) {
                 uint32_t raw = entity->getField(scaleIdx);
                 if (raw != 0) {
-                    std::memcpy(&goScale, &raw, sizeof(float));
+                    goScale = bitsToFloat(raw);
                     if (goScale <= 0.01f || goScale > 100.0f) goScale = 1.0f;
                 }
             }

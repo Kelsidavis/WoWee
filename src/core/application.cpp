@@ -16,6 +16,7 @@
 #include "game/spell_classification.hpp"
 #include "rendering/animation/animation_ids.hpp"
 #include "rendering/animation_controller.hpp"
+#include <bit>
 #include <unordered_set>
 #include <cmath>
 #include <chrono>
@@ -3331,7 +3332,7 @@ void Application::updateInGame(float deltaTime, const char*& updateCheckpoint) {
                         uint32_t raw = unit->getField(si);
                         if (raw != 0) {
                             float s2 = 1.0f;
-                            std::memcpy(&s2, &raw, sizeof(float));
+                            s2 = std::bit_cast<float>(raw);
                             if (s2 > 0.01f && s2 < 100.0f) retryScale = s2;
                         }
                     }
