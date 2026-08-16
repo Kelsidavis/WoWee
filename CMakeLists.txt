@@ -1186,6 +1186,30 @@ target_include_directories(wowee PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_BINARY_DIR}/generated
 )
+
+# Precompiled header.
+#
+# Only what is both heavy and near-universal: <cstdint> appears in 330 of this
+# project's headers, <string> in 312, <vector> in 306, and logger.hpp is
+# included by 170 translation units. Everything here is parsed by most of the
+# 400-odd sources whether it is precompiled or not.
+#
+# Deliberately no project headers beyond the logger. Putting a widely-included
+# but frequently-edited header (game_handler.hpp, renderer.hpp) in a PCH makes
+# every edit to it a full rebuild, which costs more than the parsing it saves.
+# logger.hpp qualifies because it is stable - it is a logging macro façade that
+# has no reason to churn.
+target_precompile_headers(wowee PRIVATE
+    <cstdint>
+    <cstddef>
+    <string>
+    <vector>
+    <memory>
+    <unordered_map>
+    <functional>
+    <algorithm>
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/logger.hpp
+)
 # Vendored headers as SYSTEM to suppress third-party warnings
 target_include_directories(wowee SYSTEM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/extern
