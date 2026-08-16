@@ -25,10 +25,8 @@ macro(register_test_target _target)
     endif()
 endmacro()
 
-# Shared source files used across multiple tests
-set(TEST_COMMON_SOURCES
-    ${CMAKE_SOURCE_DIR}/src/core/logger.cpp
-)
+# Shared source files used across multiple tests: see wowee_test_common below,
+# defined once TEST_INCLUDE_DIRS exists.
 
 # Include directories matching the main target
 # GLM, resolved the three ways find_package can present it.
@@ -62,6 +60,26 @@ set(TEST_INCLUDE_DIRS
 set(TEST_SYSTEM_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/extern
 )
+
+# Shared sources every test may opt into, compiled once.
+#
+# These used to be a plain source list spliced into each test's add_executable,
+# which meant one object file per test that asked for it: logger.cpp alone was
+# compiled 112 times in a clean build. An OBJECT library builds it once and the
+# generator expression below splices the same object into each executable, so
+# every existing ${TEST_COMMON_SOURCES} call site keeps working untouched.
+#
+# It stays a source-list-shaped variable rather than a link library on purpose.
+# The opt-in property the wowee_add_test comment relies on - that a test which
+# does not ask for the logger fails to link if its subject starts using one -
+# only survives while omitting the variable omits the symbols.
+add_library(wowee_test_common OBJECT
+    ${CMAKE_SOURCE_DIR}/src/core/logger.cpp
+)
+target_include_directories(wowee_test_common PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(wowee_test_common SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
+target_compile_features(wowee_test_common PRIVATE cxx_std_20)
+set(TEST_COMMON_SOURCES $<TARGET_OBJECTS:wowee_test_common>)
 
 # Helper: a test executable with the scaffolding every one of them wants.
 #
@@ -201,7 +219,7 @@ register_test_target(test_framexml)
 add_executable(test_framexml_takeover
     test_framexml_takeover.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/framexml_takeover.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/logger.cpp
+    ${TEST_COMMON_SOURCES}
 )
 target_include_directories(test_framexml_takeover PRIVATE ${TEST_INCLUDE_DIRS})
 target_include_directories(test_framexml_takeover SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
@@ -458,7 +476,6 @@ add_executable(test_m2_ribbon_tracks
     test_m2_ribbon_tracks.cpp
     ${TEST_COMMON_SOURCES}
     ${CMAKE_SOURCE_DIR}/src/pipeline/m2_loader.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/logger.cpp
 )
 target_include_directories(test_m2_ribbon_tracks PRIVATE ${TEST_INCLUDE_DIRS})
 target_include_directories(test_m2_ribbon_tracks SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
@@ -501,8 +518,7 @@ wowee_add_test(test_spline_body
     SOURCES test_spline_body.cpp
             ${TEST_COMMON_SOURCES}
             ${CMAKE_SOURCE_DIR}/src/game/spline_packet.cpp
-            ${CMAKE_SOURCE_DIR}/src/network/packet.cpp
-            ${CMAKE_SOURCE_DIR}/src/core/logger.cpp)
+            ${CMAKE_SOURCE_DIR}/src/network/packet.cpp)
 
 # ── test_spline ──────────────────────────────────────────────
 wowee_add_test(test_spline
@@ -510,8 +526,7 @@ wowee_add_test(test_spline
             ${TEST_COMMON_SOURCES}
             ${CMAKE_SOURCE_DIR}/src/math/spline.cpp
             ${CMAKE_SOURCE_DIR}/src/game/spline_packet.cpp
-            ${CMAKE_SOURCE_DIR}/src/network/packet.cpp
-            ${CMAKE_SOURCE_DIR}/src/core/logger.cpp)
+            ${CMAKE_SOURCE_DIR}/src/network/packet.cpp)
 
 # ── test_transport_path_repo ─────────────────────────────────
 wowee_add_test(test_transport_path_repo
@@ -747,7 +762,7 @@ wowee_add_test(test_m2_structs
 add_executable(test_m2_color_alpha
     test_m2_color_alpha.cpp
     ${CMAKE_SOURCE_DIR}/src/pipeline/m2_loader.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/logger.cpp
+    ${TEST_COMMON_SOURCES}
 )
 target_include_directories(test_m2_color_alpha PRIVATE ${TEST_INCLUDE_DIRS})
 target_include_directories(test_m2_color_alpha SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
@@ -764,7 +779,7 @@ register_test_target(test_m2_color_alpha)
 add_executable(test_m2_footstep_events
     test_m2_footstep_events.cpp
     ${CMAKE_SOURCE_DIR}/src/pipeline/m2_loader.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/logger.cpp
+    ${TEST_COMMON_SOURCES}
 )
 target_include_directories(test_m2_footstep_events PRIVATE ${TEST_INCLUDE_DIRS})
 target_include_directories(test_m2_footstep_events SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
@@ -1059,7 +1074,7 @@ wowee_add_test(test_open_formats
             ${CMAKE_SOURCE_DIR}/src/pipeline/wowee_collision.cpp
             ${CMAKE_SOURCE_DIR}/src/pipeline/wowee_terrain_loader.cpp
             ${CMAKE_SOURCE_DIR}/src/pipeline/wmo_loader.cpp
-            ${CMAKE_SOURCE_DIR}/src/core/logger.cpp)
+            ${TEST_COMMON_SOURCES})
 
 # ── test_open_format_emitter ─────────────────────────────────
 # Locks in the asset_extract → wowee open-format conversion path.
@@ -1074,7 +1089,7 @@ add_executable(test_open_format_emitter
     ${CMAKE_SOURCE_DIR}/src/pipeline/wowee_model.cpp
     ${CMAKE_SOURCE_DIR}/src/pipeline/wowee_building.cpp
     ${CMAKE_SOURCE_DIR}/src/pipeline/wowee_collision.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/logger.cpp
+    ${TEST_COMMON_SOURCES}
 )
 target_include_directories(test_open_format_emitter PRIVATE
     ${TEST_INCLUDE_DIRS}
@@ -1093,7 +1108,7 @@ register_test_target(test_open_format_emitter)
 wowee_add_test(test_camera
     SOURCES test_camera.cpp
             ${CMAKE_SOURCE_DIR}/src/rendering/camera.cpp
-            ${CMAKE_SOURCE_DIR}/src/core/logger.cpp)
+            ${TEST_COMMON_SOURCES})
 
 # ── test_gltf_terrain_bin ────────────────────────────────────
 # The BIN chunk of a terrain .glb, packed byte for byte by two exporters.
@@ -1123,7 +1138,7 @@ add_executable(test_editor_units
     ${CMAKE_SOURCE_DIR}/tools/editor/content_pack.cpp
     ${CMAKE_SOURCE_DIR}/tools/editor/editor_brush.cpp
     ${CMAKE_SOURCE_DIR}/tools/editor/object_placer.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/logger.cpp
+    ${TEST_COMMON_SOURCES}
 )
 target_include_directories(test_editor_units PRIVATE
     ${TEST_INCLUDE_DIRS}
@@ -1145,7 +1160,7 @@ register_test_target(test_editor_units)
 add_executable(test_expansion_profile
     test_expansion_profile.cpp
     ${CMAKE_SOURCE_DIR}/src/game/expansion_profile.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/logger.cpp
+    ${TEST_COMMON_SOURCES}
 )
 target_include_directories(test_expansion_profile PRIVATE ${TEST_INCLUDE_DIRS})
 target_include_directories(test_expansion_profile SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
@@ -1249,7 +1264,7 @@ wowee_add_packet_test(test_quest_rewards)
 add_executable(test_inventory_sort
     test_inventory_sort.cpp
     ${CMAKE_SOURCE_DIR}/src/game/inventory.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/logger.cpp
+    ${TEST_COMMON_SOURCES}
 )
 target_include_directories(test_inventory_sort PRIVATE ${TEST_INCLUDE_DIRS})
 target_include_directories(test_inventory_sort SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
@@ -1276,6 +1291,11 @@ if(WOWEE_ENABLE_ASAN AND NOT MSVC)
     # catch2_main must also be compiled with the same flags
     target_compile_options(catch2_main PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
     target_link_options(catch2_main PRIVATE -fsanitize=address,undefined)
+    # ...and so must wowee_test_common, for the same reason: its objects are
+    # linked straight into the sanitized test executables, and mixing
+    # instrumented and uninstrumented objects is how ASAN starts reporting
+    # nonsense.
+    target_compile_options(wowee_test_common PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
     message(STATUS "Test targets: ASAN + UBSan ENABLED")
 endif()
 
