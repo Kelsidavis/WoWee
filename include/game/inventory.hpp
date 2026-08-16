@@ -259,7 +259,6 @@ public:
 
     const ItemSlot& getBankBagSlot(int bagIndex, int slotIndex) const;
     bool setBankBagSlot(int bagIndex, int slotIndex, const ItemDef& item);
-    bool clearBankBagSlot(int bagIndex, int slotIndex);
     int getBankBagSize(int bagIndex) const;
     void setBankBagSize(int bagIndex, int size);
     const ItemSlot& getBankBagItem(int bagIndex) const;

@@ -511,59 +511,8 @@ void InventoryScreen::pickupFromKeyring(game::Inventory& inv, int index) {
     inventoryDirty = true;
 }
 
-void InventoryScreen::pickupFromBank(game::Inventory& inv, int bankIndex) {
-    const auto& slot = inv.getBankSlot(bankIndex);
-    if (slot.empty()) return;
-    holdingItem = true;
-    heldItem = slot.item;
-    playPickupSoundFor(heldItem);
-    heldSource = HeldSource::BANK;
-    heldBankIndex = bankIndex;
-    heldBackpackIndex = -1;
-    heldBagIndex = -1;
-    heldBagSlotIndex = -1;
-    heldBankBagIndex = -1;
-    heldBankBagSlotIndex = -1;
-    heldEquipSlot = game::EquipSlot::NUM_SLOTS;
-    inv.clearBankSlot(bankIndex);
-    inventoryDirty = true;
-}
 
-void InventoryScreen::pickupFromBankBag(game::Inventory& inv, int bagIndex, int slotIndex) {
-    const auto& slot = inv.getBankBagSlot(bagIndex, slotIndex);
-    if (slot.empty()) return;
-    holdingItem = true;
-    heldItem = slot.item;
-    playPickupSoundFor(heldItem);
-    heldSource = HeldSource::BANK_BAG;
-    heldBankBagIndex = bagIndex;
-    heldBankBagSlotIndex = slotIndex;
-    heldBankIndex = -1;
-    heldBackpackIndex = -1;
-    heldBagIndex = -1;
-    heldBagSlotIndex = -1;
-    heldEquipSlot = game::EquipSlot::NUM_SLOTS;
-    inv.clearBankBagSlot(bagIndex, slotIndex);
-    inventoryDirty = true;
-}
 
-void InventoryScreen::pickupFromBankBagEquip(game::Inventory& inv, int bagIndex) {
-    const auto& slot = inv.getBankBagItem(bagIndex);
-    if (slot.empty()) return;
-    holdingItem = true;
-    heldItem = slot.item;
-    playPickupSoundFor(heldItem);
-    heldSource = HeldSource::BANK_BAG_EQUIP;
-    heldBankBagIndex = bagIndex;
-    heldBankBagSlotIndex = -1;
-    heldBankIndex = -1;
-    heldBackpackIndex = -1;
-    heldBagIndex = -1;
-    heldBagSlotIndex = -1;
-    heldEquipSlot = game::EquipSlot::NUM_SLOTS;
-    inv.setBankBagItem(bagIndex, game::ItemDef{});
-    inventoryDirty = true;
-}
 
 bool InventoryScreen::heldItemWireSource(uint8_t& srcBag, uint8_t& srcSlot) const {
     srcBag = 0xFF;
@@ -967,21 +916,6 @@ bool InventoryScreen::dropHeldItemToEquipSlot(game::Inventory& inv, game::EquipS
     return !holdingItem;
 }
 
-void InventoryScreen::dropIntoBankSlot(game::GameHandler& /*gh*/, uint8_t dstBag, uint8_t dstSlot) {
-    if (!holdingItem || !gameHandler_) return;
-    uint8_t srcBag = 0xFF;
-    uint8_t srcSlot = 0;
-    if (!heldItemWireSource(srcBag, srcSlot)) return;
-    // Same source and dest - just cancel pickup (restore item locally).
-    // Server ignores same-slot swaps so no rebuild would run, losing the item data.
-    if (srcBag == dstBag && srcSlot == dstSlot) {
-        cancelPickup(gameHandler_->getInventory());
-        return;
-    }
-    gameHandler_->swapContainerItems(srcBag, srcSlot, dstBag, dstSlot);
-    holdingItem = false;
-    inventoryDirty = true;
-}
 
 bool InventoryScreen::beginPickupFromEquipSlot(game::Inventory& inv, game::EquipSlot slot) {
     if (holdingItem) return false;

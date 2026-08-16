@@ -188,8 +188,10 @@ def main():
     # written from the first two. They were written and
     # read every run into fields nothing else touched: this client drew its own
     # chat window once, FrameXML draws it now, and the two numbers outlived it.
-    if len(wanted) < 118:
-        print(f"\n{len(wanted)} values were moved where 118 were expected - a key "
+    # 118 until bank_combine_bags went with this client's bank window, which
+    # was the only thing that read it.
+    if len(wanted) < 117:
+        print(f"\n{len(wanted)} values were moved where 117 were expected - a key "
               "has stopped being written to the file, so nothing here is checking "
               "it any more.")
         return 1

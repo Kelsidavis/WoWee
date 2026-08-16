@@ -705,10 +705,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     if (!frameXmlOwns(UiElement::BarberShop)) {
         windowManager_.renderBarberShopWindow(gameHandler);
     }
-    if (!frameXmlOwns(UiElement::Bank)) {
-        if (windowManager_.renderBankWindow(gameHandler, inventoryScreen, chatPanel_))
-            saveSettings();
-    }
     windowManager_.renderGmCommandScreen(gameHandler);
     if (!frameXmlOwns(UiElement::DungeonFinder)) {
         socialPanel_.renderDungeonFinderWindow(gameHandler, chatPanel_);

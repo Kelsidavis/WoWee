@@ -40,11 +40,6 @@ public:
     void renderBarberShopWindow(game::GameHandler& gameHandler);
 
     // ---- Mail and banking ----
-    // Returns true when a persisted bank view option (Combine bags) changed,
-    // so the caller can save settings.
-    bool renderBankWindow(game::GameHandler& gameHandler,
-                          InventoryScreen& inventoryScreen,
-                          ChatPanel& chatPanel);
 
     // ---- Popup / overlay windows ----
     /// The game handler is only for the Help button, which has to reach
@@ -113,9 +108,6 @@ public:
 
     bool vendorBagsOpened_ = false;
     bool guildBankBagsOpened_ = false;
-    // Bank "Combine bags" view (one contiguous grid vs per-bag sections).
-    // Persisted to settings so it survives relaunches.
-    bool bankCombineBags_ = false;
 
     // Barber shop
     struct BarberStyleOption {

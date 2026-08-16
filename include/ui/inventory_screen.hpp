@@ -279,14 +279,6 @@ public:
         return out;
     }
 
-    /// Drop the currently held item into a bank slot via CMSG_SWAP_ITEM.
-    void dropIntoBankSlot(game::GameHandler& gh, uint8_t dstBag, uint8_t dstSlot);
-    /// Pick up an item from main bank slot (click-and-hold from bank window).
-    void pickupFromBank(game::Inventory& inv, int bankIndex);
-    /// Pick up an item from a bank bag slot (click-and-hold from bank window).
-    void pickupFromBankBag(game::Inventory& inv, int bagIndex, int slotIndex);
-    /// Pick up a bag from a bank bag equip slot (click-and-hold from bank window).
-    void pickupFromBankBagEquip(game::Inventory& inv, int bagIndex);
 };
 
 } // namespace ui

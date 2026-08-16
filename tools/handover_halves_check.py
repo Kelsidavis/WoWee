@@ -75,6 +75,9 @@ NOTHING_TO_GATE = {
     "Mail",
     # renderGuildBankWindow and its money input.
     "GuildBank",
+    # renderBankWindow, and with it the "Combine bags" view option it was the
+    # only reader of - see settings_file_round_trip for the key that went.
+    "Bank",
 }
 
 
