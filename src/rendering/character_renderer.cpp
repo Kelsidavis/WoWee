@@ -520,6 +520,10 @@ void CharacterRenderer::shutdown() {
         if (entry.normalHeightMap) entry.normalHeightMap->destroy(device, alloc);
     }
     textureCache.clear();
+    // The singletons the cache never held. Same reason as above.
+    if (whiteTexture_)       { whiteTexture_->destroy(device, alloc);       whiteTexture_.reset(); }
+    if (transparentTexture_) { transparentTexture_->destroy(device, alloc); transparentTexture_.reset(); }
+    if (flatNormalTexture_)  { flatNormalTexture_->destroy(device, alloc);  flatNormalTexture_.reset(); }
     texturePropsByPtr_.clear();
     normalMapByTexPtr_.clear();
     textureCacheBytes_ = 0;
