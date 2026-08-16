@@ -1,6 +1,6 @@
 # Codebase Modernization — Phased Plan
 
-**Status:** Phases 0–3 complete. Next: Phase 4 (`std::format` for 507 `snprintf` sites).
+**Status:** Phases 0–5 complete (2 and 4 cancelled on evidence). Next: Phase 6 (`std::bit_cast`).
 **Branch:** `master`. Phase 1 was done on `chore/modernization` and pushed to `master` as
 `7b9d4a93d..2b5628a0f`; later phases continue directly on `master`.
 **Scope:** code quality and modernity, codebase-wide. Not a performance effort. Where a phase
@@ -373,3 +373,25 @@ Written down so they are not re-proposed every time someone reads a blog post.
 
   Full suite under ASAN with all 156 targets genuinely instrumented: **157/157 clean.** The 77
   targets the sanitizer had been skipping hide no further bugs.
+
+- **Phase 4** — **Cancelled on evidence.** `-Wformat` under `-Werror` already makes a mismatched
+  specifier a build error, and only 40 of 507 sites format unbounded input (`.c_str()`), all of
+  them chat lines carrying names WoW caps at 12 characters. 507 edits across untested UI string
+  code for a cosmetic gain is the wrong trade. Detail in §3.
+
+- **Phase 5** — Audio RAII. Done: `4b81de7e5`.
+
+  Three sound-construction paths each malloc'd two miniaudio objects and hand-unwound them at
+  five early returns apiece — fifteen unwind sequences, each of which had to be right, and
+  nothing checked them. `MaStorage` puts the uninit-then-free distinction in one destructor.
+
+  It exposed a real leak: of the three failure paths in `playMusic`, two reset `musicData_` — a
+  `shared_ptr` holding the entire encoded music file — and the `ma_sound_start` one did not,
+  pinning the file until the next `playMusic` reassigned the member. That is precisely the
+  failure mode duplicated unwind code produces: not one path being wrong in an obvious way, but
+  one of several drifting out of step with the others.
+
+  Remaining `malloc`/`free` in `audio_engine.cpp` is the teardown in `shutdown`/`stopSound`,
+  which frees what `activeSounds_` owns. Converting those means changing `ActiveSound` in the
+  header from raw pointers, which is a wider change than the leak-prone construction paths
+  warranted.
