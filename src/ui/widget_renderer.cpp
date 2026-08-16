@@ -1822,7 +1822,7 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
         struct ClipGuard {
             ImDrawList* dl; bool on;
             ~ClipGuard() { if (on) dl->PopClipRect(); }
-        } clipGuard{dl, clipped};
+        } clipGuard{.dl = dl, .on = clipped};
 
         // WoW measures from the bottom-left and upward; the screen measures from
         // the top-left and downward. Flip here, at the one place it matters, so
@@ -2220,7 +2220,7 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
             struct ClipPop {
                 ImDrawList* dl; bool on;
                 ~ClipPop() { if (on) dl->PopClipRect(); }
-            } clipPop{dl, clipToBox};
+            } clipPop{.dl = dl, .on = clipToBox};
             ImVec2 extent =
                 font ? font->CalcTextSizeA(size, FLT_MAX, 0.0f, w->text.c_str())
                      : ImGui::CalcTextSize(w->text.c_str());

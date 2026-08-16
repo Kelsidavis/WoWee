@@ -1794,7 +1794,7 @@ void InventoryScreen::renderReputationPanel(game::GameHandler& gameHandler) {
     };
     auto getTier = [&](int32_t val) -> RepTier {
         const auto& band = game::reputationStandingFor(val);
-        return {band.name, band.floor, band.ceiling, tierColors[band.id - 1]};
+        return {.name = band.name, .floor = band.floor, .ceiling = band.ceiling, .color = tierColors[band.id - 1]};
     };
 
     // --- Reputation controls ---

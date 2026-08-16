@@ -166,7 +166,7 @@ bool parseElement(Cursor& c, XmlNode& out) {
 } // namespace
 
 bool parseXml(const std::string& source, XmlNode& outRoot, std::string& error) {
-    Cursor c{source};
+    Cursor c{.s = source};
     while (skipIgnorable(c)) {}
     if (c.eof()) { error = "document is empty"; return false; }
     if (!parseElement(c, outRoot)) { error = c.error; return false; }

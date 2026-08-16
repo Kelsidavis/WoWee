@@ -117,7 +117,7 @@ ComparableEquipped findComparableEquipped(const game::Inventory& inventory, uint
     // walks them and stops at the first one holding something.
     for (game::EquipSlot slot : game::comparableEquipSlots(inventoryType)) {
         const auto& s = inventory.getEquipSlot(slot);
-        if (!s.empty()) return ComparableEquipped{&s, slot};
+        if (!s.empty()) return ComparableEquipped{.slot = &s, .equipSlot = slot};
     }
     return {};
 }

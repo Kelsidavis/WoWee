@@ -940,7 +940,7 @@ void GameScreen::renderMinimapQuestKills(const MinimapFrame& frame, const Entity
                 auto it = quest.killCounts.find(npcEntry);
                 uint32_t current = (it != quest.killCounts.end()) ? it->second.first : 0;
                 if (current < obj.required) {
-                    killInfoMap[npcEntry] = { quest.title, current, obj.required };
+                    killInfoMap[npcEntry] = { .questTitle = quest.title, .current = current, .required = obj.required };
                 }
             }
         }
@@ -1650,8 +1650,8 @@ void GameScreen::renderMinimapMarkers(game::GameHandler& gameHandler) {
 
     // Everything a marker needs to place itself, in one place - the categories
     // below take this rather than eight locals each.
-    const MinimapFrame frame{drawList, centerX, centerY, mapRadius, bearing,
-                             playerRender, minimapView};
+    const MinimapFrame frame{.drawList = drawList, .centerX = centerX, .centerY = centerY, .mapRadius = mapRadius, .bearing = bearing,
+                             .playerRender = playerRender, .view = minimapView};
 
     // Build sets of entries that are incomplete objectives for tracked quests.
     // minimapQuestEntries: NPC creature entries (npcOrGoId > 0)

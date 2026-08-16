@@ -272,7 +272,7 @@ void QuestLogScreen::render(game::GameHandler& gameHandler, InventoryScreen& inv
                 auto grpIt = std::find_if(zoneGroups.begin(), zoneGroups.end(),
                     [&](const ZoneGroup& g) { return g.name == zoneName; });
                 if (grpIt == zoneGroups.end()) {
-                    zoneGroups.push_back({std::move(zoneName), {}});
+                    zoneGroups.push_back({.name = std::move(zoneName), .indices = {}});
                     grpIt = std::prev(zoneGroups.end());
                 }
                 grpIt->indices.push_back(i);

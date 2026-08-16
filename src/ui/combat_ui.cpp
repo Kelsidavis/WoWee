@@ -170,7 +170,7 @@ void CombatUI::renderCooldownTracker(game::GameHandler& gameHandler,
     std::vector<CDEntry> active;
     active.reserve(16);
     for (const auto& [sid, rem] : cooldowns) {
-        if (rem > 0.5f) active.push_back({sid, rem});
+        if (rem > 0.5f) active.push_back({.spellId = sid, .remaining = rem});
     }
     if (active.empty()) return;
 
@@ -278,7 +278,7 @@ void CombatUI::renderRaidWarningOverlay(game::GameHandler& gameHandler) {
                 // Limit display text length to avoid giant overlay
                 std::string text = msg.message;
                 if (text.size() > 200) text = text.substr(0, 200) + "...";
-                raidWarnEntries_.push_back({text, 0.0f, isBoss});
+                raidWarnEntries_.push_back({.text = text, .age = 0.0f, .isBossEmote = isBoss});
                 if (raidWarnEntries_.size() > 3)
                     raidWarnEntries_.erase(raidWarnEntries_.begin());
             }

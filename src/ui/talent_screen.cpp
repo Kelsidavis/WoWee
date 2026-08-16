@@ -320,7 +320,7 @@ void TalentScreen::renderTalentTree(game::GameHandler& gameHandler, uint32_t tab
         float x = gridOrigin.x + talent->column * cellSize + spacing;
         float y = gridOrigin.y + talent->row * cellSize + spacing;
         ImVec2 center(x + iconSize * 0.5f, y + iconSize * 0.5f);
-        talentPositions[talent->talentId] = {talent, center};
+        talentPositions[talent->talentId] = {.talent = talent, .center = center};
     }
 
     // Draw prerequisite arrows

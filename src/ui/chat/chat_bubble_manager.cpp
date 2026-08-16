@@ -32,7 +32,7 @@ void ChatBubbleManager::addBubble(uint64_t senderGuid, const std::string& messag
     if (bubbles_.size() >= kMaxBubbles) {
         bubbles_.erase(bubbles_.begin());
     }
-    bubbles_.push_back({senderGuid, message, duration, duration, isYell});
+    bubbles_.push_back({.senderGuid = senderGuid, .message = message, .timeRemaining = duration, .totalDuration = duration, .isYell = isYell});
 }
 
 void ChatBubbleManager::render(game::GameHandler& gameHandler, const UIServices& services) {

@@ -44,14 +44,14 @@ std::vector<ChatSegment> ChatMarkupParser::parse(const std::string& text) const 
             // No more special elements - remainder is plain text
             std::string remaining = text.substr(pos);
             if (!remaining.empty()) {
-                segments.push_back({SegmentType::Text, std::move(remaining)});
+                segments.push_back({.type = SegmentType::Text, .text = std::move(remaining)});
             }
             break;
         }
 
         // Emit plain text before the special element
         if (nextSpecial > pos) {
-            segments.push_back({SegmentType::Text, text.substr(pos, nextSpecial - pos)});
+            segments.push_back({.type = SegmentType::Text, .text = text.substr(pos, nextSpecial - pos)});
         }
 
         // Handle WoW link (|c... or bare |H...)
@@ -181,7 +181,7 @@ std::vector<ChatSegment> ChatMarkupParser::parse(const std::string& text) const 
                 }
             } else {
                 // Bare |c without enough chars for color - render literally
-                segments.push_back({SegmentType::Text, "|c"});
+                segments.push_back({.type = SegmentType::Text, .text = "|c"});
                 pos = nextSpecial + 2;
             }
             continue;
@@ -193,7 +193,7 @@ std::vector<ChatSegment> ChatMarkupParser::parse(const std::string& text) const 
             if (urlEnd == std::string::npos) urlEnd = text.size();
             std::string url = text.substr(urlStart, urlEnd - urlStart);
 
-            segments.push_back({SegmentType::Url, std::move(url)});
+            segments.push_back({.type = SegmentType::Url, .text = std::move(url)});
             pos = urlEnd;
             continue;
         }

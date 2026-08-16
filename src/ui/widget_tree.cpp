@@ -828,8 +828,8 @@ void WidgetTree::layoutWidgetSelf(uint32_t id, float screenW, float screenH) {
         const AnchorPoint mp = resolveAnchorPoint(a.point);
         // The offset is in this frame's units; the anchor it hangs from is
         // already resolved, so only the offset is scaled.
-        cx.push_back({mp.fx, relLeft   + rp.fx * relW + a.x * es});
-        cy.push_back({mp.fy, relBottom + rp.fy * relH + a.y * es});
+        cx.push_back({.f = mp.fx, .target = relLeft   + rp.fx * relW + a.x * es});
+        cy.push_back({.f = mp.fy, .target = relBottom + rp.fy * relH + a.y * es});
     }
 
     auto solveAxis = [](const std::vector<Constraint>& cs, float explicitSize,

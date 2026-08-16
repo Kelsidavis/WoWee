@@ -430,7 +430,7 @@ void SpellbookScreen::categorizeSpells(const std::unordered_set<uint32_t>& known
         std::sort(named.begin(), named.end(),
             [](const auto& a, const auto& b) { return a.first < b.first; });
         for (auto& [name, spells] : named) {
-            spellTabs.push_back({std::move(name), std::move(spells)});
+            spellTabs.push_back({.name = std::move(name), .spells = std::move(spells)});
         }
     };
 
@@ -440,7 +440,7 @@ void SpellbookScreen::categorizeSpells(const std::unordered_set<uint32_t>& known
     // 2. General tab
     if (!generalSpells.empty()) {
         std::sort(generalSpells.begin(), generalSpells.end(), byName);
-        spellTabs.push_back({"General", std::move(generalSpells)});
+        spellTabs.push_back({.name = "General", .spells = std::move(generalSpells)});
     }
 
     // 3. Professions tabs
@@ -449,13 +449,13 @@ void SpellbookScreen::categorizeSpells(const std::unordered_set<uint32_t>& known
     // 4. Mounts tab
     if (!mountSpells.empty()) {
         std::sort(mountSpells.begin(), mountSpells.end(), byName);
-        spellTabs.push_back({"Mounts", std::move(mountSpells)});
+        spellTabs.push_back({.name = "Mounts", .spells = std::move(mountSpells)});
     }
 
     // 5. Companions tab
     if (!companionSpells.empty()) {
         std::sort(companionSpells.begin(), companionSpells.end(), byName);
-        spellTabs.push_back({"Companions", std::move(companionSpells)});
+        spellTabs.push_back({.name = "Companions", .spells = std::move(companionSpells)});
     }
 
     lastKnownSpellCount = knownSpells.size();

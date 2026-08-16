@@ -318,7 +318,7 @@ void UIManager::render(core::AppState appState, auth::AuthHandler* authHandler, 
                             static_cast<int>(state));
             }
         }
-    } stateReport{uiRenderStart, appState};
+    } stateReport{.start = uiRenderStart, .state = appState};
 
     // Render appropriate screen based on application state
     switch (appState) {

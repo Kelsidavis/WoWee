@@ -316,7 +316,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
             // Both interfaces show these, and the event that carries them
             // reaches whichever is drawing.
             if (frameXmlOwns(UiElement::UiErrors)) return;
-            uiErrors_.push_back({msg, 0.0f});
+            uiErrors_.push_back({.text = msg, .age = 0.0f});
             if (uiErrors_.size() > 5) uiErrors_.erase(uiErrors_.begin());
         });
         uiErrorCallbackSet_ = true;

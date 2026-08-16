@@ -219,7 +219,7 @@ void WindowManager::ensureBarberState(game::GameHandler& gameHandler) {
     barberFacialStyles_.clear();
     barberSkinStyles_.clear();
     // Entry zero tells the server to retain the existing skin.
-    barberSkinStyles_.push_back({0, barberOrigSkinColor_, "Current"});
+    barberSkinStyles_.push_back({.entryId = 0, .appearanceId = barberOrigSkinColor_, .name = "Current"});
 
     if (services_.assetManager) {
         auto dbc = services_.assetManager->loadDBC("BarberShopStyle.dbc");
@@ -233,8 +233,8 @@ void WindowManager::ensureBarberState(game::GameHandler& gameHandler) {
                 for (uint32_t field = 2; field <= 17 && name.empty(); ++field)
                     name = dbc->getString(row, field);
                 if (name.empty()) name = "Style " + std::to_string(appearance);
-                BarberStyleOption option{dbc->getUInt32(row, 0),
-                                         static_cast<uint8_t>(appearance), std::move(name)};
+                BarberStyleOption option{.entryId = dbc->getUInt32(row, 0),
+                                         .appearanceId = static_cast<uint8_t>(appearance), .name = std::move(name)};
                 switch (dbc->getUInt32(row, 1)) {
                     case 0: barberHairStyles_.push_back(std::move(option)); break;
                     case 2: barberFacialStyles_.push_back(std::move(option)); break;
@@ -923,7 +923,7 @@ void WindowManager::renderSkillsWindow(game::GameHandler& gameHandler) {
     std::map<uint32_t, std::vector<SkillEntry>> byCategory;
     for (const auto& [id, sk] : skills) {
         uint32_t cat = gameHandler.getSkillCategory(id);
-        byCategory[cat].push_back({id, &sk});
+        byCategory[cat].push_back({.skillId = id, .skill = &sk});
     }
 
     static constexpr struct { uint32_t cat; const char* label; } kCatOrder[] = {

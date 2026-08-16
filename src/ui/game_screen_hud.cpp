@@ -532,7 +532,7 @@ void GameScreen::renderWorldMap(game::GameHandler& gameHandler) {
                     : (member.guid == partyData.leaderGuid
                        ? IM_COL32(255, 210, 0, 230)
                        : IM_COL32(100, 180, 255, 230));
-                dots.push_back({ rpos, col, member.name });
+                dots.push_back({ .renderPos = rpos, .color = col, .name = member.name });
             }
         }
         // Battleground team positions, which this client had only ever drawn
@@ -552,8 +552,8 @@ void GameScreen::renderWorldMap(game::GameHandler& gameHandler) {
                 // Packet coords are canonical: wowX north, wowY west.
                 const glm::vec3 rpos =
                     core::coords::canonicalToRender(glm::vec3(bp.wowX, bp.wowY, 0.0f));
-                dots.push_back({ rpos, ui::bgGroupColor(bp.group),
-                                 gameHandler.lookupName(bp.guid) });
+                dots.push_back({ .renderPos = rpos, .color = ui::bgGroupColor(bp.group),
+                                 .name = gameHandler.lookupName(bp.guid) });
             }
         }
         wm->setPartyDots(std::move(dots));
@@ -1580,7 +1580,7 @@ void GameScreen::renderNameplates(game::GameHandler& gameHandler) {
         if (!allowPlateOverlap) {
             const float topExtent = barH + 24.0f;
             sy = ui::plateTopClearOf(placedPlates, barX, barX + barW, sy, barH, topExtent);
-            placedPlates.push_back({barX, sy - topExtent, barX + barW, sy + barH});
+            placedPlates.push_back({.x0 = barX, .y0 = sy - topExtent, .x1 = barX + barW, .y1 = sy + barH});
         }
 
         // Guard against division by zero when maxHealth hasn't been populated yet

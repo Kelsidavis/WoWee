@@ -194,7 +194,7 @@ bool ChatPanel::runRegistryCommand(game::GameHandler& gameHandler,
                                    const std::string& alias, const std::string& args) {
     std::string lower = alias;
     for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    ChatCommandContext ctx{gameHandler, services_, *this, args, lower};
+    ChatCommandContext ctx{.gameHandler = gameHandler, .services = services_, .panel = *this, .args = args, .fullCommand = lower};
     return commandRegistry_.dispatch(lower, ctx).handled;
 }
 
@@ -309,7 +309,7 @@ void ChatPanel::sendChatMessage(game::GameHandler& gameHandler) {
         if (spacePos != std::string::npos)
             args = command.substr(spacePos + 1);
 
-        ChatCommandContext ctx{gameHandler, services_, *this, args, cmdLower};
+        ChatCommandContext ctx{.gameHandler = gameHandler, .services = services_, .panel = *this, .args = args, .fullCommand = cmdLower};
         ChatCommandResult result = commandRegistry_.dispatch(cmdLower, ctx);
         if (result.handled) {
             if (result.clearInput)

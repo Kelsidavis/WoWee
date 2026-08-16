@@ -47,7 +47,7 @@ void ToastManager::setupCallbacks(game::GameHandler& gameHandler) {
                 }
             }
             if (questToasts_.size() >= 4) questToasts_.erase(questToasts_.begin());
-            questToasts_.push_back({questTitle, objectiveName, current, required, 0.0f});
+            questToasts_.push_back({.questTitle = questTitle, .objectiveName = objectiveName, .current = current, .required = required, .age = 0.0f});
         });
         questProgressCallbackSet_ = true;
     }
@@ -64,7 +64,7 @@ void ToastManager::setupCallbacks(game::GameHandler& gameHandler) {
             }
             if (playerLevelUpToasts_.size() >= 3)
                 playerLevelUpToasts_.erase(playerLevelUpToasts_.begin());
-            playerLevelUpToasts_.push_back({guid, "", newLevel, 0.0f});
+            playerLevelUpToasts_.push_back({.guid = guid, .playerName = "", .newLevel = newLevel, .age = 0.0f});
         });
         otherPlayerLevelUpCallbackSet_ = true;
     }
@@ -73,7 +73,7 @@ void ToastManager::setupCallbacks(game::GameHandler& gameHandler) {
     if (!pvpHonorCallbackSet_) {
         gameHandler.setPvpHonorCallback([this](uint32_t honor, uint64_t /*victimGuid*/, uint32_t rank) {
             if (honor == 0) return;
-            pvpHonorToasts_.push_back({honor, rank, 0.0f});
+            pvpHonorToasts_.push_back({.honor = honor, .victimRank = rank, .age = 0.0f});
             if (pvpHonorToasts_.size() > 4)
                 pvpHonorToasts_.erase(pvpHonorToasts_.begin());
         });
@@ -93,7 +93,7 @@ void ToastManager::setupCallbacks(game::GameHandler& gameHandler) {
             }
             if (itemLootToasts_.size() >= 5)
                 itemLootToasts_.erase(itemLootToasts_.begin());
-            itemLootToasts_.push_back({itemId, count, quality, name, 0.0f});
+            itemLootToasts_.push_back({.itemId = itemId, .count = count, .quality = quality, .name = name, .age = 0.0f});
         });
         itemLootCallbackSet_ = true;
     }
@@ -111,7 +111,7 @@ void ToastManager::setupCallbacks(game::GameHandler& gameHandler) {
     // Reputation change toast callback
     if (!repChangeCallbackSet_) {
         gameHandler.setRepChangeCallback([this](const std::string& name, int32_t delta, int32_t standing) {
-            repToasts_.push_back({name, delta, standing, 0.0f});
+            repToasts_.push_back({.factionName = name, .delta = delta, .standing = standing, .age = 0.0f});
             if (repToasts_.size() > 4) repToasts_.erase(repToasts_.begin());
         });
         repChangeCallbackSet_ = true;
@@ -120,7 +120,7 @@ void ToastManager::setupCallbacks(game::GameHandler& gameHandler) {
     // Quest completion toast callback
     if (!questCompleteCallbackSet_) {
         gameHandler.setQuestCompleteCallback([this](uint32_t id, const std::string& title) {
-            questCompleteToasts_.push_back({id, title, 0.0f});
+            questCompleteToasts_.push_back({.questId = id, .title = title, .age = 0.0f});
             if (questCompleteToasts_.size() > 3) questCompleteToasts_.erase(questCompleteToasts_.begin());
         });
         questCompleteCallbackSet_ = true;
@@ -136,7 +136,7 @@ void ToastManager::renderEarlyToasts(float deltaTime, game::GameHandler& gameHan
         const std::string& curZone = rend->getCurrentZoneName();
         if (!curZone.empty() && curZone != lastKnownZone_) {
             if (!lastKnownZone_.empty()) {
-                zoneToasts_.push_back({curZone, 0.0f});
+                zoneToasts_.push_back({.zoneName = curZone, .age = 0.0f});
                 if (zoneToasts_.size() > 3)
                     zoneToasts_.erase(zoneToasts_.begin());
             }

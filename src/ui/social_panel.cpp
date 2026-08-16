@@ -708,7 +708,7 @@ void SocialPanel::renderBossFrames(game::GameHandler& gameHandler,
     std::vector<BossSlot> active;
     for (uint32_t s = 0; s < game::GameHandler::kMaxEncounterSlots; ++s) {
         uint64_t g = gameHandler.getEncounterUnitGuid(s);
-        if (g != 0) active.push_back({s, g});
+        if (g != 0) active.push_back({.slot = s, .guid = g});
     }
     if (active.empty()) return;
 
