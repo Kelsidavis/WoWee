@@ -5080,9 +5080,16 @@ void registerSystemLuaAPI(lua_State* L) {
             const bool alwaysShow = lua_toboolean(L, 5) != 0;
             (void)alwaysShow;
             saveInterfaceState();
+            // The fourth is this client's left bar, despite being labelled
+            // "Right Bar 2" where the player ticks it: the interface's fourth
+            // multi-bar is MultiBarLeft, which is action page 4, which is the
+            // upright bar this client draws at the left edge. Without it the
+            // tick did nothing and the bar could only be turned on from this
+            // client's own panel, where its checkbox then disagreed.
             if (auto* svc = getLuaServices(L); svc && svc->setClientSetting) {
                 svc->setClientSetting("showbar2",     shown[0] ? "1" : "0");
                 svc->setClientSetting("showrightbar", shown[2] ? "1" : "0");
+                svc->setClientSetting("showleftbar",  shown[3] ? "1" : "0");
             }
             return 0;
         }},
@@ -5099,6 +5106,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 };
                 shown[0] = readBool("showbar2", shown[0]);
                 shown[2] = readBool("showrightbar", shown[2]);
+                shown[3] = readBool("showleftbar", shown[3]);
             }
             for (bool on : shown) lua_pushboolean(L, on ? 1 : 0);
             return 4;
