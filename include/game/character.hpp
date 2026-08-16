@@ -61,13 +61,13 @@ struct Pronouns {
     static Pronouns forGender(Gender gender) {
         switch (gender) {
             case Gender::MALE:
-                return {"he", "him", "his", "his"};
+                return {.subject = "he", .object = "him", .possessive = "his", .possessiveP = "his"};
             case Gender::FEMALE:
-                return {"she", "her", "her", "hers"};
+                return {.subject = "she", .object = "her", .possessive = "her", .possessiveP = "hers"};
             case Gender::NONBINARY:
-                return {"they", "them", "their", "theirs"};
+                return {.subject = "they", .object = "them", .possessive = "their", .possessiveP = "theirs"};
             default:
-                return {"they", "them", "their", "theirs"};
+                return {.subject = "they", .object = "them", .possessive = "their", .possessiveP = "theirs"};
         }
     }
 };

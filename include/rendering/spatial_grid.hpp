@@ -59,9 +59,9 @@ using SpatialGrid = std::unordered_map<GridCell, std::vector<uint32_t>, GridCell
 /// map origin would each be double width.
 inline GridCell toSpatialCell(const glm::vec3& p) {
     return GridCell{
-        static_cast<int>(std::floor(p.x / kSpatialCellSize)),
-        static_cast<int>(std::floor(p.y / kSpatialCellSize)),
-        static_cast<int>(std::floor(p.z / kSpatialCellSize))
+        .x = static_cast<int>(std::floor(p.x / kSpatialCellSize)),
+        .y = static_cast<int>(std::floor(p.y / kSpatialCellSize)),
+        .z = static_cast<int>(std::floor(p.z / kSpatialCellSize))
     };
 }
 

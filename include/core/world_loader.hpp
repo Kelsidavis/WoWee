@@ -79,7 +79,7 @@ public:
 
     // Set pending world entry for deferred processing via processPendingEntry()
     void setPendingEntry(uint32_t mapId, float x, float y, float z) {
-        pendingWorldEntry_ = PendingWorldEntry{mapId, x, y, z};
+        pendingWorldEntry_ = PendingWorldEntry{.mapId = mapId, .x = x, .y = y, .z = z};
     }
 
     // Reset methods (for logout / character switch)
