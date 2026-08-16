@@ -115,7 +115,7 @@ bool Renderer::createPerFrameResources() {
     imgCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imgCI.imageType = VK_IMAGE_TYPE_2D;
     imgCI.format = VK_FORMAT_D32_SFLOAT;
-    imgCI.extent = {SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 1};
+    imgCI.extent = {.width = SHADOW_MAP_SIZE, .height = SHADOW_MAP_SIZE, .depth = 1};
     imgCI.mipLevels = 1;
     imgCI.arrayLayers = 1;
     imgCI.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -137,7 +137,7 @@ bool Renderer::createPerFrameResources() {
     viewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewCI.format = VK_FORMAT_D32_SFLOAT;
-    viewCI.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+    viewCI.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
     for (uint32_t i = 0; i < MAX_FRAMES; i++) {
         viewCI.image = shadowDepthImage[i];
         if (vkCreateImageView(device, &viewCI, nullptr, &shadowDepthView[i]) != VK_SUCCESS) {
@@ -1044,15 +1044,15 @@ void Renderer::beginFrame() {
         renderExtent = vkCtx->getSwapchainExtent();
     }
 
-    rpInfo.renderArea.offset = {0, 0};
+    rpInfo.renderArea.offset = {.x = 0, .y = 0};
     rpInfo.renderArea.extent = renderExtent;
 
     // Clear values must match attachment count: 2 (no MSAA), 3 (MSAA), or 4 (MSAA+depth resolve)
     VkClearValue clearValues[4]{};
     clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-    clearValues[1].depthStencil = {1.0f, 0};
+    clearValues[1].depthStencil = {.depth = 1.0f, .stencil = 0};
     clearValues[2].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-    clearValues[3].depthStencil = {1.0f, 0};
+    clearValues[3].depthStencil = {.depth = 1.0f, .stencil = 0};
     bool msaaOn = (vkCtx->getMsaaSamples() > VK_SAMPLE_COUNT_1_BIT);
     if (msaaOn) {
         bool depthRes = (vkCtx->getDepthResolveImageView() != VK_NULL_HANDLE);
@@ -1185,7 +1185,7 @@ bool Renderer::captureScreenshot(const std::string& outputPath) {
     vkDeviceWaitIdle(device);
 
     // Create staging buffer
-    VkBufferCreateInfo bufInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+    VkBufferCreateInfo bufInfo{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     bufInfo.size  = bufSize;
     bufInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
@@ -1203,21 +1203,21 @@ bool Renderer::captureScreenshot(const std::string& outputPath) {
     VkCommandBuffer cmd = vkCtx->beginSingleTimeCommands();
 
     // Transition swapchain image: PRESENT_SRC → TRANSFER_SRC
-    VkImageMemoryBarrier toTransfer{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+    VkImageMemoryBarrier toTransfer{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
     toTransfer.srcAccessMask       = VK_ACCESS_MEMORY_READ_BIT;
     toTransfer.dstAccessMask       = VK_ACCESS_TRANSFER_READ_BIT;
     toTransfer.oldLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     toTransfer.newLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     toTransfer.image               = srcImage;
-    toTransfer.subresourceRange    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    toTransfer.subresourceRange    = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
     vkCmdPipelineBarrier(cmd,
         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
         0, 0, nullptr, 0, nullptr, 1, &toTransfer);
 
     // Copy image to buffer
     VkBufferImageCopy region{};
-    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    region.imageExtent      = {w, h, 1};
+    region.imageSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
+    region.imageExtent      = {.width = w, .height = h, .depth = 1};
     vkCmdCopyImageToBuffer(cmd, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                            stagingBuf, 1, &region);
 
@@ -3238,7 +3238,7 @@ void Renderer::renderShadowPass() {
     b1.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
                        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     b1.image = shadowDepthImage[frame];
-    b1.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+    b1.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
     VkPipelineStageFlags srcStage = (shadowDepthLayout_[frame] == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
         ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
         : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
@@ -3251,16 +3251,16 @@ void Renderer::renderShadowPass() {
     rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     rpInfo.renderPass = shadowRenderPass;
     rpInfo.framebuffer = shadowFramebuffer[frame];
-    rpInfo.renderArea = {{0, 0}, {SHADOW_MAP_SIZE, SHADOW_MAP_SIZE}};
+    rpInfo.renderArea = {.offset = {.x = 0, .y = 0}, .extent = {.width = SHADOW_MAP_SIZE, .height = SHADOW_MAP_SIZE}};
     VkClearValue clear{};
-    clear.depthStencil = {1.0f, 0};
+    clear.depthStencil = {.depth = 1.0f, .stencil = 0};
     rpInfo.clearValueCount = 1;
     rpInfo.pClearValues = &clear;
     vkCmdBeginRenderPass(currentCmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    VkViewport vp{0, 0, static_cast<float>(SHADOW_MAP_SIZE), static_cast<float>(SHADOW_MAP_SIZE), 0.0f, 1.0f};
+    VkViewport vp{.x = 0, .y = 0, .width = static_cast<float>(SHADOW_MAP_SIZE), .height = static_cast<float>(SHADOW_MAP_SIZE), .minDepth = 0.0f, .maxDepth = 1.0f};
     vkCmdSetViewport(currentCmd, 0, 1, &vp);
-    VkRect2D sc{{0, 0}, {SHADOW_MAP_SIZE, SHADOW_MAP_SIZE}};
+    VkRect2D sc{.offset = {.x = 0, .y = 0}, .extent = {.width = SHADOW_MAP_SIZE, .height = SHADOW_MAP_SIZE}};
     vkCmdSetScissor(currentCmd, 0, 1, &sc);
 
     // Phase 7/8: render shadow casters
@@ -3294,7 +3294,7 @@ void Renderer::renderShadowPass() {
     b2.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     b2.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     b2.image = shadowDepthImage[frame];
-    b2.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+    b2.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
     vkCmdPipelineBarrier(currentCmd,
         VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
         0, 0, nullptr, 0, nullptr, 1, &b2);

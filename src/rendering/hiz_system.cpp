@@ -78,10 +78,10 @@ bool HiZSystem::createPyramidImage() {
 
     for (uint32_t f = 0; f < MAX_FRAMES; f++) {
         // Create R32F image with full mip chain
-        VkImageCreateInfo imgCi{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+        VkImageCreateInfo imgCi{.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
         imgCi.imageType = VK_IMAGE_TYPE_2D;
         imgCi.format = VK_FORMAT_R32_SFLOAT;
-        imgCi.extent = {pyramidWidth_, pyramidHeight_, 1};
+        imgCi.extent = {.width = pyramidWidth_, .height = pyramidHeight_, .depth = 1};
         imgCi.mipLevels = mipLevels_;
         imgCi.arrayLayers = 1;
         imgCi.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -98,7 +98,7 @@ bool HiZSystem::createPyramidImage() {
         }
 
         // View of ALL mip levels (for sampling in the cull shader)
-        VkImageViewCreateInfo viewCi{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+        VkImageViewCreateInfo viewCi{.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
         viewCi.image = pyramidImage_[f];
         viewCi.viewType = VK_IMAGE_VIEW_TYPE_2D;
         viewCi.format = VK_FORMAT_R32_SFLOAT;
@@ -115,7 +115,7 @@ bool HiZSystem::createPyramidImage() {
         // Per-mip views (for storage image writes in the build shader)
         pyramidMipViews_[f].resize(mipLevels_, VK_NULL_HANDLE);
         for (uint32_t mip = 0; mip < mipLevels_; mip++) {
-            VkImageViewCreateInfo mipViewCi{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+            VkImageViewCreateInfo mipViewCi{.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
             mipViewCi.image = pyramidImage_[f];
             mipViewCi.viewType = VK_IMAGE_VIEW_TYPE_2D;
             mipViewCi.format = VK_FORMAT_R32_SFLOAT;
@@ -132,7 +132,7 @@ bool HiZSystem::createPyramidImage() {
     }
 
     // Sampler for depth reads and HiZ pyramid reads (nearest, clamp)
-    VkSamplerCreateInfo samplerCi{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+    VkSamplerCreateInfo samplerCi{.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
     samplerCi.magFilter = VK_FILTER_NEAREST;
     samplerCi.minFilter = VK_FILTER_NEAREST;
     samplerCi.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
@@ -186,7 +186,7 @@ bool HiZSystem::createComputePipeline() {
     bindings[1].descriptorCount = 1;
     bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutCreateInfo layoutCi{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    VkDescriptorSetLayoutCreateInfo layoutCi{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     layoutCi.bindingCount = 2;
     layoutCi.pBindings = bindings;
     if (vkCreateDescriptorSetLayout(device, &layoutCi, nullptr, &buildSetLayout_) != VK_SUCCESS) {
@@ -202,7 +202,7 @@ bool HiZSystem::createComputePipeline() {
     hizBinding.descriptorCount = 1;
     hizBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutCreateInfo hizLayoutCi{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    VkDescriptorSetLayoutCreateInfo hizLayoutCi{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     hizLayoutCi.bindingCount = 1;
     hizLayoutCi.pBindings = &hizBinding;
     if (vkCreateDescriptorSetLayout(device, &hizLayoutCi, nullptr, &hizSetLayout_) != VK_SUCCESS) {
@@ -216,7 +216,7 @@ bool HiZSystem::createComputePipeline() {
     pushRange.offset = 0;
     pushRange.size = sizeof(HiZBuildPushConstants);
 
-    VkPipelineLayoutCreateInfo plCi{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    VkPipelineLayoutCreateInfo plCi{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     plCi.setLayoutCount = 1;
     plCi.pSetLayouts = &buildSetLayout_;
     plCi.pushConstantRangeCount = 1;
@@ -233,7 +233,7 @@ bool HiZSystem::createComputePipeline() {
         return false;
     }
 
-    VkComputePipelineCreateInfo cpCi{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    VkComputePipelineCreateInfo cpCi{.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
     cpCi.stage = buildShader.stageInfo(VK_SHADER_STAGE_COMPUTE_BIT);
     cpCi.layout = buildPipelineLayout_;
     if (vkCreateComputePipelines(device, ctx_->getPipelineCache(), 1, &cpCi, nullptr, &buildPipeline_) != VK_SUCCESS) {
@@ -269,10 +269,10 @@ bool HiZSystem::createDescriptors() {
     const uint32_t totalSets = totalBuildSets + totalHizSets;
 
     VkDescriptorPoolSize poolSizes[2] = {};
-    poolSizes[0] = {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, totalBuildSets + totalHizSets};
-    poolSizes[1] = {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, totalBuildSets};
+    poolSizes[0] = {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = totalBuildSets + totalHizSets};
+    poolSizes[1] = {.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = totalBuildSets};
 
-    VkDescriptorPoolCreateInfo poolCi{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    VkDescriptorPoolCreateInfo poolCi{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     poolCi.maxSets = totalSets;
     poolCi.poolSizeCount = 2;
     poolCi.pPoolSizes = poolSizes;
@@ -290,7 +290,7 @@ bool HiZSystem::createDescriptors() {
         // DEPTH aspect sampling which requires specific format view.
         {
             VkImage depthSrc = ctx_->getDepthCopySourceImage();
-            VkImageViewCreateInfo viewCi{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+            VkImageViewCreateInfo viewCi{.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
             viewCi.image = depthSrc;
             viewCi.viewType = VK_IMAGE_VIEW_TYPE_2D;
             viewCi.format = ctx_->getDepthFormat();
@@ -306,7 +306,7 @@ bool HiZSystem::createDescriptors() {
         // Allocate per-mip build descriptor sets
         buildDescSets_[f].resize(mipLevels_);
         for (uint32_t mip = 0; mip < mipLevels_; mip++) {
-            VkDescriptorSetAllocateInfo allocInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+            VkDescriptorSetAllocateInfo allocInfo{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
             allocInfo.descriptorPool = buildDescPool_;
             allocInfo.descriptorSetCount = 1;
             allocInfo.pSetLayouts = &buildSetLayout_;
@@ -333,14 +333,14 @@ bool HiZSystem::createDescriptors() {
             dstInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
             VkWriteDescriptorSet writes[2] = {};
-            writes[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            writes[0] = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
             writes[0].dstSet = buildDescSets_[f][mip];
             writes[0].dstBinding = 0;
             writes[0].descriptorCount = 1;
             writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             writes[0].pImageInfo = &srcInfo;
 
-            writes[1] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            writes[1] = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
             writes[1].dstSet = buildDescSets_[f][mip];
             writes[1].dstBinding = 1;
             writes[1].descriptorCount = 1;
@@ -352,7 +352,7 @@ bool HiZSystem::createDescriptors() {
 
         // Allocate HiZ sampling descriptor set (for M2 cull shader)
         {
-            VkDescriptorSetAllocateInfo allocInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+            VkDescriptorSetAllocateInfo allocInfo{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
             allocInfo.descriptorPool = buildDescPool_;
             allocInfo.descriptorSetCount = 1;
             allocInfo.pSetLayouts = &hizSetLayout_;
@@ -366,7 +366,7 @@ bool HiZSystem::createDescriptors() {
             hizInfo.imageView = pyramidViewAll_[f];
             hizInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-            VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
             write.dstSet = hizDescSet_[f];
             write.dstBinding = 0;
             write.descriptorCount = 1;
@@ -402,7 +402,7 @@ void HiZSystem::buildPyramid(VkCommandBuffer cmd, uint32_t frameIndex, VkImage d
 
     // Transition depth image from DEPTH_STENCIL_ATTACHMENT to SHADER_READ_ONLY for sampling
     {
-        VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        VkImageMemoryBarrier barrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
         barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
         barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -422,7 +422,7 @@ void HiZSystem::buildPyramid(VkCommandBuffer cmd, uint32_t frameIndex, VkImage d
 
     // Transition entire pyramid to GENERAL layout for storage writes
     {
-        VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        VkImageMemoryBarrier barrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -467,7 +467,7 @@ void HiZSystem::buildPyramid(VkCommandBuffer cmd, uint32_t frameIndex, VkImage d
 
         // Barrier between mip levels: ensure writes to mip N are visible before reads for mip N+1
         if (mip + 1 < mipLevels_) {
-            VkImageMemoryBarrier mipBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            VkImageMemoryBarrier mipBarrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
             mipBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
             mipBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             mipBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -493,7 +493,7 @@ void HiZSystem::buildPyramid(VkCommandBuffer cmd, uint32_t frameIndex, VkImage d
 
     // Transition depth back to DEPTH_STENCIL_ATTACHMENT for next frame
     {
-        VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        VkImageMemoryBarrier barrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
         barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
         barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
                                 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;

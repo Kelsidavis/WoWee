@@ -42,14 +42,14 @@ AllocatedImage createImage(VkDevice device, VmaAllocator allocator,
     VkImageUsageFlags usage, VkSampleCountFlagBits samples, uint32_t mipLevels,
     std::source_location where) {
     AllocatedImage result{};
-    result.extent = {width, height};
+    result.extent = {.width = width, .height = height};
     result.format = format;
 
     VkImageCreateInfo imgInfo{};
     imgInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imgInfo.imageType = VK_IMAGE_TYPE_2D;
     imgInfo.format = format;
-    imgInfo.extent = {width, height, 1};
+    imgInfo.extent = {.width = width, .height = height, .depth = 1};
     imgInfo.mipLevels = mipLevels;
     imgInfo.arrayLayers = 1;
     imgInfo.samples = samples;

@@ -266,25 +266,25 @@ inline constexpr const char* kItemSetThresholdKeys[10] = {
 // ---- Socket type display (gem sockets) ----
 struct SocketTypeDef { uint32_t mask; const char* label; ImVec4 col; };
 inline constexpr SocketTypeDef kSocketTypes[] = {
-    { 1, "Meta Socket",   { 0.7f, 0.7f, 0.9f, 1.0f } },
-    { 2, "Red Socket",    { 1.0f, 0.3f, 0.3f, 1.0f } },
-    { 4, "Yellow Socket", { 1.0f, 0.9f, 0.3f, 1.0f } },
-    { 8, "Blue Socket",   { 0.3f, 0.6f, 1.0f, 1.0f } },
+    { .mask = 1, .label = "Meta Socket",   .col = { 0.7f, 0.7f, 0.9f, 1.0f } },
+    { .mask = 2, .label = "Red Socket",    .col = { 1.0f, 0.3f, 0.3f, 1.0f } },
+    { .mask = 4, .label = "Yellow Socket", .col = { 1.0f, 0.9f, 0.3f, 1.0f } },
+    { .mask = 8, .label = "Blue Socket",   .col = { 0.3f, 0.6f, 1.0f, 1.0f } },
 };
 
 // ---- Class/race bitmask lookup (for allowableClass/allowableRace display) ----
 struct ClassMaskEntry { uint32_t mask; const char* name; };
 inline constexpr ClassMaskEntry kClassMasks[] = {
-    {1,"Warrior"}, {2,"Paladin"}, {4,"Hunter"}, {8,"Rogue"},
-    {16,"Priest"}, {32,"Death Knight"}, {64,"Shaman"},
-    {128,"Mage"}, {256,"Warlock"}, {1024,"Druid"},
+    {.mask = 1,.name = "Warrior"}, {.mask = 2,.name = "Paladin"}, {.mask = 4,.name = "Hunter"}, {.mask = 8,.name = "Rogue"},
+    {.mask = 16,.name = "Priest"}, {.mask = 32,.name = "Death Knight"}, {.mask = 64,.name = "Shaman"},
+    {.mask = 128,.name = "Mage"}, {.mask = 256,.name = "Warlock"}, {.mask = 1024,.name = "Druid"},
 };
 
 struct RaceMaskEntry { uint32_t mask; const char* name; };
 inline constexpr RaceMaskEntry kRaceMasks[] = {
-    {1,"Human"}, {2,"Orc"}, {4,"Dwarf"}, {8,"Night Elf"},
-    {16,"Undead"}, {32,"Tauren"}, {64,"Gnome"}, {128,"Troll"},
-    {512,"Blood Elf"}, {1024,"Draenei"},
+    {.mask = 1,.name = "Human"}, {.mask = 2,.name = "Orc"}, {.mask = 4,.name = "Dwarf"}, {.mask = 8,.name = "Night Elf"},
+    {.mask = 16,.name = "Undead"}, {.mask = 32,.name = "Tauren"}, {.mask = 64,.name = "Gnome"}, {.mask = 128,.name = "Troll"},
+    {.mask = 512,.name = "Blood Elf"}, {.mask = 1024,.name = "Draenei"},
 };
 
 // ---- WoW class colors (Blizzard canonical) ----

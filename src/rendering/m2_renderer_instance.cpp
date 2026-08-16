@@ -304,14 +304,14 @@ void M2Renderer::clear() {
             // Re-allocate the glow texture descriptor set (pre-allocated during init,
             // invalidated by pool reset).
             if (glowTexture_ && particleTexLayout_) {
-                VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+                VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
                 ai.descriptorPool = materialDescPool_;
                 ai.descriptorSetCount = 1;
                 ai.pSetLayouts = &particleTexLayout_;
                 glowTexDescSet_ = VK_NULL_HANDLE;
                 if (vkAllocateDescriptorSets(device, &ai, &glowTexDescSet_) == VK_SUCCESS) {
                     VkDescriptorImageInfo imgInfo = glowTexture_->descriptorInfo();
-                    VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                    VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                     write.dstSet = glowTexDescSet_;
                     write.dstBinding = 0;
                     write.descriptorCount = 1;
@@ -331,7 +331,7 @@ void M2Renderer::clear() {
                 bufInfo.buffer = dummyBoneBuffer_;
                 bufInfo.offset = 0;
                 bufInfo.range = sizeof(glm::mat4);
-                VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                 write.dstSet = dummyBoneSet_;
                 write.dstBinding = 0;
                 write.descriptorCount = 1;
@@ -347,7 +347,7 @@ void M2Renderer::clear() {
                     mbInfo.buffer = megaBoneBuffer_[i];
                     mbInfo.offset = 0;
                     mbInfo.range = VkDeviceSize(MEGA_BONE_MATRIX_CAPACITY) * sizeof(glm::mat4);
-                    VkWriteDescriptorSet mw{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                    VkWriteDescriptorSet mw{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                     mw.dstSet = megaBoneSet_[i];
                     mw.dstBinding = 0;
                     mw.descriptorCount = 1;

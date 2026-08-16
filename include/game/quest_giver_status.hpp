@@ -53,20 +53,20 @@ inline QuestGiverMarker questGiverMarker(QuestGiverStatus status) {
     switch (status) {
         case QuestGiverStatus::AVAILABLE:
         case QuestGiverStatus::AVAILABLE_REP:
-            return {"!", false, "Has a quest available", true};
+            return {.symbol = "!", .dim = false, .tooltip = "Has a quest available", .onMinimap = true};
         case QuestGiverStatus::LOW_LEVEL_AVAILABLE:
         case QuestGiverStatus::LOW_LEVEL_AVAILABLE_REP:
-            return {"!", true, "Has a low-level quest available", true};
+            return {.symbol = "!", .dim = true, .tooltip = "Has a low-level quest available", .onMinimap = true};
         case QuestGiverStatus::REWARD:
         case QuestGiverStatus::REWARD_REP:
-            return {"?", false, "Quest ready to turn in", true};
+            return {.symbol = "?", .dim = false, .tooltip = "Quest ready to turn in", .onMinimap = true};
         // The same mark, and deliberately not on the minimap.
         case QuestGiverStatus::REWARD2:
-            return {"?", false, "Quest ready to turn in", false};
+            return {.symbol = "?", .dim = false, .tooltip = "Quest ready to turn in", .onMinimap = false};
         case QuestGiverStatus::LOW_LEVEL_REWARD_REP:
-            return {"?", true, "Quest ready to turn in", true};
+            return {.symbol = "?", .dim = true, .tooltip = "Quest ready to turn in", .onMinimap = true};
         case QuestGiverStatus::INCOMPLETE:
-            return {"?", true, "Quest in progress", true};
+            return {.symbol = "?", .dim = true, .tooltip = "Quest in progress", .onMinimap = true};
         case QuestGiverStatus::NONE:
         case QuestGiverStatus::UNAVAILABLE:
             break;

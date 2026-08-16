@@ -107,9 +107,9 @@ bool VkRenderTarget::create(VkContext& ctx, uint32_t width, uint32_t height,
         attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         attachments[2].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-        VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-        VkAttachmentReference resolveRef{1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-        VkAttachmentReference depthRef{2, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+        VkAttachmentReference colorRef{.attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+        VkAttachmentReference resolveRef{.attachment = 1, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+        VkAttachmentReference depthRef{.attachment = 2, .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
 
         VkSubpassDescription subpass{};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -197,8 +197,8 @@ bool VkRenderTarget::create(VkContext& ctx, uint32_t width, uint32_t height,
         attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-        VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-        VkAttachmentReference depthRef{1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+        VkAttachmentReference colorRef{.attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+        VkAttachmentReference depthRef{.attachment = 1, .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
 
         VkSubpassDescription subpass{};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -293,19 +293,19 @@ void VkRenderTarget::beginPass(VkCommandBuffer cmd, const VkClearColorValue& cle
     rpBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     rpBegin.renderPass = renderPass_;
     rpBegin.framebuffer = framebuffer_;
-    rpBegin.renderArea.offset = {0, 0};
+    rpBegin.renderArea.offset = {.x = 0, .y = 0};
     rpBegin.renderArea.extent = getExtent();
 
     VkClearValue clearValues[3]{};
     clearValues[0].color = clear;           // MSAA color (or single-sample color)
     clearValues[1].color = clear;           // resolve (only used for MSAA)
-    clearValues[2].depthStencil = {1.0f, 0}; // depth
+    clearValues[2].depthStencil = {.depth = 1.0f, .stencil = 0}; // depth
 
     bool useMSAA = msaaSamples_ != VK_SAMPLE_COUNT_1_BIT;
     if (useMSAA) {
         rpBegin.clearValueCount = hasDepth_ ? 3u : 2u;
     } else {
-        clearValues[1].depthStencil = {1.0f, 0}; // depth is attachment 1 in non-MSAA
+        clearValues[1].depthStencil = {.depth = 1.0f, .stencil = 0}; // depth is attachment 1 in non-MSAA
         rpBegin.clearValueCount = hasDepth_ ? 2u : 1u;
     }
     rpBegin.pClearValues = clearValues;
@@ -323,7 +323,7 @@ void VkRenderTarget::beginPass(VkCommandBuffer cmd, const VkClearColorValue& cle
     vkCmdSetViewport(cmd, 0, 1, &viewport);
 
     VkRect2D scissor{};
-    scissor.offset = {0, 0};
+    scissor.offset = {.x = 0, .y = 0};
     scissor.extent = getExtent();
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 }

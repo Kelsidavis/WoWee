@@ -136,7 +136,7 @@ public:
                     float intensity, bool wading);
 
     VkRenderPass getReflectionRenderPass() const { return reflectionRenderPass; }
-    VkExtent2D getReflectionExtent() const { return {REFLECTION_WIDTH, REFLECTION_HEIGHT}; }
+    VkExtent2D getReflectionExtent() const { return {.width = REFLECTION_WIDTH, .height = REFLECTION_HEIGHT}; }
     bool hasReflectionPass() const { return reflectionRenderPass != VK_NULL_HANDLE; }
     bool hasSurfaces() const { return !surfaces.empty(); }
 
@@ -209,7 +209,7 @@ private:
         VkDescriptorSet sceneSet = VK_NULL_HANDLE;
     };
     PerFrameSceneHistory sceneHistory[SCENE_HISTORY_FRAMES];
-    VkExtent2D sceneHistoryExtent = {0, 0};
+    VkExtent2D sceneHistoryExtent = {.width = 0, .height = 0};
     bool sceneHistoryReady = false;
     mutable uint32_t renderDiagCounter_ = 0;
 
@@ -256,7 +256,7 @@ private:
     std::vector<WaterSurface> surfaces;
     bool renderingEnabled = true;
     bool refractionEnabled = false;
-    VkExtent2D renderExtent_{0, 0};
+    VkExtent2D renderExtent_{.width = 0, .height = 0};
 };
 
 } // namespace rendering

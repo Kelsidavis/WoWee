@@ -938,7 +938,7 @@ private:
         void put(float x, float y, float result, float normalZ, uint32_t frame) {
             uint64_t k = makeKey(x, y);
             size_t slot = k % CAPACITY;
-            entries[slot] = { k, result, normalZ, frame };
+            entries[slot] = { .key = k, .resultZ = result, .normalZ = normalZ, .frameId = frame };
         }
     };
 };

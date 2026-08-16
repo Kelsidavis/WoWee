@@ -76,8 +76,8 @@ void OverlaySystem::initSelectionCircle() {
     selCirclePipelineLayout_ = createPipelineLayout(device, {}, {pcRange});
 
     // Vertex input: binding 0, stride 12, vec3 at location 0
-    VkVertexInputBindingDescription vertBind{0, 12, VK_VERTEX_INPUT_RATE_VERTEX};
-    VkVertexInputAttributeDescription vertAttr{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
+    VkVertexInputBindingDescription vertBind{.binding = 0, .stride = 12, .inputRate = VK_VERTEX_INPUT_RATE_VERTEX};
+    VkVertexInputAttributeDescription vertAttr{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0};
 
     // Build disc geometry as TRIANGLE_LIST (N=48 segments)
     constexpr int SEGMENTS = 48;

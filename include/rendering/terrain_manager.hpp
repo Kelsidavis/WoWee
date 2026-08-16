@@ -372,8 +372,8 @@ private:
     std::unordered_map<TileCoord, bool, TileCoord::Hash> failedTiles;
 
     // Current tile (where camera is)
-    TileCoord currentTile = {-1, -1};
-    TileCoord lastStreamTile = {-1, -1};
+    TileCoord currentTile = {.x = -1, .y = -1};
+    TileCoord lastStreamTile = {.x = -1, .y = -1};
 
     // Streaming parameters
     bool streamingEnabled = true;

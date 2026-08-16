@@ -29,11 +29,11 @@ struct AnimOutput {
 
     /// Construct a valid output.
     static AnimOutput ok(uint32_t id, bool looping) {
-        return {id, looping, true};
+        return {.animId = id, .loop = looping, .valid = true};
     }
     /// Construct an invalid output (STAY policy).
     static AnimOutput stay() {
-        return {0, false, false};
+        return {.animId = 0, .loop = false, .valid = false};
     }
 };
 

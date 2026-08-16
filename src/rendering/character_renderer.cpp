@@ -364,7 +364,7 @@ bool CharacterRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFram
         bindings[2].descriptorCount = 1;
         bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        VkDescriptorSetLayoutCreateInfo ci{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+        VkDescriptorSetLayoutCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
         ci.bindingCount = 3;
         ci.pBindings = bindings;
         vkCreateDescriptorSetLayout(device, &ci, nullptr, &materialSetLayout_);
@@ -378,7 +378,7 @@ bool CharacterRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFram
         binding.descriptorCount = 1;
         binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-        VkDescriptorSetLayoutCreateInfo ci{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+        VkDescriptorSetLayoutCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
         ci.bindingCount = 1;
         ci.pBindings = &binding;
         vkCreateDescriptorSetLayout(device, &ci, nullptr, &boneSetLayout_);
@@ -389,10 +389,10 @@ bool CharacterRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFram
     // pools so we can reset safely each frame slot without exhausting descriptors.
     for (int i = 0; i < 2; i++) {
         VkDescriptorPoolSize sizes[] = {
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_MATERIAL_SETS * 2},  // diffuse + normal/height
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, MAX_MATERIAL_SETS},
+            {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = MAX_MATERIAL_SETS * 2},  // diffuse + normal/height
+            {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .descriptorCount = MAX_MATERIAL_SETS},
         };
-        VkDescriptorPoolCreateInfo ci{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        VkDescriptorPoolCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         ci.maxSets = MAX_MATERIAL_SETS;
         ci.poolSizeCount = 2;
         ci.pPoolSizes = sizes;
@@ -401,9 +401,9 @@ bool CharacterRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFram
     }
     {
         VkDescriptorPoolSize sizes[] = {
-            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_BONE_SETS},
+            {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = MAX_BONE_SETS},
         };
-        VkDescriptorPoolCreateInfo ci{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        VkDescriptorPoolCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         ci.maxSets = MAX_BONE_SETS;
         ci.poolSizeCount = 1;
         ci.pPoolSizes = sizes;
@@ -421,7 +421,7 @@ bool CharacterRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFram
         uint32_t alignedUboSize = (sizeof(CharMaterialUBO) + materialUboAlignment_ - 1) & ~(materialUboAlignment_ - 1);
         uint32_t ringSize = alignedUboSize * MATERIAL_RING_CAPACITY;
         for (int i = 0; i < 2; i++) {
-            VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+            VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
             bci.size = ringSize;
             bci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
             VmaAllocationCreateInfo aci{};
@@ -444,7 +444,7 @@ bool CharacterRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFram
         pushRange.offset = 0;
         pushRange.size = 64; // mat4
 
-        VkPipelineLayoutCreateInfo ci{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+        VkPipelineLayoutCreateInfo ci{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         ci.setLayoutCount = 3;
         ci.pSetLayouts = setLayouts;
         ci.pushConstantRangeCount = 1;
@@ -1120,18 +1120,18 @@ namespace {
 struct AtlasRegion256 { int x, y, w, h; bool known; };
 
 AtlasRegion256 regionFor(const std::string& pathLower) {
-    if (pathLower.find("faceupper") != std::string::npos) return {  0, 160, 128, 32, true};
-    if (pathLower.find("facelower") != std::string::npos) return {  0, 192, 128, 64, true};
-    if (pathLower.find("pelvis")    != std::string::npos) return {128,  96, 128, 64, true};
-    if (pathLower.find("torso")     != std::string::npos) return {128,   0, 128, 64, true};
-    if (pathLower.find("armupper")  != std::string::npos) return {  0,   0, 128, 64, true};
-    if (pathLower.find("armlower")  != std::string::npos) return {  0,  64, 128, 64, true};
-    if (pathLower.find("hand")      != std::string::npos) return {  0, 128, 128, 32, true};
+    if (pathLower.find("faceupper") != std::string::npos) return {  .x = 0, .y = 160, .w = 128, .h = 32, .known = true};
+    if (pathLower.find("facelower") != std::string::npos) return {  .x = 0, .y = 192, .w = 128, .h = 64, .known = true};
+    if (pathLower.find("pelvis")    != std::string::npos) return {.x = 128,  .y = 96, .w = 128, .h = 64, .known = true};
+    if (pathLower.find("torso")     != std::string::npos) return {.x = 128,   .y = 0, .w = 128, .h = 64, .known = true};
+    if (pathLower.find("armupper")  != std::string::npos) return {  .x = 0,   .y = 0, .w = 128, .h = 64, .known = true};
+    if (pathLower.find("armlower")  != std::string::npos) return {  .x = 0,  .y = 64, .w = 128, .h = 64, .known = true};
+    if (pathLower.find("hand")      != std::string::npos) return {  .x = 0, .y = 128, .w = 128, .h = 32, .known = true};
     if (pathLower.find("foot")      != std::string::npos ||
-        pathLower.find("feet")      != std::string::npos) return {128, 224, 128, 32, true};
+        pathLower.find("feet")      != std::string::npos) return {.x = 128, .y = 224, .w = 128, .h = 32, .known = true};
     if (pathLower.find("legupper")  != std::string::npos ||
-        pathLower.find("leg")       != std::string::npos) return {128, 160, 128, 64, true};
-    return {0, 0, 0, 0, false};
+        pathLower.find("leg")       != std::string::npos) return {.x = 128, .y = 160, .w = 128, .h = 64, .known = true};
+    return {.x = 0, .y = 0, .w = 0, .h = 0, .known = false};
 }
 
 std::string lowerPath(const std::string& s) {
@@ -2514,13 +2514,13 @@ void CharacterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet,
         if (!diffuse || !normal) return VK_NULL_HANDLE;
         const VkDescriptorImageInfo diffuseInfo = diffuse->descriptorInfo();
         const VkDescriptorImageInfo normalInfo = normal->descriptorInfo();
-        const MaterialDescriptorKey key{diffuseInfo.imageView, normalInfo.imageView,
-                                        diffuseInfo.sampler, normalInfo.sampler};
+        const MaterialDescriptorKey key{.diffuse = diffuseInfo.imageView, .normal = normalInfo.imageView,
+                                        .diffuseSampler = diffuseInfo.sampler, .normalSampler = normalInfo.sampler};
         auto& cache = materialDescriptorCache_[frameSlot];
         if (auto it = cache.find(key); it != cache.end()) return it->second;
 
         VkDescriptorSet set = VK_NULL_HANDLE;
-        VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+        VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
         ai.descriptorPool = materialDescPools_[frameSlot];
         ai.descriptorSetCount = 1;
         ai.pSetLayouts = &materialSetLayout_;
@@ -2532,12 +2532,12 @@ void CharacterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet,
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(CharMaterialUBO);
         VkWriteDescriptorSet writes[3] = {};
-        writes[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, set, 0, 0, 1,
-                     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &diffuseInfo, nullptr, nullptr};
-        writes[1] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, set, 1, 0, 1,
-                     VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, nullptr, &bufferInfo, nullptr};
-        writes[2] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, set, 2, 0, 1,
-                     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &normalInfo, nullptr, nullptr};
+        writes[0] = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pNext = nullptr, .dstSet = set, .dstBinding = 0, .dstArrayElement = 0, .descriptorCount = 1,
+                     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &diffuseInfo, .pBufferInfo = nullptr, .pTexelBufferView = nullptr};
+        writes[1] = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pNext = nullptr, .dstSet = set, .dstBinding = 1, .dstArrayElement = 0, .descriptorCount = 1,
+                     .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .pImageInfo = nullptr, .pBufferInfo = &bufferInfo, .pTexelBufferView = nullptr};
+        writes[2] = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pNext = nullptr, .dstSet = set, .dstBinding = 2, .dstArrayElement = 0, .descriptorCount = 1,
+                     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &normalInfo, .pBufferInfo = nullptr, .pTexelBufferView = nullptr};
         vkUpdateDescriptorSets(vkCtx_->getDevice(), 3, writes, 0, nullptr);
         cache.emplace(key, set);
         return set;
@@ -3153,7 +3153,7 @@ bool CharacterRenderer::initializeShadow(VkRenderPass shadowRenderPass) {
         texPoolSizes[0].descriptorCount = 256;
         texPoolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         texPoolSizes[1].descriptorCount = 256;
-        VkDescriptorPoolCreateInfo texPoolCI{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        VkDescriptorPoolCreateInfo texPoolCI{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         texPoolCI.maxSets = 256;
         texPoolCI.poolSizeCount = 2;
         texPoolCI.pPoolSizes = texPoolSizes;
@@ -3183,7 +3183,7 @@ bool CharacterRenderer::initializeShadow(VkRenderPass shadowRenderPass) {
     pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     pc.offset = 0;
     pc.size = 128;
-    VkPipelineLayoutCreateInfo plCI{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    VkPipelineLayoutCreateInfo plCI{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     plCI.setLayoutCount = 2;
     plCI.pSetLayouts = setLayouts;
     plCI.pushConstantRangeCount = 1;
@@ -3408,7 +3408,7 @@ VkDescriptorSet CharacterRenderer::shadowTexDescSet(VkTexture* tex, uint32_t fra
     VkImageView view = tex->getImageView();
     if (auto it = shadowTexSetCache_.find(view); it != shadowTexSetCache_.end()) return it->second;
 
-    VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
     ai.descriptorPool = pool;
     ai.descriptorSetCount = 1;
     ai.pSetLayouts = &shadowParams_.layout;
@@ -3490,7 +3490,7 @@ VkTexture* CharacterRenderer::resolveBatchTexture(const CharacterInstance& inst,
                 }
 
                 if (!hasFirst) {
-                    first = {texPtr, texType};
+                    first = {.tex = texPtr, .type = texType};
                     hasFirst = true;
                 }
 
@@ -3502,7 +3502,7 @@ VkTexture* CharacterRenderer::resolveBatchTexture(const CharacterInstance& inst,
                 }
 
                 if (!hasFirstNonWhite) {
-                    firstNonWhite = {texPtr, texType};
+                    firstNonWhite = {.tex = texPtr, .type = texType};
                     hasFirstNonWhite = true;
                 }
             }

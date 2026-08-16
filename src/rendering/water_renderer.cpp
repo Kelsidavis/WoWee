@@ -290,14 +290,14 @@ void WaterRenderer::setRefractionEnabled(bool enabled) {
                 toTransfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
                 toTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
                 toTransfer.image = sh.colorImage;
-                toTransfer.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+                toTransfer.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
                 toTransfer.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
                 toTransfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
                 vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                      0, 0, nullptr, 0, nullptr, 1, &toTransfer);
 
                 VkClearColorValue clearColor = {{0.0f, 0.0f, 0.0f, 0.0f}};
-                VkImageSubresourceRange range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+                VkImageSubresourceRange range = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
                 vkCmdClearColorImage(cmd, sh.colorImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColor, 1, &range);
 
                 VkImageMemoryBarrier toRead = toTransfer;
@@ -364,7 +364,7 @@ void WaterRenderer::destroySceneHistoryResources() {
     }
     sceneColorSampler = VK_NULL_HANDLE; // Owned by VkContext sampler cache
     sceneDepthSampler = VK_NULL_HANDLE; // Owned by VkContext sampler cache
-    sceneHistoryExtent = {0, 0};
+    sceneHistoryExtent = {.width = 0, .height = 0};
     sceneHistoryReady = false;
 }
 
@@ -380,7 +380,7 @@ void WaterRenderer::destroySceneHistoryResources() {
 // nothing downstream can put that back. It is the thing in the middle of the
 // screen, so it gets the pixels.
 VkExtent2D WaterRenderer::refractionCaptureExtent() const {
-    VkExtent2D full = vkCtx ? vkCtx->getSwapchainExtent() : VkExtent2D{0, 0};
+    VkExtent2D full = vkCtx ? vkCtx->getSwapchainExtent() : VkExtent2D{.width = 0, .height = 0};
     return { std::max(1u, full.width), std::max(1u, full.height) };
 }
 
@@ -417,7 +417,7 @@ void WaterRenderer::createSceneHistoryResources(VkExtent2D extent, VkFormat colo
     colorImgInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     colorImgInfo.imageType = VK_IMAGE_TYPE_2D;
     colorImgInfo.format = colorFormat;
-    colorImgInfo.extent = {extent.width, extent.height, 1};
+    colorImgInfo.extent = {.width = extent.width, .height = extent.height, .depth = 1};
     colorImgInfo.mipLevels = 1;
     colorImgInfo.arrayLayers = 1;
     colorImgInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -552,7 +552,7 @@ void WaterRenderer::createSceneHistoryResources(VkExtent2D extent, VkFormat colo
             b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             b.image = sceneHistory[f].colorImage;
-            b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            b.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
             b.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             barriers.push_back(b);
 
@@ -1231,20 +1231,20 @@ void WaterRenderer::captureSceneHistory(VkCommandBuffer cmd,
 
     if (needsScaling) {
         VkImageBlit colorBlit{};
-        colorBlit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        colorBlit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        colorBlit.srcOffsets[1] = {static_cast<int32_t>(srcExtent.width),
-                                   static_cast<int32_t>(srcExtent.height), 1};
-        colorBlit.dstOffsets[1] = {static_cast<int32_t>(sceneHistoryExtent.width),
-                                   static_cast<int32_t>(sceneHistoryExtent.height), 1};
+        colorBlit.srcSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
+        colorBlit.dstSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
+        colorBlit.srcOffsets[1] = {.x = static_cast<int32_t>(srcExtent.width),
+                                   .y = static_cast<int32_t>(srcExtent.height), .z = 1};
+        colorBlit.dstOffsets[1] = {.x = static_cast<int32_t>(sceneHistoryExtent.width),
+                                   .y = static_cast<int32_t>(sceneHistoryExtent.height), .z = 1};
         vkCmdBlitImage(cmd, srcColorImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                        sh.colorImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                        1, &colorBlit, VK_FILTER_LINEAR);
     } else {
         VkImageCopy colorCopy{};
-        colorCopy.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        colorCopy.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        colorCopy.extent = {copyExtent.width, copyExtent.height, 1};
+        colorCopy.srcSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
+        colorCopy.dstSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
+        colorCopy.extent = {.width = copyExtent.width, .height = copyExtent.height, .depth = 1};
         vkCmdCopyImage(cmd, srcColorImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                        sh.colorImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &colorCopy);
     }
@@ -1273,20 +1273,20 @@ void WaterRenderer::captureSceneHistory(VkCommandBuffer cmd,
             // Depth must not be filtered - an interpolated depth is a surface
             // that exists nowhere.
             VkImageBlit depthBlit{};
-            depthBlit.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
-            depthBlit.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
-            depthBlit.srcOffsets[1] = {static_cast<int32_t>(srcExtent.width),
-                                       static_cast<int32_t>(srcExtent.height), 1};
-            depthBlit.dstOffsets[1] = {static_cast<int32_t>(sceneHistoryExtent.width),
-                                       static_cast<int32_t>(sceneHistoryExtent.height), 1};
+            depthBlit.srcSubresource = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
+            depthBlit.dstSubresource = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
+            depthBlit.srcOffsets[1] = {.x = static_cast<int32_t>(srcExtent.width),
+                                       .y = static_cast<int32_t>(srcExtent.height), .z = 1};
+            depthBlit.dstOffsets[1] = {.x = static_cast<int32_t>(sceneHistoryExtent.width),
+                                       .y = static_cast<int32_t>(sceneHistoryExtent.height), .z = 1};
             vkCmdBlitImage(cmd, srcDepthImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                            sh.depthImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                            1, &depthBlit, VK_FILTER_NEAREST);
         } else {
             VkImageCopy depthCopy{};
-            depthCopy.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
-            depthCopy.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
-            depthCopy.extent = {copyExtent.width, copyExtent.height, 1};
+            depthCopy.srcSubresource = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
+            depthCopy.dstSubresource = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
+            depthCopy.extent = {.width = copyExtent.width, .height = copyExtent.height, .depth = 1};
             vkCmdCopyImage(cmd, srcDepthImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                            sh.depthImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &depthCopy);
         }
@@ -1565,7 +1565,7 @@ void WaterRenderer::createReflectionResources() {
     colorImgCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     colorImgCI.imageType = VK_IMAGE_TYPE_2D;
     colorImgCI.format = vkCtx->getSwapchainFormat();
-    colorImgCI.extent = {REFLECTION_WIDTH, REFLECTION_HEIGHT, 1};
+    colorImgCI.extent = {.width = REFLECTION_WIDTH, .height = REFLECTION_HEIGHT, .depth = 1};
     colorImgCI.mipLevels = 1;
     colorImgCI.arrayLayers = 1;
     colorImgCI.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1587,7 +1587,7 @@ void WaterRenderer::createReflectionResources() {
     colorViewCI.image = reflectionColorImage;
     colorViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
     colorViewCI.format = vkCtx->getSwapchainFormat();
-    colorViewCI.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    colorViewCI.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
     if (vkCreateImageView(device, &colorViewCI, nullptr, &reflectionColorView) != VK_SUCCESS) {
         LOG_ERROR("WaterRenderer: failed to create reflection color view");
         return;
@@ -1598,7 +1598,7 @@ void WaterRenderer::createReflectionResources() {
     depthImgCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     depthImgCI.imageType = VK_IMAGE_TYPE_2D;
     depthImgCI.format = vkCtx->getDepthFormat();
-    depthImgCI.extent = {REFLECTION_WIDTH, REFLECTION_HEIGHT, 1};
+    depthImgCI.extent = {.width = REFLECTION_WIDTH, .height = REFLECTION_HEIGHT, .depth = 1};
     depthImgCI.mipLevels = 1;
     depthImgCI.arrayLayers = 1;
     depthImgCI.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1617,7 +1617,7 @@ void WaterRenderer::createReflectionResources() {
     depthViewCI.image = reflectionDepthImage;
     depthViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
     depthViewCI.format = vkCtx->getDepthFormat();
-    depthViewCI.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+    depthViewCI.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
     if (vkCreateImageView(device, &depthViewCI, nullptr, &reflectionDepthView) != VK_SUCCESS) {
         LOG_ERROR("WaterRenderer: failed to create reflection depth view");
         return;
@@ -1658,8 +1658,8 @@ void WaterRenderer::createReflectionResources() {
     depthAttach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     depthAttach.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-    VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-    VkAttachmentReference depthRef{1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+    VkAttachmentReference colorRef{.attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+    VkAttachmentReference depthRef{.attachment = 1, .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -1740,7 +1740,7 @@ void WaterRenderer::createReflectionResources() {
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.image = reflectionColorImage;
-        barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        barrier.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
         vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
@@ -1783,19 +1783,19 @@ bool WaterRenderer::beginReflectionPass(VkCommandBuffer cmd) {
     rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     rpInfo.renderPass = reflectionRenderPass;
     rpInfo.framebuffer = reflectionFramebuffer;
-    rpInfo.renderArea = {{0, 0}, {REFLECTION_WIDTH, REFLECTION_HEIGHT}};
+    rpInfo.renderArea = {.offset = {.x = 0, .y = 0}, .extent = {.width = REFLECTION_WIDTH, .height = REFLECTION_HEIGHT}};
 
     VkClearValue clears[2]{};
     clears[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-    clears[1].depthStencil = {1.0f, 0};
+    clears[1].depthStencil = {.depth = 1.0f, .stencil = 0};
     rpInfo.clearValueCount = 2;
     rpInfo.pClearValues = clears;
 
     vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    VkViewport vp{0, 0, static_cast<float>(REFLECTION_WIDTH), static_cast<float>(REFLECTION_HEIGHT), 0.0f, 1.0f};
+    VkViewport vp{.x = 0, .y = 0, .width = static_cast<float>(REFLECTION_WIDTH), .height = static_cast<float>(REFLECTION_HEIGHT), .minDepth = 0.0f, .maxDepth = 1.0f};
     vkCmdSetViewport(cmd, 0, 1, &vp);
-    VkRect2D sc{{0, 0}, {REFLECTION_WIDTH, REFLECTION_HEIGHT}};
+    VkRect2D sc{.offset = {.x = 0, .y = 0}, .extent = {.width = REFLECTION_WIDTH, .height = REFLECTION_HEIGHT}};
     vkCmdSetScissor(cmd, 0, 1, &sc);
 
     return true;
@@ -2040,8 +2040,8 @@ bool WaterRenderer::createWater1xPass(VkFormat colorFormat, VkFormat depthFormat
     attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-    VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-    VkAttachmentReference depthRef{1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+    VkAttachmentReference colorRef{.attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+    VkAttachmentReference depthRef{.attachment = 1, .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;

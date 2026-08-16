@@ -116,7 +116,7 @@ bool FootprintRenderer::createDescriptorResources() {
     VkDescriptorPoolSize size{};
     size.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     size.descriptorCount = kTextureCount;
-    VkDescriptorPoolCreateInfo pool{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    VkDescriptorPoolCreateInfo pool{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     pool.maxSets = kTextureCount;
     pool.poolSizeCount = 1;
     pool.pPoolSizes = &size;
@@ -124,7 +124,7 @@ bool FootprintRenderer::createDescriptorResources() {
 
     std::array<VkDescriptorSetLayout, kTextureCount> layouts{};
     layouts.fill(materialSetLayout_);
-    VkDescriptorSetAllocateInfo alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    VkDescriptorSetAllocateInfo alloc{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
     alloc.descriptorPool = descriptorPool_;
     alloc.descriptorSetCount = kTextureCount;
     alloc.pSetLayouts = layouts.data();
@@ -149,9 +149,9 @@ bool FootprintRenderer::createPipeline() {
         pipelineLayout_ = createPipelineLayout(device, {perFrameLayout_, materialSetLayout_}, {push});
     }
 
-    VkVertexInputBindingDescription binding{0, 5 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
-    VkVertexInputAttributeDescription pos{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    VkVertexInputAttributeDescription uv{1, 0, VK_FORMAT_R32G32_SFLOAT, 3 * sizeof(float)};
+    VkVertexInputBindingDescription binding{.binding = 0, .stride = 5 * sizeof(float), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX};
+    VkVertexInputAttributeDescription pos{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0};
+    VkVertexInputAttributeDescription uv{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 3 * sizeof(float)};
     pipeline_ = PipelineBuilder()
         .setShaders(vert.stageInfo(VK_SHADER_STAGE_VERTEX_BIT), frag.stageInfo(VK_SHADER_STAGE_FRAGMENT_BIT))
         .setVertexInput({binding}, {pos, uv})
@@ -216,7 +216,7 @@ bool FootprintRenderer::loadFootprintData(pipeline::AssetManager* assets) {
         textures_[i].createSampler(device, VK_FILTER_LINEAR, VK_FILTER_LINEAR,
                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
         VkDescriptorImageInfo imageInfo = textures_[i].descriptorInfo();
-        VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+        VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
         write.dstSet = textureSets_[i];
         write.dstBinding = 0;
         write.descriptorCount = 1;
@@ -266,11 +266,11 @@ FootprintRenderer::Profile FootprintRenderer::resolveProfile(
 
     // Yards, to match the converted DBC dimensions above.
     switch (fallback) {
-        case FootprintFallback::HOOF:   return {4, 0.50f, 0.33f};
-        case FootprintFallback::PAW:    return {5, 0.67f, 0.50f};
-        case FootprintFallback::CLAW:   return {2, 0.67f, 0.50f};
-        case FootprintFallback::CLOVEN: return {3, 0.60f, 0.43f};
-        case FootprintFallback::BIPED:  return {0, 0.33f, 0.28f};
+        case FootprintFallback::HOOF:   return {.textureIndex = 4, .length = 0.50f, .width = 0.33f};
+        case FootprintFallback::PAW:    return {.textureIndex = 5, .length = 0.67f, .width = 0.50f};
+        case FootprintFallback::CLAW:   return {.textureIndex = 2, .length = 0.67f, .width = 0.50f};
+        case FootprintFallback::CLOVEN: return {.textureIndex = 3, .length = 0.60f, .width = 0.43f};
+        case FootprintFallback::BIPED:  return {.textureIndex = 0, .length = 0.33f, .width = 0.28f};
     }
     return {};
 }

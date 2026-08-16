@@ -812,7 +812,7 @@ bool VkContext::createSwapchain(int width, int height) {
     vkb::SwapchainBuilder swapchainBuilder{physicalDevice, device, surface};
 
     auto& builder = swapchainBuilder
-        .set_desired_format({VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
+        .set_desired_format({.format = VK_FORMAT_B8G8R8A8_UNORM, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
         .set_desired_extent(static_cast<uint32_t>(width), static_cast<uint32_t>(height))
         .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
         .set_desired_min_image_count(2)
@@ -1007,7 +1007,7 @@ bool VkContext::createDepthBuffer() {
     imgInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imgInfo.imageType = VK_IMAGE_TYPE_2D;
     imgInfo.format = depthFormat;
-    imgInfo.extent = {swapchainExtent.width, swapchainExtent.height, 1};
+    imgInfo.extent = {.width = swapchainExtent.width, .height = swapchainExtent.height, .depth = 1};
     imgInfo.mipLevels = 1;
     imgInfo.arrayLayers = 1;
     imgInfo.samples = msaaSamples_;
@@ -1066,7 +1066,7 @@ bool VkContext::createMsaaColorImage() {
     imgInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imgInfo.imageType = VK_IMAGE_TYPE_2D;
     imgInfo.format = swapchainFormat;
-    imgInfo.extent = {swapchainExtent.width, swapchainExtent.height, 1};
+    imgInfo.extent = {.width = swapchainExtent.width, .height = swapchainExtent.height, .depth = 1};
     imgInfo.mipLevels = 1;
     imgInfo.arrayLayers = 1;
     imgInfo.samples = msaaSamples_;
@@ -1121,7 +1121,7 @@ bool VkContext::createDepthResolveImage() {
     imgInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imgInfo.imageType = VK_IMAGE_TYPE_2D;
     imgInfo.format = depthFormat;
-    imgInfo.extent = {swapchainExtent.width, swapchainExtent.height, 1};
+    imgInfo.extent = {.width = swapchainExtent.width, .height = swapchainExtent.height, .depth = 1};
     imgInfo.mipLevels = 1;
     imgInfo.arrayLayers = 1;
     imgInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1461,7 +1461,7 @@ bool VkContext::createImGuiResources() {
     // items, talents, buffs, etc.) that are uploaded and cached for the session.
     static constexpr uint32_t IMGUI_POOL_SIZE = 2048;
     VkDescriptorPoolSize poolSizes[] = {
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, IMGUI_POOL_SIZE},
+        {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = IMGUI_POOL_SIZE},
     };
 
     VkDescriptorPoolCreateInfo dpInfo{};
@@ -1804,7 +1804,7 @@ VkDescriptorSet VkContext::uploadImGuiTexture(const uint8_t* rgba, int width, in
         imgInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imgInfo.imageType = VK_IMAGE_TYPE_2D;
         imgInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-        imgInfo.extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1};
+        imgInfo.extent = {.width = static_cast<uint32_t>(width), .height = static_cast<uint32_t>(height), .depth = 1};
         imgInfo.mipLevels = 1;
         imgInfo.arrayLayers = 1;
         imgInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1883,7 +1883,7 @@ VkDescriptorSet VkContext::uploadImGuiTexture(const uint8_t* rgba, int width, in
         viewInfo.image = image;
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         viewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-        viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        viewInfo.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
         if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
             vkDestroyImage(device, image, nullptr);
             vkFreeMemory(device, imageMemory, nullptr);
@@ -1952,7 +1952,7 @@ bool VkContext::recreateSwapchain(int width, int height) {
 
     vkb::SwapchainBuilder swapchainBuilder{physicalDevice, device, surface};
     auto& builder = swapchainBuilder
-        .set_desired_format({VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
+        .set_desired_format({.format = VK_FORMAT_B8G8R8A8_UNORM, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
         .set_desired_extent(static_cast<uint32_t>(width), static_cast<uint32_t>(height))
         .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
         .set_desired_min_image_count(2)

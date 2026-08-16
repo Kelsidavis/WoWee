@@ -73,7 +73,7 @@ inline void insertBounds(SpatialGrid& grid, const glm::vec3& boundsMin,
     for (int z = minCell.z; z <= maxCell.z; z++) {
         for (int y = minCell.y; y <= maxCell.y; y++) {
             for (int x = minCell.x; x <= maxCell.x; x++) {
-                grid[GridCell{x, y, z}].push_back(id);
+                grid[GridCell{.x = x, .y = y, .z = z}].push_back(id);
             }
         }
     }
@@ -95,7 +95,7 @@ inline void eraseBounds(SpatialGrid& grid, const glm::vec3& boundsMin,
     for (int z = minCell.z; z <= maxCell.z; z++) {
         for (int y = minCell.y; y <= maxCell.y; y++) {
             for (int x = minCell.x; x <= maxCell.x; x++) {
-                auto it = grid.find(GridCell{x, y, z});
+                auto it = grid.find(GridCell{.x = x, .y = y, .z = z});
                 if (it == grid.end()) continue;
                 auto& ids = it->second;
                 ids.erase(std::remove(ids.begin(), ids.end(), id), ids.end());
@@ -137,7 +137,7 @@ inline void gatherIds(const SpatialGrid& grid, const glm::vec3& queryMin,
     for (int z = minCell.z; z <= maxCell.z; z++) {
         for (int y = minCell.y; y <= maxCell.y; y++) {
             for (int x = minCell.x; x <= maxCell.x; x++) {
-                auto it = grid.find(GridCell{x, y, z});
+                auto it = grid.find(GridCell{.x = x, .y = y, .z = z});
                 if (it == grid.end()) continue;
                 for (uint32_t id : it->second) {
                     if (!seen.insert(id).second) continue;

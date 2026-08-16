@@ -56,7 +56,7 @@ public:
     [[nodiscard]] VkImageView getColorImageView() const { return resolveImage_.imageView ? resolveImage_.imageView : colorImage_.imageView; }
     [[nodiscard]] VkSampler getSampler() const { return sampler_; }
     [[nodiscard]] VkRenderPass getRenderPass() const { return renderPass_; }
-    [[nodiscard]] VkExtent2D getExtent() const { return { colorImage_.extent.width, colorImage_.extent.height }; }
+    [[nodiscard]] VkExtent2D getExtent() const { return { .width = colorImage_.extent.width, .height = colorImage_.extent.height }; }
     [[nodiscard]] VkFormat getFormat() const { return colorImage_.format; }
     [[nodiscard]] bool isValid() const { return framebuffer_ != VK_NULL_HANDLE; }
     [[nodiscard]] VkSampleCountFlagBits getSampleCount() const { return msaaSamples_; }

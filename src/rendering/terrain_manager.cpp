@@ -338,7 +338,7 @@ void TerrainManager::update(const Camera& camera, float deltaTime) {
 }
 
 bool TerrainManager::enqueueTile(int x, int y) {
-    TileCoord coord = {x, y};
+    TileCoord coord = {.x = x, .y = y};
     if (loadedTiles.find(coord) != loadedTiles.end()) {
         return true;
     }
@@ -359,7 +359,7 @@ bool TerrainManager::enqueueTile(int x, int y) {
 }
 
 std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
-    TileCoord coord = {x, y};
+    TileCoord coord = {.x = x, .y = y};
     if (auto cached = getCachedTile(coord)) {
         LOG_DEBUG("Using cached tile [", x, ",", y, "]");
         return cached;
@@ -1600,7 +1600,7 @@ std::shared_ptr<PendingTile> TerrainManager::getCachedTile(const TileCoord& coor
     return it->second.tile;
 }
 void TerrainManager::unloadTile(int x, int y) {
-    TileCoord coord = {x, y};
+    TileCoord coord = {.x = x, .y = y};
 
     // Also remove from pending if it was queued but not yet loaded
     {
@@ -1747,8 +1747,8 @@ void TerrainManager::softReset() {
     loadedTiles.clear();
     failedTiles.clear();
 
-    currentTile = {-1, -1};
-    lastStreamTile = {-1, -1};
+    currentTile = {.x = -1, .y = -1};
+    lastStreamTile = {.x = -1, .y = -1};
 
     if (terrainRenderer) {
         terrainRenderer->clear();
@@ -2459,7 +2459,7 @@ void TerrainManager::streamTiles() {
                     continue;
                 }
 
-                TileCoord coord = {tileX, tileY};
+                TileCoord coord = {.x = tileX, .y = tileY};
 
                 // Skip if already loaded, pending, or failed
                 if (loadedTiles.find(coord) != loadedTiles.end()) continue;

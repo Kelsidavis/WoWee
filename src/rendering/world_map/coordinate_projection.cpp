@@ -66,7 +66,7 @@ ZoneBounds projectionBoundsFor(const std::vector<Zone>& zones, int zoneIdx,
     if (isContinent) {
         float left, right, top, bottom;
         if (getContinentProjectionBounds(zones, zoneIdx, left, right, top, bottom)) {
-            bounds = {left, right, top, bottom};
+            bounds = {.locLeft = left, .locRight = right, .locTop = top, .locBottom = bottom};
         }
     }
     return bounds;

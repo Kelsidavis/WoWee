@@ -412,7 +412,7 @@ bool M2Renderer::buildMainPassPipelines(VkDescriptorSetLayout perFrameLayout) {
             // could drift.
             if (ribbonPipelineLayout_ == VK_NULL_HANDLE) {
                 VkDescriptorSetLayout ribLayouts[] = {perFrameLayout, particleTexLayout_};
-                VkPipelineLayoutCreateInfo lci{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+                VkPipelineLayoutCreateInfo lci{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
                 lci.setLayoutCount = 2;
                 lci.pSetLayouts = ribLayouts;
                 vkCreatePipelineLayout(device, &lci, nullptr, &ribbonPipelineLayout_);
@@ -506,7 +506,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         bindings[1].descriptorCount = 1;
         bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        VkDescriptorSetLayoutCreateInfo ci{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+        VkDescriptorSetLayoutCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
         ci.bindingCount = 2;
         ci.pBindings = bindings;
         vkCreateDescriptorSetLayout(device, &ci, nullptr, &materialSetLayout_);
@@ -520,7 +520,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         binding.descriptorCount = 1;
         binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-        VkDescriptorSetLayoutCreateInfo ci{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+        VkDescriptorSetLayoutCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
         ci.bindingCount = 1;
         ci.pBindings = &binding;
         vkCreateDescriptorSetLayout(device, &ci, nullptr, &boneSetLayout_);
@@ -534,7 +534,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         binding.descriptorCount = 1;
         binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-        VkDescriptorSetLayoutCreateInfo ci{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+        VkDescriptorSetLayoutCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
         ci.bindingCount = 1;
         ci.pBindings = &binding;
         vkCreateDescriptorSetLayout(device, &ci, nullptr, &instanceSetLayout_);
@@ -548,7 +548,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         binding.descriptorCount = 1;
         binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        VkDescriptorSetLayoutCreateInfo ci{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+        VkDescriptorSetLayoutCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
         ci.bindingCount = 1;
         ci.pBindings = &binding;
         vkCreateDescriptorSetLayout(device, &ci, nullptr, &particleTexLayout_);
@@ -557,10 +557,10 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
     // --- Descriptor pools ---
     {
         VkDescriptorPoolSize sizes[] = {
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_MATERIAL_SETS + 256},
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_MATERIAL_SETS + 256},
+            {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = MAX_MATERIAL_SETS + 256},
+            {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = MAX_MATERIAL_SETS + 256},
         };
-        VkDescriptorPoolCreateInfo ci{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        VkDescriptorPoolCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         ci.maxSets = MAX_MATERIAL_SETS + 256;
         ci.poolSizeCount = 2;
         ci.pPoolSizes = sizes;
@@ -569,9 +569,9 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
     }
     {
         VkDescriptorPoolSize sizes[] = {
-            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_BONE_SETS},
+            {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = MAX_BONE_SETS},
         };
-        VkDescriptorPoolCreateInfo ci{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        VkDescriptorPoolCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         ci.maxSets = MAX_BONE_SETS;
         ci.poolSizeCount = 1;
         ci.pPoolSizes = sizes;
@@ -585,7 +585,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
     {
         // Single identity matrix (bone 0 = identity)
         glm::mat4 identity(1.0f);
-        VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+        VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
         bci.size = sizeof(glm::mat4);
         bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
         VmaAllocationCreateInfo aci{};
@@ -604,7 +604,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
             bufInfo.buffer = dummyBoneBuffer_;
             bufInfo.offset = 0;
             bufInfo.range = sizeof(glm::mat4);
-            VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
             write.dstSet = dummyBoneSet_;
             write.dstBinding = 0;
             write.descriptorCount = 1;
@@ -620,7 +620,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         const VkDeviceSize megaSize = VkDeviceSize(MEGA_BONE_MATRIX_CAPACITY) * sizeof(glm::mat4);
         glm::mat4 identity(1.0f);
         for (int i = 0; i < 2; i++) {
-            VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+            VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
             bci.size = megaSize;
             bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
             VmaAllocationCreateInfo aci{};
@@ -642,7 +642,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
                 bufInfo.buffer = megaBoneBuffer_[i];
                 bufInfo.offset = 0;
                 bufInfo.range = megaSize;
-                VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                 write.dstSet = megaBoneSet_[i];
                 write.dstBinding = 0;
                 write.descriptorCount = 1;
@@ -667,15 +667,15 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         const VkDeviceSize instBufSize = MAX_INSTANCE_DATA * sizeof(M2InstanceGPU);
 
         // Descriptor pool for 2 sets (double-buffered)
-        VkDescriptorPoolSize poolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2};
-        VkDescriptorPoolCreateInfo poolCi{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        VkDescriptorPoolSize poolSize{.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 2};
+        VkDescriptorPoolCreateInfo poolCi{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         poolCi.maxSets = 2;
         poolCi.poolSizeCount = 1;
         poolCi.pPoolSizes = &poolSize;
         vkCreateDescriptorPool(device, &poolCi, nullptr, &instanceDescPool_);
 
         for (int i = 0; i < 2; i++) {
-            VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+            VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
             bci.size = instBufSize;
             bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
             VmaAllocationCreateInfo aci{};
@@ -686,7 +686,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
                             &instanceBuffer_[i], &instanceAlloc_[i], &allocInfo);
             instanceMapped_[i] = allocInfo.pMappedData;
 
-            VkDescriptorSetAllocateInfo setAi{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+            VkDescriptorSetAllocateInfo setAi{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
             setAi.descriptorPool = instanceDescPool_;
             setAi.descriptorSetCount = 1;
             setAi.pSetLayouts = &instanceSetLayout_;
@@ -696,7 +696,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
             bufInfo.buffer = instanceBuffer_[i];
             bufInfo.offset = 0;
             bufInfo.range = instBufSize;
-            VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
             write.dstSet = instanceSet_[i];
             write.dstBinding = 0;
             write.descriptorCount = 1;
@@ -728,13 +728,13 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         bindings[2].descriptorCount = 1;
         bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-        VkDescriptorSetLayoutCreateInfo layoutCi{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+        VkDescriptorSetLayoutCreateInfo layoutCi{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
         layoutCi.bindingCount = 3;
         layoutCi.pBindings = bindings;
         vkCreateDescriptorSetLayout(device, &layoutCi, nullptr, &cullSetLayout_);
 
         // Pipeline layout (no push constants - everything via UBO)
-        VkPipelineLayoutCreateInfo plCi{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+        VkPipelineLayoutCreateInfo plCi{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         plCi.setLayoutCount = 1;
         plCi.pSetLayouts = &cullSetLayout_;
         vkCreatePipelineLayout(device, &plCi, nullptr, &cullPipelineLayout_);
@@ -744,7 +744,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         if (!cullComp.loadFromFile(device, "assets/shaders/m2_cull.comp.spv")) {
             LOG_ERROR("M2Renderer: failed to load m2_cull.comp.spv - GPU culling disabled");
         } else {
-            VkComputePipelineCreateInfo cpCi{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+            VkComputePipelineCreateInfo cpCi{.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
             cpCi.stage = cullComp.stageInfo(VK_SHADER_STAGE_COMPUTE_BIT);
             cpCi.layout = cullPipelineLayout_;
             if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &cpCi, nullptr, &cullPipeline_) != VK_SUCCESS) {
@@ -768,18 +768,18 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
             hizBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
             VkDescriptorSetLayout hizSamplerLayout = VK_NULL_HANDLE;
-            VkDescriptorSetLayoutCreateInfo hizLayoutCi{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+            VkDescriptorSetLayoutCreateInfo hizLayoutCi{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
             hizLayoutCi.bindingCount = 1;
             hizLayoutCi.pBindings = &hizBinding;
             vkCreateDescriptorSetLayout(device, &hizLayoutCi, nullptr, &hizSamplerLayout);
 
             VkDescriptorSetLayout hizSetLayouts[2] = {cullSetLayout_, hizSamplerLayout};
-            VkPipelineLayoutCreateInfo hizPlCi{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+            VkPipelineLayoutCreateInfo hizPlCi{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
             hizPlCi.setLayoutCount = 2;
             hizPlCi.pSetLayouts = hizSetLayouts;
             vkCreatePipelineLayout(device, &hizPlCi, nullptr, &cullHiZPipelineLayout_);
 
-            VkComputePipelineCreateInfo hizCpCi{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+            VkComputePipelineCreateInfo hizCpCi{.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
             hizCpCi.stage = cullHiZComp.stageInfo(VK_SHADER_STAGE_COMPUTE_BIT);
             hizCpCi.layout = cullHiZPipelineLayout_;
             if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &hizCpCi, nullptr, &cullHiZPipeline_) != VK_SUCCESS) {
@@ -804,9 +804,9 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
 
         // Descriptor pool: 2 sets × 3 descriptors each (1 UBO + 2 SSBO)
         VkDescriptorPoolSize poolSizes[2] = {};
-        poolSizes[0] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2};
-        poolSizes[1] = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4};  // 2 input + 2 output
-        VkDescriptorPoolCreateInfo poolCi{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        poolSizes[0] = {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 2};
+        poolSizes[1] = {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 4};  // 2 input + 2 output
+        VkDescriptorPoolCreateInfo poolCi{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         poolCi.maxSets = 2;
         poolCi.poolSizeCount = 2;
         poolCi.pPoolSizes = poolSizes;
@@ -819,7 +819,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         for (int i = 0; i < 2; i++) {
             // Uniform buffer (frustum planes + camera)
             {
-                VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+                VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
                 bci.size = uniformSize;
                 bci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
                 VmaAllocationCreateInfo aci{};
@@ -832,7 +832,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
             }
             // Input SSBO (per-instance cull data)
             {
-                VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+                VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
                 bci.size = inputSize;
                 bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
                 VmaAllocationCreateInfo aci{};
@@ -845,7 +845,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
             }
             // Output SSBO (visibility flags - GPU writes, CPU reads)
             {
-                VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+                VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
                 bci.size = outputSize;
                 bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
                 VmaAllocationCreateInfo aci{};
@@ -858,32 +858,32 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
             }
 
             // Allocate and write descriptor set
-            VkDescriptorSetAllocateInfo setAi{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+            VkDescriptorSetAllocateInfo setAi{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
             setAi.descriptorPool = cullDescPool_;
             setAi.descriptorSetCount = 1;
             setAi.pSetLayouts = &cullSetLayout_;
             vkAllocateDescriptorSets(device, &setAi, &cullSet_[i]);
 
-            VkDescriptorBufferInfo uboInfo{cullUniformBuffer_[i], 0, uniformSize};
-            VkDescriptorBufferInfo inputInfo{cullInputBuffer_[i], 0, inputSize};
-            VkDescriptorBufferInfo outputInfo{cullOutputBuffer_[i], 0, outputSize};
+            VkDescriptorBufferInfo uboInfo{.buffer = cullUniformBuffer_[i], .offset = 0, .range = uniformSize};
+            VkDescriptorBufferInfo inputInfo{.buffer = cullInputBuffer_[i], .offset = 0, .range = inputSize};
+            VkDescriptorBufferInfo outputInfo{.buffer = cullOutputBuffer_[i], .offset = 0, .range = outputSize};
 
             VkWriteDescriptorSet writes[3] = {};
-            writes[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            writes[0] = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
             writes[0].dstSet = cullSet_[i];
             writes[0].dstBinding = 0;
             writes[0].descriptorCount = 1;
             writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             writes[0].pBufferInfo = &uboInfo;
 
-            writes[1] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            writes[1] = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
             writes[1].dstSet = cullSet_[i];
             writes[1].dstBinding = 1;
             writes[1].descriptorCount = 1;
             writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
             writes[1].pBufferInfo = &inputInfo;
 
-            writes[2] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            writes[2] = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
             writes[2].dstSet = cullSet_[i];
             writes[2].dstBinding = 2;
             writes[2].descriptorCount = 1;
@@ -906,7 +906,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         pushRange.offset = 0;
         pushRange.size = 24;
 
-        VkPipelineLayoutCreateInfo ci{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+        VkPipelineLayoutCreateInfo ci{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         ci.setLayoutCount = 4;
         ci.pSetLayouts = setLayouts;
         ci.pushConstantRangeCount = 1;
@@ -923,7 +923,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         pushRange.offset = 0;
         pushRange.size = 12; // vec2 + int
 
-        VkPipelineLayoutCreateInfo ci{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+        VkPipelineLayoutCreateInfo ci{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         ci.setLayoutCount = 2;
         ci.pSetLayouts = setLayouts;
         ci.pushConstantRangeCount = 1;
@@ -940,7 +940,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         pushRange.offset = 0;
         pushRange.size = 4;
 
-        VkPipelineLayoutCreateInfo ci{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+        VkPipelineLayoutCreateInfo ci{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         ci.setLayoutCount = 1;
         ci.pSetLayouts = setLayouts;
         ci.pushConstantRangeCount = 1;
@@ -953,7 +953,7 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
 
     // --- Create dynamic particle buffers (mapped for CPU writes) ---
     {
-        VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+        VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
         bci.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 
         VmaAllocationCreateInfo aci{};
@@ -1015,13 +1015,13 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         glowTexture_->createSampler(device, VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
         // Pre-allocate glow texture descriptor set (reused every frame)
         if (particleTexLayout_ && materialDescPool_) {
-            VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+            VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
             ai.descriptorPool = materialDescPool_;
             ai.descriptorSetCount = 1;
             ai.pSetLayouts = &particleTexLayout_;
             if (vkAllocateDescriptorSets(device, &ai, &glowTexDescSet_) == VK_SUCCESS) {
                 VkDescriptorImageInfo imgInfo = glowTexture_->descriptorInfo();
-                VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                 write.dstSet = glowTexDescSet_;
                 write.dstBinding = 0;
                 write.descriptorCount = 1;
@@ -1204,7 +1204,7 @@ void M2Renderer::destroyInstanceBones(M2Instance& inst, bool defer) {
 }
 
 VkDescriptorSet M2Renderer::allocateMaterialSet() {
-    VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
     ai.descriptorPool = materialDescPool_;
     ai.descriptorSetCount = 1;
     ai.pSetLayouts = &materialSetLayout_;
@@ -1218,7 +1218,7 @@ VkDescriptorSet M2Renderer::allocateMaterialSet() {
 }
 
 VkDescriptorSet M2Renderer::allocateBoneSet() {
-    VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
     ai.descriptorPool = boneDescPool_;
     ai.descriptorSetCount = 1;
     ai.pSetLayouts = &boneSetLayout_;
@@ -1689,14 +1689,14 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
         VkDevice device = vkCtx_->getDevice();
         gpuModel.particleTexSets.resize(model.particleEmitters.size(), VK_NULL_HANDLE);
         for (size_t ei = 0; ei < model.particleEmitters.size(); ei++) {
-            VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+            VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
             ai.descriptorPool = materialDescPool_;
             ai.descriptorSetCount = 1;
             ai.pSetLayouts = &particleTexLayout_;
             if (vkAllocateDescriptorSets(device, &ai, &gpuModel.particleTexSets[ei]) == VK_SUCCESS) {
                 VkTexture* tex = gpuModel.particleTextures[ei];
                 VkDescriptorImageInfo imgInfo = tex->descriptorInfo();
-                VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                 write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                 write.dstSet = gpuModel.particleTexSets[ei];
                 write.dstBinding = 0;
@@ -1737,14 +1737,14 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             }
             // Allocate descriptor set (reuse particleTexLayout_ = single sampler)
             if (particleTexLayout_ && materialDescPool_) {
-                VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+                VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
                 ai.descriptorPool = materialDescPool_;
                 ai.descriptorSetCount = 1;
                 ai.pSetLayouts = &particleTexLayout_;
                 if (vkAllocateDescriptorSets(device, &ai, &gpuModel.ribbonTexSets[ri]) == VK_SUCCESS) {
                     VkTexture* tex = gpuModel.ribbonTextures[ri];
                     VkDescriptorImageInfo imgInfo = tex->descriptorInfo();
-                    VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                    VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                     write.dstSet = gpuModel.ribbonTexSets[ri];
                     write.dstBinding = 0;

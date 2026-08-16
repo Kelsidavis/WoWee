@@ -142,7 +142,7 @@ VkExtent2D PostProcessPipeline::getSceneRenderExtent() const {
     if (needsFXAAPass() && fxaa_.sceneFramebuffer)
         return vkCtx_->getSwapchainExtent();  // native resolution - no downscaling
     if (fsr_.enabled && fsr_.sceneFramebuffer)
-        return { fsr_.internalWidth, fsr_.internalHeight };
+        return { .width = fsr_.internalWidth, .height = fsr_.internalHeight };
     return vkCtx_->getSwapchainExtent();
 }
 VkImage PostProcessPipeline::getSceneColorImage() const {
@@ -252,7 +252,7 @@ bool PostProcessPipeline::executePostProcessing(VkCommandBuffer cmd, uint32_t im
         // carries the scene's sample count, and these quads are 1x.
         rpInfo.renderPass = vkCtx_->getOverlayClearRenderPass();
         rpInfo.framebuffer = vkCtx_->getOverlayFramebuffers()[imageIndex];
-        rpInfo.renderArea.offset = {0, 0};
+        rpInfo.renderArea.offset = {.x = 0, .y = 0};
         rpInfo.renderArea.extent = vkCtx_->getSwapchainExtent();
 
         // The overlay pass has one attachment whatever the scene's MSAA is.
@@ -328,7 +328,7 @@ bool PostProcessPipeline::executePostProcessing(VkCommandBuffer cmd, uint32_t im
         // carries the scene's sample count, and these quads are 1x.
         rpInfo.renderPass = vkCtx_->getOverlayClearRenderPass();
         rpInfo.framebuffer = vkCtx_->getOverlayFramebuffers()[imageIndex];
-        rpInfo.renderArea.offset = {0, 0};
+        rpInfo.renderArea.offset = {.x = 0, .y = 0};
         rpInfo.renderArea.extent = vkCtx_->getSwapchainExtent();
         VkClearValue fxaaClear[1]{};
         fxaaClear[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
@@ -369,7 +369,7 @@ bool PostProcessPipeline::executePostProcessing(VkCommandBuffer cmd, uint32_t im
         // carries the scene's sample count, and these quads are 1x.
         fsrRpInfo.renderPass = vkCtx_->getOverlayClearRenderPass();
         fsrRpInfo.framebuffer = vkCtx_->getOverlayFramebuffers()[imageIndex];
-        fsrRpInfo.renderArea.offset = {0, 0};
+        fsrRpInfo.renderArea.offset = {.x = 0, .y = 0};
         fsrRpInfo.renderArea.extent = vkCtx_->getSwapchainExtent();
 
         VkClearValue fsrClearValues[1]{};
@@ -1007,7 +1007,7 @@ bool PostProcessPipeline::initFSR2Resources() {
         bindings[1].descriptorCount = 1;
         bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-        VkDescriptorSetLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+        VkDescriptorSetLayoutCreateInfo layoutInfo{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
         layoutInfo.bindingCount = 2;
         layoutInfo.pBindings = bindings;
         vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &fsr2_.motionVecDescSetLayout);
@@ -1017,7 +1017,7 @@ bool PostProcessPipeline::initFSR2Resources() {
         pc.offset = 0;
         pc.size = 2 * sizeof(glm::mat4);  // 128 bytes
 
-        VkPipelineLayoutCreateInfo plCI{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+        VkPipelineLayoutCreateInfo plCI{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         plCI.setLayoutCount = 1;
         plCI.pSetLayouts = &fsr2_.motionVecDescSetLayout;
         plCI.pushConstantRangeCount = 1;
@@ -1031,7 +1031,7 @@ bool PostProcessPipeline::initFSR2Resources() {
             return false;
         }
 
-        VkComputePipelineCreateInfo cpCI{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+        VkComputePipelineCreateInfo cpCI{.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
         cpCI.stage = compMod.stageInfo(VK_SHADER_STAGE_COMPUTE_BIT);
         cpCI.layout = fsr2_.motionVecPipelineLayout;
         if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &cpCI, nullptr, &fsr2_.motionVecPipeline) != VK_SUCCESS) {
@@ -1044,15 +1044,15 @@ bool PostProcessPipeline::initFSR2Resources() {
 
         // Descriptor pool + set
         VkDescriptorPoolSize poolSizes[2] = {};
-        poolSizes[0] = {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1};
-        poolSizes[1] = {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1};
-        VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        poolSizes[0] = {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1};
+        poolSizes[1] = {.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1};
+        VkDescriptorPoolCreateInfo poolInfo{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         poolInfo.maxSets = 1;
         poolInfo.poolSizeCount = 2;
         poolInfo.pPoolSizes = poolSizes;
         vkCreateDescriptorPool(device, &poolInfo, nullptr, &fsr2_.motionVecDescPool);
 
-        VkDescriptorSetAllocateInfo dsAI{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+        VkDescriptorSetAllocateInfo dsAI{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
         dsAI.descriptorPool = fsr2_.motionVecDescPool;
         dsAI.descriptorSetCount = 1;
         dsAI.pSetLayouts = &fsr2_.motionVecDescSetLayout;
@@ -1101,7 +1101,7 @@ bool PostProcessPipeline::initFSR2Resources() {
         bindings[4].descriptorCount = 1;
         bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-        VkDescriptorSetLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+        VkDescriptorSetLayoutCreateInfo layoutInfo{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
         layoutInfo.bindingCount = 5;
         layoutInfo.pBindings = bindings;
         vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &fsr2_.accumulateDescSetLayout);
@@ -1111,7 +1111,7 @@ bool PostProcessPipeline::initFSR2Resources() {
         pc.offset = 0;
         pc.size = 4 * sizeof(glm::vec4);  // 64 bytes
 
-        VkPipelineLayoutCreateInfo plCI{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+        VkPipelineLayoutCreateInfo plCI{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         plCI.setLayoutCount = 1;
         plCI.pSetLayouts = &fsr2_.accumulateDescSetLayout;
         plCI.pushConstantRangeCount = 1;
@@ -1125,7 +1125,7 @@ bool PostProcessPipeline::initFSR2Resources() {
             return false;
         }
 
-        VkComputePipelineCreateInfo cpCI{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+        VkComputePipelineCreateInfo cpCI{.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
         cpCI.stage = compMod.stageInfo(VK_SHADER_STAGE_COMPUTE_BIT);
         cpCI.layout = fsr2_.accumulatePipelineLayout;
         if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &cpCI, nullptr, &fsr2_.accumulatePipeline) != VK_SUCCESS) {
@@ -1138,9 +1138,9 @@ bool PostProcessPipeline::initFSR2Resources() {
 
         // Descriptor pool: 2 sets (ping-pong), each with 4 samplers + 1 storage image
         VkDescriptorPoolSize poolSizes[2] = {};
-        poolSizes[0] = {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8};
-        poolSizes[1] = {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2};
-        VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        poolSizes[0] = {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 8};
+        poolSizes[1] = {.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 2};
+        VkDescriptorPoolCreateInfo poolInfo{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         poolInfo.maxSets = 2;
         poolInfo.poolSizeCount = 2;
         poolInfo.pPoolSizes = poolSizes;
@@ -1148,7 +1148,7 @@ bool PostProcessPipeline::initFSR2Resources() {
 
         // Allocate 2 descriptor sets (one per ping-pong direction)
         VkDescriptorSetLayout layouts[2] = { fsr2_.accumulateDescSetLayout, fsr2_.accumulateDescSetLayout };
-        VkDescriptorSetAllocateInfo dsAI{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+        VkDescriptorSetAllocateInfo dsAI{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
         dsAI.descriptorPool = fsr2_.accumulateDescPool;
         dsAI.descriptorSetCount = 2;
         dsAI.pSetLayouts = layouts;
@@ -1192,7 +1192,7 @@ bool PostProcessPipeline::initFSR2Resources() {
         binding.descriptorCount = 1;
         binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        VkDescriptorSetLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+        VkDescriptorSetLayoutCreateInfo layoutInfo{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
         layoutInfo.bindingCount = 1;
         layoutInfo.pBindings = &binding;
         vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &fsr2_.sharpenDescSetLayout);
@@ -1202,7 +1202,7 @@ bool PostProcessPipeline::initFSR2Resources() {
         pc.offset = 0;
         pc.size = sizeof(glm::vec4);
 
-        VkPipelineLayoutCreateInfo plCI{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+        VkPipelineLayoutCreateInfo plCI{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         plCI.setLayoutCount = 1;
         plCI.pSetLayouts = &fsr2_.sharpenDescSetLayout;
         plCI.pushConstantRangeCount = 1;
@@ -1244,15 +1244,15 @@ bool PostProcessPipeline::initFSR2Resources() {
         }
 
         // Descriptor pool + sets for sharpen pass (double-buffered to avoid race condition)
-        VkDescriptorPoolSize poolSize{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2};
-        VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        VkDescriptorPoolSize poolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 2};
+        VkDescriptorPoolCreateInfo poolInfo{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         poolInfo.maxSets = 2;
         poolInfo.poolSizeCount = 1;
         poolInfo.pPoolSizes = &poolSize;
         vkCreateDescriptorPool(device, &poolInfo, nullptr, &fsr2_.sharpenDescPool);
 
         VkDescriptorSetLayout layouts[2] = {fsr2_.sharpenDescSetLayout, fsr2_.sharpenDescSetLayout};
-        VkDescriptorSetAllocateInfo dsAI{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+        VkDescriptorSetAllocateInfo dsAI{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
         dsAI.descriptorPool = fsr2_.sharpenDescPool;
         dsAI.descriptorSetCount = 2;
         dsAI.pSetLayouts = layouts;
@@ -1571,7 +1571,7 @@ void PostProcessPipeline::renderFSR2Sharpen() {
     }
     imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
     write.dstSet = descSet;
     write.dstBinding = 0;
     write.descriptorCount = 1;

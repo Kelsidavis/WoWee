@@ -1442,10 +1442,10 @@ namespace {
 /// different continent.
 struct ContinentEntry { uint32_t mapId; const char* name; };
 const ContinentEntry kContinents[] = {
-    {   1, "Kalimdor"         },
-    {   0, "Eastern Kingdoms" },
-    { 530, "Outland"          },
-    { 571, "Northrend"        },
+    {   .mapId = 1, .name = "Kalimdor"         },
+    {   .mapId = 0, .name = "Eastern Kingdoms" },
+    { .mapId = 530, .name = "Outland"          },
+    { .mapId = 571, .name = "Northrend"        },
 };
 constexpr int kContinentCount = static_cast<int>(std::size(kContinents));
 

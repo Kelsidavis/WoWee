@@ -26,9 +26,9 @@ inline SampleTime resolveTime(const pipeline::M2AnimationTrack& track,
             static_cast<float>(globalSequenceDurations[track.globalSequence]);
         float time = duration > 0.0f ? std::fmod(globalTimeMs, duration) : 0.0f;
         if (time < 0.0f) time += duration;
-        return {0, time};
+        return {.sequenceIndex = 0, .timeMs = time};
     }
-    return {animationSequenceIndex, animationTimeMs};
+    return {.sequenceIndex = animationSequenceIndex, .timeMs = animationTimeMs};
 }
 
 inline size_t lowerKeyIndex(const std::vector<uint32_t>& timestamps,

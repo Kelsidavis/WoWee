@@ -264,7 +264,7 @@ private:
     // Swapchain
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     VkFormat swapchainFormat = VK_FORMAT_UNDEFINED;
-    VkExtent2D swapchainExtent = {0, 0};
+    VkExtent2D swapchainExtent = {.width = 0, .height = 0};
     std::vector<VkImage> swapchainImages;
     std::vector<VkImageView> swapchainImageViews;
     std::vector<VkFramebuffer> swapchainFramebuffers;

@@ -174,8 +174,8 @@ inline VkVertexInputAttributeDescription toVkAttribute(const VertexAttribute& at
         case 4: format = VK_FORMAT_R32G32B32A32_SFLOAT; break;
         default: break;
     }
-    return VkVertexInputAttributeDescription{attribute.location, binding, format,
-                                             attribute.offset};
+    return VkVertexInputAttributeDescription{.location = attribute.location, .binding = binding, .format = format,
+                                             .offset = attribute.offset};
 }
 
 /// The same for a whole layout.

@@ -431,7 +431,7 @@ private:
     // Cached render pass state for secondary buffer inheritance
     VkRenderPass activeRenderPass_ = VK_NULL_HANDLE;
     VkFramebuffer activeFramebuffer_ = VK_NULL_HANDLE;
-    VkExtent2D activeRenderExtent_ = {0, 0};
+    VkExtent2D activeRenderExtent_ = {.width = 0, .height = 0};
 
     // Active character previews for off-screen rendering
     std::vector<CharacterPreview*> activePreviews_;

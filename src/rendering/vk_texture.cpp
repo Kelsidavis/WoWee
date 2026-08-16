@@ -99,7 +99,7 @@ bool VkTexture::upload(VkContext& ctx, const uint8_t* pixels, uint32_t width, ui
         region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         region.imageSubresource.mipLevel = 0;
         region.imageSubresource.layerCount = 1;
-        region.imageExtent = {width, height, 1};
+        region.imageExtent = {.width = width, .height = height, .depth = 1};
 
         vkCmdCopyBufferToImage(cmd, staging.buffer, image_.image,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
@@ -177,7 +177,7 @@ bool VkTexture::uploadMips(VkContext& ctx, const uint8_t* const* mipData,
             region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             region.imageSubresource.mipLevel = i;
             region.imageSubresource.layerCount = 1;
-            region.imageExtent = {mipW, mipH, 1};
+            region.imageExtent = {.width = mipW, .height = mipH, .depth = 1};
 
             vkCmdCopyBufferToImage(cmd, staging.buffer, image_.image,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
@@ -369,16 +369,16 @@ void VkTexture::generateMipmaps(VkContext& ctx, VkFormat format,
 
             // Blit from previous mip to current
             VkImageBlit blit{};
-            blit.srcOffsets[0] = {0, 0, 0};
-            blit.srcOffsets[1] = {mipW, mipH, 1};
+            blit.srcOffsets[0] = {.x = 0, .y = 0, .z = 0};
+            blit.srcOffsets[1] = {.x = mipW, .y = mipH, .z = 1};
             blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             blit.srcSubresource.mipLevel = i - 1;
             blit.srcSubresource.layerCount = 1;
-            blit.dstOffsets[0] = {0, 0, 0};
+            blit.dstOffsets[0] = {.x = 0, .y = 0, .z = 0};
             blit.dstOffsets[1] = {
-                mipW > 1 ? mipW / 2 : 1,
-                mipH > 1 ? mipH / 2 : 1,
-                1
+                .x = mipW > 1 ? mipW / 2 : 1,
+                .y = mipH > 1 ? mipH / 2 : 1,
+                .z = 1
             };
             blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             blit.dstSubresource.mipLevel = i;

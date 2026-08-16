@@ -264,7 +264,7 @@ void CharacterPreview::createFBO() {
     // the first compositePass runs.
     {
         VkCommandBuffer cmd = vkCtx_->beginSingleTimeCommands();
-        VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        VkImageMemoryBarrier barrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
         barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -286,10 +286,10 @@ void CharacterPreview::createFBO() {
     // 2. Create 1x1 dummy depth texture (shadow map placeholder, depth=1.0 = no shadow).
     //    Must be a depth format for sampler2DShadow compatibility.
     {
-        VkImageCreateInfo imgCI{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+        VkImageCreateInfo imgCI{.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
         imgCI.imageType = VK_IMAGE_TYPE_2D;
         imgCI.format = VK_FORMAT_D16_UNORM;
-        imgCI.extent = {1, 1, 1};
+        imgCI.extent = {.width = 1, .height = 1, .depth = 1};
         imgCI.mipLevels = 1;
         imgCI.arrayLayers = 1;
         imgCI.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -302,37 +302,37 @@ void CharacterPreview::createFBO() {
             LOG_ERROR("CharacterPreview: failed to create dummy shadow image");
             return;
         }
-        VkImageViewCreateInfo viewCI{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+        VkImageViewCreateInfo viewCI{.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
         viewCI.image = dummyShadowImage_;
         viewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
         viewCI.format = VK_FORMAT_D16_UNORM;
-        viewCI.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+        viewCI.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
         if (vkCreateImageView(device, &viewCI, nullptr, &dummyShadowView_) != VK_SUCCESS) {
             LOG_ERROR("CharacterPreview: failed to create dummy shadow image view");
             return;
         }
         // Clear to depth 1.0 and transition to shader-read layout
         vkCtx_->immediateSubmit([&](VkCommandBuffer cmd) {
-            VkImageMemoryBarrier toTransfer{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            VkImageMemoryBarrier toTransfer{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
             toTransfer.image = dummyShadowImage_;
             toTransfer.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             toTransfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
             toTransfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             toTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            toTransfer.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+            toTransfer.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
             toTransfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                  0, 0, nullptr, 0, nullptr, 1, &toTransfer);
-            VkClearDepthStencilValue clearVal{1.0f, 0};
-            VkImageSubresourceRange range{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+            VkClearDepthStencilValue clearVal{.depth = 1.0f, .stencil = 0};
+            VkImageSubresourceRange range{.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
             vkCmdClearDepthStencilImage(cmd, dummyShadowImage_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearVal, 1, &range);
-            VkImageMemoryBarrier toRead{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            VkImageMemoryBarrier toRead{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
             toRead.image = dummyShadowImage_;
             toRead.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
             toRead.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             toRead.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             toRead.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            toRead.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+            toRead.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
             toRead.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             toRead.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
@@ -348,7 +348,7 @@ void CharacterPreview::createFBO() {
         sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         sizes[1].descriptorCount = MAX_FRAMES;
 
-        VkDescriptorPoolCreateInfo ci{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        VkDescriptorPoolCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         ci.maxSets = MAX_FRAMES;
         ci.poolSizeCount = 2;
         ci.pPoolSizes = sizes;
@@ -364,7 +364,7 @@ void CharacterPreview::createFBO() {
 
     for (uint32_t i = 0; i < MAX_FRAMES; i++) {
         // Create mapped UBO
-        VkBufferCreateInfo bufInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+        VkBufferCreateInfo bufInfo{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
         bufInfo.size = sizeof(GPUPerFrameData);
         bufInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 
@@ -381,7 +381,7 @@ void CharacterPreview::createFBO() {
         previewUBOMapped_[i] = mapInfo.pMappedData;
 
         // Allocate descriptor set
-        VkDescriptorSetAllocateInfo setAlloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+        VkDescriptorSetAllocateInfo setAlloc{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
         setAlloc.descriptorPool = previewDescPool_;
         setAlloc.descriptorSetCount = 1;
         setAlloc.pSetLayouts = &perFrameLayout;

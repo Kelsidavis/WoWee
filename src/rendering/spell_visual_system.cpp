@@ -57,11 +57,11 @@ void SpellVisualSystem::loadSpellVisualDbc() {
     // SpecialEffect0 > BaseEffect > LeftHand > RightHand > Chest > Head > Breath
     struct KitField { const char* name; uint32_t fallback; };
     static constexpr KitField kitFieldDefs[] = {
-        {"SpecialEffect0",  11}, {"BaseEffect",       5},
-        {"LeftHandEffect",   6}, {"RightHandEffect",  7},
-        {"ChestEffect",      4}, {"HeadEffect",       3},
-        {"BreathEffect",     8}, {"SpecialEffect1",  12},
-        {"SpecialEffect2",  13},
+        {.name = "SpecialEffect0",  .fallback = 11}, {.name = "BaseEffect",       .fallback = 5},
+        {.name = "LeftHandEffect",   .fallback = 6}, {.name = "RightHandEffect",  .fallback = 7},
+        {.name = "ChestEffect",      .fallback = 4}, {.name = "HeadEffect",       .fallback = 3},
+        {.name = "BreathEffect",     .fallback = 8}, {.name = "SpecialEffect1",  .fallback = 12},
+        {.name = "SpecialEffect2",  .fallback = 13},
     };
     constexpr size_t numKitFields = sizeof(kitFieldDefs) / sizeof(kitFieldDefs[0]);
     uint32_t kitFields[numKitFields];

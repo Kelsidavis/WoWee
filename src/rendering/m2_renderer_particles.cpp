@@ -527,7 +527,7 @@ void M2Renderer::renderM2Ribbons(VkCommandBuffer cmd, VkDescriptorSet perFrameSe
     vp.height = static_cast<float>(ext.height);
     vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
     VkRect2D sc{};
-    sc.offset = {0, 0};
+    sc.offset = {.x = 0, .y = 0};
     sc.extent = ext;
     vkCmdSetViewport(cmd, 0, 1, &vp);
     vkCmdSetScissor(cmd, 0, 1, &sc);
