@@ -511,7 +511,14 @@ void CharacterRenderer::shutdown() {
     // descriptor pools are still alive, since no further frames will run.
     vkCtx_->flushDeferredCleanup();
 
-    // Clean up texture cache (VkTexture unique_ptrs auto-destroy)
+    // ~VkTexture is empty by design -- it has no device or allocator to free
+    // with -- so clearing the map drops the unique_ptrs without destroying the
+    // image, view or allocation behind each one. Both textures in an entry are
+    // owned here.
+    for (auto& [path, entry] : textureCache) {
+        if (entry.texture) entry.texture->destroy(device, alloc);
+        if (entry.normalHeightMap) entry.normalHeightMap->destroy(device, alloc);
+    }
     textureCache.clear();
     texturePropsByPtr_.clear();
     normalMapByTexPtr_.clear();
@@ -610,7 +617,15 @@ void CharacterRenderer::clear() {
         destroyInstanceBones(pair.second);
     }
 
-    // Clear texture cache (VkTexture unique_ptrs auto-destroy)
+    // See CharacterRenderer::shutdown: ~VkTexture frees nothing on its own.
+    if (vkCtx_) {
+        VkDevice dev = vkCtx_->getDevice();
+        VmaAllocator vma = vkCtx_->getAllocator();
+        for (auto& [path, entry] : textureCache) {
+            if (entry.texture) entry.texture->destroy(dev, vma);
+            if (entry.normalHeightMap) entry.normalHeightMap->destroy(dev, vma);
+        }
+    }
     textureCache.clear();
     texturePropsByPtr_.clear();
     normalMapByTexPtr_.clear();

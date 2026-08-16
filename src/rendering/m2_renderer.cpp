@@ -1077,7 +1077,12 @@ void M2Renderer::shutdown() {
     // descriptor pools are still alive.
     vkCtx_->flushDeferredCleanup();
 
-    // Delete cached textures
+    // Delete cached textures. ~VkTexture is empty by design -- it has no device
+    // or allocator to free with -- so clearing the map on its own drops the
+    // unique_ptrs and leaks every image, view and allocation behind them.
+    for (auto& [path, entry] : textureCache) {
+        if (entry.texture) entry.texture->destroy(device, alloc);
+    }
     textureCache.clear();
     textureCacheBytes_ = 0;
     textureCacheCounter_ = 0;
