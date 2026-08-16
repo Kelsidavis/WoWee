@@ -5,8 +5,13 @@
 namespace wowee {
 namespace rendering {
 
-/// Ranged weapon type for animation selection (bow/gun/crossbow/thrown)
-enum class RangedWeaponType : uint8_t { NONE = 0, BOW, GUN, CROSSBOW, THROWN };
+/// Ranged weapon type for animation selection.
+///
+/// A wand is its own kind rather than a gun. It shares the gun's inventory
+/// type - INVTYPE_RANGEDRIGHT carries guns, crossbows and wands alike - so
+/// reading that alone shouldered a wand like a rifle. What a wand actually
+/// does is hold the arm out in front, which is the directed spell pose.
+enum class RangedWeaponType : uint8_t { NONE = 0, BOW, GUN, CROSSBOW, THROWN, WAND };
 
 // ============================================================================
 // WeaponLoadout - extracted from AnimationController

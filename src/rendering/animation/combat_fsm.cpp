@@ -338,6 +338,8 @@ AnimOutput CombatFSM::resolve(const Input& in, const AnimCapabilitySet& caps,
                 animId = caps.resolvedReadyCrossbow;
             } else if (in.rangedWeaponActive && loadout.rangedType == RangedWeaponType::THROWN) {
                 animId = caps.resolvedReadyThrown;
+            } else if (in.rangedWeaponActive && loadout.rangedType == RangedWeaponType::WAND) {
+                animId = caps.resolvedReadyWand;
             } else if (loadout.is2HLoose) {
                 animId = caps.resolvedReady2HLoose;
             } else if (loadout.inventoryType == game::InvType::TWO_HAND) {

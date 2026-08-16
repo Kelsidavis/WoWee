@@ -405,6 +405,11 @@ void AnimationController::triggerRangedShot() {
         case RangedWeaponType::THROWN:
             if (has(anim::ATTACK_THROWN))    shootAnim = anim::ATTACK_THROWN;
             break;
+        case RangedWeaponType::WAND:
+            // A directed cast, not a rifle shot.
+            if (has(anim::SPELL_CAST_DIRECTED)) shootAnim = anim::SPELL_CAST_DIRECTED;
+            else if (has(anim::ATTACK_RIFLE))   shootAnim = anim::ATTACK_RIFLE;
+            break;
         default: break;
     }
     if (shootAnim == 0) return;  // Model has no ranged animation

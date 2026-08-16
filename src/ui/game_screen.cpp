@@ -958,7 +958,15 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                     if (auto* ac = r->getAnimationController()) ac->setEquippedRangedType(rendering::RangedWeaponType::BOW);
                 }
             } else if (rangedSlot.item.inventoryType == game::InvType::RANGED_GUN) {
-                if (auto* ac = r->getAnimationController()) ac->setEquippedRangedType(rendering::RangedWeaponType::GUN);
+                // That inventory type is guns, crossbows and wands together, so
+                // the subclass is what tells them apart - as it already does for
+                // a crossbow above. Without this a wand was shouldered and fired
+                // like a rifle.
+                if (rangedSlot.item.subclassName == "Wand") {
+                    if (auto* ac = r->getAnimationController()) ac->setEquippedRangedType(rendering::RangedWeaponType::WAND);
+                } else if (auto* ac = r->getAnimationController()) {
+                    ac->setEquippedRangedType(rendering::RangedWeaponType::GUN);
+                }
             } else if (rangedSlot.item.inventoryType == game::InvType::THROWN) {
                 if (auto* ac = r->getAnimationController()) ac->setEquippedRangedType(rendering::RangedWeaponType::THROWN);
             } else {

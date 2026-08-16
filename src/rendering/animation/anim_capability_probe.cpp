@@ -167,6 +167,14 @@ AnimCapabilitySet AnimCapabilityProbe::probe(Renderer* renderer, uint32_t instan
             anim::READY_THROWN, anim::READY_1H, anim::READY_UNARMED};
         caps.resolvedReadyThrown = pick(readyThrownCands, 3);
     }
+    {
+        // Not the rifle stance, which is where a wand used to end up: the
+        // inventory type it shares with a gun says nothing about how it is
+        // held. A wand is aimed the way a directed spell is.
+        static const uint32_t readyWandCands[] = {
+            anim::READY_SPELL_DIRECTED, anim::READY_1H, anim::READY_UNARMED};
+        caps.resolvedReadyWand = pick(readyWandCands, 3);
+    }
 
     // ── Ranged attacks ──────────────────────────────────────────────────
     {
@@ -179,6 +187,12 @@ AnimCapabilitySet AnimCapabilityProbe::probe(Renderer* renderer, uint32_t instan
         caps.resolvedAttackCrossbow = pick(attackCrossbowCands, 2);
     }
     caps.resolvedAttackThrown = has(anim::ATTACK_THROWN) ? anim::ATTACK_THROWN : 0;
+    {
+        // The shot itself, for the same reason as the stance above.
+        static const uint32_t attackWandCands[] = {
+            anim::SPELL_CAST_DIRECTED, anim::ATTACK_RIFLE};
+        caps.resolvedAttackWand = pick(attackWandCands, 2);
+    }
     caps.resolvedLoadBow = has(anim::LOAD_BOW) ? anim::LOAD_BOW : 0;
     caps.resolvedLoadRifle = has(anim::LOAD_RIFLE) ? anim::LOAD_RIFLE : 0;
 
