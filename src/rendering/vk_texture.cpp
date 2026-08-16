@@ -9,27 +9,37 @@ namespace wowee {
 namespace rendering {
 
 VkTexture::~VkTexture() {
-    // Must call destroy() explicitly with device/allocator before destruction
+    destroy(device_, allocator_);
 }
 
 VkTexture::VkTexture(VkTexture&& other) noexcept
     : image_(other.image_), sampler_(other.sampler_), mipLevels_(other.mipLevels_),
-      ownsSampler_(other.ownsSampler_) {
+      ownsSampler_(other.ownsSampler_), device_(other.device_),
+      allocator_(other.allocator_) {
     other.image_ = {};
     other.sampler_ = VK_NULL_HANDLE;
     // Source no longer owns the sampler - ownership transferred to this instance
     other.ownsSampler_ = false;
+    // ...nor the device, which is what stops its destructor freeing ours.
+    other.device_ = VK_NULL_HANDLE;
+    other.allocator_ = VK_NULL_HANDLE;
 }
 
 VkTexture& VkTexture::operator=(VkTexture&& other) noexcept {
     if (this != &other) {
+        // Whatever this already held is otherwise overwritten and lost.
+        destroy(device_, allocator_);
         image_ = other.image_;
         sampler_ = other.sampler_;
         mipLevels_ = other.mipLevels_;
         ownsSampler_ = other.ownsSampler_;
+        device_ = other.device_;
+        allocator_ = other.allocator_;
         other.image_ = {};
         other.sampler_ = VK_NULL_HANDLE;
         other.ownsSampler_ = false;
+        other.device_ = VK_NULL_HANDLE;
+        other.allocator_ = VK_NULL_HANDLE;
     }
     return *this;
 }
@@ -64,6 +74,12 @@ bool VkTexture::upload(VkContext& ctx, const uint8_t* pixels, uint32_t width, ui
     if (generateMips) {
         usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     }
+    // Release anything this object already held: a second upload over the
+    // same texture used to abandon the first, which is how three quest
+    // marker textures survived every re-initialisation.
+    destroy(device_, allocator_);
+    device_ = ctx.getDevice();
+    allocator_ = ctx.getAllocator();
     image_ = createImage(ctx.getDevice(), ctx.getAllocator(), width, height,
         format, usage, VK_SAMPLE_COUNT_1_BIT, mipLevels_, where);
 
@@ -133,6 +149,12 @@ bool VkTexture::uploadMips(VkContext& ctx, const uint8_t* const* mipData,
     }
     vmaUnmapMemory(ctx.getAllocator(), staging.allocation);
 
+    // Release anything this object already held: a second upload over the
+    // same texture used to abandon the first, which is how three quest
+    // marker textures survived every re-initialisation.
+    destroy(device_, allocator_);
+    device_ = ctx.getDevice();
+    allocator_ = ctx.getAllocator();
     image_ = createImage(ctx.getDevice(), ctx.getAllocator(), width, height,
         format, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_SAMPLE_COUNT_1_BIT, mipLevels_);
@@ -181,6 +203,12 @@ bool VkTexture::uploadMips(VkContext& ctx, const uint8_t* const* mipData,
 bool VkTexture::createDepth(VkContext& ctx, uint32_t width, uint32_t height, VkFormat format) {
     mipLevels_ = 1;
 
+    // Release anything this object already held: a second upload over the
+    // same texture used to abandon the first, which is how three quest
+    // marker textures survived every re-initialisation.
+    destroy(device_, allocator_);
+    device_ = ctx.getDevice();
+    allocator_ = ctx.getAllocator();
     image_ = createImage(ctx.getDevice(), ctx.getAllocator(), width, height,
         format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
@@ -199,6 +227,9 @@ bool VkTexture::createDepth(VkContext& ctx, uint32_t width, uint32_t height, VkF
 // Shared sampler finalization: try the global cache first (avoids duplicate Vulkan
 // sampler objects), fall back to direct creation if no VkContext is available.
 bool VkTexture::finalizeSampler(VkDevice device, const VkSamplerCreateInfo& samplerInfo) {
+    // A texture may be given a sampler before an image; record the device so
+    // the destructor can still free it.
+    if (device_ == VK_NULL_HANDLE) device_ = device;
     auto* ctx = VkContext::globalInstance();
     if (ctx) {
         sampler_ = ctx->getOrCreateSampler(samplerInfo);
@@ -264,12 +295,20 @@ bool VkTexture::createSampler(VkDevice device,
     return finalizeSampler(device, samplerInfo);
 }
 void VkTexture::destroy(VkDevice device, VmaAllocator allocator) {
+    // Nothing was ever created, or this has already run. Both are ordinary:
+    // the destructor calls this after an explicit destroy() has, and a
+    // default-constructed texture is destroyed without having been used.
+    if (device == VK_NULL_HANDLE) {
+        return;
+    }
     if (sampler_ != VK_NULL_HANDLE && ownsSampler_) {
         vkDestroySampler(device, sampler_, nullptr);
     }
     sampler_ = VK_NULL_HANDLE;
     ownsSampler_ = false;
     destroyImage(device, allocator, image_);
+    device_ = VK_NULL_HANDLE;
+    allocator_ = VK_NULL_HANDLE;
 }
 
 VkDescriptorImageInfo VkTexture::descriptorInfo(VkImageLayout layout) const {

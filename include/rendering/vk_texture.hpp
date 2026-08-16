@@ -59,6 +59,9 @@ public:
         float mipLodBias = 0.0f);
 
 
+    /// Release now. Safe to call more than once, and unnecessary since the
+    /// destructor does it -- kept because call sites that free eagerly rather
+    /// than at scope exit are still meaningful.
     void destroy(VkDevice device, VmaAllocator allocator);
 
     VkImage getImage() const { return image_.image; }
@@ -83,6 +86,18 @@ private:
     VkSampler sampler_ = VK_NULL_HANDLE;
     uint32_t mipLevels_ = 1;
     bool ownsSampler_ = true; // false when sampler comes from VkContext cache
+
+    /// The device and allocator whatever is held above came from, recorded so
+    /// the destructor can release it without being told.
+    ///
+    /// Before these existed ~VkTexture was empty and every owner had to call
+    /// destroy() by hand, which meant a unique_ptr<VkTexture> released
+    /// nothing, an unordered_map::emplace that lost a key race silently
+    /// dropped a texture with no handle left to free it by, and a second
+    /// upload() over the same object overwrote the first. Four separate leaks
+    /// came from that, one of them 540 MB.
+    VkDevice device_ = VK_NULL_HANDLE;
+    VmaAllocator allocator_ = VK_NULL_HANDLE;
 };
 
 } // namespace rendering
