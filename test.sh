@@ -178,13 +178,20 @@ COMPILE_COMMANDS="$TIDY_DB_DIR/compile_commands.json"
 # ---------------------------------------------------------------------------
 # Source files to check (first-party only)
 # ---------------------------------------------------------------------------
-mapfile -t SOURCE_FILES < <(
+# Read with a while loop rather than mapfile: mapfile is bash 4, and macOS
+# ships bash 3.2 as /bin/bash. The shebang finds a newer bash when one is
+# installed, so this only bites on a machine without one - where it aborts
+# under set -e with "mapfile: command not found" and no lint runs at all.
+SOURCE_FILES=()
+while IFS= read -r src_file; do
+    SOURCE_FILES+=("$src_file")
+done < <(
     find "$SCRIPT_DIR/src" -type f \( -name '*.cpp' -o -name '*.cxx' -o -name '*.cc' \) | sort
 )
 
 if [[ ${#SOURCE_FILES[@]} -eq 0 ]]; then
     echo "No source files found in src/"
-    exit 0
+    exit 1
 fi
 
 echo "Linting ${#SOURCE_FILES[@]} source files..."
