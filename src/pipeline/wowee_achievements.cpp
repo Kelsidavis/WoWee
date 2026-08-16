@@ -117,8 +117,8 @@ WoweeAchievement WoweeAchievementLoader::makeStarter(const std::string& catalogN
         e.name = "First Blood";
         e.description = "Kill your first hostile creature.";
         e.points = 5;
-        e.criteria.push_back({1, WoweeAchievement::KillCreature,
-                               1000, 1, "Kill any hostile creature"});
+        e.criteria.push_back({.criteriaId = 1, .kind = WoweeAchievement::KillCreature,
+                               .targetId = 1000, .quantity = 1, .description = "Kill any hostile creature"});
         c.entries.push_back(e);
     }
     {
@@ -127,8 +127,8 @@ WoweeAchievement WoweeAchievementLoader::makeStarter(const std::string& catalogN
         e.name = "Helping Hand";
         e.description = "Complete your first quest.";
         e.points = 5;
-        e.criteria.push_back({2, WoweeAchievement::CompleteQuest,
-                               1, 1, "Complete the Bandit Trouble quest"});
+        e.criteria.push_back({.criteriaId = 2, .kind = WoweeAchievement::CompleteQuest,
+                               .targetId = 1, .quantity = 1, .description = "Complete the Bandit Trouble quest"});
         c.entries.push_back(e);
     }
     {
@@ -137,8 +137,8 @@ WoweeAchievement WoweeAchievementLoader::makeStarter(const std::string& catalogN
         e.name = "Coming of Age";
         e.description = "Reach character level 10.";
         e.points = 10;
-        e.criteria.push_back({3, WoweeAchievement::ReachLevel,
-                               0, 10, "Reach level 10"});
+        e.criteria.push_back({.criteriaId = 3, .kind = WoweeAchievement::ReachLevel,
+                               .targetId = 0, .quantity = 10, .description = "Reach level 10"});
         c.entries.push_back(e);
     }
     return c;
@@ -155,8 +155,8 @@ WoweeAchievement WoweeAchievementLoader::makeBandit(const std::string& catalogNa
         e.points = 10;
         // creatureId 1000 matches WCRT.makeBandit + WSPN.makeCamp
         // + WLOT.makeBandit + WQT.makeStarter target.
-        e.criteria.push_back({100, WoweeAchievement::KillCreature,
-                               1000, 50, "Defias Bandits slain"});
+        e.criteria.push_back({.criteriaId = 100, .kind = WoweeAchievement::KillCreature,
+                               .targetId = 1000, .quantity = 50, .description = "Defias Bandits slain"});
         c.entries.push_back(e);
     }
     {
@@ -166,8 +166,8 @@ WoweeAchievement WoweeAchievementLoader::makeBandit(const std::string& catalogNa
         e.description = "Loot the Bandit Strongbox.";
         e.points = 5;
         // objectId 2000 matches WGOT.makeDungeon's bandit chest.
-        e.criteria.push_back({101, WoweeAchievement::LootItem,
-                               2000, 1, "Loot the Bandit Strongbox"});
+        e.criteria.push_back({.criteriaId = 101, .kind = WoweeAchievement::LootItem,
+                               .targetId = 2000, .quantity = 1, .description = "Loot the Bandit Strongbox"});
         c.entries.push_back(e);
     }
     {
@@ -176,8 +176,8 @@ WoweeAchievement WoweeAchievementLoader::makeBandit(const std::string& catalogNa
         e.name = "Brotherhood Down";
         e.description = "Complete the Bandit Trouble quest line.";
         e.points = 15;
-        e.criteria.push_back({102, WoweeAchievement::CompleteQuest,
-                               1, 1, "Quest 1: Bandit Trouble"});
+        e.criteria.push_back({.criteriaId = 102, .kind = WoweeAchievement::CompleteQuest,
+                               .targetId = 1, .quantity = 1, .description = "Quest 1: Bandit Trouble"});
         c.entries.push_back(e);
     }
     return c;
@@ -192,8 +192,8 @@ WoweeAchievement WoweeAchievementLoader::makeMeta(const std::string& catalogName
         e.description = "Reach 100 in Mining.";
         e.points = 10;
         // skillId 186 matches WSKL.makeProfessions + WGOT.makeGather.
-        e.criteria.push_back({200, WoweeAchievement::ReachSkillLevel,
-                               186, 100, "Mining at rank 100"});
+        e.criteria.push_back({.criteriaId = 200, .kind = WoweeAchievement::ReachSkillLevel,
+                               .targetId = 186, .quantity = 100, .description = "Mining at rank 100"});
         c.entries.push_back(e);
     }
     {
@@ -202,8 +202,8 @@ WoweeAchievement WoweeAchievementLoader::makeMeta(const std::string& catalogName
         e.description = "Reach 100 in Lockpicking.";
         e.points = 10;
         // skillId 633 matches WSKL.makeStarter + WLCK.makeDungeon.
-        e.criteria.push_back({201, WoweeAchievement::ReachSkillLevel,
-                               633, 100, "Lockpicking at rank 100"});
+        e.criteria.push_back({.criteriaId = 201, .kind = WoweeAchievement::ReachSkillLevel,
+                               .targetId = 633, .quantity = 100, .description = "Lockpicking at rank 100"});
         c.entries.push_back(e);
     }
     {
@@ -212,8 +212,8 @@ WoweeAchievement WoweeAchievementLoader::makeMeta(const std::string& catalogName
         e.description = "Cast Frostbolt 100 times.";
         e.points = 5;
         // spellId 116 matches WSPL.makeMage's Frostbolt.
-        e.criteria.push_back({202, WoweeAchievement::CastSpell,
-                               116, 100, "Frostbolt cast count"});
+        e.criteria.push_back({.criteriaId = 202, .kind = WoweeAchievement::CastSpell,
+                               .targetId = 116, .quantity = 100, .description = "Frostbolt cast count"});
         c.entries.push_back(e);
     }
     {
@@ -223,12 +223,12 @@ WoweeAchievement WoweeAchievementLoader::makeMeta(const std::string& catalogName
         e.points = 25;
         e.titleReward = "the Versatile";
         e.flags = WoweeAchievement::HiddenUntilEarned;
-        e.criteria.push_back({250, WoweeAchievement::CompleteAchievement,
-                               200, 1, "Mining Apprentice"});
-        e.criteria.push_back({251, WoweeAchievement::CompleteAchievement,
-                               201, 1, "Lockbreaker"});
-        e.criteria.push_back({252, WoweeAchievement::CompleteAchievement,
-                               202, 1, "Frostbinder"});
+        e.criteria.push_back({.criteriaId = 250, .kind = WoweeAchievement::CompleteAchievement,
+                               .targetId = 200, .quantity = 1, .description = "Mining Apprentice"});
+        e.criteria.push_back({.criteriaId = 251, .kind = WoweeAchievement::CompleteAchievement,
+                               .targetId = 201, .quantity = 1, .description = "Lockbreaker"});
+        e.criteria.push_back({.criteriaId = 252, .kind = WoweeAchievement::CompleteAchievement,
+                               .targetId = 202, .quantity = 1, .description = "Frostbinder"});
         c.entries.push_back(e);
     }
     return c;

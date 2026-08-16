@@ -185,7 +185,7 @@ WoweeItem WoweeItemLoader::makeStarter(const std::string& catalogName) {
         e.sellPriceCopper = 50; e.buyPriceCopper = 200;
         e.maxStack = 1; e.durability = 50;
         e.damageMin = 4; e.damageMax = 9; e.attackSpeedMs = 1800;
-        e.stats.push_back({WoweeItem::StatStrength, 1});
+        e.stats.push_back({.type = WoweeItem::StatStrength, .value = 1});
         e.name = "Worn Shortsword";
         e.description = "A simple training sword.";
         c.entries.push_back(e);
@@ -199,7 +199,7 @@ WoweeItem WoweeItemLoader::makeStarter(const std::string& catalogName) {
         e.requiredLevel = 1; e.itemLevel = 5;
         e.sellPriceCopper = 30; e.buyPriceCopper = 150;
         e.maxStack = 1; e.durability = 40;
-        e.stats.push_back({WoweeItem::StatStamina, 1});
+        e.stats.push_back({.type = WoweeItem::StatStamina, .value = 1});
         e.name = "Linen Vest";
         e.description = "Plain linen.";
         c.entries.push_back(e);
@@ -254,8 +254,8 @@ WoweeItem WoweeItemLoader::makeWeapons(const std::string& catalogName) {
         e.durability = static_cast<uint16_t>(40 + ilvl);
         e.damageMin = dmgMin; e.damageMax = dmgMax;
         e.attackSpeedMs = speedMs;
-        e.stats.push_back({WoweeItem::StatStrength,
-                            static_cast<int16_t>(1 + ilvl / 5)});
+        e.stats.push_back({.type = WoweeItem::StatStrength,
+                            .value = static_cast<int16_t>(1 + ilvl / 5)});
         e.name = name;
         c.entries.push_back(e);
     };
@@ -285,10 +285,10 @@ WoweeItem WoweeItemLoader::makeArmor(const std::string& catalogName) {
         e.maxStack = 1;
         e.durability = static_cast<uint16_t>(60 + ilvl);
         e.flags = WoweeItem::BindOnEquip;
-        if (stam) e.stats.push_back({WoweeItem::StatStamina, stam});
-        if (str_) e.stats.push_back({WoweeItem::StatStrength, str_});
-        e.stats.push_back({WoweeItem::StatDefense,
-                            static_cast<int16_t>(ilvl / 5)});
+        if (stam) e.stats.push_back({.type = WoweeItem::StatStamina, .value = stam});
+        if (str_) e.stats.push_back({.type = WoweeItem::StatStrength, .value = str_});
+        e.stats.push_back({.type = WoweeItem::StatDefense,
+                            .value = static_cast<int16_t>(ilvl / 5)});
         e.name = name;
         c.entries.push_back(e);
     };

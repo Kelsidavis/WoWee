@@ -76,50 +76,50 @@ bool WoweeSoundLoader::exists(const std::string& basePath) {
 WoweeSound WoweeSoundLoader::makeStarter(const std::string& catalogName) {
     WoweeSound c;
     c.name = catalogName;
-    c.entries.push_back({1, WoweeSound::Sfx, 0,                    1.0f,  5.0f,  30.0f, "Sound/Sfx/footstep_grass.ogg",  "Footstep (grass)"});
-    c.entries.push_back({2, WoweeSound::Music, WoweeSound::Stream, 0.7f,  0.0f,   0.0f, "Sound/Music/main_theme.ogg",    "Main theme"});
-    c.entries.push_back({3, WoweeSound::Ambient,
-                          WoweeSound::Loop | WoweeSound::Is3D,      0.5f, 10.0f,  60.0f, "Sound/Ambient/forest_loop.ogg", "Forest ambience"});
-    c.entries.push_back({4, WoweeSound::Ui, 0,                     1.0f,  0.0f,   0.0f, "Sound/Ui/button_click.ogg",     "UI button click"});
-    c.entries.push_back({5, WoweeSound::Voice, WoweeSound::Is3D,   1.0f,  3.0f,  20.0f, "Sound/Voice/vendor_greet.ogg",  "Vendor greeting"});
-    c.entries.push_back({6, WoweeSound::Spell, WoweeSound::Is3D,   0.9f,  4.0f,  40.0f, "Sound/Spell/fireball_cast.ogg", "Fireball cast"});
-    c.entries.push_back({7, WoweeSound::Combat, WoweeSound::Is3D,  0.9f,  3.0f,  25.0f, "Sound/Combat/sword_clang.ogg",  "Sword clang"});
+    c.entries.push_back({.soundId = 1, .kind = WoweeSound::Sfx, .flags = 0,                    .volume = 1.0f,  .minDistance = 5.0f,  .maxDistance = 30.0f, .filePath = "Sound/Sfx/footstep_grass.ogg",  .label = "Footstep (grass)"});
+    c.entries.push_back({.soundId = 2, .kind = WoweeSound::Music, .flags = WoweeSound::Stream, .volume = 0.7f,  .minDistance = 0.0f,   .maxDistance = 0.0f, .filePath = "Sound/Music/main_theme.ogg",    .label = "Main theme"});
+    c.entries.push_back({.soundId = 3, .kind = WoweeSound::Ambient,
+                          .flags = WoweeSound::Loop | WoweeSound::Is3D,      .volume = 0.5f, .minDistance = 10.0f,  .maxDistance = 60.0f, .filePath = "Sound/Ambient/forest_loop.ogg", .label = "Forest ambience"});
+    c.entries.push_back({.soundId = 4, .kind = WoweeSound::Ui, .flags = 0,                     .volume = 1.0f,  .minDistance = 0.0f,   .maxDistance = 0.0f, .filePath = "Sound/Ui/button_click.ogg",     .label = "UI button click"});
+    c.entries.push_back({.soundId = 5, .kind = WoweeSound::Voice, .flags = WoweeSound::Is3D,   .volume = 1.0f,  .minDistance = 3.0f,  .maxDistance = 20.0f, .filePath = "Sound/Voice/vendor_greet.ogg",  .label = "Vendor greeting"});
+    c.entries.push_back({.soundId = 6, .kind = WoweeSound::Spell, .flags = WoweeSound::Is3D,   .volume = 0.9f,  .minDistance = 4.0f,  .maxDistance = 40.0f, .filePath = "Sound/Spell/fireball_cast.ogg", .label = "Fireball cast"});
+    c.entries.push_back({.soundId = 7, .kind = WoweeSound::Combat, .flags = WoweeSound::Is3D,  .volume = 0.9f,  .minDistance = 3.0f,  .maxDistance = 25.0f, .filePath = "Sound/Combat/sword_clang.ogg",  .label = "Sword clang"});
     return c;
 }
 
 WoweeSound WoweeSoundLoader::makeAmbient(const std::string& catalogName) {
     WoweeSound c;
     c.name = catalogName;
-    c.entries.push_back({100, WoweeSound::Ambient,
-                          WoweeSound::Loop | WoweeSound::Is3D, 0.4f, 12.0f, 80.0f,
-                          "Sound/Ambient/birds_loop.ogg",   "Birds (loop)"});
-    c.entries.push_back({101, WoweeSound::Ambient,
-                          WoweeSound::Loop | WoweeSound::Is3D, 0.3f, 20.0f, 120.0f,
-                          "Sound/Ambient/wind_loop.ogg",    "Wind (loop)"});
-    c.entries.push_back({102, WoweeSound::Sfx, WoweeSound::Is3D, 0.8f, 4.0f, 25.0f,
-                          "Sound/Sfx/footstep_grass.ogg",   "Footstep grass"});
-    c.entries.push_back({103, WoweeSound::Sfx, WoweeSound::Is3D, 0.8f, 4.0f, 25.0f,
-                          "Sound/Sfx/footstep_dirt.ogg",    "Footstep dirt"});
-    c.entries.push_back({104, WoweeSound::Sfx, WoweeSound::Is3D, 0.8f, 4.0f, 25.0f,
-                          "Sound/Sfx/footstep_leaves.ogg",  "Footstep leaves"});
+    c.entries.push_back({.soundId = 100, .kind = WoweeSound::Ambient,
+                          .flags = WoweeSound::Loop | WoweeSound::Is3D, .volume = 0.4f, .minDistance = 12.0f, .maxDistance = 80.0f,
+                          .filePath = "Sound/Ambient/birds_loop.ogg",   .label = "Birds (loop)"});
+    c.entries.push_back({.soundId = 101, .kind = WoweeSound::Ambient,
+                          .flags = WoweeSound::Loop | WoweeSound::Is3D, .volume = 0.3f, .minDistance = 20.0f, .maxDistance = 120.0f,
+                          .filePath = "Sound/Ambient/wind_loop.ogg",    .label = "Wind (loop)"});
+    c.entries.push_back({.soundId = 102, .kind = WoweeSound::Sfx, .flags = WoweeSound::Is3D, .volume = 0.8f, .minDistance = 4.0f, .maxDistance = 25.0f,
+                          .filePath = "Sound/Sfx/footstep_grass.ogg",   .label = "Footstep grass"});
+    c.entries.push_back({.soundId = 103, .kind = WoweeSound::Sfx, .flags = WoweeSound::Is3D, .volume = 0.8f, .minDistance = 4.0f, .maxDistance = 25.0f,
+                          .filePath = "Sound/Sfx/footstep_dirt.ogg",    .label = "Footstep dirt"});
+    c.entries.push_back({.soundId = 104, .kind = WoweeSound::Sfx, .flags = WoweeSound::Is3D, .volume = 0.8f, .minDistance = 4.0f, .maxDistance = 25.0f,
+                          .filePath = "Sound/Sfx/footstep_leaves.ogg",  .label = "Footstep leaves"});
     return c;
 }
 
 WoweeSound WoweeSoundLoader::makeTavern(const std::string& catalogName) {
     WoweeSound c;
     c.name = catalogName;
-    c.entries.push_back({200, WoweeSound::Ambient,
-                          WoweeSound::Loop | WoweeSound::Is3D, 0.5f, 6.0f, 40.0f,
-                          "Sound/Ambient/fire_crackle.ogg", "Fire crackle (loop)"});
-    c.entries.push_back({201, WoweeSound::Ambient,
-                          WoweeSound::Loop, 0.4f, 0.0f, 0.0f,
-                          "Sound/Ambient/crowd_murmur.ogg", "Crowd murmur (loop)"});
-    c.entries.push_back({202, WoweeSound::Sfx, WoweeSound::Is3D, 0.9f, 3.0f, 15.0f,
-                          "Sound/Sfx/drink_clink.ogg",      "Drink clink"});
-    c.entries.push_back({203, WoweeSound::Sfx, WoweeSound::Is3D, 0.7f, 4.0f, 20.0f,
-                          "Sound/Sfx/door_creak.ogg",       "Door creak"});
-    c.entries.push_back({204, WoweeSound::Music, WoweeSound::Stream, 0.6f, 0.0f, 0.0f,
-                          "Sound/Music/tavern_lute.ogg",    "Tavern lute"});
+    c.entries.push_back({.soundId = 200, .kind = WoweeSound::Ambient,
+                          .flags = WoweeSound::Loop | WoweeSound::Is3D, .volume = 0.5f, .minDistance = 6.0f, .maxDistance = 40.0f,
+                          .filePath = "Sound/Ambient/fire_crackle.ogg", .label = "Fire crackle (loop)"});
+    c.entries.push_back({.soundId = 201, .kind = WoweeSound::Ambient,
+                          .flags = WoweeSound::Loop, .volume = 0.4f, .minDistance = 0.0f, .maxDistance = 0.0f,
+                          .filePath = "Sound/Ambient/crowd_murmur.ogg", .label = "Crowd murmur (loop)"});
+    c.entries.push_back({.soundId = 202, .kind = WoweeSound::Sfx, .flags = WoweeSound::Is3D, .volume = 0.9f, .minDistance = 3.0f, .maxDistance = 15.0f,
+                          .filePath = "Sound/Sfx/drink_clink.ogg",      .label = "Drink clink"});
+    c.entries.push_back({.soundId = 203, .kind = WoweeSound::Sfx, .flags = WoweeSound::Is3D, .volume = 0.7f, .minDistance = 4.0f, .maxDistance = 20.0f,
+                          .filePath = "Sound/Sfx/door_creak.ogg",       .label = "Door creak"});
+    c.entries.push_back({.soundId = 204, .kind = WoweeSound::Music, .flags = WoweeSound::Stream, .volume = 0.6f, .minDistance = 0.0f, .maxDistance = 0.0f,
+                          .filePath = "Sound/Music/tavern_lute.ogg",    .label = "Tavern lute"});
     return c;
 }
 

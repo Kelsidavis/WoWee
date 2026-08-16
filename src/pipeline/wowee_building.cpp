@@ -467,10 +467,10 @@ bool WoweeBuildingLoader::toWMOModel(const WoweeBuilding& building, WMOModel& ou
         uint16_t portalIdx = static_cast<uint16_t>(outModel.portals.size());
         outModel.portals.push_back(portal);
         if (wp.groupA >= 0) {
-            outModel.portalRefs.push_back({portalIdx, static_cast<uint16_t>(wp.groupA), -1, 0});
+            outModel.portalRefs.push_back({.portalIndex = portalIdx, .groupIndex = static_cast<uint16_t>(wp.groupA), .side = -1, .padding = 0});
         }
         if (wp.groupB >= 0) {
-            outModel.portalRefs.push_back({portalIdx, static_cast<uint16_t>(wp.groupB), 1, 0});
+            outModel.portalRefs.push_back({.portalIndex = portalIdx, .groupIndex = static_cast<uint16_t>(wp.groupB), .side = 1, .padding = 0});
         }
     }
 

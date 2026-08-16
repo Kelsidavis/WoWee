@@ -110,13 +110,13 @@ WoweeTrainer WoweeTrainerLoader::makeStarter(const std::string& catalogName) {
         e.kindMask = WoweeTrainer::Trainer | WoweeTrainer::Vendor;
         e.greeting = "Welcome to the inn, traveler. What can I do for you?";
         // Train First Aid (skillId 129 in WSKL.makeProfessions).
-        e.spells.push_back({4001, 100, 129, 1, 1});  // teaches First Aid
+        e.spells.push_back({.spellId = 4001, .moneyCostCopper = 100, .requiredSkillId = 129, .requiredSkillRank = 1, .requiredLevel = 1});  // teaches First Aid
         // Sell starter items (itemIds match WIT.makeStarter:
         // 2=Linen Vest, 3=Healing Potion). Use moneyCost=0 to
         // mean "use WIT.buyPrice".
-        e.items.push_back({2, WoweeTrainer::kUnlimitedStock, 0, 0, 0});
-        e.items.push_back({3, WoweeTrainer::kUnlimitedStock, 0, 0, 0});
-        e.items.push_back({4, 1, 86400, 0, 0});  // 1 unique item / 24h
+        e.items.push_back({.itemId = 2, .stockCount = WoweeTrainer::kUnlimitedStock, .restockSec = 0, .extendedCost = 0, .moneyCostCopper = 0});
+        e.items.push_back({.itemId = 3, .stockCount = WoweeTrainer::kUnlimitedStock, .restockSec = 0, .extendedCost = 0, .moneyCostCopper = 0});
+        e.items.push_back({.itemId = 4, .stockCount = 1, .restockSec = 86400, .extendedCost = 0, .moneyCostCopper = 0});  // 1 unique item / 24h
         c.entries.push_back(e);
     }
     return c;
@@ -134,10 +134,10 @@ WoweeTrainer WoweeTrainerLoader::makeMageTrainer(const std::string& catalogName)
         e.greeting = "Magic is a craft. Will you learn?";
         // Each spell costs scaling copper, requires reagent
         // skill (none here), and a minimum character level.
-        e.spells.push_back({116,  100,    0, 0,  4});   // Frostbolt @ lvl 4
-        e.spells.push_back({133,  100,    0, 0,  1});   // Fireball @ lvl 1
-        e.spells.push_back({1459, 1000,   0, 0,  10});  // Arcane Int @ lvl 10
-        e.spells.push_back({1953, 5000,   0, 0,  20});  // Blink @ lvl 20
+        e.spells.push_back({.spellId = 116,  .moneyCostCopper = 100,    .requiredSkillId = 0, .requiredSkillRank = 0,  .requiredLevel = 4});   // Frostbolt @ lvl 4
+        e.spells.push_back({.spellId = 133,  .moneyCostCopper = 100,    .requiredSkillId = 0, .requiredSkillRank = 0,  .requiredLevel = 1});   // Fireball @ lvl 1
+        e.spells.push_back({.spellId = 1459, .moneyCostCopper = 1000,   .requiredSkillId = 0, .requiredSkillRank = 0,  .requiredLevel = 10});  // Arcane Int @ lvl 10
+        e.spells.push_back({.spellId = 1953, .moneyCostCopper = 5000,   .requiredSkillId = 0, .requiredSkillRank = 0,  .requiredLevel = 20});  // Blink @ lvl 20
         c.entries.push_back(e);
     }
     return c;
@@ -153,11 +153,11 @@ WoweeTrainer WoweeTrainerLoader::makeWeaponVendor(const std::string& catalogName
         e.npcId = 4002;
         e.kindMask = WoweeTrainer::Vendor;
         e.greeting = "Strong steel for sturdy folk. Take a look.";
-        e.items.push_back({1001, WoweeTrainer::kUnlimitedStock, 0, 0, 0});  // Apprentice Sword
-        e.items.push_back({1002, WoweeTrainer::kUnlimitedStock, 0, 0, 0});  // Journeyman Blade
-        e.items.push_back({1003, 3, 3600, 0, 0});  // Steelthorn Edge: 3 in stock, refresh 1h
-        e.items.push_back({1004, 1, 7200, 0, 0});  // Bloodforged: 1 in stock, refresh 2h
-        e.items.push_back({1005, 0, 0, 0, 0});      // Doombringer: out of stock by default
+        e.items.push_back({.itemId = 1001, .stockCount = WoweeTrainer::kUnlimitedStock, .restockSec = 0, .extendedCost = 0, .moneyCostCopper = 0});  // Apprentice Sword
+        e.items.push_back({.itemId = 1002, .stockCount = WoweeTrainer::kUnlimitedStock, .restockSec = 0, .extendedCost = 0, .moneyCostCopper = 0});  // Journeyman Blade
+        e.items.push_back({.itemId = 1003, .stockCount = 3, .restockSec = 3600, .extendedCost = 0, .moneyCostCopper = 0});  // Steelthorn Edge: 3 in stock, refresh 1h
+        e.items.push_back({.itemId = 1004, .stockCount = 1, .restockSec = 7200, .extendedCost = 0, .moneyCostCopper = 0});  // Bloodforged: 1 in stock, refresh 2h
+        e.items.push_back({.itemId = 1005, .stockCount = 0, .restockSec = 0, .extendedCost = 0, .moneyCostCopper = 0});      // Doombringer: out of stock by default
         c.entries.push_back(e);
     }
     return c;

@@ -153,18 +153,18 @@ WoweeTaxi WoweeTaxiLoader::makeStarter(const std::string& catalogName) {
         p.pathId = 1; p.fromNodeId = 1; p.toNodeId = 2;
         p.moneyCostCopper = 5000;        // 50 silver
         // 3 waypoints carving a gentle arc between the cities.
-        p.waypoints.push_back({{-9100.0f,  90.0f, 80.0f}, 0.0f});
-        p.waypoints.push_back({{-9250.0f,  70.0f, 90.0f}, 0.0f});
-        p.waypoints.push_back({{-9460.0f,  60.0f, 56.0f}, 0.0f});
+        p.waypoints.push_back({.position = {-9100.0f,  90.0f, 80.0f}, .delaySec = 0.0f});
+        p.waypoints.push_back({.position = {-9250.0f,  70.0f, 90.0f}, .delaySec = 0.0f});
+        p.waypoints.push_back({.position = {-9460.0f,  60.0f, 56.0f}, .delaySec = 0.0f});
         c.paths.push_back(p);
     }
     {
         WoweeTaxi::Path p;
         p.pathId = 2; p.fromNodeId = 2; p.toNodeId = 1;
         p.moneyCostCopper = 5000;
-        p.waypoints.push_back({{-9250.0f,  70.0f, 90.0f}, 0.0f});
-        p.waypoints.push_back({{-9100.0f,  90.0f, 80.0f}, 0.0f});
-        p.waypoints.push_back({{-9000.0f, 100.0f, 50.0f}, 0.0f});
+        p.waypoints.push_back({.position = {-9250.0f,  70.0f, 90.0f}, .delaySec = 0.0f});
+        p.waypoints.push_back({.position = {-9100.0f,  90.0f, 80.0f}, .delaySec = 0.0f});
+        p.waypoints.push_back({.position = {-9000.0f, 100.0f, 50.0f}, .delaySec = 0.0f});
         c.paths.push_back(p);
     }
     return c;
@@ -206,9 +206,9 @@ WoweeTaxi WoweeTaxiLoader::makeRegion(const std::string& catalogName) {
         const auto& b = c.nodes[(k + 1) % 4].position;
         glm::vec3 mid1 = a + (b - a) * 0.33f;  mid1.y = 90.0f;
         glm::vec3 mid2 = a + (b - a) * 0.67f;  mid2.y = 90.0f;
-        p.waypoints.push_back({mid1, 0.0f});
-        p.waypoints.push_back({mid2, 0.0f});
-        p.waypoints.push_back({b,    0.0f});
+        p.waypoints.push_back({.position = mid1, .delaySec = 0.0f});
+        p.waypoints.push_back({.position = mid2, .delaySec = 0.0f});
+        p.waypoints.push_back({.position = b,    .delaySec = 0.0f});
         c.paths.push_back(p);
     }
     return c;
@@ -249,8 +249,8 @@ WoweeTaxi WoweeTaxiLoader::makeContinent(const std::string& catalogName) {
         const auto& a = c.findNode(from)->position;
         const auto& b = c.findNode(to)->position;
         glm::vec3 mid1 = a + (b - a) * 0.5f;  mid1.y = 120.0f;
-        p.waypoints.push_back({mid1, 0.0f});
-        p.waypoints.push_back({b,    0.0f});
+        p.waypoints.push_back({.position = mid1, .delaySec = 0.0f});
+        p.waypoints.push_back({.position = b,    .delaySec = 0.0f});
         c.paths.push_back(p);
     };
     addPath(200, 200, 201, 8000);    // hub -> Stormwind

@@ -103,7 +103,7 @@ WoweeMail WoweeMailLoader::makeStarter(const std::string& catalogName) {
         e.body = "Your bag was full so we mailed your reward. Enjoy!";
         e.senderName = "Postmaster";
         e.categoryId = WoweeMail::QuestReward;
-        e.attachments.push_back({3, 5});       // 5 healing potions (WIT 3)
+        e.attachments.push_back({.itemId = 3, .quantity = 5});       // 5 healing potions (WIT 3)
         c.entries.push_back(e);
     }
     {
@@ -113,7 +113,7 @@ WoweeMail WoweeMailLoader::makeStarter(const std::string& catalogName) {
         e.body = "Congratulations, you won the auction. Your item is attached.";
         e.senderName = "Auction House";
         e.categoryId = WoweeMail::Auction;
-        e.attachments.push_back({1001, 1});    // apprentice sword
+        e.attachments.push_back({.itemId = 1001, .quantity = 1});    // apprentice sword
         c.entries.push_back(e);
     }
     {
@@ -140,7 +140,7 @@ WoweeMail WoweeMailLoader::makeHoliday(const std::string& catalogName) {
         e.templateId = id; e.subject = subject; e.body = body;
         e.senderName = sender;
         e.categoryId = WoweeMail::EventMailing;
-        e.attachments.push_back({itemId, qty});
+        e.attachments.push_back({.itemId = itemId, .quantity = qty});
         c.entries.push_back(e);
     };
     // The itemIds (200-203) shadow WTKN.makeSeasonal token IDs

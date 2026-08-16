@@ -116,24 +116,24 @@ WoweeSpellPack WoweeSpellPackLoader::makeWarriorPack(
     // Strike=78, Mortal Strike=12294, Bloodthirst=23881,
     // Shield Block=2565, etc.
     return makeFromTabs(catalogName, {
-        {1001, 1, 0, 1, "General",
-            {78,    // Heroic Strike rank 1
+        {.packId = 1001, .classId = 1, .tabIndex = 0, .iconIndex = 1, .tabName = "General",
+            .spellIds = {78,    // Heroic Strike rank 1
              100,   // Charge rank 1
              6673,  // Battle Shout rank 1
              2457,  // Battle Stance
             }},
-        {1002, 1, 1, 30, "Arms",
-            {12294, // Mortal Strike
+        {.packId = 1002, .classId = 1, .tabIndex = 1, .iconIndex = 30, .tabName = "Arms",
+            .spellIds = {12294, // Mortal Strike
              1680,  // Whirlwind
              7384,  // Overpower
             }},
-        {1003, 1, 2, 31, "Fury",
-            {23881, // Bloodthirst
+        {.packId = 1003, .classId = 1, .tabIndex = 2, .iconIndex = 31, .tabName = "Fury",
+            .spellIds = {23881, // Bloodthirst
              5308,  // Execute
              1719,  // Recklessness
             }},
-        {1004, 1, 3, 32, "Protection",
-            {2565,  // Shield Block
+        {.packId = 1004, .classId = 1, .tabIndex = 3, .iconIndex = 32, .tabName = "Protection",
+            .spellIds = {2565,  // Shield Block
              871,   // Shield Wall
              355,   // Taunt
             }},
@@ -146,23 +146,23 @@ WoweeSpellPack WoweeSpellPackLoader::makeMagePack(
     // rank 1 (spellId 116) - the canonical "every
     // mage starts with this" spell.
     return makeFromTabs(catalogName, {
-        {2001, 8, 0, 5, "General",
-            {133,   // Fireball rank 1
+        {.packId = 2001, .classId = 8, .tabIndex = 0, .iconIndex = 5, .tabName = "General",
+            .spellIds = {133,   // Fireball rank 1
              168,   // Frost Armor rank 1
              1459,  // Arcane Intellect rank 1
             }},
-        {2002, 8, 1, 50, "Arcane",
-            {1449,  // Arcane Explosion rank 1
+        {.packId = 2002, .classId = 8, .tabIndex = 1, .iconIndex = 50, .tabName = "Arcane",
+            .spellIds = {1449,  // Arcane Explosion rank 1
              5143,  // Arcane Missiles rank 1
              1953,  // Blink
             }},
-        {2003, 8, 2, 51, "Fire",
-            {2120,  // Flamestrike rank 1
+        {.packId = 2003, .classId = 8, .tabIndex = 2, .iconIndex = 51, .tabName = "Fire",
+            .spellIds = {2120,  // Flamestrike rank 1
              11366, // Pyroblast rank 1
              2948,  // Scorch rank 1
             }},
-        {2004, 8, 3, 52, "Frost",
-            {116,   // Frostbolt rank 1 - every mage
+        {.packId = 2004, .classId = 8, .tabIndex = 3, .iconIndex = 52, .tabName = "Frost",
+            .spellIds = {116,   // Frostbolt rank 1 - every mage
                     //  begins here
              122,   // Frost Nova rank 1
              10,    // Blizzard rank 1
@@ -175,23 +175,23 @@ WoweeSpellPack WoweeSpellPackLoader::makeRoguePack(
     // classId=4 (Rogue). Combat tab seeded with
     // poison-application + lethality picks.
     return makeFromTabs(catalogName, {
-        {3001, 4, 0, 7, "General",
-            {1752,  // Sinister Strike rank 1
+        {.packId = 3001, .classId = 4, .tabIndex = 0, .iconIndex = 7, .tabName = "General",
+            .spellIds = {1752,  // Sinister Strike rank 1
              1784,  // Stealth rank 1
              921,   // Pickpocket
             }},
-        {3002, 4, 1, 70, "Assassination",
-            {703,   // Garrote rank 1
+        {.packId = 3002, .classId = 4, .tabIndex = 1, .iconIndex = 70, .tabName = "Assassination",
+            .spellIds = {703,   // Garrote rank 1
              8676,  // Ambush rank 1
              2098,  // Eviscerate rank 1
             }},
-        {3003, 4, 2, 71, "Combat",
-            {2983,  // Sprint rank 1
+        {.packId = 3003, .classId = 4, .tabIndex = 2, .iconIndex = 71, .tabName = "Combat",
+            .spellIds = {2983,  // Sprint rank 1
              1856,  // Vanish rank 1
              8647,  // Expose Armor rank 1
             }},
-        {3004, 4, 3, 72, "Subtlety",
-            {1857,  // Vanish rank 2
+        {.packId = 3004, .classId = 4, .tabIndex = 3, .iconIndex = 72, .tabName = "Subtlety",
+            .spellIds = {1857,  // Vanish rank 2
              5277,  // Evasion
              14185, // Preparation
             }},

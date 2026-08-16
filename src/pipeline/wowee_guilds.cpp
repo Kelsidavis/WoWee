@@ -177,27 +177,27 @@ namespace {
 // presets. Permissions widen toward the GM end of the ladder.
 void addDefaultRanks(WoweeGuild::Entry& e) {
     using G = WoweeGuild;
-    e.ranks.push_back({0, "Guild Master",
-                        0xFFFFFFFFu, 1000000});   // 100g/day
-    e.ranks.push_back({1, "Officer",
-                        G::PermGuildChat | G::PermOfficerChat |
+    e.ranks.push_back({.rankIndex = 0, .name = "Guild Master",
+                        .permissionsMask = 0xFFFFFFFFu, .moneyPerDayCopper = 1000000});   // 100g/day
+    e.ranks.push_back({.rankIndex = 1, .name = "Officer",
+                        .permissionsMask = G::PermGuildChat | G::PermOfficerChat |
                         G::PermInvite | G::PermRemove |
                         G::PermPromote | G::PermDemote |
                         G::PermSetMotd | G::PermViewBank |
                         G::PermDeposit | G::PermWithdraw,
-                        500000});   // 50g/day
-    e.ranks.push_back({2, "Veteran",
-                        G::PermGuildChat | G::PermInvite |
+                        .moneyPerDayCopper = 500000});   // 50g/day
+    e.ranks.push_back({.rankIndex = 2, .name = "Veteran",
+                        .permissionsMask = G::PermGuildChat | G::PermInvite |
                         G::PermViewBank | G::PermDeposit |
                         G::PermWithdraw,
-                        100000});   // 10g/day
-    e.ranks.push_back({3, "Member",
-                        G::PermGuildChat | G::PermViewBank |
+                        .moneyPerDayCopper = 100000});   // 10g/day
+    e.ranks.push_back({.rankIndex = 3, .name = "Member",
+                        .permissionsMask = G::PermGuildChat | G::PermViewBank |
                         G::PermDeposit,
-                        10000});    // 1g/day
-    e.ranks.push_back({4, "Initiate",
-                        G::PermGuildChat,
-                        0});
+                        .moneyPerDayCopper = 10000});    // 1g/day
+    e.ranks.push_back({.rankIndex = 4, .name = "Initiate",
+                        .permissionsMask = G::PermGuildChat,
+                        .moneyPerDayCopper = 0});
 }
 
 } // namespace
@@ -214,12 +214,12 @@ WoweeGuild WoweeGuildLoader::makeStarter(const std::string& catalogName) {
         e.factionId = WoweeGuild::Alliance;
         e.level = 1;
         addDefaultRanks(e);
-        e.members.push_back({"Bartleby",   0, 0,
-                              "Founder", "Owns the inn"});
-        e.members.push_back({"Hank Steelarm", 1, 0,
-                              "Smith", "Friendly officer"});
-        e.members.push_back({"Sera Goldroot", 3, 0,
-                              "Alchemist", ""});
+        e.members.push_back({.characterName = "Bartleby",   .rankIndex = 0, .joinedDate = 0,
+                              .publicNote = "Founder", .officerNote = "Owns the inn"});
+        e.members.push_back({.characterName = "Hank Steelarm", .rankIndex = 1, .joinedDate = 0,
+                              .publicNote = "Smith", .officerNote = "Friendly officer"});
+        e.members.push_back({.characterName = "Sera Goldroot", .rankIndex = 3, .joinedDate = 0,
+                              .publicNote = "Alchemist", .officerNote = ""});
         c.entries.push_back(e);
     }
     return c;
@@ -241,9 +241,9 @@ WoweeGuild WoweeGuildLoader::makeFull(const std::string& catalogName) {
         e.emblem = 0x12345678;
         // 6 ranks: GM + Officer + 2 Council tiers + Member + Initiate.
         addDefaultRanks(e);
-        e.ranks.push_back({5, "Recruit",
-                            WoweeGuild::PermGuildChat,
-                            0});
+        e.ranks.push_back({.rankIndex = 5, .name = "Recruit",
+                            .permissionsMask = WoweeGuild::PermGuildChat,
+                            .moneyPerDayCopper = 0});
         for (int k = 0; k < 8; ++k) {
             WoweeGuild::Member m;
             m.characterName = "Officer" + std::to_string(k);
@@ -264,9 +264,9 @@ WoweeGuild WoweeGuildLoader::makeFull(const std::string& catalogName) {
             e.bankTabs.push_back(t);
         }
         // 3 perks referencing WSPL spell IDs from makeMage / generic.
-        e.perks.push_back({1, "Fast Track",     78,    1});  // Heroic Strike (placeholder)
-        e.perks.push_back({2, "Cash Flow",      6673,  10}); // Battle Shout (placeholder)
-        e.perks.push_back({3, "Reinforce",      6343,  20}); // Thunder Clap (placeholder)
+        e.perks.push_back({.perkId = 1, .name = "Fast Track",     .spellId = 78,    .requiredGuildLevel = 1});  // Heroic Strike (placeholder)
+        e.perks.push_back({.perkId = 2, .name = "Cash Flow",      .spellId = 6673,  .requiredGuildLevel = 10}); // Battle Shout (placeholder)
+        e.perks.push_back({.perkId = 3, .name = "Reinforce",      .spellId = 6343,  .requiredGuildLevel = 20}); // Thunder Clap (placeholder)
         c.entries.push_back(e);
     }
     return c;
@@ -281,7 +281,7 @@ WoweeGuild WoweeGuildLoader::makeFactionPair(const std::string& catalogName) {
         e.leaderName = "Lothar Crownguard";
         e.factionId = WoweeGuild::Alliance;
         addDefaultRanks(e);
-        e.members.push_back({"Lothar Crownguard", 0, 0, "GM", ""});
+        e.members.push_back({.characterName = "Lothar Crownguard", .rankIndex = 0, .joinedDate = 0, .publicNote = "GM", .officerNote = ""});
         c.entries.push_back(e);
     }
     {
@@ -290,7 +290,7 @@ WoweeGuild WoweeGuildLoader::makeFactionPair(const std::string& catalogName) {
         e.leaderName = "Garrok Bloodfang";
         e.factionId = WoweeGuild::Horde;
         addDefaultRanks(e);
-        e.members.push_back({"Garrok Bloodfang", 0, 0, "Chieftain", ""});
+        e.members.push_back({.characterName = "Garrok Bloodfang", .rankIndex = 0, .joinedDate = 0, .publicNote = "Chieftain", .officerNote = ""});
         c.entries.push_back(e);
     }
     return c;

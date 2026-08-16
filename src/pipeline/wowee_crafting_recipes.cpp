@@ -147,24 +147,24 @@ WoweeCraftingRecipes WoweeCraftingRecipesLoader::makeAlchemyPotions(
     c.entries.push_back(makeRecipe(
         1, 2330, "Minor Healing Potion", kAlchemy, 1,
         118, 1, 1, 0,
-        {{2447, 1}, {765, 1}, {3371, 1}}));
+        {{.itemId = 2447, .count = 1}, {.itemId = 765, .count = 1}, {.itemId = 3371, .count = 1}}));
     // Lesser Mana Potion: Mageroyal + Stranglekelp.
     c.entries.push_back(makeRecipe(
         2, 2331, "Lesser Mana Potion", kAlchemy, 100,
         3385, 1, 1, 0,
-        {{785, 1}, {3820, 1}, {3371, 1}}));
+        {{.itemId = 785, .count = 1}, {.itemId = 3820, .count = 1}, {.itemId = 3371, .count = 1}}));
     // Greater Healing Potion: Liferoot + Khadgar's
     // Whisker.
     c.entries.push_back(makeRecipe(
         3, 11457, "Greater Healing Potion", kAlchemy, 155,
         3928, 1, 1, 0,
-        {{3357, 1}, {3358, 1}, {3371, 1}}));
+        {{.itemId = 3357, .count = 1}, {.itemId = 3358, .count = 1}, {.itemId = 3371, .count = 1}}));
     // Major Mana Potion: Sungrass=8838 + Blindweed
     // =8839 + Crystal Vial=8766 (uses larger vial).
     c.entries.push_back(makeRecipe(
         4, 17580, "Major Mana Potion", kAlchemy, 295,
         13444, 1, 1, 0,
-        {{8838, 3}, {8839, 3}, {8766, 1}}));
+        {{.itemId = 8838, .count = 3}, {.itemId = 8839, .count = 3}, {.itemId = 8766, .count = 1}}));
     return c;
 }
 
@@ -177,20 +177,20 @@ WoweeCraftingRecipes WoweeCraftingRecipesLoader::makeEngineering(
     c.entries.push_back(makeRecipe(
         10, 3918, "Rough Blasting Powder", kEngineering, 1,
         4357, 1, 1, 0,
-        {{2835, 1}}));
+        {{.itemId = 2835, .count = 1}}));
     // Mechanical Squirrel Box: rough copper-bar
     // recipe - 4 reagents.
     c.entries.push_back(makeRecipe(
         11, 4413, "Mechanical Squirrel Box", kEngineering, 75,
         4401, 1, 1, 0,
-        {{2840, 2}, {4399, 1}, {2589, 1}, {4357, 1}}));
+        {{.itemId = 2840, .count = 2}, {.itemId = 4399, .count = 1}, {.itemId = 2589, .count = 1}, {.itemId = 4357, .count = 1}}));
     // Target Dummy: 5 reagents - demonstrates
     // variable reagent count within the recipe
     // catalog. Blueprint is itemId 4406.
     c.entries.push_back(makeRecipe(
         12, 4079, "Target Dummy", kEngineering, 75,
         2092, 1, 1, 4406,
-        {{2840, 4}, {4361, 2}, {2997, 2}, {2589, 4}, {4357, 1}}));
+        {{.itemId = 2840, .count = 4}, {.itemId = 4361, .count = 2}, {.itemId = 2997, .count = 2}, {.itemId = 2589, .count = 4}, {.itemId = 4357, .count = 1}}));
     return c;
 }
 
@@ -203,19 +203,19 @@ WoweeCraftingRecipes WoweeCraftingRecipesLoader::makeBlacksmithing(
     c.entries.push_back(makeRecipe(
         20, 2660, "Rough Sharpening Stone", kBlacksmithing, 1,
         2862, 1, 1, 0,
-        {{2835, 1}}));
+        {{.itemId = 2835, .count = 1}}));
     // Coarse Grinding Stone: 2 Coarse Stone (2836).
     // Skill 50.
     c.entries.push_back(makeRecipe(
         21, 3326, "Coarse Grinding Stone", kBlacksmithing, 50,
         3486, 1, 1, 0,
-        {{2836, 2}}));
+        {{.itemId = 2836, .count = 2}}));
     // Heavy Mithril Helm: high-skill plate piece
     // requiring multiple bar types. Skill 235.
     c.entries.push_back(makeRecipe(
         22, 9938, "Heavy Mithril Helm", kBlacksmithing, 235,
         7909, 1, 2, 11163,
-        {{3860, 8}, {3859, 1}, {3864, 4}, {3866, 2}}));
+        {{.itemId = 3860, .count = 8}, {.itemId = 3859, .count = 1}, {.itemId = 3864, .count = 4}, {.itemId = 3866, .count = 2}}));
     return c;
 }
 

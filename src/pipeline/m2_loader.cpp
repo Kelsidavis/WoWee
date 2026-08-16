@@ -649,7 +649,7 @@ void parseAnimTrackVanilla(const std::vector<uint8_t>& data,
 
     // If no ranges, treat entire array as one sequence
     if (ranges.empty()) {
-        ranges.push_back({0, disk.nTimestamps});
+        ranges.push_back({.start = 0, .end = disk.nTimestamps});
     }
 
     // Read the flat key array ONCE before the per-sequence loop. Previously

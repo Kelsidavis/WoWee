@@ -139,14 +139,14 @@ WoweePlayerMovementAnimLoader::makeHumanMovement(
     // sequence (anim id 39 in the canonical M2 table).
     // Other states have no variant.
     appendRaceGender(c, 1000, 1 /* Human */, 0 /* M */, {
-        {P::StateIdle,  0,  0, 200},
-        {P::StateWalk,  4, 39, 250},
-        {P::StateRun,   5,  0, 200},
-        {P::StateSwim, 12,  0, 350},
-        {P::StateFly,  68,  0, 400},
-        {P::StateSit,  20,  0, 300},
-        {P::StateMount,91,  0, 400},
-        {P::StateDeath, 1,  0, 100},
+        {.state = P::StateIdle,  .baseAnim = 0,  .variantAnim = 0, .transitionMs = 200},
+        {.state = P::StateWalk,  .baseAnim = 4, .variantAnim = 39, .transitionMs = 250},
+        {.state = P::StateRun,   .baseAnim = 5,  .variantAnim = 0, .transitionMs = 200},
+        {.state = P::StateSwim, .baseAnim = 12,  .variantAnim = 0, .transitionMs = 350},
+        {.state = P::StateFly,  .baseAnim = 68,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateSit,  .baseAnim = 20,  .variantAnim = 0, .transitionMs = 300},
+        {.state = P::StateMount,.baseAnim = 91,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateDeath, .baseAnim = 1,  .variantAnim = 0, .transitionMs = 100},
     });
     // Human Female: identical state shape but anim
     // base ids differ (M2 sex models have separate
@@ -154,14 +154,14 @@ WoweePlayerMovementAnimLoader::makeHumanMovement(
     // placeholder; in production these would be the
     // female-model-specific anim indices.
     appendRaceGender(c, 1100, 1, 1, {
-        {P::StateIdle,  0,  0, 200},
-        {P::StateWalk,  4, 39, 250},
-        {P::StateRun,   5,  0, 200},
-        {P::StateSwim, 12,  0, 350},
-        {P::StateFly,  68,  0, 400},
-        {P::StateSit,  20,  0, 300},
-        {P::StateMount,91,  0, 400},
-        {P::StateDeath, 1,  0, 100},
+        {.state = P::StateIdle,  .baseAnim = 0,  .variantAnim = 0, .transitionMs = 200},
+        {.state = P::StateWalk,  .baseAnim = 4, .variantAnim = 39, .transitionMs = 250},
+        {.state = P::StateRun,   .baseAnim = 5,  .variantAnim = 0, .transitionMs = 200},
+        {.state = P::StateSwim, .baseAnim = 12,  .variantAnim = 0, .transitionMs = 350},
+        {.state = P::StateFly,  .baseAnim = 68,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateSit,  .baseAnim = 20,  .variantAnim = 0, .transitionMs = 300},
+        {.state = P::StateMount,.baseAnim = 91,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateDeath, .baseAnim = 1,  .variantAnim = 0, .transitionMs = 100},
     });
     return c;
 }
@@ -175,24 +175,24 @@ WoweePlayerMovementAnimLoader::makeOrcMovement(
     // Orc Run uses a more aggressive variant (anim 17
     // = AttackRun) for war-stance flavor.
     appendRaceGender(c, 2000, 2 /* Orc */, 0, {
-        {P::StateIdle,  0,  0, 200},
-        {P::StateWalk,  4,  0, 250},
-        {P::StateRun,   5, 17, 200},
-        {P::StateSwim, 12,  0, 350},
-        {P::StateFly,  68,  0, 400},
-        {P::StateSit,  20,  0, 300},
-        {P::StateMount,91,  0, 400},
-        {P::StateDeath, 1,  0, 100},
+        {.state = P::StateIdle,  .baseAnim = 0,  .variantAnim = 0, .transitionMs = 200},
+        {.state = P::StateWalk,  .baseAnim = 4,  .variantAnim = 0, .transitionMs = 250},
+        {.state = P::StateRun,   .baseAnim = 5, .variantAnim = 17, .transitionMs = 200},
+        {.state = P::StateSwim, .baseAnim = 12,  .variantAnim = 0, .transitionMs = 350},
+        {.state = P::StateFly,  .baseAnim = 68,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateSit,  .baseAnim = 20,  .variantAnim = 0, .transitionMs = 300},
+        {.state = P::StateMount,.baseAnim = 91,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateDeath, .baseAnim = 1,  .variantAnim = 0, .transitionMs = 100},
     });
     appendRaceGender(c, 2100, 2, 1, {
-        {P::StateIdle,  0,  0, 200},
-        {P::StateWalk,  4,  0, 250},
-        {P::StateRun,   5, 17, 200},
-        {P::StateSwim, 12,  0, 350},
-        {P::StateFly,  68,  0, 400},
-        {P::StateSit,  20,  0, 300},
-        {P::StateMount,91,  0, 400},
-        {P::StateDeath, 1,  0, 100},
+        {.state = P::StateIdle,  .baseAnim = 0,  .variantAnim = 0, .transitionMs = 200},
+        {.state = P::StateWalk,  .baseAnim = 4,  .variantAnim = 0, .transitionMs = 250},
+        {.state = P::StateRun,   .baseAnim = 5, .variantAnim = 17, .transitionMs = 200},
+        {.state = P::StateSwim, .baseAnim = 12,  .variantAnim = 0, .transitionMs = 350},
+        {.state = P::StateFly,  .baseAnim = 68,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateSit,  .baseAnim = 20,  .variantAnim = 0, .transitionMs = 300},
+        {.state = P::StateMount,.baseAnim = 91,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateDeath, .baseAnim = 1,  .variantAnim = 0, .transitionMs = 100},
     });
     return c;
 }
@@ -207,27 +207,27 @@ WoweePlayerMovementAnimLoader::makeUndeadMovement(
     // as the wounded-low-health renderer override.
     // Walk uses a stiffer cadence variant (40).
     appendRaceGender(c, 5000, 5 /* Undead */, 0, {
-        {P::StateIdle,  0,  0, 200},
-        {P::StateWalk,  4, 40, 250},
-        {P::StateRun,   5, 38, 200},
-        {P::StateSwim, 12,  0, 400},  // slower blend
+        {.state = P::StateIdle,  .baseAnim = 0,  .variantAnim = 0, .transitionMs = 200},
+        {.state = P::StateWalk,  .baseAnim = 4, .variantAnim = 40, .transitionMs = 250},
+        {.state = P::StateRun,   .baseAnim = 5, .variantAnim = 38, .transitionMs = 200},
+        {.state = P::StateSwim, .baseAnim = 12,  .variantAnim = 0, .transitionMs = 400},  // slower blend
                                         //  - undead aren't
                                         //  graceful in
                                         //  water
-        {P::StateFly,  68,  0, 400},
-        {P::StateSit,  20,  0, 300},
-        {P::StateMount,91,  0, 400},
-        {P::StateDeath, 1,  0, 100},
+        {.state = P::StateFly,  .baseAnim = 68,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateSit,  .baseAnim = 20,  .variantAnim = 0, .transitionMs = 300},
+        {.state = P::StateMount,.baseAnim = 91,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateDeath, .baseAnim = 1,  .variantAnim = 0, .transitionMs = 100},
     });
     appendRaceGender(c, 5100, 5, 1, {
-        {P::StateIdle,  0,  0, 200},
-        {P::StateWalk,  4, 40, 250},
-        {P::StateRun,   5, 38, 200},
-        {P::StateSwim, 12,  0, 400},
-        {P::StateFly,  68,  0, 400},
-        {P::StateSit,  20,  0, 300},
-        {P::StateMount,91,  0, 400},
-        {P::StateDeath, 1,  0, 100},
+        {.state = P::StateIdle,  .baseAnim = 0,  .variantAnim = 0, .transitionMs = 200},
+        {.state = P::StateWalk,  .baseAnim = 4, .variantAnim = 40, .transitionMs = 250},
+        {.state = P::StateRun,   .baseAnim = 5, .variantAnim = 38, .transitionMs = 200},
+        {.state = P::StateSwim, .baseAnim = 12,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateFly,  .baseAnim = 68,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateSit,  .baseAnim = 20,  .variantAnim = 0, .transitionMs = 300},
+        {.state = P::StateMount,.baseAnim = 91,  .variantAnim = 0, .transitionMs = 400},
+        {.state = P::StateDeath, .baseAnim = 1,  .variantAnim = 0, .transitionMs = 100},
     });
     return c;
 }

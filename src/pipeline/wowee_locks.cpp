@@ -80,14 +80,14 @@ WoweeLock WoweeLockLoader::makeStarter(const std::string& catalogName) {
         // lockId 1 matches the WGOT.makeDungeon Iron Door lock.
         WoweeLock::Entry e;
         e.lockId = 1; e.name = "Iron Door Lock";
-        e.channels[0] = {WoweeLock::ChannelItem, 0, 5001};   // requires key item 5001
-        e.channels[1] = {WoweeLock::ChannelDamage, 0, 0};    // OR force open
+        e.channels[0] = {.kind = WoweeLock::ChannelItem, .skillRequired = 0, .targetId = 5001};   // requires key item 5001
+        e.channels[1] = {.kind = WoweeLock::ChannelDamage, .skillRequired = 0, .targetId = 0};    // OR force open
         c.entries.push_back(e);
     }
     {
         WoweeLock::Entry e;
         e.lockId = 100; e.name = "Wooden Chest Lock";
-        e.channels[0] = {WoweeLock::ChannelDamage, 0, 0};   // forceable
+        e.channels[0] = {.kind = WoweeLock::ChannelDamage, .skillRequired = 0, .targetId = 0};   // forceable
         c.entries.push_back(e);
     }
     return c;
@@ -100,17 +100,17 @@ WoweeLock WoweeLockLoader::makeDungeon(const std::string& catalogName) {
         // lockId 2 matches WGOT.makeDungeon's bandit strongbox.
         WoweeLock::Entry e;
         e.lockId = 2; e.name = "Light Bandit Strongbox";
-        e.channels[0] = {WoweeLock::ChannelLockpick,
-                          1, kLockpickingSkill};   // any skill rank
+        e.channels[0] = {.kind = WoweeLock::ChannelLockpick,
+                          .skillRequired = 1, .targetId = kLockpickingSkill};   // any skill rank
         c.entries.push_back(e);
     }
     {
         WoweeLock::Entry e;
         e.lockId = 200; e.name = "Steel Chest Lock";
         // Either heavy lockpick OR a specific key.
-        e.channels[0] = {WoweeLock::ChannelLockpick,
-                          175, kLockpickingSkill};
-        e.channels[1] = {WoweeLock::ChannelItem, 0, 5101};
+        e.channels[0] = {.kind = WoweeLock::ChannelLockpick,
+                          .skillRequired = 175, .targetId = kLockpickingSkill};
+        e.channels[1] = {.kind = WoweeLock::ChannelItem, .skillRequired = 0, .targetId = 5101};
         c.entries.push_back(e);
     }
     {
@@ -118,7 +118,7 @@ WoweeLock WoweeLockLoader::makeDungeon(const std::string& catalogName) {
         e.lockId = 300; e.name = "Boss Vault Seal";
         e.flags = WoweeLock::DestructOnOpen;
         // Quest key only - no lockpick option (story-gated).
-        e.channels[0] = {WoweeLock::ChannelItem, 0, 5200};
+        e.channels[0] = {.kind = WoweeLock::ChannelItem, .skillRequired = 0, .targetId = 5200};
         c.entries.push_back(e);
     }
     return c;
@@ -130,8 +130,8 @@ WoweeLock WoweeLockLoader::makeProfessions(const std::string& catalogName) {
     auto add = [&](uint32_t id, const char* name, uint16_t skillReq) {
         WoweeLock::Entry e;
         e.lockId = id; e.name = name;
-        e.channels[0] = {WoweeLock::ChannelLockpick,
-                          skillReq, kLockpickingSkill};
+        e.channels[0] = {.kind = WoweeLock::ChannelLockpick,
+                          .skillRequired = skillReq, .targetId = kLockpickingSkill};
         c.entries.push_back(e);
     };
     add(401, "Battered Junkbox",     1);

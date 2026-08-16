@@ -149,28 +149,28 @@ WoweeCreaturePatrol WoweeCreaturePatrolLoader::makePatrol(
     };
     // Three small patrols showing each pathKind variant.
     add(1, "GuardLoop4", 100001, P::Loop, P::Walk, {
-        { -8910.0f,  -135.0f, 82.0f, 1500 },
-        { -8895.0f,  -120.0f, 82.0f, 1500 },
-        { -8895.0f,  -150.0f, 82.0f, 1500 },
-        { -8910.0f,  -150.0f, 82.0f, 1500 },
+        { .x = -8910.0f,  .y = -135.0f, .z = 82.0f, .delayMs = 1500 },
+        { .x = -8895.0f,  .y = -120.0f, .z = 82.0f, .delayMs = 1500 },
+        { .x = -8895.0f,  .y = -150.0f, .z = 82.0f, .delayMs = 1500 },
+        { .x = -8910.0f,  .y = -150.0f, .z = 82.0f, .delayMs = 1500 },
     }, 100, 200, 240, "Stormwind guard - 4-point loop with 1.5s dwell at each waypoint.");
     add(2, "RunRouteOneShot6", 100002, P::OneShot, P::Run, {
-        { -10000.0f,  500.0f, 30.0f, 0 },
-        {  -9900.0f,  600.0f, 30.0f, 0 },
-        {  -9800.0f,  700.0f, 30.0f, 0 },
-        {  -9700.0f,  800.0f, 30.0f, 0 },
-        {  -9600.0f,  900.0f, 30.0f, 0 },
-        {  -9500.0f, 1000.0f, 30.0f, 0 },
+        { .x = -10000.0f,  .y = 500.0f, .z = 30.0f, .delayMs = 0 },
+        {  .x = -9900.0f,  .y = 600.0f, .z = 30.0f, .delayMs = 0 },
+        {  .x = -9800.0f,  .y = 700.0f, .z = 30.0f, .delayMs = 0 },
+        {  .x = -9700.0f,  .y = 800.0f, .z = 30.0f, .delayMs = 0 },
+        {  .x = -9600.0f,  .y = 900.0f, .z = 30.0f, .delayMs = 0 },
+        {  .x = -9500.0f, .y = 1000.0f, .z = 30.0f, .delayMs = 0 },
     }, 220, 180, 100, "Westfall harvester - 6-point one-shot run, ends at last waypoint.");
     add(3, "TigerRandom8", 100003, P::Random, P::Walk, {
-        { -11000.0f, -2000.0f, 30.0f, 3000 },
-        { -10800.0f, -2100.0f, 30.0f, 3000 },
-        { -10600.0f, -2050.0f, 30.0f, 3000 },
-        { -10500.0f, -2200.0f, 30.0f, 3000 },
-        { -10700.0f, -2300.0f, 30.0f, 3000 },
-        { -10900.0f, -2250.0f, 30.0f, 3000 },
-        { -11100.0f, -2150.0f, 30.0f, 3000 },
-        { -11050.0f, -1950.0f, 30.0f, 3000 },
+        { .x = -11000.0f, .y = -2000.0f, .z = 30.0f, .delayMs = 3000 },
+        { .x = -10800.0f, .y = -2100.0f, .z = 30.0f, .delayMs = 3000 },
+        { .x = -10600.0f, .y = -2050.0f, .z = 30.0f, .delayMs = 3000 },
+        { .x = -10500.0f, .y = -2200.0f, .z = 30.0f, .delayMs = 3000 },
+        { .x = -10700.0f, .y = -2300.0f, .z = 30.0f, .delayMs = 3000 },
+        { .x = -10900.0f, .y = -2250.0f, .z = 30.0f, .delayMs = 3000 },
+        { .x = -11100.0f, .y = -2150.0f, .z = 30.0f, .delayMs = 3000 },
+        { .x = -11050.0f, .y = -1950.0f, .z = 30.0f, .delayMs = 3000 },
     }, 220, 100, 100, "Stranglethorn tiger - 8-point random patrol, "
         "3s dwell, picks next destination randomly.");
     return c;
@@ -195,36 +195,36 @@ WoweeCreaturePatrol WoweeCreaturePatrolLoader::makeCity(
     };
     // Four city guard routes (illustrative coordinates).
     add(100, "StormwindCathedralLoop", 110001, {
-        { -8520.0f,  840.0f, 110.0f, 2000 },
-        { -8480.0f,  860.0f, 110.0f, 2000 },
-        { -8460.0f,  820.0f, 110.0f, 2000 },
-        { -8500.0f,  800.0f, 110.0f, 2000 },
-        { -8540.0f,  820.0f, 110.0f, 2000 },
-        { -8540.0f,  860.0f, 110.0f, 2000 },
+        { .x = -8520.0f,  .y = 840.0f, .z = 110.0f, .delayMs = 2000 },
+        { .x = -8480.0f,  .y = 860.0f, .z = 110.0f, .delayMs = 2000 },
+        { .x = -8460.0f,  .y = 820.0f, .z = 110.0f, .delayMs = 2000 },
+        { .x = -8500.0f,  .y = 800.0f, .z = 110.0f, .delayMs = 2000 },
+        { .x = -8540.0f,  .y = 820.0f, .z = 110.0f, .delayMs = 2000 },
+        { .x = -8540.0f,  .y = 860.0f, .z = 110.0f, .delayMs = 2000 },
     }, "Stormwind cathedral square guard - 6-point perimeter loop.");
     add(101, "OrgrimmarValleyOfStrengthLoop", 110002, {
-        {  1640.0f, -4400.0f, 30.0f, 2000 },
-        {  1680.0f, -4380.0f, 30.0f, 2000 },
-        {  1700.0f, -4420.0f, 30.0f, 2000 },
-        {  1680.0f, -4460.0f, 30.0f, 2000 },
-        {  1640.0f, -4480.0f, 30.0f, 2000 },
-        {  1620.0f, -4440.0f, 30.0f, 2000 },
+        {  .x = 1640.0f, .y = -4400.0f, .z = 30.0f, .delayMs = 2000 },
+        {  .x = 1680.0f, .y = -4380.0f, .z = 30.0f, .delayMs = 2000 },
+        {  .x = 1700.0f, .y = -4420.0f, .z = 30.0f, .delayMs = 2000 },
+        {  .x = 1680.0f, .y = -4460.0f, .z = 30.0f, .delayMs = 2000 },
+        {  .x = 1640.0f, .y = -4480.0f, .z = 30.0f, .delayMs = 2000 },
+        {  .x = 1620.0f, .y = -4440.0f, .z = 30.0f, .delayMs = 2000 },
     }, "Orgrimmar Valley of Strength grunt - 6-point perimeter loop.");
     add(102, "IronforgeBankLoop", 110003, {
-        { -4800.0f, -930.0f, 500.0f, 2500 },
-        { -4760.0f, -910.0f, 500.0f, 2500 },
-        { -4750.0f, -950.0f, 500.0f, 2500 },
-        { -4790.0f, -980.0f, 500.0f, 2500 },
-        { -4830.0f, -960.0f, 500.0f, 2500 },
-        { -4830.0f, -920.0f, 500.0f, 2500 },
+        { .x = -4800.0f, .y = -930.0f, .z = 500.0f, .delayMs = 2500 },
+        { .x = -4760.0f, .y = -910.0f, .z = 500.0f, .delayMs = 2500 },
+        { .x = -4750.0f, .y = -950.0f, .z = 500.0f, .delayMs = 2500 },
+        { .x = -4790.0f, .y = -980.0f, .z = 500.0f, .delayMs = 2500 },
+        { .x = -4830.0f, .y = -960.0f, .z = 500.0f, .delayMs = 2500 },
+        { .x = -4830.0f, .y = -920.0f, .z = 500.0f, .delayMs = 2500 },
     }, "Ironforge bank district sentinel - 6-point perimeter loop.");
     add(103, "ThunderBluffElderRiseLoop", 110004, {
-        { -1250.0f,  120.0f, 130.0f, 2000 },
-        { -1200.0f,  140.0f, 130.0f, 2000 },
-        { -1180.0f,  100.0f, 130.0f, 2000 },
-        { -1220.0f,   80.0f, 130.0f, 2000 },
-        { -1270.0f,  100.0f, 130.0f, 2000 },
-        { -1280.0f,  150.0f, 130.0f, 2000 },
+        { .x = -1250.0f,  .y = 120.0f, .z = 130.0f, .delayMs = 2000 },
+        { .x = -1200.0f,  .y = 140.0f, .z = 130.0f, .delayMs = 2000 },
+        { .x = -1180.0f,  .y = 100.0f, .z = 130.0f, .delayMs = 2000 },
+        { .x = -1220.0f,   .y = 80.0f, .z = 130.0f, .delayMs = 2000 },
+        { .x = -1270.0f,  .y = 100.0f, .z = 130.0f, .delayMs = 2000 },
+        { .x = -1280.0f,  .y = 150.0f, .z = 130.0f, .delayMs = 2000 },
     }, "Thunder Bluff Elder Rise warrior - 6-point loop on the upper plateau.");
     return c;
 }

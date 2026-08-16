@@ -113,12 +113,12 @@ WoweeLight WoweeLightLoader::makeCave(const std::string& zoneName) {
     out.name = zoneName;
     // Single dim keyframe (caves don't change with time-of-day).
     out.keyframes.push_back({
-        720,                                    // noon (arbitrary)
-        glm::vec3(0.05f, 0.05f, 0.07f),         // very dim cool ambient
-        glm::vec3(0.10f, 0.10f, 0.14f),         // faint indirect bounce
-        glm::vec3(0.0f, -1.0f, 0.0f),
-        glm::vec3(0.04f, 0.05f, 0.07f),         // near-black fog
-        15.0f, 80.0f                            // heavy short-range fog
+        .timeOfDayMin = 720,                                    // noon (arbitrary)
+        .ambientColor = glm::vec3(0.05f, 0.05f, 0.07f),         // very dim cool ambient
+        .directionalColor = glm::vec3(0.10f, 0.10f, 0.14f),         // faint indirect bounce
+        .directionalDir = glm::vec3(0.0f, -1.0f, 0.0f),
+        .fogColor = glm::vec3(0.04f, 0.05f, 0.07f),         // near-black fog
+        .fogStart = 15.0f, .fogEnd = 80.0f                            // heavy short-range fog
     });
     return out;
 }
@@ -128,12 +128,12 @@ WoweeLight WoweeLightLoader::makeDungeon(const std::string& zoneName) {
     out.name = zoneName;
     // Single moody warm-torchlit keyframe.
     out.keyframes.push_back({
-        720,
-        glm::vec3(0.18f, 0.14f, 0.10f),         // warm dim ambient
-        glm::vec3(0.55f, 0.40f, 0.25f),         // amber torchlight tint
-        glm::vec3(0.0f, -1.0f, 0.0f),
-        glm::vec3(0.10f, 0.08f, 0.06f),         // dark warm fog
-        25.0f, 200.0f                           // medium fog range
+        .timeOfDayMin = 720,
+        .ambientColor = glm::vec3(0.18f, 0.14f, 0.10f),         // warm dim ambient
+        .directionalColor = glm::vec3(0.55f, 0.40f, 0.25f),         // amber torchlight tint
+        .directionalDir = glm::vec3(0.0f, -1.0f, 0.0f),
+        .fogColor = glm::vec3(0.10f, 0.08f, 0.06f),         // dark warm fog
+        .fogStart = 25.0f, .fogEnd = 200.0f                           // medium fog range
     });
     return out;
 }
@@ -144,12 +144,12 @@ WoweeLight WoweeLightLoader::makeNight(const std::string& zoneName) {
     // Single dark-night keyframe (e.g., always-night zones like
     // some druid graves or shadow-realm scenes).
     out.keyframes.push_back({
-        0,
-        glm::vec3(0.06f, 0.07f, 0.12f),         // cold dim blue ambient
-        glm::vec3(0.18f, 0.20f, 0.32f),         // moonlight-tinted directional
-        glm::vec3(0.30f, -0.94f, 0.0f),         // moon at low angle
-        glm::vec3(0.05f, 0.06f, 0.10f),         // near-black blue fog
-        80.0f, 500.0f                           // far fog (open night air)
+        .timeOfDayMin = 0,
+        .ambientColor = glm::vec3(0.06f, 0.07f, 0.12f),         // cold dim blue ambient
+        .directionalColor = glm::vec3(0.18f, 0.20f, 0.32f),         // moonlight-tinted directional
+        .directionalDir = glm::vec3(0.30f, -0.94f, 0.0f),         // moon at low angle
+        .fogColor = glm::vec3(0.05f, 0.06f, 0.10f),         // near-black blue fog
+        .fogStart = 80.0f, .fogEnd = 500.0f                           // far fog (open night air)
     });
     return out;
 }
@@ -161,39 +161,39 @@ WoweeLight WoweeLightLoader::makeDefaultDayNight(
     // Midnight: cold + dim, blue-tinted ambient, sun straight down
     // (it's behind the world).
     out.keyframes.push_back({
-        0,
-        glm::vec3(0.06f, 0.07f, 0.10f),
-        glm::vec3(0.10f, 0.12f, 0.20f),
-        glm::vec3(0.0f, -1.0f, 0.0f),
-        glm::vec3(0.05f, 0.06f, 0.10f),
-        40.0f, 200.0f
+        .timeOfDayMin = 0,
+        .ambientColor = glm::vec3(0.06f, 0.07f, 0.10f),
+        .directionalColor = glm::vec3(0.10f, 0.12f, 0.20f),
+        .directionalDir = glm::vec3(0.0f, -1.0f, 0.0f),
+        .fogColor = glm::vec3(0.05f, 0.06f, 0.10f),
+        .fogStart = 40.0f, .fogEnd = 200.0f
     });
     // Dawn (6:00): warm horizon glow, sun rising from -X.
     out.keyframes.push_back({
-        360,
-        glm::vec3(0.30f, 0.25f, 0.20f),
-        glm::vec3(0.95f, 0.70f, 0.55f),
-        glm::vec3(0.86f, -0.50f, 0.0f),
-        glm::vec3(0.80f, 0.55f, 0.45f),
-        100.0f, 600.0f
+        .timeOfDayMin = 360,
+        .ambientColor = glm::vec3(0.30f, 0.25f, 0.20f),
+        .directionalColor = glm::vec3(0.95f, 0.70f, 0.55f),
+        .directionalDir = glm::vec3(0.86f, -0.50f, 0.0f),
+        .fogColor = glm::vec3(0.80f, 0.55f, 0.45f),
+        .fogStart = 100.0f, .fogEnd = 600.0f
     });
     // Noon (12:00): bright + neutral, sun overhead.
     out.keyframes.push_back({
-        720,
-        glm::vec3(0.40f, 0.42f, 0.44f),
-        glm::vec3(1.00f, 0.97f, 0.92f),
-        glm::vec3(0.0f, -1.0f, 0.0f),
-        glm::vec3(0.65f, 0.72f, 0.82f),
-        120.0f, 800.0f
+        .timeOfDayMin = 720,
+        .ambientColor = glm::vec3(0.40f, 0.42f, 0.44f),
+        .directionalColor = glm::vec3(1.00f, 0.97f, 0.92f),
+        .directionalDir = glm::vec3(0.0f, -1.0f, 0.0f),
+        .fogColor = glm::vec3(0.65f, 0.72f, 0.82f),
+        .fogStart = 120.0f, .fogEnd = 800.0f
     });
     // Dusk (18:00): orange-red glow, sun setting toward +X.
     out.keyframes.push_back({
-        1080,
-        glm::vec3(0.32f, 0.22f, 0.18f),
-        glm::vec3(0.95f, 0.55f, 0.30f),
-        glm::vec3(-0.86f, -0.50f, 0.0f),
-        glm::vec3(0.85f, 0.50f, 0.35f),
-        100.0f, 500.0f
+        .timeOfDayMin = 1080,
+        .ambientColor = glm::vec3(0.32f, 0.22f, 0.18f),
+        .directionalColor = glm::vec3(0.95f, 0.55f, 0.30f),
+        .directionalDir = glm::vec3(-0.86f, -0.50f, 0.0f),
+        .fogColor = glm::vec3(0.85f, 0.50f, 0.35f),
+        .fogStart = 100.0f, .fogEnd = 500.0f
     });
     return out;
 }

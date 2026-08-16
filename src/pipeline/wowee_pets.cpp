@@ -170,9 +170,9 @@ WoweePet WoweePetLoader::makeStarter(const std::string& catalogName) {
         f.description = "Pack hunter; favors meat.";
         f.petType = WoweePet::Ferocity;
         f.dietMask = WoweePet::DietMeat;
-        f.abilities.push_back({27050, 1,  1});   // Bite r1
-        f.abilities.push_back({27047, 16, 1});   // Furious Howl
-        f.abilities.push_back({27049, 30, 1});   // Dash
+        f.abilities.push_back({.spellId = 27050, .learnedAtLevel = 1,  .rank = 1});   // Bite r1
+        f.abilities.push_back({.spellId = 27047, .learnedAtLevel = 16, .rank = 1});   // Furious Howl
+        f.abilities.push_back({.spellId = 27049, .learnedAtLevel = 30, .rank = 1});   // Dash
         c.families.push_back(f);
     }
     {
@@ -182,9 +182,9 @@ WoweePet WoweePetLoader::makeStarter(const std::string& catalogName) {
         f.description = "Stealthy hunter; favors meat or fish.";
         f.petType = WoweePet::Ferocity;
         f.dietMask = WoweePet::DietMeat | WoweePet::DietFish;
-        f.abilities.push_back({27049, 1,  1});   // Claw r1
-        f.abilities.push_back({16827, 12, 1});   // Prowl
-        f.abilities.push_back({26064, 24, 1});   // Dash
+        f.abilities.push_back({.spellId = 27049, .learnedAtLevel = 1,  .rank = 1});   // Claw r1
+        f.abilities.push_back({.spellId = 16827, .learnedAtLevel = 12, .rank = 1});   // Prowl
+        f.abilities.push_back({.spellId = 26064, .learnedAtLevel = 24, .rank = 1});   // Dash
         c.families.push_back(f);
     }
     {
@@ -192,8 +192,8 @@ WoweePet WoweePetLoader::makeStarter(const std::string& catalogName) {
         m.minionId = 1; m.name = "Imp";
         m.summonSpellId = 688;        // canonical Summon Imp
         m.creatureId = 416;           // canonical Imp creatureId
-        m.abilities.push_back({3110,  1, 1});    // Firebolt r1
-        m.abilities.push_back({7813,  1, 0});    // Blood Pact (autocast off)
+        m.abilities.push_back({.spellId = 3110,  .rank = 1, .autocastDefault = 1});    // Firebolt r1
+        m.abilities.push_back({.spellId = 7813,  .rank = 1, .autocastDefault = 0});    // Blood Pact (autocast off)
         c.minions.push_back(m);
     }
     return c;

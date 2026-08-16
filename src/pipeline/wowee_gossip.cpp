@@ -100,15 +100,15 @@ WoweeGossip WoweeGossipLoader::makeStarter(const std::string& catalogName) {
         WoweeGossip::Entry e;
         e.menuId = 1;
         e.titleText = "Greetings, traveler. How can I help?";
-        e.options.push_back({1, "I want to browse your goods.",
-                              WoweeGossip::Vendor, 0,
-                              WoweeGossip::Closes, 0});
-        e.options.push_back({2, "Train me.",
-                              WoweeGossip::Trainer, 0,
-                              WoweeGossip::Closes, 0});
-        e.options.push_back({3, "Goodbye.",
-                              WoweeGossip::Close, 0,
-                              WoweeGossip::Closes, 0});
+        e.options.push_back({.optionId = 1, .text = "I want to browse your goods.",
+                              .kind = WoweeGossip::Vendor, .actionTarget = 0,
+                              .requiredFlags = WoweeGossip::Closes, .moneyCostCopper = 0});
+        e.options.push_back({.optionId = 2, .text = "Train me.",
+                              .kind = WoweeGossip::Trainer, .actionTarget = 0,
+                              .requiredFlags = WoweeGossip::Closes, .moneyCostCopper = 0});
+        e.options.push_back({.optionId = 3, .text = "Goodbye.",
+                              .kind = WoweeGossip::Close, .actionTarget = 0,
+                              .requiredFlags = WoweeGossip::Closes, .moneyCostCopper = 0});
         c.entries.push_back(e);
     }
     return c;
@@ -127,21 +127,21 @@ WoweeGossip WoweeGossipLoader::makeInnkeeper(const std::string& catalogName) {
         e.titleText =
             "Welcome to the inn! What'll it be - a room, "
             "a meal, or directions?";
-        e.options.push_back({1, "Make this inn my home.",
-                              WoweeGossip::Innkeeper, 0,
-                              WoweeGossip::Closes, 0});
-        e.options.push_back({2, "Show me what you have for sale.",
-                              WoweeGossip::Vendor, 4001,
-                              WoweeGossip::Closes, 0});
-        e.options.push_back({3, "I need to take a flight.",
-                              WoweeGossip::FlightMaster, 0,
-                              WoweeGossip::Closes, 0});
-        e.options.push_back({4, "Tell me about the area.",
-                              WoweeGossip::Submenu, 4002,
-                              0, 0});
-        e.options.push_back({5, "Goodbye.",
-                              WoweeGossip::Close, 0,
-                              WoweeGossip::Closes, 0});
+        e.options.push_back({.optionId = 1, .text = "Make this inn my home.",
+                              .kind = WoweeGossip::Innkeeper, .actionTarget = 0,
+                              .requiredFlags = WoweeGossip::Closes, .moneyCostCopper = 0});
+        e.options.push_back({.optionId = 2, .text = "Show me what you have for sale.",
+                              .kind = WoweeGossip::Vendor, .actionTarget = 4001,
+                              .requiredFlags = WoweeGossip::Closes, .moneyCostCopper = 0});
+        e.options.push_back({.optionId = 3, .text = "I need to take a flight.",
+                              .kind = WoweeGossip::FlightMaster, .actionTarget = 0,
+                              .requiredFlags = WoweeGossip::Closes, .moneyCostCopper = 0});
+        e.options.push_back({.optionId = 4, .text = "Tell me about the area.",
+                              .kind = WoweeGossip::Submenu, .actionTarget = 4002,
+                              .requiredFlags = 0, .moneyCostCopper = 0});
+        e.options.push_back({.optionId = 5, .text = "Goodbye.",
+                              .kind = WoweeGossip::Close, .actionTarget = 0,
+                              .requiredFlags = WoweeGossip::Closes, .moneyCostCopper = 0});
         c.entries.push_back(e);
     }
     {
@@ -152,12 +152,12 @@ WoweeGossip WoweeGossipLoader::makeInnkeeper(const std::string& catalogName) {
             "There's been bandit trouble of late. The Defias "
             "have a camp east of here. Mind your purse on the "
             "road.";
-        e.options.push_back({1, "Back.",
-                              WoweeGossip::Submenu, 4001,
-                              0, 0});
-        e.options.push_back({2, "Goodbye.",
-                              WoweeGossip::Close, 0,
-                              WoweeGossip::Closes, 0});
+        e.options.push_back({.optionId = 1, .text = "Back.",
+                              .kind = WoweeGossip::Submenu, .actionTarget = 4001,
+                              .requiredFlags = 0, .moneyCostCopper = 0});
+        e.options.push_back({.optionId = 2, .text = "Goodbye.",
+                              .kind = WoweeGossip::Close, .actionTarget = 0,
+                              .requiredFlags = WoweeGossip::Closes, .moneyCostCopper = 0});
         c.entries.push_back(e);
     }
     return c;
@@ -173,22 +173,22 @@ WoweeGossip WoweeGossipLoader::makeQuestGiver(const std::string& catalogName) {
             "I have work for someone of your obvious talent.";
         // Quest options reference WQT.questId values from
         // makeStarter/makeChain.
-        e.options.push_back({1, "Tell me about Bandit Trouble.",
-                              WoweeGossip::Quest, 1,
-                              0, 0});
-        e.options.push_back({2, "What's this about a camp?",
-                              WoweeGossip::Quest, 100,
-                              0, 0});
-        e.options.push_back({3, "I have business with the bank.",
-                              WoweeGossip::Banker, 0,
-                              WoweeGossip::Closes, 0});
-        e.options.push_back({4, "Pay 10 gold to respec my talents.",
-                              WoweeGossip::Script, 9001,
-                              WoweeGossip::Coinpouch | WoweeGossip::Closes,
-                              100000});  // 10g
-        e.options.push_back({5, "Goodbye.",
-                              WoweeGossip::Close, 0,
-                              WoweeGossip::Closes, 0});
+        e.options.push_back({.optionId = 1, .text = "Tell me about Bandit Trouble.",
+                              .kind = WoweeGossip::Quest, .actionTarget = 1,
+                              .requiredFlags = 0, .moneyCostCopper = 0});
+        e.options.push_back({.optionId = 2, .text = "What's this about a camp?",
+                              .kind = WoweeGossip::Quest, .actionTarget = 100,
+                              .requiredFlags = 0, .moneyCostCopper = 0});
+        e.options.push_back({.optionId = 3, .text = "I have business with the bank.",
+                              .kind = WoweeGossip::Banker, .actionTarget = 0,
+                              .requiredFlags = WoweeGossip::Closes, .moneyCostCopper = 0});
+        e.options.push_back({.optionId = 4, .text = "Pay 10 gold to respec my talents.",
+                              .kind = WoweeGossip::Script, .actionTarget = 9001,
+                              .requiredFlags = WoweeGossip::Coinpouch | WoweeGossip::Closes,
+                              .moneyCostCopper = 100000});  // 10g
+        e.options.push_back({.optionId = 5, .text = "Goodbye.",
+                              .kind = WoweeGossip::Close, .actionTarget = 0,
+                              .requiredFlags = WoweeGossip::Closes, .moneyCostCopper = 0});
         c.entries.push_back(e);
     }
     return c;

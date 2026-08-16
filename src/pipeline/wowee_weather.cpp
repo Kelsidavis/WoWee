@@ -79,37 +79,37 @@ bool WoweeWeatherLoader::exists(const std::string& basePath) {
 WoweeWeather WoweeWeatherLoader::makeTemperate(const std::string& zoneName) {
     WoweeWeather w;
     w.name = zoneName;
-    w.entries.push_back({WoweeWeather::Clear, 0.0f, 0.0f, 6.0f, 300, 1800});
-    w.entries.push_back({WoweeWeather::Rain,  0.3f, 0.7f, 2.0f, 120, 900});
-    w.entries.push_back({WoweeWeather::Fog,   0.4f, 0.8f, 1.0f, 180, 600});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Clear, .minIntensity = 0.0f, .maxIntensity = 0.0f, .weight = 6.0f, .minDurationSec = 300, .maxDurationSec = 1800});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Rain,  .minIntensity = 0.3f, .maxIntensity = 0.7f, .weight = 2.0f, .minDurationSec = 120, .maxDurationSec = 900});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Fog,   .minIntensity = 0.4f, .maxIntensity = 0.8f, .weight = 1.0f, .minDurationSec = 180, .maxDurationSec = 600});
     return w;
 }
 
 WoweeWeather WoweeWeatherLoader::makeArctic(const std::string& zoneName) {
     WoweeWeather w;
     w.name = zoneName;
-    w.entries.push_back({WoweeWeather::Snow,     0.3f, 0.7f, 5.0f, 300, 1800});
-    w.entries.push_back({WoweeWeather::Blizzard, 0.7f, 1.0f, 2.0f, 120, 600});
-    w.entries.push_back({WoweeWeather::Fog,      0.5f, 0.9f, 2.0f, 180, 900});
-    w.entries.push_back({WoweeWeather::Clear,    0.0f, 0.0f, 1.0f, 180, 600});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Snow,     .minIntensity = 0.3f, .maxIntensity = 0.7f, .weight = 5.0f, .minDurationSec = 300, .maxDurationSec = 1800});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Blizzard, .minIntensity = 0.7f, .maxIntensity = 1.0f, .weight = 2.0f, .minDurationSec = 120, .maxDurationSec = 600});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Fog,      .minIntensity = 0.5f, .maxIntensity = 0.9f, .weight = 2.0f, .minDurationSec = 180, .maxDurationSec = 900});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Clear,    .minIntensity = 0.0f, .maxIntensity = 0.0f, .weight = 1.0f, .minDurationSec = 180, .maxDurationSec = 600});
     return w;
 }
 
 WoweeWeather WoweeWeatherLoader::makeDesert(const std::string& zoneName) {
     WoweeWeather w;
     w.name = zoneName;
-    w.entries.push_back({WoweeWeather::Clear,     0.0f, 0.0f, 8.0f, 600, 2400});
-    w.entries.push_back({WoweeWeather::Sandstorm, 0.5f, 0.9f, 2.0f, 120, 600});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Clear,     .minIntensity = 0.0f, .maxIntensity = 0.0f, .weight = 8.0f, .minDurationSec = 600, .maxDurationSec = 2400});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Sandstorm, .minIntensity = 0.5f, .maxIntensity = 0.9f, .weight = 2.0f, .minDurationSec = 120, .maxDurationSec = 600});
     return w;
 }
 
 WoweeWeather WoweeWeatherLoader::makeStormy(const std::string& zoneName) {
     WoweeWeather w;
     w.name = zoneName;
-    w.entries.push_back({WoweeWeather::Rain,  0.5f, 0.9f, 5.0f, 300, 1200});
-    w.entries.push_back({WoweeWeather::Storm, 0.6f, 1.0f, 3.0f, 180, 600});
-    w.entries.push_back({WoweeWeather::Fog,   0.4f, 0.7f, 1.0f, 120, 300});
-    w.entries.push_back({WoweeWeather::Clear, 0.0f, 0.0f, 1.0f, 60, 240});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Rain,  .minIntensity = 0.5f, .maxIntensity = 0.9f, .weight = 5.0f, .minDurationSec = 300, .maxDurationSec = 1200});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Storm, .minIntensity = 0.6f, .maxIntensity = 1.0f, .weight = 3.0f, .minDurationSec = 180, .maxDurationSec = 600});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Fog,   .minIntensity = 0.4f, .maxIntensity = 0.7f, .weight = 1.0f, .minDurationSec = 120, .maxDurationSec = 300});
+    w.entries.push_back({.weatherTypeId = WoweeWeather::Clear, .minIntensity = 0.0f, .maxIntensity = 0.0f, .weight = 1.0f, .minDurationSec = 60, .maxDurationSec = 240});
     return w;
 }
 

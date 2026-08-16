@@ -150,10 +150,10 @@ WoweeQuest WoweeQuestLoader::makeStarter(const std::string& catalogName) {
         e.questLevel = 6;
         e.giverCreatureId = 4001;          // village innkeeper from WCRT
         e.turninCreatureId = 4001;
-        e.objectives.push_back({WoweeQuest::KillCreature, 1000, 10});
+        e.objectives.push_back({.kind = WoweeQuest::KillCreature, .targetId = 1000, .quantity = 10});
         e.xpReward = 500;
         e.moneyCopperReward = 250;          // 2s 50c
-        e.rewardItems.push_back({3, 2, WoweeQuest::AutoGiven});  // 2 healing potions
+        e.rewardItems.push_back({.itemId = 3, .qty = 2, .pickFlags = WoweeQuest::AutoGiven});  // 2 healing potions
         c.entries.push_back(e);
     }
     return c;
@@ -174,7 +174,7 @@ WoweeQuest WoweeQuestLoader::makeChain(const std::string& catalogName) {
         e.giverCreatureId = 4001;
         e.turninCreatureId = 4001;
         e.nextQuestId = 101;
-        e.objectives.push_back({WoweeQuest::VisitArea, 9001, 1});
+        e.objectives.push_back({.kind = WoweeQuest::VisitArea, .targetId = 9001, .quantity = 1});
         e.xpReward = 200;
         e.moneyCopperReward = 100;
         c.entries.push_back(e);
@@ -192,10 +192,10 @@ WoweeQuest WoweeQuestLoader::makeChain(const std::string& catalogName) {
         e.turninCreatureId = 4001;
         e.prevQuestId = 100;
         e.nextQuestId = 102;
-        e.objectives.push_back({WoweeQuest::CollectItem, 4, 5});
+        e.objectives.push_back({.kind = WoweeQuest::CollectItem, .targetId = 4, .quantity = 5});
         e.xpReward = 600;
         e.moneyCopperReward = 350;
-        e.rewardItems.push_back({2, 1, WoweeQuest::AutoGiven});  // linen vest
+        e.rewardItems.push_back({.itemId = 2, .qty = 1, .pickFlags = WoweeQuest::AutoGiven});  // linen vest
         c.entries.push_back(e);
     }
     {
@@ -215,8 +215,8 @@ WoweeQuest WoweeQuestLoader::makeChain(const std::string& catalogName) {
         e.xpReward = 200;
         e.moneyCopperReward = 500;          // 5s
         // Player choice: 1 of 2 weapons.
-        e.rewardItems.push_back({1001, 1, WoweeQuest::PlayerChoice}); // sword
-        e.rewardItems.push_back({1002, 1, WoweeQuest::PlayerChoice}); // blade
+        e.rewardItems.push_back({.itemId = 1001, .qty = 1, .pickFlags = WoweeQuest::PlayerChoice}); // sword
+        e.rewardItems.push_back({.itemId = 1002, .qty = 1, .pickFlags = WoweeQuest::PlayerChoice}); // blade
         c.entries.push_back(e);
     }
     return c;
@@ -234,7 +234,7 @@ WoweeQuest WoweeQuestLoader::makeDaily(const std::string& catalogName) {
         e.minLevel = 5; e.questLevel = 5;
         e.giverCreatureId = 4002;        // smith from WCRT village
         e.turninCreatureId = 4002;
-        e.objectives.push_back({WoweeQuest::KillCreature, 2001, 8});
+        e.objectives.push_back({.kind = WoweeQuest::KillCreature, .targetId = 2001, .quantity = 8});
         e.xpReward = 250;
         e.moneyCopperReward = 1000;       // 10s = good daily payout
         e.flags = WoweeQuest::Daily |

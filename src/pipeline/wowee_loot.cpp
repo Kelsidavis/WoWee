@@ -86,7 +86,7 @@ WoweeLoot WoweeLootLoader::makeStarter(const std::string& catalogName) {
         e.creatureId = 1;
         e.dropCount = 1;
         e.moneyMinCopper = 0; e.moneyMaxCopper = 50;
-        e.itemDrops.push_back({3, 50.0f, 1, 1, 0});  // healing potion 50%
+        e.itemDrops.push_back({.itemId = 3, .chancePercent = 50.0f, .minQty = 1, .maxQty = 1, .flags = 0});  // healing potion 50%
         c.entries.push_back(e);
     }
     return c;
@@ -104,10 +104,10 @@ WoweeLoot WoweeLootLoader::makeBandit(const std::string& catalogName) {
         // chancePercent; the dropCount=2 means up to 2
         // distinct items per kill (the runtime is responsible
         // for pickin which 2 to roll first).
-        e.itemDrops.push_back({2,    35.0f, 1, 1, 0});  // linen vest @ 35%
-        e.itemDrops.push_back({101,  25.0f, 1, 3, 0});  // bolt of cloth @ 25%
-        e.itemDrops.push_back({1001, 10.0f, 1, 1, 0});  // apprentice sword @ 10%
-        e.itemDrops.push_back({102,  60.0f, 1, 1, 0});  // ale flask @ 60%
+        e.itemDrops.push_back({.itemId = 2,    .chancePercent = 35.0f, .minQty = 1, .maxQty = 1, .flags = 0});  // linen vest @ 35%
+        e.itemDrops.push_back({.itemId = 101,  .chancePercent = 25.0f, .minQty = 1, .maxQty = 3, .flags = 0});  // bolt of cloth @ 25%
+        e.itemDrops.push_back({.itemId = 1001, .chancePercent = 10.0f, .minQty = 1, .maxQty = 1, .flags = 0});  // apprentice sword @ 10%
+        e.itemDrops.push_back({.itemId = 102,  .chancePercent = 60.0f, .minQty = 1, .maxQty = 1, .flags = 0});  // ale flask @ 60%
         c.entries.push_back(e);
     }
     return c;
@@ -125,17 +125,17 @@ WoweeLoot WoweeLootLoader::makeBoss(const std::string& catalogName) {
         e.moneyMinCopper = 5000;
         e.moneyMaxCopper = 20000;
         // Guaranteed quest item.
-        e.itemDrops.push_back({4, 100.0f, 1, 1,
-            WoweeLoot::QuestRequired | WoweeLoot::AlwaysDrop});
+        e.itemDrops.push_back({.itemId = 4, .chancePercent = 100.0f, .minQty = 1, .maxQty = 1,
+            .flags = WoweeLoot::QuestRequired | WoweeLoot::AlwaysDrop});
         // Common drops.
-        e.itemDrops.push_back({2,    80.0f, 1, 1, 0});   // chest
-        e.itemDrops.push_back({1002, 40.0f, 1, 1, 0});   // journeyman blade
-        e.itemDrops.push_back({2002, 30.0f, 1, 1, 0});   // iron chest
+        e.itemDrops.push_back({.itemId = 2,    .chancePercent = 80.0f, .minQty = 1, .maxQty = 1, .flags = 0});   // chest
+        e.itemDrops.push_back({.itemId = 1002, .chancePercent = 40.0f, .minQty = 1, .maxQty = 1, .flags = 0});   // journeyman blade
+        e.itemDrops.push_back({.itemId = 2002, .chancePercent = 30.0f, .minQty = 1, .maxQty = 1, .flags = 0});   // iron chest
         // Group-only epic drop (low chance).
-        e.itemDrops.push_back({1004,  5.0f, 1, 1,
-            WoweeLoot::GroupRollOnly});                  // bloodforged
+        e.itemDrops.push_back({.itemId = 1004,  .chancePercent = 5.0f, .minQty = 1, .maxQty = 1,
+            .flags = WoweeLoot::GroupRollOnly});                  // bloodforged
         // Mass-loot trade goods.
-        e.itemDrops.push_back({101,  90.0f, 2, 5, 0});   // bolt of cloth
+        e.itemDrops.push_back({.itemId = 101,  .chancePercent = 90.0f, .minQty = 2, .maxQty = 5, .flags = 0});   // bolt of cloth
         c.entries.push_back(e);
     }
     return c;

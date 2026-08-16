@@ -278,10 +278,10 @@ WoweeChars WoweeCharsLoader::makeStarter(const std::string& catalogName) {
     };
     // Each outfit uses WIT itemIds (1 = Worn Shortsword,
     // 2 = Linen Vest, 3 = Healing Potion).
-    addOutfit(1, 1, {{1, 13}, {2, 5}, {3, 0}});            // Human Warrior
-    addOutfit(1, 2, {{1, 13}, {2, 5}, {3, 0}});            // Orc Warrior
-    addOutfit(8, 1, {{2, 5}, {3, 0}});                      // Human Mage
-    addOutfit(8, 2, {{2, 5}, {3, 0}});                      // Orc Mage
+    addOutfit(1, 1, {{.itemId = 1, .displaySlot = 13}, {.itemId = 2, .displaySlot = 5}, {.itemId = 3, .displaySlot = 0}});            // Human Warrior
+    addOutfit(1, 2, {{.itemId = 1, .displaySlot = 13}, {.itemId = 2, .displaySlot = 5}, {.itemId = 3, .displaySlot = 0}});            // Orc Warrior
+    addOutfit(8, 1, {{.itemId = 2, .displaySlot = 5}, {.itemId = 3, .displaySlot = 0}});                      // Human Mage
+    addOutfit(8, 2, {{.itemId = 2, .displaySlot = 5}, {.itemId = 3, .displaySlot = 0}});                      // Orc Mage
     return c;
 }
 
