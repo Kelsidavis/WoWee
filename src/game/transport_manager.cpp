@@ -721,7 +721,7 @@ bool TransportManager::assignTaxiPathToTransport(uint32_t entry, uint32_t taxiPa
 
         // Copy the taxi path into the main paths (indexed by GO entry for this transport)
         PathEntry copied(taxiEntry->spline, entry, taxiEntry->zOnly,
-                         /*fromDBC=*/false, taxiEntry->worldCoords);
+                         /*dbc=*/false, taxiEntry->worldCoords);
         pathRepo_.storePath(entry, std::move(copied));
 
         auto* storedEntry = pathRepo_.findPath(entry);

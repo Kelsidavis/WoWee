@@ -56,7 +56,7 @@ std::optional<float> selectHighestFloor(const std::optional<float>& a,
     std::optional<float> best;
     auto consider = [&](const std::optional<float>& h) {
         if (!h) return;
-        if (!best || *h > *best) best = *h;
+        if (!best || *h > *best) best = h;
     };
     consider(a);
     consider(b);
@@ -86,7 +86,7 @@ std::optional<float> selectReachableFloor3(const std::optional<float>& a,
     auto consider = [&](const std::optional<float>& h) {
         if (!h) return;
         if (*h > refZ + maxStepUp) return;
-        if (!best || *h > *best) best = *h;
+        if (!best || *h > *best) best = h;
     };
     consider(a);
     consider(b);

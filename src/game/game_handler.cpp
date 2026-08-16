@@ -2148,13 +2148,13 @@ float GameHandler::critPercentFromGameTable(std::vector<float>& baseCache,
 float GameHandler::getMeleeCritFromAgility() const {
     return critPercentFromGameTable(gtMeleeCritBase_, gtMeleeCrit_, gtMeleeCritLoaded_,
                                     "gtChanceToMeleeCritBase.dbc", "gtChanceToMeleeCrit.dbc",
-                                    /*STAT_AGILITY=*/1);
+                                    1 /* STAT_AGILITY */);
 }
 
 float GameHandler::getSpellCritFromIntellect() const {
     return critPercentFromGameTable(gtSpellCritBase_, gtSpellCrit_, gtSpellCritLoaded_,
                                     "gtChanceToSpellCritBase.dbc", "gtChanceToSpellCrit.dbc",
-                                    /*STAT_INTELLECT=*/3);
+                                    3 /* STAT_INTELLECT */);
 }
 
 namespace {
@@ -2181,7 +2181,7 @@ float GameHandler::getHealthRegenFromSpirit() const {
     }
     const size_t idx = static_cast<size_t>(pclass - 1) * kGtMaxLevel + (level - 1);
     if (idx >= gtOctRegenHp_.size() || idx >= gtRegenHpPerSpt_.size()) return 0.0f;
-    const float spirit = static_cast<float>(std::max(0, getPlayerStat(/*SPIRIT=*/4)));
+    const float spirit = static_cast<float>(std::max(0, getPlayerStat(4 /* SPIRIT */)));
     const float baseSpirit = std::min(spirit, 50.0f);
     const float moreSpirit = spirit - baseSpirit;
     return (baseSpirit * gtOctRegenHp_[idx] + moreSpirit * gtRegenHpPerSpt_[idx]) * 2.0f;
@@ -2196,7 +2196,7 @@ float GameHandler::getManaRegenFromSpirit() const {
     if (!gtRegenLoaded_) { getHealthRegenFromSpirit(); }  // shares the same lazy load
     const size_t idx = static_cast<size_t>(pclass - 1) * kGtMaxLevel + (level - 1);
     if (idx >= gtRegenMpPerSpt_.size()) return 0.0f;
-    const float spirit = static_cast<float>(std::max(0, getPlayerStat(/*SPIRIT=*/4)));
+    const float spirit = static_cast<float>(std::max(0, getPlayerStat(4 /* SPIRIT */)));
     return spirit * gtRegenMpPerSpt_[idx];
 }
 

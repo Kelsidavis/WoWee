@@ -713,6 +713,7 @@ void SettingsPanel::drawSchemaCategory(const char* category,
                     at = (bar == std::string::npos) ? bar : bar + 1;
                 }
                 std::vector<const char*> items;
+                items.reserve(labels.size());
                 for (const auto& label : labels) items.push_back(label.c_str());
                 int v = std::atoi(current.c_str());
                 if (ImGui::Combo(d.label, &v, items.data(),

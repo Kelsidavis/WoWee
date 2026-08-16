@@ -1864,6 +1864,9 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
             // a model frame is a window onto a scene and the art around it
             // belongs on top.
             if (w->externalTexture != 0) {
+                // NOLINTNEXTLINE(performance-no-int-to-ptr) - the widget holds
+                // the handle as an integer and ImTextureID is a pointer, so
+                // the cast is the API boundary rather than a choice.
                 dl->AddImage(reinterpret_cast<ImTextureID>(
                                  reinterpret_cast<VkDescriptorSet>(w->externalTexture)),
                              ImVec2(x0, y0), ImVec2(x1, y1),
@@ -2093,6 +2096,9 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                 // so - a portrait's render target is recreated when the window
                 // resizes, and the widget is told each frame rather than
                 // holding a handle of its own.
+                // NOLINTNEXTLINE(performance-no-int-to-ptr) - as above, the
+                // handle is stored as an integer and VkDescriptorSet is a
+                // pointer.
                 tex = reinterpret_cast<VkDescriptorSet>(w->externalTexture);
             } else {
                 // Only what is already resident. Anything still queued draws on

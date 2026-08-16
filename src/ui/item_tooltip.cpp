@@ -678,6 +678,7 @@ void renderItemTooltip(const game::ItemDef& item, const game::Inventory* invento
             };
             // Collect all extra stat types
             std::vector<uint32_t> allTypes;
+            allTypes.reserve(item.extraStats.size());
             for (const auto& es : item.extraStats) allTypes.push_back(es.statType);
             for (const auto& es : eq->item.extraStats) {
                 bool found = false;
@@ -1113,6 +1114,7 @@ void renderItemTooltip(const game::ItemQueryResponseData& info, const game::Inve
                 return 0;
             };
             std::vector<uint32_t> allTypes;
+            allTypes.reserve(info.extraStats.size());
             for (const auto& es : info.extraStats) allTypes.push_back(es.statType);
             for (const auto& es : eq->item.extraStats) {
                 bool found = false;
