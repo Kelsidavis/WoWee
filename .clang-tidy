@@ -57,6 +57,24 @@
 #       the out-of-line destructors are load-bearing: UIManager holds five
 #       unique_ptrs to forward-declared types, so defaulting the destructor
 #       in the header does not compile.
+#   bugprone-exception-escape (24)
+#       destructors that delegate to a shutdown() or disconnect(), which
+#       logs and touches containers, so the check follows the call graph to
+#       a possible bad_alloc. Silencing it means try/catch(...) in 24
+#       destructors, which is the empty catch suppressed above and would
+#       swallow real shutdown errors. The one concrete hazard in the
+#       category is std::thread::join throwing system_error on a
+#       non-joinable thread; all five joins are guarded by joinable().
+#   bugprone-throwing-static-initialization (18)
+#       namespace-scope random_device/mt19937 pairs, one mutex, and three
+#       const tables. Every report is bad_alloc during static init.
+#
+# bugprone-unchecked-string-to-number-conversion is deliberately NOT
+# suppressed. 30 of its 31 reports are benign - an env debug knob, and
+# settings the client round-trips through its own to_string - but the 31st
+# was a real one: a chat window colour read back from saved variables with
+# neither the return value nor isfinite checked, two lines from the code
+# that checks both and says why.
 
 ---
 Checks: >
@@ -100,8 +118,10 @@ Checks: >
   -readability-non-const-parameter, 
   -readability-misplaced-array-index, 
   -bugprone-switch-missing-default-case, 
-  -bugprone-misplaced-widening-cast, 
-  -performance-trivially-destructible
+  -bugprone-misplaced-widening-cast,
+  -performance-trivially-destructible,
+  -bugprone-exception-escape,
+  -bugprone-throwing-static-initialization
 
 WarningsAsErrors: ''
 

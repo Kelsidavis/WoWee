@@ -3,6 +3,7 @@
 #include <array>
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstring>
 #include <ctime>
 #include <filesystem>
@@ -2938,7 +2939,20 @@ static void loadInterfaceState() {
         else if (field == "uninteractable") w.uninteractable = (value == "1");
         else if (field == "fontSize") w.fontSize = num();
         else if (field == "colour") {
-            std::sscanf(value.c_str(), "%f,%f,%f,%f", &w.r, &w.g, &w.b, &w.alpha);
+            // Read into locals and only kept if all four are numbers, for the
+            // same reason position and size below do it: this file is written
+            // back out verbatim, so a nan taken in here is a nan saved again
+            // every session after. On a miss the window keeps the fresh-window
+            // colour the struct already holds.
+            float cr = 0.0f, cg = 0.0f, cb = 0.0f, ca = 0.0f;
+            if (std::sscanf(value.c_str(), "%f,%f,%f,%f", &cr, &cg, &cb, &ca) == 4 &&
+                std::isfinite(cr) && std::isfinite(cg) && std::isfinite(cb) &&
+                std::isfinite(ca)) {
+                w.r = cr;
+                w.g = cg;
+                w.b = cb;
+                w.alpha = ca;
+            }
         } else if (field == "position") {
             char pt[32] = {0};
             float px = 0.0f, py = 0.0f;
