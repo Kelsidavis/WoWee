@@ -43,21 +43,36 @@ inline bool isMeleeRange(float maxRange) {
 /// Rejuvenation, Mark of the Wild, Arcane Intellect and Blessing of Might all
 /// read 21, while Smite, Fireball, Shadow Bolt and Shadow Word: Pain read 6.
 enum ImplicitTarget : uint32_t {
-    kImplicitTargetCaster = 1,   ///< Lands on the caster whatever is selected.
-    kImplicitTargetEnemy  = 6,   ///< Needs a hostile unit.
-    kImplicitTargetAlly   = 21,  ///< Needs a friendly unit - heals and buffs.
-    kImplicitTargetAny    = 25,  ///< Either, e.g. Dispel Magic.
+    kImplicitTargetCaster    = 1,   ///< Lands on the caster whatever is selected.
+    kImplicitTargetEnemy     = 6,   ///< Needs a hostile unit.
+    kImplicitTargetAlly      = 21,  ///< Needs a friendly unit - heals and buffs.
+    kImplicitTargetAny       = 25,  ///< Either, e.g. Dispel Magic.
+    kImplicitTargetParty     = 35,  ///< A party member.
+    kImplicitTargetChainHeal = 45,  ///< A friendly unit the heal jumps from.
+    kImplicitTargetRaid      = 57,  ///< A raid member.
 };
 
 /// Whether a spell has to be aimed at a friendly unit, which is what makes it a
 /// candidate for falling back to the caster when nothing friendly is selected.
 ///
-/// Deliberately only the "ally" case. A spell that takes any target (Dispel
-/// Magic) is left alone: retail does not self-cast it either, because choosing
-/// for the player between cleansing themselves and purging an enemy would be
-/// guessing at the intent behind the keypress.
+/// Four values, not one. Ally covers most of it, but measured over the shipped
+/// Spell.dbc, Holy Light and Healing Wave are 45 and Hand of Protection,
+/// Beacon of Light, Levitate and Intervene are 57 - so a client asking only
+/// about 21 refuses to self-cast half the heals in the game, which is the
+/// shape this was found in.
+///
+/// Deliberately not 25, and deliberately not 63. A spell that takes any target
+/// (Dispel Magic, Holy Shock) is left alone: retail does not self-cast it
+/// either, because choosing for the player between cleansing themselves and
+/// purging an enemy would be guessing at the intent behind the keypress. 63 is
+/// a destination at the target rather than a unit, and while Circle of Healing
+/// and Wild Growth use it, so do Fire Bomb and Rain of Darkness - taking it
+/// would redirect a working hostile cast onto the caster.
 inline bool requiresFriendlyTarget(uint32_t implicitTargetA) {
-    return implicitTargetA == kImplicitTargetAlly;
+    return implicitTargetA == kImplicitTargetAlly ||
+           implicitTargetA == kImplicitTargetParty ||
+           implicitTargetA == kImplicitTargetChainHeal ||
+           implicitTargetA == kImplicitTargetRaid;
 }
 
 /// Legacy client IDs for the three repeating ranged weapon attacks.

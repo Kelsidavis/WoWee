@@ -139,7 +139,10 @@ std::array<uint8_t, 19> inferredVisibleInventoryTypes() {
 /// client that asks it is told no spell ever needs a target. What carries it
 /// is EffectImplicitTargetA, which reads 21 - ally - for those same spells.
 bool spellNeedsAUnit(uint32_t implicitTargetA) {
-    return implicitTargetA == spellclass::kImplicitTargetAlly ||
+    // Every friendly aim, not just 21: a scroll or a bandage whose spell reads
+    // 45 or 57 needs somebody picked exactly as one reading 21 does, and asking
+    // about the one value sent those at whatever was selected.
+    return spellclass::requiresFriendlyTarget(implicitTargetA) ||
            implicitTargetA == spellclass::kImplicitTargetEnemy ||
            implicitTargetA == spellclass::kImplicitTargetAny;
 }
@@ -172,7 +175,7 @@ uint64_t targetGuidForUseItem(GameHandler& owner, const ItemQueryResponseData* i
             bool allowed = true;
             auto entity = owner.getEntityManager().getEntity(target);
             if (auto unit = std::dynamic_pointer_cast<Unit>(entity)) {
-                if (aim == spellclass::kImplicitTargetAlly)      allowed = !unit->isHostile();
+                if (spellclass::requiresFriendlyTarget(aim))      allowed = !unit->isHostile();
                 else if (aim == spellclass::kImplicitTargetEnemy) allowed = unit->isHostile();
             }
             if (allowed) return target;
@@ -1802,13 +1805,18 @@ void InventoryHandler::dispatchUseItem(uint8_t wowBag, uint8_t wowSlot, uint64_t
             (useSpellId != 0 && !owner_.isSpellKnownToClient(useSpellId));
         const uint64_t chosen = unitTarget != 0
             ? unitTarget : targetGuidForUseItem(owner_, itemInfo, useSpellId);
-        // Bandages, and only bandages. Using one with nothing selected puts it
-        // on you, which is long-established and worth keeping. Food, drink and
-        // potions never reach here at all - their spells aim at the caster, so
-        // spellNeedsAUnit is already false for them - so naming the whole
-        // consumable class here would have caught nothing but treats and the
-        // other items that do need somebody picked.
-        const bool selfIsImplicit = isBandageItem(itemInfo);
+        // Bandages and scrolls. Using either with nothing selected puts it on
+        // you: a Scroll of Protection buffs whoever read it, and asking them to
+        // click somebody first is a cursor over a decision that has already
+        // been made. Food, drink and potions never reach here at all - their
+        // spells aim at the caster, so spellNeedsAUnit is already false for
+        // them - so naming the whole consumable class here would have caught
+        // nothing but treats and the other items that do need somebody picked.
+        const bool selfIsImplicit =
+            isBandageItem(itemInfo) ||
+            (itemInfo && itemInfo->valid &&
+             itemInfo->itemClass == ITEM_CLASS_CONSUMABLE &&
+             itemInfo->subClass == ITEM_SUBCLASS_SCROLL);
         if (wantsUnit && !selfIsImplicit && chosen == owner_.getPlayerGuid() &&
             owner_.getTargetGuid() == 0) {
             pendingUnitTarget_ = PendingItemTarget{wowBag, wowSlot, itemGuid, useSpellId,

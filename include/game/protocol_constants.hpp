@@ -59,6 +59,7 @@ constexpr uint32_t ITEM_ID_HEARTHSTONE = 6948;
 /// predicate over them. The two agreed, but a bandage is identified by the
 /// pair rather than by either half, so the fact belongs in one place.
 constexpr uint32_t ITEM_CLASS_CONSUMABLE = 0;
+constexpr uint32_t ITEM_SUBCLASS_SCROLL  = 4;
 constexpr uint32_t ITEM_SUBCLASS_BANDAGE = 7;
 
 // ---------------------------------------------------------------------------

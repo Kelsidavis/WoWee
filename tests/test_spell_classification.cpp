@@ -249,6 +249,24 @@ TEST_CASE("friendly-target spells are the ones that may fall back to the caster"
         CHECK(requiresFriendlyTarget(21));                    // Mark of the Wild...
     }
 
+    SECTION("the friendly aims are four values, not one") {
+        // Read out of the shipped Spell.dbc rather than assumed. Asking only
+        // about 21 left the two commonest heals in the game refusing to
+        // self-cast, since neither of them is 21.
+        CHECK(requiresFriendlyTarget(kImplicitTargetChainHeal));  // Holy Light,
+        CHECK(requiresFriendlyTarget(45));                        // Healing Wave
+        CHECK(requiresFriendlyTarget(kImplicitTargetRaid));       // Beacon of Light,
+        CHECK(requiresFriendlyTarget(57));                        // Intervene, Levitate
+        CHECK(requiresFriendlyTarget(kImplicitTargetParty));      // Seal of Sacrifice
+    }
+
+    SECTION("a destination at the target is not a friendly unit") {
+        // 63 carries Circle of Healing and Wild Growth, and also Fire Bomb and
+        // Rain of Darkness. Taking it would turn a working hostile cast into
+        // one aimed at the caster.
+        CHECK_FALSE(requiresFriendlyTarget(63));
+    }
+
     SECTION("damage does not") {
         CHECK_FALSE(requiresFriendlyTarget(kImplicitTargetEnemy));  // Smite, Fireball
         CHECK_FALSE(requiresFriendlyTarget(6));
