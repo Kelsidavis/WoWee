@@ -1,7 +1,8 @@
 # Codebase Modernization — Phased Plan
 
-**Status:** Phases 0–1 complete. Next: Phase 2.
-**Branch:** `chore/modernization`, cut from `origin/master` at `2a17404d0`.
+**Status:** Phases 0–1 complete and on `master`. Next: Phase 2.
+**Branch:** `master`. Phase 1 was done on `chore/modernization` and pushed to `master` as
+`7b9d4a93d..2b5628a0f`; later phases continue directly on `master`.
 **Scope:** code quality and modernity, codebase-wide. Not a performance effort. Where a phase
 happens to help performance that is a side effect, and no phase here is justified by it.
 
