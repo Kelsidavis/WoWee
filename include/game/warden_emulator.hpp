@@ -98,11 +98,6 @@ public:
      */
     bool freeMemory(uint32_t address);
 
-
-    /**
-     * Set CPU register value
-     */
-
     /**
      * Check if emulator is initialized
      */
@@ -128,23 +123,33 @@ public:
      */
     uint32_t writeData(const void* data, size_t size);
 
-    /**
-     * Read data from emulated memory into vector
-     */
-
     // Look up an already-registered API stub address by DLL and function name.
     // Returns 0 if not found. Used by WardenModule::bindAPIs() for IAT patching.
     [[nodiscard]] uint32_t getAPIAddress(const std::string& dllName, const std::string& funcName) const;
 
 private:
+    // Memory layout for the emulated environment. Here rather than in the
+    // .cpp because the fields below carry them as initialisers, and the .cpp
+    // defined them inside #ifdef HAVE_UNICORN - so the stub constructor could
+    // not see them and zeroed all five instead, leaving two constructors that
+    // had to agree about seven fields and did not.
+    //
+    // The heap must not overlap the module region (typically loaded at
+    // 0x400000) or the stack, so keep it above 32MB to leave the module room.
+    static constexpr uint32_t kStackBase   = 0x00100000;  // 1MB
+    static constexpr uint32_t kStackSize   = 0x00100000;  // 1MB stack
+    static constexpr uint32_t kHeapBase    = 0x02000000;  // 32MB
+    static constexpr uint32_t kHeapSize    = 0x01000000;  // 16MB heap
+    static constexpr uint32_t kApiStubBase = 0x70000000;  // high memory
+
     uc_engine* uc_ = nullptr;                  // Unicorn engine instance
-    uint32_t moduleBase_;            // Module base address
-    uint32_t moduleSize_;            // Module size
-    uint32_t stackBase_;             // Stack base address
-    uint32_t stackSize_;             // Stack size
-    uint32_t heapBase_;              // Heap base address
-    uint32_t heapSize_;              // Heap size
-    uint32_t apiStubBase_;           // API stub base address
+    uint32_t moduleBase_ = 0;         // Module base address
+    uint32_t moduleSize_ = 0;         // Module size
+    uint32_t stackBase_ = kStackBase; // Stack base address
+    uint32_t stackSize_ = kStackSize; // Stack size
+    uint32_t heapBase_ = kHeapBase;   // Heap base address
+    uint32_t heapSize_ = kHeapSize;   // Heap size
+    uint32_t apiStubBase_ = kApiStubBase;  // API stub base address
 
     // API hooks: DLL name -> Function name -> stub address
     std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> apiAddresses_;
@@ -155,13 +160,13 @@ private:
         std::function<uint32_t(WardenEmulator&, const std::vector<uint32_t>&)> handler;
     };
     std::unordered_map<uint32_t, ApiHookEntry> apiHandlers_;
-    uint32_t nextApiStubAddr_;   // tracks next free stub slot (replaces static local)
+    uint32_t nextApiStubAddr_ = kApiStubBase;  // next free stub slot
     bool apiCodeHookRegistered_ = false; // true once UC_HOOK_CODE for stub range is added
 
     // Memory allocation tracking
     std::unordered_map<uint32_t, size_t> allocations_;
     std::map<uint32_t, size_t> freeBlocks_;  // free-list keyed by base address
-    uint32_t nextHeapAddr_;
+    uint32_t nextHeapAddr_ = kHeapBase;
 
     // Hook handles for cleanup
     std::vector<uc_hook> hooks_;

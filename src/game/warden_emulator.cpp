@@ -15,29 +15,7 @@ namespace game {
 
 #ifdef HAVE_UNICORN
 
-// Memory layout for emulated environment
-// Note: heap must not overlap the module region (typically loaded at 0x400000)
-// or the stack. Keep heap above 0x02000000 (32MB) to leave space for module + padding.
-constexpr uint32_t STACK_BASE = 0x00100000;  // 1MB
-constexpr uint32_t STACK_SIZE = 0x00100000;  // 1MB stack
-constexpr uint32_t HEAP_BASE  = 0x02000000;  // 32MB - well above typical module base (0x400000)
-constexpr uint32_t HEAP_SIZE  = 0x01000000;  // 16MB heap
-constexpr uint32_t API_STUB_BASE = 0x70000000; // API stub area (high memory)
-
-WardenEmulator::WardenEmulator()
-    : 
-     moduleBase_(0)
-    , moduleSize_(0)
-    , stackBase_(STACK_BASE)
-    , stackSize_(STACK_SIZE)
-    , heapBase_(HEAP_BASE)
-    , heapSize_(HEAP_SIZE)
-    , apiStubBase_(API_STUB_BASE)
-    , nextApiStubAddr_(API_STUB_BASE)
-    , 
-     nextHeapAddr_(HEAP_BASE)
-{
-}
+WardenEmulator::WardenEmulator() = default;
 
 WardenEmulator::~WardenEmulator() {
     if (uc_) {
@@ -82,7 +60,7 @@ bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint3
     if (modEnd > heapBase_ && moduleBase_ < heapBase_ + heapSize_) {
         {
             char buf[256];
-            std::snprintf(buf, sizeof(buf), "WardenEmulator: Module [0x%X, 0x%X) overlaps heap [0x%X, 0x%X) - adjust HEAP_BASE",
+            std::snprintf(buf, sizeof(buf), "WardenEmulator: Module [0x%X, 0x%X) overlaps heap [0x%X, 0x%X) - adjust kHeapBase",
                           moduleBase_, modEnd, heapBase_, heapBase_ + heapSize_);
             LOG_ERROR(buf);
         }
@@ -158,7 +136,7 @@ bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint3
     // Add code hook over the API stub area so Windows API calls are intercepted
     uc_hook apiHook;
     uc_hook_add(uc_, &apiHook, UC_HOOK_CODE, (void*)hookCode, this,
-                API_STUB_BASE, API_STUB_BASE + 0x10000 - 1);
+                kApiStubBase, kApiStubBase + 0x10000 - 1);
     hooks_.push_back(apiHook);
     apiCodeHookRegistered_ = true;
 
@@ -578,12 +556,7 @@ void WardenEmulator::hookMemInvalid([[maybe_unused]] uc_engine* uc, int type, ui
 
 #else // !HAVE_UNICORN
 // Stub implementations - Unicorn Engine not available on this platform.
-WardenEmulator::WardenEmulator()
-    : uc_(nullptr), moduleBase_(0), moduleSize_(0)
-    , stackBase_(0), stackSize_(0)
-    , heapBase_(0), heapSize_(0)
-    , apiStubBase_(0), nextApiStubAddr_(0), apiCodeHookRegistered_(false)
-    , nextHeapAddr_(0) {}
+WardenEmulator::WardenEmulator() = default;
 WardenEmulator::~WardenEmulator() {}
 bool WardenEmulator::initialize(const void*, size_t, uint32_t) { return false; }
 uint32_t WardenEmulator::hookAPI(const std::string&, const std::string&,
