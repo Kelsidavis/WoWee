@@ -1202,14 +1202,16 @@ void Application::run() {
     // from the main thread (the one that called SDL_Init); calling them from
     // a background thread is UB on macOS (Cocoa) and unsafe on other platforms.
     std::atomic<bool> watchdogRequestRelease{false};
-    // A jthread, so its destructor requests the stop and joins. The main loop
-    // below used to be wrapped in a try/catch whose only job was to run that
-    // teardown before rethrowing, with the same three lines repeated on the
-    // normal path -- both are gone, and neither can now be forgotten on a path
-    // added later.
-    std::jthread watchdogThread([&watchdogHeartbeatMs, &watchdogRequestRelease](std::stop_token stopToken) {
+    // std::jthread would express this, but libc++ on the macOS CI image has no
+    // <stop_token>, so the flag and the thread stay separate and a guard does
+    // what jthread's destructor would: stop and join on every exit from this
+    // scope, including an exception. That replaces a try/catch whose only job
+    // was to run the same three lines before rethrowing, plus a second copy of
+    // them after the loop.
+    std::atomic<bool> watchdogRunning{true};
+    std::thread watchdogThread([&watchdogRunning, &watchdogHeartbeatMs, &watchdogRequestRelease]() {
         bool signalledForCurrentStall = false;
-        while (!stopToken.stop_requested()) {
+        while (watchdogRunning.load(std::memory_order_acquire)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(250));
             const int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -1228,6 +1230,16 @@ void Application::run() {
             }
         }
     });
+
+    // Stops and joins on the way out of this scope, however that happens.
+    struct WatchdogStop {
+        std::atomic<bool>& running;
+        std::thread& thread;
+        ~WatchdogStop() {
+            running.store(false, std::memory_order_release);
+            if (thread.joinable()) thread.join();
+        }
+    } watchdogStop{watchdogRunning, watchdogThread};
 
     while (running && !window->shouldClose()) {
         const auto frameStart = std::chrono::steady_clock::now();
