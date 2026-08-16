@@ -148,8 +148,10 @@ private:
 
     // Module execution context
     void* moduleMemory_ = nullptr;                   // Allocated executable memory region
-    size_t moduleSize_;                    // Size of loaded code
-    uint32_t moduleBase_;                  // Module base address (for emulator)
+    size_t moduleSize_ = 0;                // Size of loaded code
+    // 0x400000 is the default PE image base for 32-bit Windows executables.
+    // Warden modules are loaded as if they were PE DLLs at this base address.
+    uint32_t moduleBase_ = 0x400000;       // Module base address (for emulator)
     size_t relocDataOffset_ = 0;           // Offset into decompressedData_ where relocation data starts
     WardenFuncList funcList_;              // Callback functions
     std::unique_ptr<WardenEmulator> emulator_; // Cross-platform x86 emulator

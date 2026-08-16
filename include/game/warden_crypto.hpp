@@ -45,13 +45,13 @@ private:
 
     // RC4 state for decrypting incoming packets (server->client)
     std::vector<uint8_t> decryptRC4State_;
-    uint8_t decryptRC4_i_;
-    uint8_t decryptRC4_j_;
+    uint8_t decryptRC4_i_ = 0;
+    uint8_t decryptRC4_j_ = 0;
 
     // RC4 state for encrypting outgoing packets (client->server)
     std::vector<uint8_t> encryptRC4State_;
-    uint8_t encryptRC4_i_;
-    uint8_t encryptRC4_j_;
+    uint8_t encryptRC4_i_ = 0;
+    uint8_t encryptRC4_j_ = 0;
 
     void initRC4(const std::vector<uint8_t>& key,
                  std::vector<uint8_t>& state,

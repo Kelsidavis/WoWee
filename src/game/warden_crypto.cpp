@@ -7,13 +7,7 @@
 namespace wowee {
 namespace game {
 
-WardenCrypto::WardenCrypto()
-    : 
-     decryptRC4_i_(0)
-    , decryptRC4_j_(0)
-    , encryptRC4_i_(0)
-    , encryptRC4_j_(0) {
-}
+WardenCrypto::WardenCrypto() = default;
 
 WardenCrypto::~WardenCrypto() {
 }

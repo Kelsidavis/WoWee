@@ -71,7 +71,7 @@ private:
 
     std::vector<SplineKey> keys_;
     bool timeClosed_;
-    uint32_t durationMs_;
+    uint32_t durationMs_ = 0;
 };
 
 } // namespace wowee::math

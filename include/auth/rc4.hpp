@@ -45,8 +45,8 @@ public:
 
 private:
     uint8_t state[256];  // RC4 state array
-    uint8_t x;           // First index
-    uint8_t y;           // Second index
+    uint8_t x = 0;       // First index
+    uint8_t y = 0;       // Second index
 };
 
 } // namespace auth

@@ -5,7 +5,7 @@
 namespace wowee {
 namespace auth {
 
-RC4::RC4() : x(0), y(0) {
+RC4::RC4() {
     // Initialize state to identity
     for (int i = 0; i < 256; ++i) {
         state[i] = static_cast<uint8_t>(i);

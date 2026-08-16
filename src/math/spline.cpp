@@ -12,7 +12,6 @@ namespace wowee::math {
 CatmullRomSpline::CatmullRomSpline(std::vector<SplineKey> keys, bool timeClosed)
     : keys_(std::move(keys))
     , timeClosed_(timeClosed)
-    , durationMs_(0)
 {
     if (keys_.size() >= 2) {
         durationMs_ = keys_.back().timeMs - keys_.front().timeMs;
