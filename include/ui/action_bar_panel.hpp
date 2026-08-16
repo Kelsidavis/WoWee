@@ -57,6 +57,10 @@ public:
                       SettingsPanel& settingsPanel);
 
     int getMainActionBarPage() const { return mainActionBarPage_; }
+    /// Told by the interface, which owns the page.
+    void setMainActionBarPage(int page) {
+        if (page >= 1 && page <= kFrameXmlActionBarPages) mainActionBarPage_ = page;
+    }
 
     // ---- State owned by this panel ----
 

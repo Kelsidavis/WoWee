@@ -428,6 +428,7 @@ public:
     ToastManager& toastManager() { return toastManager_; }
     /// Reached by the barber bindings, which need state this owns.
     WindowManager& windowManager() { return windowManager_; }
+    ActionBarPanel& actionBarPanel() { return actionBarPanel_; }
 };
 
 } // namespace ui

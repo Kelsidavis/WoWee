@@ -2116,6 +2116,11 @@ void registerActionLuaAPI(lua_State* L) {
             if (page > 6) page = 6;
             lua_pushnumber(L, page);
             lua_setglobal(L, "__WoweeActionBarPage");
+            // The number keys are handled client-side against a page of their
+            // own, so it has to be told or they go on casting page one.
+            if (auto* svc = getLuaServices(L); svc && svc->setActionBarPage) {
+                svc->setActionBarPage(page);
+            }
             // Through the engine, which delivers to both registries.
             //
             // This walked __WoweeEvents by hand and stopped there. That table

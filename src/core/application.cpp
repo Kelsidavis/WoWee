@@ -427,6 +427,9 @@ bool Application::initialize() {
             LOG_INFO("Exit Game with no session to leave - closing");
             if (window) window->setShouldClose(true);
         };
+        luaSvc.setActionBarPage = [uim = uiManager.get()](int page) {
+            if (uim) uim->getGameScreen().actionBarPanel().setMainActionBarPage(page);
+        };
         luaSvc.setZoneMusicLooping = [this](bool loop) {
             if (audioCoordinator_) audioCoordinator_->setZoneMusicLooping(loop);
         };

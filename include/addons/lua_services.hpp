@@ -47,6 +47,14 @@ struct LuaServices {
     /// Loop Music - whether a zone track runs on or stops at its end.
     std::function<void(bool)> setZoneMusicLooping;
 
+    /// Which page of the main action bar is showing.
+    ///
+    /// The page belongs to the interface - ChangeActionBarPage moves it and
+    /// six frames redraw from it - while the number keys are handled here, so
+    /// the client has to be told. Without it those keys always cast page one,
+    /// whatever the bar on screen was showing.
+    std::function<void(int)> setActionBarPage;
+
     /// Close the program. The last resort behind Exit Game: the tidy path asks
     /// the server to log the character out first, and this is what answers
     /// when there is no server, no character, and no handler to ask.
