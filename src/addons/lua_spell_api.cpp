@@ -1064,97 +1064,97 @@ static int lua_IsUsableSpell(lua_State* L) {
 
 void registerSpellLuaAPI(lua_State* L) {
     static const struct { const char* name; lua_CFunction func; } api[] = {
-                {"GetTotemInfo",     lua_GetTotemInfo},
+                {.name = "GetTotemInfo",     .func = lua_GetTotemInfo},
                 // DestroyTotem(slot) - pull one down early. The totem bar's
                 // right-click, and the slot is all the request carries.
-                {"DestroyTotem", [](lua_State* L) -> int {
+                {.name = "DestroyTotem", .func = [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int slot = static_cast<int>(luaL_optnumber(L, 1, 0));
             // The bar counts from one and the request from zero.
             if (gh && slot >= 1) gh->destroyTotem(slot - 1);
             return 0;
         }},
-                {"GetTotemTimeLeft", lua_GetTotemTimeLeft},
-                {"SpellStopCasting", [](lua_State* L) -> int {
+                {.name = "GetTotemTimeLeft", .func = lua_GetTotemTimeLeft},
+                {.name = "SpellStopCasting", .func = [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->cancelCast();
             return 0;
         }},
-                {"SpellStopTargeting", [](lua_State* L) -> int {
+                {.name = "SpellStopTargeting", .func = [](lua_State* L) -> int {
             // No AoE reticle, but the item cursor a stone or an oil arms is a
             // kind of targeting and escape has to put it down.
             auto* gh = getGameHandler(L);
             if (gh && gh->isAwaitingItemTarget()) gh->cancelItemTargeting();
             return 0;
         }},
-                {"SpellIsTargeting", [](lua_State* L) -> int {
+                {.name = "SpellIsTargeting", .func = [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushboolean(L, gh && gh->isAwaitingItemTarget());
             return 1;
         }},
-                {"IsSpellInRange",    lua_IsSpellInRange},
-                {"UnitBuff",          lua_UnitBuff},
-                {"UnitDebuff",        lua_UnitDebuff},
-                {"UnitAura",          lua_UnitAuraGeneric},
-                {"UnitCastingInfo",   lua_UnitCastingInfo},
-                {"UnitChannelInfo",   lua_UnitChannelInfo},
-                {"CastSpellByName",   lua_CastSpellByName},
-                {"CastSpellByID",       lua_CastSpellByID},
-                {"IsSpellKnown",      lua_IsSpellKnown},
-                {"GetNumSpellTabs",   lua_GetNumSpellTabs},
-                {"GetSpellTabInfo",   lua_GetSpellTabInfo},
-                {"GetSpellBookItemInfo", lua_GetSpellBookItemInfo},
-                {"GetSpellBookItemName", lua_GetSpellBookItemName},
-                {"GetSpellName",      lua_GetSpellName},
-                {"SpellTargetUnit",   lua_SpellTargetUnit},
-                {"SpellTargetItem",   lua_SpellTargetItem},
-                {"DropItemOnUnit",    lua_DropItemOnUnit},
-                {"SetMultiCastSpell", lua_SetMultiCastSpell},
-                {"CastSpell",         lua_CastSpell},
-                {"IsPassiveSpell",    lua_IsPassiveSpell},
-                {"IsSelectedSpell",   lua_IsSelectedSpell},
-                {"GetSpellAutocast",  lua_GetSpellAutocast},
-                {"GetKnownSlotFromHighestRankSlot", lua_GetKnownSlotFromHighestRankSlot},
-                {"UpdateSpells",      lua_UpdateSpells},
-                {"GetSpellCooldown",  lua_GetSpellCooldown},
-                {"GetSpellPowerCost", lua_GetSpellPowerCost},
-                {"GetSpellDescription", lua_GetSpellDescription},
-                {"GetEnchantInfo",     lua_GetEnchantInfo},
-                {"GetSpellInfo",      lua_GetSpellInfo},
-                {"GetSpellTexture",   lua_GetSpellTexture},
-                {"GetSpellLink",         lua_GetSpellLink},
-                {"IsUsableSpell",        lua_IsUsableSpell},
-                {"CancelUnitBuff",      lua_CancelUnitBuff},
-                {"HasTarget",         lua_HasTarget},
-                {"TargetUnit",        lua_TargetUnit},
-                {"ClearTarget",       lua_ClearTarget},
-                {"FocusUnit",         lua_FocusUnit},
-                {"ClearFocus",        lua_ClearFocus},
-                {"AssistUnit",        lua_AssistUnit},
-                {"TargetLastTarget",  lua_TargetLastTarget},
-                {"TargetNearestEnemy",  lua_TargetNearestEnemy},
-                {"TargetNearestFriend", lua_TargetNearestFriend},
-                {"GetRaidTargetIndex",  lua_GetRaidTargetIndex},
-                {"SetRaidTarget",       lua_SetRaidTarget},
-                {"IsPlayerSpell", [](lua_State* L) -> int {
+                {.name = "IsSpellInRange",    .func = lua_IsSpellInRange},
+                {.name = "UnitBuff",          .func = lua_UnitBuff},
+                {.name = "UnitDebuff",        .func = lua_UnitDebuff},
+                {.name = "UnitAura",          .func = lua_UnitAuraGeneric},
+                {.name = "UnitCastingInfo",   .func = lua_UnitCastingInfo},
+                {.name = "UnitChannelInfo",   .func = lua_UnitChannelInfo},
+                {.name = "CastSpellByName",   .func = lua_CastSpellByName},
+                {.name = "CastSpellByID",       .func = lua_CastSpellByID},
+                {.name = "IsSpellKnown",      .func = lua_IsSpellKnown},
+                {.name = "GetNumSpellTabs",   .func = lua_GetNumSpellTabs},
+                {.name = "GetSpellTabInfo",   .func = lua_GetSpellTabInfo},
+                {.name = "GetSpellBookItemInfo", .func = lua_GetSpellBookItemInfo},
+                {.name = "GetSpellBookItemName", .func = lua_GetSpellBookItemName},
+                {.name = "GetSpellName",      .func = lua_GetSpellName},
+                {.name = "SpellTargetUnit",   .func = lua_SpellTargetUnit},
+                {.name = "SpellTargetItem",   .func = lua_SpellTargetItem},
+                {.name = "DropItemOnUnit",    .func = lua_DropItemOnUnit},
+                {.name = "SetMultiCastSpell", .func = lua_SetMultiCastSpell},
+                {.name = "CastSpell",         .func = lua_CastSpell},
+                {.name = "IsPassiveSpell",    .func = lua_IsPassiveSpell},
+                {.name = "IsSelectedSpell",   .func = lua_IsSelectedSpell},
+                {.name = "GetSpellAutocast",  .func = lua_GetSpellAutocast},
+                {.name = "GetKnownSlotFromHighestRankSlot", .func = lua_GetKnownSlotFromHighestRankSlot},
+                {.name = "UpdateSpells",      .func = lua_UpdateSpells},
+                {.name = "GetSpellCooldown",  .func = lua_GetSpellCooldown},
+                {.name = "GetSpellPowerCost", .func = lua_GetSpellPowerCost},
+                {.name = "GetSpellDescription", .func = lua_GetSpellDescription},
+                {.name = "GetEnchantInfo",     .func = lua_GetEnchantInfo},
+                {.name = "GetSpellInfo",      .func = lua_GetSpellInfo},
+                {.name = "GetSpellTexture",   .func = lua_GetSpellTexture},
+                {.name = "GetSpellLink",         .func = lua_GetSpellLink},
+                {.name = "IsUsableSpell",        .func = lua_IsUsableSpell},
+                {.name = "CancelUnitBuff",      .func = lua_CancelUnitBuff},
+                {.name = "HasTarget",         .func = lua_HasTarget},
+                {.name = "TargetUnit",        .func = lua_TargetUnit},
+                {.name = "ClearTarget",       .func = lua_ClearTarget},
+                {.name = "FocusUnit",         .func = lua_FocusUnit},
+                {.name = "ClearFocus",        .func = lua_ClearFocus},
+                {.name = "AssistUnit",        .func = lua_AssistUnit},
+                {.name = "TargetLastTarget",  .func = lua_TargetLastTarget},
+                {.name = "TargetNearestEnemy",  .func = lua_TargetNearestEnemy},
+                {.name = "TargetNearestFriend", .func = lua_TargetNearestFriend},
+                {.name = "GetRaidTargetIndex",  .func = lua_GetRaidTargetIndex},
+                {.name = "SetRaidTarget",       .func = lua_SetRaidTarget},
+                {.name = "IsPlayerSpell", .func = [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             uint32_t spellId = static_cast<uint32_t>(luaL_checknumber(L, 1));
             lua_pushboolean(L, gh && gh->getKnownSpells().count(spellId) ? 1 : 0);
             return 1;
         }},
-                {"IsSpellOverlayed", [](lua_State* L) -> int {
+                {.name = "IsSpellOverlayed", .func = [](lua_State* L) -> int {
             (void)L; lua_pushboolean(L, 0); return 1; // No proc overlay tracking
         }},
-                {"IsCurrentSpell", [](lua_State* L) -> int {
+                {.name = "IsCurrentSpell", .func = [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             uint32_t spellId = static_cast<uint32_t>(luaL_checknumber(L, 1));
             lua_pushboolean(L, gh && gh->getCurrentCastSpellId() == spellId ? 1 : 0);
             return 1;
         }},
-                {"IsAutoRepeatSpell", [](lua_State* L) -> int {
+                {.name = "IsAutoRepeatSpell", .func = [](lua_State* L) -> int {
             (void)L; lua_pushboolean(L, 0); return 1; // Stub
         }},
-                {"CastShapeshiftForm", [](lua_State* L) -> int {
+                {.name = "CastShapeshiftForm", .func = [](lua_State* L) -> int {
             // CastShapeshiftForm(index) - cast the spell for the given form slot
             auto* gh = getGameHandler(L);
             int index = static_cast<int>(luaL_checknumber(L, 1));
@@ -1165,7 +1165,7 @@ void registerSpellLuaAPI(lua_State* L) {
             gh->castSpell(forms[static_cast<size_t>(index) - 1].spellId, 0);
             return 0;
         }},
-                {"CancelShapeshiftForm", [](lua_State* L) -> int {
+                {.name = "CancelShapeshiftForm", .func = [](lua_State* L) -> int {
             // Cancel current form - cast spell 0 or cancel aura
             auto* gh = getGameHandler(L);
             if (gh && gh->getShapeshiftFormId() != 0) {
@@ -1179,12 +1179,12 @@ void registerSpellLuaAPI(lua_State* L) {
                 // in two different files and it needs both. A stub here would
                 // be dead - the bootstrap runs after these are registered - and
                 // framexml_lua_override_check exists to catch exactly that.
-                {"GetShapeshiftForm", [](lua_State* L) -> int {
+                {.name = "GetShapeshiftForm", .func = [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? gh->getShapeshiftFormId() : 0);
             return 1;
         }},
-                {"GetNumShapeshiftForms", [](lua_State* L) -> int {
+                {.name = "GetNumShapeshiftForms", .func = [](lua_State* L) -> int {
             // Return count based on player class
             auto* gh = getGameHandler(L);
             if (!gh) { return luaReturnZero(L); }
