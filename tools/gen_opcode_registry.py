@@ -73,12 +73,21 @@ def main() -> int:
     enum_lines += [f"    {name}," for name in canonical_names]
     enum_content = "\n".join(enum_lines) + "\n"
 
-    name_lines = ["// GENERATED FILE - DO NOT EDIT", ""]
+    # NOLINT wrappers because these are pair initialisers spliced into a
+    # container literal, and clang-tidy wants every one of them written as
+    # {.first = ..., .second = ...}. Nothing here can be fixed by hand -- the
+    # file says DO NOT EDIT and means it -- so the suppression belongs in the
+    # generator that writes them.
+    name_lines = ["// GENERATED FILE - DO NOT EDIT", "",
+                  "// NOLINTBEGIN(modernize-use-designated-initializers)"]
     name_lines += [f'    {{"{name}", LogicalOpcode::{name}}},' for name in canonical_names]
+    name_lines += ["// NOLINTEND(modernize-use-designated-initializers)"]
     names_content = "\n".join(name_lines) + "\n"
 
-    alias_lines = ["// GENERATED FILE - DO NOT EDIT", ""]
+    alias_lines = ["// GENERATED FILE - DO NOT EDIT", "",
+                   "// NOLINTBEGIN(modernize-use-designated-initializers)"]
     alias_lines += [f'    {{"{alias}", "{target}"}},' for alias, target in aliases.items()]
+    alias_lines += ["// NOLINTEND(modernize-use-designated-initializers)"]
     aliases_content = "\n".join(alias_lines) + "\n"
 
     write_file(inc_dir / "opcode_enum_generated.inc", enum_content)

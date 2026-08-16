@@ -1,5 +1,6 @@
 // GENERATED FILE - DO NOT EDIT
 
+// NOLINTBEGIN(modernize-use-designated-initializers)
     {"CMSG_PING", LogicalOpcode::CMSG_PING},
     {"CMSG_AUTH_SESSION", LogicalOpcode::CMSG_AUTH_SESSION},
     {"CMSG_CHAR_CREATE", LogicalOpcode::CMSG_CHAR_CREATE},
@@ -1387,3 +1388,4 @@
     {"SMSG_MOVE_SET_FLIGHT", LogicalOpcode::SMSG_MOVE_SET_FLIGHT},
     {"SMSG_MOVE_UNSET_FLIGHT", LogicalOpcode::SMSG_MOVE_UNSET_FLIGHT},
     {"SMSG_SET_EXTRA_AURA_INFO_NEED_UPDATE", LogicalOpcode::SMSG_SET_EXTRA_AURA_INFO_NEED_UPDATE},
+// NOLINTEND(modernize-use-designated-initializers)
