@@ -213,7 +213,7 @@ void TransportPathRepository::loadPathFromNodes(uint32_t pathId, const std::vect
     // Single point = stationary (durationMs = 0)
     if (waypoints.size() == 1) {
         std::vector<math::SplineKey> keys;
-        keys.push_back({0, waypoints[0]});
+        keys.push_back({.timeMs = 0, .position = waypoints[0]});
         math::CatmullRomSpline spline(std::move(keys), false);
         // Runtime fallbacks may replace stale runtime/taxi copies left under the
         // same entry, but must never overwrite an authentic expansion DBC path.
@@ -229,12 +229,12 @@ void TransportPathRepository::loadPathFromNodes(uint32_t pathId, const std::vect
     std::vector<math::SplineKey> keys;
     keys.reserve(waypoints.size() + (looping ? 1 : 0));
     uint32_t cumulativeMs = 0;
-    keys.push_back({0, waypoints[0]});
+    keys.push_back({.timeMs = 0, .position = waypoints[0]});
 
     for (size_t i = 1; i < waypoints.size(); i++) {
         float dist = glm::distance(waypoints[i-1], waypoints[i]);
         cumulativeMs += glm::max(1u, segMsFromDist(dist));
-        keys.push_back({cumulativeMs, waypoints[i]});
+        keys.push_back({.timeMs = cumulativeMs, .position = waypoints[i]});
     }
 
     // Add explicit wrap segment (last → first) for looping paths.
@@ -244,7 +244,7 @@ void TransportPathRepository::loadPathFromNodes(uint32_t pathId, const std::vect
     if (looping && waypoints.size() >= 2) {
         float wrapDist = glm::distance(waypoints.back(), waypoints.front());
         cumulativeMs += glm::max(1u, segMsFromDist(wrapDist));
-        keys.push_back({cumulativeMs, waypoints[0]});
+        keys.push_back({.timeMs = cumulativeMs, .position = waypoints[0]});
     }
 
     math::CatmullRomSpline spline(std::move(keys), false);
@@ -416,7 +416,7 @@ bool TransportPathRepository::loadTransportAnimationDBC(pipeline::AssetManager* 
                          " → canon=(", canonical.x, ",", canonical.y, ",", canonical.z, ")");
             }
 
-            keys.push_back({tMs - t0, canonical});  // Normalize: subtract first timeIndex
+            keys.push_back({.timeMs = tMs - t0, .position = canonical});  // Normalize: subtract first timeIndex
         }
 
         // Get base duration from last normalized timeIndex
@@ -439,7 +439,7 @@ bool TransportPathRepository::loadTransportAnimationDBC(pipeline::AssetManager* 
         // This makes the wrap segment (last → first) have proper duration
         const glm::vec3 fp = tramNormalize(sortedWaypoints.front().second);
         glm::vec3 firstCanonical = transportAnimationOffsetToCanonical(transportEntry, fp);
-        keys.push_back({lastTimeMs + wrapMs, firstCanonical});
+        keys.push_back({.timeMs = lastTimeMs + wrapMs, .position = firstCanonical});
 
         // Build the spline (time-closed=false because we added explicit wrap point)
         math::CatmullRomSpline spline(std::move(keys), false);
@@ -499,7 +499,7 @@ math::CatmullRomSpline TransportPathRepository::buildTaxiSegmentSpline(
 
     std::vector<math::SplineKey> keys;
     if (pts.size() < 2) {
-        if (!pts.empty()) keys.push_back({0u, pts.front()});
+        if (!pts.empty()) keys.push_back({.timeMs = 0u, .position = pts.front()});
         return math::CatmullRomSpline(std::move(keys), false);
     }
 
@@ -541,12 +541,12 @@ math::CatmullRomSpline TransportPathRepository::buildTaxiSegmentSpline(
     keys.reserve(pts.size() * 2 + 1);
     uint32_t cumulativeMs = 0;
     for (size_t i = 0; i < pts.size(); ++i) {
-        keys.push_back({cumulativeMs, pts[i]});
+        keys.push_back({.timeMs = cumulativeMs, .position = pts[i]});
         uint32_t delayMs = (i < nodeDelaysMs.size()) ? nodeDelaysMs[i] : 0u;
         if (i == pierIndex) delayMs += pierSurplusMs;
         if (delayMs != 0) {
             cumulativeMs += delayMs;
-            keys.push_back({cumulativeMs, pts[i]});
+            keys.push_back({.timeMs = cumulativeMs, .position = pts[i]});
         }
         if (i + 1 < pts.size()) {
             cumulativeMs += legMs(glm::distance(pts[i], pts[i + 1]));
@@ -556,7 +556,7 @@ math::CatmullRomSpline TransportPathRepository::buildTaxiSegmentSpline(
     if (closedLoop) {
         // Endpoints already coincide: close the ring back to the first node.
         cumulativeMs += legMs(endGap);
-        keys.push_back({cumulativeMs, pts.front()});
+        keys.push_back({.timeMs = cumulativeMs, .position = pts.front()});
     } else {
         // Open route: the boat oscillates. Append the outbound points in reverse so the
         // cycle is one continuous there-and-back that is position-closed (ends where it
@@ -570,7 +570,7 @@ math::CatmullRomSpline TransportPathRepository::buildTaxiSegmentSpline(
         // client animation; the boat just keeps ferrying while it waits for passengers.
         for (size_t i = pts.size() - 1; i-- > 0; ) {
             cumulativeMs += legMs(glm::distance(pts[i + 1], pts[i]));
-            keys.push_back({cumulativeMs, pts[i]});
+            keys.push_back({.timeMs = cumulativeMs, .position = pts[i]});
         }
     }
 
@@ -623,7 +623,7 @@ bool TransportPathRepository::loadTaxiPathNodeDBC(pipeline::AssetManager* assetM
         float posZ = dbc.getFloat(i, 6);          // Z (server coords)
         uint32_t delaySeconds = dbc.getUInt32(i, 8); // Dock dwell time
 
-        nodesByPathMap[{pathId, mapId}].push_back({nodeIdx, posX, posY, posZ, delaySeconds});
+        nodesByPathMap[{pathId, mapId}].push_back({.nodeIndex = nodeIdx, .x = posX, .y = posY, .z = posZ, .delaySeconds = delaySeconds});
     }
 
     for (auto& [key, nodes] : nodesByPathMap) {

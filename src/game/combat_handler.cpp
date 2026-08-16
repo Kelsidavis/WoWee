@@ -529,7 +529,7 @@ bool CombatHandler::shouldLogSpellstealAura(uint64_t casterGuid, uint64_t victim
 
     if (recentSpellstealLogs_.size() >= MAX_RECENT_SPELLSTEAL_LOGS)
         recentSpellstealLogs_.pop_front();
-    recentSpellstealLogs_.push_back({casterGuid, victimGuid, spellId, now});
+    recentSpellstealLogs_.push_back({.casterGuid = casterGuid, .victimGuid = victimGuid, .spellId = spellId, .timestamp = now});
     return true;
 }
 
@@ -1468,7 +1468,7 @@ void CombatHandler::cycleTarget(bool reverse, const char* noneMessage,
         const float distSq = dx * dx + dy * dy + dz * dz;
         if (distSq > kRangeSq) continue;
         if (!wanted(guid, *entity)) continue;
-        cands.push_back({guid, distSq});
+        cands.push_back({.guid = guid, .distSq = distSq});
     }
     std::sort(cands.begin(), cands.end(),
               [](const Cand& a, const Cand& b) { return a.distSq < b.distSq; });
@@ -1628,7 +1628,7 @@ void CombatHandler::tabTarget(float playerX, float playerY, float playerZ) {
             float distSq = dx*dx + dy*dy + dz*dz;
             if (distSq > kTabRangeSq) continue;
             auto* unit = static_cast<Unit*>(entity.get());
-            sortable.push_back({guid, distSq, unit->getHealth() == 0});
+            sortable.push_back({.guid = guid, .distSq = distSq, .dead = unit->getHealth() == 0});
         }
 
         // Live enemies cycle first (nearest to farthest); lootable corpses last.

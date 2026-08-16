@@ -102,7 +102,7 @@ void EntityController::clearAll() {
 // ============================================================
 
 void EntityController::enqueueUpdateObjectWork(UpdateObjectData&& data) {
-    pendingUpdateObjectWork_.push_back(PendingUpdateObjectWork{std::move(data)});
+    pendingUpdateObjectWork_.push_back(PendingUpdateObjectWork{.data = std::move(data)});
 }
 void EntityController::processPendingUpdateObjectWork(const std::chrono::steady_clock::time_point& start,
                                                  float budgetMs) {
@@ -664,69 +664,69 @@ float bitsToFloat(uint32_t raw) {
 // Resolve cached field indices once per handler call.
 EntityController::UnitFieldIndices EntityController::UnitFieldIndices::resolve() {
     return UnitFieldIndices{
-        fieldIndex(UF::UNIT_FIELD_HEALTH),
-        fieldIndex(UF::UNIT_FIELD_MAXHEALTH),
-        fieldIndex(UF::UNIT_FIELD_POWER1),
-        fieldIndex(UF::UNIT_FIELD_MAXPOWER1),
-        fieldIndex(UF::UNIT_FIELD_LEVEL),
-        fieldIndex(UF::UNIT_FIELD_FACTIONTEMPLATE),
-        fieldIndex(UF::UNIT_FIELD_FLAGS),
-        fieldIndex(UF::UNIT_DYNAMIC_FLAGS),
-        fieldIndex(UF::UNIT_FIELD_AURASTATE),
-        fieldIndex(UF::UNIT_FIELD_DISPLAYID),
-        fieldIndex(UF::UNIT_FIELD_MOUNTDISPLAYID),
-        fieldIndex(UF::UNIT_NPC_FLAGS),
-        fieldIndex(UF::UNIT_NPC_EMOTESTATE),
+        .health = fieldIndex(UF::UNIT_FIELD_HEALTH),
+        .maxHealth = fieldIndex(UF::UNIT_FIELD_MAXHEALTH),
+        .powerBase = fieldIndex(UF::UNIT_FIELD_POWER1),
+        .maxPowerBase = fieldIndex(UF::UNIT_FIELD_MAXPOWER1),
+        .level = fieldIndex(UF::UNIT_FIELD_LEVEL),
+        .faction = fieldIndex(UF::UNIT_FIELD_FACTIONTEMPLATE),
+        .flags = fieldIndex(UF::UNIT_FIELD_FLAGS),
+        .dynFlags = fieldIndex(UF::UNIT_DYNAMIC_FLAGS),
+        .auraState = fieldIndex(UF::UNIT_FIELD_AURASTATE),
+        .displayId = fieldIndex(UF::UNIT_FIELD_DISPLAYID),
+        .mountDisplayId = fieldIndex(UF::UNIT_FIELD_MOUNTDISPLAYID),
+        .npcFlags = fieldIndex(UF::UNIT_NPC_FLAGS),
+        .npcEmoteState = fieldIndex(UF::UNIT_NPC_EMOTESTATE),
         // In the struct's own order: this is an aggregate initializer, so a
         // pair added in the wrong place here silently assigns two other fields.
-        fieldIndex(UF::UNIT_FIELD_BOUNDINGRADIUS),
-        fieldIndex(UF::UNIT_FIELD_COMBATREACH),
-        fieldIndex(UF::UNIT_FIELD_BYTES_0),
-        fieldIndex(UF::UNIT_FIELD_BYTES_1),
-        fieldIndex(UF::UNIT_FIELD_PETEXPERIENCE),
-        fieldIndex(UF::UNIT_FIELD_PETNEXTLEVELEXP),
-        fieldIndex(UF::UNIT_FIELD_STAT0),
-        fieldIndex(UF::UNIT_FIELD_RESISTANCES),
-        fieldIndex(UF::UNIT_FIELD_ATTACK_POWER),
-        fieldIndex(UF::UNIT_FIELD_MINDAMAGE),
-        fieldIndex(UF::UNIT_FIELD_MAXDAMAGE)
+        .boundingRadius = fieldIndex(UF::UNIT_FIELD_BOUNDINGRADIUS),
+        .combatReach = fieldIndex(UF::UNIT_FIELD_COMBATREACH),
+        .bytes0 = fieldIndex(UF::UNIT_FIELD_BYTES_0),
+        .bytes1 = fieldIndex(UF::UNIT_FIELD_BYTES_1),
+        .petXp = fieldIndex(UF::UNIT_FIELD_PETEXPERIENCE),
+        .petNextLevelXp = fieldIndex(UF::UNIT_FIELD_PETNEXTLEVELEXP),
+        .stat0 = fieldIndex(UF::UNIT_FIELD_STAT0),
+        .resistances = fieldIndex(UF::UNIT_FIELD_RESISTANCES),
+        .attackPower = fieldIndex(UF::UNIT_FIELD_ATTACK_POWER),
+        .minDamage = fieldIndex(UF::UNIT_FIELD_MINDAMAGE),
+        .maxDamage = fieldIndex(UF::UNIT_FIELD_MAXDAMAGE)
     };
 }
 
 EntityController::PlayerFieldIndices EntityController::PlayerFieldIndices::resolve() {
     return PlayerFieldIndices{
-        fieldIndex(UF::PLAYER_XP),
-        fieldIndex(UF::PLAYER_NEXT_LEVEL_XP),
-        fieldIndex(UF::PLAYER_REST_STATE_EXPERIENCE),
-        fieldIndex(UF::UNIT_FIELD_LEVEL),
-        fieldIndex(UF::PLAYER_FIELD_COINAGE),
-        fieldIndex(UF::PLAYER_FIELD_HONOR_CURRENCY),
-        fieldIndex(UF::PLAYER_FIELD_ARENA_CURRENCY),
-        fieldIndex(UF::PLAYER_FLAGS),
-        fieldIndex(UF::UNIT_FIELD_RESISTANCES),
-        fieldIndex(UF::PLAYER_BYTES),
-        fieldIndex(UF::PLAYER_BYTES_2),
-        fieldIndex(UF::PLAYER_CHOSEN_TITLE),
-        {fieldIndex(UF::UNIT_FIELD_STAT0), fieldIndex(UF::UNIT_FIELD_STAT1),
+        .xp = fieldIndex(UF::PLAYER_XP),
+        .nextXp = fieldIndex(UF::PLAYER_NEXT_LEVEL_XP),
+        .restedXp = fieldIndex(UF::PLAYER_REST_STATE_EXPERIENCE),
+        .level = fieldIndex(UF::UNIT_FIELD_LEVEL),
+        .coinage = fieldIndex(UF::PLAYER_FIELD_COINAGE),
+        .honor = fieldIndex(UF::PLAYER_FIELD_HONOR_CURRENCY),
+        .arena = fieldIndex(UF::PLAYER_FIELD_ARENA_CURRENCY),
+        .playerFlags = fieldIndex(UF::PLAYER_FLAGS),
+        .armor = fieldIndex(UF::UNIT_FIELD_RESISTANCES),
+        .pBytes = fieldIndex(UF::PLAYER_BYTES),
+        .pBytes2 = fieldIndex(UF::PLAYER_BYTES_2),
+        .chosenTitle = fieldIndex(UF::PLAYER_CHOSEN_TITLE),
+        .stats = {fieldIndex(UF::UNIT_FIELD_STAT0), fieldIndex(UF::UNIT_FIELD_STAT1),
          fieldIndex(UF::UNIT_FIELD_STAT2), fieldIndex(UF::UNIT_FIELD_STAT3),
          fieldIndex(UF::UNIT_FIELD_STAT4)},
-        fieldIndex(UF::UNIT_FIELD_ATTACK_POWER),
-        fieldIndex(UF::UNIT_FIELD_RANGED_ATTACK_POWER),
-        fieldIndex(UF::PLAYER_FIELD_MOD_DAMAGE_DONE_POS),
-        fieldIndex(UF::PLAYER_FIELD_MOD_HEALING_DONE_POS),
-        fieldIndex(UF::PLAYER_BLOCK_PERCENTAGE),
-        fieldIndex(UF::PLAYER_DODGE_PERCENTAGE),
-        fieldIndex(UF::PLAYER_PARRY_PERCENTAGE),
-        fieldIndex(UF::PLAYER_CRIT_PERCENTAGE),
-        fieldIndex(UF::PLAYER_RANGED_CRIT_PERCENTAGE),
-        fieldIndex(UF::PLAYER_SPELL_CRIT_PERCENTAGE1),
-        fieldIndex(UF::PLAYER_FIELD_COMBAT_RATING_1),
-        fieldIndex(UF::PLAYER_EXPERTISE),
-        fieldIndex(UF::PLAYER_OFFHAND_EXPERTISE),
+        .meleeAP = fieldIndex(UF::UNIT_FIELD_ATTACK_POWER),
+        .rangedAP = fieldIndex(UF::UNIT_FIELD_RANGED_ATTACK_POWER),
+        .spDmg1 = fieldIndex(UF::PLAYER_FIELD_MOD_DAMAGE_DONE_POS),
+        .healBonus = fieldIndex(UF::PLAYER_FIELD_MOD_HEALING_DONE_POS),
+        .blockPct = fieldIndex(UF::PLAYER_BLOCK_PERCENTAGE),
+        .dodgePct = fieldIndex(UF::PLAYER_DODGE_PERCENTAGE),
+        .parryPct = fieldIndex(UF::PLAYER_PARRY_PERCENTAGE),
+        .critPct = fieldIndex(UF::PLAYER_CRIT_PERCENTAGE),
+        .rangedCritPct = fieldIndex(UF::PLAYER_RANGED_CRIT_PERCENTAGE),
+        .sCrit1 = fieldIndex(UF::PLAYER_SPELL_CRIT_PERCENTAGE1),
+        .rating1 = fieldIndex(UF::PLAYER_FIELD_COMBAT_RATING_1),
+        .expertise = fieldIndex(UF::PLAYER_EXPERTISE),
+        .offhandExpertise = fieldIndex(UF::PLAYER_OFFHAND_EXPERTISE),
         // Mana is power index 0, so the flat modifier and its interrupted
         // (while-casting) twin sit at the base of each seven-wide array.
-        fieldIndex(UF::UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER),
-        fieldIndex(UF::UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER)
+        .manaRegen = fieldIndex(UF::UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER),
+        .manaRegenCasting = fieldIndex(UF::UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER)
     };
 }
 
@@ -2822,7 +2822,7 @@ void EntityController::handleNameQueryResponse(network::Packet& packet) {
         playerNameCache[data.guid] = data.name;
         // Cache class/race from name query for UnitClass/UnitRace fallback
         if (data.classId != 0 || data.race != 0) {
-            playerClassRaceCache_[data.guid] = {data.classId, data.race};
+            playerClassRaceCache_[data.guid] = {.classId = data.classId, .raceId = data.race};
         }
         // Update entity name
         auto entity = entityManager.getEntity(data.guid);
@@ -3028,7 +3028,7 @@ void EntityController::handlePageTextQueryResponse(network::Packet& packet) {
         if (bp.pageId == data.pageId) { alreadyHave = true; break; }
     }
     if (!alreadyHave) {
-        owner_.bookPagesRef().push_back({data.pageId, data.text});
+        owner_.bookPagesRef().push_back({.pageId = data.pageId, .text = data.text});
     }
 
     // Follow the chain: if there's a next page we haven't fetched yet, request it

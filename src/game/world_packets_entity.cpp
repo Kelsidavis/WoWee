@@ -723,7 +723,7 @@ bool MonsterMoveParser::parse(network::Packet& packet, MonsterMoveData& data) {
             data.hasDest = true;
         }
         for (const auto& wp : spline.waypoints) {
-            data.waypoints.push_back({wp.x, wp.y, wp.z});
+            data.waypoints.push_back({.x = wp.x, .y = wp.y, .z = wp.z});
         }
     }
 
@@ -782,7 +782,7 @@ bool MonsterMoveParser::parseVanilla(network::Packet& packet, MonsterMoveData& d
             data.hasDest = true;
         }
         for (const auto& wp : spline.waypoints) {
-            data.waypoints.push_back({wp.x, wp.y, wp.z});
+            data.waypoints.push_back({.x = wp.x, .y = wp.y, .z = wp.z});
         }
     }
 

@@ -230,8 +230,8 @@ std::vector<Inventory::SwapOp> mergeEntries(std::vector<MergeEntry>& entries) {
             const uint32_t moved = std::min(space, src.item.stackCount);
             dst.item.stackCount += moved;
             src.item.stackCount -= moved;
-            ops.push_back({entries[indices[hi]].bag, entries[indices[hi]].slot,
-                           entries[indices[lo]].bag, entries[indices[lo]].slot});
+            ops.push_back({.srcBag = entries[indices[hi]].bag, .srcSlot = entries[indices[hi]].slot,
+                           .dstBag = entries[indices[lo]].bag, .dstSlot = entries[indices[lo]].slot});
 
             if (src.item.stackCount == 0) { src.item = ItemDef{}; --hi; }
             if (dst.item.stackCount >= dst.item.maxStack) ++lo;
@@ -264,13 +264,13 @@ std::vector<Inventory::SwapOp> Inventory::mergePartialStacks() {
     entries.reserve(BACKPACK_SLOTS + NUM_BAG_SLOTS * MAX_BAG_SIZE);
 
     for (int i = 0; i < BACKPACK_SLOTS; ++i) {
-        entries.push_back({0xFF, static_cast<uint8_t>(NUM_EQUIP_SLOTS + i), &backpack[i]});
+        entries.push_back({.bag = 0xFF, .slot = static_cast<uint8_t>(NUM_EQUIP_SLOTS + i), .ref = &backpack[i]});
     }
     for (int b = 0; b < NUM_BAG_SLOTS; ++b) {
         if (bags[b].special) continue;  // must match sortBags(): quivers stay as they are
         for (int s = 0; s < bags[b].size; ++s) {
-            entries.push_back({static_cast<uint8_t>(FIRST_BAG_EQUIP_SLOT + b),
-                               static_cast<uint8_t>(s), &bags[b].slots[s]});
+            entries.push_back({.bag = static_cast<uint8_t>(FIRST_BAG_EQUIP_SLOT + b),
+                               .slot = static_cast<uint8_t>(s), .ref = &bags[b].slots[s]});
         }
     }
     return mergeEntries(entries);
@@ -284,13 +284,13 @@ std::vector<Inventory::SwapOp> Inventory::mergeBankPartialStacks(int mainSlotCou
     entries.reserve(BANK_SLOTS + BANK_BAG_SLOTS * MAX_BAG_SIZE);
 
     for (int i = 0; i < mainSlotCount; ++i) {
-        entries.push_back({0xFF, static_cast<uint8_t>(BANK_SLOT_START + i), &bankSlots_[i]});
+        entries.push_back({.bag = 0xFF, .slot = static_cast<uint8_t>(BANK_SLOT_START + i), .ref = &bankSlots_[i]});
     }
     for (int b = 0; b < BANK_BAG_SLOTS; ++b) {
         if (bankBags_[b].special) continue;
         for (int s = 0; s < bankBags_[b].size; ++s) {
-            entries.push_back({static_cast<uint8_t>(BANK_BAG_CONTAINER_START + b),
-                               static_cast<uint8_t>(s), &bankBags_[b].slots[s]});
+            entries.push_back({.bag = static_cast<uint8_t>(BANK_BAG_CONTAINER_START + b),
+                               .slot = static_cast<uint8_t>(s), .ref = &bankBags_[b].slots[s]});
         }
     }
     return mergeEntries(entries);
@@ -390,8 +390,8 @@ std::vector<Inventory::SwapOp> Inventory::swapsToSort(
         if (entries[cur].itemId == 0 && entries[need].itemId == 0) continue;
 
         const int srcPos = posOf[need];
-        swaps.push_back({entries[srcPos].bag, entries[srcPos].slot,
-                         entries[target].bag, entries[target].slot});
+        swaps.push_back({.srcBag = entries[srcPos].bag, .srcSlot = entries[srcPos].slot,
+                         .dstBag = entries[target].bag, .dstSlot = entries[target].slot});
 
         posOf[cur] = srcPos;
         posOf[need] = target;
@@ -408,17 +408,17 @@ std::vector<Inventory::SwapOp> Inventory::computeSortSwaps() const {
     entries.reserve(BACKPACK_SLOTS + NUM_BAG_SLOTS * MAX_BAG_SIZE);
 
     for (int i = 0; i < BACKPACK_SLOTS; ++i) {
-        entries.push_back({0xFF, static_cast<uint8_t>(NUM_EQUIP_SLOTS + i),
-                           backpack[i].item.itemId, backpack[i].item.quality,
-                           backpack[i].item.stackCount});
+        entries.push_back({.bag = 0xFF, .slot = static_cast<uint8_t>(NUM_EQUIP_SLOTS + i),
+                           .itemId = backpack[i].item.itemId, .quality = backpack[i].item.quality,
+                           .stackCount = backpack[i].item.stackCount});
     }
     for (int b = 0; b < NUM_BAG_SLOTS; ++b) {
         if (bags[b].special) continue;  // must match sortBags(): quivers keep their contents
         for (int s = 0; s < bags[b].size; ++s) {
-            entries.push_back({static_cast<uint8_t>(FIRST_BAG_EQUIP_SLOT + b),
-                               static_cast<uint8_t>(s),
-                               bags[b].slots[s].item.itemId, bags[b].slots[s].item.quality,
-                               bags[b].slots[s].item.stackCount});
+            entries.push_back({.bag = static_cast<uint8_t>(FIRST_BAG_EQUIP_SLOT + b),
+                               .slot = static_cast<uint8_t>(s),
+                               .itemId = bags[b].slots[s].item.itemId, .quality = bags[b].slots[s].item.quality,
+                               .stackCount = bags[b].slots[s].item.stackCount});
         }
     }
 
@@ -471,18 +471,18 @@ std::vector<Inventory::SwapOp> Inventory::computeBankSortSwaps(int mainSlotCount
     entries.reserve(BANK_SLOTS + BANK_BAG_SLOTS * MAX_BAG_SIZE);
 
     for (int i = 0; i < mainSlotCount; ++i) {
-        entries.push_back({0xFF, static_cast<uint8_t>(BANK_SLOT_START + i),
-                           bankSlots_[i].item.itemId, bankSlots_[i].item.quality,
-                           bankSlots_[i].item.stackCount});
+        entries.push_back({.bag = 0xFF, .slot = static_cast<uint8_t>(BANK_SLOT_START + i),
+                           .itemId = bankSlots_[i].item.itemId, .quality = bankSlots_[i].item.quality,
+                           .stackCount = bankSlots_[i].item.stackCount});
     }
     for (int b = 0; b < BANK_BAG_SLOTS; ++b) {
         if (bankBags_[b].special) continue;  // must match sortBank(): never touch restricted bags
         for (int s = 0; s < bankBags_[b].size; ++s) {
-            entries.push_back({static_cast<uint8_t>(BANK_BAG_CONTAINER_START + b),
-                               static_cast<uint8_t>(s),
-                               bankBags_[b].slots[s].item.itemId,
-                               bankBags_[b].slots[s].item.quality,
-                               bankBags_[b].slots[s].item.stackCount});
+            entries.push_back({.bag = static_cast<uint8_t>(BANK_BAG_CONTAINER_START + b),
+                               .slot = static_cast<uint8_t>(s),
+                               .itemId = bankBags_[b].slots[s].item.itemId,
+                               .quality = bankBags_[b].slots[s].item.quality,
+                               .stackCount = bankBags_[b].slots[s].item.stackCount});
         }
     }
 
@@ -521,8 +521,8 @@ std::vector<Inventory::SwapOp> Inventory::computeBankBagSortSwaps(int bagIndex) 
     std::vector<SortEntry> entries;
     entries.reserve(static_cast<size_t>(bag.size));
     for (int s = 0; s < bag.size; ++s) {
-        entries.push_back({bagAddr, static_cast<uint8_t>(s), bag.slots[s].item.itemId,
-                           bag.slots[s].item.quality, bag.slots[s].item.stackCount});
+        entries.push_back({.bag = bagAddr, .slot = static_cast<uint8_t>(s), .itemId = bag.slots[s].item.itemId,
+                           .quality = bag.slots[s].item.quality, .stackCount = bag.slots[s].item.stackCount});
     }
 
     return swapsToSort(entries);

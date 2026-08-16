@@ -177,7 +177,7 @@ uint32_t WardenEmulator::hookAPI(const std::string& dllName,
     }
 
     // Store the handler so hookCode() can dispatch to it
-    apiHandlers_[stubAddr] = { argCount, std::move(handler) };
+    apiHandlers_[stubAddr] = { .argCount = argCount, .handler = std::move(handler) };
 
     // Write a RET (0xC3) at the stub address as a safe fallback in case
     // the code hook fires after EIP has already advanced past our intercept.

@@ -615,7 +615,7 @@ void SocialHandler::registerOpcodes(DispatchTable& table) {
             for (auto& r : readyCheckResults_) {
                 if (r.name == rname) { r.ready = (isReady != 0); found = true; break; }
             }
-            if (!found) readyCheckResults_.push_back({ rname, isReady != 0 });
+            if (!found) readyCheckResults_.push_back({ .name = rname, .ready = isReady != 0 });
             char rbuf[128];
             std::snprintf(rbuf, sizeof(rbuf), "%s is %s.", rname.c_str(), isReady ? "Ready" : "Not Ready");
             owner_.addSystemChatMessage(rbuf);
@@ -3676,8 +3676,8 @@ void SocialHandler::handleLfgRoleCheckUpdate(network::Packet& packet) {
     const uint8_t dungeonCount = packet.readUInt8();
     for (uint8_t i = 0; i < dungeonCount && packet.hasRemaining(4); ++i) {
         const uint32_t entry = packet.readUInt32();
-        lfgRoleCheckDungeons_.push_back({entry & 0x00FFFFFFu,
-                                         static_cast<uint8_t>((entry >> 24) & 0xFFu)});
+        lfgRoleCheckDungeons_.push_back({.dungeonId = entry & 0x00FFFFFFu,
+                                         .typeId = static_cast<uint8_t>((entry >> 24) & 0xFFu)});
     }
     lfgRoleCheckMembers_ = packet.hasRemaining(1) ? packet.readUInt8() : 0;
 

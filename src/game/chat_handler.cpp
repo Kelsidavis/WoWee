@@ -692,7 +692,7 @@ void ChatHandler::handleMessageChat(network::Packet& packet) {
             if (repeatsRecentLine(recentChatLines_, data.senderGuid, data.message, now)) {
                 return;
             }
-            recentChatLines_.push_back({data.senderGuid, data.message, now});
+            recentChatLines_.push_back({.senderGuid = data.senderGuid, .text = data.message, .at = now});
             // A short memory is the point: this is looking for a line pasted
             // again a moment later, not keeping a record of the conversation.
             while (recentChatLines_.size() > 64) recentChatLines_.pop_front();

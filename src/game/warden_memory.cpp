@@ -945,14 +945,14 @@ bool WardenMemory::searchCodePattern(const uint8_t seed[4], const uint8_t expect
                                | (uint32_t(image_[secOfs+10]) << 16) | (uint32_t(image_[secOfs+11]) << 24);
                 size_t rEnd = std::min(static_cast<size_t>(va + vsize), static_cast<size_t>(imageSize_));
                 if (va + patternLen <= rEnd)
-                    ranges.push_back({va, rEnd});
+                    ranges.push_back({.start = va, .end = rEnd});
             }
         }
     }
 
     if (ranges.empty()) {
         if (patternLen <= imageSize_)
-            ranges.push_back({0, imageSize_});
+            ranges.push_back({.start = 0, .end = imageSize_});
     }
 
     auto bruteStart = std::chrono::steady_clock::now();

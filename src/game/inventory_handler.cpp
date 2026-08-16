@@ -449,7 +449,7 @@ void InventoryHandler::registerOpcodes(DispatchTable& table) {
 
         if (!info || info->name.empty()) {
             // Item info not yet cached - defer notification
-            owner_.pendingItemPushNotifsRef().push_back({itemId, count, bagButtonId});
+            owner_.pendingItemPushNotifsRef().push_back({.itemId = itemId, .count = count, .bagButtonId = bagButtonId});
             owner_.ensureItemInfo(itemId);
             return;
         }
@@ -1678,7 +1678,7 @@ void InventoryHandler::autoEquipItemBySlot(int backpackIndex, bool confirmed) {
 
     const uint8_t wireSlot = static_cast<uint8_t>(Inventory::NUM_EQUIP_SLOTS + backpackIndex);
     if (!confirmed && slot.item.wouldBindOnEquip()) {
-        pendingEquip_ = PendingEquip{true, false, 0, backpackIndex, wireSlot};
+        pendingEquip_ = PendingEquip{.active = true, .fromBag = false, .bag = 0, .slot = backpackIndex, .wireSlot = wireSlot};
         // The auto-equip form of the prompt: right-clicking an item rather
         // than dropping it on a slot. FrameXML hides whichever of the two is
         // already up before showing the other, so firing the wrong one leaves
@@ -1700,8 +1700,8 @@ void InventoryHandler::autoEquipItemInBag(int bagIndex, int slotIndex, bool conf
     if (slotIndex < 0 || slotIndex >= owner_.inventoryRef().getBagSize(bagIndex)) return;
 
     if (!confirmed && equipWouldBindFromBag(bagIndex, slotIndex)) {
-        pendingEquip_ = PendingEquip{true, true, bagIndex, slotIndex,
-                                     static_cast<uint8_t>(slotIndex)};
+        pendingEquip_ = PendingEquip{.active = true, .fromBag = true, .bag = bagIndex, .slot = slotIndex,
+                                     .wireSlot = static_cast<uint8_t>(slotIndex)};
         if (owner_.addonEventCallbackRef())
             owner_.addonEventCallbackRef()("AUTOEQUIP_BIND_CONFIRM",
                                            {std::to_string(slotIndex)});
@@ -1747,7 +1747,7 @@ void InventoryHandler::dispatchUseItem(uint8_t wowBag, uint8_t wowSlot, uint64_t
     // Bind-on-use, and not yet bound. Same warning as the equip prompt, one
     // step earlier: using the item is what binds it.
     if (!confirmed && item.bindType == 3 && !item.soulbound) {
-        pendingUse_ = PendingUse{true, wowBag, wowSlot, itemGuid, item};
+        pendingUse_ = PendingUse{.active = true, .wowBag = wowBag, .wowSlot = wowSlot, .itemGuid = itemGuid, .item = item};
         if (owner_.addonEventCallbackRef())
             owner_.addonEventCallbackRef()("USE_BIND_CONFIRM", {});
         return;
@@ -1787,8 +1787,8 @@ void InventoryHandler::dispatchUseItem(uint8_t wowBag, uint8_t wowSlot, uint64_t
 
     if (useSpellId != 0 &&
         (owner_.getSpellTargetFlags(useSpellId) & kSpellTargetFlagItem) != 0) {
-        pendingItemTarget_ = PendingItemTarget{wowBag, wowSlot, itemGuid, useSpellId,
-                                               item.itemId, item.name};
+        pendingItemTarget_ = PendingItemTarget{.bag = wowBag, .slot = wowSlot, .itemGuid = itemGuid, .spellId = useSpellId,
+                                               .itemId = item.itemId, .itemName = item.name};
         owner_.addSystemChatMessage("Choose an item to apply " + item.name + " to.");
         return;
     }
@@ -1819,8 +1819,8 @@ void InventoryHandler::dispatchUseItem(uint8_t wowBag, uint8_t wowSlot, uint64_t
              itemInfo->subClass == ITEM_SUBCLASS_SCROLL);
         if (wantsUnit && !selfIsImplicit && chosen == owner_.getPlayerGuid() &&
             owner_.getTargetGuid() == 0) {
-            pendingUnitTarget_ = PendingItemTarget{wowBag, wowSlot, itemGuid, useSpellId,
-                                                   item.itemId, item.name, false};
+            pendingUnitTarget_ = PendingItemTarget{.bag = wowBag, .slot = wowSlot, .itemGuid = itemGuid, .spellId = useSpellId,
+                                                   .itemId = item.itemId, .itemName = item.name, .fromSpell = false};
             owner_.addSystemChatMessage("Choose a target for " + item.name + ".");
             return;
         }
@@ -1952,7 +1952,7 @@ void InventoryHandler::completeItemUseOnItem(uint64_t targetItemGuid, bool confi
         if (targetInfo && targetInfo->bindType == 2 &&
             !owner_.isItemSoulbound(targetItemGuid)) {
             pendingItemTarget_.reset();
-            pendingEnchant_ = PendingEnchant{true, targetItemGuid, pending};
+            pendingEnchant_ = PendingEnchant{.active = true, .targetItemGuid = targetItemGuid, .request = pending};
             if (owner_.addonEventCallbackRef())
                 owner_.addonEventCallbackRef()("BIND_ENCHANT", {});
             return;
@@ -1962,7 +1962,7 @@ void InventoryHandler::completeItemUseOnItem(uint64_t targetItemGuid, bool confi
         if (enchants.first != 0) {
             // Taken out of the parked slot entirely: see PendingEnchant.
             pendingItemTarget_.reset();
-            pendingEnchant_ = PendingEnchant{true, targetItemGuid, pending};
+            pendingEnchant_ = PendingEnchant{.active = true, .targetItemGuid = targetItemGuid, .request = pending};
             const std::string existing = owner_.getEnchantName(enchants.first);
             if (owner_.addonEventCallbackRef()) {
                 owner_.addonEventCallbackRef()(
@@ -2564,12 +2564,12 @@ void InventoryHandler::categorizeTrainerSpells() {
         [](const auto& a, const auto& b) { return a.first < b.first; });
 
     for (auto& [name, spells] : named) {
-        trainerTabs_.push_back({std::move(name), std::move(spells)});
+        trainerTabs_.push_back({.name = std::move(name), .spells = std::move(spells)});
     }
 
     if (!generalSpells.empty()) {
         std::sort(generalSpells.begin(), generalSpells.end(), byName);
-        trainerTabs_.push_back({"General", std::move(generalSpells)});
+        trainerTabs_.push_back({.name = "General", .spells = std::move(generalSpells)});
     }
 
     LOG_INFO("Trainer: Categorized into ", trainerTabs_.size(), " tabs");
@@ -3336,8 +3336,8 @@ void InventoryHandler::auctionSearch(const std::string& name, uint8_t levelMin, 
                                       uint32_t invTypeMask, uint8_t usableOnly, uint32_t offset,
                                       const std::vector<AuctionSortKey>& sort) {
     if (owner_.getState() != WorldState::IN_WORLD || !owner_.getSocket() || auctioneerGuid_ == 0) return;
-    lastAuctionSearch_ = {name, levelMin, levelMax, quality, itemClass, itemSubClass,
-                          invTypeMask, usableOnly, offset, sort};
+    lastAuctionSearch_ = {.name = name, .levelMin = levelMin, .levelMax = levelMax, .quality = quality, .itemClass = itemClass, .itemSubClass = itemSubClass,
+                          .invTypeMask = invTypeMask, .usableOnly = usableOnly, .offset = offset, .sort = sort};
     hasAuctionSearch_ = true;
     pendingAuctionTarget_ = AuctionResultTarget::BROWSE;
     auto packet = AuctionListItemsPacket::build(auctioneerGuid_, offset, name,
@@ -4555,7 +4555,7 @@ ItemDef InventoryHandler::buildItemDef(uint32_t entry, uint32_t stackCount,
         def.startQuestId = info.startQuestId;
         def.extraStats.clear();
         for (const auto& es : info.extraStats)
-            def.extraStats.push_back({es.statType, es.statValue});
+            def.extraStats.push_back({.statType = es.statType, .statValue = es.statValue});
     } else {
         def.name = "Item " + std::to_string(def.itemId);
         queryItemInfo(def.itemId, guid);
@@ -4573,7 +4573,7 @@ ItemDef InventoryHandler::buildItemDef(uint32_t entry, uint32_t stackCount,
                 case 5: def.intellect += b.value; break;
                 case 6: def.spirit    += b.value; break;
                 case 7: def.stamina   += b.value; break;
-                default: def.extraStats.push_back({b.statType, b.value}); break;
+                default: def.extraStats.push_back({.statType = b.statType, .statValue = b.value}); break;
             }
         }
     }
@@ -4722,7 +4722,7 @@ void InventoryHandler::rebuildOnlineInventory() {
             def.startQuestId = infoIt->second.startQuestId;
             def.extraStats.clear();
             for (const auto& es : infoIt->second.extraStats)
-                def.extraStats.push_back({es.statType, es.statValue});
+                def.extraStats.push_back({.statType = es.statType, .statValue = es.statValue});
             def.sellPrice = infoIt->second.sellPrice;
             def.bagSlots = infoIt->second.containerSlots;
         } else {
@@ -4814,7 +4814,7 @@ void InventoryHandler::rebuildOnlineInventory() {
                 def.startQuestId = infoIt->second.startQuestId;
                 def.extraStats.clear();
                 for (const auto& es : infoIt->second.extraStats)
-                    def.extraStats.push_back({es.statType, es.statValue});
+                    def.extraStats.push_back({.statType = es.statType, .statValue = es.statValue});
                 def.bagSlots = infoIt->second.containerSlots;
             } else {
                 def.name = "Item " + std::to_string(def.itemId);

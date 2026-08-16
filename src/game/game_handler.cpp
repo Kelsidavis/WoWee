@@ -2580,7 +2580,7 @@ void GameHandler::ensureAchievementCriteriaLoaded() {
         if (descField < fieldCount) c.description = dbc->getString(i, descField);
         if (limitField < fieldCount) c.timeLimit = dbc->getUInt32(i, limitField);
         if (flagsField < fieldCount) c.flags = dbc->getUInt32(i, flagsField);
-        achievementCriterionById_[c.id] = {achId, c.timeLimit};
+        achievementCriterionById_[c.id] = {.achievementId = achId, .timeLimit = c.timeLimit};
         achievementCriteria_[achId].push_back(std::move(c));
     }
     LOG_INFO("Achievement: criteria for ", achievementCriteria_.size(), " achievements");
@@ -2809,8 +2809,8 @@ void GameHandler::loadAreaNameCache() const {
             // together are the whole of what GetZonePVPInfo answers. Read while
             // the file is open rather than opening it twice.
             if (areaDbc->getFieldCount() > 28) {
-                areaPvpCache_[areaId] = AreaPvpInfo{areaDbc->getUInt32(i, 4),
-                                                    areaDbc->getUInt32(i, 28)};
+                areaPvpCache_[areaId] = AreaPvpInfo{.flags = areaDbc->getUInt32(i, 4),
+                                                    .team = areaDbc->getUInt32(i, 28)};
             }
         }
     }

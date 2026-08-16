@@ -2931,7 +2931,7 @@ void MovementHandler::buildTaxiCostMap() {
     struct AdjEntry { uint32_t node; uint32_t cost; };
     std::unordered_map<uint32_t, std::vector<AdjEntry>> adj;
     for (const auto& edge : taxiPathEdges_) {
-        adj[edge.fromNode].push_back({edge.toNode, edge.cost});
+        adj[edge.fromNode].push_back({.node = edge.toNode, .cost = edge.cost});
     }
 
     std::deque<uint32_t> queue;

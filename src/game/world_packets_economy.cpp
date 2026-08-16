@@ -38,9 +38,9 @@ bool parseAuctionMailSubject(const std::string& subject, AuctionMailSubject& res
     // cores emitted only itemEntry:0:response.
     if (fieldCount != 3 && fieldCount != 5) return false;
     if (fields[0] == 0 || fields[1] != 0 || fields[2] > 6) return false;
-    result = {fields[0], fields[2],
-              fieldCount == 5 ? fields[3] : 0,
-              fieldCount == 5 ? fields[4] : 0};
+    result = {.itemEntry = fields[0], .response = fields[2],
+              .lotId = fieldCount == 5 ? fields[3] : 0,
+              .itemCount = fieldCount == 5 ? fields[4] : 0};
     return true;
 }
 

@@ -1337,7 +1337,7 @@ const std::vector<SpellHandler::SpellBookTab>& SpellHandler::getSpellBookTabs() 
 
     if (!general.empty()) {
         std::sort(general.begin(), general.end(), byName);
-        spellBookTabs_.push_back({"General", "Interface\\Icons\\INV_Misc_Book_09", std::move(general)});
+        spellBookTabs_.push_back({.name = "General", .texture = "Interface\\Icons\\INV_Misc_Book_09", .spellIds = std::move(general)});
     }
 
     // Each tab's own picture, from SkillLine.dbc's icon column. Every tab used
@@ -1384,8 +1384,8 @@ const std::vector<SpellHandler::SpellBookTab>& SpellHandler::getSpellBookTabs() 
         auto nameIt = owner_.skillLineNamesRef().find(skillLineId);
         std::string tabName = (nameIt != owner_.skillLineNamesRef().end()) ? nameIt->second : "Unknown";
         std::sort(spells.begin(), spells.end(), byName);
-        named.push_back({tabRank(skillLineId), std::move(tabName), tabIcon(skillLineId),
-                         std::move(spells)});
+        named.push_back({.rank = tabRank(skillLineId), .name = std::move(tabName), .icon = tabIcon(skillLineId),
+                         .spells = std::move(spells)});
     }
     std::sort(named.begin(), named.end(), [](const NamedTab& a, const NamedTab& b) {
         if (a.rank != b.rank) return a.rank < b.rank;
@@ -1393,8 +1393,8 @@ const std::vector<SpellHandler::SpellBookTab>& SpellHandler::getSpellBookTabs() 
     });
 
     for (auto& tab : named) {
-        spellBookTabs_.push_back({std::move(tab.name), std::move(tab.icon),
-                                  std::move(tab.spells)});
+        spellBookTabs_.push_back({.name = std::move(tab.name), .texture = std::move(tab.icon),
+                                  .spellIds = std::move(tab.spells)});
     }
 
     return spellBookTabs_;
@@ -3919,7 +3919,7 @@ void SpellHandler::handleSpellModifier(network::Packet& packet, bool isFlat) {
         uint8_t modOpRaw   = packet.readUInt8();
         int32_t value      = static_cast<int32_t>(packet.readUInt32());
         if (groupIndex > 5 || modOpRaw >= GameHandler::SPELL_MOD_OP_COUNT) continue;
-        GameHandler::SpellModKey key{ static_cast<GameHandler::SpellModOp>(modOpRaw), groupIndex };
+        GameHandler::SpellModKey key{ .op = static_cast<GameHandler::SpellModOp>(modOpRaw), .group = groupIndex };
         modMap[key] = value;
     }
     packet.skipAll();
@@ -4021,7 +4021,7 @@ void SpellHandler::handleSpellLogMiss(network::Packet& packet) {
             }
         }
         if (i < storedLimit) {
-            parsedMisses.push_back({victimGuid, missInfo, reflectSpellId});
+            parsedMisses.push_back({.victimGuid = victimGuid, .missInfo = missInfo, .reflectSpellId = reflectSpellId});
         }
     }
 
@@ -4956,7 +4956,7 @@ void SpellHandler::handleItemEnchantTimeUpdate(network::Packet& packet) {
         for (auto& t : owner_.tempEnchantTimersRef()) {
             if (t.slot == enchSlot) { t.expireMs = expireMs; found = true; break; }
         }
-        if (!found) owner_.tempEnchantTimersRef().push_back({enchSlot, expireMs});
+        if (!found) owner_.tempEnchantTimersRef().push_back({.slot = enchSlot, .expireMs = expireMs});
 
         // Warn at important thresholds
         if (durationSec <= 60 && durationSec > 55) {

@@ -12,34 +12,34 @@ namespace {
 // rather than adding one, so a druid who has learned it has two spells for one
 // slot; the bar shows Bear and casting it casts whichever the server accepts.
 const ShapeshiftForm kDruid[] = {
-    {SPELL_BEAR_FORM,    1,  "Bear Form",         "Interface\\Icons\\Ability_Racial_BearForm"},
-    {SPELL_AQUATIC_FORM, 2,  "Aquatic Form",      "Interface\\Icons\\Ability_Druid_AquaticForm"},
-    {SPELL_CAT_FORM,     3,  "Cat Form",          "Interface\\Icons\\Ability_Druid_CatForm"},
-    {SPELL_TRAVEL_FORM,  4,  "Travel Form",       "Interface\\Icons\\Ability_Druid_TravelForm"},
-    {SPELL_MOONKIN_FORM, 31, "Moonkin Form",      "Interface\\Icons\\Spell_Nature_ForceOfNature"},
-    {SPELL_TREE_OF_LIFE, 36, "Tree of Life",      "Interface\\Icons\\Ability_Druid_TreeofLife"},
-    {SPELL_FLIGHT_FORM,  29, "Flight Form",       "Interface\\Icons\\Ability_Druid_FlightForm"},
-    {SPELL_SWIFT_FLIGHT, 27, "Swift Flight Form", "Interface\\Icons\\Ability_Druid_FlightForm"},
+    {.spellId = SPELL_BEAR_FORM,    .formId = 1,  .name = "Bear Form",         .icon = "Interface\\Icons\\Ability_Racial_BearForm"},
+    {.spellId = SPELL_AQUATIC_FORM, .formId = 2,  .name = "Aquatic Form",      .icon = "Interface\\Icons\\Ability_Druid_AquaticForm"},
+    {.spellId = SPELL_CAT_FORM,     .formId = 3,  .name = "Cat Form",          .icon = "Interface\\Icons\\Ability_Druid_CatForm"},
+    {.spellId = SPELL_TRAVEL_FORM,  .formId = 4,  .name = "Travel Form",       .icon = "Interface\\Icons\\Ability_Druid_TravelForm"},
+    {.spellId = SPELL_MOONKIN_FORM, .formId = 31, .name = "Moonkin Form",      .icon = "Interface\\Icons\\Spell_Nature_ForceOfNature"},
+    {.spellId = SPELL_TREE_OF_LIFE, .formId = 36, .name = "Tree of Life",      .icon = "Interface\\Icons\\Ability_Druid_TreeofLife"},
+    {.spellId = SPELL_FLIGHT_FORM,  .formId = 29, .name = "Flight Form",       .icon = "Interface\\Icons\\Ability_Druid_FlightForm"},
+    {.spellId = SPELL_SWIFT_FLIGHT, .formId = 27, .name = "Swift Flight Form", .icon = "Interface\\Icons\\Ability_Druid_FlightForm"},
 };
 
 const ShapeshiftForm kWarrior[] = {
-    {SPELL_BATTLE_STANCE,    17, "Battle Stance",    "Interface\\Icons\\Ability_Warrior_OffensiveStance"},
-    {SPELL_DEFENSIVE_STANCE, 18, "Defensive Stance", "Interface\\Icons\\Ability_Warrior_DefensiveStance"},
-    {SPELL_BERSERKER_STANCE, 19, "Berserker Stance", "Interface\\Icons\\Ability_Racial_Avatar"},
+    {.spellId = SPELL_BATTLE_STANCE,    .formId = 17, .name = "Battle Stance",    .icon = "Interface\\Icons\\Ability_Warrior_OffensiveStance"},
+    {.spellId = SPELL_DEFENSIVE_STANCE, .formId = 18, .name = "Defensive Stance", .icon = "Interface\\Icons\\Ability_Warrior_DefensiveStance"},
+    {.spellId = SPELL_BERSERKER_STANCE, .formId = 19, .name = "Berserker Stance", .icon = "Interface\\Icons\\Ability_Racial_Avatar"},
 };
 
 const ShapeshiftForm kDeathKnight[] = {
-    {SPELL_BLOOD_PRESENCE,  32, "Blood Presence",  "Interface\\Icons\\Spell_Deathknight_BloodPresence"},
-    {SPELL_FROST_PRESENCE,  33, "Frost Presence",  "Interface\\Icons\\Spell_Deathknight_FrostPresence"},
-    {SPELL_UNHOLY_PRESENCE, 34, "Unholy Presence", "Interface\\Icons\\Spell_Deathknight_UnholyPresence"},
+    {.spellId = SPELL_BLOOD_PRESENCE,  .formId = 32, .name = "Blood Presence",  .icon = "Interface\\Icons\\Spell_Deathknight_BloodPresence"},
+    {.spellId = SPELL_FROST_PRESENCE,  .formId = 33, .name = "Frost Presence",  .icon = "Interface\\Icons\\Spell_Deathknight_FrostPresence"},
+    {.spellId = SPELL_UNHOLY_PRESENCE, .formId = 34, .name = "Unholy Presence", .icon = "Interface\\Icons\\Spell_Deathknight_UnholyPresence"},
 };
 
 const ShapeshiftForm kRogue[] = {
-    {SPELL_STEALTH, 30, "Stealth", "Interface\\Icons\\Ability_Stealth"},
+    {.spellId = SPELL_STEALTH, .formId = 30, .name = "Stealth", .icon = "Interface\\Icons\\Ability_Stealth"},
 };
 
 const ShapeshiftForm kPriest[] = {
-    {SPELL_SHADOWFORM, 28, "Shadowform", "Interface\\Icons\\Spell_Shadow_Shadowform"},
+    {.spellId = SPELL_SHADOWFORM, .formId = 28, .name = "Shadowform", .icon = "Interface\\Icons\\Spell_Shadow_Shadowform"},
 };
 
 }  // namespace
