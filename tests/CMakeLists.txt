@@ -19,7 +19,13 @@ set(ALL_TEST_TARGETS "")
 # (auth, socket code) whose symbols live in ws2_32 there rather than libc.
 # Linking it for every test keeps a new test from breaking the Windows build.
 macro(register_test_target _target)
-    list(APPEND ALL_TEST_TARGETS ${_target})
+    # A global property, not a list variable. This macro is called both at file
+    # scope and from inside wowee_add_test, which is a function -- and
+    # list(APPEND) inside a function writes to that function's scope and is
+    # discarded on return. Every test registered through wowee_add_test was
+    # therefore missing from the list: 79 of ~144 targets were in it, and the
+    # sanitizer loop that walks it silently skipped the rest.
+    set_property(GLOBAL APPEND PROPERTY WOWEE_ALL_TEST_TARGETS ${_target})
     if(WIN32)
         target_link_libraries(${_target} PRIVATE ws2_32)
     endif()
@@ -1838,6 +1844,17 @@ wowee_add_test(test_spell_mod_ops
     SOURCES test_spell_mod_ops.cpp
             ${TEST_COMMON_SOURCES})
 
+# ── test_adt_truncation ──────────────────────────────────────
+# What the ADT parser does with a file that lies about its own sizes. The
+# chunk readers took a bare pointer and a length as separate arguments and
+# trusted every caller's arithmetic; one of those sums wrapped, turning a
+# four-byte MCAL into a memcpy length of 1.8e19. Malformed input only -- run
+# under --asan, where an overrun fails rather than passing unnoticed.
+wowee_add_test(test_adt_truncation
+    SOURCES test_adt_truncation.cpp
+            ${TEST_COMMON_SOURCES}
+            ${CMAKE_SOURCE_DIR}/src/pipeline/adt_loader.cpp)
+
 # ── Sanitizers, once every test target exists ────────────────
 # This must be the last thing in this file. The loop walks ALL_TEST_TARGETS,
 # which register_test_target appends to as each test is declared, so the
@@ -1847,6 +1864,10 @@ wowee_add_test(test_spell_mod_ops
 #
 # Re-applying to targets the earlier block already covered is harmless: the
 # flags are identical and repeat on the command line.
+get_property(ALL_TEST_TARGETS GLOBAL PROPERTY WOWEE_ALL_TEST_TARGETS)
+list(LENGTH ALL_TEST_TARGETS _wowee_test_target_count)
+message(STATUS "Test targets registered: ${_wowee_test_target_count}")
+
 if(WOWEE_ENABLE_ASAN AND NOT MSVC)
     foreach(_t IN LISTS ALL_TEST_TARGETS)
         target_compile_options(${_t} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
