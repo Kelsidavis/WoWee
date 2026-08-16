@@ -97,8 +97,8 @@ WoweeTalent WoweeTalentLoader::load(const std::string& basePath) {
                 out.trees.clear(); return out;
             }
             if (!skipPadding(is, 3)) { out.trees.clear(); return out; }
-            for (int r = 0; r < WoweeTalent::kMaxRanks; ++r) {
-                if (!readPOD(is, a.rankSpellIds[r])) {
+            for (uint32_t& rankSpellId : a.rankSpellIds) {
+                if (!readPOD(is, rankSpellId)) {
                     out.trees.clear(); return out;
                 }
             }

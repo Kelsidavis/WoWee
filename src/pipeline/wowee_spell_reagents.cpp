@@ -34,8 +34,8 @@ int WoweeSpellReagent::usedSlotCount(uint32_t reagentSetId) const {
     const Entry* e = findById(reagentSetId);
     if (!e) return 0;
     int n = 0;
-    for (int s = 0; s < kMaxReagentSlots; ++s) {
-        if (e->reagentItemId[s] != 0) ++n;
+    for (uint32_t itemId : e->reagentItemId) {
+        if (itemId != 0) ++n;
     }
     return n;
 }
@@ -59,10 +59,10 @@ bool WoweeSpellReagentLoader::save(const WoweeSpellReagent& cat,
         writeStr(os, e.name);
         writeStr(os, e.description);
         writePOD(os, e.spellId);
-        for (int s = 0; s < WoweeSpellReagent::kMaxReagentSlots; ++s)
-            writePOD(os, e.reagentItemId[s]);
-        for (int s = 0; s < WoweeSpellReagent::kMaxReagentSlots; ++s)
-            writePOD(os, e.reagentCount[s]);
+        for (uint32_t itemId : e.reagentItemId)
+            writePOD(os, itemId);
+        for (uint32_t count : e.reagentCount)
+            writePOD(os, count);
         writePOD(os, e.reagentKind);
         writePOD(os, e.pad0);
         writePOD(os, e.pad1);
@@ -78,11 +78,11 @@ WoweeSpellReagent WoweeSpellReagentLoader::load(
         if (!readPOD(is, e.reagentSetId)) { return false; }
         if (!readStr(is, e.name) || !readStr(is, e.description)) { return false; }
         if (!readPOD(is, e.spellId)) { return false; }
-        for (int s = 0; s < WoweeSpellReagent::kMaxReagentSlots; ++s) {
-            if (!readPOD(is, e.reagentItemId[s])) { return false; }
+        for (uint32_t& itemId : e.reagentItemId) {
+            if (!readPOD(is, itemId)) { return false; }
         }
-        for (int s = 0; s < WoweeSpellReagent::kMaxReagentSlots; ++s) {
-            if (!readPOD(is, e.reagentCount[s])) { return false; }
+        for (uint32_t& count : e.reagentCount) {
+            if (!readPOD(is, count)) { return false; }
         }
         if (!readPOD(is, e.reagentKind) ||
             !readPOD(is, e.pad0) ||

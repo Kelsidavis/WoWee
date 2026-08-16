@@ -46,12 +46,12 @@ bool WoweeItemSuffixLoader::save(const WoweeItemSuffix& cat,
         writePOD(os, e.suffixCategory);
         writePadding(os, 1);
         writePOD(os, e.restrictedSlotMask);
-        for (size_t k = 0; k < WoweeItemSuffix::kMaxStats; ++k) {
-            writePOD(os, e.statKind[k]);
+        for (uint8_t statKind : e.statKind) {
+            writePOD(os, statKind);
         }
         writePadding(os, 3);
-        for (size_t k = 0; k < WoweeItemSuffix::kMaxStats; ++k) {
-            writePOD(os, e.statValuePoints[k]);
+        for (uint16_t statValuePoint : e.statValuePoints) {
+            writePOD(os, statValuePoint);
         }
                        });
 }
@@ -67,12 +67,12 @@ WoweeItemSuffix WoweeItemSuffixLoader::load(
             !readPOD(is, e.suffixCategory)) { return false; }
         if (!skipPadding(is, 1)) { return false; }
         if (!readPOD(is, e.restrictedSlotMask)) { return false; }
-        for (size_t k = 0; k < WoweeItemSuffix::kMaxStats; ++k) {
-            if (!readPOD(is, e.statKind[k])) { return false; }
+        for (uint8_t& statKind : e.statKind) {
+            if (!readPOD(is, statKind)) { return false; }
         }
         if (!skipPadding(is, 3)) { return false; }
-        for (size_t k = 0; k < WoweeItemSuffix::kMaxStats; ++k) {
-            if (!readPOD(is, e.statValuePoints[k])) { return false; }
+        for (uint16_t& statValuePoint : e.statValuePoints) {
+            if (!readPOD(is, statValuePoint)) { return false; }
         }
                                   return true;
                               });

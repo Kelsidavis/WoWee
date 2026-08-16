@@ -64,11 +64,11 @@ bool WoweeTradeSkillLoader::save(const WoweeTradeSkill& cat,
         writePOD(os, e.producedMaxCount);
         writePadding(os, 2);
         writePOD(os, e.toolItemId);
-        for (size_t k = 0; k < WoweeTradeSkill::kMaxReagents; ++k) {
-            writePOD(os, e.reagentItemId[k]);
+        for (uint32_t itemId : e.reagentItemId) {
+            writePOD(os, itemId);
         }
-        for (size_t k = 0; k < WoweeTradeSkill::kMaxReagents; ++k) {
-            writePOD(os, e.reagentCount[k]);
+        for (uint8_t count : e.reagentCount) {
+            writePOD(os, count);
         }
                        });
 }
@@ -93,11 +93,11 @@ WoweeTradeSkill WoweeTradeSkillLoader::load(
             !readPOD(is, e.producedMaxCount)) { return false; }
         if (!skipPadding(is, 2)) { return false; }
         if (!readPOD(is, e.toolItemId)) { return false; }
-        for (size_t k = 0; k < WoweeTradeSkill::kMaxReagents; ++k) {
-            if (!readPOD(is, e.reagentItemId[k])) { return false; }
+        for (uint32_t& itemId : e.reagentItemId) {
+            if (!readPOD(is, itemId)) { return false; }
         }
-        for (size_t k = 0; k < WoweeTradeSkill::kMaxReagents; ++k) {
-            if (!readPOD(is, e.reagentCount[k])) { return false; }
+        for (uint8_t& count : e.reagentCount) {
+            if (!readPOD(is, count)) { return false; }
         }
                                   return true;
                               });

@@ -99,8 +99,7 @@ ChunkMesh TerrainMeshGenerator::generateChunkMesh(const MapChunk& chunk, int chu
 
         // Check for invalid vertex positions
         int invalidCount = 0;
-        for (size_t i = 0; i < mesh.vertices.size(); i++) {
-            const auto& v = mesh.vertices[i];
+        for (const auto& v : mesh.vertices) {
             if (!std::isfinite(v.position[0]) || !std::isfinite(v.position[1]) || !std::isfinite(v.position[2])) {
                 invalidCount++;
             }

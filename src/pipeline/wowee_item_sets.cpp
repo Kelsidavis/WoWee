@@ -35,14 +35,14 @@ bool WoweeItemSetLoader::save(const WoweeItemSet& cat,
         writePOD(os, e.requiredClassMask);
         writePOD(os, e.requiredSkillId);
         writePOD(os, e.requiredSkillRank);
-        for (size_t k = 0; k < WoweeItemSet::kMaxPieces; ++k) {
-            writePOD(os, e.itemIds[k]);
+        for (uint32_t itemId : e.itemIds) {
+            writePOD(os, itemId);
         }
-        for (size_t k = 0; k < WoweeItemSet::kMaxBonuses; ++k) {
-            writePOD(os, e.bonusThresholds[k]);
+        for (uint8_t bonusThreshold : e.bonusThresholds) {
+            writePOD(os, bonusThreshold);
         }
-        for (size_t k = 0; k < WoweeItemSet::kMaxBonuses; ++k) {
-            writePOD(os, e.bonusSpellIds[k]);
+        for (uint32_t bonusSpellId : e.bonusSpellIds) {
+            writePOD(os, bonusSpellId);
         }
                        });
 }
@@ -59,14 +59,14 @@ WoweeItemSet WoweeItemSetLoader::load(
         if (!readPOD(is, e.requiredClassMask) ||
             !readPOD(is, e.requiredSkillId) ||
             !readPOD(is, e.requiredSkillRank)) { return false; }
-        for (size_t k = 0; k < WoweeItemSet::kMaxPieces; ++k) {
-            if (!readPOD(is, e.itemIds[k])) { return false; }
+        for (uint32_t& itemId : e.itemIds) {
+            if (!readPOD(is, itemId)) { return false; }
         }
-        for (size_t k = 0; k < WoweeItemSet::kMaxBonuses; ++k) {
-            if (!readPOD(is, e.bonusThresholds[k])) { return false; }
+        for (uint8_t& bonusThreshold : e.bonusThresholds) {
+            if (!readPOD(is, bonusThreshold)) { return false; }
         }
-        for (size_t k = 0; k < WoweeItemSet::kMaxBonuses; ++k) {
-            if (!readPOD(is, e.bonusSpellIds[k])) { return false; }
+        for (uint32_t& bonusSpellId : e.bonusSpellIds) {
+            if (!readPOD(is, bonusSpellId)) { return false; }
         }
                                   return true;
                               });

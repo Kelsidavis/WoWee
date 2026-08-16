@@ -1794,8 +1794,7 @@ M2Model M2Loader::load(const std::vector<uint8_t>& m2Data) {
             model.batches.clear();
             model.batches.reserve(diskBatches.size());
 
-            for (size_t i = 0; i < diskBatches.size(); i++) {
-                const auto& db = diskBatches[i];
+            for (const auto& db : diskBatches) {
                 M2Batch batch;
                 batch.flags = db.flags;
                 batch.priorityPlane = db.priorityPlane;
@@ -1908,8 +1907,7 @@ bool M2Loader::loadSkin(const std::vector<uint8_t>& skinData, M2Model& model) {
         model.batches.clear();
         model.batches.reserve(diskBatches.size());
 
-        for (size_t i = 0; i < diskBatches.size(); i++) {
-            const auto& db = diskBatches[i];
+        for (const auto& db : diskBatches) {
             M2Batch batch;
 
             batch.flags = db.flags;

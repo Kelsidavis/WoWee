@@ -42,9 +42,8 @@ bool WoweeGuildBankLoader::save(const WoweeGuildBank& cat,
         writePOD(os, e.depositOnly);
         writePOD(os, e.pad0);
         writePOD(os, e.slotCount);
-        for (uint32_t r = 0;
-             r < WoweeGuildBank::kRankCount; ++r) {
-            writePOD(os, e.perRankWithdrawalLimit[r]);
+        for (uint32_t limit : e.perRankWithdrawalLimit) {
+            writePOD(os, limit);
         }
                        });
 }
@@ -60,9 +59,8 @@ WoweeGuildBank WoweeGuildBankLoader::load(
             !readPOD(is, e.depositOnly) ||
             !readPOD(is, e.pad0) ||
             !readPOD(is, e.slotCount)) { return false; }
-        for (uint32_t r = 0;
-             r < WoweeGuildBank::kRankCount; ++r) {
-            if (!readPOD(is, e.perRankWithdrawalLimit[r])) { return false; }
+        for (uint32_t& limit : e.perRankWithdrawalLimit) {
+            if (!readPOD(is, limit)) { return false; }
         }
                                   return true;
                               });

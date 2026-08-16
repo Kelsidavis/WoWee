@@ -171,8 +171,8 @@ WMOModel WMOLoader::load(const std::vector<uint8_t>& wmoData) {
                 for (uint32_t i = 0; i < nMaterials; i++) {
                     // Read all 16 uint32 fields (64 bytes)
                     uint32_t fields[16];
-                    for (int j = 0; j < 16; j++) {
-                        fields[j] = read<uint32_t>(wmoData, offset);
+                    for (uint32_t& field : fields) {
+                        field = read<uint32_t>(wmoData, offset);
                     }
 
                     // SMOMaterial layout (wowdev.wiki):
@@ -261,8 +261,8 @@ WMOModel WMOLoader::load(const std::vector<uint8_t>& wmoData) {
                     light.attenuationStart = read<float>(wmoData, offset);
                     light.attenuationEnd = read<float>(wmoData, offset);
 
-                    for (int j = 0; j < 4; j++) {
-                        light.unknown[j] = read<float>(wmoData, offset);
+                    for (float& value : light.unknown) {
+                        value = read<float>(wmoData, offset);
                     }
 
                     model.lights.push_back(light);
