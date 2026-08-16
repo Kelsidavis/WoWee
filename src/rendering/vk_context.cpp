@@ -144,13 +144,34 @@ void VkContext::shutdown() {
     renderFinishedSemaphores_.clear();
     if (nextAcquireSemaphore_) { vkDestroySemaphore(device, nextAcquireSemaphore_, nullptr); nextAcquireSemaphore_ = VK_NULL_HANDLE; }
 
-    // Clean up any in-flight async upload batches (device already idle)
-    for (auto& batch : inFlightBatches_) {
-        // Staging buffers: skip destroy - allocator is about to be torn down
-        vkDestroyFence(device, batch.fence, nullptr);
-        // Command buffer freed when pool is destroyed below
+    // Clean up any in-flight async upload batches. waitAllUploads does the full
+    // retirement -- fence, command buffer, VMA staging and the plainly
+    // allocated staging -- and the device is already idle above, so its waits
+    // return at once. Both command pools it frees from are destroyed below
+    // this point, and so is the allocator.
+    //
+    // This used to destroy only the fence, on the grounds that the allocator
+    // was about to be torn down anyway. That was never true of rawStaging,
+    // which is vkCreateBuffer/vkAllocateMemory and belongs to no allocator, and
+    // stopped being true of the rest once shutdown began destroying the VMA
+    // allocator under validation. Every batch left in flight leaked a command
+    // buffer, its staging buffers and their memory, which is most of what
+    // vkDestroyDevice reported.
+    waitAllUploads();
+
+    // The batch still being accumulated has never been submitted, so
+    // waitAllUploads does not see it. Its staging belongs to this context
+    // alone -- no descriptor pool, no sub-renderer -- so unlike the deferred
+    // queues above there is nothing here that could already be invalid.
+    for (auto& raw : batchRawStaging_) {
+        vkDestroyBuffer(device, raw.buffer, nullptr);
+        vkFreeMemory(device, raw.memory, nullptr);
     }
-    inFlightBatches_.clear();
+    batchRawStaging_.clear();
+    for (auto& staging : batchStagingBuffers_) {
+        destroyBuffer(allocator, staging);
+    }
+    batchStagingBuffers_.clear();
 
     if (immFence) { vkDestroyFence(device, immFence, nullptr); immFence = VK_NULL_HANDLE; }
     // Destroying the pool implicitly frees immCmdBuf_; just drop the handle.
