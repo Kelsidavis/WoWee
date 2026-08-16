@@ -142,6 +142,39 @@ if [[ ! -f "$COMPILE_COMMANDS" ]]; then
     exit 1
 fi
 
+# clang-tidy cannot read a precompiled header built by a different compiler,
+# and it usually is one: the PCH comes from whatever CXX cmake picked, while
+# clang-tidy comes from whatever LLVM is on PATH. Mismatched, every file fails
+# with "PCH file uses an older format that is no longer supported" and the real
+# diagnostics never appear.
+#
+# So lint against a copy of the database with the PCH arguments removed. The
+# headers are still included normally -- the PCH is only a parse cache.
+TIDY_DB_DIR="$SCRIPT_DIR/build/.tidy"
+mkdir -p "$TIDY_DB_DIR"
+python3 - "$COMPILE_COMMANDS" "$TIDY_DB_DIR/compile_commands.json" <<'PYEOF'
+import json, re, sys
+src, dst = sys.argv[1], sys.argv[2]
+db = json.load(open(src))
+strip = re.compile(r'\s+-Xclang\s+-include-pch\s+-Xclang\s+\S+|\s+-include-pch\s+\S+|\s+-Winvalid-pch')
+for entry in db:
+    if 'command' in entry:
+        entry['command'] = strip.sub('', entry['command'])
+    if 'arguments' in entry:
+        args, out = entry['arguments'], []
+        i = 0
+        while i < len(args):
+            if args[i] == '-include-pch':
+                i += 2
+            elif args[i] == '-Xclang' and i + 1 < len(args) and args[i + 1] == '-include-pch':
+                i += 4
+            else:
+                out.append(args[i]); i += 1
+        entry['arguments'] = out
+json.dump(db, open(dst, 'w'))
+PYEOF
+COMPILE_COMMANDS="$TIDY_DB_DIR/compile_commands.json"
+
 # ---------------------------------------------------------------------------
 # Source files to check (first-party only)
 # ---------------------------------------------------------------------------
@@ -208,7 +241,7 @@ if [[ -n "$RUN_CLANG_TIDY" ]]; then
     SRC_REGEX="$(echo "$SCRIPT_DIR/src" | sed 's|/|\\/|g')"
     "$RUN_CLANG_TIDY" \
         -clang-tidy-binary "$CLANG_TIDY" \
-        -p "$SCRIPT_DIR/build" \
+        -p "$TIDY_DB_DIR" \
         $FIX_FLAG \
         "${EXTRA_RUN_ARGS[@]}" \
         "$SRC_REGEX" || LINT_FAILED=$?
@@ -216,7 +249,7 @@ else
     echo "run-clang-tidy not found; running sequentially..."
     for f in "${SOURCE_FILES[@]}"; do
         "$CLANG_TIDY" \
-            -p "$SCRIPT_DIR/build" \
+            -p "$TIDY_DB_DIR" \
             $FIX_FLAG \
             "${EXTRA_TIDY_ARGS[@]}" \
             "$f" || LINT_FAILED=$?

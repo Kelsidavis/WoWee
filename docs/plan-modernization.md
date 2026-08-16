@@ -1,6 +1,6 @@
 # Codebase Modernization — Phased Plan
 
-**Status:** Phases 1, 3, 5, 6, 7 complete. Phases 2 and 4 cancelled. Phase 8 in progress.
+**Status:** Phases 1, 3, 5, 6, 7 and the timeline-semaphore half of 8 complete. Phases 2 and 4 cancelled. Next: Phase 10.
 **Scope:** code quality and modernity, codebase-wide. Not a performance effort. Where a phase
 happens to help performance that is a side effect, and no phase here is justified by it.
 
@@ -239,28 +239,35 @@ it is a rewrite, not a modernization.
 Both are core in the Vulkan 1.2 this project already requires, so neither needs an extension or
 raises the hardware floor.
 
-**Scope correction.** Timeline semaphores cannot replace the swapchain semaphores. WSI does not
-accept them: `vkAcquireNextImageKHR` and `vkQueuePresentKHR` require binary semaphores, so the
-per-image acquire and renderFinished pair is unchanged. What a timeline replaces is
-`FrameData::inFlightFence` and the keying of the deferred-cleanup queues.
+**Timeline semaphores: done.** `FrameData::inFlightFence` is replaced by one timeline semaphore
+and a monotonic counter. The swapchain semaphores are unchanged and had to be — WSI does not
+accept timeline semaphores, so `vkAcquireNextImageKHR` and `vkQueuePresentKHR` keep their binary
+pair and the submit signals both. `resetFrameSyncState` no longer destroys and recreates the
+frame sync objects: `vkDeviceWaitIdle` guarantees the counter has reached its last signalled
+value, so re-baselining each slot to it leaves the slot already satisfied.
 
-**Verification is the constraint.** No test in this repository creates a Vulkan device, submits
-work, or links `vk_context.cpp`; all 158 are headless logic tests. A green build and a green
-suite therefore say nothing about whether a frame-synchronisation change works — the failure
-modes are validation errors, GPU hangs, device loss and visual corruption. `resetFrameSyncState`
-exists because a rebuilt swapchain left fences mid-cycle and the driver lost the device; its
-comment names `VUID-vkResetFences-01123` and `VUID-vkBeginCommandBuffer-00049`.
+Verified on the target GPU with validation enabled: zero sync VUIDs, zero timeouts, correct
+across swapchain rebuilds.
 
-Acceptance criteria, on the target GPU with `WOWEE_VULKAN_VALIDATION=1`:
+**Descriptor indexing: deferred, and not on modernity grounds.** The case for it was 34
+`vkAllocateDescriptorSets` and 44 `vkUpdateDescriptorSets` call sites, but sites are not
+per-frame cost. What descriptor indexing actually removes is per-draw *binds*, and measuring
+those:
 
-1. Zero validation errors during startup, world load and shutdown.
-2. No fence/timeline timeout messages in the log.
-3. Correct behaviour across a swapchain rebuild — window resize, alt-tab, and an MSAA or FSR
-   setting change, which rebuilds without changing the image count.
-4. Both frames-in-flight slots exercised over a sustained run.
+- **M2 already avoids them.** Draws are sorted by model, and the loop skips rebinding when the
+  material has not changed (`batch.materialSet != currentMaterialSet`). The redundant-bind
+  problem is solved by state tracking.
+- **Terrain does not**, binding one set per visible chunk. But every chunk genuinely has its own
+  textures and alpha maps, so no amount of deduplication helps — only a bindless array would.
 
-Timeline semaphores and descriptor indexing land separately. They are independent, and debugging
-them together means not knowing which one broke the frame.
+That leaves a few hundred binds per frame in terrain, which is tens of microseconds. Real, but
+not what this plan is for, and it is a large change to material binding across four renderers
+plus `nonuniformEXT` in the shaders.
+
+Its actual value is as an **enabler**: a bindless material array is what lets the GPU choose a
+material without the CPU binding one, which is a precondition for GPU-driven terrain and for the
+indirect path `docs/plan-grass.md` describes. Justify it from that work when it arrives, with a
+feature that needs it, rather than as a modernization step on its own.
 
 ### Phase 9 — Vulkan: synchronization2 + dynamic rendering (one change, or neither)
 30 barrier sites / 29 barrier structs (25 image, 2 buffer, 2 memory); 12 render passes, 29
