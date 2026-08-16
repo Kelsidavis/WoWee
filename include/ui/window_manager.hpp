@@ -43,13 +43,6 @@ public:
     void renderVendorWindow(game::GameHandler& gameHandler,
                             InventoryScreen& inventoryScreen,
                             ChatPanel& chatPanel);
-    void renderTrainerWindow(game::GameHandler& gameHandler,
-                             SpellIconFn getSpellIcon,
-                             InventoryScreen& inventoryScreen);
-    // Recipe difficulty vs current skill (orange/yellow/green/gray), for the
-    // trainer panel.
-    static ImVec4 recipeDifficultyColor(game::GameHandler& gameHandler, uint32_t spellId);
-    static const char* recipeDifficultyLabel(game::GameHandler& gameHandler, uint32_t spellId);
     void renderBarberShopWindow(game::GameHandler& gameHandler);
 
     // ---- Mail and banking ----
@@ -66,9 +59,6 @@ public:
     void renderGuildBankWindow(game::GameHandler& gameHandler,
                                InventoryScreen& inventoryScreen,
                                ChatPanel& chatPanel);
-    void renderAuctionHouseWindow(game::GameHandler& gameHandler,
-                                  InventoryScreen& inventoryScreen,
-                                  ChatPanel& chatPanel);
 
     // ---- Popup / overlay windows ----
     /// The game handler is only for the Help button, which has to reach
@@ -214,28 +204,6 @@ public:
     /// Buy the current selection. The Okay button on either barber calls this;
     /// FrameXML's reaches it through ApplyBarberShopStyle.
     void barberApplySelection(game::GameHandler& gameHandler);
-
-    // Trainer
-    char trainerSearchFilter_[128] = "";
-
-    // Auction house
-    char auctionSearchName_[256] = "";
-    int auctionLevelMin_ = 0;
-    int auctionLevelMax_ = 0;
-    int auctionQuality_ = 0;
-    int auctionSellDuration_ = 2;
-    int auctionSellBid_[3] = {0, 0, 0};
-    int auctionSellBuyout_[3] = {0, 0, 0};
-    int auctionSelectedItem_ = -1;
-    int auctionSellSlotIndex_ = -1;   // slot within the selected container
-    int auctionSellBagIndex_ = -1;    // -1 = backpack, 0..3 = equipped bag
-    uint32_t auctionBrowseOffset_ = 0;
-    int auctionItemClass_ = -1;
-    int auctionItemSubClass_ = -1;
-    bool auctionUsableOnly_ = false;
-    int auctionSlotFilter_ = 0;        // index into AH equipment-slot combo (0 = All)
-    bool auctionBuyoutOnly_ = false;   // hide bid-only listings (client-side page filter)
-    int auctionMaxPriceGold_ = 0;      // client-side max buyout in gold (0 = no cap)
 
     // Guild bank money input
     int guildBankMoneyInput_[3] = {0, 0, 0};

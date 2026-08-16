@@ -61,6 +61,12 @@ NOTHING_TO_GATE = {
     # CMSG_BINDER_ACTIVATE on the innkeeper option, where FrameXML waits for
     # the server's confirm.
     "QuestGiver",
+    # src/ui/window_manager.cpp's renderTrainerWindow, and with it the two
+    # recipe-difficulty helpers that were its last callers.
+    "ClassTrainer",
+    # src/ui/window_manager.cpp's renderAuctionHouseWindow and its browse,
+    # filter and sell state.
+    "AuctionHouse",
 }
 
 

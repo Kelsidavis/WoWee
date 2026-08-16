@@ -708,11 +708,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     if (!frameXmlOwns(UiElement::Vendor)) {
         windowManager_.renderVendorWindow(gameHandler, inventoryScreen, chatPanel_);
     }
-    if (!frameXmlOwns(UiElement::ClassTrainer)) {
-        windowManager_.renderTrainerWindow(gameHandler,
-            [this](uint32_t id, pipeline::AssetManager* am) { return getSpellIcon(id, am); },
-            inventoryScreen);
-    }
     if (!frameXmlOwns(UiElement::BarberShop)) {
         windowManager_.renderBarberShopWindow(gameHandler);
     }
@@ -730,9 +725,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         windowManager_.renderGuildBankWindow(gameHandler, inventoryScreen, chatPanel_);
     }
     windowManager_.renderGmCommandScreen(gameHandler);
-    if (!frameXmlOwns(UiElement::AuctionHouse)) {
-        windowManager_.renderAuctionHouseWindow(gameHandler, inventoryScreen, chatPanel_);
-    }
     if (!frameXmlOwns(UiElement::DungeonFinder)) {
         socialPanel_.renderDungeonFinderWindow(gameHandler, chatPanel_);
     }
