@@ -408,7 +408,8 @@ void CharacterPreview::createFBO() {
         descBuf.range = sizeof(GPUPerFrameData);
 
         VkDescriptorImageInfo shadowImg{};
-        shadowImg.sampler = dummyShadowSampler_;
+        // sampler is ignored: this set comes from the renderer's per-frame
+        // layout, where binding 1 declares an immutable comparison sampler.
         shadowImg.imageView = dummyShadowView_;
         shadowImg.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 

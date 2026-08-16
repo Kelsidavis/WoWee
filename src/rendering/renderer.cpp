@@ -230,6 +230,12 @@ bool Renderer::createPerFrameResources() {
     bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     bindings[1].descriptorCount = 1;
     bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    // Immutable, because this one compares. Portability implementations may
+    // report VkPhysicalDevicePortabilitySubsetFeaturesKHR::mutableComparisonSamplers
+    // as false -- MoltenVK does -- and then a sampler with compareEnable set is
+    // only legal here, baked into the layout, rather than written into the
+    // descriptor per frame. shadowSampler is created above this point.
+    bindings[1].pImmutableSamplers = &shadowSampler;
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -298,7 +304,7 @@ bool Renderer::createPerFrameResources() {
         descBuf.range = sizeof(GPUPerFrameData);
 
         VkDescriptorImageInfo shadowImgInfo{};
-        shadowImgInfo.sampler = shadowSampler;
+        // sampler is ignored: binding 1 declares it immutable in the layout.
         shadowImgInfo.imageView = shadowDepthView[i];
         shadowImgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
@@ -360,7 +366,7 @@ bool Renderer::createPerFrameResources() {
             descBuf.range = sizeof(GPUPerFrameData);
 
             VkDescriptorImageInfo shadowImgInfo{};
-            shadowImgInfo.sampler = shadowSampler;
+            // sampler is ignored: binding 1 declares it immutable in the layout.
             shadowImgInfo.imageView = shadowDepthView[i];
             shadowImgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
