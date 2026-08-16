@@ -44,7 +44,7 @@ namespace ui {
 
 void SocialPanel::renderPartyFrames(game::GameHandler& gameHandler,
                                        ChatPanel& chatPanel,
-                                       SpellIconFn getSpellIcon) {
+                                       const SpellIconFn& getSpellIcon) {
     auto* assetMgr = services_.assetManager;
     const auto& partyData = gameHandler.getPartyData();
 
@@ -700,7 +700,7 @@ void SocialPanel::renderPartyFrames(game::GameHandler& gameHandler,
 
 void SocialPanel::renderBossFrames(game::GameHandler& gameHandler,
                                       SpellbookScreen& spellbookScreen,
-                                      SpellIconFn getSpellIcon) {
+                                      const SpellIconFn& getSpellIcon) {
     auto* assetMgr = services_.assetManager;
 
     // Collect active boss unit slots
@@ -976,7 +976,7 @@ void SocialPanel::renderGuildRoster(game::GameHandler& gameHandler,
                                        InventoryScreen& inventoryScreen,
                                        SpellbookScreen& spellbookScreen,
                                        QuestLogScreen& questLogScreen,
-                                       SpellIconFn getSpellIcon) {
+                                       const SpellIconFn& getSpellIcon) {
     // Guild Roster toggle (customizable keybind)
     if (!chatPanel.isChatInputActive() && !ImGui::GetIO().WantTextInput &&
         !ImGui::GetIO().WantCaptureKeyboard &&

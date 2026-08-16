@@ -49,7 +49,7 @@ namespace ui {
 // Cast Bar
 // ============================================================
 
-void CombatUI::renderCastBar(game::GameHandler& gameHandler, SpellIconFn getSpellIcon) {
+void CombatUI::renderCastBar(game::GameHandler& gameHandler, const SpellIconFn& getSpellIcon) {
     if (!gameHandler.isCasting()) return;
 
     auto* assetMgr = services_.assetManager;
@@ -159,7 +159,7 @@ void CombatUI::renderCastBar(game::GameHandler& gameHandler, SpellIconFn getSpel
 
 void CombatUI::renderCooldownTracker(game::GameHandler& gameHandler,
                                      const SettingsPanel& settings,
-                                     SpellIconFn getSpellIcon) {
+                                     const SpellIconFn& getSpellIcon) {
     if (!settings.showCooldownTracker_) return;
 
     const auto& cooldowns = gameHandler.getSpellCooldowns();
@@ -948,7 +948,7 @@ void CombatUI::renderBuffBar(game::GameHandler& gameHandler,
                              SpellbookScreen& spellbookScreen,
                              InventoryScreen& inventoryScreen,
                              const SettingsPanel& settings,
-                             SpellIconFn getSpellIcon) {
+                             const SpellIconFn& getSpellIcon) {
     const auto& auras = gameHandler.getPlayerAuras();
 
     // Count non-empty auras

@@ -141,9 +141,9 @@ void OverlaySystem::initSelectionCircle() {
 
 void OverlaySystem::renderSelectionCircle(const glm::mat4& view, const glm::mat4& projection,
                                            VkCommandBuffer cmd,
-                                           HeightQuery2D terrainHeight,
-                                           HeightQuery3D wmoHeight,
-                                           HeightQuery3D m2Height) {
+                                           const HeightQuery2D& terrainHeight,
+                                           const HeightQuery3D& wmoHeight,
+                                           const HeightQuery3D& m2Height) {
     if (!selCircleVisible_) return;
     initSelectionCircle();
     if (selCirclePipeline_ == VK_NULL_HANDLE || cmd == VK_NULL_HANDLE) return;

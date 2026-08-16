@@ -62,10 +62,10 @@ public:
     bool dpsMeterUserPositioned_ = false;
 
     // ---- Public render methods ----
-    void renderCastBar(game::GameHandler& gameHandler, SpellIconFn getSpellIcon);
+    void renderCastBar(game::GameHandler& gameHandler, const SpellIconFn& getSpellIcon);
     void renderCooldownTracker(game::GameHandler& gameHandler,
                                const SettingsPanel& settings,
-                               SpellIconFn getSpellIcon);
+                               const SpellIconFn& getSpellIcon);
     void renderRaidWarningOverlay(game::GameHandler& gameHandler);
     void renderCombatText(game::GameHandler& gameHandler);
     /// targetFrameBottom: screen Y of the bottom of the target frame, or a
@@ -87,7 +87,7 @@ public:
                        SpellbookScreen& spellbookScreen,
                        InventoryScreen& inventoryScreen,
                        const SettingsPanel& settings,
-                       SpellIconFn getSpellIcon);
+                       const SpellIconFn& getSpellIcon);
     void renderBattlegroundScore(game::GameHandler& gameHandler);
     void renderCombatLog(game::GameHandler& gameHandler,
                          SpellbookScreen& spellbookScreen);

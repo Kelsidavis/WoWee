@@ -26,6 +26,7 @@
 #include <array>
 #include <functional>
 #include <cstdint>
+#include <utility>
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
@@ -3359,8 +3360,8 @@ public:
     /**
      * Set callbacks
      */
-    void setOnSuccess(WorldConnectSuccessCallback callback) { onSuccess = callback; }
-    void setOnFailure(WorldConnectFailureCallback callback) { onFailure = callback; }
+    void setOnSuccess(WorldConnectSuccessCallback callback) { onSuccess = std::move(callback); }
+    void setOnFailure(WorldConnectFailureCallback callback) { onFailure = std::move(callback); }
 
     /**
      * Update - call regularly (e.g., each frame)

@@ -41,7 +41,7 @@ struct ChatSettings {
     void restoreDefaults();
 
     /** Render the "Chat" tab inside the Settings window. */
-    void renderSettingsTab(std::function<void()> saveSettingsFn);
+    void renderSettingsTab(const std::function<void()>& saveSettingsFn);
 };
 
 } // namespace ui

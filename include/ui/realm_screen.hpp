@@ -4,6 +4,7 @@
 #include <imgui.h>
 #include <string>
 #include <functional>
+#include <utility>
 
 namespace wowee { namespace ui {
 
@@ -27,7 +28,7 @@ public:
      * @param callback Function to call when realm is selected (receives realm name and address)
      */
     void setOnRealmSelected(std::function<void(const std::string&, const std::string&)> callback) {
-        onRealmSelected = callback;
+        onRealmSelected = std::move(callback);
     }
 
     void setOnBack(std::function<void()> cb) { onBack = std::move(cb); }

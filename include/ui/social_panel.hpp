@@ -67,10 +67,10 @@ public:
     // ---- Public render methods ----
     void renderPartyFrames(game::GameHandler& gameHandler,
                            ChatPanel& chatPanel,
-                           SpellIconFn getSpellIcon);
+                           const SpellIconFn& getSpellIcon);
     void renderBossFrames(game::GameHandler& gameHandler,
                           SpellbookScreen& spellbookScreen,
-                          SpellIconFn getSpellIcon);
+                          const SpellIconFn& getSpellIcon);
     // Takes the panels the markup renderer needs: the guild info text and the
     // MOTD are server strings that carry item, spell, quest and achievement
     // links, and rendering them as plain text left every link inert.
@@ -79,7 +79,7 @@ public:
                            InventoryScreen& inventoryScreen,
                            SpellbookScreen& spellbookScreen,
                            QuestLogScreen& questLogScreen,
-                           SpellIconFn getSpellIcon);
+                           const SpellIconFn& getSpellIcon);
     void renderSocialFrame(game::GameHandler& gameHandler,
                            ChatPanel& chatPanel);
     void renderDungeonFinderWindow(game::GameHandler& gameHandler,

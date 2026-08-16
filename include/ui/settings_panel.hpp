@@ -236,7 +236,7 @@ public:
     /// could be pushed at them. They are reached through setInventoryScreen
     /// now, which is what lets those three work when they are changed from the
     /// interface's options rather than only from these sliders.
-    void renderSettingsWindow(ChatPanel& chatPanel, std::function<void()> saveCallback);
+    void renderSettingsWindow(ChatPanel& chatPanel, const std::function<void()>& saveCallback);
 
     /// Apply audio volume levels to all audio coordinator sound managers
     void applyAudioVolumes(audio::AudioCoordinator* ac);
@@ -308,9 +308,9 @@ private:
     bool awaitingKeyPress_ = false;
 
     // Settings tab rendering
-    void renderSettingsInterfaceTab(std::function<void()> saveCallback);
-    void renderSettingsGameplayTab(std::function<void()> saveCallback);
-    void renderSettingsControlsTab(std::function<void()> saveCallback);
+    void renderSettingsInterfaceTab(const std::function<void()>& saveCallback);
+    void renderSettingsGameplayTab(const std::function<void()>& saveCallback);
+    void renderSettingsControlsTab(const std::function<void()>& saveCallback);
     void renderSettingsAudioTab(std::function<void()> saveCallback);
     void renderSettingsAboutTab();
     void applyGraphicsPreset(GraphicsPreset preset);

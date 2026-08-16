@@ -4,6 +4,7 @@
 #include <functional>
 #include <vector>
 #include <cstdint>
+#include <utility>
 
 namespace wowee {
 namespace network {
@@ -22,7 +23,7 @@ public:
     virtual void update() = 0;
 
     using PacketCallback = std::function<void(const Packet&)>;
-    void setPacketCallback(PacketCallback callback) { packetCallback = callback; }
+    void setPacketCallback(PacketCallback callback) { packetCallback = std::move(callback); }
 
 protected:
     PacketCallback packetCallback;

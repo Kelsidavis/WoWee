@@ -6,6 +6,7 @@
 #include <string>
 #include <functional>
 #include <array>
+#include <utility>
 
 namespace wowee {
 namespace network { class TCPSocket; class Packet; }
@@ -71,9 +72,9 @@ public:
     [[nodiscard]] bool lastFailureWasProtocol() const { return protocolFailureSuspected_; }
 
     // Callbacks
-    void setOnSuccess(AuthSuccessCallback callback) { onSuccess = callback; }
-    void setOnFailure(AuthFailureCallback callback) { onFailure = callback; }
-    void setOnRealmList(RealmListCallback callback) { onRealmList = callback; }
+    void setOnSuccess(AuthSuccessCallback callback) { onSuccess = std::move(callback); }
+    void setOnFailure(AuthFailureCallback callback) { onFailure = std::move(callback); }
+    void setOnRealmList(RealmListCallback callback) { onRealmList = std::move(callback); }
 
     // Update (call each frame)
     void update(float deltaTime);

@@ -13,6 +13,7 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <utility>
 #include <string>
 #include <array>
 
@@ -61,7 +62,7 @@ public:
      * @param callback Function to call when packet is received
      */
     void setPacketCallback(std::function<void(const Packet&)> callback) {
-        packetCallback = callback;
+        packetCallback = std::move(callback);
     }
 
     /**

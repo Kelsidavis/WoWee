@@ -6,6 +6,7 @@
 #include <string>
 #include <functional>
 #include <memory>
+#include <utility>
 
 namespace wowee {
 namespace pipeline { class AssetManager; }
@@ -42,7 +43,7 @@ public:
      * @param callback Function to call when character is selected (receives character GUID)
      */
     void setOnCharacterSelected(std::function<void(uint64_t)> callback) {
-        onCharacterSelected = callback;
+        onCharacterSelected = std::move(callback);
     }
 
     void setOnCreateCharacter(std::function<void()> cb) { onCreateCharacter = std::move(cb); }

@@ -32,9 +32,9 @@ public:
     void clearSelectionCircle();
     void renderSelectionCircle(const glm::mat4& view, const glm::mat4& projection,
                                VkCommandBuffer cmd,
-                               HeightQuery2D terrainHeight,
-                               HeightQuery3D wmoHeight,
-                               HeightQuery3D m2Height);
+                               const HeightQuery2D& terrainHeight,
+                               const HeightQuery3D& wmoHeight,
+                               const HeightQuery3D& m2Height);
 
     // Fullscreen color overlay (underwater tint, etc.)
     void renderOverlay(const glm::vec4& color, VkCommandBuffer cmd);

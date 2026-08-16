@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <utility>
 
 namespace wowee { namespace rendering { class VkContext; } }
 
@@ -36,7 +37,7 @@ public:
     /**
      * Set callback for successful authentication
      */
-    void setOnSuccess(std::function<void()> callback) { onSuccess = callback; }
+    void setOnSuccess(std::function<void()> callback) { onSuccess = std::move(callback); }
 
     /// Set services (dependency injection)
     void setServices(const UIServices& services) { services_ = services; }

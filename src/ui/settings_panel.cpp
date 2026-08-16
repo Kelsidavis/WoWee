@@ -62,7 +62,7 @@ namespace wowee { namespace ui {
 // note beside it, sixty lines of them - with the note saying something the
 // options panel on the other side of the bridge said differently or not at
 // all. Both windows read the same rows now.
-void SettingsPanel::renderSettingsInterfaceTab(std::function<void()> saveCallback) {
+void SettingsPanel::renderSettingsInterfaceTab(const std::function<void()>& saveCallback) {
     ImGui::Spacing();
     ImGui::BeginChild("InterfaceSettings", ImVec2(0, -1), true);
 
@@ -94,7 +94,7 @@ void SettingsPanel::renderSettingsInterfaceTab(std::function<void()> saveCallbac
 // game's own Interface panel drives it too - it is a control this window has
 // always had, and both write the same value through the same setter, so they
 // cannot disagree.
-void SettingsPanel::renderSettingsGameplayTab(std::function<void()> saveCallback) {
+void SettingsPanel::renderSettingsGameplayTab(const std::function<void()>& saveCallback) {
     auto* renderer = services_.renderer;
     ImGui::Spacing();
     ImGui::BeginChild("GameplaySettings", ImVec2(0, -1), true);
@@ -159,7 +159,7 @@ void SettingsPanel::renderSettingsGameplayTab(std::function<void()> saveCallback
     ImGui::EndChild();
 }
 
-void SettingsPanel::renderSettingsControlsTab(std::function<void()> saveCallback) {
+void SettingsPanel::renderSettingsControlsTab(const std::function<void()>& saveCallback) {
 ImGui::Spacing();
 
 ImGui::Text("Keybindings");
@@ -368,7 +368,7 @@ ImGui::TextDisabled("Built with Vulkan, SDL2, and ImGui");
 }
 
 void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
-                                             std::function<void()> saveCallback) {
+                                             const std::function<void()>& saveCallback) {
     if (!showSettingsWindow) return;
 
     auto* window = services_.window;
