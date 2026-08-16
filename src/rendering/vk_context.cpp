@@ -169,6 +169,17 @@ void VkContext::shutdown() {
     // allocator under validation. Every batch left in flight leaked a command
     // buffer, its staging buffers and their memory, which is most of what
     // vkDestroyDevice reported.
+    if (!inFlightBatches_.empty() || !batchRawStaging_.empty() || !batchStagingBuffers_.empty()) {
+        size_t rawInFlight = 0, vmaInFlight = 0;
+        for (const auto& b : inFlightBatches_) {
+            rawInFlight += b.rawStaging.size();
+            vmaInFlight += b.stagingBuffers.size();
+        }
+        LOG_INFO("shutdown: retiring ", inFlightBatches_.size(), " upload batches (",
+                 rawInFlight, " raw + ", vmaInFlight, " pooled staging), plus ",
+                 batchRawStaging_.size(), " raw + ", batchStagingBuffers_.size(),
+                 " pooled in the batch still being built");
+    }
     waitAllUploads();
 
     // The batch still being accumulated has never been submitted, so

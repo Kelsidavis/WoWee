@@ -65,6 +65,20 @@ static std::vector<uint8_t> hexDecode(const std::string& hex) {
 AuthScreen::AuthScreen() {
 }
 
+AuthScreen::~AuthScreen() {
+    // The background image was uploaded with plain vkCreateImage and
+    // vkAllocateMemory and nothing released it, so it and its view outlived
+    // the device on every run. bgSampler is the context's, cached and shared,
+    // and bgDescriptorSet belongs to the ImGui backend, which frees its own
+    // pool -- neither is this class's to destroy.
+    if (!bgVkCtx) return;
+    VkDevice device = bgVkCtx->getDevice();
+    if (device == VK_NULL_HANDLE) return;
+    if (bgImageView) { vkDestroyImageView(device, bgImageView, nullptr); bgImageView = VK_NULL_HANDLE; }
+    if (bgImage)     { vkDestroyImage(device, bgImage, nullptr);         bgImage = VK_NULL_HANDLE; }
+    if (bgMemory)    { vkFreeMemory(device, bgMemory, nullptr);          bgMemory = VK_NULL_HANDLE; }
+}
+
 std::string AuthScreen::makeServerKey(const std::string& host, int port) {
     std::ostringstream ss;
     ss << host << ":" << port;

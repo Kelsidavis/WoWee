@@ -22,6 +22,10 @@ namespace wowee { namespace ui {
 class AuthScreen {
 public:
     AuthScreen();
+    /// Releases the background image. It is the only Vulkan resource this
+    /// screen owns outright -- bgSampler comes from the context's cache and
+    /// bgDescriptorSet belongs to the ImGui backend.
+    ~AuthScreen();
 
     /**
      * Render the UI
