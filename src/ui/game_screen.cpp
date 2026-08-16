@@ -1525,7 +1525,12 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
             EscapeState st;
             st.interfaceConsumedKey  = interfaceConsumedKey(ImGuiKey_Escape);
             st.settingsWindowShown   = settingsPanel_.showSettingsWindow;
-            st.holdingItem           = inventoryScreen.isHoldingItem();
+            // Either cursor. With the bags handed over an item is picked up
+            // through FrameXML's, and Escape has to put that one down too -
+            // this read only the bag window's, so Escape opened the menu with
+            // an item still stuck to the pointer.
+            st.holdingItem           = inventoryScreen.isHoldingItem() ||
+                                       !frameXmlCursorItem().empty();
             st.clientMenuShown       = windowManager_.showEscapeMenu;
             st.casting               = gameHandler.isCasting();
             st.lootOpen              = gameHandler.isLootWindowOpen();
@@ -1570,7 +1575,10 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 case EscapeAction::CloseLoot:              gameHandler.closeLoot(); break;
                 case EscapeAction::CloseGossip:            gameHandler.closeGossip(); break;
                 case EscapeAction::ReturnHeldItem:
-                    inventoryScreen.returnHeldItem(gameHandler.getInventory());
+                    if (inventoryScreen.isHoldingItem())
+                        inventoryScreen.returnHeldItem(gameHandler.getInventory());
+                    else
+                        frameXmlPutCursorDown();
                     break;
                 case EscapeAction::CloseVendor:            gameHandler.closeVendor(); break;
                 case EscapeAction::CloseBarberShop:        gameHandler.closeBarberShop(); break;
@@ -1890,14 +1898,27 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 // Dropping what the cursor is carrying onto another player
                 // opens a trade with them, which is how a trade begins in WoW
                 // and was reachable here only by typing /trade.
-                if (closestGuid != 0 && inventoryScreen.isHoldingItem()) {
+                // Either cursor again: the item being offered usually comes
+                // from FrameXML's bags now, and asking only the bag window's
+                // meant a drag onto a player did nothing.
+                const bool carrying = inventoryScreen.isHoldingItem() ||
+                                      !frameXmlCursorItem().empty();
+                if (closestGuid != 0 && carrying) {
                     auto entity = gameHandler.getEntityManager().getEntity(closestGuid);
                     if (entity && entity->getType() == game::ObjectType::PLAYER) {
                         uint8_t srcBag = 0xFF, srcSlot = 0;
-                        if (inventoryScreen.heldItemSource(srcBag, srcSlot)) {
+                        const bool haveSource =
+                            inventoryScreen.isHoldingItem()
+                                ? inventoryScreen.heldItemSource(srcBag, srcSlot)
+                                : frameXmlCursorWireSlot(srcBag, srcSlot);
+                        if (haveSource) {
                             pendingTradeItem_ = PendingTradeItem{true, srcBag, srcSlot};
                             gameHandler.initiateTrade(closestGuid);
-                            inventoryScreen.releaseHeldItem();
+                            // Whichever cursor was carrying it.
+                            if (inventoryScreen.isHoldingItem())
+                                inventoryScreen.releaseHeldItem();
+                            else
+                                frameXmlPutCursorDown();
                             return;
                         }
                     }
