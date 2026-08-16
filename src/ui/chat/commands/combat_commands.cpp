@@ -89,7 +89,7 @@ uint32_t parseNumericSpellId(const std::string& str) {
 class CastCommand : public IChatCommand {
 public:
     ChatCommandResult execute(ChatCommandContext& ctx) override {
-        if (ctx.args.empty()) return {false, false};
+        if (ctx.args.empty()) return {.handled = false, .clearInput = false};
 
         std::string spellArg = ctx.args;
         trimInPlace(spellArg);
@@ -159,7 +159,7 @@ public:
 class CastSequenceCommand : public IChatCommand {
 public:
     ChatCommandResult execute(ChatCommandContext& ctx) override {
-        if (ctx.args.empty()) return {false, false};
+        if (ctx.args.empty()) return {.handled = false, .clearInput = false};
 
         std::string seqArg = ctx.args;
         trimInPlace(seqArg);
@@ -270,7 +270,7 @@ public:
 class UseCommand : public IChatCommand {
 public:
     ChatCommandResult execute(ChatCommandContext& ctx) override {
-        if (ctx.args.empty()) return {false, false};
+        if (ctx.args.empty()) return {.handled = false, .clearInput = false};
 
         std::string useArg = ctx.args;
         trimInPlace(useArg);
@@ -362,7 +362,7 @@ public:
 class EquipCommand : public IChatCommand {
 public:
     ChatCommandResult execute(ChatCommandContext& ctx) override {
-        if (ctx.args.empty()) return {false, false};
+        if (ctx.args.empty()) return {.handled = false, .clearInput = false};
 
         std::string equipArg = ctx.args;
         trimInPlace(equipArg);

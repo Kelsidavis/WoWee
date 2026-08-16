@@ -1889,7 +1889,7 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                                 ? inventoryScreen.heldItemSource(srcBag, srcSlot)
                                 : frameXmlCursorWireSlot(srcBag, srcSlot);
                         if (haveSource) {
-                            pendingTradeItem_ = PendingTradeItem{true, srcBag, srcSlot};
+                            pendingTradeItem_ = PendingTradeItem{.active = true, .bag = srcBag, .slot = srcSlot};
                             gameHandler.initiateTrade(closestGuid);
                             // Whichever cursor was carrying it.
                             if (inventoryScreen.isHoldingItem())

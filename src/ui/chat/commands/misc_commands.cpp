@@ -384,7 +384,7 @@ public:
             return {};
         }
         // Unrecognized sub-command
-        return {false, false};
+        return {.handled = false, .clearInput = false};
     }
     [[nodiscard]] std::vector<std::string> aliases() const override { return {"transport"}; }
     [[nodiscard]] std::string helpText() const override { return "Transport: /transport board|leave"; }

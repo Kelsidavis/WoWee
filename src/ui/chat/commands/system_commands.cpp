@@ -20,7 +20,7 @@ namespace wowee { namespace ui {
 class RunCommand : public IChatCommand {
 public:
     ChatCommandResult execute(ChatCommandContext& ctx) override {
-        if (ctx.args.empty()) return {false, false};
+        if (ctx.args.empty()) return {.handled = false, .clearInput = false};
         auto* am = ctx.services.addonManager;
         if (am) {
             am->runScript(ctx.args);
@@ -37,7 +37,7 @@ public:
 class DumpCommand : public IChatCommand {
 public:
     ChatCommandResult execute(ChatCommandContext& ctx) override {
-        if (ctx.args.empty()) return {false, false};
+        if (ctx.args.empty()) return {.handled = false, .clearInput = false};
         auto* am = ctx.services.addonManager;
         if (am && am->isInitialized()) {
             // Wrap expression in print(tostring(...)) to display the value

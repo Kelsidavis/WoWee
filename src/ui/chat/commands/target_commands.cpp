@@ -59,7 +59,7 @@ uint64_t findNearestByName(game::GameHandler& gh, const std::string& targetArgLo
 class TargetCommand : public IChatCommand {
 public:
     ChatCommandResult execute(ChatCommandContext& ctx) override {
-        if (ctx.args.empty()) return {false, false};
+        if (ctx.args.empty()) return {.handled = false, .clearInput = false};
 
         std::string targetArg = ctx.args;
 

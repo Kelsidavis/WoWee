@@ -1545,12 +1545,12 @@ void InventoryScreen::renderCharacterScreen(game::GameHandler& gameHandler) {
                     uint32_t categoryId;
                 };
                 static constexpr CategoryGroup groups[] = {
-                    { "Weapon Skills", 6 },
-                    { "Armor Skills", 8 },
-                    { "Secondary Skills", 10 },
-                    { "Professions", 11 },
-                    { "Languages", 9 },
-                    { "Other", 0 },
+                    { .label = "Weapon Skills", .categoryId = 6 },
+                    { .label = "Armor Skills", .categoryId = 8 },
+                    { .label = "Secondary Skills", .categoryId = 10 },
+                    { .label = "Professions", .categoryId = 11 },
+                    { .label = "Languages", .categoryId = 9 },
+                    { .label = "Other", .categoryId = 0 },
                 };
 
                 ImGui::BeginChild("##SkillsList", ImVec2(0, 0), true);

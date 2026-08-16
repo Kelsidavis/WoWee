@@ -65,10 +65,10 @@ struct GraphicsPresetValues {
 // on the way past. Low leans on its short shadow distance instead, which is
 // where the cost actually is.
 constexpr GraphicsPresetValues kGraphicsPresets[] = {
-    /* Low    */ { 600.0f, true,  100.0f, 0, false, false, 0.6f, false, 0,  25},
-    /* Medium */ {1000.0f, true,  200.0f, 1, false, true,  0.6f, true,  0,  60},
-    /* High   */ {1600.0f, true,  350.0f, 2, false, true,  0.8f, true,  1, 100},
-    /* Ultra  */ {2400.0f, true,  500.0f, 3, true,  true,  1.2f, true,  2, 150},
+    /* Low    */ { .viewDistance = 600.0f, .shadows = true,  .shadowDistance = 100.0f, .antiAliasing = 0, .fxaa = false, .normalMapping = false, .normalMapStrength = 0.6f, .parallax = false, .parallaxQuality = 0,  .groundClutter = 25},
+    /* Medium */ {.viewDistance = 1000.0f, .shadows = true,  .shadowDistance = 200.0f, .antiAliasing = 1, .fxaa = false, .normalMapping = true,  .normalMapStrength = 0.6f, .parallax = true,  .parallaxQuality = 0,  .groundClutter = 60},
+    /* High   */ {.viewDistance = 1600.0f, .shadows = true,  .shadowDistance = 350.0f, .antiAliasing = 2, .fxaa = false, .normalMapping = true,  .normalMapStrength = 0.8f, .parallax = true,  .parallaxQuality = 1, .groundClutter = 100},
+    /* Ultra  */ {.viewDistance = 2400.0f, .shadows = true,  .shadowDistance = 500.0f, .antiAliasing = 3, .fxaa = true,  .normalMapping = true,  .normalMapStrength = 1.2f, .parallax = true,  .parallaxQuality = 2, .groundClutter = 150},
 };
 
 /// The number of presets, not counting Custom - which is not a set of values

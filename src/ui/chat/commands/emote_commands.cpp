@@ -115,7 +115,7 @@ public:
 class CancelAuraCommand : public IChatCommand {
 public:
     ChatCommandResult execute(ChatCommandContext& ctx) override {
-        if (ctx.args.empty()) return {false, false};
+        if (ctx.args.empty()) return {.handled = false, .clearInput = false};
         std::string auraArg = ctx.args;
         while (!auraArg.empty() && auraArg.front() == ' ') auraArg.erase(auraArg.begin());
         while (!auraArg.empty() && auraArg.back()  == ' ') auraArg.pop_back();

@@ -363,27 +363,27 @@ struct Emitter {
         struct Slot { const char* element; const char* setter;
                       const char* layer; bool isTexture; };
         static constexpr Slot kSlots[] = {
-            {"NormalTexture",          "SetNormalTexture",          "ARTWORK",   true},
-            {"PushedTexture",          "SetPushedTexture",          "ARTWORK",   true},
-            {"DisabledTexture",        "SetDisabledTexture",        "ARTWORK",   true},
-            {"CheckedTexture",         "SetCheckedTexture",         "ARTWORK",   true},
-            {"DisabledCheckedTexture", "SetDisabledCheckedTexture", "ARTWORK",   true},
+            {.element = "NormalTexture",          .setter = "SetNormalTexture",          .layer = "ARTWORK",   .isTexture = true},
+            {.element = "PushedTexture",          .setter = "SetPushedTexture",          .layer = "ARTWORK",   .isTexture = true},
+            {.element = "DisabledTexture",        .setter = "SetDisabledTexture",        .layer = "ARTWORK",   .isTexture = true},
+            {.element = "CheckedTexture",         .setter = "SetCheckedTexture",         .layer = "ARTWORK",   .isTexture = true},
+            {.element = "DisabledCheckedTexture", .setter = "SetDisabledCheckedTexture", .layer = "ARTWORK",   .isTexture = true},
             // Drawn above the button's own art rather than beside it, which is
             // the whole point of the highlight layer.
-            {"HighlightTexture",       "SetHighlightTexture",       "HIGHLIGHT", true},
+            {.element = "HighlightTexture",       .setter = "SetHighlightTexture",       .layer = "HIGHLIGHT", .isTexture = true},
             // Over the art, so a label is never hidden by the face beneath it.
-            {"ButtonText",             "SetFontString",             "OVERLAY",   false},
+            {.element = "ButtonText",             .setter = "SetFontString",             .layer = "OVERLAY",   .isTexture = false},
             // A slider's grip, which draws over the channel it runs in.
-            {"ThumbTexture",           "SetThumbTexture",           "OVERLAY",   true},
+            {.element = "ThumbTexture",           .setter = "SetThumbTexture",           .layer = "OVERLAY",   .isTexture = true},
             // The colour picker's four parts. Declared like button art rather
             // than inside a Layer, and dropped here for the same reason button
             // art used to be: the emitter only walked Layers. ColorPickerWheel
             // is a name FrameXML looks up, so losing the region lost the name
             // as well as the art.
-            {"ColorWheelTexture",      "SetColorWheelTexture",      "ARTWORK",   true},
-            {"ColorWheelThumbTexture", "SetColorWheelThumbTexture", "OVERLAY",   true},
-            {"ColorValueTexture",      "SetColorValueTexture",      "ARTWORK",   true},
-            {"ColorValueThumbTexture", "SetColorValueThumbTexture", "OVERLAY",   true},
+            {.element = "ColorWheelTexture",      .setter = "SetColorWheelTexture",      .layer = "ARTWORK",   .isTexture = true},
+            {.element = "ColorWheelThumbTexture", .setter = "SetColorWheelThumbTexture", .layer = "OVERLAY",   .isTexture = true},
+            {.element = "ColorValueTexture",      .setter = "SetColorValueTexture",      .layer = "ARTWORK",   .isTexture = true},
+            {.element = "ColorValueThumbTexture", .setter = "SetColorValueThumbTexture", .layer = "OVERLAY",   .isTexture = true},
         };
         for (const Slot& slot : kSlots) {
             const XmlNode* child = node.child(slot.element);

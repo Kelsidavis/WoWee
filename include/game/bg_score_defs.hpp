@@ -30,17 +30,17 @@ struct BgScoreDef {
 
 inline constexpr BgScoreDef kBgScoreDefs[] = {
     // Warsong Gulch: 3 flag captures wins
-    { 489, "Warsong Gulch",          1581, 1582, 0,    3, "flags" },
+    { .mapId = 489, .name = "Warsong Gulch",          .allianceKey = 1581, .hordeKey = 1582, .maxKey = 0,    .hardcodedMax = 3, .unit = "flags" },
     // Arathi Basin: 1600 resources wins
-    { 529, "Arathi Basin",           1218, 1219, 0, 1600, "resources" },
+    { .mapId = 529, .name = "Arathi Basin",           .allianceKey = 1218, .hordeKey = 1219, .maxKey = 0, .hardcodedMax = 1600, .unit = "resources" },
     // Alterac Valley: reinforcements count down from 600 / 800 etc.
-    {  30, "Alterac Valley",         1322, 1323, 0,  600, "reinforcements" },
+    {  .mapId = 30, .name = "Alterac Valley",         .allianceKey = 1322, .hordeKey = 1323, .maxKey = 0,  .hardcodedMax = 600, .unit = "reinforcements" },
     // Eye of the Storm: 1600 resources wins
-    { 566, "Eye of the Storm",       2757, 2758, 0, 1600, "resources" },
+    { .mapId = 566, .name = "Eye of the Storm",       .allianceKey = 2757, .hordeKey = 2758, .maxKey = 0, .hardcodedMax = 1600, .unit = "resources" },
     // Strand of the Ancients (WotLK)
-    { 607, "Strand of the Ancients", 3476, 3477, 0,    4, "" },
+    { .mapId = 607, .name = "Strand of the Ancients", .allianceKey = 3476, .hordeKey = 3477, .maxKey = 0,    .hardcodedMax = 4, .unit = "" },
     // Isle of Conquest (WotLK): reinforcements (300 default)
-    { 628, "Isle of Conquest",       4221, 4222, 0,  300, "reinforcements" },
+    { .mapId = 628, .name = "Isle of Conquest",       .allianceKey = 4221, .hordeKey = 4222, .maxKey = 0,  .hardcodedMax = 300, .unit = "reinforcements" },
 };
 
 /// What each battleground's per-player objective columns are called.
@@ -59,13 +59,13 @@ struct BgObjectiveColumns {
 };
 
 inline constexpr BgObjectiveColumns kBgObjectiveColumns[] = {
-    { 489, {"Flags Captured", "Flags Returned", nullptr, nullptr, nullptr} },
-    { 529, {"Bases Assaulted", "Bases Defended", nullptr, nullptr, nullptr} },
-    {  30, {"Graveyards Assaulted", "Graveyards Defended",
+    { .mapId = 489, .labels = {"Flags Captured", "Flags Returned", nullptr, nullptr, nullptr} },
+    { .mapId = 529, .labels = {"Bases Assaulted", "Bases Defended", nullptr, nullptr, nullptr} },
+    {  .mapId = 30, .labels = {"Graveyards Assaulted", "Graveyards Defended",
             "Towers Assaulted", "Towers Defended", "Mines Captured"} },
-    { 566, {"Flags Captured", nullptr, nullptr, nullptr, nullptr} },
-    { 607, {"Demolishers Destroyed", "Gates Destroyed", nullptr, nullptr, nullptr} },
-    { 628, {"Bases Assaulted", "Bases Defended", nullptr, nullptr, nullptr} },
+    { .mapId = 566, .labels = {"Flags Captured", nullptr, nullptr, nullptr, nullptr} },
+    { .mapId = 607, .labels = {"Demolishers Destroyed", "Gates Destroyed", nullptr, nullptr, nullptr} },
+    { .mapId = 628, .labels = {"Bases Assaulted", "Bases Defended", nullptr, nullptr, nullptr} },
 };
 
 /// The label for a column, or nullptr when the map is unknown or the index is

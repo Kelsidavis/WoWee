@@ -178,7 +178,7 @@ public:
         }
         // If no args, the group LeaveCommand will handle /leave (leave party)
         // so we return not-handled to allow fallthrough
-        if (ctx.args.empty()) return {false, false};
+        if (ctx.args.empty()) return {.handled = false, .clearInput = false};
         return {};
     }
     [[nodiscard]] std::vector<std::string> aliases() const override { return {"leavechannel"}; }
@@ -189,7 +189,7 @@ public:
 class TradeChannelCommand : public IChatCommand {
 public:
     ChatCommandResult execute(ChatCommandContext& ctx) override {
-        if (ctx.args.empty()) return {false, false};
+        if (ctx.args.empty()) return {.handled = false, .clearInput = false};
         const std::string tag = (ctx.fullCommand == "wts") ? "[WTS] " : "[WTB] ";
         std::string tradeChan;
         for (const auto& ch : ctx.gameHandler.getJoinedChannels()) {

@@ -109,7 +109,7 @@ std::vector<uint8_t> WidgetRenderer::readTextureFile(const std::string& path,
         // aliased at extraction time, because the extractor preserves the
         // paths its MPQs use and is right to.
         static constexpr struct { const char* from; const char* to; } kFolders[] = {
-            {"gossipframe\\", "gossip\\"},
+            {.from = "gossipframe\\", .to = "gossip\\"},
         };
         std::string lower = resolved;
         for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));

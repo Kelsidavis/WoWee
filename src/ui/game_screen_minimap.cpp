@@ -1607,7 +1607,7 @@ void GameScreen::renderMinimapMarkers(game::GameHandler& gameHandler) {
 
     // The same view the Lua binding uses, so a ctrl+click here and a
     // Minimap:PingLocation from the interface land on the same world point.
-    const MinimapView minimapView{viewRadius, mapRadius, cosB, sinB};
+    const MinimapView minimapView{.viewRadius = viewRadius, .mapRadius = mapRadius, .cosBearing = cosB, .sinBearing = sinB};
 
     // Behind windows, in front of the map.
     //

@@ -12,7 +12,7 @@ namespace wowee { namespace ui {
 class InviteCommand : public IChatCommand {
 public:
     ChatCommandResult execute(ChatCommandContext& ctx) override {
-        if (ctx.args.empty()) return {false, false};
+        if (ctx.args.empty()) return {.handled = false, .clearInput = false};
         ctx.gameHandler.inviteToGroup(ctx.args);
         return {};
     }

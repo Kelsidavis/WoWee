@@ -292,22 +292,22 @@ void KeybindingManager::saveToConfigFile(const std::string& filePath) const {
         Action action;
         const char* name;
     } actionMap[] = {
-        {Action::TOGGLE_CHARACTER_SCREEN, "toggle_character_screen"},
-        {Action::TOGGLE_INVENTORY, "toggle_inventory"},
-        {Action::TOGGLE_BAGS, "toggle_bags"},
-        {Action::TOGGLE_SPELLBOOK, "toggle_spellbook"},
-        {Action::TOGGLE_TALENTS, "toggle_talents"},
-        {Action::TOGGLE_QUESTS, "toggle_quests"},
-        {Action::TOGGLE_MINIMAP, "toggle_minimap"},
-        {Action::TOGGLE_SETTINGS, "toggle_settings"},
-        {Action::TOGGLE_CHAT, "toggle_chat"},
-        {Action::TOGGLE_GUILD_ROSTER, "toggle_guild_roster"},
-        {Action::TOGGLE_DUNGEON_FINDER, "toggle_dungeon_finder"},
-        {Action::TOGGLE_WORLD_MAP, "toggle_world_map"},
-        {Action::TOGGLE_NAMEPLATES, "toggle_nameplates"},
-        {Action::TOGGLE_RAID_FRAMES, "toggle_raid_frames"},
-        {Action::TOGGLE_ACHIEVEMENTS, "toggle_achievements"},
-        {Action::TOGGLE_SKILLS, "toggle_skills"},
+        {.action = Action::TOGGLE_CHARACTER_SCREEN, .name = "toggle_character_screen"},
+        {.action = Action::TOGGLE_INVENTORY, .name = "toggle_inventory"},
+        {.action = Action::TOGGLE_BAGS, .name = "toggle_bags"},
+        {.action = Action::TOGGLE_SPELLBOOK, .name = "toggle_spellbook"},
+        {.action = Action::TOGGLE_TALENTS, .name = "toggle_talents"},
+        {.action = Action::TOGGLE_QUESTS, .name = "toggle_quests"},
+        {.action = Action::TOGGLE_MINIMAP, .name = "toggle_minimap"},
+        {.action = Action::TOGGLE_SETTINGS, .name = "toggle_settings"},
+        {.action = Action::TOGGLE_CHAT, .name = "toggle_chat"},
+        {.action = Action::TOGGLE_GUILD_ROSTER, .name = "toggle_guild_roster"},
+        {.action = Action::TOGGLE_DUNGEON_FINDER, .name = "toggle_dungeon_finder"},
+        {.action = Action::TOGGLE_WORLD_MAP, .name = "toggle_world_map"},
+        {.action = Action::TOGGLE_NAMEPLATES, .name = "toggle_nameplates"},
+        {.action = Action::TOGGLE_RAID_FRAMES, .name = "toggle_raid_frames"},
+        {.action = Action::TOGGLE_ACHIEVEMENTS, .name = "toggle_achievements"},
+        {.action = Action::TOGGLE_SKILLS, .name = "toggle_skills"},
     };
 
     for (const auto& [action, nameStr] : actionMap) {

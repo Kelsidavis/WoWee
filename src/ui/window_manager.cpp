@@ -927,13 +927,13 @@ void WindowManager::renderSkillsWindow(game::GameHandler& gameHandler) {
     }
 
     static constexpr struct { uint32_t cat; const char* label; } kCatOrder[] = {
-        {11, "Professions"},
-        { 9, "Secondary Skills"},
-        { 7, "Class Skills"},
-        { 6, "Weapon Skills"},
-        { 8, "Armor"},
-        { 5, "Languages"},
-        { 0, "Other"},
+        {.cat = 11, .label = "Professions"},
+        { .cat = 9, .label = "Secondary Skills"},
+        { .cat = 7, .label = "Class Skills"},
+        { .cat = 6, .label = "Weapon Skills"},
+        { .cat = 8, .label = "Armor"},
+        { .cat = 5, .label = "Languages"},
+        { .cat = 0, .label = "Other"},
     };
 
     // Collect handled categories to fall back to "Other" for unknowns

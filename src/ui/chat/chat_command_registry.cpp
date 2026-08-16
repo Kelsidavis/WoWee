@@ -30,7 +30,7 @@ ChatCommandResult ChatCommandRegistry::dispatch(const std::string& cmdLower,
                                                   ChatCommandContext& ctx) {
     auto it = commandMap_.find(cmdLower);
     if (it == commandMap_.end()) {
-        return {false, false};  // not handled
+        return {.handled = false, .clearInput = false};  // not handled
     }
     return it->second->execute(ctx);
 }

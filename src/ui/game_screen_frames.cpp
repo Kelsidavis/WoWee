@@ -875,10 +875,10 @@ void GameScreen::renderTotemFrame(game::GameHandler& gameHandler) {
     if (!anyActive) return;
 
     static constexpr struct { const char* name; ImU32 color; } kTotemInfo[4] = {
-        { "Earth", IM_COL32(139, 90,  43, 255) },   // brown
-        { "Fire",  IM_COL32(220, 80,  30, 255) },   // red-orange
-        { "Water", IM_COL32( 30,120, 220, 255) },   // blue
-        { "Air",   IM_COL32(180,220, 255, 255) },   // light blue
+        { .name = "Earth", .color = IM_COL32(139, 90,  43, 255) },   // brown
+        { .name = "Fire",  .color = IM_COL32(220, 80,  30, 255) },   // red-orange
+        { .name = "Water", .color = IM_COL32( 30,120, 220, 255) },   // blue
+        { .name = "Air",   .color = IM_COL32(180,220, 255, 255) },   // light blue
     };
 
     // Position: below pet frame / player frame, left side

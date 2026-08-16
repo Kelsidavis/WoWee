@@ -24,14 +24,14 @@ struct ReputationStanding {
 };
 
 inline constexpr ReputationStanding kReputationStandings[8] = {
-    {1, "Hated",      -42000, -6001},
-    {2, "Hostile",     -6000, -3001},
-    {3, "Unfriendly",  -3000,    -1},
-    {4, "Neutral",         0,  2999},
-    {5, "Friendly",     3000,  8999},
-    {6, "Honored",      9000, 20999},
-    {7, "Revered",     21000, 41999},
-    {8, "Exalted",     42000, 42999},
+    {.id = 1, .name = "Hated",      .floor = -42000, .ceiling = -6001},
+    {.id = 2, .name = "Hostile",     .floor = -6000, .ceiling = -3001},
+    {.id = 3, .name = "Unfriendly",  .floor = -3000,    .ceiling = -1},
+    {.id = 4, .name = "Neutral",         .floor = 0,  .ceiling = 2999},
+    {.id = 5, .name = "Friendly",     .floor = 3000,  .ceiling = 8999},
+    {.id = 6, .name = "Honored",      .floor = 9000, .ceiling = 20999},
+    {.id = 7, .name = "Revered",     .floor = 21000, .ceiling = 41999},
+    {.id = 8, .name = "Exalted",     .floor = 42000, .ceiling = 42999},
 };
 
 /// The standing's name by the index an item's requiredReputationRank uses.

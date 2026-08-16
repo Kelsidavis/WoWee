@@ -495,12 +495,12 @@ void SpellbookScreen::renderSpellTooltip(const SpellInfo* info, game::GameHandle
     if (info->schoolMask != 0 && info->schoolMask != 1 /*physical*/) {
         struct SchoolEntry { uint32_t mask; const char* name; ImVec4 color; };
         static constexpr SchoolEntry kSchools[] = {
-            { 2,  "Holy",    { 1.0f, 1.0f, 0.6f, 1.0f } },
-            { 4,  "Fire",    { 1.0f, 0.5f, 0.1f, 1.0f } },
-            { 8,  "Nature",  { 0.4f, 0.9f, 0.3f, 1.0f } },
-            { 16, "Frost",   { 0.5f, 0.8f, 1.0f, 1.0f } },
-            { 32, "Shadow",  { 0.7f, 0.4f, 1.0f, 1.0f } },
-            { 64, "Arcane",  { 0.9f, 0.5f, 1.0f, 1.0f } },
+            { .mask = 2,  .name = "Holy",    .color = { 1.0f, 1.0f, 0.6f, 1.0f } },
+            { .mask = 4,  .name = "Fire",    .color = { 1.0f, 0.5f, 0.1f, 1.0f } },
+            { .mask = 8,  .name = "Nature",  .color = { 0.4f, 0.9f, 0.3f, 1.0f } },
+            { .mask = 16, .name = "Frost",   .color = { 0.5f, 0.8f, 1.0f, 1.0f } },
+            { .mask = 32, .name = "Shadow",  .color = { 0.7f, 0.4f, 1.0f, 1.0f } },
+            { .mask = 64, .name = "Arcane",  .color = { 0.9f, 0.5f, 1.0f, 1.0f } },
         };
         bool first = true;
         for (const auto& s : kSchools) {

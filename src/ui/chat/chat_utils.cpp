@@ -30,14 +30,14 @@ struct PortBotDestination {
 };
 
 constexpr PortBotDestination kPortBotDestinations[] = {
-    {"sw",    "stormwind"},
-    {"if",    "ironforge"},
-    {"darn",  "darnassus"},
-    {"org",   "orgrimmar"},
-    {"tb",    "thunderbluff"},
-    {"uc",    "undercity"},
-    {"shatt", "shattrath"},
-    {"dal",   "dalaran"},
+    {.shortAlias = "sw",    .fullName = "stormwind"},
+    {.shortAlias = "if",    .fullName = "ironforge"},
+    {.shortAlias = "darn",  .fullName = "darnassus"},
+    {.shortAlias = "org",   .fullName = "orgrimmar"},
+    {.shortAlias = "tb",    .fullName = "thunderbluff"},
+    {.shortAlias = "uc",    .fullName = "undercity"},
+    {.shortAlias = "shatt", .fullName = "shattrath"},
+    {.shortAlias = "dal",   .fullName = "dalaran"},
 };
 
 }  // namespace

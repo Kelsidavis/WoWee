@@ -846,9 +846,9 @@ void GameScreen::renderMirrorTimers(game::GameHandler& gameHandler) {
     float screenH = displaySize.y > 0.0f ? displaySize.y : 720.0f;
 
     static constexpr struct { const char* label; ImVec4 color; } kTimerInfo[3] = {
-        { "Fatigue", ImVec4(0.8f, 0.4f, 0.1f, 1.0f) },
-        { "Breath",  ImVec4(0.2f, 0.5f, 1.0f, 1.0f) },
-        { "Feign",   kColorGray },
+        { .label = "Fatigue", .color = ImVec4(0.8f, 0.4f, 0.1f, 1.0f) },
+        { .label = "Breath",  .color = ImVec4(0.2f, 0.5f, 1.0f, 1.0f) },
+        { .label = "Feign",   .color = kColorGray },
     };
 
     float barW  = 280.0f;

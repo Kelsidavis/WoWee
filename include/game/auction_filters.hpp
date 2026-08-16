@@ -42,57 +42,57 @@ struct AuctionSlotFilter  { const char* label; uint32_t invType; const char* tok
 // WoW 3.3.5a item class ids: 0=Consumable, 1=Container, 2=Weapon, 3=Gem,
 // 4=Armor, 7=Trade Goods, 9=Recipe, 11=Quiver, 15=Miscellaneous.
 inline constexpr AuctionClassFilter kAuctionClasses[] = {
-    {"All",           kAuctionAny},
-    {"Weapon",        2},
-    {"Armor",         4},
-    {"Container",     1},
-    {"Consumable",    0},
-    {"Trade Goods",   7},
-    {"Gem",           3},
-    {"Recipe",        9},
-    {"Quiver",        11},
-    {"Miscellaneous", 15},
+    {.label = "All",           .classId = kAuctionAny},
+    {.label = "Weapon",        .classId = 2},
+    {.label = "Armor",         .classId = 4},
+    {.label = "Container",     .classId = 1},
+    {.label = "Consumable",    .classId = 0},
+    {.label = "Trade Goods",   .classId = 7},
+    {.label = "Gem",           .classId = 3},
+    {.label = "Recipe",        .classId = 9},
+    {.label = "Quiver",        .classId = 11},
+    {.label = "Miscellaneous", .classId = 15},
 };
 inline constexpr int kNumAuctionClasses = 10;
 
 inline constexpr AuctionSubFilter kAuctionWeaponSubs[] = {
-    {"All", kAuctionAny}, {"Axe (1H)", 0}, {"Axe (2H)", 1}, {"Bow", 2},
-    {"Gun", 3}, {"Mace (1H)", 4}, {"Mace (2H)", 5}, {"Polearm", 6},
-    {"Sword (1H)", 7}, {"Sword (2H)", 8}, {"Staff", 10},
-    {"Fist Weapon", 13}, {"Dagger", 15}, {"Thrown", 16},
-    {"Crossbow", 18}, {"Wand", 19},
+    {.label = "All", .subId = kAuctionAny}, {.label = "Axe (1H)", .subId = 0}, {.label = "Axe (2H)", .subId = 1}, {.label = "Bow", .subId = 2},
+    {.label = "Gun", .subId = 3}, {.label = "Mace (1H)", .subId = 4}, {.label = "Mace (2H)", .subId = 5}, {.label = "Polearm", .subId = 6},
+    {.label = "Sword (1H)", .subId = 7}, {.label = "Sword (2H)", .subId = 8}, {.label = "Staff", .subId = 10},
+    {.label = "Fist Weapon", .subId = 13}, {.label = "Dagger", .subId = 15}, {.label = "Thrown", .subId = 16},
+    {.label = "Crossbow", .subId = 18}, {.label = "Wand", .subId = 19},
 };
 inline constexpr int kNumAuctionWeaponSubs = 16;
 
 inline constexpr AuctionSubFilter kAuctionArmorSubs[] = {
-    {"All", kAuctionAny}, {"Cloth", 1}, {"Leather", 2}, {"Mail", 3},
-    {"Plate", 4}, {"Shield", 6}, {"Miscellaneous", 0},
+    {.label = "All", .subId = kAuctionAny}, {.label = "Cloth", .subId = 1}, {.label = "Leather", .subId = 2}, {.label = "Mail", .subId = 3},
+    {.label = "Plate", .subId = 4}, {.label = "Shield", .subId = 6}, {.label = "Miscellaneous", .subId = 0},
 };
 inline constexpr int kNumAuctionArmorSubs = 7;
 
 /// Equipment-slot ids, carried in the auctionSlotID field of the same request.
 inline constexpr AuctionSlotFilter kAuctionSlots[] = {
-    {"All Slots",     kAuctionAny, ""},
-    {"Head",          1,  "INVTYPE_HEAD"},
-    {"Neck",          2,  "INVTYPE_NECK"},
-    {"Shoulder",      3,  "INVTYPE_SHOULDER"},
-    {"Chest",         5,  "INVTYPE_CHEST"},
-    {"Waist",         6,  "INVTYPE_WAIST"},
-    {"Legs",          7,  "INVTYPE_LEGS"},
-    {"Feet",          8,  "INVTYPE_FEET"},
-    {"Wrist",         9,  "INVTYPE_WRIST"},
-    {"Hands",         10, "INVTYPE_HAND"},
-    {"Finger",        11, "INVTYPE_FINGER"},
-    {"Trinket",       12, "INVTYPE_TRINKET"},
-    {"Back",          16, "INVTYPE_CLOAK"},
-    {"One-Hand",      13, "INVTYPE_WEAPON"},
-    {"Two-Hand",      17, "INVTYPE_2HWEAPON"},
-    {"Main Hand",     21, "INVTYPE_WEAPONMAINHAND"},
-    {"Off Hand",      22, "INVTYPE_WEAPONOFFHAND"},
-    {"Ranged",        26, "INVTYPE_RANGED"},
-    {"Shield",        14, "INVTYPE_SHIELD"},
-    {"Held Off-hand", 23, "INVTYPE_HOLDABLE"},
-    {"Relic",         28, "INVTYPE_RELIC"},
+    {.label = "All Slots",     .invType = kAuctionAny, .token = ""},
+    {.label = "Head",          .invType = 1,  .token = "INVTYPE_HEAD"},
+    {.label = "Neck",          .invType = 2,  .token = "INVTYPE_NECK"},
+    {.label = "Shoulder",      .invType = 3,  .token = "INVTYPE_SHOULDER"},
+    {.label = "Chest",         .invType = 5,  .token = "INVTYPE_CHEST"},
+    {.label = "Waist",         .invType = 6,  .token = "INVTYPE_WAIST"},
+    {.label = "Legs",          .invType = 7,  .token = "INVTYPE_LEGS"},
+    {.label = "Feet",          .invType = 8,  .token = "INVTYPE_FEET"},
+    {.label = "Wrist",         .invType = 9,  .token = "INVTYPE_WRIST"},
+    {.label = "Hands",         .invType = 10, .token = "INVTYPE_HAND"},
+    {.label = "Finger",        .invType = 11, .token = "INVTYPE_FINGER"},
+    {.label = "Trinket",       .invType = 12, .token = "INVTYPE_TRINKET"},
+    {.label = "Back",          .invType = 16, .token = "INVTYPE_CLOAK"},
+    {.label = "One-Hand",      .invType = 13, .token = "INVTYPE_WEAPON"},
+    {.label = "Two-Hand",      .invType = 17, .token = "INVTYPE_2HWEAPON"},
+    {.label = "Main Hand",     .invType = 21, .token = "INVTYPE_WEAPONMAINHAND"},
+    {.label = "Off Hand",      .invType = 22, .token = "INVTYPE_WEAPONOFFHAND"},
+    {.label = "Ranged",        .invType = 26, .token = "INVTYPE_RANGED"},
+    {.label = "Shield",        .invType = 14, .token = "INVTYPE_SHIELD"},
+    {.label = "Held Off-hand", .invType = 23, .token = "INVTYPE_HOLDABLE"},
+    {.label = "Relic",         .invType = 28, .token = "INVTYPE_RELIC"},
 };
 inline constexpr int kNumAuctionSlots = 21;
 
