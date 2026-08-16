@@ -181,8 +181,6 @@ void renderEquippedEnhancements(
 
 InventoryScreen::~InventoryScreen() {
     setBagMoveConfigActive(false);
-    // Vulkan textures are owned by VkContext and cleaned up on shutdown
-    iconCache_.clear();
 }
 
 namespace {
@@ -250,55 +248,10 @@ ImVec4 InventoryScreen::getQualityColor(game::ItemQuality quality) {
 // ============================================================
 
 VkDescriptorSet InventoryScreen::getItemIcon(uint32_t displayInfoId) {
-    if (displayInfoId == 0 || !assetManager_) return VK_NULL_HANDLE;
-
-    auto it = iconCache_.find(displayInfoId);
-    if (it != iconCache_.end()) return it->second;
-
-    // Rate-limit GPU uploads per frame to avoid stalling when many items appear at once
-    // (e.g., opening a full bag, vendor window, or loot from a boss with many drops).
-    if (!claimUiTextureUpload()) return VK_NULL_HANDLE;  // defer - do NOT cache null here
-
-    // Load ItemDisplayInfo.dbc
-    auto displayInfoDbc = assetManager_->loadDBC("ItemDisplayInfo.dbc");
-    if (!displayInfoDbc) {
-        LOG_WARNING("getItemIcon: ItemDisplayInfo.dbc not loadable for displayInfoId=", displayInfoId);
-        iconCache_[displayInfoId] = VK_NULL_HANDLE;
-        return VK_NULL_HANDLE;
-    }
-
-    int32_t recIdx = displayInfoDbc->findRecordById(displayInfoId);
-    if (recIdx < 0) {
-        LOG_WARNING("getItemIcon: displayInfoId=", displayInfoId, " not found in ItemDisplayInfo.dbc");
-        iconCache_[displayInfoId] = VK_NULL_HANDLE;
-        return VK_NULL_HANDLE;
-    }
-
-    // Field 5 = inventoryIcon_1
-    const auto* dispL = pipeline::getActiveDBCLayout() ? pipeline::getActiveDBCLayout()->getLayout("ItemDisplayInfo") : nullptr;
-    std::string iconName = displayInfoDbc->getString(static_cast<uint32_t>(recIdx), dispL ? (*dispL)["InventoryIcon"] : 5);
-    if (iconName.empty()) {
-        LOG_WARNING("getItemIcon: displayInfoId=", displayInfoId,
-                    " recIdx=", recIdx, " has empty iconName field");
-        iconCache_[displayInfoId] = VK_NULL_HANDLE;
-        return VK_NULL_HANDLE;
-    }
-
-    std::string iconPath = "Interface\\Icons\\" + iconName + ".blp";
-    UiTextureLoad why{};
-    VkDescriptorSet ds = uploadUiTextureFromBlp(
-        assetManager_, iconPath, core::Application::getInstance().getWindow(),
-        &why);
-    // Which of the two failures happened is worth saying: a missing file is a
-    // gap in the assets, an undecodable one is a file we cannot read.
-    if (why == UiTextureLoad::NotFound) {
-        LOG_WARNING("getItemIcon: BLP not found at '", iconPath,
-                    "' (displayInfoId=", displayInfoId, ")");
-    } else if (why == UiTextureLoad::DecodeFailed) {
-        LOG_WARNING("getItemIcon: BLP decode failed for '", iconPath, "'");
-    }
-    iconCache_[displayInfoId] = ds;
-    return ds;
+    // The shared cache, so an item drawn here and on the action bar is
+    // uploaded once. See itemIconTexture.
+    return itemIconTexture(displayInfoId, assetManager_,
+                           core::Application::getInstance().getWindow());
 }
 
 // ============================================================

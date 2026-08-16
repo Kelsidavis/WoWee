@@ -66,4 +66,15 @@ VkDescriptorSet cachedIconTexture(
     const std::unordered_map<uint32_t, std::string>& paths,
     std::unordered_map<uint32_t, VkDescriptorSet>& cache);
 
+/// One item icon, by its ItemDisplayInfo id.
+///
+/// The path comes from ItemDisplayInfo.dbc rather than from a table the caller
+/// built, which is the one thing item icons do differently from the spell and
+/// talent ones above. The cache is shared by everything that draws an item -
+/// bags, the action bar, tooltips, dialogs - because they draw the same items
+/// and there is no reason for each to upload its own copy.
+VkDescriptorSet itemIconTexture(uint32_t displayInfoId,
+                                pipeline::AssetManager* assetManager,
+                                core::Window* window);
+
 }  // namespace wowee::ui

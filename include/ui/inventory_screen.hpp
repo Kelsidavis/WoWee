@@ -109,7 +109,6 @@ private:
     pipeline::AssetManager* assetManager_ = nullptr;
 
     // Item icon cache: displayInfoId -> GL texture
-    std::unordered_map<uint32_t, VkDescriptorSet> iconCache_;
 public:
     VkDescriptorSet getItemIcon(uint32_t displayInfoId);
     void renderItemTooltip(const game::ItemQueryResponseData& info, const game::Inventory* inventory = nullptr, uint64_t itemGuid = 0);

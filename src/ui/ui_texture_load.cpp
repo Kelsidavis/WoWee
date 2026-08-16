@@ -5,6 +5,8 @@
 #include "pipeline/asset_manager.hpp"
 #include "pipeline/blp_loader.hpp"
 #include "rendering/vk_context.hpp"
+#include "pipeline/dbc_layout.hpp"
+#include "core/logger.hpp"
 
 namespace wowee::ui {
 
@@ -58,6 +60,69 @@ VkDescriptorSet cachedIconTexture(
     VkDescriptorSet ds =
         uploadUiTextureFromBlp(assetManager, pit->second + ".blp", window);
     cache[iconId] = ds;
+    return ds;
+}
+
+VkDescriptorSet itemIconTexture(uint32_t displayInfoId,
+                                pipeline::AssetManager* assetManager,
+                                core::Window* window) {
+    if (displayInfoId == 0 || !assetManager) return VK_NULL_HANDLE;
+
+    // Shared across the interface: the bags, the action bar, tooltips and the
+    // dialogs all draw the same items.
+    static std::unordered_map<uint32_t, VkDescriptorSet> cache;
+    auto it = cache.find(displayInfoId);
+    if (it != cache.end()) return it->second;
+
+    // Deferred rather than cached as a miss: the budget refusing an upload
+    // this frame says nothing about the icon.
+    if (!claimUiTextureUpload()) return VK_NULL_HANDLE;
+
+    auto dbc = assetManager->loadDBC("ItemDisplayInfo.dbc");
+    if (!dbc) {
+        core::Logger::getInstance().warning(
+            "itemIconTexture: ItemDisplayInfo.dbc not loadable for displayInfoId=",
+            displayInfoId);
+        cache[displayInfoId] = VK_NULL_HANDLE;
+        return VK_NULL_HANDLE;
+    }
+
+    const int32_t recIdx = dbc->findRecordById(displayInfoId);
+    if (recIdx < 0) {
+        core::Logger::getInstance().warning(
+            "itemIconTexture: displayInfoId=", displayInfoId,
+            " not found in ItemDisplayInfo.dbc");
+        cache[displayInfoId] = VK_NULL_HANDLE;
+        return VK_NULL_HANDLE;
+    }
+
+    const auto* layout = pipeline::getActiveDBCLayout()
+                             ? pipeline::getActiveDBCLayout()->getLayout("ItemDisplayInfo")
+                             : nullptr;
+    const std::string iconName =
+        dbc->getString(static_cast<uint32_t>(recIdx), layout ? (*layout)["InventoryIcon"] : 5);
+    if (iconName.empty()) {
+        core::Logger::getInstance().warning(
+            "itemIconTexture: displayInfoId=", displayInfoId, " recIdx=", recIdx,
+            " has empty iconName field");
+        cache[displayInfoId] = VK_NULL_HANDLE;
+        return VK_NULL_HANDLE;
+    }
+
+    const std::string iconPath = "Interface\\Icons\\" + iconName + ".blp";
+    UiTextureLoad why{};
+    VkDescriptorSet ds = uploadUiTextureFromBlp(assetManager, iconPath, window, &why);
+    // Which of the two failures happened is worth saying: a missing file is a
+    // gap in the assets, an undecodable one is a file we cannot read.
+    if (why == UiTextureLoad::NotFound) {
+        core::Logger::getInstance().warning(
+            "itemIconTexture: BLP not found at '", iconPath,
+            "' (displayInfoId=", displayInfoId, ")");
+    } else if (why == UiTextureLoad::DecodeFailed) {
+        core::Logger::getInstance().warning(
+            "itemIconTexture: BLP decode failed for '", iconPath, "'");
+    }
+    cache[displayInfoId] = ds;
     return ds;
 }
 
