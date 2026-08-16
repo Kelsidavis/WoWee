@@ -129,6 +129,10 @@ void VkContext::shutdown() {
     destroyImGuiResources();
 
     // Destroy sync objects
+    if (frameTimeline_) {
+        vkDestroySemaphore(device, frameTimeline_, nullptr);
+        frameTimeline_ = VK_NULL_HANDLE;
+    }
     for (auto& frame : frames) {
         if (frame.inFlightFence) vkDestroyFence(device, frame.inFlightFence, nullptr);
         if (frame.commandPool) vkDestroyCommandPool(device, frame.commandPool, nullptr);
@@ -487,6 +491,14 @@ bool VkContext::createLogicalDevice() {
         }
         if (supported12.shaderInt8) {
             enabled12.shaderInt8 = VK_TRUE;
+        }
+        // Core in 1.2 and required of any 1.2 implementation, but the query
+        // costs nothing and this block only runs when the instance reached
+        // 1.2 at all -- on a 1.1 instance the frame ring stays on fences.
+        if (supported12.timelineSemaphore) {
+            enabled12.timelineSemaphore = VK_TRUE;
+            timelineSemaphoreSupported_ = true;
+            LOG_INFO("Enabling timelineSemaphore for frame synchronisation");
         }
         // The AMD FSR3 SDK backend hardcodes fp16Supported=true and always
         // selects the fp16 shader permutations, whose wave/subgroup reductions
@@ -849,6 +861,26 @@ bool VkContext::createSyncObjects() {
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // Start signaled so first frame doesn't block
+
+    // The timeline starts at 0 and every slot's timelineValue starts at 0, so
+    // the first wait on each slot is already satisfied -- the same starting
+    // state VK_FENCE_CREATE_SIGNALED_BIT gives the fences below.
+    if (timelineSemaphoreSupported_) {
+        VkSemaphoreTypeCreateInfo typeInfo{};
+        typeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+        typeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+        typeInfo.initialValue = 0;
+        VkSemaphoreCreateInfo timelineInfo{};
+        timelineInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        timelineInfo.pNext = &typeInfo;
+        if (vkCreateSemaphore(device, &timelineInfo, nullptr, &frameTimeline_) != VK_SUCCESS) {
+            LOG_WARNING("Could not create the frame timeline semaphore; using fences");
+            frameTimeline_ = VK_NULL_HANDLE;
+        } else {
+            frameTimelineValue_ = 0;
+            for (auto& f : frames) f.timelineValue = 0;
+        }
+    }
 
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         if (vkCreateFence(device, &fenceInfo, nullptr, &frames[i].inFlightFence) != VK_SUCCESS) {
@@ -1967,6 +1999,17 @@ void VkContext::resetFrameSyncState() {
     // is documented as needing.
     flushDeferredCleanup();
 
+    // The timeline needs none of the surgery below. vkDeviceWaitIdle above
+    // means every submit has completed, so the counter has reached
+    // frameTimelineValue_; pointing every slot at that value leaves each one
+    // already satisfied, which is the state the first frame expects. Nothing
+    // is destroyed and the counter keeps running, so no value is ever reused.
+    if (frameTimeline_ != VK_NULL_HANDLE) {
+        for (auto& f : frames) {
+            f.timelineValue = frameTimelineValue_;
+        }
+    }
+
     // Recreated rather than reset: a fence has to end up signalled, and
     // vkResetFences only ever unsignals. Destroying and remaking with
     // VK_FENCE_CREATE_SIGNALED_BIT is the state the first frame expects.
@@ -2033,9 +2076,20 @@ VkCommandBuffer VkContext::beginFrame(uint32_t& imageIndex) {
     // Wait for this frame's fence (with timeout to detect GPU hangs)
     static int beginFrameCounter = 0;
     beginFrameCounter++;
-    VkResult fenceResult = vkWaitForFences(device, 1, &frame.inFlightFence, VK_TRUE, 5000000000ULL); // 5 second timeout
+    VkResult fenceResult;
+    if (frameTimeline_ != VK_NULL_HANDLE) {
+        VkSemaphoreWaitInfo waitInfo{};
+        waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+        waitInfo.semaphoreCount = 1;
+        waitInfo.pSemaphores = &frameTimeline_;
+        waitInfo.pValues = &frame.timelineValue;
+        fenceResult = vkWaitSemaphores(device, &waitInfo, 5000000000ULL); // 5 second timeout
+    } else {
+        fenceResult = vkWaitForFences(device, 1, &frame.inFlightFence, VK_TRUE, 5000000000ULL); // 5 second timeout
+    }
     if (fenceResult == VK_TIMEOUT) {
-        LOG_ERROR("beginFrame[", beginFrameCounter, "] FENCE TIMEOUT (5s) on frame slot ", currentFrame, " - GPU hang detected!");
+        LOG_ERROR("beginFrame[", beginFrameCounter, "] FENCE TIMEOUT (5s) on frame slot ", currentFrame,
+                  " (waiting for timeline ", frame.timelineValue, ") - GPU hang detected!");
         return VK_NULL_HANDLE;
     }
     if (fenceResult != VK_SUCCESS) {
@@ -2071,7 +2125,10 @@ VkCommandBuffer VkContext::beginFrame(uint32_t& imageIndex) {
     nextAcquireSemaphore_ = imageAcquiredSemaphores_[imageIndex];
     imageAcquiredSemaphores_[imageIndex] = currentAcquireSemaphore_;
 
-    vkResetFences(device, 1, &frame.inFlightFence);
+    // A timeline only ever moves forward, so there is nothing to unsignal.
+    if (frameTimeline_ == VK_NULL_HANDLE) {
+        vkResetFences(device, 1, &frame.inFlightFence);
+    }
     vkResetCommandBuffer(frame.commandBuffer, 0);
 
     VkCommandBufferBeginInfo beginInfo{};
@@ -2124,10 +2181,41 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
     submitInfo.pWaitDstStageMask = &waitStage;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &cmd;
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &renderSem;
 
-    VkResult submitResult = vkQueueSubmit(graphicsQueue, 1, &submitInfo, frame.inFlightFence);
+    // Present still needs the binary renderFinished semaphore -- WSI does not
+    // take a timeline. So the submit signals both: the binary one for
+    // vkQueuePresentKHR, and the timeline for the CPU wait in beginFrame that
+    // used to be a fence. The value paired with a binary semaphore is ignored,
+    // but the arrays still have to be the same length.
+    VkSemaphore signalSemaphores[2] = { renderSem, frameTimeline_ };
+    uint64_t signalValues[2] = { 0, 0 };
+    const uint64_t waitValue = 0;
+    VkTimelineSemaphoreSubmitInfo timelineSubmit{};
+
+    if (frameTimeline_ != VK_NULL_HANDLE) {
+        signalValues[1] = ++frameTimelineValue_;
+        timelineSubmit.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+        timelineSubmit.waitSemaphoreValueCount = 1;
+        timelineSubmit.pWaitSemaphoreValues = &waitValue;
+        timelineSubmit.signalSemaphoreValueCount = 2;
+        timelineSubmit.pSignalSemaphoreValues = signalValues;
+        submitInfo.pNext = &timelineSubmit;
+        submitInfo.signalSemaphoreCount = 2;
+        submitInfo.pSignalSemaphores = signalSemaphores;
+    } else {
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = &renderSem;
+    }
+
+    VkResult submitResult = vkQueueSubmit(graphicsQueue, 1, &submitInfo,
+                                          frameTimeline_ != VK_NULL_HANDLE ? VK_NULL_HANDLE
+                                                                           : frame.inFlightFence);
+    if (submitResult == VK_SUCCESS && frameTimeline_ != VK_NULL_HANDLE) {
+        // Only once the submit is in: on failure the timeline is never
+        // signalled, and a slot left waiting on an unreachable value would
+        // hang the next beginFrame for its whole timeout instead of failing.
+        frame.timelineValue = signalValues[1];
+    }
     if (submitResult != VK_SUCCESS) {
         LOG_ERROR("endFrame[", endFrameCounter, "] vkQueueSubmit FAILED: ", static_cast<int>(submitResult));
         if (submitResult == VK_ERROR_DEVICE_LOST) {

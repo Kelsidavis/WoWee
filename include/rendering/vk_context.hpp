@@ -21,7 +21,13 @@ static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 struct FrameData {
     VkCommandPool commandPool = VK_NULL_HANDLE;
     VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+    /// Signalled by this slot's submit. Unused when the timeline is available.
     VkFence inFlightFence = VK_NULL_HANDLE;
+    /// The timeline value this slot's last submit signals. Reaching it means
+    /// the GPU is done with the slot. Zero is "never submitted", which the
+    /// timeline starts at, so the first wait on each slot returns immediately
+    /// -- the same reason the fences are created VK_FENCE_CREATE_SIGNALED_BIT.
+    uint64_t timelineValue = 0;
 };
 
 class VkContext {
@@ -269,6 +275,21 @@ private:
     // Per-frame resources
     FrameData frames[MAX_FRAMES_IN_FLIGHT];
     uint32_t currentFrame = 0;
+
+    /// One timeline semaphore across the whole frame ring, replacing the
+    /// per-slot fences. VK_NULL_HANDLE when the device did not offer
+    /// timelineSemaphore, in which case every path below falls back to the
+    /// fences, which are still created either way.
+    ///
+    /// This does not touch the swapchain semaphores above it and cannot:
+    /// vkAcquireNextImageKHR and vkQueuePresentKHR take binary semaphores
+    /// only, so the acquire/renderFinished pair stays exactly as it is. The
+    /// timeline replaces the CPU-side "is this slot free yet" question.
+    bool timelineSemaphoreSupported_ = false;
+    VkSemaphore frameTimeline_ = VK_NULL_HANDLE;
+    /// Last value signalled on frameTimeline_. Monotonic for the life of the
+    /// device, so it survives a swapchain rebuild without being reset.
+    uint64_t frameTimelineValue_ = 0;
 
     // Per-swapchain-image semaphores (avoids reuse while presentation engine holds them)
     std::vector<VkSemaphore> imageAcquiredSemaphores_;   // [swapchainImageCount], per-image
