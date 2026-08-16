@@ -286,7 +286,8 @@ public:
     /// Maps a superseded spell rank to the highest rank we actually know. Returns
     /// spellId unchanged when it is already known, or has no known same-name rank.
     uint32_t resolveHighestKnownRank(uint32_t spellId) const;
-    const std::string& getSkillLineName(uint32_t spellId) const;
+    /// The skill's own name, by SkillLine.dbc id.
+    const std::string& getSkillLineName(uint32_t skillLineId) const;
 
     // Cast state
     void stopCasting();

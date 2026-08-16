@@ -3754,8 +3754,8 @@ uint32_t GameHandler::getSpellSchoolMask(uint32_t spellId) const {
     return 0;
 }
 
-const std::string& GameHandler::getSkillLineName(uint32_t spellId) const {
-    if (spellHandler_) return spellHandler_->getSkillLineName(spellId);
+const std::string& GameHandler::getSkillLineName(uint32_t skillLineId) const {
+    if (spellHandler_) return spellHandler_->getSkillLineName(skillLineId);
     return EMPTY_STRING;
 }
 

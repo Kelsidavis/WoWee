@@ -3577,10 +3577,14 @@ bool SpellHandler::isSelfCastSpell(uint32_t spellId) const {
     return spellclass::isSelfCastRange(it->second.maxRange);
 }
 
-const std::string& SpellHandler::getSkillLineName(uint32_t spellId) const {
-    auto slIt = owner_.spellToSkillLineRef().find(spellId);
-    if (slIt == owner_.spellToSkillLineRef().end()) return SPELL_EMPTY_STRING;
-    auto nameIt = owner_.skillLineNamesRef().find(slIt->second);
+const std::string& SpellHandler::getSkillLineName(uint32_t skillLineId) const {
+    // By skill line id, which is what every caller holds: the trade skill
+    // window's own line and a trainer service's required skill. Reading the id
+    // as a spell and following SkillLineAbility gave a real name for the wrong
+    // skill - Tailoring is line 197, spell 197 is a Two-Handed Axes rank, so
+    // the tailoring window was titled "Two-Handed Axes".
+    owner_.loadSkillLineDbc();
+    auto nameIt = owner_.skillLineNamesRef().find(skillLineId);
     return (nameIt != owner_.skillLineNamesRef().end()) ? nameIt->second : SPELL_EMPTY_STRING;
 }
 

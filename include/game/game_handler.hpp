@@ -3292,7 +3292,8 @@ public:
         auto it = onlineItems_.find(guid);
         return (it != onlineItems_.end()) ? it->second.entry : 0;
     }
-    const std::string& getSkillLineName(uint32_t spellId) const;
+    /// The skill's own name, by SkillLine.dbc id.
+    const std::string& getSkillLineName(uint32_t skillLineId) const;
     /// Returns the DispelType for a spell (0=none,1=magic,2=curse,3=disease,4=poison,5+=other)
     uint8_t getSpellDispelType(uint32_t spellId) const;
     /// Returns true if the spell can be interrupted by abilities like Kick/Counterspell.
