@@ -2306,7 +2306,12 @@ include(CPack)
 # Bundled addons ship next to the executable, so the client finds them without
 # anyone copying files into an extracted game install. AddonManager searches
 # here as well as the game data's own Interface/AddOns.
+# Removed first, because copy_directory only ever adds. An addon deleted from
+# addons/ stays in every build tree that already had it and ships from there --
+# which is how WoweeWidgetDemo and WoweeXmlDemo kept going out after 3182e4fed
+# deleted them.
 add_custom_target(copy_bundled_addons ALL
+    COMMAND ${CMAKE_COMMAND} -E rm -rf $<TARGET_FILE_DIR:wowee>/addons
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             ${CMAKE_SOURCE_DIR}/addons $<TARGET_FILE_DIR:wowee>/addons
     COMMENT "Copying bundled addons")
