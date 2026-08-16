@@ -60,9 +60,6 @@ struct ShaderPair {
 ShaderPair loadShaderPair(VkDevice device, const std::string& vertPath,
                           const std::string& fragPath, const char* what);
 
-// Convenience: load a shader stage directly from a .spv file
-VkPipelineShaderStageCreateInfo loadShaderStage(VkDevice device,
-    const std::string& path, VkShaderStageFlagBits stage);
 
 } // namespace rendering
 } // namespace wowee

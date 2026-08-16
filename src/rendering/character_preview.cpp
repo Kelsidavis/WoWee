@@ -338,17 +338,6 @@ void CharacterPreview::createFBO() {
             vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                                  0, 0, nullptr, 0, nullptr, 1, &toRead);
         });
-        // Comparison sampler for sampler2DShadow
-        VkSamplerCreateInfo sampCI{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-        sampCI.magFilter = VK_FILTER_NEAREST;
-        sampCI.minFilter = VK_FILTER_NEAREST;
-        sampCI.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-        sampCI.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-        sampCI.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-        sampCI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-        sampCI.compareEnable = VK_TRUE;
-        sampCI.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-        dummyShadowSampler_ = vkCtx_->getOrCreateSampler(sampCI);
     }
 
     // 3. Create descriptor pool for per-frame sets (2 UBO + 2 sampler)
@@ -455,7 +444,6 @@ void CharacterPreview::destroyFBO() {
 
     destroy(device, previewDescPool_);
 
-    // dummyShadowSampler_ is owned by VkContext sampler cache - do NOT destroy
     if (dummyShadowView_) { vkDestroyImageView(device, dummyShadowView_, nullptr); dummyShadowView_ = VK_NULL_HANDLE; }
     if (dummyShadowImage_) { vmaDestroyImage(allocator, dummyShadowImage_, dummyShadowAlloc_); dummyShadowImage_ = VK_NULL_HANDLE; dummyShadowAlloc_ = VK_NULL_HANDLE; }
 

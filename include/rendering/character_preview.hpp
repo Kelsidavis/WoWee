@@ -144,7 +144,6 @@ private:
     VkImage dummyShadowImage_ = VK_NULL_HANDLE;
     VkImageView dummyShadowView_ = VK_NULL_HANDLE;
     VmaAllocation dummyShadowAlloc_ = VK_NULL_HANDLE;
-    VkSampler dummyShadowSampler_ = VK_NULL_HANDLE; // owned by VkContext sampler cache
 
     // ImGui texture handle for displaying the preview (VkDescriptorSet in Vulkan backend)
     VkDescriptorSet imguiTextureId_ = VK_NULL_HANDLE;

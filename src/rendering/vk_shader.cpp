@@ -81,35 +81,6 @@ VkPipelineShaderStageCreateInfo VkShaderModule::stageInfo(
     return info;
 }
 
-VkPipelineShaderStageCreateInfo loadShaderStage(VkDevice device,
-    const std::string& path, VkShaderStageFlagBits stage)
-{
-    // This creates a temporary module - caller must keep it alive while pipeline is created.
-    // Prefer using VkShaderModule directly for proper lifetime management.
-    VkShaderModuleCreateInfo moduleInfo{};
-    moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-
-    std::ifstream file(path, std::ios::ate | std::ios::binary);
-    std::vector<uint32_t> code;
-    if (file.is_open()) {
-        size_t fileSize = static_cast<size_t>(file.tellg());
-        code.resize(fileSize / sizeof(uint32_t));
-        file.seekg(0);
-        file.read(reinterpret_cast<char*>(code.data()), fileSize);
-        moduleInfo.codeSize = fileSize;
-        moduleInfo.pCode = code.data();
-    }
-
-    ::VkShaderModule module = VK_NULL_HANDLE;
-    vkCreateShaderModule(device, &moduleInfo, nullptr, &module);
-
-    VkPipelineShaderStageCreateInfo info{};
-    info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    info.stage = stage;
-    info.module = module;
-    info.pName = "main";
-    return info;
-}
 
 
 ShaderPair loadShaderPair(VkDevice device, const std::string& vertPath,
