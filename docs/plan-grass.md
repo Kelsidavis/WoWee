@@ -1,0 +1,299 @@
+# GPU-Driven Grass — Phased Implementation Plan
+
+**Status:** Phase 0 complete (this document). Next: Phase 1.
+**Branch:** `grass`
+**Spec:** [`docs/grass-spec.md`](grass-spec.md) — every `spec §N` below refers to a numbered
+section there. The spec is **not** authoritative; this plan and the repository are. See §2.
+
+The facts in §1 were verified by reading the files cited; cite them rather than re-deriving
+them. Keep §4 current as phases land.
+
+---
+
+## 1. Confirmed repository facts
+
+Every statement below was checked against the file named. Cite these instead of re-deriving them.
+
+### Vulkan core
+
+| Fact | Where |
+|---|---|
+| `MAX_FRAMES_IN_FLIGHT = 2` | `include/rendering/vk_context.hpp:19` |
+| Per-frame state array `FrameData frames[MAX_FRAMES_IN_FLIGHT]` | `include/rendering/vk_context.hpp:270` |
+| Deferred destruction queue, one per frame slot | `include/rendering/vk_context.hpp:316` |
+| Buffers via `VkBuffer::uploadToGPU(ctx, data, size, usage)` (GPU-local + staging) and `VkBuffer::createMapped(allocator, size, usage)` (host-visible) | `include/rendering/vk_buffer.hpp:16-50` |
+| `VkBuffer::descriptorInfo(offset, range)` builds `VkDescriptorBufferInfo` | `include/rendering/vk_buffer.hpp` |
+| Allocator is VMA (`VmaAllocation`, `AllocatedBuffer`) | `include/rendering/vk_buffer.hpp` |
+
+**`synchronization2` is NOT used anywhere in this codebase.** `rg -c "vkCmdPipelineBarrier2|VK_KHR_SYNCHRONIZATION_2"` returns zero hits across `src/` and `include/`. The grass spec asks for `vkCmdPipelineBarrier2`; **ignore that** and use legacy `vkCmdPipelineBarrier`. The repository is authoritative. Do not enable a new device feature for this.
+
+### Shaders
+
+- Sources: `assets/shaders/<name>.<stage>.glsl` → compiled **in place** to `<name>.<stage>.spv`.
+- Stages recognised by filename: `.vert.glsl`, `.frag.glsl`, `.comp.glsl`, `.geom.glsl` (`CMakeLists.txt:459-467`).
+- `compile_shaders()` does `file(GLOB "${SHADER_DIR}/*.glsl")` (`CMakeLists.txt:449`) — **a new shader is picked up automatically; no CMake edit is needed**, but CMake must be re-run for the glob to refresh.
+- `.spv` files are **tracked in git** and are the fallback when `glslc` is absent. Commit both `.glsl` and `.spv`.
+- Loading: `VkShader::loadFromFile(device, "assets/shaders/<name>.<stage>.spv")` (`src/rendering/hiz_system.cpp:231`).
+
+### Existing GPU compute precedent — copy these conventions
+
+`assets/shaders/m2_cull.comp.glsl` (76 lines) is the model to follow:
+
+- `layout(local_size_x = 64) in;`
+- `layout(std140, set = 0, binding = 0) uniform CullUniforms { vec4 frustumPlanes[6]; vec4 cameraPos; uint instanceCount; ... }` — note `cameraPos.w` is reused as `maxPossibleDistSq`.
+- `layout(std430, set = 0, binding = 1) readonly buffer CullInput { ... };`
+- `layout(std430, set = 0, binding = 2) writeonly buffer CullOutput { ... };`
+- Early-out order: flags → loose distance → per-instance distance → 6-plane sphere test.
+
+Compute pipeline creation: `HiZSystem::createComputePipeline()` (`src/rendering/hiz_system.cpp:173-247`) — `VkComputePipelineCreateInfo`, `ctx_->getPipelineCache()`, push-constant range, per-frame descriptor sets indexed `set_[frameIndex]`.
+
+Dispatch site: `src/rendering/m2_renderer_render.cpp:706-886` — dispatches into the **primary frame command buffer**, `groupCount = (n + 63) / 64`.
+
+There are **five** compute shaders in `assets/shaders/`: `fsr2_accumulate.comp.glsl`,
+`fsr2_motion.comp.glsl`, `hiz_build.comp.glsl`, `m2_cull.comp.glsl`, `m2_cull_hiz.comp.glsl`.
+
+**C++/GLSL binary-compatibility precedent:** `include/rendering/m2_renderer.hpp:689` —
+`struct CullUniformsGPU { // matches CullUniforms in m2_cull_hiz.comp.glsl (std140)`. Copy that
+pattern (and its comment convention) for the blade struct in Phase 1.
+
+**Important delta:** M2 culling writes a `uint visibility[]` mask and **reads it back on the CPU** (barrier `VK_ACCESS_SHADER_WRITE_BIT → VK_ACCESS_HOST_READ_BIT`, `VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT → VK_PIPELINE_STAGE_HOST_BIT`, `m2_renderer_render.cpp:877-885`). It has **no atomic compaction and no compute-generated indirect draw.** Grass will be the first genuinely GPU-driven path in WoWee. That is a real extension, not duplication — build it, but model the *style* on `m2_cull.comp.glsl`.
+
+### Coordinate system — **+Z is UP**
+
+`include/core/spawn_presets.hpp:11` — *"Canonical WoW coords: +X=North, +Y=West, +Z=Up"*.
+Confirmed by `src/core/world_loader.cpp:891` and `include/math/spline.hpp:39` ("Z-up convention").
+
+**The spec is written Y-up and is wrong here.** §10 computes slope as
+`1.0 - dot(terrainNormal, vec3(0,1,0))` and §31 blends toward `vec3(0,1,0)`. Both must be
+`vec3(0,0,1)`. Using the spec's constants compiles fine and produces silently garbage slope and
+lighting. In `m2.vert.glsl` the existing foliage code uses `pos.z` for height and `worldRef.xy`
+for the horizontal plane — follow that.
+
+### Wind and player interaction are ALREADY IMPLEMENTED — port, do not invent
+
+`assets/shaders/m2.vert.glsl` has a working, tuned foliage system. Read it before writing any
+wind or interaction code.
+
+- Push constant `int isFoliage` — `-1` sky, `0` none, `1` foliage, `2` ground clutter (line 21).
+- **Height weighting** (lines 91-95): `heightFactor = clamp(pos.z / swayRefHeight, 0, 1)`, then
+  **squared** — *"quadratic so the roots stay planted and the motion collects at the tip."* That is
+  spec §27's `windWeight`, already solved. `swayRefHeight` is 20 for tree-sized models; ground
+  clutter passes its own height, because normalising a one-yard tuft against twenty moves it by
+  nothing.
+- **Three-layer wind** (lines 104-126), gated to `isFoliage == 1`: trunk sway
+  (`windTime*0.8`, amp 0.35/0.25), branch sway (`windTime*1.7`, per-branch phase), leaf flutter
+  (`windTime*4.5`, per-vertex). `windTime = fogParams.z`. Phase comes from
+  `dot(worldRef.xy, vec2(...))` — **world-space stable, never frame-dependent**, which is exactly
+  what spec §36 requires.
+- Ground clutter (`isFoliage == 2`) is deliberately **excluded** from shader wind: each detail
+  doodad plays its own one-bone animation, and a shader wind on top would be two swings of the
+  same plant at two rates. Grass blades are procedural and have no authored animation, so they
+  **do** want shader wind — but keep the same phase constants so grass and existing foliage move
+  as one field rather than two systems.
+- **Player brush + springback** (lines 130-185): bends away from `playerPos` and `playerWake`,
+  takes whichever influence is stronger, smooth `reach` falloff, only reacts to foliage at the
+  player's own level. Applied in **world space after the model transform**, because the
+  displacement is a distance in yards, not something model scale should rescale. Reuse this math.
+
+Spec §26/§27/§28 are therefore mostly a porting job, not a design job.
+
+### Per-frame UBO — already has everything grass needs
+
+`struct GPUPerFrameData` (`include/rendering/vk_frame_data.hpp:14-34`), bound as **set 0**:
+
+```
+mat4 view, projection, lightSpaceMatrix
+vec4 lightDir       // xyz = direction
+vec4 lightColor     // xyz = color
+vec4 ambientColor   // xyz = color
+vec4 viewPos        // xyz = camera position
+vec4 fogColor
+vec4 fogParams      // x = fogStart, y = fogEnd, z = TIME, w = water ripple strength
+vec4 shadowParams
+vec4 playerPos      // xyz = player world position, w = horizontal speed (yd/s)
+vec4 playerWake     // xyz = trailing player position
+vec4 localLightPosRadius[MAX_LOCAL_LIGHTS]
+vec4 localLightColorIntensity[MAX_LOCAL_LIGHTS]
+ivec4 localLightMeta // x = active light count
+```
+
+Consequences — **do not add a new UBO for any of these**:
+- Wind time → `fogParams.z`.
+- Distance cull / LOD → `viewPos.xyz`.
+- Frustum planes → derive from `projection * view` (or extend the grass cull UBO the way `m2_cull` does).
+- Lighting and subsurface → `lightDir`, `lightColor`, `ambientColor`.
+- **Player interaction → `playerPos` and `playerWake`, which already exist for exactly this purpose.** The header comment reads: *"the foliage the player brushes past. playerWake trails the player by a fixed time constant, so clutter the player has already walked through springs back over that interval instead of snapping upright."* Spec §28 says do not invent a second entity-position system; this is the system.
+
+### Terrain — the authoritative vegetation source
+
+WoW's ADT format already encodes where grass grows. **Do not build a parallel classifier.**
+
+`struct TextureLayer` (`include/pipeline/adt_loader.hpp:33-42`):
+```cpp
+uint32_t textureId;   // index into MTEX
+uint32_t flags;
+uint32_t offsetMCAL;  // offset to alpha map in MCAL
+uint32_t effectId;    // ← ground-effect id for THIS layer
+bool useAlpha() const;        // flags & 0x100
+bool compressedAlpha() const; // flags & 0x200
+```
+
+`struct MapChunk` (`include/pipeline/adt_loader.hpp:46+`):
+```cpp
+uint32_t flags, indexX, indexY, areaId;
+uint16_t holes;                      // 4x4 hole bitmask
+float position[3];
+HeightMap heightMap;                 // getHeight(x, y)
+std::vector<TextureLayer> layers;    // up to 4
+std::vector<uint8_t> alphaMap;       // MCAL blend weights
+std::array<int8_t, 145*3> normals;   // compressed, 145 verts
+```
+
+`TerrainManager` (`include/rendering/terrain_manager.hpp:484-492`):
+```cpp
+struct GroundEffectEntry {
+    std::array<uint32_t,4> doodadIds{};
+    std::array<uint32_t,4> weights{};
+    uint32_t density = 0;
+};
+bool groundEffectsLoaded_;
+std::unordered_map<uint32_t, GroundEffectEntry> groundEffectById_;   // effectId -> config
+std::unordered_map<uint32_t, std::string> groundDoodadModelById_;    // doodadId -> model path
+float groundClutterDensityScale_ = 1.0f;
+```
+
+**This is the whole answer to spec §3–§7.** The chain is native, not invented:
+
+```
+texel → per-layer alpha weight (MCAL)
+      → layer.effectId
+      → groundEffectById_[effectId].density   (0 ⇒ NO GRASS: rock, road, bare dirt)
+      → .doodadIds/.weights                   (which vegetation profile)
+```
+
+A layer with `effectId == 0` or an id absent from `groundEffectById_` is Blizzard explicitly saying *no vegetation here*. Roads, cliffs, and dirt already carry no ground effect. Slope comes from `MapChunk::normals`, root height from `HeightMap::getHeight`, and `holes` must suppress grass over cave openings.
+
+`TerrainChunkGPU` (`include/rendering/terrain_renderer.hpp:34-77`) already has the splat maps on the GPU:
+```cpp
+VkTexture* baseTexture;
+VkTexture* layerTextures[3];
+VkTexture* alphaTextures[3];   // ← splat weights, already resident
+int layerCount;
+VkDescriptorSet materialSet;   // set 1: 7 samplers + params UBO
+glm::vec3 boundingSphereCenter; float boundingSphereRadius;
+int tileX, tileY;              // owning tile, for per-tile removal
+int32_t megaBaseVertex; uint32_t megaFirstIndex, vertexCount;
+```
+
+Descriptor convention: **set 0 = per-frame UBO, set 1 = material.** Follow it.
+
+**An editor-side vegetation system also exists** — `tools/editor/terrain_biomes.hpp:113`
+(`struct VegetationAsset`) and `:123` (`struct BiomeVegetation`), placed by
+`tools/editor/object_placer.hpp:86 populateBiome(const BiomeVegetation&, ...)`. Read these before
+inventing a profile type (spec §6: do not duplicate an existing system). It is editor tooling, not
+the runtime path, so it may not be the right home for runtime profiles — but its field set is a
+strong prior for what a vegetation profile needs, and reusing its vocabulary keeps the two
+consistent.
+
+Streaming: `TerrainManager::unloadTile(int x, int y)` (`include/rendering/terrain_manager.hpp:224`) is the unload hook grass must participate in (spec §12). Tiles are finalized incrementally across frames (`finalizingTiles_`).
+
+### Build & test
+
+- `./test.sh` — unit tests + clang-tidy. `--asan`, `--lint`, `FIX=1 ./test.sh --lint`.
+- `WOWEE_WARNINGS_AS_ERRORS` is **ON** by default. A warning fails the build.
+- 89 Catch2 v3 suites via CTest, in `tests/`.
+- Debug HUD: `PerformanceHUD` (`include/rendering/performance_hud.hpp`), F1 to toggle, `setShowTerrain(bool)` etc. — add grass counters here, do not build a new overlay.
+
+---
+
+## 2. Spec deviations (decided, do not relitigate)
+
+| Spec asks | We do | Why |
+|---|---|---|
+| §22 `vkCmdPipelineBarrier2` | legacy `vkCmdPipelineBarrier` | synchronization2 is not used anywhere; enabling it for one feature adds a device requirement |
+| §13 32-byte blade struct | measure and document the real packed layout | spec itself says do not force 32 bytes |
+| §6 new `GrassType` enum | derive profiles from `GroundEffectEntry.doodadIds` | spec §6: "do not duplicate an existing WoWee enum/system" |
+| §28 entity buffer | reuse `playerPos`/`playerWake` in `GPUPerFrameData` | already exists, purpose-built for foliage |
+| §21 hierarchical compaction | plain `atomicAdd` first | spec §21: "do not implement the more complicated system prematurely" |
+| §10/§31 up axis `vec3(0,1,0)` | `vec3(0,0,1)` | WoWee is **Z-up**; the spec is written Y-up. Silent garbage otherwise |
+| §26/§27 new wind system | port the 3-layer model from `m2.vert.glsl:104-126` | already tuned, world-stable, and keeps grass coherent with existing foliage |
+| §28 new interaction code | reuse the bend/springback in `m2.vert.glsl:130-185` | already handles wake, reach falloff and player level |
+
+---
+
+## 3. Phases
+
+One phase per session. Each ends green: `./test.sh` passes, zero validation-layer errors.
+Do **not** start the next phase in the same session — update §4 and stop.
+
+### Phase 1 — GPU walking skeleton
+**Goal:** the full GPU-driven path working end to end, on deliberately fake data.
+
+Fixed test population (a flat grid of ~100k blades at a hardcoded world origin, no terrain input).
+This isolates the Vulkan plumbing — the part where a mistake produces a black screen with no clue —
+from the terrain logic, which is where correctness actually lives.
+
+- Packed blade struct in C++ **and** GLSL, binary compatible. `static_assert` on `sizeof`/`alignof`; a test asserting both plus every member offset. Document the layout in this file.
+- Source SSBO (`VK_BUFFER_USAGE_STORAGE_BUFFER_BIT`), shared/immutable.
+- Per-frame ×2: visible-index SSBO, indirect buffer (`VkDrawIndexedIndirectCommand`, `INDIRECT | STORAGE`), counter.
+- `assets/shaders/grass_cull.comp.glsl` — modeled on `m2_cull.comp.glsl`. Frustum + distance cull, `atomicAdd` compaction, writes `instanceCount`. Reset the counter each frame (`vkCmdFillBuffer` before dispatch).
+- Barrier: `COMPUTE_SHADER → DRAW_INDIRECT | VERTEX_SHADER`, `SHADER_WRITE → INDIRECT_COMMAND_READ | SHADER_READ`. **No host readback.**
+- Minimal `grass.vert.glsl` / `grass.frag.glsl`: flat quads, solid colour. No Bézier, no wind.
+- `vkCmdDrawIndexedIndirect`.
+
+**Exit:** flat green blades render at the test origin. Validation layers clean. Counter never read on CPU. Correct under 2 frames in flight (verify frame N doesn't stomp N-1: per-frame output buffers).
+
+**Risk:** highest of any phase. If it stalls, the fault is almost always the barrier or a descriptor mismatch — check those before suspecting the shader.
+
+### Phase 2 — Terrain suitability (CPU only, no Vulkan)
+**Goal:** answer "should grass grow at this world position, and what kind" from real terrain data.
+
+New `GrassTerrainAdapter`. Given a `MapChunk` + world XZ, return `{suitability 0..1, effectId, slope, rootHeight}`:
+- Sample per-layer alpha weights from `MapChunk::alphaMap` (respect `useAlpha()` / `compressedAlpha()`).
+- `layer.effectId → groundEffectById_` → density. Absent or 0 ⇒ suitability 0.
+- Weight each layer's contribution by its alpha ⇒ **continuous** suitability, not binary (spec §4).
+- Slope from `MapChunk::normals`; root Y from `HeightMap::getHeight`.
+- `holes` bitmask ⇒ suitability 0.
+
+**Exit:** new Catch2 suite, headless, no GPU. Cases: pure grass layer, grass→dirt blend, road, rock, hole, steep slope, multi-layer blend. Assert continuity across a blend boundary (no hard step).
+
+This phase is where spec §44 ("if the terrain says no grass, put no grass") is actually won.
+
+### Phase 3 — Real population generator
+Replace Phase 1's fake grid. Deterministic world-space hash (position + tile coords + stable seed — **never** frame-dependent, spec §36). Density from Phase 2 suitability × `groundClutterDensityScale_`. Generate per terrain tile; allocate the source SSBO on tile load and release it in `unloadTile()` via the deferred-destruction queue.
+
+**Exit:** grass follows real terrain. Walk a grass→dirt boundary and see it thin out. Load/unload tiles repeatedly — no leaks (`--asan`), no stale buffers. Blade identity stable across frames.
+
+### Phase 4 — Vegetation profiles
+Map `GroundEffectEntry.doodadIds`/`weights` → profiles controlling height range, width, root/tip colour, colour variation, curve strength, wind influence/stiffness, slope tolerance. Table-driven and data-derived; do not hardcode per-zone rules.
+
+**Exit:** lush / dry / rocky terrain visibly differ in density, height, and colour.
+
+### Phase 5 — Blade geometry, wind, interaction
+Mostly a **porting** phase. Open `assets/shaders/m2.vert.glsl` first and work from it.
+
+- 12-vertex strip, 5 segments, quadratic Bézier (spec §25), local basis built without per-vertex matrices. Remember **Z is up**.
+- Wind: reuse the phase constants and `dot(worldRef.xy, ...)` world-space seeding from `m2.vert.glsl:104-126`. Grass needs two layers, not three — map trunk→gust and leaf→rustle, and **multiply** them (spec §27) rather than summing as the M2 path does for its three. Time from `fogParams.z`. Keep the quadratic height weighting from `:91-95`.
+- Interaction: port the bend/springback from `m2.vert.glsl:130-185` — `playerPos` vs `playerWake`, stronger influence wins, `reach` falloff, player-level gate, applied in world space after the model transform.
+
+**Exit:** blades curve and move coherently; walking through them bends and springs back; grass and nearby M2 foliage visibly move as one field, not two systems at different rates.
+
+### Phase 6 — Shading
+Root→tip gradient, terrain colour influence (mix, don't replace — spec §8), upright-normal blend (§31), `gl_FrontFacing` two-sided (§32), cheap wrapped-diffuse subsurface (§33) from `lightDir`/`lightColor`/`ambientColor`. Keep the fragment shader cheap; this is a high-overdraw workload.
+
+**Exit:** grass reads as part of the terrain, no harsh dark edges, no neon-on-brown.
+
+### Phase 7 — LOD, debug, validation sweep
+Distance density falloff with no visible popping. `PerformanceHUD` counters: source count, visible count, cull %, dispatch size. Toggles: disable culling / terrain mask / wind / interaction, show mask, show density, show profile. Then run the full spec §43 validation list and record results in §4.
+
+**Exit:** spec §43 swept, findings recorded, remaining limitations stated honestly.
+
+---
+
+## 4. Status
+
+Phase 0 (reconnaissance) and Phase 0a (spec recovery) are done: the facts in §1 were
+verified against the files cited, the deviations in §2 are decided, and all 50 spec
+sections are in `docs/grass-spec.md` with navigable `## N.` headings.
+
+Phase 1 has not started.
