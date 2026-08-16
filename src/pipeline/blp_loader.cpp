@@ -1,5 +1,7 @@
 #include "pipeline/dxt_block.hpp"
 #include "pipeline/blp_loader.hpp"
+
+#include <span>
 #include "core/logger.hpp"
 #include <cstring>
 #include <algorithm>
@@ -18,9 +20,9 @@ BLPImage BLPLoader::load(const std::vector<uint8_t>& blpData) {
 
     // Check magic number
     if (std::memcmp(magic, "BLP1", 4) == 0) {
-        return loadBLP1(data, blpData.size());
+        return loadBLP1(blpData);
     } else if (std::memcmp(magic, "BLP2", 4) == 0) {
-        return loadBLP2(data, blpData.size());
+        return loadBLP2(blpData);
     } else if (std::memcmp(magic, "BLP0", 4) == 0) {
         LOG_WARNING("BLP0 format not fully supported");
         return BLPImage();
@@ -30,14 +32,15 @@ BLPImage BLPLoader::load(const std::vector<uint8_t>& blpData) {
     }
 }
 
-BLPImage BLPLoader::loadBLP1(const uint8_t* data, size_t size) {
+BLPImage BLPLoader::loadBLP1(std::span<const uint8_t> data) {
+    const size_t size = data.size();
     // Copy header to stack to avoid unaligned reinterpret_cast (UB on strict platforms)
     if (size < sizeof(BLP1Header)) {
         LOG_ERROR("BLP1 data too small for header");
         return BLPImage();
     }
     BLP1Header header;
-    std::memcpy(&header, data, sizeof(BLP1Header));
+    std::memcpy(&header, data.data(), sizeof(BLP1Header));
 
     BLPImage image;
     image.format = BLPFormat::BLP1;
@@ -65,12 +68,14 @@ BLPImage BLPLoader::loadBLP1(const uint8_t* data, size_t size) {
     uint32_t offset = header.mipOffsets[0];
     uint32_t mipSize = header.mipSizes[0];
 
-    if (offset + mipSize > size) {
+    // Widened before adding: both fields come from the file, and as uint32
+    // an offset near 4G plus a size wraps and passes this check.
+    if (static_cast<uint64_t>(offset) + mipSize > size) {
         LOG_ERROR("BLP1 mipmap data out of bounds (offset=", offset, " size=", mipSize, " fileSize=", size, ")");
         return BLPImage();
     }
 
-    const uint8_t* mipData = data + offset;
+    const std::span<const uint8_t> mipData = data.subspan(offset, mipSize);
 
     if (image.width <= 0 || image.height <= 0 || image.width > 4096 || image.height > 4096) {
         LOG_ERROR("BLP1 dimensions out of range: ", image.width, "x", image.height);
@@ -85,14 +90,15 @@ BLPImage BLPLoader::loadBLP1(const uint8_t* data, size_t size) {
     return image;
 }
 
-BLPImage BLPLoader::loadBLP2(const uint8_t* data, size_t size) {
+BLPImage BLPLoader::loadBLP2(std::span<const uint8_t> data) {
+    const size_t size = data.size();
     // Copy header to stack to avoid unaligned reinterpret_cast (UB on strict platforms)
     if (size < sizeof(BLP2Header)) {
         LOG_ERROR("BLP2 data too small for header");
         return BLPImage();
     }
     BLP2Header header;
-    std::memcpy(&header, data, sizeof(BLP2Header));
+    std::memcpy(&header, data.data(), sizeof(BLP2Header));
 
     BLPImage image;
     image.format = BLPFormat::BLP2;
@@ -138,12 +144,13 @@ BLPImage BLPLoader::loadBLP2(const uint8_t* data, size_t size) {
     uint32_t offset = header.mipOffsets[0];
     uint32_t mipSize = header.mipSizes[0];
 
-    if (offset + mipSize > size) {
+    // See loadBLP1: widened so a near-4G offset cannot wrap past this check.
+    if (static_cast<uint64_t>(offset) + mipSize > size) {
         LOG_ERROR("BLP2 mipmap data out of bounds");
         return BLPImage();
     }
 
-    const uint8_t* mipData = data + offset;
+    const std::span<const uint8_t> mipData = data.subspan(offset, mipSize);
 
     if (image.width <= 0 || image.height <= 0 || image.width > 4096 || image.height > 4096) {
         LOG_ERROR("BLP2 dimensions out of range: ", image.width, "x", image.height);
@@ -197,14 +204,16 @@ BLPImage BLPLoader::loadBLP2(const uint8_t* data, size_t size) {
     return image;
 }
 
-void BLPLoader::decompressDXT1(const uint8_t* src, uint8_t* dst, int width, int height) {
+void BLPLoader::decompressDXT1(std::span<const uint8_t> src, uint8_t* dst, int width, int height) {
     // DXT1 decompression (8 bytes per 4x4 block)
     int blockWidth = (width + 3) / 4;
     int blockHeight = (height + 3) / 4;
 
     for (int by = 0; by < blockHeight; by++) {
         for (int bx = 0; bx < blockWidth; bx++) {
-            const uint8_t* block = src + (by * blockWidth + bx) * 8;
+            const size_t blockOffset = static_cast<size_t>(by * blockWidth + bx) * 8;
+            if (blockOffset + 8 > src.size()) continue;
+            const uint8_t* block = src.data() + blockOffset;
 
             // DXT1 reads the endpoint order as a mode flag, which is how a
             // cut-out texture encodes its transparent pixels.
@@ -262,14 +271,16 @@ void writeBlockPixels(const DxtColorBlock& colors, uint8_t* dst,
 
 }  // namespace
 
-void BLPLoader::decompressDXT3(const uint8_t* src, uint8_t* dst, int width, int height) {
+void BLPLoader::decompressDXT3(std::span<const uint8_t> src, uint8_t* dst, int width, int height) {
     // DXT3 decompression (16 bytes per 4x4 block - 8 bytes alpha + 8 bytes color)
     int blockWidth = (width + 3) / 4;
     int blockHeight = (height + 3) / 4;
 
     for (int by = 0; by < blockHeight; by++) {
         for (int bx = 0; bx < blockWidth; bx++) {
-            const uint8_t* block = src + (by * blockWidth + bx) * 16;
+            const size_t blockOffset = static_cast<size_t>(by * blockWidth + bx) * 16;
+            if (blockOffset + 16 > src.size()) continue;
+            const uint8_t* block = src.data() + blockOffset;
 
             // First 8 bytes: 4-bit alpha values
             uint64_t alphaBlock = 0;
@@ -293,14 +304,16 @@ void BLPLoader::decompressDXT3(const uint8_t* src, uint8_t* dst, int width, int 
     }
 }
 
-void BLPLoader::decompressDXT5(const uint8_t* src, uint8_t* dst, int width, int height) {
+void BLPLoader::decompressDXT5(std::span<const uint8_t> src, uint8_t* dst, int width, int height) {
     // DXT5 decompression (16 bytes per 4x4 block - interpolated alpha + color)
     int blockWidth = (width + 3) / 4;
     int blockHeight = (height + 3) / 4;
 
     for (int by = 0; by < blockHeight; by++) {
         for (int bx = 0; bx < blockWidth; bx++) {
-            const uint8_t* block = src + (by * blockWidth + bx) * 16;
+            const size_t blockOffset = static_cast<size_t>(by * blockWidth + bx) * 16;
+            if (blockOffset + 16 > src.size()) continue;
+            const uint8_t* block = src.data() + blockOffset;
 
             // Alpha endpoints
             uint8_t alpha0 = block[0];
@@ -347,16 +360,21 @@ void BLPLoader::decompressDXT5(const uint8_t* src, uint8_t* dst, int width, int 
     }
 }
 
-void BLPLoader::decompressPalette(const uint8_t* src, uint8_t* dst, const uint32_t* palette, int width, int height, uint8_t alphaDepth) {
-    int pixelCount = width * height;
+void BLPLoader::decompressPalette(std::span<const uint8_t> src, uint8_t* dst, const uint32_t* palette, int width, int height, uint8_t alphaDepth) {
+    const size_t pixelCount = static_cast<size_t>(width) * static_cast<size_t>(height);
 
-    // Palette indices are first (1 byte per pixel)
-    const uint8_t* indices = src;
-    // Alpha data follows the palette indices
-    const uint8_t* alphaData = src + pixelCount;
+    // Palette indices come first (one byte per pixel) and the alpha data
+    // follows them. Neither length is stated in the file: the mip size is,
+    // and it need not agree with width * height. Read through a checked
+    // accessor rather than trusting it to -- a mip of eight bytes claiming
+    // 4096x4096 would otherwise walk 16M bytes off the end.
+    const auto byteAt = [&src](size_t i) -> uint8_t {
+        return i < src.size() ? src[i] : uint8_t{0};
+    };
+    const size_t alphaBase = pixelCount;
 
-    for (int i = 0; i < pixelCount; i++) {
-        uint8_t index = indices[i];
+    for (size_t i = 0; i < pixelCount; i++) {
+        uint8_t index = byteAt(i);
         uint32_t color = palette[index];
 
         // Palette stores BGR (the high byte is typically 0, not alpha)
@@ -366,15 +384,15 @@ void BLPLoader::decompressPalette(const uint8_t* src, uint8_t* dst, const uint32
 
         // Alpha is stored separately after the index data
         if (alphaDepth == 8) {
-            dst[i * 4 + 3] = alphaData[i];
+            dst[i * 4 + 3] = byteAt(alphaBase + i);
         } else if (alphaDepth == 4) {
             // 4-bit alpha: 2 pixels packed per byte (low nibble first).
             // Multiply by 17 to scale [0..15] → [0..255] (equivalent to n * 255 / 15).
-            uint8_t alphaByte = alphaData[i / 2];
+            uint8_t alphaByte = byteAt(alphaBase + i / 2);
             dst[i * 4 + 3] = (i % 2 == 0) ? ((alphaByte & 0x0F) * 17) : ((alphaByte >> 4) * 17);
         } else if (alphaDepth == 1) {
             // 1-bit alpha: 8 pixels per byte
-            uint8_t alphaByte = alphaData[i / 8];
+            uint8_t alphaByte = byteAt(alphaBase + i / 8);
             dst[i * 4 + 3] = ((alphaByte >> (i % 8)) & 1) ? 255 : 0;
         } else {
             // No alpha channel: fully opaque

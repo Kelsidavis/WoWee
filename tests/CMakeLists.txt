@@ -1855,6 +1855,17 @@ wowee_add_test(test_adt_truncation
             ${TEST_COMMON_SOURCES}
             ${CMAKE_SOURCE_DIR}/src/pipeline/adt_loader.cpp)
 
+# ── test_blp_truncation ──────────────────────────────────────
+# What the BLP loader does with a texture that lies about its own sizes. The
+# decompressors derived how much source to read from width and height and
+# bounded only the destination, so a 4096x4096 DXT1 header with an eight-byte
+# mip level read two megabytes out of an eight-byte buffer. Malformed input
+# only -- run under --asan, where the overrun fails rather than passing.
+wowee_add_test(test_blp_truncation
+    SOURCES test_blp_truncation.cpp
+            ${TEST_COMMON_SOURCES}
+            ${CMAKE_SOURCE_DIR}/src/pipeline/blp_loader.cpp)
+
 # ── Sanitizers, once every test target exists ────────────────
 # This must be the last thing in this file. The loop walks ALL_TEST_TARGETS,
 # which register_test_target appends to as each test is declared, so the

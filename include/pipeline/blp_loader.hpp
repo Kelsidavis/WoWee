@@ -1,5 +1,6 @@
 #pragma once
 
+#include <span>
 #include <vector>
 #include <cstdint>
 #include <string>
@@ -103,12 +104,17 @@ private:
     static_assert(sizeof(BLP2Header) == 1172,
                   "BLP2Header is memcpy'd from the file: 1172 bytes, no padding");
 
-    static BLPImage loadBLP1(const uint8_t* data, size_t size);
-    static BLPImage loadBLP2(const uint8_t* data, size_t size);
-    static void decompressDXT1(const uint8_t* src, uint8_t* dst, int width, int height);
-    static void decompressDXT3(const uint8_t* src, uint8_t* dst, int width, int height);
-    static void decompressDXT5(const uint8_t* src, uint8_t* dst, int width, int height);
-    static void decompressPalette(const uint8_t* src, uint8_t* dst, const uint32_t* palette, int width, int height, uint8_t alphaDepth = 8);
+    static BLPImage loadBLP1(std::span<const uint8_t> data);
+    static BLPImage loadBLP2(std::span<const uint8_t> data);
+    static void decompressDXT1(std::span<const uint8_t> src, uint8_t* dst, int width, int height);
+    static void decompressDXT3(std::span<const uint8_t> src, uint8_t* dst, int width, int height);
+    static void decompressDXT5(std::span<const uint8_t> src, uint8_t* dst, int width, int height);
+    static void decompressPalette(std::span<const uint8_t> src, uint8_t* dst, const uint32_t* palette, int width, int height, uint8_t alphaDepth = 8);
+
+    /// Bytes a mip level must hold for the given format and dimensions.
+    /// Returns 0 when the product would overflow.
+    static size_t requiredSourceBytes(BLPCompression compression, int width, int height,
+                                      uint8_t alphaDepth);
 };
 
 } // namespace pipeline
