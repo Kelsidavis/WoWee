@@ -698,12 +698,9 @@ private:
     uint64_t bankerGuid_ = 0;
     std::array<uint64_t, 28> bankSlotGuids_{};
     std::array<uint64_t, 7> bankBagSlotGuids_{};
-    /// Bank slots whose guid changed, waiting for the rebuild to catch up.
-    ///
-    /// The fields say what moved; rebuildOnlineInventory is what turns them
-    /// into the items the bank frame draws, and it runs after this. Announcing
-    /// a slot before then redraws it from what it held a moment ago, and
-    /// nothing announces it again - see fireBankSlotEvents.
+    /// Bank slots whose guid changed, held until rebuildOnlineInventory has
+    /// written the items the bank frame reads. Announcing earlier redraws the
+    /// slot from what it held before the move.
     std::vector<int> pendingBankSlotEvents_;
     int effectiveBankSlots_ = 28;
     int effectiveBankBagSlots_ = 7;

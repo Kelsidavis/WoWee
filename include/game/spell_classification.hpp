@@ -55,19 +55,12 @@ enum ImplicitTarget : uint32_t {
 /// Whether a spell has to be aimed at a friendly unit, which is what makes it a
 /// candidate for falling back to the caster when nothing friendly is selected.
 ///
-/// Four values, not one. Ally covers most of it, but measured over the shipped
-/// Spell.dbc, Holy Light and Healing Wave are 45 and Hand of Protection,
-/// Beacon of Light, Levitate and Intervene are 57 - so a client asking only
-/// about 21 refuses to self-cast half the heals in the game, which is the
-/// shape this was found in.
+/// Four values, measured over the shipped Spell.dbc: Holy Light and Healing
+/// Wave are 45, Hand of Protection and Beacon of Light 57.
 ///
-/// Deliberately not 25, and deliberately not 63. A spell that takes any target
-/// (Dispel Magic, Holy Shock) is left alone: retail does not self-cast it
-/// either, because choosing for the player between cleansing themselves and
-/// purging an enemy would be guessing at the intent behind the keypress. 63 is
-/// a destination at the target rather than a unit, and while Circle of Healing
-/// and Wild Growth use it, so do Fire Bomb and Rain of Darkness - taking it
-/// would redirect a working hostile cast onto the caster.
+/// Not 25, which takes either target (Dispel Magic, Holy Shock) - retail does
+/// not self-cast those. Not 63, which is a destination rather than a unit and
+/// carries Fire Bomb and Rain of Darkness as well as Circle of Healing.
 inline bool requiresFriendlyTarget(uint32_t implicitTargetA) {
     return implicitTargetA == kImplicitTargetAlly ||
            implicitTargetA == kImplicitTargetParty ||

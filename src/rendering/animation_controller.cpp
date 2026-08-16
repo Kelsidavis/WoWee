@@ -405,11 +405,18 @@ void AnimationController::triggerRangedShot() {
         case RangedWeaponType::THROWN:
             if (has(anim::ATTACK_THROWN))    shootAnim = anim::ATTACK_THROWN;
             break;
-        case RangedWeaponType::WAND:
-            // A directed cast, not a rifle shot.
-            if (has(anim::SPELL_CAST_DIRECTED)) shootAnim = anim::SPELL_CAST_DIRECTED;
-            else if (has(anim::ATTACK_RIFLE))   shootAnim = anim::ATTACK_RIFLE;
+        case RangedWeaponType::WAND: {
+            // WOWEE_WAND_ANIM=<id> overrides the shot animation, for comparing
+            // candidates on screen: 32 cast, 49 rifle, 53 directed, 54 omni.
+            static const uint32_t kForced = []() -> uint32_t {
+                const char* v = std::getenv("WOWEE_WAND_ANIM");
+                return v ? static_cast<uint32_t>(std::atoi(v)) : 0;
+            }();
+            if (kForced != 0 && has(kForced))        shootAnim = kForced;
+            else if (has(anim::SPELL_CAST_DIRECTED)) shootAnim = anim::SPELL_CAST_DIRECTED;
+            else if (has(anim::ATTACK_RIFLE))        shootAnim = anim::ATTACK_RIFLE;
             break;
+        }
         default: break;
     }
     if (shootAnim == 0) return;  // Model has no ranged animation

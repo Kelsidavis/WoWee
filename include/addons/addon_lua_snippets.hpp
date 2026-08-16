@@ -1301,16 +1301,12 @@ if realInitialize then
 end
 )LUA";
 
-/// Chat that stays on screen.
+/// Chat lines do not fade.
 ///
-/// ChatFrameTemplate declares displayDuration="120.0", so every line a chat
-/// window holds fades two minutes after it arrives and the window empties
-/// itself while the player is reading it. Zero is what this client's message
-/// frames take for "never", and a chat frame is the one kind of window that
-/// wants it - UIErrorsFrame, which declares five seconds, is left alone.
-///
-/// Applied to the windows the interface has now and to any opened later, since
-/// a chat window can be created after this runs.
+/// ChatFrameTemplate declares displayDuration="120.0", so lines faded two
+/// minutes after arriving. Zero means never here. UIErrorsFrame, which
+/// declares five seconds, is left alone. Applied to existing windows and to
+/// any opened later.
 inline constexpr const char* kChatNoFadeLua = R"LUA(
 local function hold(frame)
     if frame and frame.SetTimeVisible then

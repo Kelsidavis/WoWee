@@ -168,9 +168,7 @@ AnimCapabilitySet AnimCapabilityProbe::probe(Renderer* renderer, uint32_t instan
         caps.resolvedReadyThrown = pick(readyThrownCands, 3);
     }
     {
-        // Not the rifle stance, which is where a wand used to end up: the
-        // inventory type it shares with a gun says nothing about how it is
-        // held. A wand is aimed the way a directed spell is.
+        // A wand takes the directed spell stance, not the rifle's.
         static const uint32_t readyWandCands[] = {
             anim::READY_SPELL_DIRECTED, anim::READY_1H, anim::READY_UNARMED};
         caps.resolvedReadyWand = pick(readyWandCands, 3);
@@ -188,7 +186,7 @@ AnimCapabilitySet AnimCapabilityProbe::probe(Renderer* renderer, uint32_t instan
     }
     caps.resolvedAttackThrown = has(anim::ATTACK_THROWN) ? anim::ATTACK_THROWN : 0;
     {
-        // The shot itself, for the same reason as the stance above.
+        // The shot, matching the stance above.
         static const uint32_t attackWandCands[] = {
             anim::SPELL_CAST_DIRECTED, anim::ATTACK_RIFLE};
         caps.resolvedAttackWand = pick(attackWandCands, 2);
