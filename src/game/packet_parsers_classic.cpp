@@ -1109,7 +1109,7 @@ bool ClassicPacketParsers::parseGuildRoster(network::Packet& packet, GuildRoster
     // Vanilla sends ten ranks and nothing but their rights, and no gender
     // byte. Its own copy of this checked no read against what was left, so a
     // truncated roster read past the end of the packet.
-    return parseGuildRosterBody(packet, data, {/*rankCount=*/false, /*gender=*/false});
+    return parseGuildRosterBody(packet, data, {/*rankCount=*/.rankCount=false, /*gender=*/.gender=false});
 }
 
 // ============================================================================

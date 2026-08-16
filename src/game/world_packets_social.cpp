@@ -1073,7 +1073,7 @@ bool parseGuildRosterBody(network::Packet& packet, GuildRosterData& data,
 }
 
 bool GuildRosterParser::parse(network::Packet& packet, GuildRosterData& data) {
-    return parseGuildRosterBody(packet, data, {/*rankCount=*/true, /*gender=*/true});
+    return parseGuildRosterBody(packet, data, {/*rankCount=*/.rankCount=true, /*gender=*/.gender=true});
 }
 
 bool GuildEventParser::parse(network::Packet& packet, GuildEventData& data) {

@@ -1398,7 +1398,7 @@ bool TbcPacketParsers::parseGuildRoster(network::Packet& packet, GuildRosterData
     // TBC's roster is WotLK's without the gender byte. It was ninety-nine
     // lines saying so, and the copy dropped the bank tab rights it had just
     // read - see parseGuildRosterBody.
-    return parseGuildRosterBody(packet, data, {/*rankCount=*/true, /*gender=*/false});
+    return parseGuildRosterBody(packet, data, {/*rankCount=*/.rankCount=true, /*gender=*/.gender=false});
 }
 
 // ============================================================================

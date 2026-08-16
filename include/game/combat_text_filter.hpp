@@ -44,27 +44,27 @@ inline CombatTextFilterRule combatTextFilterFor(CombatTextEntry::Type type,
         case T::IMMUNE: case T::RESIST: case T::DEFLECT: case T::REFLECT:
         case T::INTERRUPT: case T::DISPEL: case T::STEAL: case T::ABSORB: {
             const bool onTarget = (dstGuid != 0 && dstGuid == targetGuid);
-            return onTarget ? CombatTextFilterRule{"fctSpellMechanics", "1"}
-                            : CombatTextFilterRule{"fctSpellMechanicsOther", "0"};
+            return onTarget ? CombatTextFilterRule{.cvar = "fctSpellMechanics", .fallback = "1"}
+                            : CombatTextFilterRule{.cvar = "fctSpellMechanicsOther", .fallback = "0"};
         }
         // A pet's swing is its own row, and it is answered before the damage
         // row below so that clearing pet damage does not also require the
         // player to clear their own.
         case T::MELEE_DAMAGE:
             if (petGuid != 0 && srcGuid == petGuid) {
-                return {"PetMeleeDamage", "1"};
+                return {.cvar = "PetMeleeDamage", .fallback = "1"};
             }
             [[fallthrough]];
         case T::SPELL_DAMAGE: case T::CRIT_DAMAGE:
         case T::GLANCING: case T::CRUSHING:
             if (!isPlayerSource) return {};
-            return {"CombatDamage", "1"};
+            return {.cvar = "CombatDamage", .fallback = "1"};
         case T::PERIODIC_DAMAGE: case T::PERIODIC_HEAL:
             if (!isPlayerSource) return {};
-            return {"CombatLogPeriodicSpells", "1"};
+            return {.cvar = "CombatLogPeriodicSpells", .fallback = "1"};
         case T::HEAL: case T::CRIT_HEAL:
             if (!isPlayerSource) return {};
-            return {"CombatHealing", "1"};
+            return {.cvar = "CombatHealing", .fallback = "1"};
         default:
             return {};
     }

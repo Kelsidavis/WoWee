@@ -35,10 +35,10 @@ struct KnownAreaTriggerDestination {
 };
 
 constexpr KnownAreaTriggerDestination kKnownAreaTriggerDestinations[] = {
-    {2166, 0,   -4838.95f, -1318.46f, 501.868f, 1.42372f}, // Deeprun Tram -> Ironforge
-    {2171, 0,   -8364.57f,   535.981f, 91.7969f, 2.24619f}, // Deeprun Tram -> Stormwind
-    {2173, 369,    68.3006f, 2490.91f, -4.29647f, 3.12192f}, // Stormwind -> Deeprun Tram
-    {2175, 369,    69.2542f,   10.257f, -4.29664f, 3.09832f}, // Ironforge -> Deeprun Tram
+    {.triggerId = 2166, .mapId = 0,   .serverX = -4838.95f, .serverY = -1318.46f, .serverZ = 501.868f, .serverO = 1.42372f}, // Deeprun Tram -> Ironforge
+    {.triggerId = 2171, .mapId = 0,   .serverX = -8364.57f,   .serverY = 535.981f, .serverZ = 91.7969f, .serverO = 2.24619f}, // Deeprun Tram -> Stormwind
+    {.triggerId = 2173, .mapId = 369,    .serverX = 68.3006f, .serverY = 2490.91f, .serverZ = -4.29647f, .serverO = 3.12192f}, // Stormwind -> Deeprun Tram
+    {.triggerId = 2175, .mapId = 369,    .serverX = 69.2542f,   .serverY = 10.257f, .serverZ = -4.29664f, .serverO = 3.09832f}, // Ironforge -> Deeprun Tram
 };
 
 const KnownAreaTriggerDestination* findKnownAreaTriggerDestination(uint32_t triggerId, uint32_t mapId) {
