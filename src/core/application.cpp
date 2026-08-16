@@ -3771,10 +3771,14 @@ void Application::render() {
                     ui::UnitPortrait* model;
                     uint32_t* widgetId;
                 };
+                // NOLINTBEGIN(modernize-use-designated-initializers) - a table
+                // whose columns are its field names, with the struct in view
+                // directly above.
                 const DressUp kDressUps[] = {
                     {"DressUpModel",        &dressUpModel_,        &dressUpWidgetId_},
                     {"AuctionDressUpModel", &auctionDressUpModel_, &auctionDressUpWidgetId_},
                 };
+                // NOLINTEND(modernize-use-designated-initializers)
                 for (const DressUp& room : kDressUps) {
                     ui::Widget* dressUp = *room.widgetId
                         ? widgets.get(*room.widgetId) : nullptr;
@@ -3834,10 +3838,14 @@ void Application::render() {
                     ui::UnitPortrait* model;
                     uint32_t* widgetId;
                 };
+                // NOLINTBEGIN(modernize-use-designated-initializers) - a table
+                // whose columns are its field names, with the struct in view
+                // directly above.
                 const CreatureModel kCreatureModels[] = {
                     {"PetStableModel",      &stableModel_,    &stableModelWidgetId_},
                     {"CompanionModelFrame", &companionModel_, &companionModelWidgetId_},
                 };
+                // NOLINTEND(modernize-use-designated-initializers)
                 for (const CreatureModel& cm : kCreatureModels) {
                     ui::Widget* frame = *cm.widgetId ? widgets.get(*cm.widgetId) : nullptr;
                     if (!frame || frame->name != cm.name) {
@@ -4001,6 +4009,9 @@ void Application::render() {
                     }
                 }
                 const uint64_t npcGuid = gameHandler->getInteractNpcGuid();
+                // NOLINTBEGIN(modernize-use-designated-initializers) - a table
+                // whose columns are its field names, with the struct in view
+                // directly above.
                 const UnitFace kFaces[] = {
                     // "npc" and "questnpc" are the same unit under two names -
                     // whoever the open window belongs to. The interface uses
@@ -4015,6 +4026,7 @@ void Application::render() {
                     {"party3", &partyPortraits_[2], partyGuids[2]},
                     {"party4", &partyPortraits_[3], partyGuids[3]},
                 };
+                // NOLINTEND(modernize-use-designated-initializers)
                 for (const UnitFace& face : kFaces) {
                     static const std::vector<uint32_t> kNoAlias;
                     const auto& claimed = widgets.portraitsFor(face.unit);
@@ -4172,6 +4184,9 @@ void Application::render() {
                 using ui::UiElement;
                 using K = ui::KeybindingManager;
                 struct Route { UiElement element; K::Action action; const char* call; };
+                // NOLINTBEGIN(modernize-use-designated-initializers) - a table
+                // whose columns are its field names, with the struct in view
+                // directly above.
                 static const Route kRoutes[] = {
                     // Names checked against this FrameXML rather than assumed:
                     // ToggleAllBags, ToggleQuestLog and ToggleWorldMap are all
@@ -4214,6 +4229,7 @@ void Application::render() {
                     {UiElement::Social,         K::Action::TOGGLE_GUILD_ROSTER,     "ToggleFriendsFrame()"},
                     {UiElement::DungeonFinder,  K::Action::TOGGLE_DUNGEON_FINDER,   "ToggleLFDParentFrame()"},
                 };
+                // NOLINTEND(modernize-use-designated-initializers)
                 for (const Route& r : kRoutes) {
                     if (!ui::frameXmlOwns(r.element)) continue;
                     if (!K::getInstance().isActionPressed(r.action)) continue;

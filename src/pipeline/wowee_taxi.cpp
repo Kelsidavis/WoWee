@@ -175,12 +175,15 @@ WoweeTaxi WoweeTaxiLoader::makeRegion(const std::string& catalogName) {
     c.name = catalogName;
     // 4 nodes at corners of a 500m square at y=80 altitude.
     struct Pos { float x; float z; const char* name; };
+    // NOLINTBEGIN(modernize-use-designated-initializers) - a table whose
+    // columns are its field names, with the struct in view directly above.
     Pos posns[4] = {
         { -250.0f, -250.0f, "Northwest Outpost" },
         {  250.0f, -250.0f, "Northeast Outpost" },
         {  250.0f,  250.0f, "Southeast Outpost" },
         { -250.0f,  250.0f, "Southwest Outpost" },
     };
+    // NOLINTEND(modernize-use-designated-initializers)
     for (int k = 0; k < 4; ++k) {
         WoweeTaxi::Node n;
         n.nodeId = 100 + k;
@@ -217,6 +220,8 @@ WoweeTaxi WoweeTaxiLoader::makeContinent(const std::string& catalogName) {
     // 6 nodes spread across a continent - a hub-and-spoke
     // network with 1 central node connected to 5 outliers.
     struct Pos { float x; float z; const char* name; };
+    // NOLINTBEGIN(modernize-use-designated-initializers) - a table whose
+    // columns are its field names, with the struct in view directly above.
     Pos posns[6] = {
         {     0.0f,     0.0f, "Crossroads (hub)" },
         { -1500.0f, -1500.0f, "Stormwind" },
@@ -225,6 +230,7 @@ WoweeTaxi WoweeTaxiLoader::makeContinent(const std::string& catalogName) {
         { -1500.0f,  1500.0f, "Westfall" },
         {     0.0f,  3000.0f, "Tirisfal" },
     };
+    // NOLINTEND(modernize-use-designated-initializers)
     for (int k = 0; k < 6; ++k) {
         WoweeTaxi::Node n;
         n.nodeId = 200 + k;

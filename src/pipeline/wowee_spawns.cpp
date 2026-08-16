@@ -174,6 +174,8 @@ WoweeSpawns WoweeSpawnsLoader::makeVillage(const std::string& catalogName) {
     // 6 friendly NPCs (different roles) spread over a ~30 m
     // square plus 2 signpost game objects + 4 tree doodads.
     struct Npc { float x; float z; uint32_t id; const char* label; };
+    // NOLINTBEGIN(modernize-use-designated-initializers) - a table whose
+    // columns are its field names, with the struct in view directly above.
     Npc npcs[6] = {
         {  0.0f,   0.0f, 4001, "innkeeper" },
         { 12.0f,  -5.0f, 4002, "smith" },
@@ -182,6 +184,7 @@ WoweeSpawns WoweeSpawnsLoader::makeVillage(const std::string& catalogName) {
         { -8.0f,  -7.0f, 4005, "guard captain" },
         { 15.0f,   3.0f, 4006, "stable master" },
     };
+    // NOLINTEND(modernize-use-designated-initializers)
     for (const auto& n : npcs) {
         WoweeSpawns::Entry e;
         e.kind = WoweeSpawns::Creature;
@@ -204,10 +207,13 @@ WoweeSpawns WoweeSpawnsLoader::makeVillage(const std::string& catalogName) {
         c.entries.push_back(e);
     }
     struct Tree { float x; float z; };
+    // NOLINTBEGIN(modernize-use-designated-initializers) - a table whose
+    // columns are its field names, with the struct in view directly above.
     Tree trees[4] = {
         { -18.0f, -12.0f }, { 18.0f, -12.0f },
         { -18.0f,  12.0f }, { 18.0f,  12.0f },
     };
+    // NOLINTEND(modernize-use-designated-initializers)
     for (const auto& t : trees) {
         WoweeSpawns::Entry e;
         e.kind = WoweeSpawns::Doodad;

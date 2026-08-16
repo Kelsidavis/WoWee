@@ -22,6 +22,8 @@ struct RaceVoiceInfo {
 
 const RaceVoiceInfo* raceVoiceInfo(uint8_t raceId) {
     // Race IDs match game::Race. Goblin (9) has no player error voices.
+    // NOLINTBEGIN(modernize-use-designated-initializers) - a table whose
+    // columns are its field names, with the struct in view directly above.
     switch (raceId) {
         case 1:  { static const RaceVoiceInfo v{"Human",    "",         "Human"};    return &v; }
         case 2:  { static const RaceVoiceInfo v{"Orc",      "Orc",      "Orc"};      return &v; }
@@ -35,6 +37,7 @@ const RaceVoiceInfo* raceVoiceInfo(uint8_t raceId) {
         case 11: { static const RaceVoiceInfo v{"Draenei",  nullptr,    "Draenei"};  return &v; }
         default: return nullptr;
     }
+    // NOLINTEND(modernize-use-designated-initializers)
 }
 
 // File name token for each speech type ({race}{gender}_err_{token}NN.wav)

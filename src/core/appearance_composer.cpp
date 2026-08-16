@@ -456,10 +456,13 @@ void AppearanceComposer::loadEquippedWeapons() {
         game::EquipSlot slot;
         uint32_t attachmentId;
     };
+    // NOLINTBEGIN(modernize-use-designated-initializers) - a table whose
+    // columns are its field names, with the struct in view directly above.
     WeaponSlot weaponSlots[] = {
         { game::EquipSlot::MAIN_HAND, kAttachRightHand },
         { game::EquipSlot::OFF_HAND,  kAttachLeftHand },
     };
+    // NOLINTEND(modernize-use-designated-initializers)
 
     // Equipment reloads and Z toggles can move models between these points.
     // Clear both held and sheathed locations so old copies never remain behind.

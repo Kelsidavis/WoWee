@@ -327,6 +327,8 @@ void ActivitySoundManager::setCharacterVoiceProfile(const std::string& modelName
     std::string base = "Human";
 
     struct RaceMap { const char* token; const char* folder; const char* base; };
+    // NOLINTBEGIN(modernize-use-designated-initializers) - a table whose
+    // columns are its field names, with the struct in view directly above.
     static constexpr RaceMap races[] = {
         {"human", "Human", "Human"},
         {"orc", "Orc", "Orc"},
@@ -342,6 +344,7 @@ void ActivitySoundManager::setCharacterVoiceProfile(const std::string& modelName
         {"goblin", "Goblin", "Goblin"},
         {"worgen", "Worgen", "Worgen"},
     };
+    // NOLINTEND(modernize-use-designated-initializers)
     for (const auto& r : races) {
         if (lower.find(r.token) != std::string::npos) {
             folder = r.folder;

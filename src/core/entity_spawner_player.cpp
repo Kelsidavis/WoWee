@@ -807,10 +807,13 @@ void EntitySpawner::setOnlinePlayerEquipment(uint64_t guid,
         int slotIndex;
         uint32_t attachmentId;
     };
+    // NOLINTBEGIN(modernize-use-designated-initializers) - a table whose
+    // columns are its field names, with the struct in view directly above.
     static constexpr OnlineWeaponSlot weaponSlots[] = {
         { 15, 1 },  // MAIN_HAND → right hand
         { 16, 2 },  // OFF_HAND  → left hand
     };
+    // NOLINTEND(modernize-use-designated-initializers)
 
     for (const auto& ws : weaponSlots) {
         uint32_t weapDisplayId = displayInfoIds[ws.slotIndex];
@@ -910,6 +913,8 @@ std::string EntitySpawner::transportModelPath(uint32_t entry, uint32_t displayId
     static constexpr const char* kZeppelin = "World\\wmo\\transports\\transport_zeppelin\\transport_zeppelin.wmo";
     static constexpr const char* kHordeZep = "World\\wmo\\transports\\transport_horde_zeppelin\\Transport_Horde_Zeppelin.wmo";
     static constexpr const char* kIceship  = "World\\wmo\\transports\\icebreaker\\Transport_Icebreaker_ship.wmo";
+    // NOLINTBEGIN(modernize-use-designated-initializers) - a table whose
+    // columns are its field names, with the struct in view directly above.
     static constexpr TransportModel kTransportModels[] = {
         // Ships (display 3015)
         {  20808, 3015, kShip },      // The Maiden's Fancy
@@ -929,6 +934,7 @@ std::string EntitySpawner::transportModelPath(uint32_t entry, uint32_t displayId
         { 181688, 7446, kIceship },   // Northspear
         { 190536, 7446, kIceship },   // Stormwind's Pride
     };
+    // NOLINTEND(modernize-use-designated-initializers)
 
     for (const TransportModel& t : kTransportModels) {
         if (entry == t.entry || displayId == t.displayId) return t.path;
