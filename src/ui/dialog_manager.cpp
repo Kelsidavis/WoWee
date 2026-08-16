@@ -77,9 +77,9 @@ void DialogManager::renderDialogs(game::GameHandler& gameHandler,
     // this client's version has no equivalent of - so leaving this ungated
     // asks the same question twice.
     if (!frameXmlOwns(UiElement::Dialogs)) renderSharedQuestPopup(gameHandler);
-    // ItemTextFrame answers ITEM_TEXT_BEGIN, which this client fires. The
-    // client's other page-text surface, WindowManager::renderBookWindow, was
-    // already gated on Book; this one reads different state and was not.
+    // ItemTextFrame answers ITEM_TEXT_BEGIN, which this client fires. This is
+    // the client's remaining page-text surface, and it reads different state
+    // from the book window that used to sit beside it.
     if (!frameXmlOwns(UiElement::Book)) renderItemTextWindow(gameHandler);
     // StaticPopupDialogs["GUILD_INVITE"], shown from UIParent's own handler
     // for GUILD_INVITE_REQUEST.

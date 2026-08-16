@@ -48,6 +48,9 @@ NOTHING_TO_GATE = {
     # FrameXML's. Its two difficulty helpers moved to window_manager.cpp,
     # where the trainer list still uses them.
     "TradeSkill",
+    # src/ui/window_manager.cpp's renderStableWindow, removed once the stable
+    # was FrameXML's. Its pet list comes from the same handler either way.
+    "Stable",
 }
 
 

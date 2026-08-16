@@ -731,20 +731,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     if (!frameXmlOwns(UiElement::BarberShop)) {
         windowManager_.renderBarberShopWindow(gameHandler);
     }
-    if (!frameXmlOwns(UiElement::Stable)) {
-        windowManager_.renderStableWindow(gameHandler);
-    }
-    // Flight selection is handled by the world map's flight-map mode (see
-    // renderWorldMap); the legacy list window remains as a fallback when the
-    // world map system is unavailable.
-    {
-        auto* mapRenderer = core::Application::getInstance().getRenderer();
-        if (!mapRenderer || !mapRenderer->getWorldMap()) {
-            if (!frameXmlOwns(UiElement::Taxi)) {
-                windowManager_.renderTaxiWindow(gameHandler);
-            }
-        }
-    }
     if (!frameXmlOwns(UiElement::Mail)) {
         windowManager_.renderMailWindow(gameHandler, inventoryScreen, chatPanel_);
     }
@@ -781,9 +767,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     }
     if (!frameXmlOwns(UiElement::Inspect)) {
         socialPanel_.renderInspectWindow(gameHandler, inventoryScreen);
-    }
-    if (!frameXmlOwns(UiElement::Book)) {
-        windowManager_.renderBookWindow(gameHandler);
     }
     combatUI_.renderThreatWindow(gameHandler);
     if (!frameXmlOwns(UiElement::BattlegroundScore)) {

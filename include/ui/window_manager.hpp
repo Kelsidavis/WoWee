@@ -62,8 +62,6 @@ public:
     static ImVec4 recipeDifficultyColor(game::GameHandler& gameHandler, uint32_t spellId);
     static const char* recipeDifficultyLabel(game::GameHandler& gameHandler, uint32_t spellId);
     void renderBarberShopWindow(game::GameHandler& gameHandler);
-    void renderStableWindow(game::GameHandler& gameHandler);
-    void renderTaxiWindow(game::GameHandler& gameHandler);
 
     // ---- Mail and banking ----
     void renderMailWindow(game::GameHandler& gameHandler,
@@ -93,7 +91,6 @@ public:
     void renderInstanceLockouts(game::GameHandler& gameHandler);
     void renderAchievementWindow(game::GameHandler& gameHandler);
     void renderGmTicketWindow(game::GameHandler& gameHandler);
-    void renderBookWindow(game::GameHandler& gameHandler);
     void renderTitlesWindow(game::GameHandler& gameHandler);
     void renderEquipSetWindow(game::GameHandler& gameHandler);
     void renderSkillsWindow(game::GameHandler& gameHandler);
@@ -152,10 +149,6 @@ public:
     bool showGmTicketWindow_     = false;
     bool gmTicketWindowWasOpen_  = false;
     char gmTicketBuf_[2048] = {};
-
-    // Book / scroll reader
-    bool showBookWindow_ = false;
-    int  bookCurrentPage_ = 0;
 
     // Death screen
     float deathElapsed_ = 0.0f;
