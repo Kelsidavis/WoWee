@@ -39,6 +39,17 @@ bool QuestMarkerRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFr
         return false;
     }
 
+    // Re-initialisation is a supported path -- the renderer calls this again
+    // when the asset manager arrives and after a device rebuild -- and every
+    // resource below is created unconditionally. Without releasing the
+    // previous set first, each re-init abandoned three textures, the pipeline,
+    // its layout, the descriptor pool and the quad vertex buffer, none of
+    // which any later shutdown could reach.
+    if (vkCtx_) {
+        LOG_INFO("QuestMarkerRenderer: re-initialising, releasing the previous resources");
+        shutdown();
+    }
+
     LOG_INFO("QuestMarkerRenderer: Initializing...");
     vkCtx_ = ctx;
     VkDevice device = vkCtx_->getDevice();

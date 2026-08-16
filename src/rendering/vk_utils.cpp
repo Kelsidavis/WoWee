@@ -39,8 +39,8 @@ void destroyBuffer(VmaAllocator allocator, AllocatedBuffer& buffer) {
 
 AllocatedImage createImage(VkDevice device, VmaAllocator allocator,
     uint32_t width, uint32_t height, VkFormat format,
-    VkImageUsageFlags usage, VkSampleCountFlagBits samples, uint32_t mipLevels)
-{
+    VkImageUsageFlags usage, VkSampleCountFlagBits samples, uint32_t mipLevels,
+    std::source_location where) {
     AllocatedImage result{};
     result.extent = {width, height};
     result.format = format;
@@ -71,8 +71,11 @@ AllocatedImage createImage(VkDevice device, VmaAllocator allocator,
     // back from the leak dump to whatever asked for an image this size.
     {
         char name[64];
-        std::snprintf(name, sizeof(name), "img %ux%u mips=%u fmt=%d",
-                      width, height, mipLevels, static_cast<int>(format));
+        const char* file = where.file_name();
+        if (const char* slash = std::strrchr(file, '/')) file = slash + 1;
+        std::snprintf(name, sizeof(name), "img %ux%u mips=%u fmt=%d from %s:%u",
+                      width, height, mipLevels, static_cast<int>(format),
+                      file, where.line());
         vmaSetAllocationName(allocator, result.allocation, name);
     }
 

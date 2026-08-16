@@ -35,8 +35,7 @@ VkTexture& VkTexture::operator=(VkTexture&& other) noexcept {
 }
 
 bool VkTexture::upload(VkContext& ctx, const uint8_t* pixels, uint32_t width, uint32_t height,
-    VkFormat format, bool generateMips)
-{
+    VkFormat format, bool generateMips, std::source_location where) {
     if (!pixels || width == 0 || height == 0) return false;
 
     mipLevels_ = generateMips
@@ -66,7 +65,7 @@ bool VkTexture::upload(VkContext& ctx, const uint8_t* pixels, uint32_t width, ui
         usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     }
     image_ = createImage(ctx.getDevice(), ctx.getAllocator(), width, height,
-        format, usage, VK_SAMPLE_COUNT_1_BIT, mipLevels_);
+        format, usage, VK_SAMPLE_COUNT_1_BIT, mipLevels_, where);
 
     if (!image_.image) {
         destroyBuffer(ctx.getAllocator(), staging);

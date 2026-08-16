@@ -1,5 +1,7 @@
 #pragma once
 
+#include <source_location>
+
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <cstdint>
@@ -111,7 +113,11 @@ void destroyBuffer(VmaAllocator allocator, AllocatedBuffer& buffer);
 AllocatedImage createImage(VkDevice device, VmaAllocator allocator,
     uint32_t width, uint32_t height, VkFormat format,
     VkImageUsageFlags usage, VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
-    uint32_t mipLevels = 1);
+    uint32_t mipLevels = 1,
+    /// Defaulted, so the allocation records who asked for it without any call
+    /// site having to say. Used only to name the allocation for the shutdown
+    /// leak dump.
+    std::source_location where = std::source_location::current());
 
 void destroyImage(VkDevice device, VmaAllocator allocator, AllocatedImage& image);
 

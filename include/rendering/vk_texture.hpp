@@ -1,5 +1,7 @@
 #pragma once
 
+#include <source_location>
+
 #include "rendering/vk_utils.hpp"
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
@@ -23,7 +25,10 @@ public:
 
     // Upload RGBA8 pixel data to GPU
     bool upload(VkContext& ctx, const uint8_t* pixels, uint32_t width, uint32_t height,
-        VkFormat format = VK_FORMAT_R8G8B8A8_UNORM, bool generateMips = true);
+        VkFormat format = VK_FORMAT_R8G8B8A8_UNORM, bool generateMips = true,
+        /// Defaulted, so the allocation records the caller rather than this
+        /// file. Names the allocation for the shutdown leak dump only.
+        std::source_location where = std::source_location::current());
 
     // Upload with pre-existing mip data (array of mip levels)
     bool uploadMips(VkContext& ctx, const uint8_t* const* mipData, const uint32_t* mipSizes,
