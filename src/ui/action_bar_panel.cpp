@@ -537,80 +537,6 @@ void ActionBarPanel::renderActionBar(game::GameHandler& gameHandler,
             ImGui::PopStyleColor();
         }
 
-        // Press-and-hold to pick a slot up for reorganizing. Holding the left mouse
-        // button on a filled slot for kActionBarPickupDelay lifts its action onto the
-        // cursor; a normal quick click still casts/uses as before. Once carried, click
-        // another slot to swap (see the drop handling below).
-        // Lock Action Bars, which the panel offers and nothing read - so an
-        // action could always be dragged off, which is what the setting exists
-        // to stop. Read per slot rather than hoisted: this runs inside the
-        // per-slot loop, the answer comes from a map, and a bar being locked
-        // mid-drag should take effect on the next press rather than never.
-        const bool barsLocked =
-            addons::storedCVarValue("lockActionBars", "0") != "0";
-
-        if (actionBarDragSlot_ < 0 && !barsLocked) {
-            const bool held = ImGui::IsItemActive() && ImGui::IsMouseDown(ImGuiMouseButton_Left);
-            if (held && !slot.isEmpty()) {
-                if (actionBarHoldSlot_ != absSlot) {
-                    actionBarHoldSlot_  = absSlot;
-                    actionBarHoldStart_ = ImGui::GetTime();
-                } else {
-                    double heldFor = ImGui::GetTime() - actionBarHoldStart_;
-                    if (heldFor >= kActionBarPickupDelay) {
-                        // Pick up: lift this action onto the cursor and empty its slot
-                        // so it visibly leaves the bar while carried.
-                        actionBarDragSlot_ = absSlot;
-                        actionBarDragIcon_ = iconTex;
-                        actionBarCarryType_ = static_cast<uint8_t>(slot.type);
-                        actionBarCarryId_ = slot.id;
-                        gameHandler.setActionBarSlot(absSlot, game::ActionBarSlot::EMPTY, 0);
-                        actionBarHoldSlot_ = -1;
-                        // The initiating press is still down; swallow its release so it
-                        // doesn't immediately drop the action back into its own slot.
-                        actionBarCarryPressActive_ = true;
-                    } else {
-                        // Draw a rising fill as feedback that a pickup is charging.
-                        float t = static_cast<float>(heldFor / kActionBarPickupDelay);
-                        ImVec2 rMin = ImGui::GetItemRectMin();
-                        ImVec2 rMax = ImGui::GetItemRectMax();
-                        float fillTop = rMax.y - (rMax.y - rMin.y) * t;
-                        ImGui::GetWindowDrawList()->AddRectFilled(
-                            ImVec2(rMin.x, fillTop), rMax,
-                            IM_COL32(255, 220, 80, 70));
-                    }
-                }
-            } else if (actionBarHoldSlot_ == absSlot) {
-                // Released or dragged off before the delay - cancel this hold.
-                actionBarHoldSlot_ = -1;
-            }
-        }
-
-        // Error-flash overlay: red fade on spell cast failure (~0.5 s).
-        // Check both spell slots directly and macro slots via their primary spell.
-        {
-            uint32_t flashSpellId = 0;
-            if (slot.type == game::ActionBarSlot::SPELL && slot.id != 0)
-                flashSpellId = slot.id;
-            else if (slot.type == game::ActionBarSlot::MACRO && slot.id != 0)
-                flashSpellId = resolveMacroPrimarySpellId(slot.id, gameHandler);
-            auto flashIt = (flashSpellId != 0) ? actionFlashEndTimes_.find(flashSpellId) : actionFlashEndTimes_.end();
-            if (flashIt != actionFlashEndTimes_.end()) {
-                float now = static_cast<float>(ImGui::GetTime());
-                float remaining = flashIt->second - now;
-                if (remaining > 0.0f) {
-                    float alpha = remaining / kActionFlashDuration;  // 1→0
-                    ImVec2 rMin = ImGui::GetItemRectMin();
-                    ImVec2 rMax = ImGui::GetItemRectMax();
-                    ImGui::GetWindowDrawList()->AddRectFilled(
-                        rMin, rMax,
-                        ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 0.1f, 0.1f, 0.55f * alpha)));
-                } else {
-                    actionFlashEndTimes_.erase(flashIt);
-                }
-            }
-        }
-
         bool hoveredOnRelease = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
                                 ImGui::IsMouseReleased(ImGuiMouseButton_Left);
 
@@ -622,28 +548,6 @@ void ActionBarPanel::renderActionBar(game::GameHandler& gameHandler,
             const auto& held = inventoryScreen.getHeldItem();
             gameHandler.setActionBarSlot(absSlot, game::ActionBarSlot::ITEM, held.itemId);
             inventoryScreen.returnHeldItem(gameHandler.getInventory());
-        } else if (clicked && actionBarDragSlot_ >= 0) {
-            if (actionBarCarryPressActive_) {
-                // Release of the press that completed the pickup - keep carrying.
-            } else {
-                // Capture whatever is here before overwriting it (the slot is a live
-                // reference, so read the displaced action first).
-                const auto displacedType = slot.type;
-                const uint32_t displacedId = slot.id;
-                gameHandler.setActionBarSlot(
-                    absSlot, static_cast<game::ActionBarSlot::Type>(actionBarCarryType_),
-                    actionBarCarryId_);
-                // A displaced action falls back into the now-empty origin slot (a swap).
-                // Dropping onto the origin itself just restores the carried action.
-                if (absSlot != actionBarDragSlot_ &&
-                    displacedType != game::ActionBarSlot::EMPTY && displacedId != 0) {
-                    gameHandler.setActionBarSlot(actionBarDragSlot_, displacedType, displacedId);
-                }
-                actionBarDragSlot_ = -1;
-                actionBarDragIcon_ = 0;
-                actionBarCarryType_ = 0;
-                actionBarCarryId_ = 0;
-            }
         } else if (clicked && !slot.isEmpty()) {
             if (slot.type == game::ActionBarSlot::SPELL && slot.isReady()) {
                 // Check if this spell belongs to an item (e.g., Hearthstone spell 8690).
@@ -1161,62 +1065,6 @@ void ActionBarPanel::renderActionBar(game::GameHandler& gameHandler,
     }
 
     // Handle action bar drag: render icon at cursor and detect drop outside
-    if (actionBarDragSlot_ >= 0) {
-        ImVec2 mousePos = ImGui::GetMousePos();
-
-        // Draw dragged icon at cursor
-        if (actionBarDragIcon_) {
-            ImGui::GetForegroundDrawList()->AddImage(
-                (ImTextureID)(uintptr_t)actionBarDragIcon_,
-                ImVec2(mousePos.x - 20, mousePos.y - 20),
-                ImVec2(mousePos.x + 20, mousePos.y + 20));
-        } else {
-            ImGui::GetForegroundDrawList()->AddRectFilled(
-                ImVec2(mousePos.x - 20, mousePos.y - 20),
-                ImVec2(mousePos.x + 20, mousePos.y + 20),
-                IM_COL32(80, 80, 120, 180));
-        }
-
-        if (actionBarCarryPressActive_) {
-            // Still waiting for the initiating hold-press to be released - swallow it
-            // so it doesn't count as a drop, then the carry is "armed" for real clicks.
-            if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
-                actionBarCarryPressActive_ = false;
-        } else {
-            bool insideBar = (mousePos.x >= barX && mousePos.x <= barX + barW &&
-                              mousePos.y >= barY && mousePos.y <= barY + barH);
-
-            // Helper: put the carried action back where it was lifted from.
-            auto restoreCarried = [&]() {
-                gameHandler.setActionBarSlot(
-                    actionBarDragSlot_,
-                    static_cast<game::ActionBarSlot::Type>(actionBarCarryType_),
-                    actionBarCarryId_);
-            };
-            auto endCarry = [&]() {
-                actionBarDragSlot_ = -1;
-                actionBarDragIcon_ = 0;
-                actionBarCarryType_ = 0;
-                actionBarCarryId_ = 0;
-            };
-
-            // Left-release off the bar removes the action, which is what
-            // dragging something off a bar means and what the real client
-            // does. The origin slot was emptied at pickup, so there is nothing
-            // left to clear. A left-release on a slot is consumed by the
-            // per-slot drop logic above, which moves it there instead.
-            if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && !insideBar) {
-                endCarry();
-            }
-
-            // Right-release puts it back where it was lifted from, wherever the
-            // pointer is. The way out of a drag begun by mistake.
-            if (ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
-                restoreCarried();
-                endCarry();
-            }
-        }
-    }
 }
 
 void ActionBarPanel::renderStanceBar(game::GameHandler& gameHandler,

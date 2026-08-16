@@ -65,22 +65,9 @@ public:
     std::unordered_map<uint32_t, float> itemSpellCooldownTotals_;
     static constexpr float kActionFlashDuration = 0.5f;
 
-    // Action bar drag state. actionBarDragSlot_ is the origin slot the carried action
-    // was lifted from (-1 = not carrying). While carrying, the origin slot is left
-    // empty and the action rides the cursor as (carryType, carryId) with its icon.
-    int actionBarDragSlot_ = -1;
-    VkDescriptorSet actionBarDragIcon_ = VK_NULL_HANDLE;
-    uint8_t  actionBarCarryType_ = 0;   // game::ActionBarSlot::Type of the carried action
-    uint32_t actionBarCarryId_ = 0;     // spell/item/macro id of the carried action
-    // Press-and-hold pickup: which slot is being held down and when the press began.
-    // After holding kActionBarPickupDelay the slot is "picked up" into the drag state.
-    int actionBarHoldSlot_ = -1;
-    double actionBarHoldStart_ = 0.0;
-    // True from the moment a pickup completes until the initiating mouse press is
-    // released. While set, that pending release is swallowed everywhere so it can't
-    // immediately drop what was just picked up.
-    bool actionBarCarryPressActive_ = false;
-    static constexpr double kActionBarPickupDelay = 0.6;  // seconds to hold before pickup
+    // No drag state here: the action bars are FrameXML's, and picking an
+    // action up, moving it and dropping it off the bar are its own
+    // ActionButton scripts through PickupAction and PlaceAction.
     int mainActionBarPage_ = 1;  // FrameXML main pages are 1..6.
 
     // Bag bar state

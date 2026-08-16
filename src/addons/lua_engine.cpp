@@ -9687,6 +9687,23 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
                     const uint32_t dropOn = dropOwnerOf(hit);
                     if (dropOn != 0 && dropOn != draggingWid_) {
                         callFrameScript(dropOn, "OnReceiveDrag", b.name);
+                    } else if (dropOn == 0 && L_) {
+                        // Let go over the world, which is how an action is
+                        // taken off a bar: the slot emptied when it was picked
+                        // up, so clearing the cursor is what removes it. A drop
+                        // on a frame that does not accept drags keeps it, as
+                        // the real client does, so only the world counts.
+                        const auto* under = hit ? widgets_.get(hit) : nullptr;
+                        const bool onWorld = !under || under->name == "UIParent" ||
+                                             under->name == "WorldFrame";
+                        if (onWorld) {
+                            lua_getglobal(L_, "ClearCursor");
+                            if (lua_isfunction(L_, -1)) {
+                                if (lua_pcall(L_, 0, 0, 0) != 0) lua_pop(L_, 1);
+                            } else {
+                                lua_pop(L_, 1);
+                            }
+                        }
                     }
                     const auto* target = dropOn ? widgets_.get(dropOn)
                                                 : (hit ? widgets_.get(hit) : nullptr);
