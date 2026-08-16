@@ -42,20 +42,8 @@
 namespace {
     using namespace wowee::ui::colors;
 
-    // Abbreviated month names (indexed 0-11)
-    constexpr const char* kMonthAbbrev[12] = {
-        "Jan","Feb","Mar","Apr","May","Jun",
-        "Jul","Aug","Sep","Oct","Nov","Dec"
-    };
-
-    constexpr auto& kColorRed         = kRed;
-    constexpr auto& kColorGreen       = kGreen;
-    constexpr auto& kColorYellow      = kYellow;
     constexpr auto& kColorGray        = kGray;
     constexpr auto& kColorDarkGray    = kDarkGray;
-
-    // Common ImGui window flags for popup dialogs
-    const ImGuiWindowFlags kDialogFlags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize;
 
 } // anonymous namespace
 
