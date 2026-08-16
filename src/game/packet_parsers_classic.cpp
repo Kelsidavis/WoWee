@@ -855,7 +855,7 @@ bool ClassicPacketParsers::parseAuraUpdate(network::Packet& packet, AuraUpdateDa
         AuraSlot aura;
         if (spellId != 0) {
             aura.spellId = spellId;
-            if (rem() < 3) { data.updates.push_back({slot, aura}); break; }
+            if (rem() < 3) { data.updates.emplace_back(slot, aura); break; }
             aura.flags   = packet.readUInt8();
             aura.level   = packet.readUInt8();
             aura.charges = packet.readUInt8();
@@ -869,7 +869,7 @@ bool ClassicPacketParsers::parseAuraUpdate(network::Packet& packet, AuraUpdateDa
             // No effect amounts field in Classic (WotLK added it gated by 0x40)
         }
 
-        data.updates.push_back({slot, aura});
+        data.updates.emplace_back(slot, aura);
         if (!isAll) break;
     }
 

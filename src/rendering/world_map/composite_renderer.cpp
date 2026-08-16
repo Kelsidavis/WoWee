@@ -99,13 +99,13 @@ bool CompositeRenderer::initialize(VkContext* ctx, pipeline::AssetManager* am) {
 
     uint32_t si = 0;
     for (auto& tileRow : tileDescSets)
-        for (int t = 0; t < 12; t++)
-            tileRow[t] = allSets[si++];
+        for (auto& tileSet : tileRow)
+            tileSet = allSets[si++];
     imguiDisplaySet = allSets[si++];
     fogDescSet_ = allSets[si++];
     for (auto& overlayRow : overlayDescSets_)
-        for (uint32_t t = 0; t < MAX_OVERLAY_TILES; t++)
-            overlayRow[t] = allSets[si++];
+        for (auto& overlaySet : overlayRow)
+            overlaySet = allSets[si++];
 
     // --- Write display descriptor set → composite render target ---
     VkDescriptorImageInfo compositeImgInfo = compositeTarget->descriptorInfo();

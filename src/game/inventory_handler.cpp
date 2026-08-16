@@ -2558,7 +2558,7 @@ void InventoryHandler::categorizeTrainerSpells() {
         auto nameIt = owner_.skillLineNamesRef().find(skillLineId);
         std::string tabName = (nameIt != owner_.skillLineNamesRef().end()) ? nameIt->second : "Specialty";
         std::sort(spells.begin(), spells.end(), byName);
-        named.push_back({std::move(tabName), std::move(spells)});
+        named.emplace_back(std::move(tabName), std::move(spells));
     }
     std::sort(named.begin(), named.end(),
         [](const auto& a, const auto& b) { return a.first < b.first; });

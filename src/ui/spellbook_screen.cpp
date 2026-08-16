@@ -425,7 +425,7 @@ void SpellbookScreen::categorizeSpells(const std::unordered_set<uint32_t>& known
             auto nameIt = skillLineNames.find(skillLineId);
             std::string tabName = (nameIt != skillLineNames.end()) ? nameIt->second : fallbackName;
             std::sort(spells.begin(), spells.end(), byName);
-            named.push_back({std::move(tabName), std::move(spells)});
+            named.emplace_back(std::move(tabName), std::move(spells));
         }
         std::sort(named.begin(), named.end(),
             [](const auto& a, const auto& b) { return a.first < b.first; });

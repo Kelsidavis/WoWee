@@ -337,7 +337,7 @@ struct Emitter {
     void emitRegionTemplate(const XmlNode& node, bool isTexture) {
         const std::string name = node.attrOr("name", "");
         if (name.empty()) {
-            result.warnings.push_back("virtual region with no name was skipped");
+            result.warnings.emplace_back("virtual region with no name was skipped");
             return;
         }
         Emitter inner;
@@ -552,7 +552,7 @@ struct Emitter {
             // can replay it onto a real frame, which is the only thing "virtual"
             // means in FrameXML.
             if (name.empty()) {
-                result.warnings.push_back("virtual frame with no name was skipped");
+                result.warnings.emplace_back("virtual frame with no name was skipped");
                 return {};
             }
             Emitter inner;
@@ -1348,7 +1348,7 @@ void emitBindings(Emitter& e, const XmlNode& root) {
         if (b.name != "Binding") continue;
         const std::string name = b.attrOr("name", "");
         if (name.empty()) {
-            e.result.warnings.push_back("<Binding> without a name is not a "
+            e.result.warnings.emplace_back("<Binding> without a name is not a "
                                         "command anything can refer to");
             continue;
         }

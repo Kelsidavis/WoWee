@@ -268,7 +268,7 @@ bool AuraUpdateParser::parse(network::Packet& packet, AuraUpdateData& data, bool
             }
         }
 
-        data.updates.push_back({slot, aura});
+        data.updates.emplace_back(slot, aura);
 
         // For single update, only one entry
         if (!isAll) break;
@@ -297,7 +297,7 @@ bool SpellCooldownParser::parse(network::Packet& packet, SpellCooldownData& data
     while (packet.hasRemaining(8) && cooldownCount < maxCooldowns) {
         uint32_t spellId = packet.readUInt32();
         uint32_t cooldownMs = packet.readUInt32();
-        data.cooldowns.push_back({spellId, cooldownMs});
+        data.cooldowns.emplace_back(spellId, cooldownMs);
         cooldownCount++;
     }
 

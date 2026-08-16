@@ -136,7 +136,7 @@ static void precacheNearbyTiles(rendering::TerrainManager* terrainMgr,
     tiles.reserve(static_cast<size_t>(side) * static_cast<size_t>(side));
     for (int dy = -radius; dy <= radius; dy++)
         for (int dx = -radius; dx <= radius; dx++)
-            tiles.push_back({tileX + dx, tileY + dy});
+            tiles.emplace_back(tileX + dx, tileY + dy);
     terrainMgr->precacheTiles(tiles);
 }
 

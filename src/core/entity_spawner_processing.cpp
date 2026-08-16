@@ -690,7 +690,7 @@ void EntitySpawner::processPlayerSpawnQueue() {
         // Apply any equipment updates that arrived before the player was spawned.
         auto pit = pendingOnlinePlayerEquipment_.find(s.guid);
         if (pit != pendingOnlinePlayerEquipment_.end()) {
-            deferredEquipmentQueue_.push_back({s.guid, pit->second});
+            deferredEquipmentQueue_.emplace_back(s.guid, pit->second);
             pendingOnlinePlayerEquipment_.erase(pit);
         }
         processed++;

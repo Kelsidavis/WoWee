@@ -741,8 +741,8 @@ void TalentScreen::renderGlyphs(game::GameHandler& gameHandler) {
         } else {
             isMajor = (i % 2 == 0);  // empty slots follow same pattern
         }
-        if (isMajor) majorSlots.push_back({i, true});
-        else         minorSlots.push_back({i, false});
+        if (isMajor) majorSlots.emplace_back(i, true);
+        else         minorSlots.emplace_back(i, false);
     }
 
     auto renderGlyphSlot = [&](int slotIdx) {

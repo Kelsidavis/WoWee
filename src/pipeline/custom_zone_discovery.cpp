@@ -57,7 +57,7 @@ std::vector<CustomZoneInfo> CustomZoneDiscovery::scanDirectory(const std::string
                         // WoW tile grid is 64x64. Drop bad entries instead
                         // of feeding them to the loader.
                         if (tx < 0 || tx > 63 || ty < 0 || ty > 63) continue;
-                        info.tiles.push_back({tx, ty});
+                        info.tiles.emplace_back(tx, ty);
                     }
                 }
             }

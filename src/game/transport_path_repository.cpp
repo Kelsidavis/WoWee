@@ -332,7 +332,7 @@ bool TransportPathRepository::loadTransportAnimationDBC(pipeline::AssetManager* 
                      " raw=(", posX, ",", posY, ",", posZ, ")");
         }
 
-        waypointsByTransport[transportEntry].push_back({timeIndex, glm::vec3(posX, posY, posZ)});
+        waypointsByTransport[transportEntry].emplace_back(timeIndex, glm::vec3(posX, posY, posZ));
     }
 
     // Create time-indexed paths from waypoints
