@@ -496,7 +496,7 @@ bool Application::initialize() {
             if (!uim) return;
             auto& gs = uim->getGameScreen();
             auto& sp = gs.getSettingsPanel();
-            const int pct = static_cast<int>(v * 100.0f + 0.5f);
+            const int pct = static_cast<int>(std::lround(v * 100.0f));
             if (key == "master") {
                 sp.pendingMasterVolume = pct;
                 // Raising it means sound is wanted, the same as the slider in

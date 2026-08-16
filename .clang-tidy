@@ -1,3 +1,41 @@
+# Suppressions below the aggressive-check note were each added after reading
+# every finding the check produced on this codebase. They are systematically
+# intentional here rather than occasionally wrong, so leaving them enabled
+# means a lint gate that can never go green and that nobody reads. Unique
+# finding counts are as of LLVM 22.
+#
+#   bugprone-narrowing-conversions (152)
+#       float/int conversion is what graphics maths is made of:
+#       (32.0f - x) * TILE_SIZE, chunkIdx / 16.
+#   bugprone-branch-clone (193)
+#       dispatch code where identical bodies are deliberate, one explicit
+#       case per event type.
+#   performance-enum-size (328)
+#       enums are sized for the wire format and struct layout, not for the
+#       smallest type that fits.
+#   bugprone-implicit-widening-of-multiplication-result (31)
+#       every site is a compile-time constant (MAX_DUST * 5 * sizeof(float))
+#       or a byte count over 1024*1024 for a log line. Note it does not catch
+#       the + and - overflows that were the real bugs in the ADT and BLP
+#       parsers.
+#   bugprone-invalid-enum-default-initialization (33)
+#       fires on VkImageCreateInfo ci{}. Zero-initialising a C API struct and
+#       then setting sType is the required Vulkan idiom.
+#   bugprone-empty-catch (39)
+#       all try { std::stoi(s) } catch (...) {} over addon and cvar strings,
+#       where the variable already holds the default that failure keeps.
+#   bugprone-infinite-loop (9)
+#       false positives on loops bounded upstream, eg
+#       for (size_t i = pts.size() - 1; i-- > 0;) behind an early return on
+#       size < 2.
+#   bugprone-std-namespace-modification (35)
+#       std::hash specialisations, which is the sanctioned way.
+#   bugprone-derived-method-shadowing-base-method (28), bugprone-parent-virtual-call (2)
+#       the expansion-specific packet parsers deliberately override and call
+#       through to their base.
+#   bugprone-integer-division (6)
+#       decomposing a duration into years/months/days wants truncation.
+
 # clang-tidy configuration for WoWee
 # Targets C++20. Checks are tuned for a Vulkan/game-engine codebase:
 #   - reinterpret_cast, pointer arithmetic, and magic numbers are frequent
@@ -30,7 +68,29 @@ Checks: >
   readability-string-compare, 
   -bugprone-easily-swappable-parameters, 
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling, 
-  -performance-avoid-endl
+  -performance-avoid-endl, 
+  -bugprone-narrowing-conversions, 
+  -bugprone-branch-clone, 
+  -performance-enum-size, 
+  -bugprone-implicit-widening-of-multiplication-result, 
+  -bugprone-invalid-enum-default-initialization, 
+  -bugprone-empty-catch, 
+  -bugprone-infinite-loop, 
+  -bugprone-std-namespace-modification, 
+  -bugprone-derived-method-shadowing-base-method, 
+  -bugprone-parent-virtual-call, 
+  -bugprone-integer-division, 
+  -bugprone-narrowing-conversions, 
+  -bugprone-branch-clone, 
+  -performance-enum-size, 
+  -bugprone-implicit-widening-of-multiplication-result, 
+  -bugprone-invalid-enum-default-initialization, 
+  -bugprone-empty-catch, 
+  -bugprone-infinite-loop, 
+  -bugprone-std-namespace-modification, 
+  -bugprone-derived-method-shadowing-base-method, 
+  -bugprone-parent-virtual-call, 
+  -bugprone-integer-division
 
 WarningsAsErrors: ''
 

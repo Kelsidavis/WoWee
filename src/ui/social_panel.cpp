@@ -228,7 +228,7 @@ void SocialPanel::renderPartyFrames(game::GameHandler& gameHandler,
                         if (isOOR)
                             snprintf(hpPct, sizeof(hpPct), "OOR");
                         else
-                            snprintf(hpPct, sizeof(hpPct), "%d%%", static_cast<int>(pct * 100.0f + 0.5f));
+                            snprintf(hpPct, sizeof(hpPct), "%d%%", static_cast<int>(std::lround(pct * 100.0f)));
                         ImVec2 ts = ImGui::CalcTextSize(hpPct);
                         float tx = (barBg.x + barBgEnd.x - ts.x) * 0.5f;
                         float ty = barBg.y + (BAR_H - ts.y) * 0.5f;

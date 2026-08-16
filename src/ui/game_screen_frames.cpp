@@ -1424,7 +1424,7 @@ void GameScreen::renderTargetFrame(game::GameHandler& gameHandler) {
                             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.15f, 0.15f, 0.15f, 0.8f));
                             char totOverlay[32];
                             snprintf(totOverlay, sizeof(totOverlay), "%u%%",
-                                     static_cast<unsigned>(totPct * 100.0f + 0.5f));
+                                     static_cast<unsigned>(std::lround(totPct * 100.0f)));
                             ImGui::ProgressBar(totPct, ImVec2(-1, 10), totOverlay);
                             ImGui::PopStyleColor(2);
                         }
@@ -2267,7 +2267,7 @@ void GameScreen::renderFocusFrame(game::GameHandler& gameHandler) {
                             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.15f, 0.15f, 0.15f, 0.8f));
                             char fofOverlay[32];
                             snprintf(fofOverlay, sizeof(fofOverlay), "%u%%",
-                                     static_cast<unsigned>(fofPct * 100.0f + 0.5f));
+                                     static_cast<unsigned>(std::lround(fofPct * 100.0f)));
                             ImGui::ProgressBar(fofPct, ImVec2(-1, 10), fofOverlay);
                             ImGui::PopStyleColor(2);
                         }

@@ -2135,7 +2135,7 @@ void GameScreen::setGamma(float gamma) {
     // WoW's own slider runs 0.3 to 2.8; clamped to what the 0-100 setting can
     // hold so a value from outside cannot push the slider off its own track.
     const float clamped = std::clamp(gamma, 0.0f, 2.0f);
-    const int stored = static_cast<int>(clamped * 50.0f + 0.5f);
+    const int stored = static_cast<int>(std::lround(clamped * 50.0f));
     // Saved here, because nothing else was going to.
     //
     // Every other route into these settings goes through the settings window,
