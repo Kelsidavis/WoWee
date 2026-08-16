@@ -47,7 +47,7 @@ bool isPortBotTarget(const std::string& target) {
 }
 
 std::string portBotCommandFor(const std::string& rawInput) {
-    const std::string input = trim(rawInput);
+    std::string input = trim(rawInput);
     if (input.empty()) return "";
     const std::string lower = toLower(input);
     if (lower == "help" || lower == "?") return "__help__";

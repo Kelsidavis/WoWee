@@ -1460,7 +1460,6 @@ void EntitySpawner::processPendingMount() {
         }
 
         // Load external .anim files (only idle + run needed for mounts)
-        std::string basePath = m2Path.substr(0, m2Path.size() - 3);
         // Only what a mount does while standing still; the rest would stall.
         pipeline::loadExternalAnimations(
             *assetManager_, m2Path, m2Data, model,

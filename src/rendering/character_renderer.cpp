@@ -3890,7 +3890,7 @@ bool CharacterRenderer::findAttachmentBone(uint32_t modelId, uint32_t attachment
     }
 
     // Fallback for head attachment (ID 11): use bone 0 if attachment not defined
-    if (!found && attachmentId == 11 && model.bones.size() > 0) {
+    if (!found && attachmentId == 11 && !model.bones.empty()) {
         outBoneIndex = 0;
         found = true;
     }

@@ -500,7 +500,7 @@ void LightingManager::update(const glm::vec3& playerPos, uint32_t mapId, uint32_
                               0.7152f * newParams.skyTopColor.g +
                               0.0722f * newParams.skyTopColor.b;
         uint32_t firstVolume = 0, secondVolume = 0;
-        if (activeVolumes_.size() > 0) firstVolume = activeVolumes_[0].volume->lightId;
+        if (!activeVolumes_.empty()) firstVolume = activeVolumes_[0].volume->lightId;
         if (activeVolumes_.size() > 1) secondVolume = activeVolumes_[1].volume->lightId;
         const bool changed =
             zoneId != diagZoneId_ || activeSkyboxPath_ != diagSkyboxPath_ ||

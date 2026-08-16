@@ -238,7 +238,7 @@ void KeybindingManager::loadFromConfigFile(const std::string& filePath) {
             key = ImGuiKey_Home;
         } else if (keyStr == "End") {
             key = ImGuiKey_End;
-        } else if (keyStr.find("F") == 0 && keyStr.length() <= 3) {
+        } else if (keyStr.find('F') == 0 && keyStr.length() <= 3) {
             // F1-F12 keys
             try {
                 int fNum = std::stoi(keyStr.substr(1));

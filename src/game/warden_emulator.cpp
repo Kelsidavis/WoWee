@@ -465,7 +465,7 @@ uint32_t WardenEmulator::apiGetTickCount([[maybe_unused]] WardenEmulator& emu, [
 }
 
 uint32_t WardenEmulator::apiSleep([[maybe_unused]] WardenEmulator& emu, const std::vector<uint32_t>& args) {
-    if (args.size() < 1) return 0;
+    if (args.empty()) return 0;
     uint32_t dwMilliseconds = args[0];
 
     LOG_DEBUG("WinAPI: Sleep(", dwMilliseconds, ")");

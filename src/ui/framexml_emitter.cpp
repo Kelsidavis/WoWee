@@ -219,7 +219,6 @@ struct Emitter {
                            bool isTexture, const std::string& nameVar = std::string()) {
         const std::string var = nextVar();
         const std::string rawName = node.attrOr("name", "");
-        const std::string name = substituteParent(rawName, parentName);
 
         line(var + " = " + parentVar +
              (isTexture ? ":CreateTexture(" : ":CreateFontString(") +

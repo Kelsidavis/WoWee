@@ -395,7 +395,7 @@ void CharacterCreateScreen::render(game::GameHandler& /*gameHandler*/) {
         preview_->requestComposite();
     }
 
-    bool hasPreview = (preview_ && preview_->getTextureId() != 0);
+    bool hasPreview = (preview_ && preview_->getTextureId() != nullptr);
     ImGuiViewport* vp = ImGui::GetMainViewport();
     const SelectionScreenLayout layout = makeSelectionScreenLayout(*vp);
 

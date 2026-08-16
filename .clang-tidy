@@ -68,6 +68,14 @@
 #   bugprone-throwing-static-initialization (18)
 #       namespace-scope random_device/mt19937 pairs, one mutex, and three
 #       const tables. Every report is bad_alloc during static init.
+#   performance-inefficient-string-concatenation (40)
+#       none is the s = s + x accumulation this check exists to catch.
+#       All forty build one string from pieces in a single expression -- an
+#       asset path, a Lua line, a chat message -- and the check reaches them
+#       through its "concatenation inside a loop" heuristic rather than by
+#       finding the quadratic shape. Rewriting each as a run of += turns one
+#       readable line into four to seven statements, for temporaries that
+#       cost nothing beside the file read or one-time init they sit next to.
 #
 # bugprone-unchecked-string-to-number-conversion is deliberately NOT
 # suppressed. 30 of its 31 reports are benign - an env debug knob, and
@@ -121,7 +129,8 @@ Checks: >
   -bugprone-misplaced-widening-cast,
   -performance-trivially-destructible,
   -bugprone-exception-escape,
-  -bugprone-throwing-static-initialization
+  -bugprone-throwing-static-initialization,
+  -performance-inefficient-string-concatenation
 
 WarningsAsErrors: ''
 

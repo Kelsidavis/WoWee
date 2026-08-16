@@ -137,7 +137,7 @@ void UIManager::loadInterfaceFont(const std::string& dataRoot,
     // matched none of them, the built-in face was kept, and the only trace was
     // an info line the log does not carry.
     auto childIgnoringCase = [&](const fs::path& base, const std::string& name) {
-        const fs::path exact = base / name;
+        fs::path exact = base / name;
         if (fs::exists(exact, ec)) return exact;
         auto lower = [](std::string v) {
             for (char& c : v) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));

@@ -19,11 +19,11 @@ std::string resolveItemRegionTexture(AssetManager& assets, int region,
     if (dir[0] == '\0') return {};
 
     const std::string base = std::string("Item\\TextureComponents\\") + dir + "\\" + texName;
-    const std::string gendered = base + (isFemale ? "_F.blp" : "_M.blp");
+    std::string gendered = base + (isFemale ? "_F.blp" : "_M.blp");
     if (assets.fileExists(gendered)) return gendered;
-    const std::string unisex = base + "_U.blp";
+    std::string unisex = base + "_U.blp";
     if (assets.fileExists(unisex)) return unisex;
-    const std::string plain = base + ".blp";
+    std::string plain = base + ".blp";
     if (assets.fileExists(plain)) return plain;
     return {};
 }

@@ -63,7 +63,7 @@ namespace {
 std::filesystem::path resolveChild(const std::filesystem::path& base,
                                    const std::string& name) {
     std::error_code ec;
-    const std::filesystem::path exact = base / name;
+    std::filesystem::path exact = base / name;
     if (std::filesystem::exists(exact, ec)) return exact;
 
     auto lower = [](std::string v) {

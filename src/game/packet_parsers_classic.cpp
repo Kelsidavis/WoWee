@@ -1200,7 +1200,7 @@ bool ClassicPacketParsers::parseGossipMessage(network::Packet& packet, GossipMes
     remaining = packet.getRemainingSize();
     if (remaining < 4) {
         LOG_WARNING("Classic SMSG_GOSSIP_MESSAGE truncated before questCount");
-        return data.options.size() > 0;  // Return true if we got at least some options
+        return !data.options.empty();  // Return true if we got at least some options
     }
 
     uint32_t questCount = packet.readUInt32();

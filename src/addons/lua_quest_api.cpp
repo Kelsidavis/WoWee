@@ -1065,7 +1065,7 @@ static std::vector<uint32_t> skillOrder(game::GameHandler* gh) {
     ids.reserve(skills.size());
     for (const auto& [id, skill] : skills) ids.push_back(id);
     std::sort(ids.begin(), ids.end(), [gh](uint32_t a, uint32_t b) {
-        const std::string na = gh->getSkillName(a), nb = gh->getSkillName(b);
+        const std::string &na = gh->getSkillName(a), &nb = gh->getSkillName(b);
         if (na != nb) return na < nb;
         return a < b;
     });

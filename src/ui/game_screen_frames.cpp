@@ -774,7 +774,7 @@ void GameScreen::renderPetFrame(game::GameHandler& gameHandler) {
                         snprintf(label, sizeof(label), "%s", builtinLabel);
                     } else {
                         // Show first 3 chars of spell name or spell ID.
-                        std::string nm = gameHandler.getSpellName(actionId);
+                        const std::string& nm = gameHandler.getSpellName(actionId);
                         if (nm.empty()) snprintf(label, sizeof(label), "?%u", actionId % 100);
                         else            snprintf(label, sizeof(label), "%.3s", nm.c_str());
                     }

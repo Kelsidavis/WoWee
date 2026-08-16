@@ -599,7 +599,7 @@ void ChatHandler::handleMessageChat(network::Packet& packet) {
             msg.rfind("oRA", 0) == 0 ||            // oRA raid addon
             msg.rfind("BWVQ", 0) == 0 ||           // BigWigs
             msg.rfind("AVR", 0) == 0 ||            // AVR (Augmented Virtual Reality)
-            msg.rfind("\t", 0) == 0 ||             // Tab-prefixed addon messages
+            msg.rfind('\t', 0) == 0 ||             // Tab-prefixed addon messages
             (msg.size() > 4 && static_cast<unsigned char>(msg[0]) > 127))) {  // Binary data
             return; // Silently discard addon whisper
         }

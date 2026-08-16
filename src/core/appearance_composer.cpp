@@ -568,7 +568,7 @@ void AppearanceComposer::loadEquippedWeapons() {
                     loadWeaponM2(m2Path, weaponModel);
                 }
 
-                if (weaponModel.vertices.size() > 0) {
+                if (!weaponModel.vertices.empty()) {
                     std::string texturePath;
                     if (!textureName.empty()) {
                         texturePath = "Item\\ObjectComponents\\Weapon\\" + textureName + ".blp";

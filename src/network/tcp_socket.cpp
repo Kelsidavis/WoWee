@@ -159,7 +159,7 @@ void TCPSocket::update() {
 
 void TCPSocket::tryParsePackets() {
     // For auth packets, we need at least 1 byte (opcode)
-    while (receiveBuffer.size() >= 1) {
+    while (!receiveBuffer.empty()) {
         uint8_t opcode = receiveBuffer[0];
 
         // Determine expected packet size based on opcode

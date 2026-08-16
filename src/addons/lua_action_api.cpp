@@ -1528,7 +1528,7 @@ void pushBindingToClient(const std::string& command, const std::string& key) {
 std::optional<std::string> liveKeyFor(const std::string& command) {
     for (const auto& live : kLiveBindings) {
         if (command != live.command) continue;
-        const std::string key =
+        std::string key =
             wowKeyFromImGui(wowee::ui::KeybindingManager::getInstance()
                                 .getKeyForAction(live.action));
         if (key.empty()) return std::nullopt;
