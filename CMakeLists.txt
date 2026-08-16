@@ -1189,25 +1189,50 @@ target_include_directories(wowee PRIVATE
 
 # Precompiled header.
 #
-# Only what is both heavy and near-universal: <cstdint> appears in 330 of this
-# project's headers, <string> in 312, <vector> in 306, and logger.hpp is
-# included by 170 translation units. Everything here is parsed by most of the
-# 400-odd sources whether it is precompiled or not.
+# Chosen by measuring preprocessed output, not by reading include lists. A
+# translation unit that includes game_handler.hpp expands to 133k lines, of
+# which the standard library and glm are 115k -- every project header it drags
+# in, game_handler.hpp's own 5000 lines included, accounts for the remaining
+# 13%. The expensive headers in this codebase are not its own:
+#
+#   <chrono>  89k    <glm/glm.hpp> 89k    <future> 87k    <map>  74k
+#   <set>     73k    <deque>       73k    <mutex>  53k    <array> 48k
+#
+# (reproduce with: c++ -E -std=c++20 <build flags> on a one-line TU)
 #
 # Deliberately no project headers beyond the logger. Putting a widely-included
 # but frequently-edited header (game_handler.hpp, renderer.hpp) in a PCH makes
 # every edit to it a full rebuild, which costs more than the parsing it saves.
 # logger.hpp qualifies because it is stable - it is a logging macro façade that
-# has no reason to churn.
-target_precompile_headers(wowee PRIVATE
+# has no reason to churn. glm qualifies for the same reason: vendored, 135
+# direct includers, and never edited here.
+# The standard-library half is shared with the test targets, which are more
+# than half of a clean build (477 test objects against 413 for wowee) and
+# otherwise get no PCH at all. Kept free of glm and of any project header so it
+# is safe on every test target, including those that link neither.
+set(WOWEE_PCH_STD
     <cstdint>
     <cstddef>
     <string>
     <vector>
     <memory>
     <unordered_map>
+    <unordered_set>
+    <map>
+    <set>
+    <deque>
+    <array>
+    <optional>
     <functional>
     <algorithm>
+    <chrono>
+    <mutex>
+    <future>
+)
+
+target_precompile_headers(wowee PRIVATE
+    ${WOWEE_PCH_STD}
+    <glm/glm.hpp>
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/logger.hpp
 )
 # Vendored headers as SYSTEM to suppress third-party warnings
