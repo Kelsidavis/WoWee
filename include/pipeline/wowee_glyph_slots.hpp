@@ -68,14 +68,14 @@ struct WoweeGlyphSlot {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t slotId) const;
+    [[nodiscard]] const Entry* findById(uint32_t slotId) const;
 
     // Returns true if a character of the given class+level
     // has access to this slot. classBit is one of the WCHC
     // class-bit flags (Warrior=0x01, Paladin=0x02, ...).
-    bool isUnlockedFor(uint32_t slotId,
+    [[nodiscard]] bool isUnlockedFor(uint32_t slotId,
                         uint32_t classBit,
                         uint8_t characterLevel) const;
 

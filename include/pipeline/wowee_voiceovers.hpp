@@ -97,16 +97,16 @@ struct WoweeVoiceovers {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t voiceId) const;
+    [[nodiscard]] const Entry* findById(uint32_t voiceId) const;
 
     // Returns all voice entries for a given (npc, event)
     // pair. The trigger handler picks one randomly when
     // multiple variantIndex values are available - the
     // boss-aggro handler might have 3 lines and pick one
     // per encounter for variety.
-    std::vector<const Entry*> findForTrigger(uint32_t npcId,
+    [[nodiscard]] std::vector<const Entry*> findForTrigger(uint32_t npcId,
                                                 uint8_t eventKind) const;
 };
 

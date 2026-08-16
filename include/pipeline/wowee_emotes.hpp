@@ -91,20 +91,20 @@ struct WoweeEmotes {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t emoteId) const;
+    [[nodiscard]] const Entry* findById(uint32_t emoteId) const;
 
     // Looks up an emote by its slash-command string (the
     // bit after the slash - "dance", "wave"). Used by the
     // chat input parser to dispatch /<cmd> to the right
     // emote without scanning the full table.
-    const Entry* findByCommand(const std::string& cmd) const;
+    [[nodiscard]] const Entry* findByCommand(const std::string& cmd) const;
 
     // Returns all emotes of one kind - used by the social
     // wheel UI to populate per-tab listings (Social /
     // Combat / RolePlay / System).
-    std::vector<const Entry*> findByKind(uint8_t emoteKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByKind(uint8_t emoteKind) const;
 };
 
 class WoweeEmotesLoader {

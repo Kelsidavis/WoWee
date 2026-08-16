@@ -14,8 +14,8 @@ public:
         ctx.gameHandler.requestGuildInfo();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"ginfo", "guildinfo"}; }
-    std::string helpText() const override { return "Show guild info"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"ginfo", "guildinfo"}; }
+    [[nodiscard]] std::string helpText() const override { return "Show guild info"; }
 };
 
 // --- /groster, /guildroster ---
@@ -25,8 +25,8 @@ public:
         ctx.gameHandler.requestGuildRoster();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"groster", "guildroster"}; }
-    std::string helpText() const override { return "Show guild roster"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"groster", "guildroster"}; }
+    [[nodiscard]] std::string helpText() const override { return "Show guild roster"; }
 };
 
 // --- /gmotd, /guildmotd ---
@@ -44,8 +44,8 @@ public:
         ctx.gameHandler.addLocalChatMessage(msg);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"gmotd", "guildmotd"}; }
-    std::string helpText() const override { return "Set guild message of the day"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"gmotd", "guildmotd"}; }
+    [[nodiscard]] std::string helpText() const override { return "Set guild message of the day"; }
 };
 
 // --- /gpromote, /guildpromote ---
@@ -63,8 +63,8 @@ public:
         ctx.gameHandler.addLocalChatMessage(msg);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"gpromote", "guildpromote"}; }
-    std::string helpText() const override { return "Promote guild member"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"gpromote", "guildpromote"}; }
+    [[nodiscard]] std::string helpText() const override { return "Promote guild member"; }
 };
 
 // --- /gdemote, /guilddemote ---
@@ -82,8 +82,8 @@ public:
         ctx.gameHandler.addLocalChatMessage(msg);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"gdemote", "guilddemote"}; }
-    std::string helpText() const override { return "Demote guild member"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"gdemote", "guilddemote"}; }
+    [[nodiscard]] std::string helpText() const override { return "Demote guild member"; }
 };
 
 // --- /gquit, /guildquit, /leaveguild ---
@@ -93,8 +93,8 @@ public:
         ctx.gameHandler.leaveGuild();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"gquit", "guildquit", "leaveguild"}; }
-    std::string helpText() const override { return "Leave guild"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"gquit", "guildquit", "leaveguild"}; }
+    [[nodiscard]] std::string helpText() const override { return "Leave guild"; }
 };
 
 // --- /ginvite, /guildinvite ---
@@ -112,8 +112,8 @@ public:
         ctx.gameHandler.addLocalChatMessage(msg);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"ginvite", "guildinvite"}; }
-    std::string helpText() const override { return "Invite player to guild"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"ginvite", "guildinvite"}; }
+    [[nodiscard]] std::string helpText() const override { return "Invite player to guild"; }
 };
 
 // --- /gkick, /guildkick ---
@@ -131,8 +131,8 @@ public:
         ctx.gameHandler.addLocalChatMessage(msg);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"gkick", "guildkick"}; }
-    std::string helpText() const override { return "Kick player from guild"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"gkick", "guildkick"}; }
+    [[nodiscard]] std::string helpText() const override { return "Kick player from guild"; }
 };
 
 // --- /gcreate, /guildcreate ---
@@ -150,8 +150,8 @@ public:
         ctx.gameHandler.addLocalChatMessage(msg);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"gcreate", "guildcreate"}; }
-    std::string helpText() const override { return "Create a guild"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"gcreate", "guildcreate"}; }
+    [[nodiscard]] std::string helpText() const override { return "Create a guild"; }
 };
 
 // --- /gdisband, /guilddisband ---
@@ -161,8 +161,8 @@ public:
         ctx.gameHandler.disbandGuild();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"gdisband", "guilddisband"}; }
-    std::string helpText() const override { return "Disband guild"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"gdisband", "guilddisband"}; }
+    [[nodiscard]] std::string helpText() const override { return "Disband guild"; }
 };
 
 // --- /gleader, /guildleader ---
@@ -180,8 +180,8 @@ public:
         ctx.gameHandler.addLocalChatMessage(msg);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"gleader", "guildleader"}; }
-    std::string helpText() const override { return "Transfer guild leadership"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"gleader", "guildleader"}; }
+    [[nodiscard]] std::string helpText() const override { return "Transfer guild leadership"; }
 };
 
 // --- Registration ---

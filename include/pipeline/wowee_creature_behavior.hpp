@@ -103,14 +103,14 @@ struct WoweeCreatureBehavior {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t behaviorId) const;
+    [[nodiscard]] const Entry* findById(uint32_t behaviorId) const;
 
     // Returns all behaviors of one kind - used by the
     // creature-template editor to suggest archetype
     // policies when authoring a new creature.
-    std::vector<const Entry*> findByKind(uint8_t creatureKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByKind(uint8_t creatureKind) const;
 };
 
 class WoweeCreatureBehaviorLoader {

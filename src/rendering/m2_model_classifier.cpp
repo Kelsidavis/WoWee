@@ -47,7 +47,7 @@ struct TokenMatch {
     bool found = false;
 
     // Ranks after `other`: ends further right, or ends level but is longer.
-    bool outranks(const TokenMatch& other) const noexcept {
+    [[nodiscard]] bool outranks(const TokenMatch& other) const noexcept {
         if (!found) return false;
         if (!other.found) return true;
         if (end != other.end) return end > other.end;

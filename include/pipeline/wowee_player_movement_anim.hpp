@@ -73,21 +73,21 @@ struct WoweePlayerMovementAnim {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t mapId) const;
+    [[nodiscard]] const Entry* findById(uint32_t mapId) const;
 
     // Returns the binding for a specific (race, gender,
     // state) - the canonical lookup the renderer uses
     // each frame to decide which animation sequence to
     // play.
-    const Entry* find(uint8_t raceId, uint8_t genderId,
+    [[nodiscard]] const Entry* find(uint8_t raceId, uint8_t genderId,
                        uint8_t state) const;
 
     // Returns all bindings for a race+gender combo.
     // Used by character-preview UIs to show the full
     // state machine for one model.
-    std::vector<const Entry*> findByRaceGender(uint8_t raceId,
+    [[nodiscard]] std::vector<const Entry*> findByRaceGender(uint8_t raceId,
                                                  uint8_t genderId) const;
 };
 

@@ -82,14 +82,14 @@ struct WoweeAchievementCriteria {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t criteriaId) const;
+    [[nodiscard]] const Entry* findById(uint32_t criteriaId) const;
 
     // Return all criteria for the given achievement, sorted
     // by progressOrder. The achievement UI uses this to
     // show the progress checklist.
-    std::vector<const Entry*> findByAchievement(
+    [[nodiscard]] std::vector<const Entry*> findByAchievement(
         uint32_t achievementId) const;
 
     static const char* criteriaTypeName(uint8_t k);

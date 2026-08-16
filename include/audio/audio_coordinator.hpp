@@ -68,8 +68,8 @@ public:
     /// Called from Renderer::update() with a pre-filled context.
     void updateZoneAudio(const ZoneAudioContext& ctx);
 
-    const std::string& getCurrentZoneName() const { return currentZoneName_; }
-    uint32_t getCurrentZoneId() const { return currentZoneId_; }
+    [[nodiscard]] const std::string& getCurrentZoneName() const { return currentZoneName_; }
+    [[nodiscard]] uint32_t getCurrentZoneId() const { return currentZoneId_; }
 
     /// Called when the "Enable WoWee Music" setting is turned off. If one of
     /// the WoWee (file-based) tracks is currently playing, crossfade to a

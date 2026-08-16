@@ -38,7 +38,7 @@ public:
     /** Encrypt an outgoing CMSG_WARDEN_DATA payload. */
     std::vector<uint8_t> encrypt(const std::vector<uint8_t>& data);
 
-    bool isInitialized() const { return initialized_; }
+    [[nodiscard]] bool isInitialized() const { return initialized_; }
 
 private:
     bool initialized_ = false;

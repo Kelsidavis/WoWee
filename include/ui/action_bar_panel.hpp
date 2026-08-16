@@ -22,7 +22,7 @@ public:
         return (page - 1) * 12 + buttonIndex;
     }
 
-    int getMainActionBarPage() const { return mainActionBarPage_; }
+    [[nodiscard]] int getMainActionBarPage() const { return mainActionBarPage_; }
     /// Told by the interface, which owns the page.
     void setMainActionBarPage(int page) {
         if (page >= 1 && page <= kFrameXmlActionBarPages) mainActionBarPage_ = page;

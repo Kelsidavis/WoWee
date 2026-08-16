@@ -57,7 +57,7 @@ public:
 
     // ---- Input helpers (called by GameScreen keybind handling) ----
 
-    bool isChatInputActive() const { return chatInputActive_; }
+    [[nodiscard]] bool isChatInputActive() const { return chatInputActive_; }
 
     /** Insert a spell / item link into the chat input buffer (shift-click). */
     void insertChatLink(const std::string& link);
@@ -83,7 +83,7 @@ public:
     /// For bridging them into FrameXML's SlashCmdList. With chat handed over,
     /// the edit box is FrameXML's and ChatEdit_ParseText consults nothing but
     /// that table, so a command living only here cannot be typed at all.
-    std::vector<std::string> registryCommandNames() const;
+    [[nodiscard]] std::vector<std::string> registryCommandNames() const;
 
     /// Run one of them, without going near SlashCmdList.
     ///
@@ -143,12 +143,12 @@ public:
 
     // ---- Accessors for command system (Phase 3) ----
     char* getChatInputBuffer() { return chatInputBuffer_; }
-    size_t getChatInputBufferSize() const { return sizeof(chatInputBuffer_); }
+    [[nodiscard]] size_t getChatInputBufferSize() const { return sizeof(chatInputBuffer_); }
     char* getWhisperTargetBuffer() { return whisperTargetBuffer_; }
-    size_t getWhisperTargetBufferSize() const { return sizeof(whisperTargetBuffer_); }
-    int  getSelectedChatType() const { return selectedChatType_; }
+    [[nodiscard]] size_t getWhisperTargetBufferSize() const { return sizeof(whisperTargetBuffer_); }
+    [[nodiscard]] int  getSelectedChatType() const { return selectedChatType_; }
     void setSelectedChatType(int t) { selectedChatType_ = t; }
-    int  getSelectedChannelIdx() const { return selectedChannelIdx_; }
+    [[nodiscard]] int  getSelectedChannelIdx() const { return selectedChannelIdx_; }
     bool& macroStopped() { return macroStopped_; }
     CastSequenceTracker& getCastSeqTracker() { return castSeqTracker_; }
     SlashCommands& getSlashCmds() { return slashCmds_; }
@@ -219,7 +219,7 @@ private:
 public:
     /// The chatBubbles setting, which the interface options own. Forwarded
     /// rather than exposing the manager: the panel is what the outside holds.
-    bool bubblesShown() const { return bubbleManager_.bubblesShown(); }
+    [[nodiscard]] bool bubblesShown() const { return bubbleManager_.bubblesShown(); }
     void setBubblesShown(bool shown) { bubbleManager_.setBubblesShown(shown); }
 private:
 

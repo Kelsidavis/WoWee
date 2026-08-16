@@ -175,7 +175,7 @@ public:
     /**
      * Get current lighting parameters
      */
-    const LightingParams& getLightingParams() const { return currentParams_; }
+    [[nodiscard]] const LightingParams& getLightingParams() const { return currentParams_; }
 
     /**
      * Set whether player is indoors (disables outdoor lighting)
@@ -185,24 +185,24 @@ public:
     /// 0 keeps LightParams' own fog colour, 1 is the sky itself. See
     /// LightingManager::update.
     void setFogSkyBlend(float blend) { fogSkyBlend_ = blend; }
-    float getFogSkyBlend() const { return fogSkyBlend_; }
+    [[nodiscard]] float getFogSkyBlend() const { return fogSkyBlend_; }
     /// How much distance fog, as a multiplier on the zone's own fog distances.
     /// 1 is the DBC unchanged, above 1 is thicker, 0 is none; the default
     /// 0.4 thins the authored fog, which reads too heavy here. See
     /// LightingManager::update.
     void setFogStrength(float strength) { fogStrength_ = strength; }
-    float getFogStrength() const { return fogStrength_; }
+    [[nodiscard]] float getFogStrength() const { return fogStrength_; }
 
     /**
      * Get current time of day (0.0-1.0)
      */
-    float getTimeOfDay() const { return timeOfDay_; }
+    [[nodiscard]] float getTimeOfDay() const { return timeOfDay_; }
 
     /** Time used by the visible sky, including persistent zone ambience. */
-    float getVisualTimeOfDayHours() const { return visualTimeOfDayHours_; }
+    [[nodiscard]] float getVisualTimeOfDayHours() const { return visualTimeOfDayHours_; }
 
     /** Original client M2 sky selected by the dominant LightParams volume. */
-    const std::string& getActiveSkyboxPath() const { return activeSkyboxPath_; }
+    [[nodiscard]] const std::string& getActiveSkyboxPath() const { return activeSkyboxPath_; }
 
     /**
      * Manually set time of day for testing
@@ -243,7 +243,7 @@ private:
     /**
      * Find light volumes for blending (up to 4 with weight > 0)
      */
-    std::vector<WeightedVolume> findLightVolumes(const glm::vec3& playerPos, uint32_t mapId) const;
+    [[nodiscard]] std::vector<WeightedVolume> findLightVolumes(const glm::vec3& playerPos, uint32_t mapId) const;
 
     /**
      * Get LightParams ID based on conditions
@@ -258,17 +258,17 @@ private:
     /**
      * Sample color from band
      */
-    glm::vec3 sampleColorBand(const ColorBand& band, uint16_t timeHalfMinutes) const;
+    [[nodiscard]] glm::vec3 sampleColorBand(const ColorBand& band, uint16_t timeHalfMinutes) const;
 
     /**
      * Sample float from band
      */
-    float sampleFloatBand(const FloatBand& band, uint16_t timeHalfMinutes) const;
+    [[nodiscard]] float sampleFloatBand(const FloatBand& band, uint16_t timeHalfMinutes) const;
 
     /**
      * Convert DBC BGR color to RGB vec3
      */
-    glm::vec3 dbcColorToVec3(uint32_t dbcColor) const;
+    [[nodiscard]] glm::vec3 dbcColorToVec3(uint32_t dbcColor) const;
 
     pipeline::AssetManager* assetManager_ = nullptr;
 

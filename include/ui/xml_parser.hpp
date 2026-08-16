@@ -27,26 +27,26 @@ struct XmlNode {
 
     /// Attribute lookup, case-sensitive as XML requires. Returns nullptr when
     /// absent, which callers distinguish from present-but-empty.
-    const std::string* attr(const std::string& key) const {
+    [[nodiscard]] const std::string* attr(const std::string& key) const {
         auto it = attrs.find(key);
         return it == attrs.end() ? nullptr : &it->second;
     }
-    std::string attrOr(const std::string& key, const std::string& fallback) const {
+    [[nodiscard]] std::string attrOr(const std::string& key, const std::string& fallback) const {
         const std::string* v = attr(key);
         return v ? *v : fallback;
     }
     /// FrameXML writes booleans as "true"/"false".
-    bool attrBool(const std::string& key, bool fallback = false) const {
+    [[nodiscard]] bool attrBool(const std::string& key, bool fallback = false) const {
         const std::string* v = attr(key);
         if (!v) return fallback;
         return *v == "true" || *v == "1";
     }
-    float attrFloat(const std::string& key, float fallback = 0.0f) const {
+    [[nodiscard]] float attrFloat(const std::string& key, float fallback = 0.0f) const {
         const std::string* v = attr(key);
         if (!v || v->empty()) return fallback;
         try { return std::stof(*v); } catch (...) { return fallback; }
     }
-    const XmlNode* child(const std::string& name) const {
+    [[nodiscard]] const XmlNode* child(const std::string& name) const {
         for (const auto& c : children) if (c.name == name) return &c;
         return nullptr;
     }

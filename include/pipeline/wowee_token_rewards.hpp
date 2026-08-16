@@ -93,14 +93,14 @@ struct WoweeTokenReward {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t tokenRewardId) const;
+    [[nodiscard]] const Entry* findById(uint32_t tokenRewardId) const;
 
     // Returns all rewards offered for spending the given
     // token item id. Used by vendor frames to populate
     // the "what can I buy with these?" list.
-    std::vector<const Entry*> findByToken(uint32_t tokenItemId) const;
+    [[nodiscard]] std::vector<const Entry*> findByToken(uint32_t tokenItemId) const;
 
     static const char* rewardKindName(uint8_t k);
     static const char* factionStandingName(uint8_t s);

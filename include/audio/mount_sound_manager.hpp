@@ -65,15 +65,15 @@ public:
     void playLandSound();     // Landing (thud/hoof)
     void playIdleSound();     // Ambient idle (snort/stomp/breath)
 
-    bool isMounted() const { return mounted_; }
-    MountFamily getCurrentMountFamily() const { return currentMountFamily_; }
+    [[nodiscard]] bool isMounted() const { return mounted_; }
+    [[nodiscard]] MountFamily getCurrentMountFamily() const { return currentMountFamily_; }
     void setVolumeScale(float scale) { volumeScale_ = scale; }
-    float getVolumeScale() const { return volumeScale_; }
+    [[nodiscard]] float getVolumeScale() const { return volumeScale_; }
 
 private:
-    MountType detectMountType(uint32_t creatureDisplayId) const;
-    MountFamily detectMountFamily(uint32_t creatureDisplayId) const;
-    MountFamily detectMountFamilyFromPath(const std::string& modelPath) const;
+    [[nodiscard]] MountType detectMountType(uint32_t creatureDisplayId) const;
+    [[nodiscard]] MountFamily detectMountFamily(uint32_t creatureDisplayId) const;
+    [[nodiscard]] MountFamily detectMountFamilyFromPath(const std::string& modelPath) const;
     void updateMountSounds();
     void stopAllMountSounds();
     void loadMountSounds();
@@ -102,7 +102,7 @@ private:
     std::unordered_map<MountFamily, FamilySounds, MountFamilyHash> familySounds_;
 
     // Helper to get sounds for current family (unknown/unloaded -> silent)
-    const FamilySounds& getCurrentFamilySounds() const;
+    [[nodiscard]] const FamilySounds& getCurrentFamilySounds() const;
 
     // Sound state tracking
     bool playingMovementSound_ = false;

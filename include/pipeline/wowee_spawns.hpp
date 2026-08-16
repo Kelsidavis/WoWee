@@ -69,10 +69,10 @@ struct WoweeSpawns {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Per-kind counts - useful for the editor info display.
-    uint32_t countByKind(uint8_t k) const;
+    [[nodiscard]] uint32_t countByKind(uint8_t k) const;
 
     static const char* kindName(uint8_t k);
 };

@@ -28,17 +28,17 @@ public:
     using const_iterator = std::vector<value_type>::const_iterator;
     using iterator       = std::vector<value_type>::iterator;
 
-    bool   empty() const noexcept { return data_.empty(); }
-    size_t size()  const noexcept { return data_.size(); }
+    [[nodiscard]] bool   empty() const noexcept { return data_.empty(); }
+    [[nodiscard]] size_t size()  const noexcept { return data_.size(); }
     void   clear()                { data_.clear(); }
     void   reserve(size_t n)      { data_.reserve(n); }
 
     iterator       begin()        { return data_.begin(); }
     iterator       end()          { return data_.end(); }
-    const_iterator begin()  const { return data_.begin(); }
-    const_iterator end()    const { return data_.end(); }
-    const_iterator cbegin() const { return data_.cbegin(); }
-    const_iterator cend()   const { return data_.cend(); }
+    [[nodiscard]] const_iterator begin()  const { return data_.begin(); }
+    [[nodiscard]] const_iterator end()    const { return data_.end(); }
+    [[nodiscard]] const_iterator cbegin() const { return data_.cbegin(); }
+    [[nodiscard]] const_iterator cend()   const { return data_.cend(); }
 
     // Append at end. Caller must ensure key is strictly greater than the
     // previously appended key - used by the UPDATE_OBJECT parser which
@@ -69,10 +69,10 @@ public:
         return data_.insert(it, value_type(key, 0u))->second;
     }
 
-    const value_type& back() const { return data_.back(); }
+    [[nodiscard]] const value_type& back() const { return data_.back(); }
     value_type&       back()       { return data_.back(); }
 
-    const_iterator find(uint16_t key) const {
+    [[nodiscard]] const_iterator find(uint16_t key) const {
         auto it = std::lower_bound(
             data_.begin(), data_.end(), key,
             [](const value_type& p, uint16_t k) { return p.first < k; });

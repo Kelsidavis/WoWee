@@ -25,8 +25,8 @@ public:
 
     void destroy();
 
-    ::VkShaderModule getModule() const { return module_; }
-    bool isValid() const { return module_ != VK_NULL_HANDLE; }
+    [[nodiscard]] ::VkShaderModule getModule() const { return module_; }
+    [[nodiscard]] bool isValid() const { return module_ != VK_NULL_HANDLE; }
 
     // Create a VkPipelineShaderStageCreateInfo for this module
     VkPipelineShaderStageCreateInfo stageInfo(VkShaderStageFlagBits stage,

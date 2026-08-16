@@ -48,7 +48,7 @@ struct LogonChallengeResponse {
     // Authenticator extension (securityFlags & 0x04)
     uint8_t authenticatorRequired = 0;
 
-    bool isSuccess() const { return result == AuthResult::SUCCESS; }
+    [[nodiscard]] bool isSuccess() const { return result == AuthResult::SUCCESS; }
 };
 
 // LOGON_CHALLENGE response parser
@@ -87,7 +87,7 @@ struct LogonProofResponse {
     uint8_t status;
     std::vector<uint8_t> M2;  // Server proof (20 bytes)
 
-    bool isSuccess() const { return status == 0; }
+    [[nodiscard]] bool isSuccess() const { return status == 0; }
 };
 
 // LOGON_PROOF response parser
@@ -114,7 +114,7 @@ struct Realm {
     uint8_t patchVersion = 0;
     uint16_t build = 0;
 
-    bool hasVersionInfo() const { return (flags & 0x04) != 0; }
+    [[nodiscard]] bool hasVersionInfo() const { return (flags & 0x04) != 0; }
 };
 
 // REALM_LIST packet builder

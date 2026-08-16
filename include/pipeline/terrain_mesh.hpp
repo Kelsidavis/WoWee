@@ -57,9 +57,9 @@ struct ChunkMesh {
     };
     std::vector<LayerInfo> layers;
 
-    bool isValid() const { return !vertices.empty() && !indices.empty(); }
-    size_t getVertexCount() const { return vertices.size(); }
-    size_t getTriangleCount() const { return indices.size() / 3; }
+    [[nodiscard]] bool isValid() const { return !vertices.empty() && !indices.empty(); }
+    [[nodiscard]] size_t getVertexCount() const { return vertices.size(); }
+    [[nodiscard]] size_t getTriangleCount() const { return indices.size() / 3; }
 };
 
 /**
@@ -71,7 +71,7 @@ struct TerrainMesh {
 
     int validChunkCount = 0;
 
-    const ChunkMesh& getChunk(int x, int y) const { return chunks[y * 16 + x]; }
+    [[nodiscard]] const ChunkMesh& getChunk(int x, int y) const { return chunks[y * 16 + x]; }
     ChunkMesh& getChunk(int x, int y) { return chunks[y * 16 + x]; }
 };
 

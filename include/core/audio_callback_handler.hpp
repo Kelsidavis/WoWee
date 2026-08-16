@@ -27,7 +27,7 @@ public:
 
 private:
     /// Resolve SoundEntries.dbc → file path for a given soundId (eliminates 3x copy-paste)
-    std::optional<std::string> resolveSoundEntryPath(uint32_t soundId) const;
+    [[nodiscard]] std::optional<std::string> resolveSoundEntryPath(uint32_t soundId) const;
 
     pipeline::AssetManager& assetManager_;
     audio::AudioCoordinator* audioCoordinator_;

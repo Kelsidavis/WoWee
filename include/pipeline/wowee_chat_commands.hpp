@@ -89,19 +89,19 @@ struct WoweeChatCommands {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t cmdId) const;
+    [[nodiscard]] const Entry* findById(uint32_t cmdId) const;
 
     // Resolves a chat command by typed string -
     // matches against canonical command name OR
     // any alias. Used by the chat parser hot path.
-    const Entry* findByCommand(const std::string& cmd) const;
+    [[nodiscard]] const Entry* findByCommand(const std::string& cmd) const;
 
     // Returns all commands a player at the given
     // security level can use. The /help UI calls
     // this with the player's security level filter.
-    std::vector<const Entry*> findByMinSecurity(uint8_t playerSec) const;
+    [[nodiscard]] std::vector<const Entry*> findByMinSecurity(uint8_t playerSec) const;
 };
 
 class WoweeChatCommandsLoader {

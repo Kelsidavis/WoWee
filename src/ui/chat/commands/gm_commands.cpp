@@ -105,8 +105,8 @@ public:
             chat_utils::makeSystemMessage("Tab-complete works with dot-prefix (type .te<Tab>)."));
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"gmhelp", "gmcommands"}; }
-    std::string helpText() const override { return "List GM dot-commands (server-side)"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"gmhelp", "gmcommands"}; }
+    [[nodiscard]] std::string helpText() const override { return "List GM dot-commands (server-side)"; }
 };
 
 // ---------------------------------------------------------------------------

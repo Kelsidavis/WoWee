@@ -46,7 +46,7 @@ struct UIServices {
     core::WorldLoader* worldLoader = nullptr;
     
     // Helper to check if core services are wired
-    bool isValid() const {
+    [[nodiscard]] bool isValid() const {
         return window && renderer && assetManager && gameHandler;
     }
 };

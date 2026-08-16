@@ -12,9 +12,9 @@ class IModifierState {
 public:
     virtual ~IModifierState() = default;
 
-    virtual bool isShiftHeld() const = 0;
-    virtual bool isCtrlHeld() const = 0;
-    virtual bool isAltHeld() const = 0;
+    [[nodiscard]] virtual bool isShiftHeld() const = 0;
+    [[nodiscard]] virtual bool isCtrlHeld() const = 0;
+    [[nodiscard]] virtual bool isAltHeld() const = 0;
 };
 
 } // namespace ui

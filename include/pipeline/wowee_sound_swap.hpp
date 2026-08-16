@@ -81,15 +81,15 @@ struct WoweeSoundSwap {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t ruleId) const;
+    [[nodiscard]] const Entry* findById(uint32_t ruleId) const;
 
     // Returns all rules that target a given
     // originalSoundId - used by the audio dispatch
     // hot path to walk candidate replacements for an
     // about-to-play sound.
-    std::vector<const Entry*> findByOriginalSound(uint32_t soundId) const;
+    [[nodiscard]] std::vector<const Entry*> findByOriginalSound(uint32_t soundId) const;
 };
 
 class WoweeSoundSwapLoader {

@@ -150,7 +150,7 @@ struct M2ModelGPU {
                                  std::vector<uint32_t>& out) const;
         void getWallTrisInRange(float minX, float minY, float maxX, float maxY,
                                 std::vector<uint32_t>& out) const;
-        bool valid() const { return triCount > 0; }
+        [[nodiscard]] bool valid() const { return triCount > 0; }
     };
     CollisionMesh collision;
 
@@ -193,7 +193,7 @@ struct M2ModelGPU {
     std::vector<uint16_t> textureTransformLookup;
     std::vector<int> idleVariationIndices;  // Sequence indices for idle variations (animId 0)
 
-    bool isValid() const { return vertexBuffer != VK_NULL_HANDLE && indexCount > 0; }
+    [[nodiscard]] bool isValid() const { return vertexBuffer != VK_NULL_HANDLE && indexCount > 0; }
 };
 
 /**
@@ -373,7 +373,7 @@ public:
     void setSkyMode(bool enabled) { skyMode_ = enabled; }
     void shutdown();
 
-    bool hasModel(uint32_t modelId) const;
+    [[nodiscard]] bool hasModel(uint32_t modelId) const;
     bool loadModel(const pipeline::M2Model& model, uint32_t modelId);
     /** Force-remove a model and all its GPU resources. Caller must ensure no instances reference it. */
     void unloadModel(uint32_t modelId);
@@ -421,7 +421,7 @@ public:
      * Initialize shadow pipeline (Phase 7)
      */
     [[nodiscard]] bool initializeShadow(VkRenderPass shadowRenderPass);
-    bool hasShadowPipeline() const { return shadowPipeline_ != VK_NULL_HANDLE; }
+    [[nodiscard]] bool hasShadowPipeline() const { return shadowPipeline_ != VK_NULL_HANDLE; }
 
     /**
      * Render depth-only pass for shadow casting
@@ -451,8 +451,8 @@ public:
     /// Finds the first sequence with matching ID. Unfreezes the instance and resets time.
     void setInstanceAnimation(uint32_t instanceId, uint32_t animationId, bool loop = true);
     /// Check if a model instance has a specific animation ID in its sequence table.
-    bool hasAnimation(uint32_t instanceId, uint32_t animationId) const;
-    float getInstanceAnimDuration(uint32_t instanceId) const;
+    [[nodiscard]] bool hasAnimation(uint32_t instanceId, uint32_t animationId) const;
+    [[nodiscard]] float getInstanceAnimDuration(uint32_t instanceId) const;
     /// World-space visual bounding sphere of an instance (center + radius),
     /// used for cursor picking and selection circles. Returns false for an
     /// unknown instance or a degenerate (zero-radius) model.
@@ -461,7 +461,7 @@ public:
     /// instance IDs (game objects, transports) use this to notice an instance
     /// that was dropped underneath them - e.g. by a renderer-wide clear - and
     /// respawn it instead of silently addressing a dead handle forever.
-    bool hasInstance(uint32_t instanceId) const {
+    [[nodiscard]] bool hasInstance(uint32_t instanceId) const {
         return instanceIndexById.find(instanceId) != instanceIndexById.end();
     }
     void removeInstance(uint32_t instanceId);
@@ -489,12 +489,12 @@ public:
     bool checkCollision(const glm::vec3& from, const glm::vec3& to,
                         glm::vec3& adjustedPos, float playerRadius = 0.5f) const;
     std::optional<float> getFloorHeight(float glX, float glY, float glZ, float* outNormalZ = nullptr) const;
-    float raycastBoundingBoxes(const glm::vec3& origin, const glm::vec3& direction, float maxDistance) const;
+    [[nodiscard]] float raycastBoundingBoxes(const glm::vec3& origin, const glm::vec3& direction, float maxDistance) const;
     void setCollisionFocus(const glm::vec3& worldPos, float radius);
 
     void resetQueryStats();
-    double getQueryTimeMs() const { return queryTimeMs; }
-    uint32_t getQueryCallCount() const { return queryCallCount; }
+    [[nodiscard]] double getQueryTimeMs() const { return queryTimeMs; }
+    [[nodiscard]] uint32_t getQueryCallCount() const { return queryCallCount; }
 
     void recreatePipelines();
 
@@ -504,11 +504,11 @@ public:
     bool buildMainPassPipelines(VkDescriptorSetLayout perFrameLayout);
 
     // Stats
-    bool isInitialized() const { return initialized_; }
-    uint32_t getModelCount() const { return static_cast<uint32_t>(models.size()); }
-    uint32_t getInstanceCount() const { return static_cast<uint32_t>(instances.size()); }
-    uint32_t getTotalTriangleCount() const;
-    uint32_t getDrawCallCount() const { return lastDrawCallCount; }
+    [[nodiscard]] bool isInitialized() const { return initialized_; }
+    [[nodiscard]] uint32_t getModelCount() const { return static_cast<uint32_t>(models.size()); }
+    [[nodiscard]] uint32_t getInstanceCount() const { return static_cast<uint32_t>(instances.size()); }
+    [[nodiscard]] uint32_t getTotalTriangleCount() const;
+    [[nodiscard]] uint32_t getDrawCallCount() const { return lastDrawCallCount; }
 
     // Lighting/fog/shadow are now in per-frame UBO; these are no-ops for API compat
     void setFog(const glm::vec3& /*color*/, float /*start*/, float /*end*/) {}
@@ -519,7 +519,7 @@ public:
 
     /// How far the furthest doodad drawn this frame was. See
     /// Renderer::logViewDistanceDiag.
-    float getFurthestDrawnDistance() const { return std::sqrt(furthestDrawnSq_); }
+    [[nodiscard]] float getFurthestDrawnDistance() const { return std::sqrt(furthestDrawnSq_); }
     /// How many particles to emit, as a fraction of what a model asks for -
     /// the game's Particle Density.
     ///
@@ -531,7 +531,7 @@ public:
     void setParticleDensity(float density) {
         particleDensity_ = std::clamp(density, 0.05f, 1.0f);
     }
-    float particleDensity() const { return particleDensity_; }
+    [[nodiscard]] float particleDensity() const { return particleDensity_; }
 
     void setSuppressBakedStars(bool suppress) { suppressBakedStars_ = suppress; }
     void setInsideInterior(bool inside) { insideInterior = inside; }
@@ -563,15 +563,15 @@ public:
     void setGroundDetailDistance(float yards) {
         groundDetailMaxDistance_ = std::clamp(yards, 0.0f, 500.0f);
     }
-    float groundDetailDistance() const { return groundDetailMaxDistance_; }
+    [[nodiscard]] float groundDetailDistance() const { return groundDetailMaxDistance_; }
 
     void setEnvironmentDetail(float detail) {
         environmentDetail_ = std::clamp(detail, 0.25f, 1.5f);
         recomputeViewDistanceScale();
     }
-    float environmentDetail() const { return environmentDetail_; }
+    [[nodiscard]] float environmentDetail() const { return environmentDetail_; }
 
-    std::vector<glm::vec3> getWaterVegetationPositions(const glm::vec3& camPos, float maxDist) const;
+    [[nodiscard]] std::vector<glm::vec3> getWaterVegetationPositions(const glm::vec3& camPos, float maxDist) const;
 
     // Pre-decoded BLP cache: set by terrain manager before calling loadModel()
     // so loadTexture() can skip the expensive assetManager->loadTexture() call.

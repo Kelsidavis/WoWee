@@ -99,10 +99,10 @@ struct WoweeGem {
     std::vector<GemEntry> gems;
     std::vector<EnchantEntry> enchantments;
 
-    bool isValid() const { return !gems.empty() || !enchantments.empty(); }
+    [[nodiscard]] bool isValid() const { return !gems.empty() || !enchantments.empty(); }
 
-    const GemEntry* findGem(uint32_t gemId) const;
-    const EnchantEntry* findEnchant(uint32_t enchantId) const;
+    [[nodiscard]] const GemEntry* findGem(uint32_t gemId) const;
+    [[nodiscard]] const EnchantEntry* findEnchant(uint32_t enchantId) const;
 
     static const char* colorName(uint8_t c);
     static const char* enchantSlotName(uint8_t s);

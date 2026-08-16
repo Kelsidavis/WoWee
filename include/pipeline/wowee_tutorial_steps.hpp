@@ -87,14 +87,14 @@ struct WoweeTutorialSteps {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t tutId) const;
+    [[nodiscard]] const Entry* findById(uint32_t tutId) const;
 
     // Returns all steps that fire on a given event,
     // sorted by stepIndex. Used by the tutorial
     // dispatcher to play steps in order.
-    std::vector<const Entry*> findByEvent(uint8_t triggerEvent) const;
+    [[nodiscard]] std::vector<const Entry*> findByEvent(uint8_t triggerEvent) const;
 };
 
 class WoweeTutorialStepsLoader {

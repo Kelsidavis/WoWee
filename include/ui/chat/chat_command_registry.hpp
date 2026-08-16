@@ -31,7 +31,7 @@ public:
     ChatCommandResult dispatch(const std::string& cmdLower, ChatCommandContext& ctx);
 
     /** Get all command aliases matching a prefix (for tab completion). */
-    std::vector<std::string> getCompletions(const std::string& prefix) const;
+    [[nodiscard]] std::vector<std::string> getCompletions(const std::string& prefix) const;
 
 
 

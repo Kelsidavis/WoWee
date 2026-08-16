@@ -70,19 +70,19 @@ struct WoweeBossEncounter {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t encounterId) const;
+    [[nodiscard]] const Entry* findById(uint32_t encounterId) const;
 
     // Returns all encounters bound to a given map id
     // (typically all bosses in one raid instance), in the
     // order they appear in the catalog. Used by the Encounter
     // Journal UI and instance lockout logic.
-    std::vector<const Entry*> findByMap(uint32_t mapId) const;
+    [[nodiscard]] std::vector<const Entry*> findByMap(uint32_t mapId) const;
 
     // Returns all encounters bound to a given boss creature
     // (typically the per-difficulty variants of one boss).
-    std::vector<const Entry*> findByBossCreature(
+    [[nodiscard]] std::vector<const Entry*> findByBossCreature(
         uint32_t bossCreatureId) const;
 };
 

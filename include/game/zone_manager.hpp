@@ -32,8 +32,8 @@ public:
     // Safe to call after initialize(); idempotent and additive (does not remove existing paths).
     void enrichFromDBC(pipeline::AssetManager* assets);
 
-    uint32_t getZoneId(int tileX, int tileY) const;
-    uint32_t resolveAreaZoneId(uint32_t areaId) const;
+    [[nodiscard]] uint32_t getZoneId(int tileX, int tileY) const;
+    [[nodiscard]] uint32_t resolveAreaZoneId(uint32_t areaId) const;
 
     /// Whether an area is a world PvP objective - one of the eleven the
     /// AREA_FLAG_OUTDOOR_PVP bit marks, or anywhere in Wintergrasp, which
@@ -43,14 +43,14 @@ public:
     /// from the position: Wintergrasp's own area carries 0x01000000 there and
     /// Shattrath carries the sanctuary bit, and neither would hold if the
     /// column were something else.
-    bool isOutdoorPvpArea(uint32_t areaId) const;
-    const ZoneInfo* getZoneInfo(uint32_t zoneId) const;
+    [[nodiscard]] bool isOutdoorPvpArea(uint32_t areaId) const;
+    [[nodiscard]] const ZoneInfo* getZoneInfo(uint32_t zoneId) const;
     std::string getRandomMusic(uint32_t zoneId);
-    std::vector<std::string> getAllMusicPaths() const;
+    [[nodiscard]] std::vector<std::string> getAllMusicPaths() const;
 
     // When false, file: (original soundtrack) tracks are excluded from the pool
     void setUseOriginalSoundtrack(bool use) { useOriginalSoundtrack_ = use; }
-    bool getUseOriginalSoundtrack() const { return useOriginalSoundtrack_; }
+    [[nodiscard]] bool getUseOriginalSoundtrack() const { return useOriginalSoundtrack_; }
 
 private:
     // tile key = tileX * 100 + tileY

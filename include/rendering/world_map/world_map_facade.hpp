@@ -63,13 +63,13 @@ public:
     /// Whether a frame rect is set - which, when FrameXML owns the map, is how
     /// the client knows FrameXML has its map panel on screen and wants the map
     /// drawn into it.
-    bool hasFrameRect() const;
+    [[nodiscard]] bool hasFrameRect() const;
     /// Nearby rare/rare-elite creatures currently spawned near the player.
     void setRares(std::vector<RareMark> rares);
     /// Nearby chest-type game objects currently spawned near the player.
     void setChests(std::vector<ChestMark> chests);
 
-    bool isOpen() const;
+    [[nodiscard]] bool isOpen() const;
     void close();
 
     /// Flight-map (taxi selection) mode - opens the map locked to the player's
@@ -83,7 +83,7 @@ public:
     /// Silent close (no onClose callback) - used when the game state already
     /// closed the flight master window.
     void closeTaxiMap();
-    bool isTaxiMapOpen() const;
+    [[nodiscard]] bool isTaxiMapOpen() const;
 
     // ── What the interface needs to draw the same map itself ─────────
     //
@@ -94,7 +94,7 @@ public:
 
     /// The overlays for whatever the map is showing, in draw order. Empty at
     /// continent and cosmic level, which have no per-zone art.
-    std::vector<OverlayEntry> currentOverlays() const;
+    [[nodiscard]] std::vector<OverlayEntry> currentOverlays() const;
 
     /// One area POI, already projected into the [0,1] map space the interface
     /// places its pins in.
@@ -106,7 +106,7 @@ public:
     };
     /// The POIs on the shown map. Only those belonging to it, and only those
     /// that project inside it.
-    std::vector<Landmark> currentLandmarks() const;
+    [[nodiscard]] std::vector<Landmark> currentLandmarks() const;
 
 
     /// The zone under a point on the map being shown, in [0,1] map space, or
@@ -114,10 +114,10 @@ public:
     ///
     /// The same ZMP lookup the hover highlight does, and pulled out of it so
     /// the interface can ask about a point rather than about the mouse.
-    int zoneAtMapPoint(float u, float v) const;
+    [[nodiscard]] int zoneAtMapPoint(float u, float v) const;
 
     /// The name of that zone, or empty.
-    std::string zoneNameAtMapPoint(float u, float v) const;
+    [[nodiscard]] std::string zoneNameAtMapPoint(float u, float v) const;
 
     /// Drill into the zone under that point, as clicking it would.
     bool clickMapPoint(float u, float v);
@@ -145,11 +145,11 @@ public:
     /// The continents, in the order 3.3.5 indexes them: Kalimdor, Eastern
     /// Kingdoms, Outland, Northrend. Fixed rather than discovered, because the
     /// index is what the interface passes back and addons hard-code it.
-    std::vector<std::string> continentNames() const;
+    [[nodiscard]] std::vector<std::string> continentNames() const;
 
     /// The zones on that continent by their display names, alphabetically.
     /// One-based continent index; empty for anything else.
-    std::vector<std::string> zoneNames(int continentIndex) const;
+    [[nodiscard]] std::vector<std::string> zoneNames(int continentIndex) const;
 
     /// Show a continent, or one zone on it. Both indices one-based, as the
     /// interface counts; zone zero means the continent itself. Continent zero
@@ -158,11 +158,11 @@ public:
 
     /// What is being shown, in those same one-based indices. Zero for the
     /// world, and zero zone for a continent.
-    int currentContinentIndex() const;
-    int currentZoneIndex() const;
+    [[nodiscard]] int currentContinentIndex() const;
+    [[nodiscard]] int currentZoneIndex() const;
 
     /// Whether there is a level above this one to step out to.
-    bool canZoomOut() const;
+    [[nodiscard]] bool canZoomOut() const;
 
     /// Show the zone the player is standing in. The interface asks for this
     /// every time the map is shown, and used to reach nothing.
@@ -172,7 +172,7 @@ public:
     /// not showing one. This is the id the interface passes back to
     /// showWorldMapArea - not the AreaTable id, and not the physical map the
     /// terrain came from.
-    uint32_t currentWorldMapAreaId() const;
+    [[nodiscard]] uint32_t currentWorldMapAreaId() const;
 
     /// Show the zone or continent with that WorldMapArea id. False if the map
     /// data has no such area.

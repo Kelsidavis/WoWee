@@ -28,7 +28,7 @@ public:
     bool updateCharge(float deltaTime);
 
     // Charge state queries (used by Application::update for externallyDrivenMotion)
-    bool isCharging() const { return chargeActive_; }
+    [[nodiscard]] bool isCharging() const { return chargeActive_; }
 
     // Reset charge state (logout/disconnect)
     void resetChargeState();

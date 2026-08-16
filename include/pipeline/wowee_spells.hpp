@@ -116,10 +116,10 @@ struct WoweeSpell {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Lookup by spellId - nullptr if not present.
-    const Entry* findById(uint32_t spellId) const;
+    [[nodiscard]] const Entry* findById(uint32_t spellId) const;
 
     static const char* schoolName(uint8_t s);
     static const char* targetTypeName(uint8_t t);

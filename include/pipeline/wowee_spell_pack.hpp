@@ -57,16 +57,16 @@ struct WoweeSpellPack {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t packId) const;
-    const Entry* findByClassTab(uint8_t classId,
+    [[nodiscard]] const Entry* findById(uint32_t packId) const;
+    [[nodiscard]] const Entry* findByClassTab(uint8_t classId,
                                  uint8_t tabIndex) const;
 
     // Returns all packs for a class (typically 4: General
     // + 3 spec tabs). Used by the spellbook-screen UI to
     // populate per-class tab order.
-    std::vector<const Entry*> findByClass(uint8_t classId) const;
+    [[nodiscard]] std::vector<const Entry*> findByClass(uint8_t classId) const;
 };
 
 class WoweeSpellPackLoader {

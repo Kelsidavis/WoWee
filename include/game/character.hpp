@@ -88,7 +88,7 @@ struct EquipmentItem {
     uint8_t inventoryType;      // Inventory slot type
     uint32_t enchantment;       // Enchantment/effect ID
 
-    bool isEmpty() const { return displayModel == 0; }
+    [[nodiscard]] bool isEmpty() const { return displayModel == 0; }
 };
 
 /**
@@ -99,7 +99,7 @@ struct PetData {
     uint32_t level;             // Pet level
     uint32_t family;            // Pet family ID
 
-    bool exists() const { return displayModel != 0; }
+    [[nodiscard]] bool exists() const { return displayModel != 0; }
 };
 
 /**
@@ -139,8 +139,8 @@ struct Character {
     std::vector<EquipmentItem> equipment;       // Equipment (23 slots)
 
     // Helper methods
-    bool hasGuild() const { return guildId != 0; }
-    bool hasPet() const { return pet.exists(); }
+    [[nodiscard]] bool hasGuild() const { return guildId != 0; }
+    [[nodiscard]] bool hasPet() const { return pet.exists(); }
 };
 
 // Race/class combo and appearance range validation (WoW 3.3.5a)

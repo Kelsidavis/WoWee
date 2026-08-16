@@ -61,11 +61,11 @@ public:
     bool dispatchFrameGeneration(const AmdFsr3RuntimeDispatchDesc& desc);
     void shutdown();
 
-    bool isReady() const { return ready_; }
-    bool isFrameGenerationReady() const { return frameGenerationReady_; }
-    const std::string& loadedLibraryPath() const { return loadedLibraryPath_; }
-    LoadPathKind loadPathKind() const { return loadPathKind_; }
-    const std::string& lastError() const { return lastError_; }
+    [[nodiscard]] bool isReady() const { return ready_; }
+    [[nodiscard]] bool isFrameGenerationReady() const { return frameGenerationReady_; }
+    [[nodiscard]] const std::string& loadedLibraryPath() const { return loadedLibraryPath_; }
+    [[nodiscard]] LoadPathKind loadPathKind() const { return loadPathKind_; }
+    [[nodiscard]] const std::string& lastError() const { return lastError_; }
 
 private:
     enum class ApiMode {

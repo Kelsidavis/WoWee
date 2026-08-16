@@ -80,14 +80,14 @@ struct WoweeSkyParams {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t skyId) const;
+    [[nodiscard]] const Entry* findById(uint32_t skyId) const;
 
     // Returns all entries for one (map, area) sorted by
     // hour. Used by the sky renderer to build the
     // diurnal interpolation curve at zone load time.
-    std::vector<const Entry*> findByArea(uint32_t mapId,
+    [[nodiscard]] std::vector<const Entry*> findByArea(uint32_t mapId,
                                            uint32_t areaId) const;
 };
 

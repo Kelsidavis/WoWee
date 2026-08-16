@@ -40,18 +40,18 @@ public:
     /// Ask the server for a channel's members; the answer arrives as
     /// SMSG_CHANNEL_LIST and fires CHANNEL_ROSTER_UPDATE.
     void requestChannelList(const std::string& channelName);
-    std::string getChannelByIndex(int index) const;
-    int getChannelIndex(const std::string& channelName) const;
-    const std::vector<std::string>& getJoinedChannels() const { return joinedChannels_; }
+    [[nodiscard]] std::string getChannelByIndex(int index) const;
+    [[nodiscard]] int getChannelIndex(const std::string& channelName) const;
+    [[nodiscard]] const std::vector<std::string>& getJoinedChannels() const { return joinedChannels_; }
     /// Whether the player owns this channel - the one who created it, or who
     /// it passed to. SMSG_CHANNEL_NOTIFY says so with OWNER_CHANGED, which
     /// carries the new owner's guid: AzerothCore's Channel::MakeOwnerChanged
     /// writes _ownerGUID into it.
-    bool ownsChannel(const std::string& name) const {
+    [[nodiscard]] bool ownsChannel(const std::string& name) const {
         return ownedChannels_.count(name) != 0;
     }
     /// Who sent the line with this id, or zero if it is not remembered.
-    uint64_t chatLineSender(uint32_t lineId) const {
+    [[nodiscard]] uint64_t chatLineSender(uint32_t lineId) const {
         for (const auto& [id, guid] : chatLineSenders_)
             if (id == lineId) return guid;
         return 0;
@@ -60,7 +60,7 @@ public:
     /// The roster of a channel by name, empty until a list is asked for. The
     /// list used to be printed to chat and dropped, so the channel panel had
     /// no members to show and reported every channel as having none.
-    const std::vector<ChannelMember>& getChannelRoster(const std::string& channel) const {
+    [[nodiscard]] const std::vector<ChannelMember>& getChannelRoster(const std::string& channel) const {
         static const std::vector<ChannelMember> empty;
         auto it = channelRosters_.find(channel);
         return (it != channelRosters_.end()) ? it->second : empty;
@@ -94,8 +94,8 @@ public:
 
     // --- State accessors ---
     std::deque<MessageChatData>& getChatHistory() { return chatHistory_; }
-    const std::deque<MessageChatData>& getChatHistory() const { return chatHistory_; }
-    size_t getMaxChatHistory() const { return maxChatHistory_; }
+    [[nodiscard]] const std::deque<MessageChatData>& getChatHistory() const { return chatHistory_; }
+    [[nodiscard]] size_t getMaxChatHistory() const { return maxChatHistory_; }
     void setMaxChatHistory(size_t n) { maxChatHistory_ = n; }
 
     // Chat auto-join settings (aliased from handler_types.hpp)

@@ -68,13 +68,13 @@ public:
      * @brief Set weather type
      */
     void setWeatherType(Type type) { weatherType = type; }
-    Type getWeatherType() const { return weatherType; }
+    [[nodiscard]] Type getWeatherType() const { return weatherType; }
 
     /**
      * @brief Set weather intensity (0.0 = none, 1.0 = heavy)
      */
     void setIntensity(float intensity);
-    float getIntensity() const { return intensity; }
+    [[nodiscard]] float getIntensity() const { return intensity; }
 
     /// How much of the weather to draw, as a fraction of what the current
     /// weather would use. The game's Weather Detail setting, which is a
@@ -87,18 +87,18 @@ public:
     void setDensityScale(float scale) {
         densityScale_ = std::clamp(scale, 0.0f, 1.0f);
     }
-    float densityScale() const { return densityScale_; }
+    [[nodiscard]] float densityScale() const { return densityScale_; }
 
     /**
      * @brief Enable or disable weather
      */
     void setEnabled(bool enabled) { this->enabled = enabled; }
-    bool isEnabled() const { return enabled; }
+    [[nodiscard]] bool isEnabled() const { return enabled; }
 
     /**
      * @brief Get active particle count
      */
-    int getParticleCount() const;
+    [[nodiscard]] int getParticleCount() const;
 
     /**
      * @brief Zone weather configuration
@@ -144,7 +144,7 @@ private:
 
     void resetParticles(const Camera& camera);
     void updateParticle(Particle& particle, const glm::vec3& cameraPos, float deltaTime);
-    glm::vec3 getRandomPosition(const glm::vec3& center) const;
+    [[nodiscard]] glm::vec3 getRandomPosition(const glm::vec3& center) const;
 
     // Vulkan objects
     VkContext* vkCtx = nullptr;

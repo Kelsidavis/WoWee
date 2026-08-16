@@ -73,17 +73,17 @@ struct WoweeItemFlags {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t flagId) const;
-    const Entry* findByBit(uint32_t bitMask) const;
+    [[nodiscard]] const Entry* findById(uint32_t flagId) const;
+    [[nodiscard]] const Entry* findByBit(uint32_t bitMask) const;
 
     // Decode an item.flags integer into the list of
     // matching entries. Returns the entries whose bitMask
     // is set in the input. Used by tooltip generators
     // to expand 0x40240000 -> ["Heroic", "BindOnPickup",
     // "Unique"].
-    std::vector<const Entry*> decode(uint32_t flagsValue) const;
+    [[nodiscard]] std::vector<const Entry*> decode(uint32_t flagsValue) const;
 
     static const char* flagKindName(uint8_t k);
 };

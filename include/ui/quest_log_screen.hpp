@@ -12,7 +12,7 @@ class InventoryScreen;
 class QuestLogScreen {
 public:
     void render(game::GameHandler& gameHandler, InventoryScreen& invScreen);
-    bool isOpen() const { return open; }
+    [[nodiscard]] bool isOpen() const { return open; }
     void toggle() { open = !open; }
     void setOpen(bool o) { open = o; }
     // Open the log and scroll to the given quest (by questId)

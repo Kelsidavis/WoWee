@@ -45,15 +45,15 @@ public:
     /// position is left where it was.
     bool readSizedString(std::string& out, uint32_t maxLength = 256);
 
-    uint16_t getOpcode() const { return opcode; }
-    const std::vector<uint8_t>& getData() const { return data; }
-    size_t getReadPos() const { return readPos; }
-    size_t getSize() const { return data.size(); }
+    [[nodiscard]] uint16_t getOpcode() const { return opcode; }
+    [[nodiscard]] const std::vector<uint8_t>& getData() const { return data; }
+    [[nodiscard]] size_t getReadPos() const { return readPos; }
+    [[nodiscard]] size_t getSize() const { return data.size(); }
     // Clamp to 0 instead of wrapping to ~(size_t)0 when readPos overshoots
     // (can happen via setReadPos with an unchecked offset).
-    size_t getRemainingSize() const { return (readPos <= data.size()) ? (data.size() - readPos) : 0; }
-    bool hasRemaining(size_t need) const { return readPos <= data.size() && need <= (data.size() - readPos); }
-    bool hasFullPackedGuid() const {
+    [[nodiscard]] size_t getRemainingSize() const { return (readPos <= data.size()) ? (data.size() - readPos) : 0; }
+    [[nodiscard]] bool hasRemaining(size_t need) const { return readPos <= data.size() && need <= (data.size() - readPos); }
+    [[nodiscard]] bool hasFullPackedGuid() const {
         if (readPos >= data.size()) return false;
         uint8_t mask = data[readPos];
         size_t guidBytes = 1;
@@ -62,7 +62,7 @@ public:
         return getRemainingSize() >= guidBytes;
     }
     void setReadPos(size_t pos) { readPos = pos; }
-    bool hasData() const { return readPos < data.size(); }
+    [[nodiscard]] bool hasData() const { return readPos < data.size(); }
     void skipAll() { readPos = data.size(); }
 
 private:

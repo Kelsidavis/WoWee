@@ -39,7 +39,7 @@ public:
      * Enable/disable HUD display
      */
     void setEnabled(bool enabled) { this->enabled = enabled; }
-    bool isEnabled() const { return enabled; }
+    [[nodiscard]] bool isEnabled() const { return enabled; }
 
     /**
      * Toggle HUD visibility

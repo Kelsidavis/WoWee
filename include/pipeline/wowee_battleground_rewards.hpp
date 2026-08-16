@@ -74,21 +74,21 @@ struct WoweeBattlegroundRewards {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t rewardId) const;
+    [[nodiscard]] const Entry* findById(uint32_t rewardId) const;
 
     // Resolve the reward stage for a (BG, level
     // bracket) pair - the canonical lookup the
     // post-match handler uses to credit honor +
     // marks to each participant.
-    const Entry* find(uint16_t bgId,
+    [[nodiscard]] const Entry* find(uint16_t bgId,
                        uint8_t bracketIndex) const;
 
     // Returns all reward entries for a single
     // battleground - used by the BG queue UI to
     // show per-bracket reward previews.
-    std::vector<const Entry*> findByBg(uint16_t bgId) const;
+    [[nodiscard]] std::vector<const Entry*> findByBg(uint16_t bgId) const;
 };
 
 class WoweeBattlegroundRewardsLoader {

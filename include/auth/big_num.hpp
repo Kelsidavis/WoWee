@@ -27,23 +27,23 @@ public:
     static BigNum fromHex(const std::string& hex);
 
     // Arithmetic operations
-    BigNum add(const BigNum& other) const;
-    BigNum subtract(const BigNum& other) const;
-    BigNum multiply(const BigNum& other) const;
-    BigNum mod(const BigNum& modulus) const;
-    BigNum modPow(const BigNum& exponent, const BigNum& modulus) const;
+    [[nodiscard]] BigNum add(const BigNum& other) const;
+    [[nodiscard]] BigNum subtract(const BigNum& other) const;
+    [[nodiscard]] BigNum multiply(const BigNum& other) const;
+    [[nodiscard]] BigNum mod(const BigNum& modulus) const;
+    [[nodiscard]] BigNum modPow(const BigNum& exponent, const BigNum& modulus) const;
 
     // Comparison
-    bool equals(const BigNum& other) const;
-    bool isZero() const;
+    [[nodiscard]] bool equals(const BigNum& other) const;
+    [[nodiscard]] bool isZero() const;
 
     // Conversion
-    std::vector<uint8_t> toArray(bool littleEndian = true, int minSize = 0) const;
-    std::string toHex() const;
+    [[nodiscard]] std::vector<uint8_t> toArray(bool littleEndian = true, int minSize = 0) const;
+    [[nodiscard]] std::string toHex() const;
 
     // Direct access (for advanced operations)
     BIGNUM* getBN() { return bn; }
-    const BIGNUM* getBN() const { return bn; }
+    [[nodiscard]] const BIGNUM* getBN() const { return bn; }
 
 private:
     BIGNUM* bn;

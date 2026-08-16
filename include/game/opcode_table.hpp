@@ -42,16 +42,16 @@ public:
     bool loadFromJson(const std::string& path);
 
     /** LogicalOpcode → wire value for sending packets. Returns 0xFFFF if unknown. */
-    uint16_t toWire(LogicalOpcode op) const;
+    [[nodiscard]] uint16_t toWire(LogicalOpcode op) const;
 
     /** Wire value → LogicalOpcode for receiving packets. Returns nullopt if unknown. */
-    std::optional<LogicalOpcode> fromWire(uint16_t wireValue) const;
+    [[nodiscard]] std::optional<LogicalOpcode> fromWire(uint16_t wireValue) const;
 
     /** Check if a logical opcode has a wire mapping. */
-    bool hasOpcode(LogicalOpcode op) const;
+    [[nodiscard]] bool hasOpcode(LogicalOpcode op) const;
 
     /** Number of mapped opcodes. */
-    size_t size() const { return logicalToWireSize_; }
+    [[nodiscard]] size_t size() const { return logicalToWireSize_; }
 
     /** Get canonical enum name for a logical opcode. */
     static const char* logicalToName(LogicalOpcode op);

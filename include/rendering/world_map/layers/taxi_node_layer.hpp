@@ -24,7 +24,7 @@ public:
             onSelect_ = nullptr;
         }
     }
-    bool taxiModeActive() const { return taxiMode_; }
+    [[nodiscard]] bool taxiModeActive() const { return taxiMode_; }
 
     /// routeProvider: destination node id → hop chain (current → dest, inclusive).
     /// onSelect: called with the destination node id when the player clicks it.

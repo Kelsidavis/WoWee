@@ -93,15 +93,15 @@ struct WoweePlayerSpawnProfile {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t profileId) const;
+    [[nodiscard]] const Entry* findById(uint32_t profileId) const;
 
     // Find the first profile whose race/class masks both
     // include the given bits. Used by character creation
     // to look up "Human Warrior" given race=Human(1) +
     // class=Warrior(1).
-    const Entry* findByRaceClass(uint32_t raceBit,
+    [[nodiscard]] const Entry* findByRaceClass(uint32_t raceBit,
                                   uint32_t classBit) const;
 };
 

@@ -86,9 +86,9 @@ struct WoweeSpellEffectType {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t effectId) const;
+    [[nodiscard]] const Entry* findById(uint32_t effectId) const;
 
     static const char* effectKindName(uint8_t k);
 };

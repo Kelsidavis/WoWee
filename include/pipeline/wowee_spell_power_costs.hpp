@@ -92,15 +92,15 @@ struct WoweeSpellPowerCost {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t powerCostId) const;
+    [[nodiscard]] const Entry* findById(uint32_t powerCostId) const;
 
     // Resolve the actual cost amount at the given caster
     // level + max power pool. Sums baseCost + perLevelCost
     // *level + percentOfBase*maxPower (whichever fields are
     // non-zero). Returns 0 for NoCost type.
-    int32_t resolveCost(uint32_t powerCostId,
+    [[nodiscard]] int32_t resolveCost(uint32_t powerCostId,
                          uint32_t casterLevel,
                          int32_t maxPower) const;
 

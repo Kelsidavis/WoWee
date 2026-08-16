@@ -265,7 +265,7 @@ public:
         /// A model with no skin draws as a white shape, which is worse than an
         /// empty frame - so a caller with nowhere to get textures should treat
         /// this as nothing to draw.
-        bool valid() const { return !m2Path.empty() && !skin1.empty(); }
+        [[nodiscard]] bool valid() const { return !m2Path.empty() && !skin1.empty(); }
     };
     uint32_t getGryphonDisplayId() const { return gryphonDisplayId_; }
     uint32_t getWyvernDisplayId() const { return wyvernDisplayId_; }

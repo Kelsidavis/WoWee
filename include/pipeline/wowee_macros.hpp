@@ -68,9 +68,9 @@ struct WoweeMacro {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t macroId) const;
+    [[nodiscard]] const Entry* findById(uint32_t macroId) const;
 
     static const char* macroKindName(uint8_t k);
 };

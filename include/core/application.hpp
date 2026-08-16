@@ -74,7 +74,7 @@ public:
     void beatWatchdog();
 
     // State management
-    AppState getState() const { return state; }
+    [[nodiscard]] AppState getState() const { return state; }
     void setState(AppState newState);
     /// The world connection dropped: tear the world down and say so.
     void handleWorldDisconnect();
@@ -91,7 +91,7 @@ public:
     game::ExpansionRegistry* getExpansionRegistry() { return expansionRegistry_.get(); }
     pipeline::DBCLayout* getDBCLayout() { return dbcLayout_.get(); }
     bool setAssetExpansionOverride(const std::string& id);
-    const std::string& getAssetExpansionOverride() const { return assetExpansionOverrideId_; }
+    [[nodiscard]] const std::string& getAssetExpansionOverride() const { return assetExpansionOverrideId_; }
     void reloadExpansionData();
     /// The opcode table, update fields, packet parsers and DBC layouts a
     /// protocol profile brings with it. Loaded at startup and on every
@@ -112,12 +112,12 @@ public:
     bool getRenderPositionForGuid(uint64_t guid, glm::vec3& outPos) const;
 
     // Character skin composite state - delegated to AppearanceComposer
-    const std::string& getBodySkinPath() const { return appearanceComposer_ ? appearanceComposer_->getBodySkinPath() : emptyString_; }
-    const std::vector<std::string>& getUnderwearPaths() const { return appearanceComposer_ ? appearanceComposer_->getUnderwearPaths() : emptyStringVec_; }
-    uint32_t getSkinTextureSlotIndex() const { return appearanceComposer_ ? appearanceComposer_->getSkinTextureSlotIndex() : 0; }
-    uint32_t getCloakTextureSlotIndex() const { return appearanceComposer_ ? appearanceComposer_->getCloakTextureSlotIndex() : 0; }
-    uint32_t getGryphonDisplayId() const { return entitySpawner_ ? entitySpawner_->getGryphonDisplayId() : 0; }
-    uint32_t getWyvernDisplayId() const { return entitySpawner_ ? entitySpawner_->getWyvernDisplayId() : 0; }
+    [[nodiscard]] const std::string& getBodySkinPath() const { return appearanceComposer_ ? appearanceComposer_->getBodySkinPath() : emptyString_; }
+    [[nodiscard]] const std::vector<std::string>& getUnderwearPaths() const { return appearanceComposer_ ? appearanceComposer_->getUnderwearPaths() : emptyStringVec_; }
+    [[nodiscard]] uint32_t getSkinTextureSlotIndex() const { return appearanceComposer_ ? appearanceComposer_->getSkinTextureSlotIndex() : 0; }
+    [[nodiscard]] uint32_t getCloakTextureSlotIndex() const { return appearanceComposer_ ? appearanceComposer_->getCloakTextureSlotIndex() : 0; }
+    [[nodiscard]] uint32_t getGryphonDisplayId() const { return entitySpawner_ ? entitySpawner_->getGryphonDisplayId() : 0; }
+    [[nodiscard]] uint32_t getWyvernDisplayId() const { return entitySpawner_ ? entitySpawner_->getWyvernDisplayId() : 0; }
 
     // Entity spawner access
     EntitySpawner* getEntitySpawner() { return entitySpawner_.get(); }

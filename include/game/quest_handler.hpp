@@ -47,13 +47,13 @@ public:
     void closeGossip();
     void offerQuestFromItem(uint64_t itemGuid, uint32_t questId);
 
-    bool isGossipWindowOpen() const { return gossipWindowOpen_; }
-    const GossipMessageData& getCurrentGossip() const { return currentGossip_; }
-    const std::string& getNpcText(uint32_t textId) const;
+    [[nodiscard]] bool isGossipWindowOpen() const { return gossipWindowOpen_; }
+    [[nodiscard]] const GossipMessageData& getCurrentGossip() const { return currentGossip_; }
+    [[nodiscard]] const std::string& getNpcText(uint32_t textId) const;
     /// What a quest giver says over its list of quests, from
     /// SMSG_QUESTGIVER_QUEST_LIST. Empty when the window came from gossip
     /// instead, which carries its text as an npc-text id rather than inline.
-    const std::string& getQuestGreeting() const { return questGreeting_; }
+    [[nodiscard]] const std::string& getQuestGreeting() const { return questGreeting_; }
 
     // Quest details
     /// Whether a quest giver's detail page is up. True from the moment the
@@ -75,31 +75,31 @@ public:
     /// gave it. The reward list appeared in the middle of the screen, outside
     /// the quest frame, and closing the frame did not take it away because it
     /// was never inside it.
-    bool isQuestDetailsOpen() const { return questDetailsOpen_; }
+    [[nodiscard]] bool isQuestDetailsOpen() const { return questDetailsOpen_; }
 
     /// Whether the item queries sent when the details arrived have had time to
     /// answer. Only this client's own quest window asks: it draws the reward
     /// icons itself and they are blank until the names land. The interface
     /// does not, because FrameXML redraws when the item info event arrives.
-    bool questDetailsItemInfoReady() const {
+    [[nodiscard]] bool questDetailsItemInfoReady() const {
         return questDetailsOpenTime_ == std::chrono::steady_clock::time_point{} ||
                std::chrono::steady_clock::now() >= questDetailsOpenTime_;
     }
-    const QuestDetailsData& getQuestDetails() const { return currentQuestDetails_; }
+    [[nodiscard]] const QuestDetailsData& getQuestDetails() const { return currentQuestDetails_; }
 
     // Gossip / quest map POI markers (aliased from handler_types.hpp)
     using GossipPoi = game::GossipPoi;
-    const std::vector<GossipPoi>& getGossipPois() const { return gossipPois_; }
+    [[nodiscard]] const std::vector<GossipPoi>& getGossipPois() const { return gossipPois_; }
     void clearGossipPois() { gossipPois_.clear(); }
 
     // Quest turn-in
-    bool isQuestRequestItemsOpen() const { return questRequestItemsOpen_; }
-    const QuestRequestItemsData& getQuestRequestItems() const { return currentQuestRequestItems_; }
+    [[nodiscard]] bool isQuestRequestItemsOpen() const { return questRequestItemsOpen_; }
+    [[nodiscard]] const QuestRequestItemsData& getQuestRequestItems() const { return currentQuestRequestItems_; }
     void completeQuest();
     void closeQuestRequestItems(bool announce = true);
 
-    bool isQuestOfferRewardOpen() const { return questOfferRewardOpen_; }
-    const QuestOfferRewardData& getQuestOfferReward() const { return currentQuestOfferReward_; }
+    [[nodiscard]] bool isQuestOfferRewardOpen() const { return questOfferRewardOpen_; }
+    [[nodiscard]] const QuestOfferRewardData& getQuestOfferReward() const { return currentQuestOfferReward_; }
     void chooseQuestReward(uint32_t rewardIndex);
     void closeQuestOfferReward(bool announce = true);
 
@@ -150,7 +150,7 @@ public:
         std::array<QuestRewardItem, 4> rewardItems{};
         std::array<QuestRewardItem, 6> rewardChoiceItems{};
     };
-    const std::vector<QuestLogEntry>& getQuestLog() const { return questLog_; }
+    [[nodiscard]] const std::vector<QuestLogEntry>& getQuestLog() const { return questLog_; }
     /// Mutable access for the headless harness to seed a quest with text the
     /// server would otherwise supply, so the quest-log flow can be driven and
     /// drawn without a running realm. Not used on the live path.
@@ -160,7 +160,7 @@ public:
     /// in it. This is what the interface means by a quest index - every quest
     /// log API takes it, and QUEST_WATCH_UPDATE carries it - and it is not the
     /// quest id, which is what was being sent in its place.
-    int questLogIndexOf(uint32_t questId) const {
+    [[nodiscard]] int questLogIndexOf(uint32_t questId) const {
         for (size_t i = 0; i < questLog_.size(); ++i) {
             if (questLog_[i].questId == questId) return static_cast<int>(i) + 1;
         }
@@ -171,7 +171,7 @@ public:
     // fails, as a Unix timestamp; zero means the quest is not timed.
     std::vector<std::pair<uint32_t, uint32_t>> getQuestTimers() const;
     // Server-side quest log capacity: 20 slots in Vanilla/Turtle, 25 from TBC on
-    int maxQuestLogSlots() const;
+    [[nodiscard]] int maxQuestLogSlots() const;
     // QuestSort.dbc name ("Seasonal", class/profession sorts, ...) for negative
     // ZoneOrSort values; empty if unknown
     const std::string& getQuestSortName(uint32_t sortId);
@@ -187,7 +187,7 @@ public:
     /// value index (row 1 for a gain, row 2 for a loss), the same as
     /// AzerothCore's Player::RewardReputation display value.
     int32_t getQuestRewardReputation(int32_t valueId, int32_t override);
-    int getSelectedQuestLogIndex() const { return selectedQuestLogIndex_; }
+    [[nodiscard]] int getSelectedQuestLogIndex() const { return selectedQuestLogIndex_; }
     void setSelectedQuestLogIndex(int idx) { selectedQuestLogIndex_ = idx; }
     void abandonQuest(uint32_t questId);
     void shareQuestWithParty(uint32_t questId);
@@ -197,26 +197,26 @@ public:
     // read, and this handler's own quest code reaches it via
     // owner_.setQuestTracked(). A second copy here would answer only to
     // whoever wrote it.
-    bool isQuestQueryPending(uint32_t questId) const {
+    [[nodiscard]] bool isQuestQueryPending(uint32_t questId) const {
         return pendingQuestQueryIds_.count(questId) > 0;
     }
     void clearQuestQueryPending(uint32_t questId) { pendingQuestQueryIds_.erase(questId); }
 
     // Quest giver status (! and ? markers)
-    QuestGiverStatus getQuestGiverStatus(uint64_t guid) const;
-    const std::unordered_map<uint64_t, QuestGiverStatus>& getNpcQuestStatuses() const { return npcQuestStatus_; }
+    [[nodiscard]] QuestGiverStatus getQuestGiverStatus(uint64_t guid) const;
+    [[nodiscard]] const std::unordered_map<uint64_t, QuestGiverStatus>& getNpcQuestStatuses() const { return npcQuestStatus_; }
 
     // Shared quest
-    bool hasPendingSharedQuest() const { return pendingSharedQuest_; }
-    uint32_t getSharedQuestId() const { return sharedQuestId_; }
-    const std::string& getSharedQuestTitle() const { return sharedQuestTitle_; }
-    const std::string& getSharedQuestSharerName() const { return sharedQuestSharerName_; }
+    [[nodiscard]] bool hasPendingSharedQuest() const { return pendingSharedQuest_; }
+    [[nodiscard]] uint32_t getSharedQuestId() const { return sharedQuestId_; }
+    [[nodiscard]] const std::string& getSharedQuestTitle() const { return sharedQuestTitle_; }
+    [[nodiscard]] const std::string& getSharedQuestSharerName() const { return sharedQuestSharerName_; }
     void acceptSharedQuest();
     void declineSharedQuest();
 
     // --- Internal helpers called from GameHandler ---
-    bool hasQuestInLog(uint32_t questId) const;
-    int findQuestLogSlotIndexFromServer(uint32_t questId) const;
+    [[nodiscard]] bool hasQuestInLog(uint32_t questId) const;
+    [[nodiscard]] int findQuestLogSlotIndexFromServer(uint32_t questId) const;
     void addQuestToLocalLogIfMissing(uint32_t questId, const std::string& title, const std::string& objectives);
     bool resyncQuestLogFromServerSlots(bool forceQueryMetadata);
     void applyQuestStateFromFields(const FlatFieldMap& fields);

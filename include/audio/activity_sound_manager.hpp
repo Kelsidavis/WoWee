@@ -21,7 +21,7 @@ public:
     bool initialize(pipeline::AssetManager* assets);
     void shutdown();
     void update(float deltaTime);
-    bool isInitialized() const { return initialized; }
+    [[nodiscard]] bool isInitialized() const { return initialized; }
 
     void playJump();
     void playLanding(FootstepSurface surface, bool hardLanding);
@@ -34,7 +34,7 @@ public:
     void playAttackGrunt();
     void playWound(bool isCrit = false);
     void setVolumeScale(float scale) { volumeScale = scale; }
-    float getVolumeScale() const { return volumeScale; }
+    [[nodiscard]] float getVolumeScale() const { return volumeScale; }
 
 private:
     struct Sample {

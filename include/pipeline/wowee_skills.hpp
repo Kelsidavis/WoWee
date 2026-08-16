@@ -61,10 +61,10 @@ struct WoweeSkill {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Lookup by skillId - nullptr if not present.
-    const Entry* findById(uint32_t skillId) const;
+    [[nodiscard]] const Entry* findById(uint32_t skillId) const;
 
     static const char* categoryName(uint8_t c);
 };

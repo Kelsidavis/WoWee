@@ -83,9 +83,9 @@ struct WoweeSpellAuraType {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t auraTypeId) const;
+    [[nodiscard]] const Entry* findById(uint32_t auraTypeId) const;
 
     static const char* auraKindName(uint8_t k);
     static const char* targetingHintName(uint8_t t);

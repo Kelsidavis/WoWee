@@ -87,16 +87,16 @@ struct WoweeChatLinks {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t linkId) const;
+    [[nodiscard]] const Entry* findById(uint32_t linkId) const;
 
     // Returns the template for a given hyperlink
     // kind. Used by the chat-link composer when a
     // player shift-clicks an item/spell/quest into
     // chat - picks the matching template and
     // sprintf-fills the parameters.
-    const Entry* findByKind(uint8_t linkKind) const;
+    [[nodiscard]] const Entry* findByKind(uint8_t linkKind) const;
 };
 
 class WoweeChatLinksLoader {

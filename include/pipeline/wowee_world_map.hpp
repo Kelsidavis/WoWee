@@ -49,13 +49,13 @@ struct WoweeWorldMap {
     // when a tile exists at column x, row y.
     std::vector<uint8_t> tileBitmap;
 
-    bool isValid() const { return gridSize > 0 && gridSize <= 128; }
+    [[nodiscard]] bool isValid() const { return gridSize > 0 && gridSize <= 128; }
 
-    bool hasTile(uint32_t x, uint32_t y) const;
+    [[nodiscard]] bool hasTile(uint32_t x, uint32_t y) const;
     void setTile(uint32_t x, uint32_t y, bool present);
 
     // Count of set bits in the bitmap (= number of present tiles).
-    uint32_t countTiles() const;
+    [[nodiscard]] uint32_t countTiles() const;
 
     static const char* worldTypeName(uint8_t t);
 };

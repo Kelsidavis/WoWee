@@ -55,7 +55,7 @@ struct WoweeBuilding {
     std::vector<DoodadPlacement> doodads;
     float boundRadius = 1.0f;
 
-    bool isValid() const { return !groups.empty(); }
+    [[nodiscard]] bool isValid() const { return !groups.empty(); }
 };
 
 class WoweeBuildingLoader {

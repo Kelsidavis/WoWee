@@ -79,9 +79,9 @@ struct WoweeBattleground {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t bgId) const;
+    [[nodiscard]] const Entry* findById(uint32_t bgId) const;
 
     static const char* objectiveKindName(uint8_t k);
 };

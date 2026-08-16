@@ -105,8 +105,8 @@ public:
     void moveInstanceTo(uint32_t instanceId, const glm::vec3& destination, float durationSeconds);
     void startFadeIn(uint32_t instanceId, float durationSeconds);
     void setInstanceOpacity(uint32_t instanceId, float opacity);
-    const pipeline::M2Model* getModelData(uint32_t modelId) const;
-    const pipeline::M2Model* getInstanceModelData(uint32_t instanceId) const;
+    [[nodiscard]] const pipeline::M2Model* getModelData(uint32_t modelId) const;
+    [[nodiscard]] const pipeline::M2Model* getInstanceModelData(uint32_t instanceId) const;
     void setActiveGeosets(uint32_t instanceId, const std::unordered_set<uint16_t>& geosets);
     /// Opt an instance into the Skin Extra head-detail batch. Only a character
     /// whose type 8 slot has been filled from CharSections should ask for it.
@@ -122,8 +122,8 @@ public:
     bool getAnimationState(uint32_t instanceId, uint32_t& animationId, float& animationTimeMs, float& animationDurationMs) const;
     /// Footfall ($FSD) event times in ms for the sequence the instance is
     /// currently playing; nullptr if the model has none for that sequence.
-    const std::vector<uint32_t>* getFootstepEventTimes(uint32_t instanceId) const;
-    bool hasAnimation(uint32_t instanceId, uint32_t animationId) const;
+    [[nodiscard]] const std::vector<uint32_t>* getFootstepEventTimes(uint32_t instanceId) const;
+    [[nodiscard]] bool hasAnimation(uint32_t instanceId, uint32_t animationId) const;
     bool getAnimationSequences(uint32_t instanceId, std::vector<pipeline::M2Sequence>& out) const;
     bool getInstanceModelName(uint32_t instanceId, std::string& modelName) const;
     bool getInstanceBounds(uint32_t instanceId, glm::vec3& outCenter, float& outRadius) const;
@@ -151,7 +151,7 @@ public:
     void unloadModelIfUnused(uint32_t modelId);
 
     // Model id an instance renders with (0 if the instance doesn't exist).
-    uint32_t getInstanceModelId(uint32_t instanceId) const {
+    [[nodiscard]] uint32_t getInstanceModelId(uint32_t instanceId) const {
         auto it = instances.find(instanceId);
         return it != instances.end() ? it->second.modelId : 0;
     }
@@ -174,7 +174,7 @@ public:
     /** Get the world-space transform of an attachment point on an instance. */
     bool getAttachmentTransform(uint32_t instanceId, uint32_t attachmentId, glm::mat4& outTransform);
 
-    size_t getInstanceCount() const { return instances.size(); }
+    [[nodiscard]] size_t getInstanceCount() const { return instances.size(); }
 
     // Normal mapping / POM settings
     void setNormalMappingEnabled(bool enabled) { normalMappingEnabled_ = enabled; }
@@ -309,7 +309,7 @@ private:
     void calculateBoneMatrices(CharacterInstance& instance);
     glm::mat4 getBoneTransform(const pipeline::M2Bone& bone, float animTime, float globalSeqTime,
                                int sequenceIndex, const std::vector<uint32_t>& globalSeqDurations);
-    glm::mat4 getModelMatrix(const CharacterInstance& instance) const;
+    [[nodiscard]] glm::mat4 getModelMatrix(const CharacterInstance& instance) const;
     void destroyModelGPU(M2ModelGPU& gpuModel, bool defer = false);
     void destroyInstanceBones(CharacterInstance& inst, bool defer = false);
 
@@ -336,7 +336,7 @@ public:
 
     /** Load a BLP texture from MPQ and return VkTexture* (cached). */
     VkTexture* loadTexture(const std::string& path);
-    VkTexture* getTransparentTexture() const { return transparentTexture_.get(); }
+    [[nodiscard]] VkTexture* getTransparentTexture() const { return transparentTexture_.get(); }
 
     /** Replace a loaded model's texture at the given slot. */
     void setModelTexture(uint32_t modelId, uint32_t textureSlot, VkTexture* texture);
@@ -494,7 +494,7 @@ private:
 
     /// Which texture a batch draws with. Shared by the main pass and the shadow
     /// pass, which needs it to cut a silhouette rather than a rectangle.
-    VkTexture* resolveBatchTexture(const CharacterInstance& inst,
+    [[nodiscard]] VkTexture* resolveBatchTexture(const CharacterInstance& inst,
                                    const M2ModelGPU& gm,
                                    const pipeline::M2Batch& b) const;
 

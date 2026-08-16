@@ -35,38 +35,38 @@ public:
      * Lookup an entry by normalized WoW path (lowercase, backslash)
      * @return Pointer to entry or nullptr if not found
      */
-    const Entry* lookup(const std::string& normalizedWowPath) const;
+    [[nodiscard]] const Entry* lookup(const std::string& normalizedWowPath) const;
 
     /**
      * Resolve full filesystem path for a WoW virtual path
      * @return Full filesystem path or empty string if not found
      */
-    std::string resolveFilesystemPath(const std::string& normalizedWowPath) const;
+    [[nodiscard]] std::string resolveFilesystemPath(const std::string& normalizedWowPath) const;
 
     /**
      * Check if an entry exists
      */
-    bool hasEntry(const std::string& normalizedWowPath) const;
+    [[nodiscard]] bool hasEntry(const std::string& normalizedWowPath) const;
 
     /**
      * Get base path (directory containing extracted assets)
      */
-    const std::string& getBasePath() const { return basePath_; }
+    [[nodiscard]] const std::string& getBasePath() const { return basePath_; }
 
     /**
      * Get total number of entries
      */
-    size_t getEntryCount() const { return entries_.size(); }
+    [[nodiscard]] size_t getEntryCount() const { return entries_.size(); }
 
     /**
      * Access entries map (read-only) for iteration
      */
-    const std::unordered_map<std::string, Entry>& getEntries() const { return entries_; }
+    [[nodiscard]] const std::unordered_map<std::string, Entry>& getEntries() const { return entries_; }
 
     /**
      * Check if manifest is loaded
      */
-    bool isLoaded() const { return loaded_; }
+    [[nodiscard]] bool isLoaded() const { return loaded_; }
 
 private:
     bool loaded_ = false;

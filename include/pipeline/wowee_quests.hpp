@@ -118,10 +118,10 @@ struct WoweeQuest {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Lookup by questId - nullptr if not present.
-    const Entry* findById(uint32_t questId) const;
+    [[nodiscard]] const Entry* findById(uint32_t questId) const;
 
     static const char* objectiveKindName(uint8_t k);
 };

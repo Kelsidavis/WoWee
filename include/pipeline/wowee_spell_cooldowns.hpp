@@ -71,9 +71,9 @@ struct WoweeSpellCooldown {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t bucketId) const;
+    [[nodiscard]] const Entry* findById(uint32_t bucketId) const;
 
     static const char* bucketKindName(uint8_t k);
 };

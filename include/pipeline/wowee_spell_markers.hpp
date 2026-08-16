@@ -87,14 +87,14 @@ struct WoweeSpellMarkers {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t markerId) const;
+    [[nodiscard]] const Entry* findById(uint32_t markerId) const;
 
     // Returns the marker (if any) bound to the given
     // spellId. Used by the spell-cast pipeline to look
     // up "which decal does this spell spawn?"
-    const Entry* findBySpell(uint32_t spellId) const;
+    [[nodiscard]] const Entry* findBySpell(uint32_t spellId) const;
 };
 
 class WoweeSpellMarkersLoader {

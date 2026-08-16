@@ -67,29 +67,29 @@ public:
     /**
      * @return Descriptor set layout for the HiZ pyramid sampler (set 1 for m2_cull_hiz).
      */
-    VkDescriptorSetLayout getDescriptorSetLayout() const { return hizSetLayout_; }
+    [[nodiscard]] VkDescriptorSetLayout getDescriptorSetLayout() const { return hizSetLayout_; }
 
     /**
      * @return Descriptor set for the given frame (sampler2D of the HiZ pyramid).
      *         Bind as set 1 in the M2 HiZ cull pipeline.
      */
-    VkDescriptorSet getDescriptorSet(uint32_t frameIndex) const { return hizDescSet_[frameIndex]; }
+    [[nodiscard]] VkDescriptorSet getDescriptorSet(uint32_t frameIndex) const { return hizDescSet_[frameIndex]; }
 
     /**
      * @return true if HiZ system is initialized and ready.
      */
-    bool isReady() const { return ready_; }
+    [[nodiscard]] bool isReady() const { return ready_; }
 
     /**
      * @return Number of mip levels in the pyramid.
      */
-    uint32_t getMipLevels() const { return mipLevels_; }
+    [[nodiscard]] uint32_t getMipLevels() const { return mipLevels_; }
 
     /**
      * @return Pyramid base resolution (mip 0).
      */
-    uint32_t getPyramidWidth() const { return pyramidWidth_; }
-    uint32_t getPyramidHeight() const { return pyramidHeight_; }
+    [[nodiscard]] uint32_t getPyramidWidth() const { return pyramidWidth_; }
+    [[nodiscard]] uint32_t getPyramidHeight() const { return pyramidHeight_; }
 
 private:
     bool createPyramidImage();

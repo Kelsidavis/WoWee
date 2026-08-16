@@ -78,13 +78,13 @@ struct WoweeTaxi {
     std::vector<Node> nodes;
     std::vector<Path> paths;
 
-    bool isValid() const { return !nodes.empty(); }
+    [[nodiscard]] bool isValid() const { return !nodes.empty(); }
 
     // Lookup helpers.
-    const Node* findNode(uint32_t nodeId) const;
-    const Path* findPath(uint32_t pathId) const;
+    [[nodiscard]] const Node* findNode(uint32_t nodeId) const;
+    [[nodiscard]] const Path* findPath(uint32_t pathId) const;
     // First path matching a from→to pair, or nullptr.
-    const Path* findPathBetween(uint32_t fromNodeId, uint32_t toNodeId) const;
+    [[nodiscard]] const Path* findPathBetween(uint32_t fromNodeId, uint32_t toNodeId) const;
 };
 
 class WoweeTaxiLoader {

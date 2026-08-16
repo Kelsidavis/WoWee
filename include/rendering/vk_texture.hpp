@@ -64,17 +64,17 @@ public:
     /// than at scope exit are still meaningful.
     void destroy(VkDevice device, VmaAllocator allocator);
 
-    VkImage getImage() const { return image_.image; }
-    VkImageView getImageView() const { return image_.imageView; }
-    VkSampler getSampler() const { return sampler_; }
-    uint32_t getWidth() const { return image_.extent.width; }
-    uint32_t getHeight() const { return image_.extent.height; }
-    VkFormat getFormat() const { return image_.format; }
-    uint32_t getMipLevels() const { return mipLevels_; }
-    bool isValid() const { return image_.image != VK_NULL_HANDLE && sampler_ != VK_NULL_HANDLE; }
+    [[nodiscard]] VkImage getImage() const { return image_.image; }
+    [[nodiscard]] VkImageView getImageView() const { return image_.imageView; }
+    [[nodiscard]] VkSampler getSampler() const { return sampler_; }
+    [[nodiscard]] uint32_t getWidth() const { return image_.extent.width; }
+    [[nodiscard]] uint32_t getHeight() const { return image_.extent.height; }
+    [[nodiscard]] VkFormat getFormat() const { return image_.format; }
+    [[nodiscard]] uint32_t getMipLevels() const { return mipLevels_; }
+    [[nodiscard]] bool isValid() const { return image_.image != VK_NULL_HANDLE && sampler_ != VK_NULL_HANDLE; }
 
     // Write descriptor info for binding
-    VkDescriptorImageInfo descriptorInfo(VkImageLayout layout =
+    [[nodiscard]] VkDescriptorImageInfo descriptorInfo(VkImageLayout layout =
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) const;
 
 private:

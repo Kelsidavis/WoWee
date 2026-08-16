@@ -16,7 +16,7 @@ namespace world_map {
 class ExplorationState {
 public:
     void setServerMask(const std::vector<uint32_t>& masks, bool hasData);
-    bool hasServerMask() const { return hasServerMask_; }
+    [[nodiscard]] bool hasServerMask() const { return hasServerMask_; }
 
     /// Recompute explored zones and overlays for given player position.
     /// @param zones          All loaded zones
@@ -31,17 +31,17 @@ public:
                 const std::unordered_map<uint32_t, uint32_t>& exploreFlagByAreaId,
                 uint32_t playerZoneId = 0);
 
-    const std::unordered_set<int>& exploredZones() const { return exploredZones_; }
-    const std::unordered_set<int>& exploredOverlays() const { return exploredOverlays_; }
+    [[nodiscard]] const std::unordered_set<int>& exploredZones() const { return exploredZones_; }
+    [[nodiscard]] const std::unordered_set<int>& exploredOverlays() const { return exploredOverlays_; }
 
     /// Returns true if the explored overlay set changed since last update.
-    bool overlaysChanged() const { return overlaysChanged_; }
+    [[nodiscard]] bool overlaysChanged() const { return overlaysChanged_; }
 
     /// Clear accumulated local exploration data.
     void clearLocal() { locallyExploredZones_.clear(); }
 
 private:
-    bool isBitSet(uint32_t bitIndex) const;
+    [[nodiscard]] bool isBitSet(uint32_t bitIndex) const;
 
     std::vector<uint32_t> serverMask_;
     bool hasServerMask_ = false;

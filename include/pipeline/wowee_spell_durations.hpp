@@ -69,15 +69,15 @@ struct WoweeSpellDuration {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t durationId) const;
+    [[nodiscard]] const Entry* findById(uint32_t durationId) const;
 
     // Resolve to the actual duration in ms at the given
     // caster level. Clamps to maxDurationMs when set
     // (>0). Returns -1 for kinds with negative base
     // (UntilCancelled / UntilDeath) to signal "no timer".
-    int32_t resolveAtLevel(uint32_t durationId,
+    [[nodiscard]] int32_t resolveAtLevel(uint32_t durationId,
                            uint32_t casterLevel) const;
 
     static const char* durationKindName(uint8_t k);

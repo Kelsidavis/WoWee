@@ -13,12 +13,12 @@ struct SelectionScreenLayout {
     ImVec2 windowPos{};
     ImVec2 windowSize{};
 
-    float footerHeight() const { return 88.0f * scale; }
-    float gap() const { return 10.0f * scale; }
-    ImVec2 button(float width = 120.0f) const {
+    [[nodiscard]] float footerHeight() const { return 88.0f * scale; }
+    [[nodiscard]] float gap() const { return 10.0f * scale; }
+    [[nodiscard]] ImVec2 button(float width = 120.0f) const {
         return ImVec2(width * scale, 38.0f * scale);
     }
-    ImVec2 primaryButton(float width = 180.0f) const {
+    [[nodiscard]] ImVec2 primaryButton(float width = 180.0f) const {
         return ImVec2(width * scale, 42.0f * scale);
     }
 };

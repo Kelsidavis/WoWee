@@ -65,20 +65,20 @@ struct WoweeGroupComposition {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t compId) const;
+    [[nodiscard]] const Entry* findById(uint32_t compId) const;
 
     // Returns all compositions registered for one instance
     // (typically the per-difficulty variants). Used by the
     // LFG UI to populate the difficulty/comp picker.
-    std::vector<const Entry*> findByMap(uint32_t mapId) const;
+    [[nodiscard]] std::vector<const Entry*> findByMap(uint32_t mapId) const;
 
     // Returns true if a queueing party of (tanks, healers,
     // dps) satisfies the composition's role requirements.
     // Used by the matchmaker to decide if a group is ready
     // to launch.
-    bool partyMeetsComp(uint32_t compId,
+    [[nodiscard]] bool partyMeetsComp(uint32_t compId,
                          uint8_t haveTanks,
                          uint8_t haveHealers,
                          uint8_t haveDps) const;

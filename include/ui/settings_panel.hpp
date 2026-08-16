@@ -250,7 +250,7 @@ public:
     ///
     /// Values are strings, because a CVar is a string. Unknown keys answer
     /// empty and change nothing.
-    std::string settingValue(const std::string& key) const;
+    [[nodiscard]] std::string settingValue(const std::string& key) const;
     bool setSettingValue(const std::string& key, const std::string& value);
 
     /// Push a setting that has just changed at the thing it affects.

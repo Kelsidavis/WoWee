@@ -207,7 +207,7 @@ public:
      * @param mapName Map name (e.g., "Azeroth", "Kalimdor")
      */
     void setMapName(const std::string& mapName) { this->mapName = mapName; }
-    bool isCustomZone() const { return isCustomZone_; }
+    [[nodiscard]] bool isCustomZone() const { return isCustomZone_; }
     void setCustomZone(bool custom) { isCustomZone_ = custom; }
 
 
@@ -241,7 +241,7 @@ public:
     void setUpdateInterval(float seconds) { updateInterval = seconds; }
     void setTaxiStreamingMode(bool enabled) { taxiStreamingMode_ = enabled; }
     void setGroundClutterDensityScale(float scale) { groundClutterDensityScale_ = glm::clamp(scale, 0.0f, 1.5f); }
-    float getGroundClutterDensityScale() const { return groundClutterDensityScale_; }
+    [[nodiscard]] float getGroundClutterDensityScale() const { return groundClutterDensityScale_; }
     void setWaterRenderer(WaterRenderer* renderer) { waterRenderer = renderer; }
     void setM2Renderer(M2Renderer* renderer) { m2Renderer = renderer; }
     void setWMORenderer(WMORenderer* renderer) { wmoRenderer = renderer; }
@@ -253,7 +253,7 @@ public:
      * @param glY GL Y position
      * @return Height (GL Z) if terrain loaded at that position, empty otherwise
      */
-    std::optional<float> getHeightAt(float glX, float glY) const;
+    [[nodiscard]] std::optional<float> getHeightAt(float glX, float glY) const;
 
     /**
      * True when the MCNK chunk containing this position is cut by terrain holes.
@@ -264,7 +264,7 @@ public:
      * quad: this only ever gates a safety net, and being coarse in the safe
      * direction beats depending on the hole bit's axis order.
      */
-    bool chunkHasHoles(float glX, float glY) const;
+    [[nodiscard]] bool chunkHasHoles(float glX, float glY) const;
 
     /**
      * True when the single terrain quad under this position is cut away.
@@ -273,7 +273,7 @@ public:
      * containing one cave mouth would report every yard of it as empty. This
      * is the per-quad question, matched to the quads the mesh builder skips.
      */
-    bool isHoleAt(float glX, float glY) const;
+    [[nodiscard]] bool isHoleAt(float glX, float glY) const;
 
     /**
      * The chunk under a world position, plus the offsets within it that
@@ -286,24 +286,24 @@ public:
                                           float& fracX, float& fracY) const;
 
     /** Get the precise MCNK AreaTable ID at a world position. */
-    std::optional<uint32_t> getAreaIdAt(float glX, float glY) const;
+    [[nodiscard]] std::optional<uint32_t> getAreaIdAt(float glX, float glY) const;
 
 
     /**
      * Get dominant terrain texture name at a GL position.
      * Returns empty if terrain is not loaded at that position.
      */
-    std::optional<std::string> getDominantTextureAt(float glX, float glY) const;
+    [[nodiscard]] std::optional<std::string> getDominantTextureAt(float glX, float glY) const;
 
     /**
      * Get statistics
      */
-    int getLoadedTileCount() const { return static_cast<int>(loadedTiles.size()); }
-    int getPendingTileCount() const { return static_cast<int>(pendingTiles.size()); }
-    int getReadyQueueCount() const { return static_cast<int>(readyQueue.size()); }
+    [[nodiscard]] int getLoadedTileCount() const { return static_cast<int>(loadedTiles.size()); }
+    [[nodiscard]] int getPendingTileCount() const { return static_cast<int>(pendingTiles.size()); }
+    [[nodiscard]] int getReadyQueueCount() const { return static_cast<int>(readyQueue.size()); }
     /** Total unfinished tiles (worker threads + ready queue + finalizing) */
-    int getRemainingTileCount() const { return static_cast<int>(pendingTiles.size() + readyQueue.size() + finalizingTiles_.size()); }
-    TileCoord getCurrentTile() const { return currentTile; }
+    [[nodiscard]] int getRemainingTileCount() const { return static_cast<int>(pendingTiles.size() + readyQueue.size() + finalizingTiles_.size()); }
+    [[nodiscard]] TileCoord getCurrentTile() const { return currentTile; }
 
     /** Process one ready tile (for loading screens with per-tile progress updates) */
     void processOneReadyTile();
@@ -318,7 +318,7 @@ private:
     /**
      * Get tile coordinates from GL world position
      */
-    TileCoord worldToTile(float worldX, float worldY) const;
+    [[nodiscard]] TileCoord worldToTile(float worldX, float worldY) const;
 
     /**
      * Get world bounds for a tile
@@ -329,7 +329,7 @@ private:
     /**
      * Build ADT file path
      */
-    std::string getADTPath(const TileCoord& coord) const;
+    [[nodiscard]] std::string getADTPath(const TileCoord& coord) const;
 
     /**
      * Load tiles in radius around current tile
@@ -393,7 +393,7 @@ private:
         bool loaded = false;
     };
     std::unordered_map<uint64_t, CollisionData> collisionTiles_;
-    uint64_t tileKey(int x, int y) const { return (static_cast<uint64_t>(x) << 32) | static_cast<uint32_t>(y); }
+    [[nodiscard]] uint64_t tileKey(int x, int y) const { return (static_cast<uint64_t>(x) << 32) | static_cast<uint32_t>(y); }
 
     // Tile size constants (WoW ADT specifications)
     // A tile (ADT) = 16x16 chunks = 533.33 units across

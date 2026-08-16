@@ -26,9 +26,9 @@ public:
 
     void setMovementSpeed(float speed) { movementSpeed = speed; }
     void setMouseSensitivity(float sensitivity) { mouseSensitivity = sensitivity; }
-    float getMouseSensitivity() const { return mouseSensitivity; }
+    [[nodiscard]] float getMouseSensitivity() const { return mouseSensitivity; }
     void setInvertMouse(bool invert) { invertMouse = invert; }
-    bool isInvertMouse() const { return invertMouse; }
+    [[nodiscard]] bool isInvertMouse() const { return invertMouse; }
     /// How far back the camera may be pulled, as a multiple of the original
     /// client's own limit.
     ///
@@ -40,8 +40,8 @@ public:
     void setMaxDistanceFactor(float factor) {
         maxDistanceFactor_ = std::clamp(factor, 1.0f, kMaxDistanceFactorLimit);
     }
-    float maxDistanceFactor() const { return maxDistanceFactor_; }
-    bool isExtendedZoom() const { return extendedZoom_; }
+    [[nodiscard]] float maxDistanceFactor() const { return maxDistanceFactor_; }
+    [[nodiscard]] bool isExtendedZoom() const { return extendedZoom_; }
     void setEnabled(bool enabled) { this->enabled = enabled; }
     void setTerrainManager(TerrainManager* tm) { terrainManager = tm; }
     void setWMORenderer(WMORenderer* wmo) { wmoRenderer = wmo; }
@@ -62,16 +62,16 @@ public:
     void setOnlineMode(bool online) { onlineMode = online; }
 
     // Last known safe position (grounded, not falling)
-    bool hasLastSafePosition() const { return hasLastSafe_; }
-    const glm::vec3& getLastSafePosition() const { return lastSafePos_; }
-    float getContinuousFallTime() const { return continuousFallTime_; }
+    [[nodiscard]] bool hasLastSafePosition() const { return hasLastSafe_; }
+    [[nodiscard]] const glm::vec3& getLastSafePosition() const { return lastSafePos_; }
+    [[nodiscard]] float getContinuousFallTime() const { return continuousFallTime_; }
 
     // Auto-unstuck callback (triggered when falling too long)
     using AutoUnstuckCallback = std::function<void()>;
     void setAutoUnstuckCallback(AutoUnstuckCallback cb) { autoUnstuckCallback_ = std::move(cb); }
     void startIntroPan(float durationSec = 2.8f, float orbitDegrees = 140.0f);
-    bool isIntroActive() const { return introActive; }
-    bool isIdleOrbit() const { return idleOrbit_; }
+    [[nodiscard]] bool isIntroActive() const { return introActive; }
+    [[nodiscard]] bool isIdleOrbit() const { return idleOrbit_; }
     void setIdleOrbitEnabled(bool enabled) {
         idleOrbitEnabled_ = enabled;
         if (!enabled && idleOrbit_) {
@@ -80,23 +80,23 @@ public:
             idleTimer_ = 0.0f;
         }
     }
-    bool isIdleOrbitEnabled() const { return idleOrbitEnabled_; }
+    [[nodiscard]] bool isIdleOrbitEnabled() const { return idleOrbitEnabled_; }
 
-    float getMovementSpeed() const { return movementSpeed; }
-    const glm::vec3& getDefaultPosition() const { return defaultPosition; }
-    bool isMoving() const;
-    float getYaw() const { return yaw; }
-    float getPitch() const { return pitch; }
-    float getFacingYaw() const { return facingYaw; }
-    float getTravelYaw() const { return travelYaw_; }
-    bool isThirdPerson() const { return thirdPerson; }
-    bool isFirstPersonView() const { return thirdPerson && (userTargetDistance <= MIN_DISTANCE + 0.15f); }
-    bool isGrounded() const { return grounded; }
-    bool isJumping() const { return !grounded && verticalVelocity > 0.0f; }
+    [[nodiscard]] float getMovementSpeed() const { return movementSpeed; }
+    [[nodiscard]] const glm::vec3& getDefaultPosition() const { return defaultPosition; }
+    [[nodiscard]] bool isMoving() const;
+    [[nodiscard]] float getYaw() const { return yaw; }
+    [[nodiscard]] float getPitch() const { return pitch; }
+    [[nodiscard]] float getFacingYaw() const { return facingYaw; }
+    [[nodiscard]] float getTravelYaw() const { return travelYaw_; }
+    [[nodiscard]] bool isThirdPerson() const { return thirdPerson; }
+    [[nodiscard]] bool isFirstPersonView() const { return thirdPerson && (userTargetDistance <= MIN_DISTANCE + 0.15f); }
+    [[nodiscard]] bool isGrounded() const { return grounded; }
+    [[nodiscard]] bool isJumping() const { return !grounded && verticalVelocity > 0.0f; }
     // A swimming character is not grounded and is not rising, but it is not
     // falling either - treating it as falling made leaving the water register as
     // a hard landing.
-    bool isFalling() const { return !grounded && !swimming && verticalVelocity <= 0.0f; }
+    [[nodiscard]] bool isFalling() const { return !grounded && !swimming && verticalVelocity <= 0.0f; }
 
     // Call every frame while riding a transport that forces Z to a locked value
     // externally (e.g. the Deeprun Tram, which has no real floor mid-tunnel).
@@ -107,20 +107,20 @@ public:
     // instant the external Z lock releases at disembark, clipping the player
     // through the floor.
     void suppressVerticalPhysics() { verticalVelocity = 0.0f; grounded = true; }
-    bool isJumpKeyPressed() const { return jumpBufferTimer > 0.0f; }
-    bool isSprinting() const;
-    bool isMovingForward() const { return moveForwardActive; }
-    bool isMovingBackward() const { return moveBackwardActive; }
-    bool isStrafingLeft() const { return strafeLeftActive; }
-    bool isStrafingRight() const { return strafeRightActive; }
-    bool isTurningLeft() const { return turningLeftActive; }
-    bool isTurningRight() const { return turningRightActive; }
-    bool isAutoRunning() const { return autoRunning; }
-    bool isRightMouseHeld() const { return rightMouseDown; }
-    bool isSitting() const { return sitting; }
-    bool isSwimming() const { return swimming; }
-    bool isInsideWMO() const { return cachedInsideWMO; }
-    bool isInsideInteriorWMO() const { return cachedInsideInteriorWMO; }
+    [[nodiscard]] bool isJumpKeyPressed() const { return jumpBufferTimer > 0.0f; }
+    [[nodiscard]] bool isSprinting() const;
+    [[nodiscard]] bool isMovingForward() const { return moveForwardActive; }
+    [[nodiscard]] bool isMovingBackward() const { return moveBackwardActive; }
+    [[nodiscard]] bool isStrafingLeft() const { return strafeLeftActive; }
+    [[nodiscard]] bool isStrafingRight() const { return strafeRightActive; }
+    [[nodiscard]] bool isTurningLeft() const { return turningLeftActive; }
+    [[nodiscard]] bool isTurningRight() const { return turningRightActive; }
+    [[nodiscard]] bool isAutoRunning() const { return autoRunning; }
+    [[nodiscard]] bool isRightMouseHeld() const { return rightMouseDown; }
+    [[nodiscard]] bool isSitting() const { return sitting; }
+    [[nodiscard]] bool isSwimming() const { return swimming; }
+    [[nodiscard]] bool isInsideWMO() const { return cachedInsideWMO; }
+    [[nodiscard]] bool isInsideInteriorWMO() const { return cachedInsideInteriorWMO; }
     void setGrounded(bool g) { grounded = g; }
     void setSitting(bool s) { sitting = s; }
     /// Ignore the slope limit, so any face can be walked straight up.
@@ -128,9 +128,9 @@ public:
     /// For reaching a place to look at it, not for playing. Off by default and
     /// never saved: it is a thing you turn on for a minute.
     void setIgnoreSlopeLimit(bool ignore) { ignoreSlopeLimit_ = ignore; }
-    bool ignoresSlopeLimit() const { return ignoreSlopeLimit_; }
-    bool isOnTaxi() const { return externalFollow_; }
-    const glm::vec3* getFollowTarget() const { return followTarget; }
+    [[nodiscard]] bool ignoresSlopeLimit() const { return ignoreSlopeLimit_; }
+    [[nodiscard]] bool isOnTaxi() const { return externalFollow_; }
+    [[nodiscard]] const glm::vec3* getFollowTarget() const { return followTarget; }
     glm::vec3* getFollowTargetMutable() { return followTarget; }
 
     // Movement callback for sending opcodes to server
@@ -161,14 +161,14 @@ public:
     // Server turn rate in rad/s (SMSG_FORCE_TURN_RATE_CHANGE); 0 = use WOW_TURN_SPEED default
     void setTurnRateOverride(float rateRadS) { turnRateOverride_ = rateRadS; }
     void setMovementRooted(bool rooted) { movementRooted_ = rooted; }
-    bool isMovementRooted() const { return movementRooted_; }
+    [[nodiscard]] bool isMovementRooted() const { return movementRooted_; }
     void setGravityDisabled(bool disabled) { gravityDisabled_ = disabled; }
     void setFeatherFallActive(bool active) { featherFallActive_ = active; }
     void setWaterWalkActive(bool active) { waterWalkActive_ = active; }
     void setFlyingActive(bool active) { flyingActive_ = active; }
-    bool isFlyingActive() const { return flyingActive_; }
-    bool isAscending() const { return wasAscending_; }
-    bool isDescending() const { return wasDescending_; }
+    [[nodiscard]] bool isFlyingActive() const { return flyingActive_; }
+    [[nodiscard]] bool isAscending() const { return wasAscending_; }
+    [[nodiscard]] bool isDescending() const { return wasDescending_; }
     void setHoverActive(bool active) { hoverActive_ = active; }
     void setMounted(bool m) { mounted_ = m; }
     void setIntoxication(float amount) { intoxication_ = std::clamp(amount, 0.0f, 1.0f); }
@@ -185,7 +185,7 @@ public:
     // Stops within FOLLOW_STOP_DIST; cancels on manual WASD input.
     void setAutoFollow(const glm::vec3* targetPos) { autoFollowTarget_ = targetPos; }
     void cancelAutoFollow() { autoFollowTarget_ = nullptr; }
-    bool isAutoFollowing() const { return autoFollowTarget_ != nullptr; }
+    [[nodiscard]] bool isAutoFollowing() const { return autoFollowTarget_ != nullptr; }
 
     // Trigger mount jump (applies vertical velocity for physics hop)
     void triggerMountJump();
@@ -216,7 +216,7 @@ public:
     void setShakeScale(float scale) {
         shakeScale_ = scale < 0.0f ? 0.0f : (scale > 1.0f ? 1.0f : scale);
     }
-    float shakeScale() const { return shakeScale_; }
+    [[nodiscard]] float shakeScale() const { return shakeScale_; }
 
     // For first-person player hiding
     void setCharacterRenderer(class CharacterRenderer* cr, uint32_t playerId) {
@@ -359,11 +359,11 @@ private:
     bool smoothCameraFollow_ = false;
 public:
     void setCameraSmoothSpeed(float speed) { camSmoothSpeed_ = std::clamp(speed, 5.0f, 100.0f); }
-    float getCameraSmoothSpeed() const { return camSmoothSpeed_; }
+    [[nodiscard]] float getCameraSmoothSpeed() const { return camSmoothSpeed_; }
     void setSmoothCameraFollow(bool smooth) { smoothCameraFollow_ = smooth; }
-    bool isSmoothCameraFollow() const { return smoothCameraFollow_; }
+    [[nodiscard]] bool isSmoothCameraFollow() const { return smoothCameraFollow_; }
     void setPivotHeight(float h) { pivotHeight_ = std::clamp(h, 0.0f, 3.0f); }
-    float getPivotHeight() const { return pivotHeight_; }
+    [[nodiscard]] float getPivotHeight() const { return pivotHeight_; }
 private:
     static constexpr float PIVOT_HEIGHT_DEFAULT = 1.6f;
     float pivotHeight_ = PIVOT_HEIGHT_DEFAULT;  // User-configurable pivot height
@@ -438,7 +438,7 @@ private:
     // Ray-march the terrain heightfield along pivot→camDir and return the
     // farthest camera distance that keeps clearance above the terrain surface.
     // Returns maxDist when the ray stays clear (or terrain is unavailable).
-    float raymarchTerrainCameraLimit(const glm::vec3& pivot, const glm::vec3& camDir,
+    [[nodiscard]] float raymarchTerrainCameraLimit(const glm::vec3& pivot, const glm::vec3& camDir,
                                      float maxDist) const;
 
     // Swimming

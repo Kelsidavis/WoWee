@@ -52,7 +52,7 @@ struct M2AnimationTrack {
     };
     std::vector<SequenceKeys> sequences;    // One per animation sequence
 
-    bool hasData() const { return !sequences.empty(); }
+    [[nodiscard]] bool hasData() const { return !sequences.empty(); }
 };
 
 // Bone data for skeletal animation
@@ -279,7 +279,7 @@ struct M2Model {
     // Flags
     uint32_t globalFlags;
 
-    bool isValid() const {
+    [[nodiscard]] bool isValid() const {
         return !vertices.empty() && !indices.empty();
     }
 };

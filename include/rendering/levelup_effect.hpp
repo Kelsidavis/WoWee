@@ -31,7 +31,7 @@ public:
     /// Remove expired effect instances
     void update(float deltaTime);
 
-    bool isModelLoaded() const { return modelLoaded_; }
+    [[nodiscard]] bool isModelLoaded() const { return modelLoaded_; }
 
 private:
     static constexpr float EFFECT_DURATION = 3.5f;

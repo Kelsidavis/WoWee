@@ -107,22 +107,22 @@ struct WoweeBuffBook {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t buffId) const;
+    [[nodiscard]] const Entry* findById(uint32_t buffId) const;
 
     // Walks the rank chain from buffId all the way to
     // rank 1, returning entries from first to last. Used
     // by the spellbook UI's "rank picker" widget which
     // shows all ranks the player can currently train.
-    std::vector<const Entry*>
+    [[nodiscard]] std::vector<const Entry*>
     walkChainBackToRoot(uint32_t buffId) const;
 
     // Returns the highest rank in the chain starting from
     // buffId (the entry with nextRankId=0 reachable from
     // here). Used by the auto-cast logic to always apply
     // the highest rank the caster knows.
-    const Entry* findChainTip(uint32_t buffId) const;
+    [[nodiscard]] const Entry* findChainTip(uint32_t buffId) const;
 };
 
 class WoweeBuffBookLoader {

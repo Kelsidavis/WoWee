@@ -85,19 +85,19 @@ struct WoweeGlobalChannels {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t channelId) const;
+    [[nodiscard]] const Entry* findById(uint32_t channelId) const;
 
     // Returns all channels of one kind. Used by the
     // chat-window UI to populate per-kind tabs (Global
     // tab, Custom tab, etc.).
-    std::vector<const Entry*> findByKind(uint8_t channelKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByKind(uint8_t channelKind) const;
 
     // Returns AutoJoinOnZone channels that should
     // enroll a player entering the given mapId. Used
     // by the zone-load handler.
-    std::vector<const Entry*> findAutoJoinForZone(uint32_t mapId) const;
+    [[nodiscard]] std::vector<const Entry*> findAutoJoinForZone(uint32_t mapId) const;
 };
 
 class WoweeGlobalChannelsLoader {

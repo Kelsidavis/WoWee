@@ -104,20 +104,20 @@ struct WoweeQuestGraph {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t questId) const;
+    [[nodiscard]] const Entry* findById(uint32_t questId) const;
 
     // Returns all quests that have the given questId
     // as a prereq (the "what unlocks once I finish
     // this" lookup - used by the journal UI's
     // "completing this opens" panel).
-    std::vector<const Entry*> findUnlocksFrom(uint32_t questId) const;
+    [[nodiscard]] std::vector<const Entry*> findUnlocksFrom(uint32_t questId) const;
 
     // Returns all quests in a zone - used by the
     // zone-detail UI to populate the per-zone quest
     // list.
-    std::vector<const Entry*> findByZone(uint32_t zoneId) const;
+    [[nodiscard]] std::vector<const Entry*> findByZone(uint32_t zoneId) const;
 };
 
 class WoweeQuestGraphLoader {

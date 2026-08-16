@@ -66,7 +66,7 @@ public:
                           const glm::vec3& position);
 
     void setVolumeScale(float scale) { volumeScale_ = scale; }
-    float getVolumeScale() const { return volumeScale_; }
+    [[nodiscard]] float getVolumeScale() const { return volumeScale_; }
 
 private:
     enum class SoundCategory {

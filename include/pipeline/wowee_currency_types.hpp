@@ -75,16 +75,16 @@ struct WoweeCurrencyType {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t currencyId) const;
+    [[nodiscard]] const Entry* findById(uint32_t currencyId) const;
 
     // Returns the smaller of (remaining weekly cap,
     // remaining absolute cap) - i.e. the maximum amount a
     // character can earn right now given current balances.
     // Either cap is unbounded if the corresponding field
     // is 0.
-    uint32_t earnableNow(uint32_t currencyId,
+    [[nodiscard]] uint32_t earnableNow(uint32_t currencyId,
                           uint32_t currentTotal,
                           uint32_t earnedThisWeek) const;
 

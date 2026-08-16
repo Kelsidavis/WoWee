@@ -66,30 +66,30 @@ public:
     ///
     /// Windowed or full screen, for gxWindow. Both records again, for the same
     /// reason.
-    bool getFullscreen() const;
+    [[nodiscard]] bool getFullscreen() const;
     void setFullscreen(bool enabled);
 
     /// The resolution, by position in ui/display_modes.hpp. Both records
     /// again: the settings panel keeps pendingResolutionWidth/Height and the
     /// index it drew the combo with, and writes all three to disk.
-    int getResolutionIndex() const;
+    [[nodiscard]] int getResolutionIndex() const;
     void setResolutionIndex(int index);
     /// Anti-aliasing, as a row in the four modes the panels offer.
-    int getAntiAliasingIndex() const;
+    [[nodiscard]] int getAntiAliasingIndex() const;
     void setAntiAliasingIndex(int index);
 
     // Gamma, as WoW's video options mean it: 1.0 is untouched, and the client
     // keeps the same number as a 0-100 brightness where 50 is neutral. Exposed
     // so the interface's own brightness slider drives the one setting rather
     // than a second copy of it.
-    float getGamma() const;
+    [[nodiscard]] float getGamma() const;
     void  setGamma(float gamma);
 
     // Nameplates over hostile and neutral units, which the V key already
     // toggles. Exposed for the same reason gamma is: the interface's
     // nameplateShowEnemies option should drive this flag rather than a second
     // copy of it that disagrees with what the key did.
-    bool getShowNameplates() const { return showNameplates_; }
+    [[nodiscard]] bool getShowNameplates() const { return showNameplates_; }
     void setShowNameplates(bool shown) { showNameplates_ = shown; }
 
     /// Hand the saved anti-aliasing setting to the renderer.
@@ -112,7 +112,7 @@ public:
     /**
      * Check if chat input is active
      */
-    bool isChatInputActive() const { return chatPanel_.isChatInputActive(); }
+    [[nodiscard]] bool isChatInputActive() const { return chatPanel_.isChatInputActive(); }
     ChatPanel& getChatPanel() { return chatPanel_; }
 
     void saveSettings();

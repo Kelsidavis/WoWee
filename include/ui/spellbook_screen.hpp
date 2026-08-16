@@ -28,7 +28,7 @@ struct SpellInfo {
     uint32_t schoolMask = 0;     // School bitmask (1=phys,2=holy,4=fire,8=nature,16=frost,32=shadow,64=arcane)
     uint32_t casterAuraState = 0;     // Required 1-based UNIT_FIELD_AURASTATE bit
     uint32_t casterAuraStateNot = 0;  // Forbidden 1-based UNIT_FIELD_AURASTATE bit
-    bool isPassive() const { return (attributes & 0x40) != 0; }
+    [[nodiscard]] bool isPassive() const { return (attributes & 0x40) != 0; }
 };
 
 struct SpellTabInfo {
@@ -39,7 +39,7 @@ struct SpellTabInfo {
 class SpellbookScreen {
 public:
     void render(game::GameHandler& gameHandler, pipeline::AssetManager* assetManager);
-    bool isOpen() const { return open; }
+    [[nodiscard]] bool isOpen() const { return open; }
     void toggle() { open = !open; }
     void setOpen(bool o) { open = o; }
 
@@ -52,8 +52,8 @@ public:
                                 pipeline::AssetManager* assetManager);
 
     // Drag-and-drop state for action bar assignment
-    bool isDraggingSpell() const { return draggingSpell_; }
-    uint32_t getDragSpellId() const { return dragSpellId_; }
+    [[nodiscard]] bool isDraggingSpell() const { return draggingSpell_; }
+    [[nodiscard]] uint32_t getDragSpellId() const { return dragSpellId_; }
     void consumeDragSpell() { draggingSpell_ = false; dragSpellId_ = 0; dragSpellIconTex_ = VK_NULL_HANDLE; }
 
     /// Returns the max range in yards for a spell (0 if self-cast, unknown, or melee).
@@ -118,7 +118,7 @@ private:
     void loadSkillLineDBCs(pipeline::AssetManager* assetManager);
     void categorizeSpells(const std::unordered_set<uint32_t>& knownSpells);
     VkDescriptorSet getSpellIcon(uint32_t iconId, pipeline::AssetManager* assetManager);
-    const SpellInfo* getSpellInfo(uint32_t spellId) const;
+    [[nodiscard]] const SpellInfo* getSpellInfo(uint32_t spellId) const;
 
     // Tooltip rendering helper (showUsageHints=false when called from action bar)
     void renderSpellTooltip(const SpellInfo* info, game::GameHandler& gameHandler, bool showUsageHints = true);

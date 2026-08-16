@@ -86,20 +86,20 @@ struct WoweeTabards {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t tabardId) const;
+    [[nodiscard]] const Entry* findById(uint32_t tabardId) const;
 
     // Returns all tabards belonging to one guild - used
     // by the guild-bank tabard preview UI to populate
     // the design-history list (guilds can keep multiple
     // approved designs and switch between them).
-    std::vector<const Entry*> findByGuild(uint32_t guildId) const;
+    [[nodiscard]] std::vector<const Entry*> findByGuild(uint32_t guildId) const;
 
     // Returns all approved tabards (isApproved=1). Server
     // tabard-moderation policy may hide unapproved
     // designs from the public picker until reviewed.
-    std::vector<const Entry*> findApproved() const;
+    [[nodiscard]] std::vector<const Entry*> findApproved() const;
 };
 
 class WoweeTabardsLoader {

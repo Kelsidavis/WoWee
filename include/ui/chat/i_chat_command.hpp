@@ -47,10 +47,10 @@ public:
     virtual ChatCommandResult execute(ChatCommandContext& ctx) = 0;
 
     /** Return all aliases for this command (e.g. {"w", "whisper", "tell", "t"}). */
-    virtual std::vector<std::string> aliases() const = 0;
+    [[nodiscard]] virtual std::vector<std::string> aliases() const = 0;
 
     /** Optional help text shown by /help. */
-    virtual std::string helpText() const { return ""; }
+    [[nodiscard]] virtual std::string helpText() const { return ""; }
 };
 
 } // namespace ui

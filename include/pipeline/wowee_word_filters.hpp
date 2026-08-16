@@ -92,15 +92,15 @@ struct WoweeWordFilters {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t filterId) const;
+    [[nodiscard]] const Entry* findById(uint32_t filterId) const;
 
     // Returns all filters of one kind - used by the
     // chat preprocessor to dispatch per-kind handlers
     // (URL kind hits the link expander, AllCaps kind
     // hits the shout-suppressor, etc.).
-    std::vector<const Entry*> findByKind(uint8_t filterKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByKind(uint8_t filterKind) const;
 };
 
 class WoweeWordFiltersLoader {

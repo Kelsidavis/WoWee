@@ -76,7 +76,7 @@ public:
                         float targetFrameBottom);
 
     // Saved-position access for settings persistence (see GameScreen settings I/O).
-    ImVec2 getDPSMeterPos() const { return dpsMeterUserPositioned_ ? dpsMeterPos_ : ImVec2(-1.0f, -1.0f); }
+    [[nodiscard]] ImVec2 getDPSMeterPos() const { return dpsMeterUserPositioned_ ? dpsMeterPos_ : ImVec2(-1.0f, -1.0f); }
     void setDPSMeterPos(float x, float y) {
         if (x < 0.0f || y < 0.0f) return;
         dpsMeterPos_ = ImVec2(x, y);

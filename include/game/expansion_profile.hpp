@@ -34,7 +34,7 @@ struct ExpansionProfile {
     std::vector<uint32_t> races;
     std::vector<uint32_t> classes;
 
-    std::string versionString() const;  // e.g. "3.3.5a"
+    [[nodiscard]] std::string versionString() const;  // e.g. "3.3.5a"
 };
 
 /**
@@ -50,19 +50,19 @@ public:
     size_t initialize(const std::string& dataRoot);
 
     /** All discovered profiles. */
-    const std::vector<ExpansionProfile>& getAllProfiles() const { return profiles_; }
+    [[nodiscard]] const std::vector<ExpansionProfile>& getAllProfiles() const { return profiles_; }
 
     /** Lookup by id (e.g. "wotlk"). Returns nullptr if not found. */
-    const ExpansionProfile* getProfile(const std::string& id) const;
+    [[nodiscard]] const ExpansionProfile* getProfile(const std::string& id) const;
 
     /** Set the active expansion. Returns false if id not found. */
     bool setActive(const std::string& id);
 
     /** Get the active expansion profile. Never null after successful initialize(). */
-    const ExpansionProfile* getActive() const;
+    [[nodiscard]] const ExpansionProfile* getActive() const;
 
     /** Convenience: active expansion id. Empty if none. */
-    const std::string& getActiveId() const { return activeId_; }
+    [[nodiscard]] const std::string& getActiveId() const { return activeId_; }
 
 private:
     std::vector<ExpansionProfile> profiles_;

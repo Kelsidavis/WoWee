@@ -90,18 +90,18 @@ public:
      * Default: OFF (stars come from skybox)
      */
     void setProceduralStarsEnabled(bool enabled) { proceduralStarsEnabled_ = enabled; }
-    bool isProceduralStarsEnabled() const { return proceduralStarsEnabled_; }
+    [[nodiscard]] bool isProceduralStarsEnabled() const { return proceduralStarsEnabled_; }
 
     /**
      * Enable/disable debug sky mode (forces procedural stars even with skybox)
      */
     void setDebugSkyMode(bool enabled) { debugSkyMode_ = enabled; }
-    bool isDebugSkyMode() const { return debugSkyMode_; }
+    [[nodiscard]] bool isDebugSkyMode() const { return debugSkyMode_; }
 
     /**
      * Get sun position in world space (for lens flare, shadows, etc.)
      */
-    glm::vec3 getSunPosition(const SkyParams& params) const;
+    [[nodiscard]] glm::vec3 getSunPosition(const SkyParams& params) const;
 
     /**
      * Enable/disable moon phase cycling
@@ -110,14 +110,14 @@ public:
 
     void setBlueChildPhase(float phase);
 
-    float getBlueChildPhase() const;
+    [[nodiscard]] float getBlueChildPhase() const;
 
     // Component accessors (for direct control if needed)
-    Skybox*    getSkybox()    const { return skybox_.get(); }
-    Celestial* getCelestial() const { return celestial_.get(); }
-    StarField* getStarField() const { return starField_.get(); }
-    Clouds*    getClouds()    const { return clouds_.get(); }
-    LensFlare* getLensFlare() const { return lensFlare_.get(); }
+    [[nodiscard]] Skybox*    getSkybox()    const { return skybox_.get(); }
+    [[nodiscard]] Celestial* getCelestial() const { return celestial_.get(); }
+    [[nodiscard]] StarField* getStarField() const { return starField_.get(); }
+    [[nodiscard]] Clouds*    getClouds()    const { return clouds_.get(); }
+    [[nodiscard]] LensFlare* getLensFlare() const { return lensFlare_.get(); }
 
 private:
     std::unique_ptr<Skybox>    skybox_;      // Authoritative sky

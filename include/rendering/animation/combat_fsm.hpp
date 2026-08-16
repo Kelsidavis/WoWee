@@ -66,11 +66,11 @@ public:
     AnimOutput resolve(const Input& in, const AnimCapabilitySet& caps,
                        const WeaponLoadout& loadout);
 
-    State getState() const { return state_; }
+    [[nodiscard]] State getState() const { return state_; }
     void setState(State s) { state_ = s; }
 
-    bool isStunned() const { return state_ == State::STUNNED; }
-    bool isActive() const { return state_ != State::INACTIVE; }
+    [[nodiscard]] bool isStunned() const { return state_ == State::STUNNED; }
+    [[nodiscard]] bool isActive() const { return state_ != State::INACTIVE; }
     void reset();
 
     // ── Spell cast management ───────────────────────────────────────────
@@ -114,7 +114,7 @@ private:
     void updateTransitions(const Input& in);
 
     /// Detect if a one-shot animation has completed.
-    bool oneShotComplete(const Input& in, uint32_t expectedAnimId) const;
+    [[nodiscard]] bool oneShotComplete(const Input& in, uint32_t expectedAnimId) const;
 };
 
 } // namespace rendering

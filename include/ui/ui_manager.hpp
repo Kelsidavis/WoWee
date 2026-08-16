@@ -108,7 +108,7 @@ public:
         if (authScreen) authScreen->setServices(services);
         if (characterScreen) characterScreen->setServices(services);
     }
-    const UIServices& getServices() const { return services_; }
+    [[nodiscard]] const UIServices& getServices() const { return services_; }
 
 private:
     core::Window* window = nullptr;

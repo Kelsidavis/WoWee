@@ -42,7 +42,7 @@ public:
 
     // Volume control
     void setVolumeScale(float scale);
-    float getVolumeScale() const { return volumeScale_; }
+    [[nodiscard]] float getVolumeScale() const { return volumeScale_; }
 
     // Window sounds
     void playBagOpen();

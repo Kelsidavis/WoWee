@@ -29,42 +29,42 @@ public:
 
     // --- Entity Manager access ---
     EntityManager& getEntityManager() { return entityManager; }
-    const EntityManager& getEntityManager() const { return entityManager; }
+    [[nodiscard]] const EntityManager& getEntityManager() const { return entityManager; }
 
     // --- Name / info cache queries ---
     void queryPlayerName(uint64_t guid);
     void queryCreatureInfo(uint32_t entry, uint64_t guid);
     void queryGameObjectInfo(uint32_t entry, uint64_t guid);
-    std::string getCachedPlayerName(uint64_t guid) const;
-    std::string getCachedCreatureName(uint32_t entry) const;
+    [[nodiscard]] std::string getCachedPlayerName(uint64_t guid) const;
+    [[nodiscard]] std::string getCachedCreatureName(uint32_t entry) const;
     void invalidatePlayerName(uint64_t guid) { playerNameCache.erase(guid); }
 
     // Read-only cache access for other handlers
-    const std::unordered_map<uint64_t, std::string>& getPlayerNameCache() const { return playerNameCache; }
-    const std::unordered_map<uint32_t, CreatureQueryResponseData>& getCreatureInfoCache() const { return creatureInfoCache; }
-    std::string getCachedCreatureSubName(uint32_t entry) const {
+    [[nodiscard]] const std::unordered_map<uint64_t, std::string>& getPlayerNameCache() const { return playerNameCache; }
+    [[nodiscard]] const std::unordered_map<uint32_t, CreatureQueryResponseData>& getCreatureInfoCache() const { return creatureInfoCache; }
+    [[nodiscard]] std::string getCachedCreatureSubName(uint32_t entry) const {
         auto it = creatureInfoCache.find(entry);
         return (it != creatureInfoCache.end()) ? it->second.subName : "";
     }
-    int getCreatureRank(uint32_t entry) const {
+    [[nodiscard]] int getCreatureRank(uint32_t entry) const {
         auto it = creatureInfoCache.find(entry);
         return (it != creatureInfoCache.end()) ? static_cast<int>(it->second.rank) : -1;
     }
-    uint32_t getCreatureType(uint32_t entry) const {
+    [[nodiscard]] uint32_t getCreatureType(uint32_t entry) const {
         auto it = creatureInfoCache.find(entry);
         return (it != creatureInfoCache.end()) ? it->second.creatureType : 0;
     }
-    uint32_t getCreatureFamily(uint32_t entry) const {
+    [[nodiscard]] uint32_t getCreatureFamily(uint32_t entry) const {
         auto it = creatureInfoCache.find(entry);
         return (it != creatureInfoCache.end()) ? it->second.family : 0;
     }
-    const GameObjectQueryResponseData* getCachedGameObjectInfo(uint32_t entry) const {
+    [[nodiscard]] const GameObjectQueryResponseData* getCachedGameObjectInfo(uint32_t entry) const {
         auto it = gameObjectInfoCache_.find(entry);
         return (it != gameObjectInfoCache_.end()) ? &it->second : nullptr;
     }
 
     // Name lookup (checks cache then entity manager)
-    const std::string& lookupName(uint64_t guid) const {
+    [[nodiscard]] const std::string& lookupName(uint64_t guid) const {
         static const std::string kEmpty;
         auto it = playerNameCache.find(guid);
         if (it != playerNameCache.end()) return it->second;
@@ -77,24 +77,24 @@ public:
         }
         return kEmpty;
     }
-    uint8_t lookupPlayerClass(uint64_t guid) const {
+    [[nodiscard]] uint8_t lookupPlayerClass(uint64_t guid) const {
         auto it = playerClassRaceCache_.find(guid);
         return it != playerClassRaceCache_.end() ? it->second.classId : 0;
     }
-    uint8_t lookupPlayerRace(uint64_t guid) const {
+    [[nodiscard]] uint8_t lookupPlayerRace(uint64_t guid) const {
         auto it = playerClassRaceCache_.find(guid);
         return it != playerClassRaceCache_.end() ? it->second.raceId : 0;
     }
 
     // --- Transport GUID tracking ---
-    bool isTransportGuid(uint64_t guid) const { return transportGuids_.count(guid) > 0; }
-    bool hasServerTransportUpdate(uint64_t guid) const { return serverUpdatedTransportGuids_.count(guid) > 0; }
+    [[nodiscard]] bool isTransportGuid(uint64_t guid) const { return transportGuids_.count(guid) > 0; }
+    [[nodiscard]] bool hasServerTransportUpdate(uint64_t guid) const { return serverUpdatedTransportGuids_.count(guid) > 0; }
 
     // --- Update object work queue ---
     void enqueueUpdateObjectWork(UpdateObjectData&& data);
     void processPendingUpdateObjectWork(const std::chrono::steady_clock::time_point& start,
                                         float budgetMs);
-    bool hasPendingUpdateObjectWork() const { return !pendingUpdateObjectWork_.empty(); }
+    [[nodiscard]] bool hasPendingUpdateObjectWork() const { return !pendingUpdateObjectWork_.empty(); }
 
     // --- Reset all state (called on disconnect / character switch) ---
     void clearAll();
@@ -289,7 +289,7 @@ private:
     struct CorpseTypeHandler;
     std::unordered_map<uint8_t, std::unique_ptr<IObjectTypeHandler>> typeHandlers_;
     void initTypeHandlers();
-    IObjectTypeHandler* getTypeHandler(ObjectType type) const;
+    [[nodiscard]] IObjectTypeHandler* getTypeHandler(ObjectType type) const;
 
     void onCreateUnit(const UpdateBlock& block, std::shared_ptr<Entity>& entity);
     void onCreatePlayer(const UpdateBlock& block, std::shared_ptr<Entity>& entity);

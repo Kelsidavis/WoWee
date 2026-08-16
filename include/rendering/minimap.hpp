@@ -45,16 +45,16 @@ public:
                 float playerOrientation = 0.0f, bool hasPlayerOrientation = false);
 
     void setEnabled(bool enabled) { this->enabled = enabled; }
-    bool isEnabled() const { return enabled; }
+    [[nodiscard]] bool isEnabled() const { return enabled; }
     void toggle() { enabled = !enabled; }
 
     void setViewRadius(float radius) { viewRadius = radius; }
     void setRotateWithCamera(bool rotate) { rotateWithCamera = rotate; }
-    bool isRotateWithCamera() const { return rotateWithCamera; }
+    [[nodiscard]] bool isRotateWithCamera() const { return rotateWithCamera; }
 
     void setSquareShape(bool square) { squareShape = square; }
-    bool isSquareShape() const { return squareShape; }
-    float getViewRadius() const { return viewRadius; }
+    [[nodiscard]] bool isSquareShape() const { return squareShape; }
+    [[nodiscard]] float getViewRadius() const { return viewRadius; }
 
     void zoomIn() { viewRadius = std::max(100.0f, viewRadius - 50.0f); }
     void zoomOut() { viewRadius = std::min(800.0f, viewRadius + 50.0f); }
@@ -79,16 +79,16 @@ public:
     /// puts its own minimap in, and when FrameXML draws the ring the map moves
     /// to whatever rect the Minimap widget occupies. Blips computed against
     /// the old corner land beside the map rather than on it.
-    bool hasScreenRect() const { return haveRect_; }
-    float screenRectX() const { return rectX_; }
-    float screenRectY() const { return rectY_; }
-    float screenRectW() const { return rectW_; }
-    float screenRectH() const { return rectH_; }
+    [[nodiscard]] bool hasScreenRect() const { return haveRect_; }
+    [[nodiscard]] float screenRectX() const { return rectX_; }
+    [[nodiscard]] float screenRectY() const { return rectY_; }
+    [[nodiscard]] float screenRectW() const { return rectW_; }
+    [[nodiscard]] float screenRectH() const { return rectH_; }
 
     // Public accessors for WorldMap
     VkTexture* getOrLoadTileTexture(int tileX, int tileY);
     void ensureTRSParsed() { if (!trsParsed) parseTRS(); }
-    const std::string& getMapName() const { return mapName; }
+    [[nodiscard]] const std::string& getMapName() const { return mapName; }
 
 private:
     void parseTRS();

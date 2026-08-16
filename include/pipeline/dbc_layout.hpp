@@ -16,7 +16,7 @@ struct DBCFieldMap {
     std::unordered_map<std::string, uint32_t> fields;
 
     /** Get column index by field name. Returns 0xFFFFFFFF if unknown. */
-    uint32_t field(const std::string& name) const {
+    [[nodiscard]] uint32_t field(const std::string& name) const {
         auto it = fields.find(name);
         return (it != fields.end()) ? it->second : 0xFFFFFFFF;
     }
@@ -35,10 +35,10 @@ public:
     bool loadFromJson(const std::string& path);
 
     /** Get the field map for a DBC file. Returns nullptr if unknown. */
-    const DBCFieldMap* getLayout(const std::string& dbcName) const;
+    [[nodiscard]] const DBCFieldMap* getLayout(const std::string& dbcName) const;
 
     /** Number of DBC layouts loaded. */
-    size_t size() const { return layouts_.size(); }
+    [[nodiscard]] size_t size() const { return layouts_.size(); }
 
 private:
     std::unordered_map<std::string, DBCFieldMap> layouts_;

@@ -62,9 +62,9 @@ struct WoweeRuneCost {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t runeCostId) const;
+    [[nodiscard]] const Entry* findById(uint32_t runeCostId) const;
 
     static const char* spellTreeBranchName(uint8_t b);
 };

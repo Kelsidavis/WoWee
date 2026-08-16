@@ -44,7 +44,7 @@ struct WoweeLight {
     std::string name;                  // zone or scene name
     std::vector<Keyframe> keyframes;   // sorted by timeOfDayMin
 
-    bool isValid() const { return !keyframes.empty(); }
+    [[nodiscard]] bool isValid() const { return !keyframes.empty(); }
 };
 
 class WoweeLightLoader {

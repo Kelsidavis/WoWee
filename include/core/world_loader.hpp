@@ -64,15 +64,15 @@ public:
         float x = 0, y = 0;
         bool valid = false;
     };
-    LastWorldInfo loadLastWorldInfo() const;
+    [[nodiscard]] LastWorldInfo loadLastWorldInfo() const;
 
     // State accessors
-    uint32_t getLoadedMapId() const { return loadedMapId_; }
-    bool isLoadingWorld() const { return loadingWorld_; }
-    bool hasPendingEntry() const { return pendingWorldEntry_.has_value(); }
+    [[nodiscard]] uint32_t getLoadedMapId() const { return loadedMapId_; }
+    [[nodiscard]] bool isLoadingWorld() const { return loadingWorld_; }
+    [[nodiscard]] bool hasPendingEntry() const { return pendingWorldEntry_.has_value(); }
 
     // Get cached map name by ID (returns empty string if not found)
-    std::string getMapNameById(uint32_t mapId) const {
+    [[nodiscard]] std::string getMapNameById(uint32_t mapId) const {
         auto it = mapNameById_.find(mapId);
         return (it != mapNameById_.end()) ? it->second : std::string{};
     }

@@ -77,25 +77,25 @@ struct WoweeCraftingRecipes {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t recipeId) const;
+    [[nodiscard]] const Entry* findById(uint32_t recipeId) const;
 
     // Returns the recipe for a given cast spellId -
     // the lookup the trade-skill cast handler uses
     // to resolve which item to produce + which
     // reagents to consume.
-    const Entry* findBySpellId(uint32_t spellId) const;
+    [[nodiscard]] const Entry* findBySpellId(uint32_t spellId) const;
 
     // Returns all recipes belonging to a trade
     // skill. Used by the trade-skill window UI to
     // populate the per-skill recipe list.
-    std::vector<const Entry*> findByTradeSkill(uint16_t tradeSkillId) const;
+    [[nodiscard]] std::vector<const Entry*> findByTradeSkill(uint16_t tradeSkillId) const;
 
     // Returns all recipes that produce a given
     // itemId - useful for "how do I make this?"
     // tooltip-link queries.
-    std::vector<const Entry*> findByProducedItem(uint32_t itemId) const;
+    [[nodiscard]] std::vector<const Entry*> findByProducedItem(uint32_t itemId) const;
 };
 
 class WoweeCraftingRecipesLoader {

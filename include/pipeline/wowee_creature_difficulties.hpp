@@ -78,17 +78,17 @@ struct WoweeCreatureDifficulty {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t difficultyId) const;
-    const Entry* findByBaseCreature(uint32_t baseCreatureId) const;
+    [[nodiscard]] const Entry* findById(uint32_t difficultyId) const;
+    [[nodiscard]] const Entry* findByBaseCreature(uint32_t baseCreatureId) const;
 
     // Resolve to the variant creature id for the given
     // difficulty index. mode: 0=Normal-10, 1=Normal-25,
     // 2=Heroic-10, 3=Heroic-25. Returns 0 if no variant
     // is configured for that mode (caller falls back to
     // baseCreatureId).
-    uint32_t resolveVariant(uint32_t difficultyId,
+    [[nodiscard]] uint32_t resolveVariant(uint32_t difficultyId,
                              uint8_t mode) const;
 
     static const char* spawnGroupKindName(uint8_t k);

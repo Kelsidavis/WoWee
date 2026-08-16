@@ -69,9 +69,9 @@ struct WoweeSpellRange {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t rangeId) const;
+    [[nodiscard]] const Entry* findById(uint32_t rangeId) const;
 
     static const char* rangeKindName(uint8_t k);
 };

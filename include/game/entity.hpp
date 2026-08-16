@@ -102,14 +102,14 @@ public:
     virtual ~Entity() = default;
 
     // GUID access
-    uint64_t getGuid() const { return guid; }
+    [[nodiscard]] uint64_t getGuid() const { return guid; }
     void setGuid(uint64_t g) { guid = g; }
 
     // Position
-    float getX() const { return x; }
-    float getY() const { return y; }
-    float getZ() const { return z; }
-    float getOrientation() const { return orientation; }
+    [[nodiscard]] float getX() const { return x; }
+    [[nodiscard]] float getY() const { return y; }
+    [[nodiscard]] float getZ() const { return z; }
+    [[nodiscard]] float getOrientation() const { return orientation; }
     // Update orientation only, without disrupting an in-progress movement interpolation.
     void setOrientation(float o) { orientation = o; }
 
@@ -272,44 +272,44 @@ public:
         }
     }
 
-    bool isEntityMoving() const { return isMoving_; }
+    [[nodiscard]] bool isEntityMoving() const { return isMoving_; }
 
     /// True only during the active interpolation phase (before reaching destination).
     /// Unlike isEntityMoving(), this does NOT include the dead-reckoning overrun window,
     /// so animations (Run/Walk) should use this to avoid "running in place" after arrival.
-    bool isActivelyMoving() const {
+    [[nodiscard]] bool isActivelyMoving() const {
         return isMoving_ && moveElapsed_ < moveDuration_;
     }
 
     // Returns the latest server-authoritative position: destination if moving, current if not.
     // Unlike getX/Y/Z (which only update via updateMovement), this always reflects the
     // last known server position regardless of distance culling.
-    float getLatestX() const { return isMoving_ ? moveEndX_ : x; }
-    float getLatestY() const { return isMoving_ ? moveEndY_ : y; }
-    float getLatestZ() const { return isMoving_ ? moveEndZ_ : z; }
+    [[nodiscard]] float getLatestX() const { return isMoving_ ? moveEndX_ : x; }
+    [[nodiscard]] float getLatestY() const { return isMoving_ ? moveEndY_ : y; }
+    [[nodiscard]] float getLatestZ() const { return isMoving_ ? moveEndZ_ : z; }
 
     // Object type
-    ObjectType getType() const { return type; }
+    [[nodiscard]] ObjectType getType() const { return type; }
     void setType(ObjectType t) { type = t; }
 
     /// True if this entity is a Unit or Player (both derive from Unit).
-    bool isUnit() const { return type == ObjectType::UNIT || type == ObjectType::PLAYER; }
+    [[nodiscard]] bool isUnit() const { return type == ObjectType::UNIT || type == ObjectType::PLAYER; }
 
     // Fields (for update values)
     void setField(uint16_t index, uint32_t value) {
         fields[index] = value;
     }
 
-    uint32_t getField(uint16_t index) const {
+    [[nodiscard]] uint32_t getField(uint16_t index) const {
         auto it = fields.find(index);
         return (it != fields.end()) ? it->second : 0;
     }
 
-    bool hasField(uint16_t index) const {
+    [[nodiscard]] bool hasField(uint16_t index) const {
         return fields.find(index) != fields.end();
     }
 
-    const FlatFieldMap& getFields() const {
+    [[nodiscard]] const FlatFieldMap& getFields() const {
         return fields;
     }
 
@@ -348,88 +348,88 @@ public:
     explicit Unit(uint64_t guid) : Entity(guid) { type = ObjectType::UNIT; }
 
     // Name
-    const std::string& getName() const { return name; }
+    [[nodiscard]] const std::string& getName() const { return name; }
     void setName(const std::string& n) { name = n; }
 
     // Health
-    uint32_t getHealth() const { return health; }
+    [[nodiscard]] uint32_t getHealth() const { return health; }
     void setHealth(uint32_t h) { health = h; }
 
-    uint32_t getMaxHealth() const { return maxHealth; }
+    [[nodiscard]] uint32_t getMaxHealth() const { return maxHealth; }
     void setMaxHealth(uint32_t h) { maxHealth = h; }
 
     // Power (mana/rage/energy) - indexed by power type (0-6)
-    uint32_t getPower() const { return powers[powerType < 7 ? powerType : 0]; }
+    [[nodiscard]] uint32_t getPower() const { return powers[powerType < 7 ? powerType : 0]; }
     void setPower(uint32_t p) { powers[powerType < 7 ? powerType : 0] = p; }
     void setPowerByType(uint8_t type, uint32_t p) { if (type < 7) powers[type] = p; }
 
-    uint32_t getMaxPower() const { return maxPowers[powerType < 7 ? powerType : 0]; }
+    [[nodiscard]] uint32_t getMaxPower() const { return maxPowers[powerType < 7 ? powerType : 0]; }
     void setMaxPower(uint32_t p) { maxPowers[powerType < 7 ? powerType : 0] = p; }
     void setMaxPowerByType(uint8_t type, uint32_t p) { if (type < 7) maxPowers[type] = p; }
 
-    uint32_t getPowerByType(uint8_t type) const { return type < 7 ? powers[type] : 0; }
-    uint32_t getMaxPowerByType(uint8_t type) const { return type < 7 ? maxPowers[type] : 0; }
+    [[nodiscard]] uint32_t getPowerByType(uint8_t type) const { return type < 7 ? powers[type] : 0; }
+    [[nodiscard]] uint32_t getMaxPowerByType(uint8_t type) const { return type < 7 ? maxPowers[type] : 0; }
 
-    uint8_t getPowerType() const { return powerType; }
+    [[nodiscard]] uint8_t getPowerType() const { return powerType; }
     void setPowerType(uint8_t t) { powerType = t; }
 
-    uint32_t getAuraState() const { return auraState; }
+    [[nodiscard]] uint32_t getAuraState() const { return auraState; }
     void setAuraState(uint32_t state) { auraState = state; }
 
     // Level
-    uint32_t getLevel() const { return level; }
+    [[nodiscard]] uint32_t getLevel() const { return level; }
     void setLevel(uint32_t l) { level = l; }
 
     // Entry ID (creature template entry)
-    uint32_t getEntry() const { return entry; }
+    [[nodiscard]] uint32_t getEntry() const { return entry; }
     void setEntry(uint32_t e) { entry = e; }
 
     // Display ID (model display)
-    uint32_t getDisplayId() const { return displayId; }
+    [[nodiscard]] uint32_t getDisplayId() const { return displayId; }
     void setDisplayId(uint32_t id) { displayId = id; }
     /// How far this unit's edge is from its centre, and how far past that it
     /// can reach. Range between two units is measured edge to edge, so both
     /// come off the centre distance - see UNIT_FIELD_COMBATREACH.
-    float getCombatReach() const { return combatReach; }
+    [[nodiscard]] float getCombatReach() const { return combatReach; }
     void setCombatReach(float r) { combatReach = r; }
-    float getBoundingRadius() const { return boundingRadius; }
+    [[nodiscard]] float getBoundingRadius() const { return boundingRadius; }
     void setBoundingRadius(float r) { boundingRadius = r; }
 
     // Mount display ID (UNIT_FIELD_MOUNTDISPLAYID, index 69)
-    uint32_t getMountDisplayId() const { return mountDisplayId; }
+    [[nodiscard]] uint32_t getMountDisplayId() const { return mountDisplayId; }
     void setMountDisplayId(uint32_t id) { mountDisplayId = id; }
 
     // Unit flags (UNIT_FIELD_FLAGS, index 59)
-    uint32_t getUnitFlags() const { return unitFlags; }
+    [[nodiscard]] uint32_t getUnitFlags() const { return unitFlags; }
     void setUnitFlags(uint32_t f) { unitFlags = f; }
 
     // Client presentation flags (byte 2 of UNIT_FIELD_BYTES_1).
-    uint8_t getVisibilityFlags() const { return visibilityFlags; }
+    [[nodiscard]] uint8_t getVisibilityFlags() const { return visibilityFlags; }
     void setVisibilityFlags(uint8_t f) { visibilityFlags = f; }
-    bool hasCreepVisibility() const { return (visibilityFlags & UNIT_VIS_FLAG_CREEP) != 0; }
+    [[nodiscard]] bool hasCreepVisibility() const { return (visibilityFlags & UNIT_VIS_FLAG_CREEP) != 0; }
     void clearCreepVisibility() {
         visibilityFlags &= static_cast<uint8_t>(~UNIT_VIS_FLAG_CREEP);
     }
 
     // Dynamic flags (UNIT_DYNAMIC_FLAGS, index 147)
-    uint32_t getDynamicFlags() const { return dynamicFlags; }
+    [[nodiscard]] uint32_t getDynamicFlags() const { return dynamicFlags; }
     void setDynamicFlags(uint32_t f) { dynamicFlags = f; }
 
     // NPC flags (UNIT_NPC_FLAGS, index 82)
-    uint32_t getNpcFlags() const { return npcFlags; }
+    [[nodiscard]] uint32_t getNpcFlags() const { return npcFlags; }
     void setNpcFlags(uint32_t f) { npcFlags = f; }
 
     // NPC emote state (UNIT_NPC_EMOTESTATE) - persistent looping animation for NPCs
-    uint32_t getNpcEmoteState() const { return npcEmoteState; }
+    [[nodiscard]] uint32_t getNpcEmoteState() const { return npcEmoteState; }
     void setNpcEmoteState(uint32_t e) { npcEmoteState = e; }
 
     // Returns true if NPC has interaction flags (gossip/vendor/quest/trainer)
-    bool isInteractable() const { return npcFlags != 0; }
+    [[nodiscard]] bool isInteractable() const { return npcFlags != 0; }
 
     // Faction-based hostility
-    uint32_t getFactionTemplate() const { return factionTemplate; }
+    [[nodiscard]] uint32_t getFactionTemplate() const { return factionTemplate; }
     void setFactionTemplate(uint32_t f) { factionTemplate = f; }
-    bool isHostile() const { return hostile; }
+    [[nodiscard]] bool isHostile() const { return hostile; }
     void setHostile(bool h) { hostile = h; }
 
 protected:
@@ -478,13 +478,13 @@ public:
     GameObject() { type = ObjectType::GAMEOBJECT; }
     explicit GameObject(uint64_t guid) : Entity(guid) { type = ObjectType::GAMEOBJECT; }
 
-    const std::string& getName() const { return name; }
+    [[nodiscard]] const std::string& getName() const { return name; }
     void setName(const std::string& n) { name = n; }
 
-    uint32_t getEntry() const { return entry; }
+    [[nodiscard]] uint32_t getEntry() const { return entry; }
     void setEntry(uint32_t e) { entry = e; }
 
-    uint32_t getDisplayId() const { return displayId; }
+    [[nodiscard]] uint32_t getDisplayId() const { return displayId; }
     void setDisplayId(uint32_t id) { displayId = id; }
 
 protected:

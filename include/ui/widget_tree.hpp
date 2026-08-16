@@ -651,7 +651,7 @@ public:
     void addLinkRect(const LinkRect& r) { linkRects_.push_back(r); }
     /// The last link drawn under this point, which is the topmost - the draw
     /// order is back to front and later rects sit over earlier ones.
-    const LinkRect* linkAt(float x, float y) const {
+    [[nodiscard]] const LinkRect* linkAt(float x, float y) const {
         for (auto it = linkRects_.rbegin(); it != linkRects_.rend(); ++it) {
             if (x >= it->x0 && x <= it->x1 && y >= it->y0 && y <= it->y1) return &*it;
         }
@@ -660,12 +660,12 @@ public:
 
     /// The screen-sized root every unparented widget hangs from. WoW calls it
     /// UIParent and addons anchor to it by name constantly.
-    uint32_t root() const { return rootId_; }
+    [[nodiscard]] uint32_t root() const { return rootId_; }
 
     uint32_t create(WidgetKind kind, uint32_t parent, const std::string& name);
     Widget* get(uint32_t id);
-    const Widget* get(uint32_t id) const;
-    size_t size() const { return widgets_.size(); }
+    [[nodiscard]] const Widget* get(uint32_t id) const;
+    [[nodiscard]] size_t size() const { return widgets_.size(); }
 
     /// Anchor helpers. clearPoints is SetPoint's implicit reset when a frame is
     /// re-anchored from scratch, and what SetAllPoints does before pinning both
@@ -712,7 +712,7 @@ public:
     /// is read by the input loop, so the two need somewhere to meet. It lives
     /// here beside the pressed and hovered frames rather than in the input
     /// loop, because that is what the bindings can already reach.
-    uint32_t movingWidget() const { return movingWid_; }
+    [[nodiscard]] uint32_t movingWidget() const { return movingWid_; }
     void setMovingWidget(uint32_t id) { movingWid_ = id; }
 
     /// The frame a size grabber is dragging, and which corner it took hold of.
@@ -721,8 +721,8 @@ public:
     /// StartSizing is called from Lua and the cursor is read by the input loop.
     /// The corner matters because dragging the left edge has to move the frame
     /// as well as resize it - its right edge must stay where it is.
-    uint32_t sizingWidget() const { return sizingWid_; }
-    const std::string& sizingPoint() const { return sizingPoint_; }
+    [[nodiscard]] uint32_t sizingWidget() const { return sizingWid_; }
+    [[nodiscard]] const std::string& sizingPoint() const { return sizingPoint_; }
     void setSizingWidget(uint32_t id, const std::string& point) {
         sizingWid_ = id;
         sizingPoint_ = point;
@@ -789,7 +789,7 @@ public:
     /// How many pixels one interface unit is worth, after the player's own
     /// scale. Everything that converts between units and pixels uses this, so
     /// hit testing and drawing stay in step.
-    float uiScale() const { return uiScale_; }
+    [[nodiscard]] float uiScale() const { return uiScale_; }
 
     /// The player's UI Scale, as WoW's video options mean it.
     ///
@@ -816,7 +816,7 @@ public:
         userScale_ = clamped;
         layoutDirty_ = true;
     }
-    float userScale() const { return userScale_; }
+    [[nodiscard]] float userScale() const { return userScale_; }
 
     /// The canvas height the interface lays out in. The scale a screen of a
     /// given pixel height gets is pixelHeight / this, times the user's own.
@@ -829,10 +829,10 @@ public:
     static constexpr float kMaxUserScale = kInterfaceHeight / kMinLayoutHeight;
 
     /// The screen-filling frame everything else hangs off.
-    uint32_t rootId() const { return rootId_; }
+    [[nodiscard]] uint32_t rootId() const { return rootId_; }
     /// UIParent, which is the root's one child at startup and the parent of
     /// nearly everything. Distinct from rootId() - see the note there.
-    uint32_t uiParentId() const { return uiParentId_; }
+    [[nodiscard]] uint32_t uiParentId() const { return uiParentId_; }
 
     /// Records a frame as a scroll frame, and keeps the list of them. Walking
     /// every widget each frame to find a handful is the kind of cost that does
@@ -871,7 +871,7 @@ public:
     /// off a list only stops the updates, and the last face would stay.
     void setPortraitUnit(uint32_t id, const std::string& unit);
     /// Every texture claimed for this unit, or an empty list.
-    const std::vector<uint32_t>& portraitsFor(const std::string& unit) const;
+    [[nodiscard]] const std::vector<uint32_t>& portraitsFor(const std::string& unit) const;
 
     /// What the mouse is doing, so state art can be chosen. The engine owns
     /// this - it is the only thing that knows what is under the cursor and
@@ -884,11 +884,11 @@ public:
     /// Which frame is being held, for anything that draws differently while a
     /// button is down. The tree already chooses the pushed texture from this;
     /// the label moves with it.
-    uint32_t pressedWidget() const { return pressedId_; }
+    [[nodiscard]] uint32_t pressedWidget() const { return pressedId_; }
     /// Which frame the cursor is over, for anything that draws differently
     /// under it - a button's label lightens in WoW, and that is a font object
     /// the template names rather than a colour the renderer invents.
-    uint32_t hoveredWidget() const { return hoveredId_; }
+    [[nodiscard]] uint32_t hoveredWidget() const { return hoveredId_; }
 
     /// Record which frame a tooltip is describing, so it can be taken away
     /// with it. See hideOrphanedTooltips.
@@ -902,14 +902,14 @@ public:
     /// each of the places a panel can close, because every one of them is the
     /// same omission and new ones would arrive with the same bug.
     void hideOrphanedTooltips();
-    const std::vector<uint32_t>& scrollFrames() const { return scrollFrames_; }
-    const std::vector<uint32_t>& playerPortraits() const { return portraitsFor("player"); }
+    [[nodiscard]] const std::vector<uint32_t>& scrollFrames() const { return scrollFrames_; }
+    [[nodiscard]] const std::vector<uint32_t>& playerPortraits() const { return portraitsFor("player"); }
 
     /// The widget published under this name, or null. Names are unique in
     /// FrameXML by convention, and the last one to claim a name wins, which is
     /// what a lookup by name means there too.
     Widget* findByName(std::string_view name);
-    const Widget* findByName(std::string_view name) const;
+    [[nodiscard]] const Widget* findByName(std::string_view name) const;
 
     /// The height the interface is authored against. Blizzard's own number.
 
@@ -917,7 +917,7 @@ public:
     /// decides what draws over what - so whatever the player can see on top is
     /// what they click. Regions are never hit: in WoW a texture is not a mouse
     /// target, its frame is.
-    uint32_t hitTest(float x, float y) const;
+    [[nodiscard]] uint32_t hitTest(float x, float y) const;
 
     /// The same, for the mouse wheel, which frames may take without taking the
     /// mouse. EnableMouseWheel and EnableMouse are separate in WoW and
@@ -925,16 +925,16 @@ public:
     /// OnMouseWheel and never enables the mouse. Asking the plain hit test
     /// meant no scroll frame in the interface was ever found under the cursor,
     /// so the wheel fell through to the camera and nothing scrolled.
-    uint32_t hitTestWheel(float x, float y) const;
+    [[nodiscard]] uint32_t hitTestWheel(float x, float y) const;
 
     /// Widgets to draw, in the order to draw them. Only those that resolved to a
     /// visible, non-empty rect. Valid until the next layout().
-    const std::vector<const Widget*>& drawOrder() const { return drawOrder_; }
+    [[nodiscard]] const std::vector<const Widget*>& drawOrder() const { return drawOrder_; }
 
 private:
     /// Both hit tests, which differ only in whether a frame that took the
     /// wheel without taking the mouse counts as under the cursor.
-    uint32_t hitTestFor(float x, float y, bool forWheel) const;
+    [[nodiscard]] uint32_t hitTestFor(float x, float y, bool forWheel) const;
     std::vector<LinkRect> linkRects_;
     void layoutWidget(uint32_t id, float screenW, float screenH);
     /// The same, without descending into the children. What a single-widget
@@ -980,7 +980,7 @@ private:
     uint32_t pressedId_ = 0;
 
     /// Whether a state texture should be drawn given what the mouse is doing.
-    bool buttonArtVisible(const Widget& w) const;
+    [[nodiscard]] bool buttonArtVisible(const Widget& w) const;
     std::deque<Widget> widgets_;   ///< Index 0 is a placeholder; id == index.
     /// The screen itself, above UIParent. Everything FrameXML draws hangs off
     /// UIParent, but not quite everything: a frame declared at XML top level

@@ -80,15 +80,15 @@ struct ScenePick {
     /// The living win; a corpse is still selectable, but only when nothing alive
     /// was under the cursor - which is what makes a player standing on a body
     /// clickable, and what looting and skinning still need.
-    uint64_t unitGuid() const { return livingUnitGuid != 0 ? livingUnitGuid : deadUnitGuid; }
-    float unitCenterT() const {
+    [[nodiscard]] uint64_t unitGuid() const { return livingUnitGuid != 0 ? livingUnitGuid : deadUnitGuid; }
+    [[nodiscard]] float unitCenterT() const {
         return livingUnitGuid != 0 ? livingUnitCenterT : deadUnitCenterT;
     }
 
     /// Resolve to the one thing under the cursor: a unit unless an object's
     /// centre is clearly in front of it, so a creature is never lost to a
     /// decorative or backing object behind it. A hostile keeps its priority.
-    uint64_t resolve() const;
+    [[nodiscard]] uint64_t resolve() const;
 };
 
 /// Called for every entity the ray hits, so a caller can gather what only it

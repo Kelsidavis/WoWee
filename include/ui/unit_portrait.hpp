@@ -108,7 +108,7 @@ public:
     /// The rendered portrait, or zero until the first composite has run. The
     /// value is a VkDescriptorSet, carried as an integer so this header does
     /// not drag Vulkan into the widget tree.
-    uint64_t textureId() const;
+    [[nodiscard]] uint64_t textureId() const;
 
     void shutdown(rendering::Renderer* renderer);
 

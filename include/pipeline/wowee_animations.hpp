@@ -85,9 +85,9 @@ struct WoweeAnimation {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t animationId) const;
+    [[nodiscard]] const Entry* findById(uint32_t animationId) const;
 
     static const char* behaviorTierName(uint8_t t);
 };

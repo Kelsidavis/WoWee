@@ -23,7 +23,7 @@ public:
 
     // Volume control
     void setVolumeScale(float scale);
-    float getVolumeScale() const { return volumeScale_; }
+    [[nodiscard]] float getVolumeScale() const { return volumeScale_; }
 
     // Character size (for water splash intensity)
     enum class CharacterSize {

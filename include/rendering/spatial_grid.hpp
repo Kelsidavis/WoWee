@@ -156,7 +156,7 @@ struct CellRange {
     int maxX = 0;
     int maxY = 0;
 
-    size_t count() const {
+    [[nodiscard]] size_t count() const {
         return static_cast<size_t>(maxX - minX + 1) * static_cast<size_t>(maxY - minY + 1);
     }
 };

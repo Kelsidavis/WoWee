@@ -294,7 +294,7 @@ public:
         game::ItemDef item;
         uint8_t srcBag = 0xFF;
         uint8_t srcSlot = 0;
-        bool occupied() const { return itemGuid != 0; }
+        [[nodiscard]] bool occupied() const { return itemGuid != 0; }
     };
     bool isMailboxOpen() const { return mailboxOpen_; }
     const std::vector<MailMessage>& getMailInbox() const { return mailInbox_; }

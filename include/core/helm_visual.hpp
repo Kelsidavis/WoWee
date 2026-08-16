@@ -65,7 +65,7 @@ struct HelmVisual {
     std::string baseModelPath;
     std::string texturePath;       ///< Already resolved against what exists.
 
-    bool valid() const { return !baseModelPath.empty(); }
+    [[nodiscard]] bool valid() const { return !baseModelPath.empty(); }
 };
 
 /// Resolve the head model and texture for an ItemDisplayInfo id. Returns an

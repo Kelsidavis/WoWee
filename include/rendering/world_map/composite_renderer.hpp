@@ -60,7 +60,7 @@ public:
                        bool hasServerMask);
 
     /// Descriptor set for ImGui display of the composite.
-    VkDescriptorSet displayDescriptorSet() const { return imguiDisplaySet; }
+    [[nodiscard]] VkDescriptorSet displayDescriptorSet() const { return imguiDisplaySet; }
 
     /// Destroy all loaded zone textures (on map change).
 
@@ -74,13 +74,13 @@ public:
     void flushStaleTextures();
 
     /// Index of the zone currently composited (-1 if none).
-    int compositedIdx() const { return compositedIdx_; }
+    [[nodiscard]] int compositedIdx() const { return compositedIdx_; }
 
     /// Reset composited index to force re-composite.
     void invalidateComposite() { compositedIdx_ = -1; }
 
     /// Check whether a zone has any loaded tile textures.
-    bool hasAnyTile(int zoneIdx) const;
+    [[nodiscard]] bool hasAnyTile(int zoneIdx) const;
 
     // FBO dimensions (public for overlay coordinate math)
     static constexpr int GRID_COLS = 4;

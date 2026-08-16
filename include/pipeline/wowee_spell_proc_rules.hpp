@@ -99,19 +99,19 @@ struct WoweeSpellProcRules {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t procRuleId) const;
+    [[nodiscard]] const Entry* findById(uint32_t procRuleId) const;
 
     // Returns all proc rules where the given spellId
     // is the source aura. A single buff may have
     // multiple procs on different events.
-    std::vector<const Entry*> findBySourceSpell(uint32_t spellId) const;
+    [[nodiscard]] std::vector<const Entry*> findBySourceSpell(uint32_t spellId) const;
 
     // Returns all proc rules that fire on a given
     // event - used by the combat-event dispatcher
     // hot path.
-    std::vector<const Entry*> findByEvent(uint8_t triggerEvent) const;
+    [[nodiscard]] std::vector<const Entry*> findByEvent(uint8_t triggerEvent) const;
 };
 
 class WoweeSpellProcRulesLoader {

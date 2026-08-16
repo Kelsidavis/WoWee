@@ -64,12 +64,12 @@ public:
 
     // Weapon sheathe state
     void setWeaponsSheathed(bool sheathed) { weaponsSheathed_ = sheathed; }
-    bool isWeaponsSheathed() const { return weaponsSheathed_; }
+    [[nodiscard]] bool isWeaponsSheathed() const { return weaponsSheathed_; }
     void toggleWeaponsSheathed() { weaponsSheathed_ = !weaponsSheathed_; }
 
     // Ranged weapon swap: temporarily show ranged weapon in right hand
     void showRangedWeapon(bool show);
-    bool isShowingRanged() const { return showingRanged_; }
+    [[nodiscard]] bool isShowingRanged() const { return showingRanged_; }
 
     // Mining casts temporarily replace the held main-hand model with a pickaxe.
     void showMiningPick(bool show);
@@ -79,10 +79,10 @@ public:
     void showFishingPole(bool show);
 
     // Saved skin state accessors (used by game_screen.cpp for equipment re-compositing)
-    const std::string& getBodySkinPath() const { return bodySkinPath_; }
-    const std::vector<std::string>& getUnderwearPaths() const { return underwearPaths_; }
-    uint32_t getSkinTextureSlotIndex() const { return skinTextureSlotIndex_; }
-    uint32_t getCloakTextureSlotIndex() const { return cloakTextureSlotIndex_; }
+    [[nodiscard]] const std::string& getBodySkinPath() const { return bodySkinPath_; }
+    [[nodiscard]] const std::vector<std::string>& getUnderwearPaths() const { return underwearPaths_; }
+    [[nodiscard]] uint32_t getSkinTextureSlotIndex() const { return skinTextureSlotIndex_; }
+    [[nodiscard]] uint32_t getCloakTextureSlotIndex() const { return cloakTextureSlotIndex_; }
 
 private:
     bool loadWeaponM2(const std::string& m2Path, pipeline::M2Model& outModel);

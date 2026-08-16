@@ -92,14 +92,14 @@ public:
 
     // Returns the ImGui texture handle. Returns VK_NULL_HANDLE until the first
     // compositePass has run (image is in UNDEFINED layout before that).
-    VkDescriptorSet getTextureId() const { return compositeRendered_ ? imguiTextureId_ : VK_NULL_HANDLE; }
-    int getWidth() const { return fboWidth_; }
-    int getHeight() const { return fboHeight_; }
+    [[nodiscard]] VkDescriptorSet getTextureId() const { return compositeRendered_ ? imguiTextureId_ : VK_NULL_HANDLE; }
+    [[nodiscard]] int getWidth() const { return fboWidth_; }
+    [[nodiscard]] int getHeight() const { return fboHeight_; }
 
     CharacterRenderer* getCharacterRenderer() { return charRenderer_.get(); }
-    uint32_t getInstanceId() const { return instanceId_; }
-    uint32_t getModelId() const { return PREVIEW_MODEL_ID; }
-    bool isModelLoaded() const { return modelLoaded_; }
+    [[nodiscard]] uint32_t getInstanceId() const { return instanceId_; }
+    [[nodiscard]] uint32_t getModelId() const { return PREVIEW_MODEL_ID; }
+    [[nodiscard]] bool isModelLoaded() const { return modelLoaded_; }
 
 private:
     struct FacialHairGeosets {
@@ -112,7 +112,7 @@ private:
     void destroyFBO();
     void ensureAppearanceGeosetsLoaded();
     std::unordered_set<uint16_t> buildBaseGeosets();
-    uint16_t selectedHairScalpGeoset() const;
+    [[nodiscard]] uint16_t selectedHairScalpGeoset() const;
 
     // Read an M2 (plus its .skin for WotLK-era models) through the asset manager.
     bool loadPreviewM2(const std::string& m2Path, pipeline::M2Model& outModel);

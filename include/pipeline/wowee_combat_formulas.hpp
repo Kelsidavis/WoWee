@@ -101,15 +101,15 @@ struct WoweeCombatFormulas {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t formulaId) const;
+    [[nodiscard]] const Entry* findById(uint32_t formulaId) const;
 
     // Returns all formulas that produce a given
     // output stat for a given class+level - used
     // by the combat math hot path to compute
     // derived stats from base stats.
-    std::vector<const Entry*> findApplicable(
+    [[nodiscard]] std::vector<const Entry*> findApplicable(
         uint8_t outputStatKind,
         uint8_t classId,
         uint8_t level) const;

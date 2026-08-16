@@ -16,7 +16,7 @@ public:
 
     virtual bool connect(const std::string& host, uint16_t port) = 0;
     virtual void disconnect() = 0;
-    virtual bool isConnected() const = 0;
+    [[nodiscard]] virtual bool isConnected() const = 0;
 
     virtual void send(const Packet& packet) = 0;
     virtual void update() = 0;

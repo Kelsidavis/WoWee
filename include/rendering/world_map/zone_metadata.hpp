@@ -17,7 +17,7 @@ public:
     void initialize();
 
     /// Look up metadata for a zone by area name. Returns nullptr if not found.
-    const ZoneMeta* find(const std::string& areaName) const;
+    [[nodiscard]] const ZoneMeta* find(const std::string& areaName) const;
 
     /// Format a zone label with level range and faction tag.
     /// e.g. "Elwynn (1-10) [Alliance]"

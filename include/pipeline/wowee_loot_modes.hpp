@@ -90,15 +90,15 @@ struct WoweeLootModes {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t modeId) const;
+    [[nodiscard]] const Entry* findById(uint32_t modeId) const;
 
     // Returns all modes of one kind. Used by the loot-
     // policy UI to populate per-kind preset selectors
     // (the Master Loot section, the Need-Before-Greed
     // tier picker, etc.).
-    std::vector<const Entry*> findByKind(uint8_t modeKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByKind(uint8_t modeKind) const;
 };
 
 class WoweeLootModesLoader {

@@ -75,10 +75,10 @@ struct WoweeLoot {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Lookup by creatureId - nullptr if not present.
-    const Entry* findByCreatureId(uint32_t creatureId) const;
+    [[nodiscard]] const Entry* findByCreatureId(uint32_t creatureId) const;
 };
 
 class WoweeLootLoader {

@@ -72,15 +72,15 @@ struct WoweeItemQuality {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t qualityId) const;
+    [[nodiscard]] const Entry* findById(uint32_t qualityId) const;
 
     // Returns true if an item of this quality can drop
     // for a character of the given level (gated by
     // [minLevelToDrop, maxLevelToDrop] when maxLevelToDrop
     // is non-zero).
-    bool canDropAtLevel(uint32_t qualityId,
+    [[nodiscard]] bool canDropAtLevel(uint32_t qualityId,
                          uint8_t characterLevel) const;
 };
 

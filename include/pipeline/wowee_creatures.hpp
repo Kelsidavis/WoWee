@@ -128,10 +128,10 @@ struct WoweeCreature {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Lookup by creatureId - nullptr if not present.
-    const Entry* findById(uint32_t creatureId) const;
+    [[nodiscard]] const Entry* findById(uint32_t creatureId) const;
 
     static const char* typeName(uint8_t t);
     static const char* familyName(uint8_t f);

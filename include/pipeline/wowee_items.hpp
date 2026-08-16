@@ -150,10 +150,10 @@ struct WoweeItem {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Lookup by itemId - nullptr if not present.
-    const Entry* findById(uint32_t itemId) const;
+    [[nodiscard]] const Entry* findById(uint32_t itemId) const;
 
     static const char* qualityName(uint8_t q);
     static const char* classNameOf(uint8_t c);

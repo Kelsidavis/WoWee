@@ -38,7 +38,7 @@ public:
 
     void log(LogLevel level, const std::string& message);
     void setLogLevel(LogLevel level);
-    bool shouldLog(LogLevel level) const;
+    [[nodiscard]] bool shouldLog(LogLevel level) const;
 
     template<typename... Args>
     void debug(Args&&... args) {

@@ -71,14 +71,14 @@ struct WoweeTalentTab {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t tabId) const;
+    [[nodiscard]] const Entry* findById(uint32_t tabId) const;
 
     // Return all tabs for the given class, in displayOrder.
     // The talent UI uses this to populate the three (or
     // four, for druids) tab buttons.
-    std::vector<const Entry*> findByClass(uint32_t classBit) const;
+    [[nodiscard]] std::vector<const Entry*> findByClass(uint32_t classBit) const;
 
     static const char* roleHintName(uint8_t r);
 };

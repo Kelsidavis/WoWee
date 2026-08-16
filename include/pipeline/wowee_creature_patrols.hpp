@@ -86,16 +86,16 @@ struct WoweeCreaturePatrol {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t pathId) const;
-    const Entry* findByCreatureGuid(uint32_t creatureGuid) const;
+    [[nodiscard]] const Entry* findById(uint32_t pathId) const;
+    [[nodiscard]] const Entry* findByCreatureGuid(uint32_t creatureGuid) const;
 
     // Compute total path length in yards by summing
     // segment distances between consecutive waypoints.
     // For Loop kind, includes the closing segment back to
     // the first waypoint.
-    float pathLengthYards(uint32_t pathId) const;
+    [[nodiscard]] float pathLengthYards(uint32_t pathId) const;
 
     static const char* pathKindName(uint8_t k);
     static const char* moveTypeName(uint8_t m);

@@ -68,23 +68,23 @@ struct WoweeMinimapLevels {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t levelId) const;
+    [[nodiscard]] const Entry* findById(uint32_t levelId) const;
 
     // Returns the level entry whose Z-range contains the
     // player's current Z position, for the given (map,
     // area). Used by the minimap renderer at every camera
     // tick to swap the overlay layer when the player
     // crosses a floor boundary.
-    const Entry* findContainingZ(uint32_t mapId,
+    [[nodiscard]] const Entry* findContainingZ(uint32_t mapId,
                                    uint32_t areaId,
                                    float z) const;
 
     // Returns all levels for one (map, area) sorted by
     // levelIndex. Used by the world-map UI to populate
     // the per-zone level-picker dropdown.
-    std::vector<const Entry*> findByArea(uint32_t mapId,
+    [[nodiscard]] std::vector<const Entry*> findByArea(uint32_t mapId,
                                            uint32_t areaId) const;
 };
 

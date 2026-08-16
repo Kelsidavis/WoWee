@@ -70,19 +70,19 @@ struct WoweeCombatStats {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t statId) const;
+    [[nodiscard]] const Entry* findById(uint32_t statId) const;
 
     // Returns the binding for an exact (classId, level)
     // pair - used by the level-up handler to commit
     // base-stat changes when a player dings.
-    const Entry* find(uint8_t classId, uint8_t level) const;
+    [[nodiscard]] const Entry* find(uint8_t classId, uint8_t level) const;
 
     // Returns all entries for a class, sorted by level.
     // Used by the runtime stat-interpolator to find the
     // bracketing two entries for an intermediate level.
-    std::vector<const Entry*> findByClass(uint8_t classId) const;
+    [[nodiscard]] std::vector<const Entry*> findByClass(uint8_t classId) const;
 };
 
 class WoweeCombatStatsLoader {

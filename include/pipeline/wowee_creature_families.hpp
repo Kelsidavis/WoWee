@@ -87,9 +87,9 @@ struct WoweeCreatureFamily {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t familyId) const;
+    [[nodiscard]] const Entry* findById(uint32_t familyId) const;
 
     static const char* familyKindName(uint8_t k);
     static const char* petTalentTreeName(uint8_t t);

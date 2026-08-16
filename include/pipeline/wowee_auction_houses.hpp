@@ -85,19 +85,19 @@ struct WoweeAuctionHouses {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t ahId) const;
+    [[nodiscard]] const Entry* findById(uint32_t ahId) const;
 
     // Returns the AH entry an auctioneer NPC opens
     // when right-clicked. Used by the gossip handler
     // to dispatch to the correct AH config.
-    const Entry* findByNpc(uint32_t npcId) const;
+    [[nodiscard]] const Entry* findByNpc(uint32_t npcId) const;
 
     // Returns all AH entries accessible to a faction.
     // Used by the AH-finder UI to suggest reachable
     // auctioneers.
-    std::vector<const Entry*> findByFaction(uint8_t faction) const;
+    [[nodiscard]] std::vector<const Entry*> findByFaction(uint8_t faction) const;
 };
 
 class WoweeAuctionHousesLoader {

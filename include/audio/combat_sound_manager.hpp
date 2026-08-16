@@ -23,7 +23,7 @@ public:
 
     // Volume control
     void setVolumeScale(float scale);
-    float getVolumeScale() const { return volumeScale_; }
+    [[nodiscard]] float getVolumeScale() const { return volumeScale_; }
 
     // Weapon swing sounds (whoosh sounds before impact)
     enum class WeaponSize {

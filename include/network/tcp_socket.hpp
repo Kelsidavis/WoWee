@@ -13,7 +13,7 @@ public:
 
     bool connect(const std::string& host, uint16_t port) override;
     void disconnect() override;
-    bool isConnected() const override { return connected; }
+    [[nodiscard]] bool isConnected() const override { return connected; }
 
     void send(const Packet& packet) override;
     void update() override;

@@ -52,9 +52,9 @@ public:
     /**
      * Check if asset manager is initialized
      */
-    bool isInitialized() const { return initialized; }
-    const std::string& getDataPath() const { return dataPath; }
-    const AssetManifest& getManifest() const { return manifest_; }
+    [[nodiscard]] bool isInitialized() const { return initialized; }
+    [[nodiscard]] const std::string& getDataPath() const { return dataPath; }
+    [[nodiscard]] const AssetManifest& getManifest() const { return manifest_; }
 
     /**
      * Load a BLP texture
@@ -100,14 +100,14 @@ public:
      * @param path Virtual file path
      * @return true if file exists
      */
-    bool fileExists(const std::string& path) const;
+    [[nodiscard]] bool fileExists(const std::string& path) const;
 
     /**
      * Read raw file data
      * @param path Virtual file path
      * @return File contents (empty if not found)
      */
-    std::vector<uint8_t> readFile(const std::string& path) const;
+    [[nodiscard]] std::vector<uint8_t> readFile(const std::string& path) const;
 
     /**
      * Read optional file data without warning spam.
@@ -115,19 +115,19 @@ public:
      * @param path Virtual file path
      * @return File contents (empty if not found)
      */
-    std::vector<uint8_t> readFileOptional(const std::string& path) const;
+    [[nodiscard]] std::vector<uint8_t> readFileOptional(const std::string& path) const;
 
     /**
      * Get loaded DBC count
      */
-    size_t getLoadedDBCCount() const { return dbcCache.size(); }
+    [[nodiscard]] size_t getLoadedDBCCount() const { return dbcCache.size(); }
 
     /**
      * Get file cache stats
      */
-    size_t getFileCacheSize() const { return fileCacheTotalBytes; }
-    size_t getFileCacheHits() const { return fileCacheHits; }
-    size_t getFileCacheMisses() const { return fileCacheMisses; }
+    [[nodiscard]] size_t getFileCacheSize() const { return fileCacheTotalBytes; }
+    [[nodiscard]] size_t getFileCacheHits() const { return fileCacheHits; }
+    [[nodiscard]] size_t getFileCacheMisses() const { return fileCacheMisses; }
 
     /**
      * Clear all cached resources
@@ -148,7 +148,7 @@ public:
      * extracted file's directory without reading it.
      * @return absolute or relative fs path, or "" if not found
      */
-    std::string resolveFile(const std::string& normalizedPath) const;
+    [[nodiscard]] std::string resolveFile(const std::string& normalizedPath) const;
 
 private:
     bool initialized = false;
@@ -194,12 +194,12 @@ private:
      * Try to load a PNG override for a BLP path.
      * Returns valid BLPImage if PNG found, invalid otherwise.
      */
-    BLPImage tryLoadPngOverride(const std::string& normalizedPath) const;
+    [[nodiscard]] BLPImage tryLoadPngOverride(const std::string& normalizedPath) const;
 
     /**
      * Normalize path for case-insensitive lookup
      */
-    std::string normalizePath(const std::string& path) const;
+    [[nodiscard]] std::string normalizePath(const std::string& path) const;
 };
 
 } // namespace pipeline

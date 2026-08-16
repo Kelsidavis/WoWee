@@ -46,7 +46,7 @@ public:
     /**
      * Get the currently bound key for an action.
      */
-    ImGuiKey getKeyForAction(Action action) const;
+    [[nodiscard]] ImGuiKey getKeyForAction(Action action) const;
 
     /**
      * Rebind an action to a different key.

@@ -94,8 +94,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"target"}; }
-    std::string helpText() const override { return "Target unit by name"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"target"}; }
+    [[nodiscard]] std::string helpText() const override { return "Target unit by name"; }
 };
 
 // --- /cleartarget ---
@@ -115,8 +115,8 @@ public:
         if (condPass) ctx.gameHandler.clearTarget();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"cleartarget"}; }
-    std::string helpText() const override { return "Clear current target"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"cleartarget"}; }
+    [[nodiscard]] std::string helpText() const override { return "Clear current target"; }
 };
 
 // --- /targetenemy ---
@@ -126,8 +126,8 @@ public:
         ctx.gameHandler.targetEnemy(false);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"targetenemy"}; }
-    std::string helpText() const override { return "Cycle to next enemy"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"targetenemy"}; }
+    [[nodiscard]] std::string helpText() const override { return "Cycle to next enemy"; }
 };
 
 // --- /targetfriend ---
@@ -137,8 +137,8 @@ public:
         ctx.gameHandler.targetFriend(false);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"targetfriend"}; }
-    std::string helpText() const override { return "Cycle to next friendly unit"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"targetfriend"}; }
+    [[nodiscard]] std::string helpText() const override { return "Cycle to next friendly unit"; }
 };
 
 // --- /targetlasttarget, /targetlast ---
@@ -148,8 +148,8 @@ public:
         ctx.gameHandler.targetLastTarget();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"targetlasttarget", "targetlast"}; }
-    std::string helpText() const override { return "Target previous target"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"targetlasttarget", "targetlast"}; }
+    [[nodiscard]] std::string helpText() const override { return "Target previous target"; }
 };
 
 // --- /targetlastenemy ---
@@ -159,8 +159,8 @@ public:
         ctx.gameHandler.targetEnemy(true);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"targetlastenemy"}; }
-    std::string helpText() const override { return "Cycle to previous enemy"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"targetlastenemy"}; }
+    [[nodiscard]] std::string helpText() const override { return "Cycle to previous enemy"; }
 };
 
 // --- /targetlastfriend ---
@@ -170,8 +170,8 @@ public:
         ctx.gameHandler.targetFriend(true);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"targetlastfriend"}; }
-    std::string helpText() const override { return "Cycle to previous friendly unit"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"targetlastfriend"}; }
+    [[nodiscard]] std::string helpText() const override { return "Cycle to previous friendly unit"; }
 };
 
 // --- /focus ---
@@ -216,8 +216,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"focus"}; }
-    std::string helpText() const override { return "Set focus target"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"focus"}; }
+    [[nodiscard]] std::string helpText() const override { return "Set focus target"; }
 };
 
 // --- /clearfocus ---
@@ -227,8 +227,8 @@ public:
         ctx.gameHandler.clearFocus();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"clearfocus"}; }
-    std::string helpText() const override { return "Clear focus target"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"clearfocus"}; }
+    [[nodiscard]] std::string helpText() const override { return "Clear focus target"; }
 };
 
 // --- Registration ---

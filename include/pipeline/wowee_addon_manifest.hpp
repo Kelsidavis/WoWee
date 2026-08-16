@@ -70,15 +70,15 @@ struct WoweeAddonManifest {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t addonId) const;
-    const Entry* findByName(const std::string& name) const;
+    [[nodiscard]] const Entry* findById(uint32_t addonId) const;
+    [[nodiscard]] const Entry* findByName(const std::string& name) const;
 
     // Returns addons that depend on the given addonId
     // (reverse-lookup, used by the addon-disable UI to
     // warn "disabling this will also disable: X, Y").
-    std::vector<const Entry*> findDependents(uint32_t addonId) const;
+    [[nodiscard]] std::vector<const Entry*> findDependents(uint32_t addonId) const;
 };
 
 class WoweeAddonManifestLoader {

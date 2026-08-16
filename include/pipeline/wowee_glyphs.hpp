@@ -77,9 +77,9 @@ struct WoweeGlyph {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t glyphId) const;
+    [[nodiscard]] const Entry* findById(uint32_t glyphId) const;
 
     static const char* glyphTypeName(uint8_t t);
 };

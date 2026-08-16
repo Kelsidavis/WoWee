@@ -78,8 +78,8 @@ struct GroupListData {
     std::vector<GroupMember> members;
     uint64_t leaderGuid = 0;
 
-    bool isValid() const { return true; }
-    bool isEmpty() const { return memberCount == 0; }
+    [[nodiscard]] bool isValid() const { return true; }
+    [[nodiscard]] bool isEmpty() const { return memberCount == 0; }
 };
 
 /**

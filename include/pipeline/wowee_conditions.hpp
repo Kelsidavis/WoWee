@@ -92,9 +92,9 @@ struct WoweeCondition {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t conditionId) const;
+    [[nodiscard]] const Entry* findById(uint32_t conditionId) const;
 
     static const char* kindName(uint8_t k);
     static const char* aggregatorName(uint8_t a);

@@ -51,11 +51,11 @@ struct WoweeWeather {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Total weight across all entries - handy for normalizing
     // selection probabilities at the call site.
-    float totalWeight() const;
+    [[nodiscard]] float totalWeight() const;
 
     static const char* typeName(uint32_t typeId);
 };

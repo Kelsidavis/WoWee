@@ -31,24 +31,24 @@ public:
     // --- Public API (delegated from GameHandler) ---
     void startAutoAttack(uint64_t targetGuid);
     void stopAutoAttack();
-    bool isAutoAttacking() const { return autoAttacking_; }
-    bool hasAutoAttackIntent() const { return autoAttackRequested_; }
-    bool isInCombat() const { return autoAttacking_ || !hostileAttackers_.empty(); }
-    bool isInCombatWith(uint64_t guid) const {
+    [[nodiscard]] bool isAutoAttacking() const { return autoAttacking_; }
+    [[nodiscard]] bool hasAutoAttackIntent() const { return autoAttackRequested_; }
+    [[nodiscard]] bool isInCombat() const { return autoAttacking_ || !hostileAttackers_.empty(); }
+    [[nodiscard]] bool isInCombatWith(uint64_t guid) const {
         return guid != 0 &&
                ((autoAttacking_ && autoAttackTarget_ == guid) ||
                 (hostileAttackers_.count(guid) > 0));
     }
-    uint64_t getAutoAttackTargetGuid() const { return autoAttackTarget_; }
-    bool isAggressiveTowardPlayer(uint64_t guid) const { return hostileAttackers_.count(guid) > 0; }
-    uint64_t getLastMeleeSwingMs() const { return lastMeleeSwingMs_; }
+    [[nodiscard]] uint64_t getAutoAttackTargetGuid() const { return autoAttackTarget_; }
+    [[nodiscard]] bool isAggressiveTowardPlayer(uint64_t guid) const { return hostileAttackers_.count(guid) > 0; }
+    [[nodiscard]] uint64_t getLastMeleeSwingMs() const { return lastMeleeSwingMs_; }
 
     // Floating combat text
-    const std::vector<CombatTextEntry>& getCombatText() const { return combatText_; }
+    [[nodiscard]] const std::vector<CombatTextEntry>& getCombatText() const { return combatText_; }
     void updateCombatText(float deltaTime);
 
     // Combat log (persistent rolling history)
-    const std::deque<CombatLogEntry>& getCombatLog() const { return combatLog_; }
+    [[nodiscard]] const std::deque<CombatLogEntry>& getCombatLog() const { return combatLog_; }
     void clearCombatLog() { combatLog_.clear(); }
 
     // Threat
@@ -56,17 +56,17 @@ public:
         uint64_t victimGuid = 0;
         uint32_t threat     = 0;
     };
-    const std::vector<ThreatEntry>* getThreatList(uint64_t unitGuid) const {
+    [[nodiscard]] const std::vector<ThreatEntry>* getThreatList(uint64_t unitGuid) const {
         auto it = threatLists_.find(unitGuid);
         return (it != threatLists_.end()) ? &it->second : nullptr;
     }
 
     // Hostile attacker tracking
-    bool isHostileAttacker(uint64_t guid) const { return hostileAttackers_.count(guid) > 0; }
+    [[nodiscard]] bool isHostileAttacker(uint64_t guid) const { return hostileAttackers_.count(guid) > 0; }
     void clearHostileAttackers() { hostileAttackers_.clear(); }
 
     // Forced faction reactions
-    const std::unordered_map<uint32_t, uint8_t>& getForcedReactions() const { return forcedReactions_; }
+    [[nodiscard]] const std::unordered_map<uint32_t, uint8_t>& getForcedReactions() const { return forcedReactions_; }
 
     // Auto-attack timing state (read by GameHandler::update for retry/resend logic)
     bool& autoAttackOutOfRangeRef() { return autoAttackOutOfRange_; }
@@ -89,13 +89,13 @@ public:
     // --- Targeting ---
     /// False for creature corpses that are neither lootable nor skinnable -
     /// those cannot be selected. Living units, players and non-units are always selectable.
-    bool isSelectableUnit(uint64_t guid) const;
+    [[nodiscard]] bool isSelectableUnit(uint64_t guid) const;
     void setTarget(uint64_t guid);
     void clearTarget();
-    std::shared_ptr<Entity> getTarget() const;
+    [[nodiscard]] std::shared_ptr<Entity> getTarget() const;
     void setFocus(uint64_t guid);
     void clearFocus();
-    std::shared_ptr<Entity> getFocus() const;
+    [[nodiscard]] std::shared_ptr<Entity> getFocus() const;
     void setMouseoverGuid(uint64_t guid);
     void targetLastTarget();
     void targetEnemy(bool reverse);
@@ -126,8 +126,8 @@ public:
 
     // --- Death / Resurrection ---
     void releaseSpirit();
-    bool canReclaimCorpse() const;
-    float getCorpseReclaimDelaySec() const;
+    [[nodiscard]] bool canReclaimCorpse() const;
+    [[nodiscard]] float getCorpseReclaimDelaySec() const;
     void reclaimCorpse();
     void useSelfRes();
     void activateSpiritHealer(uint64_t npcGuid);
@@ -164,7 +164,7 @@ private:
                      const std::function<bool(uint64_t, Entity&)>& wanted);
 
     /// Whether a guid is in the player's group.
-    bool isGroupMemberGuid(uint64_t guid) const;
+    [[nodiscard]] bool isGroupMemberGuid(uint64_t guid) const;
 
     // --- Packet handlers ---
     void handleAttackStart(network::Packet& packet);
@@ -228,7 +228,7 @@ private:
     /// Whether an aggro warning applies at all where the player is - the same
     /// question IsThreatWarningEnabled answers for the indicator, asked from
     /// C++ so the sound and the picture agree about when they are wanted.
-    bool threatWarningWanted() const;
+    [[nodiscard]] bool threatWarningWanted() const;
 
     // Forced faction reactions
     std::unordered_map<uint32_t, uint8_t> forcedReactions_;

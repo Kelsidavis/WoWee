@@ -38,15 +38,15 @@ public:
 
     void swapBuffers() {} // No-op: Vulkan presents in Renderer::endFrame()
 
-    bool shouldClose() const { return shouldCloseFlag; }
+    [[nodiscard]] bool shouldClose() const { return shouldCloseFlag; }
     void setShouldClose(bool value) { shouldCloseFlag = value; }
 
-    int getWidth() const { return width; }
-    int getHeight() const { return height; }
+    [[nodiscard]] int getWidth() const { return width; }
+    [[nodiscard]] int getHeight() const { return height; }
     void setSize(int w, int h) { width = w; height = h; }
-    float getAspectRatio() const { return static_cast<float>(width) / height; }
-    bool isFullscreen() const { return fullscreen; }
-    bool isVsyncEnabled() const { return vsync; }
+    [[nodiscard]] float getAspectRatio() const { return static_cast<float>(width) / height; }
+    [[nodiscard]] bool isFullscreen() const { return fullscreen; }
+    [[nodiscard]] bool isVsyncEnabled() const { return vsync; }
 
     /// Frames per second the main loop paces itself to, or 0 for uncapped.
     ///
@@ -55,15 +55,15 @@ public:
     /// will otherwise run as fast as the hardware allows, which on a laptop is
     /// heat and fan noise for frames nobody sees.
     void setFrameCap(int fps) { frameCapFps_ = (fps > 0) ? fps : 0; }
-    int frameCap() const { return frameCapFps_; }
+    [[nodiscard]] int frameCap() const { return frameCapFps_; }
     void setFullscreen(bool enable);
     void setVsync(bool enable);
     void applyResolution(int w, int h);
 
-    SDL_Window* getSDLWindow() const { return window; }
+    [[nodiscard]] SDL_Window* getSDLWindow() const { return window; }
 
     // Vulkan context access
-    rendering::VkContext* getVkContext() const { return vkContext.get(); }
+    [[nodiscard]] rendering::VkContext* getVkContext() const { return vkContext.get(); }
 
 private:
     WindowConfig config;

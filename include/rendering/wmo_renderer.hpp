@@ -618,7 +618,7 @@ private:
         size_t nextGroupIndex = 0;
         uint32_t loadedGroups = 0;
 
-        uint32_t getTotalTriangles() const {
+        [[nodiscard]] uint32_t getTotalTriangles() const {
             uint32_t total = 0;
             for (const auto& group : groups) {
                 total += group.indexCount / 3;
@@ -905,7 +905,7 @@ private:
         uint32_t modelId = 0;
         int32_t groupIdx = -1;
         std::vector<uint32_t> neighborGroups;  // portal-connected groups
-        bool isValid() const { return instanceIdx != UINT32_MAX && groupIdx >= 0; }
+        [[nodiscard]] bool isValid() const { return instanceIdx != UINT32_MAX && groupIdx >= 0; }
         void invalidate() { instanceIdx = UINT32_MAX; groupIdx = -1; neighborGroups.clear(); }
     };
     mutable ActiveGroupInfo activeGroup_;
@@ -916,7 +916,7 @@ private:
         struct Entry { uint64_t key; float resultZ; float normalZ; uint32_t frameId; };
         Entry entries[CAPACITY] = {};
 
-        uint64_t makeKey(float x, float y) const {
+        [[nodiscard]] uint64_t makeKey(float x, float y) const {
             // 0.5-unit quantized grid
             int32_t ix = static_cast<int32_t>(std::floor(x * 2.0f));
             int32_t iy = static_cast<int32_t>(std::floor(y * 2.0f));

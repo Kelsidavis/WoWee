@@ -81,15 +81,15 @@ struct WoweeNPCService {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t serviceId) const;
+    [[nodiscard]] const Entry* findById(uint32_t serviceId) const;
 
     // Return all services of a given kind across the
     // catalog. Used by NPC-spawning code to find e.g.
     // "all FlightMaster services configured for this
     // server" when populating taxi nodes.
-    std::vector<const Entry*> findByKind(uint8_t kind) const;
+    [[nodiscard]] std::vector<const Entry*> findByKind(uint8_t kind) const;
 
     static const char* serviceKindName(uint8_t k);
 };

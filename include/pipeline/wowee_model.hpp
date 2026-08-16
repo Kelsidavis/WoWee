@@ -65,9 +65,9 @@ struct WoweeModel {
     glm::vec3 boundMin{0}, boundMax{0};
     uint32_t version = 1; // 1=WOM1(static), 2=WOM2(animated), 3=WOM3(multi-batch)
 
-    bool isValid() const { return !vertices.empty() && !indices.empty(); }
-    bool hasAnimation() const { return !bones.empty() && !animations.empty(); }
-    bool hasBatches() const { return !batches.empty(); }
+    [[nodiscard]] bool isValid() const { return !vertices.empty() && !indices.empty(); }
+    [[nodiscard]] bool hasAnimation() const { return !bones.empty() && !animations.empty(); }
+    [[nodiscard]] bool hasBatches() const { return !batches.empty(); }
 };
 
 class WoweeModelLoader {

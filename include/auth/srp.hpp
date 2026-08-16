@@ -37,16 +37,16 @@ public:
     void setHashBigEndian(bool enabled) { hashBigEndian_ = enabled; }
 
     // Get client public ephemeral (A) - send to server
-    std::vector<uint8_t> getA() const;
+    [[nodiscard]] std::vector<uint8_t> getA() const;
 
     // Get client proof (M1) - send to server
-    std::vector<uint8_t> getM1() const;
+    [[nodiscard]] std::vector<uint8_t> getM1() const;
 
     // Verify server proof (M2)
-    bool verifyServerProof(const std::vector<uint8_t>& serverM2) const;
+    [[nodiscard]] bool verifyServerProof(const std::vector<uint8_t>& serverM2) const;
 
     // Get session key (K) - used for encryption
-    std::vector<uint8_t> getSessionKey() const;
+    [[nodiscard]] std::vector<uint8_t> getSessionKey() const;
 
     // Securely erase stored plaintext credentials from memory.
     // Called automatically at the end of feed() once the SRP values are computed.
@@ -57,7 +57,7 @@ private:
     static constexpr uint32_t K_VALUE = 3;
 
     // Helper methods
-    std::vector<uint8_t> computeAuthHash(const std::string& username,
+    [[nodiscard]] std::vector<uint8_t> computeAuthHash(const std::string& username,
                                           const std::string& password) const;
     void computeClientEphemeral();
     void computeSessionKey();

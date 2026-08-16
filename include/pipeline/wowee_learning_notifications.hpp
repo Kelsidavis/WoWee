@@ -115,16 +115,16 @@ struct WoweeLearningNotifications {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t notificationId) const;
+    [[nodiscard]] const Entry* findById(uint32_t notificationId) const;
 
     // Returns all notifications of one trigger kind. Used
     // by the per-trigger dispatcher (level-up logic
     // queries kind=LevelReach; quest complete logic
     // queries kind=QuestComplete; etc.) to scope the
     // search.
-    std::vector<const Entry*> findByTrigger(uint8_t triggerKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByTrigger(uint8_t triggerKind) const;
 };
 
 class WoweeLearningNotificationsLoader {

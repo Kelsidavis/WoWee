@@ -101,10 +101,10 @@ struct WoweeMaps {
     std::vector<Map> maps;
     std::vector<Area> areas;
 
-    bool isValid() const { return !maps.empty(); }
+    [[nodiscard]] bool isValid() const { return !maps.empty(); }
 
-    const Map* findMap(uint32_t mapId) const;
-    const Area* findArea(uint32_t areaId) const;
+    [[nodiscard]] const Map* findMap(uint32_t mapId) const;
+    [[nodiscard]] const Area* findArea(uint32_t areaId) const;
 
     static const char* mapTypeName(uint8_t t);
     static const char* expansionName(uint8_t e);

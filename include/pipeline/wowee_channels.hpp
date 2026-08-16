@@ -76,9 +76,9 @@ struct WoweeChannel {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t channelId) const;
+    [[nodiscard]] const Entry* findById(uint32_t channelId) const;
 
     static const char* channelTypeName(uint8_t t);
     static const char* factionAccessName(uint8_t f);

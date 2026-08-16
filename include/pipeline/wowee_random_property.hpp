@@ -91,14 +91,14 @@ struct WoweeRandomProperty {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t poolId) const;
+    [[nodiscard]] const Entry* findById(uint32_t poolId) const;
 
     // Returns pools applicable to a given slot mask
     // - used by the loot generator to pick eligible
     // suffix pools at roll time.
-    std::vector<const Entry*> findBySlot(uint8_t slotMask) const;
+    [[nodiscard]] std::vector<const Entry*> findBySlot(uint8_t slotMask) const;
 };
 
 class WoweeRandomPropertyLoader {

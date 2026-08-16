@@ -28,7 +28,7 @@ public:
     // Weather control
     enum class WeatherType { NONE, RAIN_LIGHT, RAIN_MEDIUM, RAIN_HEAVY, SNOW_LIGHT, SNOW_MEDIUM, SNOW_HEAVY };
     void setWeather(WeatherType type);
-    WeatherType getCurrentWeather() const { return currentWeather_; }
+    [[nodiscard]] WeatherType getCurrentWeather() const { return currentWeather_; }
 
     // Zone ambience control
     enum class ZoneType {
@@ -43,7 +43,7 @@ public:
         DESERT_PLAINS
     };
     void setZoneType(ZoneType type);
-    ZoneType getCurrentZone() const { return currentZone_; }
+    [[nodiscard]] ZoneType getCurrentZone() const { return currentZone_; }
 
     // Convenience: derive ZoneType and CityType from a WoW zone ID
     void setZoneId(uint32_t zoneId);
@@ -59,7 +59,7 @@ public:
         THUNDERBLUFF
     };
     void setCityType(CityType type);
-    CityType getCurrentCity() const { return currentCity_; }
+    [[nodiscard]] CityType getCurrentCity() const { return currentCity_; }
 
     // Emitter management
     enum class AmbientType {
@@ -83,9 +83,9 @@ public:
 
     // Volume control
     void setVolumeScale(float scale);
-    float getVolumeScale() const { return volumeScale_; }
+    [[nodiscard]] float getVolumeScale() const { return volumeScale_; }
     void setBellVolumeScale(float scale) { bellVolumeScale_ = scale; }
-    float getBellVolumeScale() const { return bellVolumeScale_; }
+    [[nodiscard]] float getBellVolumeScale() const { return bellVolumeScale_; }
 
 private:
     struct AmbientEmitter {
@@ -210,8 +210,8 @@ private:
     bool loadSound(const std::string& path, AmbientSample& sample, pipeline::AssetManager* assets);
 
     // Time of day helpers
-    bool isDaytime() const { return gameTimeHours_ >= 6.0f && gameTimeHours_ < 20.0f; }
-    bool isNighttime() const { return !isDaytime(); }
+    [[nodiscard]] bool isDaytime() const { return gameTimeHours_ >= 6.0f && gameTimeHours_ < 20.0f; }
+    [[nodiscard]] bool isNighttime() const { return !isDaytime(); }
 };
 
 } // namespace audio

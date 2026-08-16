@@ -43,7 +43,7 @@ struct BLPImage {
     std::vector<uint8_t> data;      // RGBA8 pixel data (decompressed)
     std::vector<std::vector<uint8_t>> mipmaps;  // Mipmap levels
 
-    bool isValid() const { return width > 0 && height > 0 && !data.empty(); }
+    [[nodiscard]] bool isValid() const { return width > 0 && height > 0 && !data.empty(); }
 };
 
 /**

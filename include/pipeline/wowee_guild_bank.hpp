@@ -67,14 +67,14 @@ struct WoweeGuildBank {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t tabId) const;
+    [[nodiscard]] const Entry* findById(uint32_t tabId) const;
 
     // Returns all bank tabs owned by a guild - used
     // by the guild-bank UI to populate the per-guild
     // tab strip.
-    std::vector<const Entry*> findByGuild(uint32_t guildId) const;
+    [[nodiscard]] std::vector<const Entry*> findByGuild(uint32_t guildId) const;
 };
 
 class WoweeGuildBankLoader {

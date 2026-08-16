@@ -81,9 +81,9 @@ struct WoweeLFGDungeon {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t dungeonId) const;
+    [[nodiscard]] const Entry* findById(uint32_t dungeonId) const;
 
     static const char* difficultyName(uint8_t d);
     static const char* expansionRequiredName(uint8_t e);

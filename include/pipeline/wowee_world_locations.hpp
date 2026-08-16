@@ -104,19 +104,19 @@ struct WoweeWorldLocations {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t locationId) const;
+    [[nodiscard]] const Entry* findById(uint32_t locationId) const;
 
     // Returns all locations on a map (used by the
     // world-map UI to populate per-map markers).
-    std::vector<const Entry*> findByMap(uint32_t mapId) const;
+    [[nodiscard]] std::vector<const Entry*> findByMap(uint32_t mapId) const;
 
     // Returns all locations of a single kind on a
     // map. Used by the herbalism-tracking UI to
     // show only HerbNode markers without polluting
     // with POIs.
-    std::vector<const Entry*> findByMapAndKind(uint32_t mapId,
+    [[nodiscard]] std::vector<const Entry*> findByMapAndKind(uint32_t mapId,
                                                   uint8_t kind) const;
 };
 

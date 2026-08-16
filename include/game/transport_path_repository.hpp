@@ -89,22 +89,22 @@ public:
                            bool looping = true, float speed = 18.0f);
 
     // ── Lookup ──────────────────────────────────────────────
-    const PathEntry* findPath(uint32_t pathId) const;
+    [[nodiscard]] const PathEntry* findPath(uint32_t pathId) const;
     // Taxi paths are stored per-map: a continent-crossing boat path has nodes on
     // two maps, and only the segment on the transport's current map is valid world
     // geometry. mapId selects that segment.
-    const PathEntry* findTaxiPath(uint32_t taxiPathId, uint32_t mapId) const;
-    bool hasPathForEntry(uint32_t entry) const;
-    bool hasTaxiPath(uint32_t taxiPathId) const;              // exists on any map
-    bool hasTaxiPathForMap(uint32_t taxiPathId, uint32_t mapId) const;
+    [[nodiscard]] const PathEntry* findTaxiPath(uint32_t taxiPathId, uint32_t mapId) const;
+    [[nodiscard]] bool hasPathForEntry(uint32_t entry) const;
+    [[nodiscard]] bool hasTaxiPath(uint32_t taxiPathId) const;              // exists on any map
+    [[nodiscard]] bool hasTaxiPathForMap(uint32_t taxiPathId, uint32_t mapId) const;
 
     // ── Query ───────────────────────────────────────────────
-    bool hasUsableMovingPathForEntry(uint32_t entry, float minXYRange = 1.0f) const;
-    uint32_t inferDbcPathForSpawn(const glm::vec3& spawnWorldPos, float maxDistance,
+    [[nodiscard]] bool hasUsableMovingPathForEntry(uint32_t entry, float minXYRange = 1.0f) const;
+    [[nodiscard]] uint32_t inferDbcPathForSpawn(const glm::vec3& spawnWorldPos, float maxDistance,
                                   bool allowZOnly) const;
-    uint32_t inferMovingPathForSpawn(const glm::vec3& spawnWorldPos,
+    [[nodiscard]] uint32_t inferMovingPathForSpawn(const glm::vec3& spawnWorldPos,
                                      float maxDistance = 1200.0f) const;
-    uint32_t pickFallbackMovingPath(uint32_t entry, uint32_t displayId) const;
+    [[nodiscard]] uint32_t pickFallbackMovingPath(uint32_t entry, uint32_t displayId) const;
 
     // ── Mutation ─────────────────────────────────────────────
     /// Store or overwrite a path entry (used by assignTaxiPathToTransport).

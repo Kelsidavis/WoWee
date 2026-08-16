@@ -61,7 +61,7 @@ public:
 
     /// Number of distinct textures resident. Cheap diagnostic; the cache never
     /// evicts, because Interface\ art is small, bounded and reused constantly.
-    size_t textureCount() const { return textures_.size(); }
+    [[nodiscard]] size_t textureCount() const { return textures_.size(); }
 
     /// Whether the art at this path can be read and decoded at all, and how big
     /// it is. Public because it answers a question worth asking from outside:
@@ -78,7 +78,7 @@ private:
     /// mistyped path is not re-read every frame.
     VkDescriptorSet texture(const std::string& path, bool add = false);
     /// Already-uploaded texture for a path, without triggering an upload.
-    VkDescriptorSet resident(const std::string& path, bool add = false) const;
+    [[nodiscard]] VkDescriptorSet resident(const std::string& path, bool add = false) const;
 
     /// scale is pixels per interface unit. The rect arrives in pixels, but a
     /// backdrop's insets and edge size are authored in units like everything

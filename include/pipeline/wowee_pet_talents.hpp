@@ -92,18 +92,18 @@ struct WoweePetTalents {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t talentId) const;
+    [[nodiscard]] const Entry* findById(uint32_t talentId) const;
 
     // Returns all talents in one tree (used by the pet
     // talent UI to populate the tree-switching tabs).
-    std::vector<const Entry*> findByTree(uint8_t treeKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByTree(uint8_t treeKind) const;
 
     // Returns the talent (if any) at the given (tier,
     // column) of the given tree. Used by the talent grid
     // renderer to look up "what occupies this cell?"
-    const Entry* findAtCell(uint8_t treeKind, uint8_t tier,
+    [[nodiscard]] const Entry* findAtCell(uint8_t treeKind, uint8_t tier,
                              uint8_t column) const;
 };
 

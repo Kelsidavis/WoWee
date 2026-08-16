@@ -56,11 +56,11 @@ public:
 
     // Size of MovementInfo.flags2 in bytes for MSG_MOVE_* payloads.
     // Classic: none, TBC: u8, WotLK: u16.
-    virtual uint8_t movementFlags2Size() const { return 2; }
+    [[nodiscard]] virtual uint8_t movementFlags2Size() const { return 2; }
 
     // Wire-format movement flag that gates transport data in MSG_MOVE_* payloads.
     // WotLK/TBC: 0x200, Classic/Turtle: 0x02000000.
-    virtual uint32_t wireOnTransportFlag() const { return 0x00000200; }
+    [[nodiscard]] virtual uint32_t wireOnTransportFlag() const { return 0x00000200; }
 
     // --- Movement ---
 
@@ -260,12 +260,12 @@ public:
 
     /** Stride of PLAYER_QUEST_LOG fields in update-object blocks.
      *  WotLK: 5 fields per slot, Classic/Vanilla: 3. */
-    virtual uint8_t questLogStride() const { return 5; }
+    [[nodiscard]] virtual uint8_t questLogStride() const { return 5; }
 
     /** Number of PLAYER_EXPLORED_ZONES uint32 fields in update-object blocks.
      *  Classic/Vanilla/Turtle: 64 (bit-packs up to zone ID 2047).
      *  TBC/WotLK: 128 (covers Outland/Northrend zone IDs up to 4095). */
-    virtual uint8_t exploredZonesCount() const { return 128; }
+    [[nodiscard]] virtual uint8_t exploredZonesCount() const { return 128; }
 
     // --- Quest Giver Status ---
 
@@ -370,7 +370,7 @@ class WotlkPacketParsers : public PacketParsers {
  */
 class TbcPacketParsers : public PacketParsers {
 public:
-    uint8_t movementFlags2Size() const override { return 1; }
+    [[nodiscard]] uint8_t movementFlags2Size() const override { return 1; }
     bool parseMovementBlock(network::Packet& packet, UpdateBlock& block) override;
     void writeMovementPayload(network::Packet& packet, const MovementInfo& info) override;
     network::Packet buildMovementPacket(LogicalOpcode opcode,
@@ -417,7 +417,7 @@ public:
     bool parseSpellHealLog(network::Packet& packet, SpellHealLogData& data) override;
     // TBC 2.4.3 quest log has 4 update fields per slot (questId, state, counts, timer)
     // WotLK expands this to 5 (splits counts into two fields).
-    uint8_t questLogStride() const override { return 4; }
+    [[nodiscard]] uint8_t questLogStride() const override { return 4; }
     // TBC 2.4.3 CMSG_QUESTGIVER_QUERY_QUEST: guid(8) + questId(4) - no trailing
     // isDialogContinued byte that WotLK added
     network::Packet buildQueryQuestPacket(uint64_t npcGuid, uint32_t questId) override;
@@ -466,8 +466,8 @@ public:
  */
 class ClassicPacketParsers : public TbcPacketParsers {
 public:
-    uint8_t movementFlags2Size() const override { return 0; }
-    uint32_t wireOnTransportFlag() const override { return 0x02000000; }
+    [[nodiscard]] uint8_t movementFlags2Size() const override { return 0; }
+    [[nodiscard]] uint32_t wireOnTransportFlag() const override { return 0x02000000; }
     bool parseCharEnum(network::Packet& packet, CharEnumResponse& response) override;
     bool parseMovementBlock(network::Packet& packet, UpdateBlock& block) override;
     void writeMovementPayload(network::Packet& packet, const MovementInfo& info) override;
@@ -508,10 +508,10 @@ public:
     bool parseQuestDetails(network::Packet& packet, QuestDetailsData& data) override {
         return parseQuestDetailsPreWotlk(packet, data, /*hasSuggestedPlayers=*/false);
     }
-    uint8_t questLogStride() const override { return 3; }
+    [[nodiscard]] uint8_t questLogStride() const override { return 3; }
     // Classic 1.12 has 64 explored-zone uint32 fields (zone IDs fit in 2048 bits).
     // TBC/WotLK use 128 (needed for Outland/Northrend zone IDs up to 4095).
-    uint8_t exploredZonesCount() const override { return 64; }
+    [[nodiscard]] uint8_t exploredZonesCount() const override { return 64; }
     bool parseMonsterMove(network::Packet& packet, MonsterMoveData& data) override {
         return MonsterMoveParser::parseVanilla(packet, data);
     }
@@ -548,7 +548,7 @@ public:
  */
 class TurtlePacketParsers : public ClassicPacketParsers {
 public:
-    uint8_t movementFlags2Size() const override { return 0; }
+    [[nodiscard]] uint8_t movementFlags2Size() const override { return 0; }
     bool parseUpdateObject(network::Packet& packet, UpdateObjectData& data) override;
     bool parseMovementBlock(network::Packet& packet, UpdateBlock& block) override;
     bool parseMonsterMove(network::Packet& packet, MonsterMoveData& data) override;

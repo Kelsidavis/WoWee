@@ -87,16 +87,16 @@ struct WoweeSpellVariants {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t variantId) const;
+    [[nodiscard]] const Entry* findById(uint32_t variantId) const;
 
     // Returns all variants of one base spell, sorted by
     // descending priority. The spell-cast pipeline
     // iterates this list at cast time and picks the
     // highest-priority variant whose condition is
     // satisfied (or falls through to the base spell).
-    std::vector<const Entry*> findByBaseSpell(uint32_t baseSpellId) const;
+    [[nodiscard]] std::vector<const Entry*> findByBaseSpell(uint32_t baseSpellId) const;
 };
 
 class WoweeSpellVariantsLoader {

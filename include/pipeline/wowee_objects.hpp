@@ -94,10 +94,10 @@ struct WoweeGameObject {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Lookup by objectId - nullptr if not present.
-    const Entry* findById(uint32_t objectId) const;
+    [[nodiscard]] const Entry* findById(uint32_t objectId) const;
 
     static const char* typeName(uint8_t t);
 };

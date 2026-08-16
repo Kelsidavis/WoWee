@@ -77,16 +77,16 @@ struct WoweeHeroicScaling {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t scalingId) const;
+    [[nodiscard]] const Entry* findById(uint32_t scalingId) const;
 
     // Returns the scaling rules for a given (map,
     // difficulty) combo, or nullptr if no Heroic
     // scaling is defined (defaults to no scaling).
     // Used by the loot-roll engine when an encounter
     // dies on Heroic-difficulty content.
-    const Entry* findForInstance(uint32_t mapId,
+    [[nodiscard]] const Entry* findForInstance(uint32_t mapId,
                                   uint32_t difficultyId) const;
 };
 

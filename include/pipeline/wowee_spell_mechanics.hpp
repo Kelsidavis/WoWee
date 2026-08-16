@@ -82,9 +82,9 @@ struct WoweeSpellMechanic {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t mechanicId) const;
+    [[nodiscard]] const Entry* findById(uint32_t mechanicId) const;
 
     static const char* drCategoryName(uint8_t c);
     static const char* dispelTypeName(uint8_t d);

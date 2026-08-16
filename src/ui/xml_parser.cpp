@@ -13,8 +13,8 @@ struct Cursor {
     size_t i = 0;
     std::string error;
 
-    bool eof() const { return i >= s.size(); }
-    char peek(size_t ahead = 0) const {
+    [[nodiscard]] bool eof() const { return i >= s.size(); }
+    [[nodiscard]] char peek(size_t ahead = 0) const {
         return (i + ahead < s.size()) ? s[i + ahead] : '\0';
     }
     bool starts(const char* lit) const { return s.compare(i, strlen(lit), lit) == 0; }

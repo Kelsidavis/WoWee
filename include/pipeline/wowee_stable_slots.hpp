@@ -56,14 +56,14 @@ struct WoweeStableSlot {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t slotId) const;
+    [[nodiscard]] const Entry* findById(uint32_t slotId) const;
 
     // Returns the count of slots a hunter at the given
     // character level has unlocked. Used by the stable
     // master frame to decide how many slot tabs to render.
-    int unlockedSlotCount(uint8_t characterLevel) const;
+    [[nodiscard]] int unlockedSlotCount(uint8_t characterLevel) const;
 };
 
 class WoweeStableSlotLoader {

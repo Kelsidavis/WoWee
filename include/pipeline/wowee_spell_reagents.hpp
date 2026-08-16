@@ -71,14 +71,14 @@ struct WoweeSpellReagent {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t reagentSetId) const;
-    const Entry* findBySpell(uint32_t spellId) const;
+    [[nodiscard]] const Entry* findById(uint32_t reagentSetId) const;
+    [[nodiscard]] const Entry* findBySpell(uint32_t spellId) const;
 
     // Count the slots actually used (slots whose itemId is
     // non-zero). Most reagent sets use only 1-2 slots.
-    int usedSlotCount(uint32_t reagentSetId) const;
+    [[nodiscard]] int usedSlotCount(uint32_t reagentSetId) const;
 
     static const char* reagentKindName(uint8_t k);
 };

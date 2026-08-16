@@ -119,7 +119,7 @@ struct WMOLiquid {
     std::vector<float> heights; // Height per vertex (xVerts * yVerts)
     std::vector<uint8_t> flags; // Flags per tile (xTiles * yTiles)
 
-    bool hasLiquid() const { return xVerts > 0 && yVerts > 0; }
+    [[nodiscard]] bool hasLiquid() const { return xVerts > 0 && yVerts > 0; }
 };
 
 // WMO Group Vertex
@@ -224,7 +224,7 @@ struct WMOModel {
     std::vector<std::string> groupNames;
     std::vector<uint8_t> groupNameRaw;  // Raw MOGN chunk for offset-based name lookup
 
-    bool isValid() const {
+    [[nodiscard]] bool isValid() const {
         return nGroups > 0 && !groups.empty();
     }
 };

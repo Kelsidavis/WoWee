@@ -31,7 +31,7 @@ public:
     /// weapon oil, and handle cancelling it. Call once per frame, after the windows.
     void renderItemTargetCursor();
 
-    bool isOpen() const { return open; }
+    [[nodiscard]] bool isOpen() const { return open; }
     void toggle() { open = !open; }
     void setOpen(bool o) { open = o; }
 
@@ -41,22 +41,22 @@ public:
     void openAllBags();
     void closeAllBags();
     void setSeparateBags(bool sep) { separateBags_ = sep; }
-    bool isSeparateBags() const { return separateBags_; }
+    [[nodiscard]] bool isSeparateBags() const { return separateBags_; }
     void toggleCompactBags() { compactBags_ = !compactBags_; }
-    bool isCompactBags() const { return compactBags_; }
+    [[nodiscard]] bool isCompactBags() const { return compactBags_; }
     void setShowKeyring(bool show) { showKeyring_ = show; }
-    bool isShowKeyring() const { return showKeyring_; }
+    [[nodiscard]] bool isShowKeyring() const { return showKeyring_; }
     void setBagScale(float scale) { bagScale_ = std::clamp(scale, 0.75f, 1.5f); }
-    float getBagScale() const { return bagScale_; }
+    [[nodiscard]] float getBagScale() const { return bagScale_; }
     static float recommendedBagScale(float displayHeight) {
         if (displayHeight >= 2000.0f) return 1.20f;
         if (displayHeight >= 1300.0f) return 1.10f;
         return 1.00f;
     }
-    bool isBackpackOpen() const { return backpackOpen_; }
-    bool isBagOpen(int idx) const { return idx >= 0 && idx < 4 ? bagOpen_[idx] : false; }
+    [[nodiscard]] bool isBackpackOpen() const { return backpackOpen_; }
+    [[nodiscard]] bool isBagOpen(int idx) const { return idx >= 0 && idx < 4 ? bagOpen_[idx] : false; }
 
-    bool isCharacterOpen() const { return characterOpen; }
+    [[nodiscard]] bool isCharacterOpen() const { return characterOpen; }
     void toggleCharacter() { characterOpen = !characterOpen; }
     void setCharacterOpen(bool o) { characterOpen = o; }
 
@@ -250,7 +250,7 @@ public:
     static ImVec4 getQualityColor(game::ItemQuality quality);
 
     /// Returns true if the user is currently holding an item (pickup cursor).
-    bool isHoldingItem() const { return holdingItem; }
+    [[nodiscard]] bool isHoldingItem() const { return holdingItem; }
     /// Where the held item came from, in the bag and slot the server names.
     /// False when nothing is held or its source cannot be addressed.
     bool heldItemSource(uint8_t& bag, uint8_t& slot) const {
@@ -260,7 +260,7 @@ public:
     /// takes it from its own slot, so the cursor is simply cleared.
     void releaseHeldItem() { holdingItem = false; }
     /// Returns the item being held (only valid when isHoldingItem() is true).
-    const game::ItemDef& getHeldItem() const { return heldItem; }
+    [[nodiscard]] const game::ItemDef& getHeldItem() const { return heldItem; }
     /// Cancel the pickup, returning the item to its original slot.
     void returnHeldItem(game::Inventory& inv) { cancelPickup(inv); }
     /// Returns a WoW item link string if the user shift-clicked a bag item, then clears it.

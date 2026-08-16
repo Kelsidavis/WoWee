@@ -73,9 +73,9 @@ struct WoweeSpellVisualKit {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t visualKitId) const;
+    [[nodiscard]] const Entry* findById(uint32_t visualKitId) const;
 };
 
 class WoweeSpellVisualKitLoader {

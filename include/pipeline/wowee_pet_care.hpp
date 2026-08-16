@@ -94,20 +94,20 @@ struct WoweePetCare {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t actionId) const;
+    [[nodiscard]] const Entry* findById(uint32_t actionId) const;
 
     // Returns all actions available to a specific class
     // bit (4=Hunter, 256=Warlock). Used by the action-bar
     // UI to populate the pet-actions tab per character.
-    std::vector<const Entry*> findByClass(uint32_t classBit) const;
+    [[nodiscard]] std::vector<const Entry*> findByClass(uint32_t classBit) const;
 
     // Returns all actions of one kind - used by the
     // stable-master NPC interaction handler to find which
     // actions become available when the player talks to
     // a stable master.
-    std::vector<const Entry*> findByKind(uint8_t actionKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByKind(uint8_t actionKind) const;
 };
 
 class WoweePetCareLoader {

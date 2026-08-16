@@ -58,7 +58,7 @@ struct WaterSurface {
     // Material descriptor set (set 1)
     VkDescriptorSet materialSet = VK_NULL_HANDLE;
 
-    bool hasHeightData() const { return !heights.empty(); }
+    [[nodiscard]] bool hasHeightData() const { return !heights.empty(); }
 };
 
 /**

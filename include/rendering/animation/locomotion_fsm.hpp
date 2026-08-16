@@ -50,7 +50,7 @@ public:
     /// Returns AnimOutput with valid=false if no change needed (STAY policy).
     AnimOutput resolve(const Input& in, const AnimCapabilitySet& caps);
 
-    State getState() const { return state_; }
+    [[nodiscard]] State getState() const { return state_; }
     void setState(State s) { state_ = s; }
     void reset();
 
@@ -72,7 +72,7 @@ private:
 
     /// Internal: update state transitions based on input.
     void updateTransitions(const Input& in, const AnimCapabilitySet& caps);
-    bool oneShotComplete(const Input& in, uint32_t expectedAnimId) const;
+    [[nodiscard]] bool oneShotComplete(const Input& in, uint32_t expectedAnimId) const;
 };
 
 } // namespace rendering

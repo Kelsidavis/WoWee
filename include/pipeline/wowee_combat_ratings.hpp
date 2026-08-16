@@ -68,9 +68,9 @@ struct WoweeCombatRating {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t ratingType) const;
+    [[nodiscard]] const Entry* findById(uint32_t ratingType) const;
 
     static const char* ratingKindName(uint8_t k);
 };

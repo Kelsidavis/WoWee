@@ -19,8 +19,8 @@ public:
         ctx.gameHandler.initiateReadyCheck();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"readycheck", "rc"}; }
-    std::string helpText() const override { return "Initiate ready check"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"readycheck", "rc"}; }
+    [[nodiscard]] std::string helpText() const override { return "Initiate ready check"; }
 };
 
 // --- /ready ---
@@ -30,8 +30,8 @@ public:
         ctx.gameHandler.respondToReadyCheck(true);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"ready"}; }
-    std::string helpText() const override { return "Respond yes to ready check"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"ready"}; }
+    [[nodiscard]] std::string helpText() const override { return "Respond yes to ready check"; }
 };
 
 // --- /notready, /nr ---
@@ -41,8 +41,8 @@ public:
         ctx.gameHandler.respondToReadyCheck(false);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"notready", "nr"}; }
-    std::string helpText() const override { return "Respond no to ready check"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"notready", "nr"}; }
+    [[nodiscard]] std::string helpText() const override { return "Respond no to ready check"; }
 };
 
 // --- /yield, /forfeit, /surrender ---
@@ -52,8 +52,8 @@ public:
         ctx.gameHandler.forfeitDuel();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"yield", "forfeit", "surrender"}; }
-    std::string helpText() const override { return "Forfeit current duel"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"yield", "forfeit", "surrender"}; }
+    [[nodiscard]] std::string helpText() const override { return "Forfeit current duel"; }
 };
 
 // --- /afk, /away ---
@@ -63,8 +63,8 @@ public:
         ctx.gameHandler.toggleAfk(ctx.args);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"afk", "away"}; }
-    std::string helpText() const override { return "Toggle AFK status"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"afk", "away"}; }
+    [[nodiscard]] std::string helpText() const override { return "Toggle AFK status"; }
 };
 
 // --- /dnd, /busy ---
@@ -74,8 +74,8 @@ public:
         ctx.gameHandler.toggleDnd(ctx.args);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"dnd", "busy"}; }
-    std::string helpText() const override { return "Toggle Do Not Disturb"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"dnd", "busy"}; }
+    [[nodiscard]] std::string helpText() const override { return "Toggle Do Not Disturb"; }
 };
 
 // --- /uninvite, /kick ---
@@ -93,8 +93,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"uninvite", "kick"}; }
-    std::string helpText() const override { return "Remove player from group"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"uninvite", "kick"}; }
+    [[nodiscard]] std::string helpText() const override { return "Remove player from group"; }
 };
 
 // --- /leave, /leaveparty ---
@@ -110,8 +110,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"leave", "leaveparty"}; }
-    std::string helpText() const override { return "Leave party/raid or channel"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"leave", "leaveparty"}; }
+    [[nodiscard]] std::string helpText() const override { return "Leave party/raid or channel"; }
 };
 
 // --- /maintank, /mt ---
@@ -129,8 +129,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"maintank", "mt"}; }
-    std::string helpText() const override { return "Set target as main tank"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"maintank", "mt"}; }
+    [[nodiscard]] std::string helpText() const override { return "Set target as main tank"; }
 };
 
 // --- /mainassist, /ma ---
@@ -148,8 +148,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"mainassist", "ma"}; }
-    std::string helpText() const override { return "Set target as main assist"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"mainassist", "ma"}; }
+    [[nodiscard]] std::string helpText() const override { return "Set target as main assist"; }
 };
 
 // --- /clearmaintank ---
@@ -159,8 +159,8 @@ public:
         ctx.gameHandler.clearMainTank();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"clearmaintank"}; }
-    std::string helpText() const override { return "Clear main tank assignment"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"clearmaintank"}; }
+    [[nodiscard]] std::string helpText() const override { return "Clear main tank assignment"; }
 };
 
 // --- /clearmainassist ---
@@ -170,8 +170,8 @@ public:
         ctx.gameHandler.clearMainAssist();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"clearmainassist"}; }
-    std::string helpText() const override { return "Clear main assist assignment"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"clearmainassist"}; }
+    [[nodiscard]] std::string helpText() const override { return "Clear main assist assignment"; }
 };
 
 // --- /raidinfo ---
@@ -181,8 +181,8 @@ public:
         ctx.gameHandler.requestRaidInfo();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"raidinfo"}; }
-    std::string helpText() const override { return "Show raid instance lockouts"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"raidinfo"}; }
+    [[nodiscard]] std::string helpText() const override { return "Show raid instance lockouts"; }
 };
 
 // --- /raidconvert ---
@@ -192,8 +192,8 @@ public:
         ctx.gameHandler.convertToRaid();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"raidconvert"}; }
-    std::string helpText() const override { return "Convert party to raid"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"raidconvert"}; }
+    [[nodiscard]] std::string helpText() const override { return "Convert party to raid"; }
 };
 
 // --- /lootmethod, /grouploot, /setloot ---
@@ -234,8 +234,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"lootmethod", "grouploot", "setloot"}; }
-    std::string helpText() const override { return "Set loot method"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"lootmethod", "grouploot", "setloot"}; }
+    [[nodiscard]] std::string helpText() const override { return "Set loot method"; }
 };
 
 // --- /lootthreshold ---
@@ -285,8 +285,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"lootthreshold"}; }
-    std::string helpText() const override { return "Set loot quality threshold"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"lootthreshold"}; }
+    [[nodiscard]] std::string helpText() const override { return "Set loot quality threshold"; }
 };
 
 // --- /mark, /marktarget, /raidtarget ---
@@ -333,8 +333,8 @@ public:
         ctx.gameHandler.setRaidMark(ctx.gameHandler.getTargetGuid(), icon);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"mark", "marktarget", "raidtarget"}; }
-    std::string helpText() const override { return "Set raid target mark on target"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"mark", "marktarget", "raidtarget"}; }
+    [[nodiscard]] std::string helpText() const override { return "Set raid target mark on target"; }
 };
 
 // --- /roll, /random, /rnd ---
@@ -363,8 +363,8 @@ public:
         ctx.gameHandler.randomRoll(minRoll, maxRoll);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"roll", "random", "rnd"}; }
-    std::string helpText() const override { return "Random dice roll"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"roll", "random", "rnd"}; }
+    [[nodiscard]] std::string helpText() const override { return "Random dice roll"; }
 };
 
 // --- Registration ---

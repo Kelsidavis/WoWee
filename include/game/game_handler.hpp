@@ -61,7 +61,7 @@ struct PlayerSkill {
     uint16_t maxValue = 0;
     uint16_t bonusTemp = 0;    // temporary buff bonus (food, potions, etc.)
     uint16_t bonusPerm = 0;    // permanent spec/misc bonus (rarely non-zero)
-    uint16_t effectiveValue() const { return value + bonusTemp + bonusPerm; }
+    [[nodiscard]] uint16_t effectiveValue() const { return value + bonusTemp + bonusPerm; }
 };
 
 /**
@@ -85,9 +85,9 @@ struct ContactEntry {
     uint32_t    level    = 0;
     uint32_t    classId  = 0;
 
-    bool isFriend() const { return (flags & 0x1) != 0; }
-    bool isIgnored() const { return (flags & 0x2) != 0; }
-    bool isOnline()  const { return (status & 0x01) != 0; }
+    [[nodiscard]] bool isFriend() const { return (flags & 0x1) != 0; }
+    [[nodiscard]] bool isIgnored() const { return (flags & 0x2) != 0; }
+    [[nodiscard]] bool isOnline()  const { return (status & 0x01) != 0; }
 };
 
 /**
@@ -1160,7 +1160,7 @@ public:
         float    wowY       = 0.0f;  // canonical WoW Y (west)
         float    age        = 0.0f;  // seconds since received
         static constexpr float LIFETIME = 5.0f;
-        bool isExpired() const { return age >= LIFETIME; }
+        [[nodiscard]] bool isExpired() const { return age >= LIFETIME; }
     };
     const std::vector<MinimapPing>& getMinimapPings() const { return minimapPings_; }
     void tickMinimapPings(float dt) {
@@ -2425,8 +2425,8 @@ public:
         uint32_t spellId     = 0;
         uint32_t durationMs  = 0;
         std::chrono::steady_clock::time_point placedAt{};
-        bool active() const { return spellId != 0 && remainingMs() > 0; }
-        float remainingMs() const {
+        [[nodiscard]] bool active() const { return spellId != 0 && remainingMs() > 0; }
+        [[nodiscard]] float remainingMs() const {
             if (spellId == 0 || durationMs == 0) return 0.0f;
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - placedAt).count();
@@ -3116,7 +3116,7 @@ public:
         game::ItemDef item;
         uint8_t srcBag = 0xFF;   // source container for return
         uint8_t srcSlot = 0;
-        bool occupied() const { return itemGuid != 0; }
+        [[nodiscard]] bool occupied() const { return itemGuid != 0; }
     };
     bool attachItemFromBackpack(int backpackIndex);
     bool attachItemFromBag(int bagIndex, int slotIndex);

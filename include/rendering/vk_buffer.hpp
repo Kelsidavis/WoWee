@@ -34,13 +34,13 @@ public:
 
     void destroy();
 
-    ::VkBuffer getBuffer() const { return buf_.buffer; }
-    VkDeviceSize getSize() const { return size_; }
-    void* getMappedData() const { return buf_.info.pMappedData; }
-    bool isValid() const { return buf_.buffer != VK_NULL_HANDLE; }
+    [[nodiscard]] ::VkBuffer getBuffer() const { return buf_.buffer; }
+    [[nodiscard]] VkDeviceSize getSize() const { return size_; }
+    [[nodiscard]] void* getMappedData() const { return buf_.info.pMappedData; }
+    [[nodiscard]] bool isValid() const { return buf_.buffer != VK_NULL_HANDLE; }
 
     // Descriptor info for uniform/storage buffer binding
-    VkDescriptorBufferInfo descriptorInfo(VkDeviceSize offset = 0,
+    [[nodiscard]] VkDescriptorBufferInfo descriptorInfo(VkDeviceSize offset = 0,
         VkDeviceSize range = VK_WHOLE_SIZE) const;
 
 private:

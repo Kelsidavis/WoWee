@@ -109,19 +109,19 @@ struct WoweeRealmList {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t realmId) const;
+    [[nodiscard]] const Entry* findById(uint32_t realmId) const;
 
     // Returns realms a player should see based on their
     // installed expansion (Vanilla clients can only see
     // Vanilla realms; WotLK clients see Vanilla/TBC/WotLK
     // due to the realm picker being expansion-tolerant).
-    std::vector<const Entry*> findByExpansion(uint8_t maxExpansion) const;
+    [[nodiscard]] std::vector<const Entry*> findByExpansion(uint8_t maxExpansion) const;
 
     // Returns realms of one type - used by the picker UI's
     // "PvP only" / "RP only" filters.
-    std::vector<const Entry*> findByType(uint8_t realmType) const;
+    [[nodiscard]] std::vector<const Entry*> findByType(uint8_t realmType) const;
 };
 
 class WoweeRealmListLoader {

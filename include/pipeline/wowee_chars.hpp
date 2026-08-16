@@ -108,12 +108,12 @@ struct WoweeChars {
     std::vector<Race> races;
     std::vector<Outfit> outfits;
 
-    bool isValid() const { return !classes.empty() || !races.empty(); }
+    [[nodiscard]] bool isValid() const { return !classes.empty() || !races.empty(); }
 
-    const Class* findClass(uint32_t classId) const;
-    const Race* findRace(uint32_t raceId) const;
+    [[nodiscard]] const Class* findClass(uint32_t classId) const;
+    [[nodiscard]] const Race* findRace(uint32_t raceId) const;
     // First outfit matching the (class, race, gender) triple, or nullptr.
-    const Outfit* findOutfit(uint32_t classId, uint32_t raceId,
+    [[nodiscard]] const Outfit* findOutfit(uint32_t classId, uint32_t raceId,
                               uint8_t gender) const;
 
     static const char* powerTypeName(uint8_t p);

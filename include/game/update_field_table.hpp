@@ -154,16 +154,16 @@ public:
     bool loadFromJson(const std::string& path);
 
     /** Get the wire index for a logical field. Returns 0xFFFF if unknown. */
-    uint16_t index(UF field) const;
+    [[nodiscard]] uint16_t index(UF field) const;
 
     /** Override a wire index at runtime (used for auto-detecting custom field layouts). */
     void setIndex(UF field, uint16_t idx) { fieldMap_[static_cast<uint16_t>(field)] = idx; }
 
     /** Check if a field is mapped. */
-    bool hasField(UF field) const;
+    [[nodiscard]] bool hasField(UF field) const;
 
     /** Number of mapped fields. */
-    size_t size() const { return fieldMap_.size(); }
+    [[nodiscard]] size_t size() const { return fieldMap_.size(); }
 
 private:
     std::unordered_map<uint16_t, uint16_t> fieldMap_;  // UF enum → wire index

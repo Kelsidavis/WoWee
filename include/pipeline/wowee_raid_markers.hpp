@@ -66,14 +66,14 @@ struct WoweeRaidMarkers {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t markerId) const;
+    [[nodiscard]] const Entry* findById(uint32_t markerId) const;
 
     // Returns all markers of one kind, sorted by
     // priority. Used by the marker-picker UI to
     // populate per-tab listings.
-    std::vector<const Entry*> findByKind(uint8_t markerKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByKind(uint8_t markerKind) const;
 };
 
 class WoweeRaidMarkersLoader {

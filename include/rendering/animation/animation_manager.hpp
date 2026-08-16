@@ -42,7 +42,7 @@ public:
 
 
     // ── Counts ──────────────────────────────────────────────────────────
-    size_t count() const { return animators_.size(); }
+    [[nodiscard]] size_t count() const { return animators_.size(); }
 
 private:
     std::unordered_map<uint32_t, std::unique_ptr<CharacterAnimator>> animators_;

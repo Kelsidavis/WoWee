@@ -115,21 +115,21 @@ struct WoweeSoulbindRules {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t ruleId) const;
+    [[nodiscard]] const Entry* findById(uint32_t ruleId) const;
 
     // Resolve the rule that applies to an item of a
     // given quality. Returns the most-specific rule
     // (highest qualityFloor that doesn't exceed
     // itemQuality). The runtime walks all rules and
     // picks the best match.
-    const Entry* resolveForQuality(uint8_t itemQuality) const;
+    [[nodiscard]] const Entry* resolveForQuality(uint8_t itemQuality) const;
 
     // Returns all rules of one bind kind - used by
     // the inventory UI to color-code BoP vs BoE
     // tooltips uniformly.
-    std::vector<const Entry*> findByBindKind(uint8_t bindKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByBindKind(uint8_t bindKind) const;
 };
 
 class WoweeSoulbindRulesLoader {

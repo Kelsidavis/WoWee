@@ -27,7 +27,7 @@ public:
     // Initialization
     [[nodiscard]] bool initialize();
     void shutdown();
-    bool isInitialized() const { return initialized_; }
+    [[nodiscard]] bool isInitialized() const { return initialized_; }
 
     /// The playback device miniaudio actually opened, by name.
     ///
@@ -36,11 +36,11 @@ public:
     /// and does not switch between them, so the list is this one name - the
     /// truth rather than a guess, and the same shape the video panel's
     /// resolution list already takes. Empty if the engine is not up.
-    std::string getOutputDeviceName() const;
+    [[nodiscard]] std::string getOutputDeviceName() const;
 
     // Master volume (0.0 = silent, 1.0 = full)
     void setMasterVolume(float volume);
-    float getMasterVolume() const { return masterVolume_; }
+    [[nodiscard]] float getMasterVolume() const { return masterVolume_; }
 
     /// Silence the output without forgetting the volume the player chose.
     ///
@@ -51,7 +51,7 @@ public:
     /// at all - so a suspended client would come back to silence where a
     /// looping track used to be.
     void setSuspended(bool suspended);
-    bool isSuspended() const { return suspended_; }
+    [[nodiscard]] bool isSuspended() const { return suspended_; }
 
     // Asset manager (enables sound loading by MPQ path)
     void setAssetManager(pipeline::AssetManager* am) { assetManager_ = am; }
@@ -59,7 +59,7 @@ public:
     // 3D listener position (for positional audio)
     void setListenerPosition(const glm::vec3& position);
     void setListenerOrientation(const glm::vec3& forward, const glm::vec3& up);
-    const glm::vec3& getListenerPosition() const { return listenerPosition_; }
+    [[nodiscard]] const glm::vec3& getListenerPosition() const { return listenerPosition_; }
 
     // Simple 2D sound playback (non-blocking)
     bool playSound2D(const std::vector<uint8_t>& wavData, float volume = 1.0f, float pitch = 1.0f);
@@ -82,7 +82,7 @@ public:
     bool playMusic(std::shared_ptr<const std::vector<uint8_t>> musicData,
                    float volume = 1.0f, bool loop = true);
     void stopMusic();
-    bool isMusicPlaying() const;
+    [[nodiscard]] bool isMusicPlaying() const;
     void setMusicVolume(float volume);
 
     // Update (call once per frame for cleanup/position sync)

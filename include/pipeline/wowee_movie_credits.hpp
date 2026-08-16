@@ -81,14 +81,14 @@ struct WoweeMovieCredits {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t rollId) const;
+    [[nodiscard]] const Entry* findById(uint32_t rollId) const;
 
     // Returns all credit-roll entries for one cinematic,
     // sorted by orderHint. Used by the credit renderer
     // to assemble the full scroll for one cinematic.
-    std::vector<const Entry*> findByCinematic(uint32_t cinematicId) const;
+    [[nodiscard]] std::vector<const Entry*> findByCinematic(uint32_t cinematicId) const;
 };
 
 class WoweeMovieCreditsLoader {

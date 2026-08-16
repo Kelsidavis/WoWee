@@ -68,12 +68,12 @@ struct WoweeTitle {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t titleId) const;
+    [[nodiscard]] const Entry* findById(uint32_t titleId) const;
     // String match against the canonical name - used to
     // resolve WACH.titleReward references.
-    const Entry* findByName(const std::string& name) const;
+    [[nodiscard]] const Entry* findByName(const std::string& name) const;
 
     static const char* categoryName(uint8_t c);
 };

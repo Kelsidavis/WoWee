@@ -29,7 +29,7 @@ struct DxtColorBlock {
     uint32_t indices = 0;
 
     /// Which of the four entries pixel (px, py) uses.
-    int indexAt(int px, int py) const {
+    [[nodiscard]] int indexAt(int px, int py) const {
         return static_cast<int>((indices >> ((py * 4 + px) * 2)) & 0x3u);
     }
 };

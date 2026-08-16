@@ -91,20 +91,20 @@ struct WoweeMagePortals {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t portalId) const;
+    [[nodiscard]] const Entry* findById(uint32_t portalId) const;
 
     // Returns the binding for a given cast spellId -
     // the lookup the portal-cast handler uses to
     // decide where to teleport the target.
-    const Entry* findBySpellId(uint32_t spellId) const;
+    [[nodiscard]] const Entry* findBySpellId(uint32_t spellId) const;
 
     // Returns all portals accessible to a faction.
     // Used by the spellbook UI to filter the mage
     // portal tab (Alliance mages don't see Horde
     // city portals).
-    std::vector<const Entry*> findByFaction(uint8_t faction) const;
+    [[nodiscard]] std::vector<const Entry*> findByFaction(uint8_t faction) const;
 };
 
 class WoweeMagePortalsLoader {

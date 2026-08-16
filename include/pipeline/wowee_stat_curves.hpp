@@ -76,15 +76,15 @@ struct WoweeStatCurve {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t curveId) const;
+    [[nodiscard]] const Entry* findById(uint32_t curveId) const;
 
     // Resolve the curve at the given character level,
     // applying the linear formula then scaling by the
     // multiplier and clamping to [minLevel..maxLevel].
     // Returns 0.0 if the level is below minLevel.
-    float resolveAtLevel(uint32_t curveId, uint8_t level) const;
+    [[nodiscard]] float resolveAtLevel(uint32_t curveId, uint8_t level) const;
 
     static const char* curveKindName(uint8_t k);
 };

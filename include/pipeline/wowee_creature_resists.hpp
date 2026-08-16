@@ -90,15 +90,15 @@ struct WoweeCreatureResists {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t resistId) const;
+    [[nodiscard]] const Entry* findById(uint32_t resistId) const;
 
     // Returns the resist profile for a given creature
     // entry, or nullptr if the creature uses defaults.
     // Used by the damage-calculation path to look up
     // "what's this mob's frost resist?" without scanning.
-    const Entry* findByCreature(uint32_t creatureEntry) const;
+    [[nodiscard]] const Entry* findByCreature(uint32_t creatureEntry) const;
 };
 
 class WoweeCreatureResistsLoader {

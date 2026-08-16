@@ -84,9 +84,9 @@ struct WoweeTrigger {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t triggerId) const;
+    [[nodiscard]] const Entry* findById(uint32_t triggerId) const;
 
     static const char* shapeName(uint8_t s);
     static const char* kindName(uint8_t k);

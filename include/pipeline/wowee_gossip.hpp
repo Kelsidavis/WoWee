@@ -89,10 +89,10 @@ struct WoweeGossip {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Lookup by menuId - nullptr if not present.
-    const Entry* findById(uint32_t menuId) const;
+    [[nodiscard]] const Entry* findById(uint32_t menuId) const;
 
     static const char* optionKindName(uint8_t k);
 };

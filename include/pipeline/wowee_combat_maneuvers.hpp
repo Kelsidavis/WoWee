@@ -76,20 +76,20 @@ struct WoweeCombatManeuvers {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t groupId) const;
+    [[nodiscard]] const Entry* findById(uint32_t groupId) const;
 
     // Returns all maneuver groups available to a class
     // (used by the action-bar UI to compute which spells
     // share a mutex bucket and grey accordingly).
-    std::vector<const Entry*> findByClass(uint32_t classBit) const;
+    [[nodiscard]] std::vector<const Entry*> findByClass(uint32_t classBit) const;
 
     // Returns the group containing the given spell ID, if
     // any. Used by the action-bar update path to know
     // whether casting a spell should clear a "currently
     // active" outline elsewhere on the bar.
-    const Entry* findGroupForSpell(uint32_t spellId) const;
+    [[nodiscard]] const Entry* findGroupForSpell(uint32_t spellId) const;
 };
 
 class WoweeCombatManeuversLoader {

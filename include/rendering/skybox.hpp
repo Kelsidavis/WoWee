@@ -42,20 +42,20 @@ public:
      * Enable/disable skybox rendering
      */
     void setEnabled(bool enabled) { renderingEnabled = enabled; }
-    bool isEnabled() const { return renderingEnabled; }
+    [[nodiscard]] bool isEnabled() const { return renderingEnabled; }
 
     /**
      * Set time of day (0-24 hours)
      * 0 = midnight, 6 = dawn, 12 = noon, 18 = dusk, 24 = midnight
      */
     void setTimeOfDay(float time);
-    float getTimeOfDay() const { return timeOfDay; }
+    [[nodiscard]] float getTimeOfDay() const { return timeOfDay; }
 
     /**
      * Enable/disable time progression
      */
     void setTimeProgression(bool enabled) { timeProgressionEnabled = enabled; }
-    bool isTimeProgressionEnabled() const { return timeProgressionEnabled; }
+    [[nodiscard]] bool isTimeProgressionEnabled() const { return timeProgressionEnabled; }
 
     /**
      * Update time progression

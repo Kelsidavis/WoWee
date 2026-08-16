@@ -59,13 +59,13 @@ public:
     /**
      * Check if a realm has been selected
      */
-    bool hasSelection() const { return realmSelected; }
+    [[nodiscard]] bool hasSelection() const { return realmSelected; }
 
     /**
      * Get selected realm info
      */
-    const std::string& getSelectedName() const { return selectedRealmName; }
-    const std::string& getSelectedAddress() const { return selectedRealmAddress; }
+    [[nodiscard]] const std::string& getSelectedName() const { return selectedRealmName; }
+    [[nodiscard]] const std::string& getSelectedAddress() const { return selectedRealmAddress; }
 
 private:
     // UI state
@@ -90,12 +90,12 @@ private:
     /**
      * Get realm status text
      */
-    const char* getRealmStatus(uint8_t flags) const;
+    [[nodiscard]] const char* getRealmStatus(uint8_t flags) const;
 
     /**
      * Get population color
      */
-    ImVec4 getPopulationColor(float population) const;
+    [[nodiscard]] ImVec4 getPopulationColor(float population) const;
 };
 
 }} // namespace wowee::ui

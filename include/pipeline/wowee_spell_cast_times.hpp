@@ -72,14 +72,14 @@ struct WoweeSpellCastTime {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t castTimeId) const;
+    [[nodiscard]] const Entry* findById(uint32_t castTimeId) const;
 
     // Resolve to the actual ms a spell will cast at the
     // given character level, before haste is applied.
     // Clamps to [minCastMs, maxCastMs] when those are set.
-    int32_t resolveAtLevel(uint32_t castTimeId,
+    [[nodiscard]] int32_t resolveAtLevel(uint32_t castTimeId,
                            uint32_t characterLevel) const;
 
     static const char* castKindName(uint8_t k);

@@ -107,10 +107,10 @@ struct WoweePet {
     std::vector<Family> families;
     std::vector<Minion> minions;
 
-    bool isValid() const { return !families.empty() || !minions.empty(); }
+    [[nodiscard]] bool isValid() const { return !families.empty() || !minions.empty(); }
 
-    const Family* findFamily(uint32_t familyId) const;
-    const Minion* findMinion(uint32_t minionId) const;
+    [[nodiscard]] const Family* findFamily(uint32_t familyId) const;
+    [[nodiscard]] const Minion* findMinion(uint32_t minionId) const;
 
     static const char* petTypeName(uint8_t t);
     // Decode a dietMask into a short string ("meat+fish").

@@ -75,12 +75,12 @@ public:
     /**
      * Check if a character has been selected
      */
-    bool hasSelection() const { return characterSelected; }
+    [[nodiscard]] bool hasSelection() const { return characterSelected; }
 
     /**
      * Get selected character GUID
      */
-    uint64_t getSelectedGuid() const { return selectedCharacterGuid; }
+    [[nodiscard]] uint64_t getSelectedGuid() const { return selectedCharacterGuid; }
 
     /**
      * Update status message
@@ -116,7 +116,7 @@ private:
     /**
      * Get faction color based on race
      */
-    ImVec4 getFactionColor(game::Race race) const;
+    [[nodiscard]] ImVec4 getFactionColor(game::Race race) const;
 
     /// AddOns management window (list + enable/disable), opened from the footer.
     bool showAddonsWindow_ = false;

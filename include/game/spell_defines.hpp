@@ -21,9 +21,9 @@ struct AuraSlot {
     uint64_t casterGuid = 0;
     uint64_t receivedAtMs = 0; // Client timestamp (ms) when durationMs was set
 
-    bool isEmpty() const { return spellId == 0; }
+    [[nodiscard]] bool isEmpty() const { return spellId == 0; }
     // Remaining duration in ms, counting down from when the packet was received
-    int32_t getRemainingMs(uint64_t nowMs) const {
+    [[nodiscard]] int32_t getRemainingMs(uint64_t nowMs) const {
         if (durationMs < 0) return -1;
         uint64_t elapsed = (nowMs > receivedAtMs) ? (nowMs - receivedAtMs) : 0;
         int32_t remaining = durationMs - static_cast<int32_t>(elapsed);
@@ -41,8 +41,8 @@ struct ActionBarSlot {
     float cooldownRemaining = 0.0f;
     float cooldownTotal = 0.0f;
 
-    bool isReady() const { return cooldownRemaining <= 0.0f; }
-    bool isEmpty() const { return type == EMPTY; }
+    [[nodiscard]] bool isReady() const { return cooldownRemaining <= 0.0f; }
+    [[nodiscard]] bool isEmpty() const { return type == EMPTY; }
 };
 
 /**
@@ -66,7 +66,7 @@ struct CombatTextEntry {
     float xSeed = 0.0f;         // Random horizontal offset seed (-1..1) to stagger overlapping text
 
     static constexpr float LIFETIME = 2.5f;
-    bool isExpired() const { return age >= LIFETIME; }
+    [[nodiscard]] bool isExpired() const { return age >= LIFETIME; }
 };
 
 /**

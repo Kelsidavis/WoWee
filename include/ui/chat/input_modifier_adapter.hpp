@@ -13,9 +13,9 @@ namespace ui {
  */
 class InputModifierAdapter : public IModifierState {
 public:
-    bool isShiftHeld() const override;
-    bool isCtrlHeld() const override;
-    bool isAltHeld() const override;
+    [[nodiscard]] bool isShiftHeld() const override;
+    [[nodiscard]] bool isCtrlHeld() const override;
+    [[nodiscard]] bool isAltHeld() const override;
 };
 
 } // namespace ui

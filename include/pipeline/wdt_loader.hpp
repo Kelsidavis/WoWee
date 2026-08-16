@@ -9,7 +9,7 @@ namespace pipeline {
 
 struct WDTInfo {
     uint32_t mphdFlags = 0;
-    bool isWMOOnly() const { return mphdFlags & 0x01; }  // WDTF_GLOBAL_WMO
+    [[nodiscard]] bool isWMOOnly() const { return mphdFlags & 0x01; }  // WDTF_GLOBAL_WMO
 
     std::string rootWMOPath;       // from MWMO chunk (null-terminated string)
 

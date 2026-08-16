@@ -91,15 +91,15 @@ struct WoweeFaction {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Lookup by factionId - nullptr if not present.
-    const Entry* findById(uint32_t factionId) const;
+    [[nodiscard]] const Entry* findById(uint32_t factionId) const;
 
     // True if A's enemies list contains B (hostile-on-sight).
     // Does NOT walk parent factions; use isAtWarTransitive
     // for that.
-    bool isHostile(uint32_t aFactionId, uint32_t bFactionId) const;
+    [[nodiscard]] bool isHostile(uint32_t aFactionId, uint32_t bFactionId) const;
 };
 
 class WoweeFactionLoader {

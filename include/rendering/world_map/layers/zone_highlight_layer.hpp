@@ -23,7 +23,7 @@ public:
     void initialize(VkContext* ctx, pipeline::AssetManager* am);
     void clearTextures();
     void render(const LayerContext& ctx) override;
-    int hoveredZone() const { return hoveredZone_; }
+    [[nodiscard]] int hoveredZone() const { return hoveredZone_; }
 
     /// Get the ImGui texture ID for a highlight BLP, loading lazily.
     /// key is used as cache key; customPath overrides the default path if non-empty.

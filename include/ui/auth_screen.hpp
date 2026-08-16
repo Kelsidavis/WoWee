@@ -45,14 +45,14 @@ public:
     /**
      * Check if authentication is in progress
      */
-    bool isAuthenticating() const { return authenticating; }
+    [[nodiscard]] bool isAuthenticating() const { return authenticating; }
 
     void stopLoginMusic();
 
     /**
      * Get status message
      */
-    const std::string& getStatusMessage() const { return statusMessage; }
+    [[nodiscard]] const std::string& getStatusMessage() const { return statusMessage; }
 
     /// Say why the player is looking at this screen. Public because a
     /// disconnect is announced from outside: the world tears itself down on the
@@ -143,7 +143,7 @@ private:
     static std::string makeServerKey(const std::string& host, int port);
     void selectServerProfile(int index);
     void upsertCurrentServerProfile(bool includePasswordHash);
-    std::string currentExpansionId() const;
+    [[nodiscard]] std::string currentExpansionId() const;
 
     // Background image (Vulkan)
     bool bgInitAttempted = false;

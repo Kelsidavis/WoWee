@@ -29,8 +29,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"run", "script"}; }
-    std::string helpText() const override { return "Execute Lua code"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"run", "script"}; }
+    [[nodiscard]] std::string helpText() const override { return "Execute Lua code"; }
 };
 
 // --- /dump, /print ---
@@ -57,8 +57,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"dump", "print"}; }
-    std::string helpText() const override { return "Evaluate & print Lua expression"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"dump", "print"}; }
+    [[nodiscard]] std::string helpText() const override { return "Evaluate & print Lua expression"; }
 };
 
 // --- /reload, /reloadui, /rl ---
@@ -90,8 +90,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"reload", "reloadui", "rl"}; }
-    std::string helpText() const override { return "Reload all addons"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"reload", "reloadui", "rl"}; }
+    [[nodiscard]] std::string helpText() const override { return "Reload all addons"; }
 };
 
 // --- /fxcheck ---
@@ -129,8 +129,8 @@ public:
         ctx.gameHandler.addLocalChatMessage(msg);
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"fxcheck"}; }
-    std::string helpText() const override {
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"fxcheck"}; }
+    [[nodiscard]] std::string helpText() const override {
         return "Report the FrameXML takeover check for the interface as it is now";
     }
 };
@@ -153,8 +153,8 @@ public:
         if (shouldStop) ctx.panel.macroStopped() = true;
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"stopmacro"}; }
-    std::string helpText() const override { return "Stop macro execution"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"stopmacro"}; }
+    [[nodiscard]] std::string helpText() const override { return "Stop macro execution"; }
 };
 
 // --- /clear ---
@@ -164,8 +164,8 @@ public:
         ctx.gameHandler.clearChatHistory();
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"clear"}; }
-    std::string helpText() const override { return "Clear chat history"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"clear"}; }
+    [[nodiscard]] std::string helpText() const override { return "Clear chat history"; }
 };
 
 // --- /difficulty ---
@@ -211,8 +211,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"difficulty"}; }
-    std::string helpText() const override { return "Set dungeon difficulty"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"difficulty"}; }
+    [[nodiscard]] std::string helpText() const override { return "Set dungeon difficulty"; }
 };
 
 // --- Registration ---
@@ -242,8 +242,8 @@ public:
                  : "Climb: off - the 50 degree limit is back."));
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"climb", "slope"}; }
-    std::string helpText() const override {
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"climb", "slope"}; }
+    [[nodiscard]] std::string helpText() const override {
         return "Walk up any slope, for reaching somewhere to look at it (/climb on|off)";
     }
 };

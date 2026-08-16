@@ -109,9 +109,9 @@ struct WoweePlayerCondition {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t conditionId) const;
+    [[nodiscard]] const Entry* findById(uint32_t conditionId) const;
 
     static const char* conditionKindName(uint8_t k);
     static const char* comparisonOpName(uint8_t o);

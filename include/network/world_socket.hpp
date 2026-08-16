@@ -39,7 +39,7 @@ public:
 
     bool connect(const std::string& host, uint16_t port) override;
     void disconnect() override;
-    bool isConnected() const override;
+    [[nodiscard]] bool isConnected() const override;
 
     /**
      * Send a world packet
@@ -78,7 +78,7 @@ public:
     /**
      * Check if header encryption is enabled
      */
-    bool isEncryptionEnabled() const { return encryptionEnabled; }
+    [[nodiscard]] bool isEncryptionEnabled() const { return encryptionEnabled; }
 
 private:
     /**

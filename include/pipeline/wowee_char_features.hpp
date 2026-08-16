@@ -87,9 +87,9 @@ struct WoweeCharFeature {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t featureId) const;
+    [[nodiscard]] const Entry* findById(uint32_t featureId) const;
 
     static const char* featureKindName(uint8_t k);
     static const char* sexIdName(uint8_t s);

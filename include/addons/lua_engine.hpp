@@ -50,7 +50,7 @@ public:
     /// Error from the last executeFile/executeString that returned false.
     /// Lets a caller loading many files report them together rather than
     /// leaving the reasons scattered through the log.
-    const std::string& lastError() const { return lastError_; }
+    [[nodiscard]] const std::string& lastError() const { return lastError_; }
 
     void setGameHandler(game::GameHandler* handler);
     void setLuaServices(const LuaServices& services);
@@ -101,7 +101,7 @@ public:
     /// it: the button is still down as far as the tree is concerned, the drag
     /// never ends, and the drop lands wherever the cursor happens to be when
     /// the mouse is finally heard from again.
-    bool holdsMousePress() const;
+    [[nodiscard]] bool holdsMousePress() const;
 
     /// Take the cursor away from the interface: whatever it was over is told
     /// OnLeave and nothing is left highlighted.
@@ -196,7 +196,7 @@ public:
     /// asks as well, because a box can leave without ever being hidden - a
     /// panel destroyed with focus inside it, or one that went invisible
     /// through a parent before the frame that would have noticed ran.
-    bool editBoxHasFocus() const;
+    [[nodiscard]] bool editBoxHasFocus() const;
     void setEditFocus(uint32_t wid);
 
     // SavedVariables: load globals from file, save globals to file
@@ -211,7 +211,7 @@ public:
     ui::WidgetTree& widgets() { return widgets_; }
 
     lua_State* getState() { return L_; }
-    bool isInitialized() const { return L_ != nullptr; }
+    [[nodiscard]] bool isInitialized() const { return L_ != nullptr; }
 
     /// Abort a chunk that runs longer than this many milliseconds, naming the
     /// Lua source and line it was on. Zero disables it.
@@ -234,7 +234,7 @@ public:
     void setOpenSettingsCallback(OpenSettingsCallback cb) {
         openSettingsCallback_ = std::move(cb);
     }
-    const OpenSettingsCallback& openSettingsCallbackRef() const {
+    [[nodiscard]] const OpenSettingsCallback& openSettingsCallbackRef() const {
         return openSettingsCallback_;
     }
 
@@ -327,7 +327,7 @@ private:
     /// how an item is destroyed, so the caller has to be able to tell the two
     /// apart - and only the widget tree knows.
 public:
-    bool mouseOverFrameXml() const { return lastMouseHit_ != 0; }
+    [[nodiscard]] bool mouseOverFrameXml() const { return lastMouseHit_ != 0; }
 private:
     uint32_t lastMouseHit_ = 0;
     /// Where the cursor last was, in interface units. Static so a widget

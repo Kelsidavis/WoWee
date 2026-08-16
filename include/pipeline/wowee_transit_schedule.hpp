@@ -106,21 +106,21 @@ struct WoweeTransitSchedule {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t routeId) const;
+    [[nodiscard]] const Entry* findById(uint32_t routeId) const;
 
     // Returns all routes accessible by a given faction
     // mask (Alliance/Horde/Neutral all see Both routes;
     // a faction-specific call also includes that
     // faction's exclusive routes).
-    std::vector<const Entry*> findAccessibleByFaction(
+    [[nodiscard]] std::vector<const Entry*> findAccessibleByFaction(
         uint8_t faction) const;
 
     // Returns all routes departing from a given
     // origin map. Used by the boat-dock UI to
     // populate the "next departure" widget.
-    std::vector<const Entry*> findDeparturesFromMap(
+    [[nodiscard]] std::vector<const Entry*> findDeparturesFromMap(
         uint32_t mapId) const;
 };
 

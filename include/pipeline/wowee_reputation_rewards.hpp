@@ -74,22 +74,22 @@ struct WoweeReputationRewards {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t tierId) const;
+    [[nodiscard]] const Entry* findById(uint32_t tierId) const;
 
     // Returns the tier for a given (faction, current
     // standing). Picks the highest tier whose
     // minStanding the player meets. Used by the vendor
     // UI to compute "at what discount can I buy from
     // this NPC?" without scanning the catalog.
-    const Entry* findActiveTierFor(uint32_t factionId,
+    [[nodiscard]] const Entry* findActiveTierFor(uint32_t factionId,
                                      int32_t currentStanding) const;
 
     // Returns all tiers for a faction in ascending
     // standing order. Used by the achievement / unlock
     // preview UI ("what do I get at Revered?").
-    std::vector<const Entry*> findByFaction(uint32_t factionId) const;
+    [[nodiscard]] std::vector<const Entry*> findByFaction(uint32_t factionId) const;
 };
 
 class WoweeReputationRewardsLoader {

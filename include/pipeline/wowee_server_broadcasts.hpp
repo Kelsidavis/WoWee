@@ -81,21 +81,21 @@ struct WoweeServerBroadcasts {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t broadcastId) const;
+    [[nodiscard]] const Entry* findById(uint32_t broadcastId) const;
 
     // Returns all broadcasts that should fire for a player
     // of the given faction and level. Used by the
     // BroadcastTicker to build the per-player message
     // queue on login.
-    std::vector<const Entry*> findFor(uint8_t playerFaction,
+    [[nodiscard]] std::vector<const Entry*> findFor(uint8_t playerFaction,
                                        uint8_t playerLevel) const;
 
     // Returns all broadcasts of one channel kind (used by
     // the periodic ticker to schedule SystemChannel /
     // HelpTip rotations independently from login MOTDs).
-    std::vector<const Entry*> findByChannel(uint8_t channelKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByChannel(uint8_t channelKind) const;
 };
 
 class WoweeServerBroadcastsLoader {

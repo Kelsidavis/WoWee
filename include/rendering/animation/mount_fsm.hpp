@@ -101,10 +101,10 @@ public:
     /// Main evaluation: produces Output describing what to play.
     Output evaluate(const Input& in);
 
-    bool isActive() const { return active_; }
-    MountState getState() const { return state_; }
-    MountAction getAction() const { return action_; }
-    const MountAnimSet& getAnims() const { return anims_; }
+    [[nodiscard]] bool isActive() const { return active_; }
+    [[nodiscard]] MountState getState() const { return state_; }
+    [[nodiscard]] MountAction getAction() const { return action_; }
+    [[nodiscard]] const MountAnimSet& getAnims() const { return anims_; }
 
 private:
     bool active_ = false;
@@ -137,10 +137,10 @@ private:
     uint32_t lastMountAnim_ = 0;
 
     /// Resolve the mount animation for the given input (non-taxi).
-    uint32_t resolveGroundOrFlyAnim(const Input& in) const;
+    [[nodiscard]] uint32_t resolveGroundOrFlyAnim(const Input& in) const;
 
     /// Check if an action animation has completed.
-    bool actionAnimComplete(const Input& in) const;
+    [[nodiscard]] bool actionAnimComplete(const Input& in) const;
 };
 
 } // namespace rendering

@@ -95,21 +95,21 @@ struct WoweeLocalization {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t stringId) const;
+    [[nodiscard]] const Entry* findById(uint32_t stringId) const;
 
     // Returns the localized override (if any) for a
     // given (key, language, namespace) lookup. Used at
     // every render-call by the locale-aware text layer.
-    const Entry* findOverride(const std::string& originalKey,
+    [[nodiscard]] const Entry* findOverride(const std::string& originalKey,
                                 uint8_t languageCode,
                                 uint8_t namespaceKind) const;
 
     // Returns all entries in one language. Used by the
     // per-language asset bundling step to package only
     // the strings the client needs.
-    std::vector<const Entry*> findByLanguage(uint8_t languageCode) const;
+    [[nodiscard]] std::vector<const Entry*> findByLanguage(uint8_t languageCode) const;
 };
 
 class WoweeLocalizationLoader {

@@ -94,15 +94,15 @@ struct WoweeServerConfig {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t configId) const;
+    [[nodiscard]] const Entry* findById(uint32_t configId) const;
 
     // Returns all entries of one configKind. Used by
     // server startup code to iterate the matching
     // tunables: pull all XPRate entries to seed the
     // experience-rate matrix per character class, etc.
-    std::vector<const Entry*> findByKind(uint8_t configKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByKind(uint8_t configKind) const;
 };
 
 class WoweeServerConfigLoader {

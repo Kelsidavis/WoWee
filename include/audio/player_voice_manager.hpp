@@ -66,10 +66,10 @@ public:
     void shutdown();
 
     void setEnabled(bool enabled) { enabled_ = enabled; }
-    bool isEnabled() const { return enabled_; }
+    [[nodiscard]] bool isEnabled() const { return enabled_; }
 
     void setVolumeScale(float scale);
-    float getVolumeScale() const { return volumeScale_; }
+    [[nodiscard]] float getVolumeScale() const { return volumeScale_; }
 
     /// Play a spoken error response for the player's race/gender.
     /// raceId: game Race enum value (1=Human .. 11=Draenei); gender: 0=male, 1=female

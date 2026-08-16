@@ -81,12 +81,12 @@ public:
     /**
      * Check if module is loaded and ready
      */
-    bool isLoaded() const { return loaded_; }
+    [[nodiscard]] bool isLoaded() const { return loaded_; }
 
     /**
      * Get module MD5 identifier
      */
-    const std::vector<uint8_t>& getMD5Hash() const { return md5Hash_; }
+    [[nodiscard]] const std::vector<uint8_t>& getMD5Hash() const { return md5Hash_; }
 
     /**
      * Process check request packet via module's PacketHandler
@@ -124,9 +124,9 @@ public:
      */
     void unload();
 
-    const void* getModuleMemory() const { return moduleMemory_; }
-    size_t getModuleSize() const { return moduleSize_; }
-    const std::vector<uint8_t>& getDecompressedData() const { return decompressedData_; }
+    [[nodiscard]] const void* getModuleMemory() const { return moduleMemory_; }
+    [[nodiscard]] size_t getModuleSize() const { return moduleSize_; }
+    [[nodiscard]] const std::vector<uint8_t>& getDecompressedData() const { return decompressedData_; }
 
     // Inject dependencies for module callbacks (sendPacket, generateRC4).
     // Must be called before initializeModule() so callbacks can reach the

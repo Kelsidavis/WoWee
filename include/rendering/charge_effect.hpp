@@ -49,7 +49,7 @@ public:
     void update(float deltaTime);
     void render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet);
 
-    bool isActive() const { return emitting_ || !trail_.empty() || !dustPuffs_.empty(); }
+    [[nodiscard]] bool isActive() const { return emitting_ || !trail_.empty() || !dustPuffs_.empty(); }
 
 private:
     // --- Ribbon trail ---

@@ -16,7 +16,7 @@ namespace ui {
 class TalentScreen {
 public:
     void render(game::GameHandler& gameHandler);
-    bool isOpen() const { return open; }
+    [[nodiscard]] bool isOpen() const { return open; }
     void toggle() { open = !open; }
     void setOpen(bool o) { open = o; }
 

@@ -74,7 +74,7 @@ public:
     /// separate request from the inspect itself, and answered on its own
     /// opcode, which is why the tab asks for it when it opens.
     void requestInspectHonorData(uint64_t guid);
-    const InspectResult* getInspectResult() const {
+    [[nodiscard]] const InspectResult* getInspectResult() const {
         return inspectResult_.guid ? &inspectResult_ : nullptr;
     }
 
@@ -85,13 +85,13 @@ public:
     /// Seconds until the daily quest reset, or 0 if the server has not said.
     /// Counted down from when the answer arrived rather than stored raw, since
     /// the reply is asked for once and read for the rest of the session.
-    uint32_t getSecondsUntilDailyReset() const;
+    [[nodiscard]] uint32_t getSecondsUntilDailyReset() const;
     void requestPlayedTime();
     void queryWho(const std::string& playerName = "");
-    uint32_t getTotalTimePlayed() const { return totalTimePlayed_; }
-    uint32_t getLevelTimePlayed() const { return levelTimePlayed_; }
-    const std::vector<WhoEntry>& getWhoResults() const { return whoResults_; }
-    uint32_t getWhoOnlineCount() const { return whoOnlineCount_; }
+    [[nodiscard]] uint32_t getTotalTimePlayed() const { return totalTimePlayed_; }
+    [[nodiscard]] uint32_t getLevelTimePlayed() const { return levelTimePlayed_; }
+    [[nodiscard]] const std::vector<WhoEntry>& getWhoResults() const { return whoResults_; }
+    [[nodiscard]] uint32_t getWhoOnlineCount() const { return whoOnlineCount_; }
 
     /// Where a /who answer goes: the panel, or the chat.
     ///
@@ -101,8 +101,8 @@ public:
     /// which is what a stock client does and what this one did not, having
     /// treated the call as a no-op and always kept the rows to itself.
     void setWhoToUI(bool toUI) { whoToUI_ = toUI; }
-    bool isWhoToUI() const { return whoToUI_; }
-    std::string getWhoAreaName(uint32_t zoneId) const;
+    [[nodiscard]] bool isWhoToUI() const { return whoToUI_; }
+    [[nodiscard]] std::string getWhoAreaName(uint32_t zoneId) const;
 
     // Social commands
     void addFriend(const std::string& playerName, const std::string& note = "");
@@ -115,7 +115,7 @@ public:
     void randomRoll(uint32_t minRoll = 1, uint32_t maxRoll = 100);
 
     // Battleground
-    bool hasPendingBgInvite() const;
+    [[nodiscard]] bool hasPendingBgInvite() const;
     void acceptBattlefield(uint32_t queueSlot = 0xFFFFFFFF);
     void declineBattlefield(uint32_t queueSlot = 0xFFFFFFFF);
     void leaveBattlefield();
@@ -125,21 +125,21 @@ public:
     void reportPvpAfk(uint64_t playerGuid);
     void joinBattlefield(uint64_t battlemasterGuid, uint32_t bgTypeId,
                          uint32_t instanceId, bool asGroup);
-    const std::array<BgQueueSlot, 3>& getBgQueues() const { return bgQueues_; }
-    const std::vector<AvailableBgInfo>& getAvailableBgs() const { return availableBgs_; }
+    [[nodiscard]] const std::array<BgQueueSlot, 3>& getBgQueues() const { return bgQueues_; }
+    [[nodiscard]] const std::vector<AvailableBgInfo>& getAvailableBgs() const { return availableBgs_; }
     void requestPvpLog();
-    const BgScoreboardData* getBgScoreboard() const {
+    [[nodiscard]] const BgScoreboardData* getBgScoreboard() const {
         return bgScoreboard_.players.empty() ? nullptr : &bgScoreboard_;
     }
-    const std::vector<BgPlayerPosition>& getBgPlayerPositions() const { return bgPlayerPositions_; }
+    [[nodiscard]] const std::vector<BgPlayerPosition>& getBgPlayerPositions() const { return bgPlayerPositions_; }
 
     // Logout. exitAfterLogout distinguishes /quit and /exit, which leave the game
     // entirely, from /logout and /camp, which drop back to character select.
     void requestLogout(bool exitAfterLogout = false);
     void cancelLogout();
-    bool  isLoggingOut()        const { return loggingOut_; }
-    float getLogoutCountdown()  const { return logoutCountdown_; }
-    bool  isLogoutToExit()      const { return exitAfterLogout_; }
+    [[nodiscard]] bool  isLoggingOut()        const { return loggingOut_; }
+    [[nodiscard]] float getLogoutCountdown()  const { return logoutCountdown_; }
+    [[nodiscard]] bool  isLogoutToExit()      const { return exitAfterLogout_; }
 
     // Guild
     void requestGuildInfo();
@@ -172,11 +172,11 @@ public:
     /// which is the same test the unit menu makes before offering the entry.
     void setGroupAssistant(uint64_t guid, bool apply);
     static constexpr uint8_t kGuildBankMoneyTab = 6;
-    const std::vector<GuildBankLogEntry>& getGuildBankLog(uint8_t tab) const {
+    [[nodiscard]] const std::vector<GuildBankLogEntry>& getGuildBankLog(uint8_t tab) const {
         static const std::vector<GuildBankLogEntry> empty;
         return (tab < guildBankLogs_.size()) ? guildBankLogs_[tab] : empty;
     }
-    const std::vector<GuildEventLogEntry>& getGuildEventLog() const { return guildEventLog_; }
+    [[nodiscard]] const std::vector<GuildEventLogEntry>& getGuildEventLog() const { return guildEventLog_; }
     void setGuildInfoText(const std::string& text);
     void takeInboxTextItem(uint32_t mailId);
     void setGuildMotd(const std::string& motd);
@@ -203,11 +203,11 @@ public:
                      uint32_t clientIndex = 1);
 
     // Guild state accessors
-    bool isInGuild() const;
-    const std::string& getGuildName() const { return guildName_; }
-    const GuildRosterData& getGuildRoster() const { return guildRoster_; }
-    bool hasGuildRoster() const { return hasGuildRoster_; }
-    const std::vector<std::string>& getGuildRankNames() const { return guildRankNames_; }
+    [[nodiscard]] bool isInGuild() const;
+    [[nodiscard]] const std::string& getGuildName() const { return guildName_; }
+    [[nodiscard]] const GuildRosterData& getGuildRoster() const { return guildRoster_; }
+    [[nodiscard]] bool hasGuildRoster() const { return hasGuildRoster_; }
+    [[nodiscard]] const std::vector<std::string>& getGuildRankNames() const { return guildRankNames_; }
     /// The rights bitmask of the player's own guild rank, or 0 when it is not
     /// known. The roster carries one per rank and the member row names which
     /// rank each member holds; both were parsed and stored and neither was
@@ -215,32 +215,32 @@ public:
     /// Where the player sits in the guild, as an index into the rank list.
     /// 0xFFFFFFFF when the roster has not arrived or the player is not in it -
     /// distinct from rank zero, which is the guild master.
-    uint32_t getPlayerGuildRankIndex() const;
-    uint32_t getPlayerGuildRankRights() const;
-    bool hasPendingGuildInvite() const { return pendingGuildInvite_; }
-    const std::string& getPendingGuildInviterName() const { return pendingGuildInviterName_; }
-    const std::string& getPendingGuildInviteGuildName() const { return pendingGuildInviteGuildName_; }
-    const GuildInfoData& getGuildInfoData() const { return guildInfoData_; }
-    const GuildQueryResponseData& getGuildQueryData() const { return guildQueryData_; }
-    bool hasGuildInfoData() const { return guildInfoData_.isValid(); }
+    [[nodiscard]] uint32_t getPlayerGuildRankIndex() const;
+    [[nodiscard]] uint32_t getPlayerGuildRankRights() const;
+    [[nodiscard]] bool hasPendingGuildInvite() const { return pendingGuildInvite_; }
+    [[nodiscard]] const std::string& getPendingGuildInviterName() const { return pendingGuildInviterName_; }
+    [[nodiscard]] const std::string& getPendingGuildInviteGuildName() const { return pendingGuildInviteGuildName_; }
+    [[nodiscard]] const GuildInfoData& getGuildInfoData() const { return guildInfoData_; }
+    [[nodiscard]] const GuildQueryResponseData& getGuildQueryData() const { return guildQueryData_; }
+    [[nodiscard]] bool hasGuildInfoData() const { return guildInfoData_.isValid(); }
 
     // Petition
-    bool hasPetitionShowlist() const { return showPetitionDialog_; }
+    [[nodiscard]] bool hasPetitionShowlist() const { return showPetitionDialog_; }
     void clearPetitionDialog() { showPetitionDialog_ = false; }
     /// Shuts the vendor session and tells the interface. Both windows read a
     /// different thing, so closing one has to close the other.
     void closePetitionVendor();
-    bool isGuildRegistrar() const { return petitionIsGuildCharter_; }
+    [[nodiscard]] bool isGuildRegistrar() const { return petitionIsGuildCharter_; }
     /// The charters on offer, in the order the vendor listed them - one from a
     /// guild registrar, three from an arena registrar for the two, three and
     /// five person teams.
-    const std::vector<PetitionShowlistData::Charter>& getPetitionCharters() const {
+    [[nodiscard]] const std::vector<PetitionShowlistData::Charter>& getPetitionCharters() const {
         return petitionCharters_;
     }
-    uint32_t getPetitionCost() const { return petitionCost_; }
-    uint64_t getPetitionNpcGuid() const { return petitionNpcGuid_; }
-    const PetitionInfo& getPetitionInfo() const { return petitionInfo_; }
-    bool hasPetitionSignaturesUI() const { return petitionInfo_.showUI; }
+    [[nodiscard]] uint32_t getPetitionCost() const { return petitionCost_; }
+    [[nodiscard]] uint64_t getPetitionNpcGuid() const { return petitionNpcGuid_; }
+    [[nodiscard]] const PetitionInfo& getPetitionInfo() const { return petitionInfo_; }
+    [[nodiscard]] bool hasPetitionSignaturesUI() const { return petitionInfo_.showUI; }
     void clearPetitionSignaturesUI() { petitionInfo_.showUI = false; }
     void signPetition(uint64_t petitionGuid);
     void turnInPetition(uint64_t petitionGuid);
@@ -249,24 +249,24 @@ public:
 
     // Guild name lookup
     const std::string& lookupGuildName(uint32_t guildId);
-    uint32_t getEntityGuildId(uint64_t guid) const;
+    [[nodiscard]] uint32_t getEntityGuildId(uint64_t guid) const;
 
     // Ready check
     void initiateReadyCheck();
     void respondToReadyCheck(bool ready);
-    bool hasPendingReadyCheck() const { return pendingReadyCheck_; }
+    [[nodiscard]] bool hasPendingReadyCheck() const { return pendingReadyCheck_; }
     void dismissReadyCheck() { pendingReadyCheck_ = false; }
-    const std::string& getReadyCheckInitiator() const { return readyCheckInitiator_; }
-    const std::vector<ReadyCheckResult>& getReadyCheckResults() const { return readyCheckResults_; }
+    [[nodiscard]] const std::string& getReadyCheckInitiator() const { return readyCheckInitiator_; }
+    [[nodiscard]] const std::vector<ReadyCheckResult>& getReadyCheckResults() const { return readyCheckResults_; }
 
     // Duel
     void acceptDuel();
     void forfeitDuel();
     void proposeDuel(uint64_t targetGuid);
     void reportPlayer(uint64_t targetGuid, const std::string& reason);
-    bool hasPendingDuelRequest() const { return pendingDuelRequest_; }
-    const std::string& getDuelChallengerName() const { return duelChallengerName_; }
-    float getDuelCountdownRemaining() const {
+    [[nodiscard]] bool hasPendingDuelRequest() const { return pendingDuelRequest_; }
+    [[nodiscard]] const std::string& getDuelChallengerName() const { return duelChallengerName_; }
+    [[nodiscard]] float getDuelCountdownRemaining() const {
         if (duelCountdownMs_ == 0) return 0.0f;
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - duelCountdownStartedAt_).count();
@@ -295,10 +295,10 @@ public:
     void leaveGroup();
     void convertToRaid();
     void sendSetLootMethod(uint32_t method, uint32_t threshold, uint64_t masterLooterGuid);
-    bool isInGroup() const { return !partyData.isEmpty(); }
-    const GroupListData& getPartyData() const { return partyData; }
-    bool hasPendingGroupInvite() const { return pendingGroupInvite; }
-    const std::string& getPendingInviterName() const { return pendingInviterName; }
+    [[nodiscard]] bool isInGroup() const { return !partyData.isEmpty(); }
+    [[nodiscard]] const GroupListData& getPartyData() const { return partyData; }
+    [[nodiscard]] bool hasPendingGroupInvite() const { return pendingGroupInvite; }
+    [[nodiscard]] const std::string& getPendingInviterName() const { return pendingInviterName; }
     void setGuildBankTabText(uint8_t tab, const std::string& text);
     void channelModeration(Opcode op, const std::string& channelName,
                            const std::string& targetName,
@@ -324,28 +324,28 @@ public:
     /// The roles last offered to the dungeon finder. lfgSetRoles used to send
     /// them and keep nothing, so the panel reading its own checkboxes back, and
     /// the ready dialog naming the role it found you a group for, had no source.
-    uint8_t getLfgOfferedRoles() const { return lfgOfferedRoles_; }
-    int32_t  getLfgWaitTank() const   { return lfgWaitTank_; }
-    int32_t  getLfgWaitHealer() const { return lfgWaitHealer_; }
-    int32_t  getLfgWaitDps() const    { return lfgWaitDps_; }
-    uint8_t  getLfgNeedTank() const   { return lfgNeedTank_; }
-    uint8_t  getLfgNeedHealer() const { return lfgNeedHealer_; }
-    uint8_t  getLfgNeedDps() const    { return lfgNeedDps_; }
-    uint64_t getLfgBootVictimGuid() const { return lfgBootVictimGuid_; }
-    const std::unordered_map<uint32_t, uint32_t>& getLfgLocks() const { return lfgLocks_; }
-    const std::vector<LfgReward>& getLfgRewards() const { return lfgRewards_; }
+    [[nodiscard]] uint8_t getLfgOfferedRoles() const { return lfgOfferedRoles_; }
+    [[nodiscard]] int32_t  getLfgWaitTank() const   { return lfgWaitTank_; }
+    [[nodiscard]] int32_t  getLfgWaitHealer() const { return lfgWaitHealer_; }
+    [[nodiscard]] int32_t  getLfgWaitDps() const    { return lfgWaitDps_; }
+    [[nodiscard]] uint8_t  getLfgNeedTank() const   { return lfgNeedTank_; }
+    [[nodiscard]] uint8_t  getLfgNeedHealer() const { return lfgNeedHealer_; }
+    [[nodiscard]] uint8_t  getLfgNeedDps() const    { return lfgNeedDps_; }
+    [[nodiscard]] uint64_t getLfgBootVictimGuid() const { return lfgBootVictimGuid_; }
+    [[nodiscard]] const std::unordered_map<uint32_t, uint32_t>& getLfgLocks() const { return lfgLocks_; }
+    [[nodiscard]] const std::vector<LfgReward>& getLfgRewards() const { return lfgRewards_; }
     void handleLfgPlayerInfo(network::Packet& packet);
-    const std::vector<LfgProposalMember>& getLfgProposalMembers() const {
+    [[nodiscard]] const std::vector<LfgProposalMember>& getLfgProposalMembers() const {
         return lfgProposalMembers_;
     }
 
     // Instance lockouts
-    const std::vector<InstanceLockout>& getInstanceLockouts() const { return instanceLockouts_; }
+    [[nodiscard]] const std::vector<InstanceLockout>& getInstanceLockouts() const { return instanceLockouts_; }
 
     // Instance difficulty
-    uint32_t getInstanceDifficulty() const { return instanceDifficulty_; }
-    bool isInstanceHeroic() const { return instanceIsHeroic_; }
-    bool isInInstance() const { return inInstance_; }
+    [[nodiscard]] uint32_t getInstanceDifficulty() const { return instanceDifficulty_; }
+    [[nodiscard]] bool isInstanceHeroic() const { return instanceIsHeroic_; }
+    [[nodiscard]] bool isInInstance() const { return inInstance_; }
 
     // Minimap ping
     void sendMinimapPing(float wowX, float wowY);
@@ -428,21 +428,21 @@ public:
         bool previouslySaved = false;
         uint32_t completedEncounterMask = 0;
     };
-    const InstanceLockPrompt& getInstanceLockPrompt() const { return instanceLock_; }
+    [[nodiscard]] const InstanceLockPrompt& getInstanceLockPrompt() const { return instanceLock_; }
     void respondInstanceLock(bool accept);
 
     // Encounter unit tracking
     static constexpr uint32_t kMaxEncounterSlots = 5;
-    uint64_t getEncounterUnitGuid(uint32_t slot) const {
+    [[nodiscard]] uint64_t getEncounterUnitGuid(uint32_t slot) const {
         return (slot < kMaxEncounterSlots) ? encounterUnitGuids_[slot] : 0;
     }
 
     // Raid target markers (0-7: Star, Circle, Diamond, Triangle, Moon, Square, Cross, Skull)
     static constexpr uint32_t kRaidMarkCount = 8;
-    uint64_t getRaidMarkGuid(uint32_t icon) const {
+    [[nodiscard]] uint64_t getRaidMarkGuid(uint32_t icon) const {
         return (icon < kRaidMarkCount) ? raidTargetGuids_[icon] : 0;
     }
-    uint8_t getEntityRaidMark(uint64_t guid) const {
+    [[nodiscard]] uint8_t getEntityRaidMark(uint64_t guid) const {
         if (guid == 0) return 0xFF;
         for (uint32_t i = 0; i < kRaidMarkCount; ++i)
             if (raidTargetGuids_[i] == guid) return static_cast<uint8_t>(i);
@@ -458,34 +458,34 @@ public:
     void lfgAcceptProposal(uint32_t proposalId, bool accept);
     void lfgSetBootVote(bool vote);
     void lfgTeleport(bool toLfgDungeon = true);
-    LfgState getLfgState()           const { return lfgState_; }
+    [[nodiscard]] LfgState getLfgState()           const { return lfgState_; }
     /// What the last finished dungeon paid out, for GetLFGCompletionReward.
-    const LfgCompletionReward& getLfgCompletionReward() const { return lfgCompletionReward_; }
-    bool isLfgQueued()               const { return lfgState_ == LfgState::Queued; }
-    bool isLfgInDungeon()            const { return lfgState_ == LfgState::InDungeon; }
-    uint32_t getLfgDungeonId()       const { return lfgDungeonId_; }
-    std::string getCurrentLfgDungeonName() const;
-    uint32_t getLfgProposalId()      const { return lfgProposalId_; }
-    int32_t  getLfgAvgWaitSec()      const { return lfgAvgWaitSec_; }
-    uint32_t getLfgTimeInQueueMs()   const { return lfgTimeInQueueMs_; }
-    uint32_t getLfgBootVotes()       const { return lfgBootVotes_; }
-    uint32_t getLfgBootTotal()       const { return lfgBootTotal_; }
-    uint32_t getLfgBootTimeLeft()    const { return lfgBootTimeLeft_; }
-    uint32_t getLfgBootNeeded()      const { return lfgBootNeeded_; }
-    const std::string& getLfgBootTargetName() const { return lfgBootTargetName_; }
-    const std::string& getLfgBootReason()     const { return lfgBootReason_; }
-    const std::vector<LfgRoleCheckDungeon>& getLfgRoleCheckDungeons() const {
+    [[nodiscard]] const LfgCompletionReward& getLfgCompletionReward() const { return lfgCompletionReward_; }
+    [[nodiscard]] bool isLfgQueued()               const { return lfgState_ == LfgState::Queued; }
+    [[nodiscard]] bool isLfgInDungeon()            const { return lfgState_ == LfgState::InDungeon; }
+    [[nodiscard]] uint32_t getLfgDungeonId()       const { return lfgDungeonId_; }
+    [[nodiscard]] std::string getCurrentLfgDungeonName() const;
+    [[nodiscard]] uint32_t getLfgProposalId()      const { return lfgProposalId_; }
+    [[nodiscard]] int32_t  getLfgAvgWaitSec()      const { return lfgAvgWaitSec_; }
+    [[nodiscard]] uint32_t getLfgTimeInQueueMs()   const { return lfgTimeInQueueMs_; }
+    [[nodiscard]] uint32_t getLfgBootVotes()       const { return lfgBootVotes_; }
+    [[nodiscard]] uint32_t getLfgBootTotal()       const { return lfgBootTotal_; }
+    [[nodiscard]] uint32_t getLfgBootTimeLeft()    const { return lfgBootTimeLeft_; }
+    [[nodiscard]] uint32_t getLfgBootNeeded()      const { return lfgBootNeeded_; }
+    [[nodiscard]] const std::string& getLfgBootTargetName() const { return lfgBootTargetName_; }
+    [[nodiscard]] const std::string& getLfgBootReason()     const { return lfgBootReason_; }
+    [[nodiscard]] const std::vector<LfgRoleCheckDungeon>& getLfgRoleCheckDungeons() const {
         return lfgRoleCheckDungeons_;
     }
-    uint8_t getLfgRoleCheckMembers() const { return lfgRoleCheckMembers_; }
-    bool isLfgBootInProgress() const { return lfgBootInProgress_; }
-    bool hasLfgBootVoted()     const { return lfgBootDidVote_; }
-    bool getLfgBootMyVote()    const { return lfgBootMyVote_; }
+    [[nodiscard]] uint8_t getLfgRoleCheckMembers() const { return lfgRoleCheckMembers_; }
+    [[nodiscard]] bool isLfgBootInProgress() const { return lfgBootInProgress_; }
+    [[nodiscard]] bool hasLfgBootVoted()     const { return lfgBootDidVote_; }
+    [[nodiscard]] bool getLfgBootMyVote()    const { return lfgBootMyVote_; }
 
     // Arena
-    const std::vector<ArenaTeamStats>& getArenaTeamStats() const { return arenaTeamStats_; }
+    [[nodiscard]] const std::vector<ArenaTeamStats>& getArenaTeamStats() const { return arenaTeamStats_; }
     void requestArenaTeamRoster(uint32_t teamId);
-    const ArenaTeamRoster* getArenaTeamRoster(uint32_t teamId) const {
+    [[nodiscard]] const ArenaTeamRoster* getArenaTeamRoster(uint32_t teamId) const {
         for (const auto& r : arenaTeamRosters_)
             if (r.teamId == teamId) return &r;
         return nullptr;

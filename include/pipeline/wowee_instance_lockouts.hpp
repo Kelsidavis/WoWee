@@ -73,20 +73,20 @@ struct WoweeInstanceLockout {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t lockoutId) const;
+    [[nodiscard]] const Entry* findById(uint32_t lockoutId) const;
 
     // Returns all lockouts bound to a given map (typically
     // all 4 difficulty variants of one raid). Used by the
     // raid-finder UI to populate the difficulty picker.
-    std::vector<const Entry*> findByMap(uint32_t mapId) const;
+    [[nodiscard]] std::vector<const Entry*> findByMap(uint32_t mapId) const;
 
     // Returns the next reset wall-clock millis after the
     // given current time, assuming the standard Tuesday
     // reset epoch. Engines override with their server's
     // chosen reset time.
-    uint64_t nextResetMs(uint32_t lockoutId,
+    [[nodiscard]] uint64_t nextResetMs(uint32_t lockoutId,
                          uint64_t currentMs) const;
 
     static const char* lockoutKindName(uint8_t k);

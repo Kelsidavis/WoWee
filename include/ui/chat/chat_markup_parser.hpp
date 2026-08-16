@@ -45,7 +45,7 @@ struct ChatSegment {
 class ChatMarkupParser {
 public:
     /** Parse a raw chat message string into ordered segments. */
-    std::vector<ChatSegment> parse(const std::string& rawMessage) const;
+    [[nodiscard]] std::vector<ChatSegment> parse(const std::string& rawMessage) const;
 
     /** Parse |cAARRGGBB color code at given position. */
     static ImVec4 parseWowColor(const std::string& text, size_t pos);

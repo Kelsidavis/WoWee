@@ -34,7 +34,7 @@ struct WowDate {
 
     /// The four-digit year. FrameXML wants the short form instead: SHORTDATE
     /// formats it "%02d", so GetAchievementInfo returns yearSince2000.
-    constexpr int fullYear() const { return yearSince2000 + 2000; }
+    [[nodiscard]] constexpr int fullYear() const { return yearSince2000 + 2000; }
 };
 
 /// Unpack a server packed-time field. A zero packs to 1 January 2000, which is

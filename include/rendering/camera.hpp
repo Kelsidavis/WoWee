@@ -37,27 +37,27 @@ public:
         this->fov = fov; updateProjectionMatrix();
     }
 
-    const glm::vec3& getPosition() const { return position; }
-    const glm::mat4& getViewMatrix() const { return viewMatrix; }
-    const glm::mat4& getProjectionMatrix() const { return projectionMatrix; }
-    const glm::mat4& getUnjitteredProjectionMatrix() const { return unjitteredProjectionMatrix; }
-    glm::mat4 getViewProjectionMatrix() const { return projectionMatrix * viewMatrix; }
-    glm::mat4 getUnjitteredViewProjectionMatrix() const { return unjitteredProjectionMatrix * viewMatrix; }
-    float getAspectRatio() const { return aspectRatio; }
-    float getFovDegrees() const { return fov; }
-    float getNearPlane() const { return nearPlane; }
-    float getFarPlane() const { return farPlane; }
+    [[nodiscard]] const glm::vec3& getPosition() const { return position; }
+    [[nodiscard]] const glm::mat4& getViewMatrix() const { return viewMatrix; }
+    [[nodiscard]] const glm::mat4& getProjectionMatrix() const { return projectionMatrix; }
+    [[nodiscard]] const glm::mat4& getUnjitteredProjectionMatrix() const { return unjitteredProjectionMatrix; }
+    [[nodiscard]] glm::mat4 getViewProjectionMatrix() const { return projectionMatrix * viewMatrix; }
+    [[nodiscard]] glm::mat4 getUnjitteredViewProjectionMatrix() const { return unjitteredProjectionMatrix * viewMatrix; }
+    [[nodiscard]] float getAspectRatio() const { return aspectRatio; }
+    [[nodiscard]] float getFovDegrees() const { return fov; }
+    [[nodiscard]] float getNearPlane() const { return nearPlane; }
+    [[nodiscard]] float getFarPlane() const { return farPlane; }
 
     // Sub-pixel jitter for temporal upscaling (FSR 2)
     void setJitter(float jx, float jy);
     void clearJitter();
-    glm::vec2 getJitter() const { return jitterOffset; }
+    [[nodiscard]] glm::vec2 getJitter() const { return jitterOffset; }
 
-    glm::vec3 getForward() const;
-    glm::vec3 getRight() const;
-    glm::vec3 getUp() const;
+    [[nodiscard]] glm::vec3 getForward() const;
+    [[nodiscard]] glm::vec3 getRight() const;
+    [[nodiscard]] glm::vec3 getUp() const;
 
-    Ray screenToWorldRay(float screenX, float screenY, float screenW, float screenH) const;
+    [[nodiscard]] Ray screenToWorldRay(float screenX, float screenY, float screenW, float screenH) const;
 
 private:
     void updateViewMatrix();

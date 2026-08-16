@@ -87,8 +87,8 @@ private:
     bool createDescriptorResources();
     bool createQuad();
     bool loadFootprintData(pipeline::AssetManager* assetManager);
-    Profile resolveProfile(const std::string& modelName, FootprintFallback fallback) const;
-    float resolveFloorHeight(const glm::vec3& position) const;
+    [[nodiscard]] Profile resolveProfile(const std::string& modelName, FootprintFallback fallback) const;
+    [[nodiscard]] float resolveFloorHeight(const glm::vec3& position) const;
 };
 
 } // namespace rendering

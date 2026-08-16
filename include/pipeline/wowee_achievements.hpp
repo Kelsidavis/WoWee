@@ -105,10 +105,10 @@ struct WoweeAchievement {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Lookup by achievementId - nullptr if not present.
-    const Entry* findById(uint32_t achievementId) const;
+    [[nodiscard]] const Entry* findById(uint32_t achievementId) const;
 
     static const char* criteriaKindName(uint8_t k);
     static const char* factionName(uint8_t f);

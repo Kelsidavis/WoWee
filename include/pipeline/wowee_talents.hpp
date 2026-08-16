@@ -82,12 +82,12 @@ struct WoweeTalent {
     std::string name;
     std::vector<Tree> trees;
 
-    bool isValid() const { return !trees.empty(); }
+    [[nodiscard]] bool isValid() const { return !trees.empty(); }
 
-    const Tree* findTree(uint32_t treeId) const;
+    [[nodiscard]] const Tree* findTree(uint32_t treeId) const;
     // Talent lookup is global across all trees (talentIds are
     // expected to be unique within a single .wtal catalog).
-    const Talent* findTalent(uint32_t talentId) const;
+    [[nodiscard]] const Talent* findTalent(uint32_t talentId) const;
 };
 
 class WoweeTalentLoader {

@@ -52,19 +52,19 @@ public:
 
     /// Spell.dbc EffectImplicitTargetA, or 0 when the spell is unknown. 21 means
     /// the spell has to be aimed at a friendly unit.
-    uint32_t getSpellImplicitTargetA(uint32_t spellId) const;
+    [[nodiscard]] uint32_t getSpellImplicitTargetA(uint32_t spellId) const;
     /// Whether Spell.dbc has this spell at all.
     ///
     /// A server may cast something the client's own data has never heard of -
     /// a private core's custom item does it routinely - and the answer to
     /// "what does this aim at" is then not zero but unknown. The two are worth
     /// telling apart: zero means the spell says nothing, unknown means we do.
-    bool isSpellKnownToClient(uint32_t spellId) const;
+    [[nodiscard]] bool isSpellKnownToClient(uint32_t spellId) const;
 
     /// The last spell the player cast while on foot. When mounting is detected,
     /// this identifies which of the player's indefinite self-cast auras is the
     /// mount - scanning for one blindly can land on a racial or a tracking buff.
-    uint32_t getLastGroundCastSpellId() const { return lastGroundCastSpellId_; }
+    [[nodiscard]] uint32_t getLastGroundCastSpellId() const { return lastGroundCastSpellId_; }
 
     /// Record a spell cast by using an item - pre-WotLK mounts are items, and
     /// their on-use spell never passes through castSpell().
@@ -73,41 +73,41 @@ public:
     void cancelAura(uint32_t spellId);
 
     // Known spells
-    const std::unordered_set<uint32_t>& getKnownSpells() const { return knownSpells_; }
-    const std::unordered_map<uint32_t, float>& getSpellCooldowns() const { return spellCooldowns_; }
-    float getSpellCooldown(uint32_t spellId) const;
-    float getSpellCooldownTotal(uint32_t spellId) const;
+    [[nodiscard]] const std::unordered_set<uint32_t>& getKnownSpells() const { return knownSpells_; }
+    [[nodiscard]] const std::unordered_map<uint32_t, float>& getSpellCooldowns() const { return spellCooldowns_; }
+    [[nodiscard]] float getSpellCooldown(uint32_t spellId) const;
+    [[nodiscard]] float getSpellCooldownTotal(uint32_t spellId) const;
 
     // Cast state
-    bool isCasting() const { return casting_ || restorationActive_; }
-    bool isChanneling() const { return casting_ ? castIsChannel_ : restorationActive_; }
-    bool isRestoring() const { return restorationActive_; }
-    bool isGameObjectInteractionCasting() const;
-    uint32_t getCurrentCastSpellId() const {
+    [[nodiscard]] bool isCasting() const { return casting_ || restorationActive_; }
+    [[nodiscard]] bool isChanneling() const { return casting_ ? castIsChannel_ : restorationActive_; }
+    [[nodiscard]] bool isRestoring() const { return restorationActive_; }
+    [[nodiscard]] bool isGameObjectInteractionCasting() const;
+    [[nodiscard]] uint32_t getCurrentCastSpellId() const {
         return casting_ ? currentCastSpellId_ : restorationSpellId_;
     }
-    float getCastProgress() const {
+    [[nodiscard]] float getCastProgress() const {
         const float total = casting_ ? castTimeTotal_ : restorationTimeTotal_;
         const float remaining = casting_ ? castTimeRemaining_ : restorationTimeRemaining_;
         return total > 0.0f ? (total - remaining) / total : 0.0f;
     }
-    float getCastTimeRemaining() const {
+    [[nodiscard]] float getCastTimeRemaining() const {
         return casting_ ? castTimeRemaining_ : restorationTimeRemaining_;
     }
-    float getCastTimeTotal() const {
+    [[nodiscard]] float getCastTimeTotal() const {
         return casting_ ? castTimeTotal_ : restorationTimeTotal_;
     }
 
     // Repeat-craft queue
     void startCraftQueue(uint32_t spellId, int count);
     void cancelCraftQueue();
-    int getCraftQueueRemaining() const { return craftQueueRemaining_; }
-    uint32_t getCraftQueueSpellId() const { return craftQueueSpellId_; }
+    [[nodiscard]] int getCraftQueueRemaining() const { return craftQueueRemaining_; }
+    [[nodiscard]] uint32_t getCraftQueueSpellId() const { return craftQueueSpellId_; }
 
     // Crafting window (client-side; opened by casting a profession spell
     // like Cooking or First Aid - see tradeskillOpenerSkillLine)
-    bool isCraftingWindowOpen() const { return craftingWindowOpen_; }
-    uint32_t getCraftingSkillLine() const { return craftingSkillLine_; }
+    [[nodiscard]] bool isCraftingWindowOpen() const { return craftingWindowOpen_; }
+    [[nodiscard]] uint32_t getCraftingSkillLine() const { return craftingSkillLine_; }
     /// Opening and closing a profession announce themselves, because the
     /// interface's trade skill panel is driven entirely by these two events -
     /// it hides on TRADE_SKILL_CLOSE and fills itself on TRADE_SKILL_SHOW.
@@ -127,11 +127,11 @@ public:
     const std::string& getTotemCategoryName(uint32_t categoryId);
 
     // Spell queue (400ms window)
-    uint32_t getQueuedSpellId() const { return queuedSpellId_; }
+    [[nodiscard]] uint32_t getQueuedSpellId() const { return queuedSpellId_; }
     void cancelQueuedSpell() { queuedSpellId_ = 0; queuedSpellTarget_ = 0; }
 
     // Unit cast state (tracked per GUID for target frame + boss frames)
-    const UnitCastState* getUnitCastState(uint64_t guid) const {
+    [[nodiscard]] const UnitCastState* getUnitCastState(uint64_t guid) const {
         auto it = unitCastStates_.find(guid);
         return (it != unitCastStates_.end() && it->second.casting) ? &it->second : nullptr;
     }
@@ -144,7 +144,7 @@ public:
 
     // Known spells mutation (formerly accessed via friend)
     void addKnownSpell(uint32_t spellId) { knownSpells_.insert(spellId); }
-    bool hasKnownSpell(uint32_t spellId) const { return knownSpells_.count(spellId) > 0; }
+    [[nodiscard]] bool hasKnownSpell(uint32_t spellId) const { return knownSpells_.count(spellId) > 0; }
 
     // Target aura mutation (formerly accessed via friend)
     void clearTargetAuras() { for (auto& slot : targetAuras_) slot = AuraSlot{}; }
@@ -155,29 +155,29 @@ public:
     std::vector<AuraSlot>& getPlayerAurasMut() { return playerAuras_; }
 
     // Target cast helpers
-    bool isTargetCasting() const;
-    uint32_t getTargetCastSpellId() const;
-    float getTargetCastProgress() const;
-    float getTargetCastTimeRemaining() const;
-    bool isTargetCastInterruptible() const;
+    [[nodiscard]] bool isTargetCasting() const;
+    [[nodiscard]] uint32_t getTargetCastSpellId() const;
+    [[nodiscard]] float getTargetCastProgress() const;
+    [[nodiscard]] float getTargetCastTimeRemaining() const;
+    [[nodiscard]] bool isTargetCastInterruptible() const;
 
     // Talents
-    uint8_t getActiveTalentSpec() const { return activeTalentSpec_; }
-    uint8_t getUnspentTalentPoints() const { return unspentTalentPoints_[activeTalentSpec_]; }
-    uint8_t getUnspentTalentPoints(uint8_t spec) const { return spec < 2 ? unspentTalentPoints_[spec] : 0; }
-    const std::unordered_map<uint32_t, uint8_t>& getLearnedTalents() const { return learnedTalents_[activeTalentSpec_]; }
-    const std::unordered_map<uint32_t, uint8_t>& getLearnedTalents(uint8_t spec) const {
+    [[nodiscard]] uint8_t getActiveTalentSpec() const { return activeTalentSpec_; }
+    [[nodiscard]] uint8_t getUnspentTalentPoints() const { return unspentTalentPoints_[activeTalentSpec_]; }
+    [[nodiscard]] uint8_t getUnspentTalentPoints(uint8_t spec) const { return spec < 2 ? unspentTalentPoints_[spec] : 0; }
+    [[nodiscard]] const std::unordered_map<uint32_t, uint8_t>& getLearnedTalents() const { return learnedTalents_[activeTalentSpec_]; }
+    [[nodiscard]] const std::unordered_map<uint32_t, uint8_t>& getLearnedTalents(uint8_t spec) const {
         static std::unordered_map<uint32_t, uint8_t> empty;
         return spec < 2 ? learnedTalents_[spec] : empty;
     }
 
     static constexpr uint8_t MAX_GLYPH_SLOTS = 6;
-    const std::array<uint16_t, MAX_GLYPH_SLOTS>& getGlyphs() const { return learnedGlyphs_[activeTalentSpec_]; }
-    const std::array<uint16_t, MAX_GLYPH_SLOTS>& getGlyphs(uint8_t spec) const {
+    [[nodiscard]] const std::array<uint16_t, MAX_GLYPH_SLOTS>& getGlyphs() const { return learnedGlyphs_[activeTalentSpec_]; }
+    [[nodiscard]] const std::array<uint16_t, MAX_GLYPH_SLOTS>& getGlyphs(uint8_t spec) const {
         static std::array<uint16_t, MAX_GLYPH_SLOTS> empty{};
         return spec < 2 ? learnedGlyphs_[spec] : empty;
     }
-    uint8_t getTalentRank(uint32_t talentId) const {
+    [[nodiscard]] uint8_t getTalentRank(uint32_t talentId) const {
         auto it = learnedTalents_[activeTalentSpec_].find(talentId);
         return (it != learnedTalents_[activeTalentSpec_].end()) ? it->second : 0;
     }
@@ -185,16 +185,16 @@ public:
     void switchTalentSpec(uint8_t newSpec);
 
     // Talent DBC access
-    const TalentEntry* getTalentEntry(uint32_t talentId) const {
+    [[nodiscard]] const TalentEntry* getTalentEntry(uint32_t talentId) const {
         auto it = talentCache_.find(talentId);
         return (it != talentCache_.end()) ? &it->second : nullptr;
     }
-    const TalentTabEntry* getTalentTabEntry(uint32_t tabId) const {
+    [[nodiscard]] const TalentTabEntry* getTalentTabEntry(uint32_t tabId) const {
         auto it = talentTabCache_.find(tabId);
         return (it != talentTabCache_.end()) ? &it->second : nullptr;
     }
-    const std::unordered_map<uint32_t, TalentEntry>& getAllTalents() const { return talentCache_; }
-    const std::unordered_map<uint32_t, TalentTabEntry>& getAllTalentTabs() const { return talentTabCache_; }
+    [[nodiscard]] const std::unordered_map<uint32_t, TalentEntry>& getAllTalents() const { return talentCache_; }
+    [[nodiscard]] const std::unordered_map<uint32_t, TalentTabEntry>& getAllTalentTabs() const { return talentTabCache_; }
 
     /// Drops what was read out of Talent.dbc and TalentTab.dbc.
     ///
@@ -210,39 +210,39 @@ public:
     void syncPreWotlkTalentsFromKnownSpells();
 
     // Auras
-    const std::vector<AuraSlot>& getPlayerAuras() const { return playerAuras_; }
-    const std::vector<AuraSlot>& getTargetAuras() const { return targetAuras_; }
-    const std::vector<AuraSlot>* getUnitAuras(uint64_t guid) const {
+    [[nodiscard]] const std::vector<AuraSlot>& getPlayerAuras() const { return playerAuras_; }
+    [[nodiscard]] const std::vector<AuraSlot>& getTargetAuras() const { return targetAuras_; }
+    [[nodiscard]] const std::vector<AuraSlot>* getUnitAuras(uint64_t guid) const {
         auto it = unitAurasCache_.find(guid);
         return (it != unitAurasCache_.end()) ? &it->second : nullptr;
     }
 
     // Global Cooldown (GCD)
-    float getGCDRemaining() const {
+    [[nodiscard]] float getGCDRemaining() const {
         if (gcdTotal_ <= 0.0f) return 0.0f;
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - gcdStartedAt_).count() / 1000.0f;
         float rem = gcdTotal_ - elapsed;
         return rem > 0.0f ? rem : 0.0f;
     }
-    float getGCDTotal() const { return gcdTotal_; }
-    bool isGCDActive() const { return getGCDRemaining() > 0.0f; }
+    [[nodiscard]] float getGCDTotal() const { return gcdTotal_; }
+    [[nodiscard]] bool isGCDActive() const { return getGCDRemaining() > 0.0f; }
 
     // Spell book tabs
     const std::vector<SpellBookTab>& getSpellBookTabs();
 
     // Talent wipe confirm dialog
-    bool showTalentWipeConfirmDialog() const { return talentWipePending_; }
-    uint32_t getTalentWipeCost() const { return talentWipeCost_; }
+    [[nodiscard]] bool showTalentWipeConfirmDialog() const { return talentWipePending_; }
+    [[nodiscard]] uint32_t getTalentWipeCost() const { return talentWipeCost_; }
     /// The trainer offering the wipe. The confirmation closes itself when the
     /// player walks away from them.
-    uint64_t getTalentWipeNpcGuid() const { return talentWipeNpcGuid_; }
+    [[nodiscard]] uint64_t getTalentWipeNpcGuid() const { return talentWipeNpcGuid_; }
     void confirmTalentWipe();
     void cancelTalentWipe() { talentWipePending_ = false; }
 
     // Pet talent respec confirm
-    bool showPetUnlearnDialog() const { return petUnlearnPending_; }
-    uint32_t getPetUnlearnCost() const { return petUnlearnCost_; }
+    [[nodiscard]] bool showPetUnlearnDialog() const { return petUnlearnPending_; }
+    [[nodiscard]] uint32_t getPetUnlearnCost() const { return petUnlearnCost_; }
     void confirmPetUnlearn();
     void cancelPetUnlearn() { petUnlearnPending_ = false; }
 
@@ -258,36 +258,36 @@ public:
     void renamePet(const std::string& newName);
 
     // Spell DBC accessors
-    const int32_t* getSpellEffectBasePoints(uint32_t spellId) const;
-    float getSpellDuration(uint32_t spellId) const;
-    const std::string& getSpellName(uint32_t spellId) const;
-    const std::string& getSpellRank(uint32_t spellId) const;
-    const std::string& getSpellDescription(uint32_t spellId) const;
-    std::string getEnchantName(uint32_t enchantId) const;
+    [[nodiscard]] const int32_t* getSpellEffectBasePoints(uint32_t spellId) const;
+    [[nodiscard]] float getSpellDuration(uint32_t spellId) const;
+    [[nodiscard]] const std::string& getSpellName(uint32_t spellId) const;
+    [[nodiscard]] const std::string& getSpellRank(uint32_t spellId) const;
+    [[nodiscard]] const std::string& getSpellDescription(uint32_t spellId) const;
+    [[nodiscard]] std::string getEnchantName(uint32_t enchantId) const;
     /// The gem item an enchantment came out of (SpellItemEnchantment.Src_ItemID).
     /// Zero when the enchantment is not a gem, or on a file with no such column.
     /// This is the only route from an enchantment sitting in an item's socket
     /// back to the gem that is in the socket - the item fields carry the
     /// enchantment id and nothing else.
-    uint32_t getEnchantGemItem(uint32_t enchantId) const;
-    uint8_t getSpellDispelType(uint32_t spellId) const;
-    bool isSpellInterruptible(uint32_t spellId) const;
-    bool isSpellPassive(uint32_t spellId) const;
-    uint32_t getSpellSchoolMask(uint32_t spellId) const;
+    [[nodiscard]] uint32_t getEnchantGemItem(uint32_t enchantId) const;
+    [[nodiscard]] uint8_t getSpellDispelType(uint32_t spellId) const;
+    [[nodiscard]] bool isSpellInterruptible(uint32_t spellId) const;
+    [[nodiscard]] bool isSpellPassive(uint32_t spellId) const;
+    [[nodiscard]] uint32_t getSpellSchoolMask(uint32_t spellId) const;
     /// Spell.dbc Targets mask (SpellCastTargetFlags): 0x10 = TARGET_FLAG_ITEM.
-    uint32_t getSpellTargetFlags(uint32_t spellId) const;
-    uint32_t getSpellTargetAuraState(uint32_t spellId) const;
+    [[nodiscard]] uint32_t getSpellTargetFlags(uint32_t spellId) const;
+    [[nodiscard]] uint32_t getSpellTargetAuraState(uint32_t spellId) const;
     /// Spell.dbc RangeIndex resolved via SpellRange.dbc, in yards. Melee ("Combat
     /// Range") is 5; self-only is 0; negative means SpellRange.dbc was unavailable.
-    float getSpellMaxRange(uint32_t spellId) const;
+    [[nodiscard]] float getSpellMaxRange(uint32_t spellId) const;
     /// True for "Self Only" range spells (shouts, self-buffs): they always land on
     /// the caster, so they take no explicit target and skip melee range checks.
-    bool isSelfCastSpell(uint32_t spellId) const;
+    [[nodiscard]] bool isSelfCastSpell(uint32_t spellId) const;
     /// Maps a superseded spell rank to the highest rank we actually know. Returns
     /// spellId unchanged when it is already known, or has no known same-name rank.
-    uint32_t resolveHighestKnownRank(uint32_t spellId) const;
+    [[nodiscard]] uint32_t resolveHighestKnownRank(uint32_t spellId) const;
     /// The skill's own name, by SkillLine.dbc id.
-    const std::string& getSkillLineName(uint32_t skillLineId) const;
+    [[nodiscard]] const std::string& getSkillLineName(uint32_t skillLineId) const;
 
     // Cast state
     void stopCasting();
@@ -344,7 +344,7 @@ public:
     /// unit, spell name, rank, cast id, spell id - in that order, which is what
     /// FrameXML unpacks. These were being fired as just the unit and the spell
     /// id, so the id sat where the name belongs and the cast id was absent.
-    std::vector<std::string> spellcastArgs(const std::string& unitId,
+    [[nodiscard]] std::vector<std::string> spellcastArgs(const std::string& unitId,
                                            uint32_t spellId) const;
 
     void abandonPet();

@@ -52,19 +52,19 @@ public:
     void endPass(VkCommandBuffer cmd);
 
     // Accessors - always return the resolved (single-sample) image for reading
-    VkImage getColorImage() const { return resolveImage_.image ? resolveImage_.image : colorImage_.image; }
-    VkImageView getColorImageView() const { return resolveImage_.imageView ? resolveImage_.imageView : colorImage_.imageView; }
-    VkSampler getSampler() const { return sampler_; }
-    VkRenderPass getRenderPass() const { return renderPass_; }
-    VkExtent2D getExtent() const { return { colorImage_.extent.width, colorImage_.extent.height }; }
-    VkFormat getFormat() const { return colorImage_.format; }
-    bool isValid() const { return framebuffer_ != VK_NULL_HANDLE; }
-    VkSampleCountFlagBits getSampleCount() const { return msaaSamples_; }
+    [[nodiscard]] VkImage getColorImage() const { return resolveImage_.image ? resolveImage_.image : colorImage_.image; }
+    [[nodiscard]] VkImageView getColorImageView() const { return resolveImage_.imageView ? resolveImage_.imageView : colorImage_.imageView; }
+    [[nodiscard]] VkSampler getSampler() const { return sampler_; }
+    [[nodiscard]] VkRenderPass getRenderPass() const { return renderPass_; }
+    [[nodiscard]] VkExtent2D getExtent() const { return { colorImage_.extent.width, colorImage_.extent.height }; }
+    [[nodiscard]] VkFormat getFormat() const { return colorImage_.format; }
+    [[nodiscard]] bool isValid() const { return framebuffer_ != VK_NULL_HANDLE; }
+    [[nodiscard]] VkSampleCountFlagBits getSampleCount() const { return msaaSamples_; }
 
     /**
      * Descriptor info for binding the color attachment as a texture in a shader.
      */
-    VkDescriptorImageInfo descriptorInfo() const;
+    [[nodiscard]] VkDescriptorImageInfo descriptorInfo() const;
 
 private:
     AllocatedImage colorImage_{};     // MSAA color (or single-sample if no MSAA)

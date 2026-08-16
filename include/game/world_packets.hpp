@@ -33,7 +33,7 @@ struct AuthChallengeData {
     uint32_t serverSeed;    // Random seed from server
     // Note: 3.3.5a has additional data after this
 
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 /**
@@ -123,7 +123,7 @@ enum class AuthResult : uint8_t {
 struct AuthResponseData {
     AuthResult result;
 
-    bool isSuccess() const { return result == AuthResult::OK; }
+    [[nodiscard]] bool isSuccess() const { return result == AuthResult::OK; }
 };
 
 /**
@@ -165,8 +165,8 @@ public:
 struct CharEnumResponse {
     std::vector<Character> characters;
 
-    bool isEmpty() const { return characters.empty(); }
-    size_t count() const { return characters.size(); }
+    [[nodiscard]] bool isEmpty() const { return characters.empty(); }
+    [[nodiscard]] size_t count() const { return characters.size(); }
 };
 
 /**
@@ -291,7 +291,7 @@ struct LoginVerifyWorldData {
     float x, y, z;          // Initial position coordinates
     float orientation;      // Initial orientation (facing direction)
 
-    bool isValid() const { return mapId != 0xFFFFFFFF; }
+    [[nodiscard]] bool isValid() const { return mapId != 0xFFFFFFFF; }
 };
 
 /**
@@ -312,7 +312,7 @@ struct AccountDataTimesData {
     uint8_t unknown;                    // Unknown (always 1?)
     uint32_t accountDataTimes[8];       // Timestamps for 8 account data slots
 
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 /**
@@ -331,8 +331,8 @@ public:
 struct MotdData {
     std::vector<std::string> lines;     // MOTD text lines
 
-    bool isEmpty() const { return lines.empty(); }
-    size_t lineCount() const { return lines.size(); }
+    [[nodiscard]] bool isEmpty() const { return lines.empty(); }
+    [[nodiscard]] size_t lineCount() const { return lines.size(); }
 };
 
 /**
@@ -368,7 +368,7 @@ public:
 struct PongData {
     uint32_t sequence;      // Sequence number from CMSG_PING
 
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 /**
@@ -472,26 +472,26 @@ struct MovementInfo {
     int8_t transportSeat = -1;      // Transport seat (-1 when unknown/not seated)
     uint32_t transportTime2 = 0;    // Secondary transport time (when interpolated movement flag is set)
 
-    bool hasFlag(MovementFlags flag) const {
+    [[nodiscard]] bool hasFlag(MovementFlags flag) const {
         return (flags & static_cast<uint32_t>(flag)) != 0;
     }
 
     // What the movement flags mean. GameHandler and MovementHandler both used
     // to spell these out against their own copy of the flag word, which is one
     // definition of flying in two places.
-    bool isPlayerRooted() const { return hasFlag(MovementFlags::ROOT); }
-    bool isGravityDisabled() const { return hasFlag(MovementFlags::LEVITATING); }
-    bool isFeatherFalling() const { return hasFlag(MovementFlags::FEATHER_FALL); }
-    bool isWaterWalking() const { return hasFlag(MovementFlags::WATER_WALK); }
-    bool isHovering() const { return hasFlag(MovementFlags::HOVER); }
-    bool isSwimming() const { return hasFlag(MovementFlags::SWIMMING); }
+    [[nodiscard]] bool isPlayerRooted() const { return hasFlag(MovementFlags::ROOT); }
+    [[nodiscard]] bool isGravityDisabled() const { return hasFlag(MovementFlags::LEVITATING); }
+    [[nodiscard]] bool isFeatherFalling() const { return hasFlag(MovementFlags::FEATHER_FALL); }
+    [[nodiscard]] bool isWaterWalking() const { return hasFlag(MovementFlags::WATER_WALK); }
+    [[nodiscard]] bool isHovering() const { return hasFlag(MovementFlags::HOVER); }
+    [[nodiscard]] bool isSwimming() const { return hasFlag(MovementFlags::SWIMMING); }
 
     /// Both flags, not either. CAN_FLY on its own is permission to fly, which
     /// a player has while mounted on a flying mount and standing on the
     /// ground, and FLYING on its own arrives briefly mid-transition. Treating
     /// either as flying puts the character into the airborne animation while
     /// it is walking around.
-    bool isPlayerFlying() const {
+    [[nodiscard]] bool isPlayerFlying() const {
         const uint32_t flyMask = static_cast<uint32_t>(MovementFlags::CAN_FLY) |
                                  static_cast<uint32_t>(MovementFlags::FLYING);
         return (flags & flyMask) == flyMask;
@@ -775,7 +775,7 @@ struct MessageChatData {
     // Stable cache key for the chat UI's formatted/parsed line cache.
     uint64_t uid = 0;
 
-    bool isValid() const { return !message.empty(); }
+    [[nodiscard]] bool isValid() const { return !message.empty(); }
 };
 
 /**
@@ -821,7 +821,7 @@ struct TextEmoteData {
     uint32_t emoteNum = 0;
     std::string targetName;
 
-    bool isValid() const { return senderGuid != 0; }
+    [[nodiscard]] bool isValid() const { return senderGuid != 0; }
 };
 
 /**
@@ -902,7 +902,7 @@ struct ChannelNotifyData {
     std::string channelName;
     uint64_t senderGuid = 0;
 
-    bool isValid() const { return !channelName.empty(); }
+    [[nodiscard]] bool isValid() const { return !channelName.empty(); }
 };
 
 /**
@@ -1280,9 +1280,9 @@ struct PetitionShowlistData {
     /// Guild Charter is item 5863; the arena charters are 23560, 23561 and
     /// 23562. Which of the two panels opens depends on this and nothing else -
     /// the opcode is the same for both.
-    bool isGuildCharter() const { return itemId == 5863; }
+    [[nodiscard]] bool isGuildCharter() const { return itemId == 5863; }
 
-    bool isValid() const { return npcGuid != 0; }
+    [[nodiscard]] bool isValid() const { return npcGuid != 0; }
 };
 
 /** SMSG_PETITION_SHOWLIST parser */
@@ -1324,7 +1324,7 @@ struct GuildQueryResponseData {
     uint32_t backgroundColor = 0;
     uint32_t rankCount = 0;
 
-    bool isValid() const { return guildId != 0 && !guildName.empty(); }
+    [[nodiscard]] bool isValid() const { return guildId != 0 && !guildName.empty(); }
 };
 
 /** SMSG_GUILD_QUERY_RESPONSE parser */
@@ -1342,7 +1342,7 @@ struct GuildInfoData {
     uint32_t numMembers = 0;
     uint32_t numAccounts = 0;
 
-    bool isValid() const { return !guildName.empty(); }
+    [[nodiscard]] bool isValid() const { return !guildName.empty(); }
 };
 
 /** SMSG_GUILD_INFO parser */
@@ -1383,7 +1383,7 @@ struct GuildRosterData {
     std::vector<GuildRankInfo> ranks;
     std::vector<GuildRosterMember> members;
 
-    bool isEmpty() const { return members.empty(); }
+    [[nodiscard]] bool isEmpty() const { return members.empty(); }
 };
 
 /// The two facts that separate SMSG_GUILD_ROSTER's three shapes.
@@ -1416,7 +1416,7 @@ struct GuildEventData {
     std::string strings[3];
     uint64_t guid = 0;
 
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 /** SMSG_GUILD_EVENT parser */
@@ -1430,7 +1430,7 @@ struct GuildInviteResponseData {
     std::string inviterName;
     std::string guildName;
 
-    bool isValid() const { return !inviterName.empty(); }
+    [[nodiscard]] bool isValid() const { return !inviterName.empty(); }
 };
 
 /** SMSG_GUILD_INVITE parser */
@@ -1445,7 +1445,7 @@ struct GuildCommandResultData {
     std::string name;
     uint32_t errorCode = 0;
 
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 /** SMSG_GUILD_COMMAND_RESULT parser */
@@ -1748,7 +1748,7 @@ struct NameQueryResponseData {
     uint8_t gender = 0;
     uint8_t classId = 0;
 
-    bool isValid() const { return found == 0 && !name.empty(); }
+    [[nodiscard]] bool isValid() const { return found == 0 && !name.empty(); }
 };
 
 /** SMSG_NAME_QUERY_RESPONSE parser */
@@ -1775,7 +1775,7 @@ struct CreatureQueryResponseData {
     uint32_t rank = 0;         // 0=Normal, 1=Elite, 2=Rare Elite, 3=Boss, 4=Rare
     uint32_t displayId[4] = {};  // Up to 4 random display models (0 = unused)
 
-    bool isValid() const { return entry != 0 && !name.empty(); }
+    [[nodiscard]] bool isValid() const { return entry != 0 && !name.empty(); }
 };
 
 /** SMSG_CREATURE_QUERY_RESPONSE parser */
@@ -1803,7 +1803,7 @@ struct GameObjectQueryResponseData {
     uint32_t data[24] = {};  // Type-specific data fields (e.g. data[0]=taxiPathId for MO_TRANSPORT)
     bool hasData = false;    // Whether data[] was parsed
 
-    bool isValid() const { return entry != 0 && !name.empty(); }
+    [[nodiscard]] bool isValid() const { return entry != 0 && !name.empty(); }
 };
 
 /** SMSG_GAMEOBJECT_QUERY_RESPONSE parser */
@@ -1831,7 +1831,7 @@ struct PageTextQueryResponseData {
     std::string text;
     uint32_t nextPageId = 0;
 
-    bool isValid() const { return pageId != 0; }
+    [[nodiscard]] bool isValid() const { return pageId != 0; }
 };
 
 /** SMSG_PAGE_TEXT_QUERY_RESPONSE parser */
@@ -2013,7 +2013,7 @@ public:
 struct AttackStartData {
     uint64_t attackerGuid = 0;
     uint64_t victimGuid = 0;
-    bool isValid() const { return attackerGuid != 0 && victimGuid != 0; }
+    [[nodiscard]] bool isValid() const { return attackerGuid != 0 && victimGuid != 0; }
 };
 
 class AttackStartParser {
@@ -2026,7 +2026,7 @@ struct AttackStopData {
     uint64_t attackerGuid = 0;
     uint64_t victimGuid = 0;
     uint32_t unknown = 0;
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 class AttackStopParser {
@@ -2064,11 +2064,11 @@ struct AttackerStateUpdateData {
     int32_t overkill = -1;
     uint32_t blocked = 0;
 
-    bool isValid() const { return attackerGuid != 0; }
-    bool isCrit() const     { return (hitInfo & 0x0200) != 0; }
-    bool isMiss() const     { return (hitInfo & 0x0010) != 0; }
-    bool isGlancing() const { return (hitInfo & 0x0800) != 0; }
-    bool isCrushing() const { return (hitInfo & 0x1000) != 0; }
+    [[nodiscard]] bool isValid() const { return attackerGuid != 0; }
+    [[nodiscard]] bool isCrit() const     { return (hitInfo & 0x0200) != 0; }
+    [[nodiscard]] bool isMiss() const     { return (hitInfo & 0x0010) != 0; }
+    [[nodiscard]] bool isGlancing() const { return (hitInfo & 0x0800) != 0; }
+    [[nodiscard]] bool isCrushing() const { return (hitInfo & 0x1000) != 0; }
 };
 
 class AttackerStateUpdateParser {
@@ -2088,7 +2088,7 @@ struct SpellDamageLogData {
     uint32_t resisted = 0;
     bool isCrit = false;
 
-    bool isValid() const { return spellId != 0; }
+    [[nodiscard]] bool isValid() const { return spellId != 0; }
 };
 
 class SpellDamageLogParser {
@@ -2106,7 +2106,7 @@ struct SpellHealLogData {
     uint32_t absorbed = 0;
     bool isCrit = false;
 
-    bool isValid() const { return spellId != 0; }
+    [[nodiscard]] bool isValid() const { return spellId != 0; }
 };
 
 class SpellHealLogParser {
@@ -2125,7 +2125,7 @@ struct XpGainData {
     uint8_t type = 0;           // 0 = kill, 1 = non-kill
     uint32_t groupBonus = 0;
 
-    bool isValid() const { return totalXp > 0; }
+    [[nodiscard]] bool isValid() const { return totalXp > 0; }
 };
 
 class XpGainParser {
@@ -2143,7 +2143,7 @@ struct InitialSpellsData {
     std::vector<uint32_t> spellIds;
     std::vector<SpellCooldownEntry> cooldowns;
 
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 class InitialSpellsParser {
@@ -2219,7 +2219,7 @@ struct CastFailedData {
     uint32_t miscArg = 0;   // first trailing id (see readCastResultArgs)
     uint32_t miscArg2 = 0;  // second trailing id (totem failures only)
 
-    bool isValid() const { return spellId != 0; }
+    [[nodiscard]] bool isValid() const { return spellId != 0; }
 };
 
 class CastFailedParser {
@@ -2237,7 +2237,7 @@ struct SpellStartData {
     uint32_t castTime = 0;
     uint64_t targetGuid = 0;
 
-    bool isValid() const { return spellId != 0; }
+    [[nodiscard]] bool isValid() const { return spellId != 0; }
 };
 
 class SpellStartParser {
@@ -2263,7 +2263,7 @@ struct SpellGoData {
     std::vector<SpellGoMissEntry> missTargets;
     uint64_t targetGuid = 0;  ///< Primary target GUID from SpellCastTargets (0 = none/AoE)
 
-    bool isValid() const { return spellId != 0; }
+    [[nodiscard]] bool isValid() const { return spellId != 0; }
 };
 
 class SpellGoParser {
@@ -2276,7 +2276,7 @@ struct AuraUpdateData {
     uint64_t guid = 0;
     std::vector<std::pair<uint8_t, AuraSlot>> updates; // slot index + aura data
 
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 class AuraUpdateParser {
@@ -2290,7 +2290,7 @@ struct SpellCooldownData {
     uint8_t flags = 0;
     std::vector<std::pair<uint32_t, uint32_t>> cooldowns; // spellId, cooldownMs
 
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 class SpellCooldownParser {
@@ -2313,7 +2313,7 @@ struct GroupInviteResponseData {
     uint8_t canAccept = 0;
     std::string inviterName;
 
-    bool isValid() const { return !inviterName.empty(); }
+    [[nodiscard]] bool isValid() const { return !inviterName.empty(); }
 };
 
 class GroupInviteResponseParser {
@@ -2350,7 +2350,7 @@ struct PartyCommandResultData {
     std::string name;
     PartyResult result;
 
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 class PartyCommandResultParser {
@@ -2361,7 +2361,7 @@ public:
 /** SMSG_GROUP_DECLINE data */
 struct GroupDeclineData {
     std::string playerName;
-    bool isValid() const { return !playerName.empty(); }
+    [[nodiscard]] bool isValid() const { return !playerName.empty(); }
 };
 
 class GroupDeclineResponseParser {
@@ -2392,10 +2392,10 @@ struct LootResponseData {
     uint32_t gold = 0;           // In copper
     std::vector<LootItem> items;
 
-    bool isValid() const { return true; }
-    uint32_t getGold() const { return gold / 10000; }
-    uint32_t getSilver() const { return (gold / 100) % 100; }
-    uint32_t getCopper() const { return gold % 100; }
+    [[nodiscard]] bool isValid() const { return true; }
+    [[nodiscard]] uint32_t getGold() const { return gold / 10000; }
+    [[nodiscard]] uint32_t getSilver() const { return (gold / 100) % 100; }
+    [[nodiscard]] uint32_t getCopper() const { return gold % 100; }
 };
 
 /** CMSG_LOOT packet builder */
@@ -2516,7 +2516,7 @@ struct GossipMessageData {
     std::vector<GossipOption> options;
     std::vector<GossipQuestItem> quests;
 
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 /** CMSG_GOSSIP_HELLO packet builder */
@@ -2628,7 +2628,7 @@ struct QuestRequestItemsData {
     uint32_t completableFlags = 0;  // 0x03 = completable
     std::vector<QuestRewardItem> requiredItems;
 
-    bool isCompletable() const { return (completableFlags & 0x03) != 0; }
+    [[nodiscard]] bool isCompletable() const { return (completableFlags & 0x03) != 0; }
 };
 
 /** SMSG_QUESTGIVER_REQUEST_ITEMS parser */
@@ -2752,7 +2752,7 @@ struct ListInventoryData {
     std::vector<VendorItem> items;
     bool canRepair = false;  // Set when vendor was opened via GOSSIP_OPTION_ARMORER
 
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 /** CMSG_LIST_INVENTORY packet builder */
@@ -2808,7 +2808,7 @@ struct TrainerListData {
     uint32_t trainerType = 0;  // 0=class, 1=mounts, 2=tradeskills, 3=pets
     std::vector<TrainerSpell> spells;
     std::string greeting;
-    bool isValid() const { return true; }
+    [[nodiscard]] bool isValid() const { return true; }
 };
 
 class TrainerListParser {
@@ -2901,7 +2901,7 @@ struct ShowTaxiNodesData {
     uint64_t npcGuid = 0;
     uint32_t nearestNode = 0;       // Taxi node player is at
     uint32_t nodeMask[TLK_TAXI_MASK_SIZE] = {};
-    bool isNodeKnown(uint32_t nodeId) const {
+    [[nodiscard]] bool isNodeKnown(uint32_t nodeId) const {
         if (nodeId == 0) return false;
         uint32_t bitIndex = nodeId - 1;
         uint32_t idx = bitIndex / 32;

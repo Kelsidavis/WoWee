@@ -86,9 +86,9 @@ struct WoweeCompanion {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t companionId) const;
+    [[nodiscard]] const Entry* findById(uint32_t companionId) const;
 
     static const char* companionKindName(uint8_t k);
     static const char* rarityName(uint8_t r);

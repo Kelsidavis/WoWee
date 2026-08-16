@@ -90,9 +90,9 @@ struct WoweeItemMaterial {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t materialId) const;
+    [[nodiscard]] const Entry* findById(uint32_t materialId) const;
 
     static const char* materialKindName(uint8_t k);
     static const char* weightCategoryName(uint8_t w);

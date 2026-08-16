@@ -177,7 +177,7 @@ struct ItemDef {
     /// because it had been written out three times in inventory_screen.cpp and
     /// nowhere on the path FrameXML takes - so equipping through the interface
     /// bound the item with no prompt at all.
-    bool wouldBindOnEquip() const { return bindType == 2 && !soulbound; }
+    [[nodiscard]] bool wouldBindOnEquip() const { return bindType == 2 && !soulbound; }
     // Per-instance ITEM_FIELD_RANDOM_PROPERTIES_ID: >0 → ItemRandomProperties.dbc (prefix),
     // <0 → ItemRandomSuffix.dbc (e.g. "of the Bear"). 0 means no random property rolled.
     int32_t randomPropertyId = 0;
@@ -194,7 +194,7 @@ struct ItemDef {
 
 struct ItemSlot {
     ItemDef item;
-    bool empty() const { return item.itemId == 0; }
+    [[nodiscard]] bool empty() const { return item.itemId == 0; }
 };
 
 class Inventory {
@@ -215,10 +215,10 @@ public:
     Inventory();
 
     // Backpack
-    const ItemSlot& getBackpackSlot(int index) const;
+    [[nodiscard]] const ItemSlot& getBackpackSlot(int index) const;
     bool setBackpackSlot(int index, const ItemDef& item);
     bool clearBackpackSlot(int index);
-    int getBackpackSize() const { return BACKPACK_SLOTS; }
+    [[nodiscard]] int getBackpackSize() const { return BACKPACK_SLOTS; }
 
     /// How many of an item the backpack and equipped bags hold together.
     ///
@@ -228,50 +228,50 @@ public:
     /// items split on what to do about it: the Lua bindings read such a slot
     /// as one and the client's own counters read it as none. A reagent could
     /// be in the bags and missing from the crafting check at the same time.
-    uint32_t countItem(uint32_t itemId) const;
+    [[nodiscard]] uint32_t countItem(uint32_t itemId) const;
 
     // Equipment
-    const ItemSlot& getEquipSlot(EquipSlot slot) const;
+    [[nodiscard]] const ItemSlot& getEquipSlot(EquipSlot slot) const;
     bool setEquipSlot(EquipSlot slot, const ItemDef& item);
     bool clearEquipSlot(EquipSlot slot);
 
     // Keyring
-    const ItemSlot& getKeyringSlot(int index) const;
+    [[nodiscard]] const ItemSlot& getKeyringSlot(int index) const;
     bool setKeyringSlot(int index, const ItemDef& item);
     bool clearKeyringSlot(int index);
-    int getKeyringSize() const { return KEYRING_SLOTS; }
+    [[nodiscard]] int getKeyringSize() const { return KEYRING_SLOTS; }
 
     // Extra bags
-    int getBagSize(int bagIndex) const;
+    [[nodiscard]] int getBagSize(int bagIndex) const;
     void setBagSize(int bagIndex, int size);
     // Special containers (quivers, ammo pouches, profession bags) only accept
     // their own item type: sorting skips them and the UI marks their slots.
-    bool isBagSpecial(int bagIndex) const;
+    [[nodiscard]] bool isBagSpecial(int bagIndex) const;
     void setBagSpecial(int bagIndex, bool special);
-    const ItemSlot& getBagSlot(int bagIndex, int slotIndex) const;
+    [[nodiscard]] const ItemSlot& getBagSlot(int bagIndex, int slotIndex) const;
     bool setBagSlot(int bagIndex, int slotIndex, const ItemDef& item);
     bool clearBagSlot(int bagIndex, int slotIndex);
 
     // Bank slots (28 main + 7 bank bags)
-    const ItemSlot& getBankSlot(int index) const;
+    [[nodiscard]] const ItemSlot& getBankSlot(int index) const;
     bool setBankSlot(int index, const ItemDef& item);
     bool clearBankSlot(int index);
 
-    const ItemSlot& getBankBagSlot(int bagIndex, int slotIndex) const;
+    [[nodiscard]] const ItemSlot& getBankBagSlot(int bagIndex, int slotIndex) const;
     bool setBankBagSlot(int bagIndex, int slotIndex, const ItemDef& item);
-    int getBankBagSize(int bagIndex) const;
+    [[nodiscard]] int getBankBagSize(int bagIndex) const;
     void setBankBagSize(int bagIndex, int size);
-    const ItemSlot& getBankBagItem(int bagIndex) const;
+    [[nodiscard]] const ItemSlot& getBankBagItem(int bagIndex) const;
     void setBankBagItem(int bagIndex, const ItemDef& item);
 
-    uint8_t getPurchasedBankBagSlots() const { return purchasedBankBagSlots_; }
+    [[nodiscard]] uint8_t getPurchasedBankBagSlots() const { return purchasedBankBagSlots_; }
     void setPurchasedBankBagSlots(uint8_t count) { purchasedBankBagSlots_ = count; }
 
     // Swap two bag slots (equip items + contents)
     void swapBagContents(int bagA, int bagB);
 
     // Utility
-    int findFreeBackpackSlot() const;
+    [[nodiscard]] int findFreeBackpackSlot() const;
     bool addItem(const ItemDef& item);
 
     // Sort all bag slots (backpack + equip bags) by quality desc → itemId asc → stackCount desc.
@@ -334,9 +334,9 @@ public:
 
     // Compute the CMSG_SWAP_ITEM operations needed to reach sorted order.
     // Does NOT modify the inventory - caller is responsible for sending packets.
-    std::vector<SwapOp> computeSortSwaps() const;
-    std::vector<SwapOp> computeBankSortSwaps(int mainSlotCount) const;
-    std::vector<SwapOp> computeBankBagSortSwaps(int bagIndex) const;
+    [[nodiscard]] std::vector<SwapOp> computeSortSwaps() const;
+    [[nodiscard]] std::vector<SwapOp> computeBankSortSwaps(int mainSlotCount) const;
+    [[nodiscard]] std::vector<SwapOp> computeBankBagSortSwaps(int bagIndex) const;
 
     // WoW bag/slot addressing for bank storage (used by sort + drag-drop):
     // main bank slots live in bag 0xFF at slot BANK_SLOT_START + index; each bank bag's

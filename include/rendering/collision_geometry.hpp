@@ -86,7 +86,7 @@ struct CollisionFocus {
     /// The box is tested rather than its centre, so a long building whose
     /// origin is far away is still collided while the player stands on one
     /// end of it.
-    bool excludes(const glm::vec3& boundsMin, const glm::vec3& boundsMax) const {
+    [[nodiscard]] bool excludes(const glm::vec3& boundsMin, const glm::vec3& boundsMax) const {
         return enabled &&
                pointAABBDistanceSq(position, boundsMin, boundsMax) > radiusSq;
     }

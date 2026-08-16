@@ -24,8 +24,8 @@ struct HeightMap {
     std::array<float, 145> heights;  // 9x9 outer + 8x8 inner vertices
     bool loaded = false;
 
-    float getHeight(int x, int y) const;
-    bool isLoaded() const { return loaded; }
+    [[nodiscard]] float getHeight(int x, int y) const;
+    [[nodiscard]] bool isLoaded() const { return loaded; }
 };
 
 /**
@@ -37,8 +37,8 @@ struct TextureLayer {
     uint32_t offsetMCAL;     // Offset to alpha map in MCAL chunk
     uint32_t effectId;       // Effect ID (optional)
 
-    bool useAlpha() const { return (flags & 0x100) != 0; }
-    bool compressedAlpha() const { return (flags & 0x200) != 0; }
+    [[nodiscard]] bool useAlpha() const { return (flags & 0x100) != 0; }
+    [[nodiscard]] bool compressedAlpha() const { return (flags & 0x200) != 0; }
 };
 
 /**
@@ -59,11 +59,11 @@ struct MapChunk {
     // Normals (compressed)
     std::array<int8_t, 145 * 3> normals;  // X, Y, Z per vertex
 
-    bool hasHeightMap() const { return heightMap.isLoaded(); }
-    bool hasLayers() const { return !layers.empty(); }
+    [[nodiscard]] bool hasHeightMap() const { return heightMap.isLoaded(); }
+    [[nodiscard]] bool hasLayers() const { return !layers.empty(); }
 
     // Check if a quad has a hole (y and x are quad indices 0-7)
-    bool isHole(int y, int x) const {
+    [[nodiscard]] bool isHole(int y, int x) const {
         int column = y / 2;
         int row = x / 2;
         int bit = 1 << (column * 4 + row);
@@ -136,16 +136,16 @@ struct ADTTerrain {
 
     struct ChunkWater {
         std::vector<WaterLayer> layers;
-        bool hasWater() const { return !layers.empty(); }
+        [[nodiscard]] bool hasWater() const { return !layers.empty(); }
     };
 
     std::array<ChunkWater, 256> waterData;  // Water for each chunk
 
     MapChunk& getChunk(int x, int y) { return chunks[y * 16 + x]; }
-    const MapChunk& getChunk(int x, int y) const { return chunks[y * 16 + x]; }
+    [[nodiscard]] const MapChunk& getChunk(int x, int y) const { return chunks[y * 16 + x]; }
 
-    bool isLoaded() const { return loaded; }
-    size_t getTextureCount() const { return textures.size(); }
+    [[nodiscard]] bool isLoaded() const { return loaded; }
+    [[nodiscard]] size_t getTextureCount() const { return textures.size(); }
 };
 
 /**

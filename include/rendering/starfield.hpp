@@ -45,19 +45,19 @@ public:
      * Enable/disable star rendering
      */
     void setEnabled(bool enabled) { renderingEnabled = enabled; }
-    bool isEnabled() const { return renderingEnabled; }
+    [[nodiscard]] bool isEnabled() const { return renderingEnabled; }
 
     /**
      * Get number of stars
      */
-    int getStarCount() const { return starCount; }
+    [[nodiscard]] int getStarCount() const { return starCount; }
 
 private:
     void generateStars();
     void createStarBuffers();
     void destroyStarBuffers();
 
-    float getStarIntensity(float timeOfDay) const;
+    [[nodiscard]] float getStarIntensity(float timeOfDay) const;
 
     struct Star {
         glm::vec3 position;

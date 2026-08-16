@@ -17,7 +17,7 @@ namespace rendering {
 // Resource handle - identifies a virtual resource (image or buffer) within the graph.
 struct RGResource {
     uint32_t id = UINT32_MAX;
-    bool valid() const { return id != UINT32_MAX; }
+    [[nodiscard]] bool valid() const { return id != UINT32_MAX; }
 };
 
 // Image barrier descriptor for automatic synchronization between passes.
@@ -68,7 +68,7 @@ public:
     RGResource registerResource(const std::string& name);
 
     // Look up a previously registered resource by name.
-    RGResource findResource(const std::string& name) const;
+    [[nodiscard]] RGResource findResource(const std::string& name) const;
 
     // Add a render pass node.
     // inputs: resources this pass reads from
@@ -90,8 +90,8 @@ public:
     void execute(VkCommandBuffer cmd);
 
     // Query: get the compiled execution order (pass names, for debug HUD).
-    const std::vector<uint32_t>& getExecutionOrder() const { return executionOrder_; }
-    const std::vector<RGPass>& getPasses() const { return passes_; }
+    [[nodiscard]] const std::vector<uint32_t>& getExecutionOrder() const { return executionOrder_; }
+    [[nodiscard]] const std::vector<RGPass>& getPasses() const { return passes_; }
 
 private:
     // Topological sort helper (Kahn's algorithm).

@@ -93,15 +93,15 @@ struct WoweeCameraPresets {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t presetId) const;
+    [[nodiscard]] const Entry* findById(uint32_t presetId) const;
 
     // Returns all presets of one purpose - used by
     // the camera controller when context changes
     // (e.g. entering a vehicle picks the first
     // Vehicle-purpose preset).
-    std::vector<const Entry*> findByPurpose(uint8_t purposeKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByPurpose(uint8_t purposeKind) const;
 };
 
 class WoweeCameraPresetsLoader {

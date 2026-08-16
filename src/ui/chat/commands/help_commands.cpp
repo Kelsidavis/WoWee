@@ -40,8 +40,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"help", "?"}; }
-    std::string helpText() const override { return "List all slash commands"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"help", "?"}; }
+    [[nodiscard]] std::string helpText() const override { return "List all slash commands"; }
 };
 
 // --- /chathelp ---
@@ -77,8 +77,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"chathelp"}; }
-    std::string helpText() const override { return "List chat channel commands"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"chathelp"}; }
+    [[nodiscard]] std::string helpText() const override { return "List chat channel commands"; }
 };
 
 // --- /macrohelp ---
@@ -109,8 +109,8 @@ public:
         }
         return {};
     }
-    std::vector<std::string> aliases() const override { return {"macrohelp"}; }
-    std::string helpText() const override { return "List macro conditionals"; }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"macrohelp"}; }
+    [[nodiscard]] std::string helpText() const override { return "List macro conditionals"; }
 };
 
 // --- Registration ---

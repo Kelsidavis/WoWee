@@ -42,10 +42,10 @@ public:
     void playFootstep(FootstepSurface surface, bool sprinting);
     void playMountFootstep(FootstepSurface surface, FootstepBank bank);
     void setVolumeScale(float scale) { volumeScale = scale; }
-    float getVolumeScale() const { return volumeScale; }
+    [[nodiscard]] float getVolumeScale() const { return volumeScale; }
 
-    bool isInitialized() const { return assetManager != nullptr; }
-    bool hasAnySamples() const { return sampleCount > 0; }
+    [[nodiscard]] bool isInitialized() const { return assetManager != nullptr; }
+    [[nodiscard]] bool hasAnySamples() const { return sampleCount > 0; }
 
 private:
     struct Sample {

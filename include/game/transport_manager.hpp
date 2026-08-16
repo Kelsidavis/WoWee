@@ -187,9 +187,9 @@ public:
     // MAIN-THREAD-ONLY: this reference is not lock-protected, matching EntityManager's
     // getEntities(). Callers on another thread (e.g. a headless HTTP API thread) must
     // use snapshotTransports() instead.
-    const std::unordered_map<uint64_t, ActiveTransport>& getTransports() const { return transports_; }
+    [[nodiscard]] const std::unordered_map<uint64_t, ActiveTransport>& getTransports() const { return transports_; }
     // Thread-safe copy of all registered transports, safe to call from any thread.
-    std::vector<ActiveTransport> snapshotTransports() const {
+    [[nodiscard]] std::vector<ActiveTransport> snapshotTransports() const {
         std::lock_guard<std::mutex> lock(mutex_);
         std::vector<ActiveTransport> snapshot;
         snapshot.reserve(transports_.size());
@@ -199,7 +199,7 @@ public:
         return snapshot;
     }
     glm::vec3 getPlayerWorldPosition(uint64_t transportGuid, const glm::vec3& localOffset);
-    glm::vec3 serverToTransportLocal(uint64_t transportGuid,
+    [[nodiscard]] glm::vec3 serverToTransportLocal(uint64_t transportGuid,
                                      const glm::vec3& serverOffset) const;
     // Adopt the server's published route phase for a transport. phase is a
     // fraction in [0,1) of periodMs. Cheap and idempotent - safe to call on every
@@ -214,12 +214,12 @@ public:
     /// Whether this transport's hull collision has finished loading. Distinguishes
     /// "the deck query found nothing because there is no deck here" from "because
     /// the model is still uploading".
-    bool isTransportCollisionReady(uint64_t transportGuid) const;
+    [[nodiscard]] bool isTransportCollisionReady(uint64_t transportGuid) const;
 
-    bool isPointOnTransportDeck(uint64_t transportGuid,
+    [[nodiscard]] bool isPointOnTransportDeck(uint64_t transportGuid,
                                 const glm::vec3& canonicalPosition,
                                 float maxFloorDelta = 1.25f) const;
-    std::optional<float> getTransportDeckFloorHeight(
+    [[nodiscard]] std::optional<float> getTransportDeckFloorHeight(
         uint64_t transportGuid,
         const glm::vec3& canonicalPosition) const;
 
@@ -233,9 +233,9 @@ public:
     bool loadTaxiPathNodeDBC(pipeline::AssetManager* assetMgr);
 
     // Check if a TaxiPathNode path exists for a given taxiPathId (on any map)
-    bool hasTaxiPath(uint32_t taxiPathId) const;
+    [[nodiscard]] bool hasTaxiPath(uint32_t taxiPathId) const;
     // Check if a TaxiPathNode segment exists for a taxiPathId on a specific map
-    bool hasTaxiPathForMap(uint32_t taxiPathId, uint32_t mapId) const;
+    [[nodiscard]] bool hasTaxiPathForMap(uint32_t taxiPathId, uint32_t mapId) const;
 
     // Assign a TaxiPathNode path to an existing transport (called when GO query response arrives).
     // mapId selects the per-map segment (cross-map boat paths only have valid world
@@ -243,24 +243,24 @@ public:
     bool assignTaxiPathToTransport(uint32_t entry, uint32_t taxiPathId, uint32_t mapId);
 
     // Check if a path exists for a given GameObject entry
-    bool hasPathForEntry(uint32_t entry) const;
+    [[nodiscard]] bool hasPathForEntry(uint32_t entry) const;
     // Check if a path has meaningful XY travel (used to reject near-stationary false positives).
-    bool hasUsableMovingPathForEntry(uint32_t entry, float minXYRange = 1.0f) const;
+    [[nodiscard]] bool hasUsableMovingPathForEntry(uint32_t entry, float minXYRange = 1.0f) const;
 
     // Infer a real moving DBC path by spawn position (for servers whose transport entry IDs
     // don't map 1:1 to TransportAnimation.dbc entry IDs).
     // Returns 0 when no suitable path match is found.
-    uint32_t inferMovingPathForSpawn(const glm::vec3& spawnWorldPos, float maxDistance = 1200.0f) const;
+    [[nodiscard]] uint32_t inferMovingPathForSpawn(const glm::vec3& spawnWorldPos, float maxDistance = 1200.0f) const;
 
     // Infer a DBC path by spawn position, optionally including z-only elevator paths.
     // Returns 0 when no suitable path match is found.
-    uint32_t inferDbcPathForSpawn(const glm::vec3& spawnWorldPos,
+    [[nodiscard]] uint32_t inferDbcPathForSpawn(const glm::vec3& spawnWorldPos,
                                   float maxDistance,
                                   bool allowZOnly) const;
 
     // Choose a deterministic fallback moving DBC path for known server transport entries/displayIds.
     // Returns 0 when no suitable moving path is available.
-    uint32_t pickFallbackMovingPath(uint32_t entry, uint32_t displayId) const;
+    [[nodiscard]] uint32_t pickFallbackMovingPath(uint32_t entry, uint32_t displayId) const;
 
     // Update server-controlled transport position/rotation directly (bypasses path movement)
     void updateServerTransport(uint64_t guid, const glm::vec3& position, float orientation);
@@ -289,7 +289,7 @@ public:
 
     // Enable/disable client-side animation for transports without server updates
     void setClientSideAnimation(bool enabled) { clientSideAnimation_ = enabled; }
-    bool isClientSideAnimation() const { return clientSideAnimation_; }
+    [[nodiscard]] bool isClientSideAnimation() const { return clientSideAnimation_; }
 
 private:
     void updateTransportMovement(ActiveTransport& transport, float deltaTime);

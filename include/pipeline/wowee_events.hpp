@@ -80,9 +80,9 @@ struct WoweeEvent {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t eventId) const;
+    [[nodiscard]] const Entry* findById(uint32_t eventId) const;
 
     static const char* holidayKindName(uint8_t k);
     static const char* factionGroupName(uint8_t f);

@@ -46,28 +46,28 @@ public:
     void update(float deltaTime);
     void shutdown();
 
-    const std::vector<TocFile>& getAddons() const { return addons_; }
+    [[nodiscard]] const std::vector<TocFile>& getAddons() const { return addons_; }
     /// The addons that wait to be asked for. Half the interface's own panels
     /// are here - the talent tree, the achievements, the macro editor - and
     /// each is loaded whole or not at all, so one of them raising during load
     /// costs its entire panel rather than degrading it.
-    const std::vector<TocFile>& getLoadOnDemandAddons() const { return lodAddons_; }
+    [[nodiscard]] const std::vector<TocFile>& getLoadOnDemandAddons() const { return lodAddons_; }
 
     /// Load a load-on-demand addon by name. Names are matched without regard to
     /// case, because the interface asks for "Blizzard_TalentUI" and the
     /// directory on a case-sensitive filesystem is blizzard_talentui.
     bool loadAddOnByName(const std::string& name, std::string& reason);
-    bool isAddOnLoadedByName(const std::string& name) const;
+    [[nodiscard]] bool isAddOnLoadedByName(const std::string& name) const;
     LuaEngine* getLuaEngine() { return &luaEngine_; }
-    bool isInitialized() const { return luaEngine_.isInitialized(); }
+    [[nodiscard]] bool isInitialized() const { return luaEngine_.isInitialized(); }
 
     // Per-addon enable/disable (persisted). Disabled addons are skipped by
     // loadAllAddons; changes take effect on the next load (world enter or /reload).
-    bool isAddonEnabled(const std::string& addonName) const;
+    [[nodiscard]] bool isAddonEnabled(const std::string& addonName) const;
     void setAddonEnabled(const std::string& addonName, bool enabled);
     // True once any addon has been loaded this session (so the UI can note that a
     // toggle only applies after the next reload).
-    bool addonsLoaded() const { return addonsLoaded_; }
+    [[nodiscard]] bool addonsLoaded() const { return addonsLoaded_; }
 
     void saveAllSavedVariables();
     void setCharacterName(const std::string& name) { characterName_ = name; }
@@ -89,11 +89,11 @@ private:
     /// own files. This is the source of truth for which names must answer as
     /// absent before their addon loads; the literal list in the Lua bootstrap
     /// is a floor for an install with no addons extracted.
-    std::vector<std::string> deferredAddonGlobals() const;
+    [[nodiscard]] std::vector<std::string> deferredAddonGlobals() const;
 
     bool loadAddon(const TocFile& addon);
-    std::string getSavedVariablesPath(const TocFile& addon) const;
-    std::string getSavedVariablesPerCharacterPath(const TocFile& addon) const;
+    [[nodiscard]] std::string getSavedVariablesPath(const TocFile& addon) const;
+    [[nodiscard]] std::string getSavedVariablesPerCharacterPath(const TocFile& addon) const;
     std::string characterName_;
 
     // addonName -> enabled. Absent means enabled (default on).

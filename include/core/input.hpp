@@ -14,18 +14,18 @@ public:
     void update();
 
     // Keyboard
-    bool isKeyPressed(SDL_Scancode key) const;
-    bool isKeyJustPressed(SDL_Scancode key) const;
+    [[nodiscard]] bool isKeyPressed(SDL_Scancode key) const;
+    [[nodiscard]] bool isKeyJustPressed(SDL_Scancode key) const;
 
     // Mouse
-    bool isMouseButtonPressed(int button) const;
-    bool isMouseButtonJustPressed(int button) const;
-    bool isMouseButtonJustReleased(int button) const;
+    [[nodiscard]] bool isMouseButtonPressed(int button) const;
+    [[nodiscard]] bool isMouseButtonJustPressed(int button) const;
+    [[nodiscard]] bool isMouseButtonJustReleased(int button) const;
 
-    glm::vec2 getMousePosition() const { return mousePosition; }
-    glm::vec2 getMouseDelta() const { return mouseDelta; }
+    [[nodiscard]] glm::vec2 getMousePosition() const { return mousePosition; }
+    [[nodiscard]] glm::vec2 getMouseDelta() const { return mouseDelta; }
 
-    bool isMouseLocked() const { return mouseLocked; }
+    [[nodiscard]] bool isMouseLocked() const { return mouseLocked; }
 
 private:
     Input() = default;

@@ -12,12 +12,12 @@ namespace world_map {
 /// Manages the current view level and transitions between views.
 class ViewStateMachine {
 public:
-    ViewLevel currentLevel() const { return level_; }
-    const TransitionState& transition() const { return transition_; }
+    [[nodiscard]] ViewLevel currentLevel() const { return level_; }
+    [[nodiscard]] const TransitionState& transition() const { return transition_; }
 
-    int continentIdx() const { return continentIdx_; }
-    int currentZoneIdx() const { return currentIdx_; }
-    bool cosmicEnabled() const { return cosmicEnabled_; }
+    [[nodiscard]] int continentIdx() const { return continentIdx_; }
+    [[nodiscard]] int currentZoneIdx() const { return currentIdx_; }
+    [[nodiscard]] bool cosmicEnabled() const { return cosmicEnabled_; }
 
     void setContinentIdx(int idx) { continentIdx_ = idx; }
     void setCurrentZoneIdx(int idx) { currentIdx_ = idx; }

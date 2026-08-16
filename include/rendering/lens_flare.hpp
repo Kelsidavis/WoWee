@@ -64,13 +64,13 @@ public:
      * @brief Enable or disable lens flare rendering
      */
     void setEnabled(bool enabled) { this->enabled = enabled; }
-    bool isEnabled() const { return enabled; }
+    [[nodiscard]] bool isEnabled() const { return enabled; }
 
     /**
      * @brief Set flare intensity multiplier
      */
     void setIntensity(float intensity);
-    float getIntensity() const { return intensityMultiplier; }
+    [[nodiscard]] float getIntensity() const { return intensityMultiplier; }
 
 private:
     struct FlareElement {
@@ -88,8 +88,8 @@ private:
     };
 
     void generateFlareElements();
-    float calculateSunVisibility(const Camera& camera, const glm::vec3& sunPosition) const;
-    glm::vec2 worldToScreen(const Camera& camera, const glm::vec3& worldPos) const;
+    [[nodiscard]] float calculateSunVisibility(const Camera& camera, const glm::vec3& sunPosition) const;
+    [[nodiscard]] glm::vec2 worldToScreen(const Camera& camera, const glm::vec3& worldPos) const;
 
     VkContext* vkCtx = nullptr;
 

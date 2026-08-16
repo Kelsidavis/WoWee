@@ -38,26 +38,26 @@ public:
     struct EmoteResult { uint32_t animId; bool loop; };
 
     /// Look up an emote by chat command (e.g. "dance", "wave").
-    std::optional<EmoteResult> findEmote(const std::string& command) const;
+    [[nodiscard]] std::optional<EmoteResult> findEmote(const std::string& command) const;
 
 
     /// Get the animation ID for an Emotes.dbc emote ID, as used by SMSG_EMOTE
     /// and UNIT_NPC_EMOTESTATE.
-    uint32_t animByEmotesId(uint32_t emoteId) const;
+    [[nodiscard]] uint32_t animByEmotesId(uint32_t emoteId) const;
 
     /// True if the Emotes.dbc entry is a persistent state emote (EmoteSpecProc
     /// != 0, e.g. STATE_WORK_NOSHEATHE) rather than a one-shot (ONESHOT_WAVE).
-    bool isStateEmote(uint32_t emoteId) const;
+    [[nodiscard]] bool isStateEmote(uint32_t emoteId) const;
 
     /// Get the emote state variant (looping) for a one-shot emote animation.
-    uint32_t getStateVariant(uint32_t oneShotAnimId) const;
+    [[nodiscard]] uint32_t getStateVariant(uint32_t oneShotAnimId) const;
 
     /// Get first-person emote text for a command.
     std::string textFor(const std::string& emoteName,
                         const std::string* targetName = nullptr) const;
 
     /// Get DBC ID for an emote command.
-    uint32_t dbcIdFor(const std::string& emoteName) const;
+    [[nodiscard]] uint32_t dbcIdFor(const std::string& emoteName) const;
 
     /// Get third-person emote text by DBC ID.
     std::string textByDbcId(uint32_t dbcId,

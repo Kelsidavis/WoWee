@@ -20,7 +20,7 @@ struct Plane {
      * Calculate signed distance from point to plane
      * Positive = in front, Negative = behind
      */
-    float distanceToPoint(const glm::vec3& point) const {
+    [[nodiscard]] float distanceToPoint(const glm::vec3& point) const {
         return glm::dot(normal, point) + distance;
     }
 };
@@ -52,7 +52,7 @@ public:
     /**
      * Test if point is inside frustum
      */
-    bool containsPoint(const glm::vec3& point) const;
+    [[nodiscard]] bool containsPoint(const glm::vec3& point) const;
 
     /**
      * Test if sphere is inside or intersecting frustum
@@ -60,7 +60,7 @@ public:
      * @param radius Sphere radius
      * @return true if sphere is visible (fully or partially inside)
      */
-    bool intersectsSphere(const glm::vec3& center, float radius) const;
+    [[nodiscard]] bool intersectsSphere(const glm::vec3& center, float radius) const;
 
     /**
      * Test if axis-aligned bounding box intersects frustum
@@ -68,12 +68,12 @@ public:
      * @param max Box maximum corner
      * @return true if box is visible (fully or partially inside)
      */
-    bool intersectsAABB(const glm::vec3& min, const glm::vec3& max) const;
+    [[nodiscard]] bool intersectsAABB(const glm::vec3& min, const glm::vec3& max) const;
 
     /**
      * Get frustum plane
      */
-    const Plane& getPlane(Side side) const { return planes[side]; }
+    [[nodiscard]] const Plane& getPlane(Side side) const { return planes[side]; }
 
 private:
     std::array<Plane, 6> planes;

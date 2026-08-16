@@ -18,9 +18,9 @@ public:
     void setTexture(std::shared_ptr<Texture> texture) { this->texture = texture; }
     void setColor(const glm::vec4& color) { this->color = color; }
 
-    std::shared_ptr<Shader> getShader() const { return shader; }
-    std::shared_ptr<Texture> getTexture() const { return texture; }
-    const glm::vec4& getColor() const { return color; }
+    [[nodiscard]] std::shared_ptr<Shader> getShader() const { return shader; }
+    [[nodiscard]] std::shared_ptr<Texture> getTexture() const { return texture; }
+    [[nodiscard]] const glm::vec4& getColor() const { return color; }
 
 private:
     std::shared_ptr<Shader> shader;

@@ -87,20 +87,20 @@ struct WoweeHearthBinds {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t bindId) const;
+    [[nodiscard]] const Entry* findById(uint32_t bindId) const;
 
     // Returns all bind points available to a player of the
     // given faction (Alliance=1, Horde=2). Bindings with
     // factionMask=3 (Both) are returned for either query.
     // Used by the world-map UI to filter the inn-icon
     // overlay layer per character.
-    std::vector<const Entry*> findByFaction(uint8_t playerFaction) const;
+    [[nodiscard]] std::vector<const Entry*> findByFaction(uint8_t playerFaction) const;
 
     // Returns all bind points within a given map (for the
     // continent-level inn overlay).
-    std::vector<const Entry*> findByMap(uint32_t mapId) const;
+    [[nodiscard]] std::vector<const Entry*> findByMap(uint32_t mapId) const;
 };
 
 class WoweeHearthBindsLoader {

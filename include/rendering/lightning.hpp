@@ -42,10 +42,10 @@ public:
 
     // Control
     void setEnabled(bool enabled);
-    bool isEnabled() const { return enabled; }
+    [[nodiscard]] bool isEnabled() const { return enabled; }
 
     void setIntensity(float intensity);  // 0.0 - 1.0 (affects frequency)
-    float getIntensity() const { return intensity; }
+    [[nodiscard]] float getIntensity() const { return intensity; }
 
     // Trigger manual strike (for testing or scripted events)
     void triggerStrike(const glm::vec3& position);

@@ -72,9 +72,9 @@ struct WoweeSkillCost {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t costId) const;
+    [[nodiscard]] const Entry* findById(uint32_t costId) const;
 
     // Returns the entry that would be next-trainable for a
     // character with the given current skill points and
@@ -82,7 +82,7 @@ struct WoweeSkillCost {
     // character qualifies for and hasn't already maxed out.
     // Returns nullptr if every entry is either capped or
     // gated by level.
-    const Entry* nextTrainable(uint16_t currentSkill,
+    [[nodiscard]] const Entry* nextTrainable(uint16_t currentSkill,
                                 uint8_t characterLevel) const;
 
     static const char* costKindName(uint8_t k);

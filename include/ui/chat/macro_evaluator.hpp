@@ -41,7 +41,7 @@ private:
     bool evalCondition(const std::string& cond, uint64_t& tgt) const;
 
     /** Resolve effective target GUID (follows @/target= overrides). */
-    uint64_t resolveEffectiveTarget(uint64_t tgt) const;
+    [[nodiscard]] uint64_t resolveEffectiveTarget(uint64_t tgt) const;
 
     IGameState& gameState_;
     IModifierState& modState_;

@@ -106,16 +106,16 @@ struct WoweeAnniversaryEvents {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t eventId) const;
+    [[nodiscard]] const Entry* findById(uint32_t eventId) const;
 
     // Returns all events of one kind. Used by the event
     // scheduler to dispatch per-kind handlers (Holiday
     // events spawn cosmetic NPCs, DoubleXP events
     // multiply XP rates, BattlegroundBonus events boost
     // honor accrual).
-    std::vector<const Entry*> findByKind(uint8_t eventKind) const;
+    [[nodiscard]] std::vector<const Entry*> findByKind(uint8_t eventKind) const;
 };
 
 class WoweeAnniversaryEventsLoader {

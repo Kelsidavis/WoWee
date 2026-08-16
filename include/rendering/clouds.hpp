@@ -49,14 +49,14 @@ public:
 
     // --- Enable / disable ---
     void setEnabled(bool enabled) { enabled_ = enabled; }
-    bool isEnabled() const { return enabled_; }
+    [[nodiscard]] bool isEnabled() const { return enabled_; }
 
     // --- Cloud parameters ---
     void setDensity(float density);
-    float getDensity() const { return density_; }
+    [[nodiscard]] float getDensity() const { return density_; }
 
     void setWindSpeed(float speed) { windSpeed_ = speed; }
-    float getWindSpeed() const { return windSpeed_; }
+    [[nodiscard]] float getWindSpeed() const { return windSpeed_; }
 
 private:
     // Push constant block - must match clouds.frag.glsl

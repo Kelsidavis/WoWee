@@ -83,10 +83,10 @@ struct WoweeTrainer {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
     // Lookup by npcId - nullptr if not present.
-    const Entry* findByNpc(uint32_t npcId) const;
+    [[nodiscard]] const Entry* findByNpc(uint32_t npcId) const;
 
     // Decode the kindMask into a short string (e.g.
     // "trainer+vendor" or just "vendor").

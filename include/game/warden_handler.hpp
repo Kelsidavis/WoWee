@@ -37,15 +37,15 @@ public:
     void initModuleManager();
 
     /** Whether the server requires Warden (gates char enum / create). */
-    bool requiresWarden() const { return requiresWarden_; }
+    [[nodiscard]] bool requiresWarden() const { return requiresWarden_; }
     void setRequiresWarden(bool v) { requiresWarden_ = v; }
 
-    bool wardenGateSeen() const { return wardenGateSeen_; }
+    [[nodiscard]] bool wardenGateSeen() const { return wardenGateSeen_; }
 
     /** Increment packet-after-gate counter (called from handlePacket). */
     void notifyPacketAfterGate() { ++wardenPacketsAfterGate_; }
 
-    bool wardenCharEnumBlockedLogged() const { return wardenCharEnumBlockedLogged_; }
+    [[nodiscard]] bool wardenCharEnumBlockedLogged() const { return wardenCharEnumBlockedLogged_; }
     void setWardenCharEnumBlockedLogged(bool v) { wardenCharEnumBlockedLogged_ = v; }
 
     /** Called from GameHandler::update() to drain async warden response + log gate timing. */

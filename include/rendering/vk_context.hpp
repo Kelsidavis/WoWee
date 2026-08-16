@@ -58,7 +58,7 @@ public:
     /// restart, which is what it used to key on: the restart was removed, its
     /// only caller went with it, and the check downstream quietly became dead
     /// code that never fired.
-    uint32_t uiTextureGeneration() const { return uiTextureGeneration_; }
+    [[nodiscard]] uint32_t uiTextureGeneration() const { return uiTextureGeneration_; }
 
     VkContext() = default;
     ~VkContext();
@@ -91,7 +91,7 @@ public:
     void ensureBatchCmd();
     void endUploadBatch();       // Async: submits but does NOT wait for fence
     void endUploadBatchSync();   // Sync: submits and waits (for load screens)
-    bool isInUploadBatch() const { return inUploadBatch_; }
+    [[nodiscard]] bool isInUploadBatch() const { return inUploadBatch_; }
     /// Hands a plainly-allocated staging buffer to the current batch, which
     /// frees it once its copies have actually run.
     void deferRawStagingCleanup(VkBuffer buffer, VkDeviceMemory memory);
@@ -114,70 +114,70 @@ public:
     void deferAfterAllFrameFences(std::function<void()>&& fn);
 
     // Accessors
-    VkInstance getInstance() const { return instance; }
-    VkPhysicalDevice getPhysicalDevice() const { return physicalDevice; }
-    VkDevice getDevice() const { return device; }
-    uint32_t getGpuVendorId() const { return gpuVendorId_; }
-    const char* getGpuName() const { return gpuName_; }
-    bool isAmdGpu() const { return gpuVendorId_ == 0x1002; }
-    bool isNvidiaGpu() const { return gpuVendorId_ == 0x10DE; }
-    VkQueue getGraphicsQueue() const { return graphicsQueue; }
-    uint32_t getGraphicsQueueFamily() const { return graphicsQueueFamily; }
-    bool hasDedicatedTransferQueue() const { return hasDedicatedTransfer_; }
-    VmaAllocator getAllocator() const { return allocator; }
-    VkSurfaceKHR getSurface() const { return surface; }
-    VkPipelineCache getPipelineCache() const { return pipelineCache_; }
+    [[nodiscard]] VkInstance getInstance() const { return instance; }
+    [[nodiscard]] VkPhysicalDevice getPhysicalDevice() const { return physicalDevice; }
+    [[nodiscard]] VkDevice getDevice() const { return device; }
+    [[nodiscard]] uint32_t getGpuVendorId() const { return gpuVendorId_; }
+    [[nodiscard]] const char* getGpuName() const { return gpuName_; }
+    [[nodiscard]] bool isAmdGpu() const { return gpuVendorId_ == 0x1002; }
+    [[nodiscard]] bool isNvidiaGpu() const { return gpuVendorId_ == 0x10DE; }
+    [[nodiscard]] VkQueue getGraphicsQueue() const { return graphicsQueue; }
+    [[nodiscard]] uint32_t getGraphicsQueueFamily() const { return graphicsQueueFamily; }
+    [[nodiscard]] bool hasDedicatedTransferQueue() const { return hasDedicatedTransfer_; }
+    [[nodiscard]] VmaAllocator getAllocator() const { return allocator; }
+    [[nodiscard]] VkSurfaceKHR getSurface() const { return surface; }
+    [[nodiscard]] VkPipelineCache getPipelineCache() const { return pipelineCache_; }
 
-    VkSwapchainKHR getSwapchain() const { return swapchain; }
-    VkFormat getSwapchainFormat() const { return swapchainFormat; }
-    VkExtent2D getSwapchainExtent() const { return swapchainExtent; }
-    const std::vector<VkImageView>& getSwapchainImageViews() const { return swapchainImageViews; }
-    const std::vector<VkImage>& getSwapchainImages() const { return swapchainImages; }
-    uint32_t getSwapchainImageCount() const { return static_cast<uint32_t>(swapchainImages.size()); }
+    [[nodiscard]] VkSwapchainKHR getSwapchain() const { return swapchain; }
+    [[nodiscard]] VkFormat getSwapchainFormat() const { return swapchainFormat; }
+    [[nodiscard]] VkExtent2D getSwapchainExtent() const { return swapchainExtent; }
+    [[nodiscard]] const std::vector<VkImageView>& getSwapchainImageViews() const { return swapchainImageViews; }
+    [[nodiscard]] const std::vector<VkImage>& getSwapchainImages() const { return swapchainImages; }
+    [[nodiscard]] uint32_t getSwapchainImageCount() const { return static_cast<uint32_t>(swapchainImages.size()); }
 
-    uint32_t getCurrentFrame() const { return currentFrame; }
-    const FrameData& getCurrentFrameData() const { return frames[currentFrame]; }
+    [[nodiscard]] uint32_t getCurrentFrame() const { return currentFrame; }
+    [[nodiscard]] const FrameData& getCurrentFrameData() const { return frames[currentFrame]; }
 
     // For ImGui
-    VkRenderPass getImGuiRenderPass() const { return imguiRenderPass; }
+    [[nodiscard]] VkRenderPass getImGuiRenderPass() const { return imguiRenderPass; }
     // Single-sampled, colour-only pass that loads the swapchain. The UI draws
     // here, after the scene has resolved and after water refraction has copied
     // it, so the capture never contains the UI.
-    VkRenderPass getOverlayRenderPass() const { return overlayRenderPass; }
+    [[nodiscard]] VkRenderPass getOverlayRenderPass() const { return overlayRenderPass; }
     // The same pass but clearing, for screens that draw the UI with no scene
     // behind it. Shares getOverlayFramebuffers().
-    VkRenderPass getOverlayClearRenderPass() const { return overlayClearRenderPass; }
-    const std::vector<VkFramebuffer>& getOverlayFramebuffers() const { return overlayFramebuffers; }
+    [[nodiscard]] VkRenderPass getOverlayClearRenderPass() const { return overlayClearRenderPass; }
+    [[nodiscard]] const std::vector<VkFramebuffer>& getOverlayFramebuffers() const { return overlayFramebuffers; }
     // Compatible with getImGuiRenderPass(), but loads the scene instead of
     // clearing it, so drawing can continue into the same framebuffer after the
     // pass has been closed for a copy. Null under MSAA.
-    VkRenderPass getSceneContinueRenderPass() const { return sceneContinueRenderPass; }
-    VkDescriptorPool getImGuiDescriptorPool() const { return imguiDescriptorPool; }
-    const std::vector<VkFramebuffer>& getSwapchainFramebuffers() const { return swapchainFramebuffers; }
+    [[nodiscard]] VkRenderPass getSceneContinueRenderPass() const { return sceneContinueRenderPass; }
+    [[nodiscard]] VkDescriptorPool getImGuiDescriptorPool() const { return imguiDescriptorPool; }
+    [[nodiscard]] const std::vector<VkFramebuffer>& getSwapchainFramebuffers() const { return swapchainFramebuffers; }
 
-    bool isSwapchainDirty() const { return swapchainDirty; }
+    [[nodiscard]] bool isSwapchainDirty() const { return swapchainDirty; }
     void markSwapchainDirty() { swapchainDirty = true; }
 
     // VSync (present mode)
-    bool isVsyncEnabled() const { return vsync_; }
+    [[nodiscard]] bool isVsyncEnabled() const { return vsync_; }
     void setVsync(bool enabled) { vsync_ = enabled; }
 
-    bool isDeviceLost() const { return deviceLost_; }
+    [[nodiscard]] bool isDeviceLost() const { return deviceLost_; }
 
     // MSAA
-    VkSampleCountFlagBits getMsaaSamples() const { return msaaSamples_; }
+    [[nodiscard]] VkSampleCountFlagBits getMsaaSamples() const { return msaaSamples_; }
     void setMsaaSamples(VkSampleCountFlagBits samples);
-    VkSampleCountFlagBits getMaxUsableSampleCount() const;
-    VkImage getDepthImage() const { return depthImage; }
-    VkImage getDepthCopySourceImage() const {
+    [[nodiscard]] VkSampleCountFlagBits getMaxUsableSampleCount() const;
+    [[nodiscard]] VkImage getDepthImage() const { return depthImage; }
+    [[nodiscard]] VkImage getDepthCopySourceImage() const {
         return (depthResolveImage != VK_NULL_HANDLE) ? depthResolveImage : depthImage;
     }
-    bool isDepthCopySourceMsaa() const {
+    [[nodiscard]] bool isDepthCopySourceMsaa() const {
         return (depthResolveImage == VK_NULL_HANDLE) && (msaaSamples_ > VK_SAMPLE_COUNT_1_BIT);
     }
-    VkFormat getDepthFormat() const { return depthFormat; }
-    VkImageView getDepthResolveImageView() const { return depthResolveImageView; }
-    VkImageView getDepthImageView() const { return depthImageView; }
+    [[nodiscard]] VkFormat getDepthFormat() const { return depthFormat; }
+    [[nodiscard]] VkImageView getDepthResolveImageView() const { return depthResolveImageView; }
+    [[nodiscard]] VkImageView getDepthImageView() const { return depthImageView; }
 
     // Sampler cache: returns a shared VkSampler matching the given create info.
     // Callers must NOT destroy the returned sampler - it is owned by VkContext.
@@ -185,7 +185,7 @@ public:
     VkSampler getOrCreateSampler(const VkSamplerCreateInfo& info);
 
     // Whether the physical device supports sampler anisotropy.
-    bool isSamplerAnisotropySupported() const { return samplerAnisotropySupported_; }
+    [[nodiscard]] bool isSamplerAnisotropySupported() const { return samplerAnisotropySupported_; }
 
     /// A ceiling on every sampler's anisotropy - the game's Texture Filtering.
     ///
@@ -197,7 +197,7 @@ public:
     void setAnisotropyLimit(float limit) {
         anisotropyLimit_ = std::clamp(limit, 1.0f, 16.0f);
     }
-    float anisotropyLimit() const { return anisotropyLimit_; }
+    [[nodiscard]] float anisotropyLimit() const { return anisotropyLimit_; }
 
     // Global sampler cache accessor (set during VkContext::initialize, cleared on shutdown).
     // Used by VkTexture and other code that only has a VkDevice handle.

@@ -106,12 +106,12 @@ public:
     /**
      * Check if emulator is initialized
      */
-    bool isInitialized() const { return uc_ != nullptr; }
+    [[nodiscard]] bool isInitialized() const { return uc_ != nullptr; }
 
     /**
      * Get module base address
      */
-    uint32_t getModuleBase() const { return moduleBase_; }
+    [[nodiscard]] uint32_t getModuleBase() const { return moduleBase_; }
 
     /**
      * Setup common Windows API hooks
@@ -134,7 +134,7 @@ public:
 
     // Look up an already-registered API stub address by DLL and function name.
     // Returns 0 if not found. Used by WardenModule::bindAPIs() for IAT patching.
-    uint32_t getAPIAddress(const std::string& dllName, const std::string& funcName) const;
+    [[nodiscard]] uint32_t getAPIAddress(const std::string& dllName, const std::string& funcName) const;
 
 private:
     uc_engine* uc_ = nullptr;                  // Unicorn engine instance

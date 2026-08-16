@@ -75,14 +75,14 @@ struct WoweeActionBar {
     std::string name;
     std::vector<Entry> entries;
 
-    bool isValid() const { return !entries.empty(); }
+    [[nodiscard]] bool isValid() const { return !entries.empty(); }
 
-    const Entry* findById(uint32_t bindingId) const;
+    [[nodiscard]] const Entry* findById(uint32_t bindingId) const;
 
     // Return all entries for a given class on a specific
     // bar mode, in buttonSlot order. Used by character
     // creation to populate the action bar with defaults.
-    std::vector<const Entry*> findByClass(uint32_t classBit,
+    [[nodiscard]] std::vector<const Entry*> findByClass(uint32_t classBit,
                                            uint8_t barMode) const;
 
     static const char* barModeName(uint8_t m);

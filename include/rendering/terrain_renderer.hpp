@@ -71,7 +71,7 @@ struct TerrainChunkGPU {
     uint32_t megaFirstIndex = 0;
     uint32_t vertexCount = 0;
 
-    bool isValid() const { return vertexBuffer != VK_NULL_HANDLE && indexBuffer != VK_NULL_HANDLE; }
+    [[nodiscard]] bool isValid() const { return vertexBuffer != VK_NULL_HANDLE && indexBuffer != VK_NULL_HANDLE; }
 };
 
 /**
@@ -133,7 +133,7 @@ public:
     void renderShadow(VkCommandBuffer cmd, const glm::mat4& lightSpaceMatrix,
                       const glm::vec3& shadowCenter, float shadowRadius);
 
-    bool hasShadowPipeline() const { return shadowPipeline_ != VK_NULL_HANDLE; }
+    [[nodiscard]] bool hasShadowPipeline() const { return shadowPipeline_ != VK_NULL_HANDLE; }
 
     void clear();
 
@@ -147,20 +147,20 @@ public:
     void setWireframe(bool enabled) { wireframe = enabled; }
     void setFrustumCulling(bool enabled) { frustumCullingEnabled = enabled; }
     void setFogEnabled(bool enabled) { fogEnabled = enabled; }
-    bool isFogEnabled() const { return fogEnabled; }
+    [[nodiscard]] bool isFogEnabled() const { return fogEnabled; }
     void setViewDistance(float distance) { maxViewDistance_ = std::clamp(distance, 400.0f, 2400.0f); }
 
     void setShadowMap(VkDescriptorImageInfo /*depthInfo*/, const glm::mat4& /*lightSpaceMat*/) {}
     void clearShadowMap() {}
 
-    int getChunkCount() const { return static_cast<int>(chunks.size()); }
-    int getRenderedChunkCount() const { return renderedChunks; }
+    [[nodiscard]] int getChunkCount() const { return static_cast<int>(chunks.size()); }
+    [[nodiscard]] int getRenderedChunkCount() const { return renderedChunks; }
     /// How far the furthest chunk drawn this frame was, for the diagnostic that
     /// compares it against the doodads. See Renderer::logViewDistanceDiag.
-    float getFurthestDrawnDistance() const { return std::sqrt(furthestDrawnSq_); }
-    int getCulledChunkCount() const { return culledChunks; }
-    int getTriangleCount() const;
-    VkContext* getVkContext() const { return vkCtx; }
+    [[nodiscard]] float getFurthestDrawnDistance() const { return std::sqrt(furthestDrawnSq_); }
+    [[nodiscard]] int getCulledChunkCount() const { return culledChunks; }
+    [[nodiscard]] int getTriangleCount() const;
+    [[nodiscard]] VkContext* getVkContext() const { return vkCtx; }
 
 private:
     TerrainChunkGPU uploadChunk(const pipeline::ChunkMesh& chunk);
