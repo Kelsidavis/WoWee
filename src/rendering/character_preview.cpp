@@ -852,12 +852,15 @@ bool CharacterPreview::applyEquipment(const std::vector<game::EquipmentItem>& eq
             if (gg > 0) geosetSleeves = pickGeoset(core::equippedGeoset(core::equipment::kChestBare, gg), core::kGeosetBareSleeves);
         }
     }
-    // Belt → group 18 (buckle)
+    // Belt → group 18 (buckle), falling back to the base variant so the waist
+    // is not left empty - see the spawner's copy for what that costs.
     uint16_t geosetBelt = 0;
     {
         uint32_t did = findDisplayId({6});
         uint32_t gg = getGeosetGroup(did, geosetGroup1Field);
-        if (gg > 0) geosetBelt = pickGeoset(core::equippedGeoset(core::equipment::kBeltBase, gg), 0);
+        geosetBelt = pickGeoset(
+            gg > 0 ? core::equippedGeoset(core::equipment::kBeltBase, gg) : 0,
+            core::equipment::kBeltBase);
     }
 
     eraseGroup(4);

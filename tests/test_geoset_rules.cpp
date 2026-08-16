@@ -231,3 +231,16 @@ TEST_CASE("no cloak group is chosen before the equipment is known", "[geoset]") 
     CHECK(bare.count(wowee::core::kGeosetNoCape) == 0);
     CHECK(bare.count(wowee::core::kGeosetWithCape) == 0);
 }
+
+TEST_CASE("the belt's base variant is the waist, not nothing", "[geoset]") {
+    // Group 18 is erased and rebuilt on every equipment change. On the older
+    // human male the group holds only 1802, so erasing it and adding nothing
+    // costs nothing; the Legion model carries 1801, 1802 and 1803, and 1801 is
+    // the waist itself - dropped with nothing in its place, the torso floats
+    // above the legs.
+    CHECK(wowee::core::equipment::kBeltBase == 1801);
+    CHECK(geosetGroup(wowee::core::equipment::kBeltBase) == 18);
+    // A belt worn is the variant after it, which is what the model carries for
+    // a buckle on both asset sets.
+    CHECK(equippedGeoset(wowee::core::equipment::kBeltBase, 1) == 1802);
+}

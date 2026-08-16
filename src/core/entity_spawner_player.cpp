@@ -513,11 +513,18 @@ void EntitySpawner::setOnlinePlayerEquipment(uint64_t guid,
     }
 
     // Waist/Belt (invType 6) → buckle group 18
+    //
+    // The base variant when no belt is worn, rather than nothing. Group 18 is
+    // erased below, and on the Legion human male 1801 is the waist itself, so
+    // dropping it with nothing in its place left a gap between the torso and
+    // the legs. The older models carry no 1801, where pickGeoset resolves this
+    // to nothing exactly as before.
     uint16_t geosetBelt = 0;
     {
         uint32_t did = findDisplayIdByInvType({6});
         uint32_t gg1 = getGeosetGroup(did, geosetGroup1Field);
-        if (gg1 > 0) geosetBelt = pickGeoset(equippedGeoset(equipment::kBeltBase, gg1), 0);
+        geosetBelt = pickGeoset(gg1 > 0 ? equippedGeoset(equipment::kBeltBase, gg1) : 0,
+                                equipment::kBeltBase);
     }
 
     eraseGroup(4);
