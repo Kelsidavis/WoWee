@@ -398,7 +398,7 @@ inline QuestSpecialItem questSpecialItemAt(game::GameHandler* gh, int questIndex
     for (int i = 0; i < inv.getBackpackSize(); ++i) {
         const auto& slot = inv.getBackpackSlot(i);
         if (!slot.empty() && slot.item.itemId == itemId) {
-            return {0, i + 1, itemId, slot.item.stackCount};
+            return {.bag = 0, .slot = i + 1, .itemId = itemId, .count = slot.item.stackCount};
         }
     }
     for (int bag = 0; bag < 4; ++bag) {
@@ -406,7 +406,7 @@ inline QuestSpecialItem questSpecialItemAt(game::GameHandler* gh, int questIndex
         for (int i = 0; i < size; ++i) {
             const auto& slot = inv.getBagSlot(bag, i);
             if (!slot.empty() && slot.item.itemId == itemId) {
-                return {bag + 1, i + 1, itemId, slot.item.stackCount};
+                return {.bag = bag + 1, .slot = i + 1, .itemId = itemId, .count = slot.item.stackCount};
             }
         }
     }
