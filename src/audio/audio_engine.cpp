@@ -18,6 +18,54 @@ namespace audio {
 
 namespace {
 
+/// Owns malloc'd storage for a miniaudio object and unwinds it correctly on
+/// any early return.
+///
+/// miniaudio initialises into caller-provided storage, so teardown is two
+/// steps -- uninit the object, then free the storage -- and the uninit must
+/// not run on storage that was never initialised. That is the distinction the
+/// hand-written cleanup here used to encode by having a different free()
+/// sequence at each of five early returns per function, duplicated across two
+/// functions. Every one of them had to be right, and nothing checked that.
+///
+/// Call markInitialised() once the matching ma_*_init has succeeded, and
+/// release() to hand the pointer to activeSounds_, which owns it from then on.
+template <typename T, void (*Uninit)(T*)>
+class MaStorage {
+public:
+    MaStorage() : ptr_(static_cast<T*>(std::malloc(sizeof(T)))) {}
+    ~MaStorage() {
+        if (ptr_ != nullptr) {
+            if (initialised_) {
+                Uninit(ptr_);
+            }
+            std::free(ptr_);
+        }
+    }
+
+    MaStorage(const MaStorage&) = delete;
+    MaStorage& operator=(const MaStorage&) = delete;
+
+    explicit operator bool() const { return ptr_ != nullptr; }
+    T* get() const { return ptr_; }
+    void markInitialised() { initialised_ = true; }
+
+    /// Give up ownership. The caller frees it from here on.
+    T* release() {
+        T* p = ptr_;
+        ptr_ = nullptr;
+        initialised_ = false;
+        return p;
+    }
+
+private:
+    T* ptr_ = nullptr;
+    bool initialised_ = false;
+};
+
+using AudioBufferStorage = MaStorage<ma_audio_buffer, ma_audio_buffer_uninit>;
+using SoundStorage = MaStorage<ma_sound, ma_sound_uninit>;
+
 struct DecodedWavCacheEntry {
     ma_format format = ma_format_unknown;
     ma_uint32 channels = 0;
@@ -287,54 +335,44 @@ bool AudioEngine::playSound2D(const std::vector<uint8_t>& wavData, float volume,
     // pitch distortion if it differs from the file's native rate (e.g. 22050 vs 44100 Hz).
     bufferConfig.sampleRate = decoded.sampleRate;
 
-    ma_audio_buffer* audioBuffer = static_cast<ma_audio_buffer*>(std::malloc(sizeof(ma_audio_buffer)));
+    AudioBufferStorage audioBuffer;
     if (!audioBuffer) return false;
-    ma_result result = ma_audio_buffer_init(&bufferConfig, audioBuffer);
+    ma_result result = ma_audio_buffer_init(&bufferConfig, audioBuffer.get());
     if (result != MA_SUCCESS) {
         LOG_WARNING("Failed to create audio buffer: ", result);
-        std::free(audioBuffer);
         return false;
     }
+    audioBuffer.markInitialised();
 
     // Create sound from audio buffer
-    ma_sound* sound = static_cast<ma_sound*>(std::malloc(sizeof(ma_sound)));
-    if (!sound) {
-        ma_audio_buffer_uninit(audioBuffer);
-        std::free(audioBuffer);
-        return false;
-    }
+    SoundStorage sound;
+    if (!sound) return false;
     result = ma_sound_init_from_data_source(
         engine_,
-        audioBuffer,
+        audioBuffer.get(),
         MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC | MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_NO_SPATIALIZATION,
         nullptr,
-        sound
+        sound.get()
     );
 
     if (result != MA_SUCCESS) {
         LOG_WARNING("Failed to create sound: ", result);
-        ma_audio_buffer_uninit(audioBuffer);
-        std::free(audioBuffer);
-        std::free(sound);
         return false;
     }
+    sound.markInitialised();
 
     // Set volume (pitch not supported with NO_PITCH flag)
-    ma_sound_set_volume(sound, volume);
+    ma_sound_set_volume(sound.get(), volume);
 
     // Start playback
-    result = ma_sound_start(sound);
+    result = ma_sound_start(sound.get());
     if (result != MA_SUCCESS) {
         LOG_WARNING("Failed to start sound: ", result);
-        ma_sound_uninit(sound);
-        ma_audio_buffer_uninit(audioBuffer);
-        std::free(audioBuffer);
-        std::free(sound);
         return false;
     }
 
     // Track this sound for cleanup (decoded PCM shared across plays)
-    activeSounds_.push_back({sound, audioBuffer, decoded.pcmData, 0u});
+    activeSounds_.push_back({sound.release(), audioBuffer.release(), decoded.pcmData, 0u});
 
     return true;
 }
@@ -350,42 +388,32 @@ uint32_t AudioEngine::playSound2DStoppable(const std::vector<uint8_t>& wavData, 
         decoded.format, decoded.channels, decoded.frames, decoded.pcmData->data(), nullptr);
     bufferConfig.sampleRate = decoded.sampleRate;
 
-    ma_audio_buffer* audioBuffer = static_cast<ma_audio_buffer*>(std::malloc(sizeof(ma_audio_buffer)));
+    AudioBufferStorage audioBuffer;
     if (!audioBuffer) return 0;
-    if (ma_audio_buffer_init(&bufferConfig, audioBuffer) != MA_SUCCESS) {
-        std::free(audioBuffer);
+    if (ma_audio_buffer_init(&bufferConfig, audioBuffer.get()) != MA_SUCCESS) {
         return 0;
     }
+    audioBuffer.markInitialised();
 
-    ma_sound* sound = static_cast<ma_sound*>(std::malloc(sizeof(ma_sound)));
-    if (!sound) {
-        ma_audio_buffer_uninit(audioBuffer);
-        std::free(audioBuffer);
-        return 0;
-    }
+    SoundStorage sound;
+    if (!sound) return 0;
     ma_result result = ma_sound_init_from_data_source(
-        engine_, audioBuffer,
+        engine_, audioBuffer.get(),
         MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC | MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_NO_SPATIALIZATION,
-        nullptr, sound);
+        nullptr, sound.get());
     if (result != MA_SUCCESS) {
-        ma_audio_buffer_uninit(audioBuffer);
-        std::free(audioBuffer);
-        std::free(sound);
         return 0;
     }
+    sound.markInitialised();
 
-    ma_sound_set_volume(sound, volume);
-    if (ma_sound_start(sound) != MA_SUCCESS) {
-        ma_sound_uninit(sound);
-        ma_audio_buffer_uninit(audioBuffer);
-        std::free(audioBuffer);
-        std::free(sound);
+    ma_sound_set_volume(sound.get(), volume);
+    if (ma_sound_start(sound.get()) != MA_SUCCESS) {
         return 0;
     }
 
     uint32_t id = nextSoundId_++;
     if (nextSoundId_ == 0) nextSoundId_ = 1;  // Skip 0 (sentinel)
-    activeSounds_.push_back({sound, audioBuffer, decoded.pcmData, id});
+    activeSounds_.push_back({sound.release(), audioBuffer.release(), decoded.pcmData, id});
     return id;
 }
 
@@ -451,59 +479,49 @@ bool AudioEngine::playSound3D(const std::vector<uint8_t>& wavData, const glm::ve
     // pitch distortion if it differs from the file's native rate (e.g. 22050 vs 44100 Hz).
     bufferConfig.sampleRate = decoded.sampleRate;
 
-    ma_audio_buffer* audioBuffer = static_cast<ma_audio_buffer*>(std::malloc(sizeof(ma_audio_buffer)));
+    AudioBufferStorage audioBuffer;
     if (!audioBuffer) return false;
-    ma_result result = ma_audio_buffer_init(&bufferConfig, audioBuffer);
+    ma_result result = ma_audio_buffer_init(&bufferConfig, audioBuffer.get());
     if (result != MA_SUCCESS) {
-        std::free(audioBuffer);
         return false;
     }
+    audioBuffer.markInitialised();
 
     // Create 3D sound (spatialization enabled, pitch enabled)
-    ma_sound* sound = static_cast<ma_sound*>(std::malloc(sizeof(ma_sound)));
-    if (!sound) {
-        ma_audio_buffer_uninit(audioBuffer);
-        std::free(audioBuffer);
-        return false;
-    }
+    SoundStorage sound;
+    if (!sound) return false;
     result = ma_sound_init_from_data_source(
         engine_,
-        audioBuffer,
+        audioBuffer.get(),
         MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC,  // Removed NO_PITCH flag
         nullptr,
-        sound
+        sound.get()
     );
 
     if (result != MA_SUCCESS) {
         LOG_WARNING("playSound3D: Failed to create sound, error: ", result);
-        ma_audio_buffer_uninit(audioBuffer);
-        std::free(audioBuffer);
-        std::free(sound);
         return false;
     }
+    sound.markInitialised();
 
     // Set 3D position and attenuation
-    ma_sound_set_position(sound, position.x, position.y, position.z);
-    ma_sound_set_volume(sound, volume);
-    ma_sound_set_pitch(sound, pitch);  // Enable pitch variation
-    ma_sound_set_attenuation_model(sound, ma_attenuation_model_inverse);
-    ma_sound_set_min_gain(sound, 0.0f);
-    ma_sound_set_max_gain(sound, 1.0f);
-    ma_sound_set_min_distance(sound, 1.0f);
-    ma_sound_set_max_distance(sound, maxDistance);
-    ma_sound_set_rolloff(sound, 1.0f);
+    ma_sound_set_position(sound.get(), position.x, position.y, position.z);
+    ma_sound_set_volume(sound.get(), volume);
+    ma_sound_set_pitch(sound.get(), pitch);  // Enable pitch variation
+    ma_sound_set_attenuation_model(sound.get(), ma_attenuation_model_inverse);
+    ma_sound_set_min_gain(sound.get(), 0.0f);
+    ma_sound_set_max_gain(sound.get(), 1.0f);
+    ma_sound_set_min_distance(sound.get(), 1.0f);
+    ma_sound_set_max_distance(sound.get(), maxDistance);
+    ma_sound_set_rolloff(sound.get(), 1.0f);
 
-    result = ma_sound_start(sound);
+    result = ma_sound_start(sound.get());
     if (result != MA_SUCCESS) {
-        ma_sound_uninit(sound);
-        ma_audio_buffer_uninit(audioBuffer);
-        std::free(audioBuffer);
-        std::free(sound);
         return false;
     }
 
     // Track for cleanup
-    activeSounds_.push_back({sound, audioBuffer, decoded.pcmData});
+    activeSounds_.push_back({sound.release(), audioBuffer.release(), decoded.pcmData});
 
     return true;
 }
@@ -602,6 +620,10 @@ bool AudioEngine::playMusic(std::shared_ptr<const std::vector<uint8_t>> musicDat
         ma_decoder_uninit(decoder);
         delete decoder;
         musicDecoder_ = nullptr;
+        // The two failure paths above release this and this one did not, so a
+        // failed start pinned the whole encoded file until the next playMusic
+        // reassigned the member.
+        musicData_.reset();
         return false;
     }
 

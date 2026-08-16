@@ -161,16 +161,35 @@ Note the survey pattern that nearly wasted a session: grepping for
 `wowee_*.cpp` files — lambda parameters, not buffers. Tighten the pattern to require a
 length-shaped name (`len|size|length|count`) before believing a count.
 
-### Phase 4 — `std::format` for the 507 `snprintf` sites
-Each `char buf[N]` + `snprintf` is a truncation and type-safety hazard. `std::format` makes both
-compile-time concerns. Work by cluster: `combat_ui.cpp` (132), `game_screen_frames.cpp` (39),
-`inventory_screen.cpp` (38), then the tail.
+### Phase 4 — ~~`std::format` for the 507 `snprintf` sites~~ **CANCELLED — measured, not worth it**
+The case for this phase was that each `char buf[N]` + `snprintf` is a truncation *and* a
+type-safety hazard. Measuring both halves killed it.
 
-Verify libc++/libstdc++/MSVC all have `<format>` on the CI matrix before starting; if any lag,
-use `std::vformat` or defer this phase rather than adding a dependency.
+**Type safety is already enforced.** `CMakeLists.txt:1339` sets `-Wall -Wextra -Wpedantic` and
+`:1351` adds `-Werror`. `-Wformat` fires on a mismatched specifier, so `%d` against a
+`unsigned long long` is a *build error* in this project today, not a latent bug. Verified by
+compiling one.
 
-**Exit:** `snprintf` count near zero, no fixed-size char buffers left in UI string building,
-tests green. Enable a lint check to keep it out.
+**Truncation is bounded and mostly unreachable.** `snprintf` cannot overrun — it truncates. And
+of the 507 sites:
+
+| | count |
+|---|---|
+| total `snprintf` | 507 |
+| formatting any `%s` | 140 |
+| formatting a `.c_str()` (unbounded input) | **40** |
+
+The 40 are chat and UI lines — `"%s killed %s."` with player names, which WoW caps at 12
+characters, into 128- and 256-byte buffers. The remaining 467 format integers and floats into
+buffers that cannot overflow.
+
+So the cost is 507 edits across UI code with **no test coverage for string output**, against a
+benefit of "a name longer than the format budget would display in full". Every edit is a chance
+to get `%02d` → `{:02}` or `%.1f` → `{:.1f}` subtly wrong, and nothing would catch it. That
+trades a real regression risk for a cosmetic gain, which is the opposite of this plan's
+"safety before elegance" rule.
+
+Revisit only if a specific truncation is observed in practice, and then fix that site.
 
 ### Phase 5 — RAII the audio C interop
 Wrap the miniaudio `malloc`/`free` pairs in `audio_engine.cpp` in a `unique_ptr` with a custom
