@@ -3,6 +3,8 @@
 #include <thread>
 #include <mutex>
 #include "rendering/vk_context.hpp"
+
+#include <fstream>
 #include "core/logger.hpp"
 #include <VkBootstrap.h>
 #include <SDL2/SDL_vulkan.h>
@@ -121,8 +123,18 @@ void VkContext::shutdown() {
     // reference) have already been destroyed, so running them would call
     // vkFreeDescriptorSets on invalid pools.  vkDestroyDevice reclaims all
     // device-child resources anyway.
+    size_t droppedCleanups = 0;
     for (uint32_t fi = 0; fi < MAX_FRAMES_IN_FLIGHT; fi++) {
+        droppedCleanups += deferredCleanup_[fi].size();
         deferredCleanup_[fi].clear();
+    }
+    // Said out loud, because these are exactly the objects vkDestroyDevice then
+    // reports as leaked, and without the count there is no way to tell that
+    // report apart from a resource nobody freed at all.
+    if (droppedCleanups > 0) {
+        LOG_INFO("shutdown: dropped ", droppedCleanups,
+                 " deferred destructions unexecuted (their pools are already gone;"
+                 " vkDestroyDevice reclaims them and validation counts them as leaked)");
     }
 
     LOG_DEBUG("VkContext::shutdown - destroyImGuiResources...");
@@ -211,6 +223,32 @@ void VkContext::shutdown() {
     // noise. Players never take this path.
     if (allocator) {
         if (validationActive_) {
+            // What the allocator still holds, before it is torn down. Anything
+            // counted here is a vmaCreateBuffer/Image whose owner never called
+            // the matching vmaDestroy, and vmaDestroyAllocator frees the memory
+            // blocks without destroying those handles -- so they are what
+            // vkDestroyDevice then reports.
+            VmaTotalStatistics stats{};
+            vmaCalculateStatistics(allocator, &stats);
+            LOG_INFO("shutdown: VMA still holds ",
+                     stats.total.statistics.allocationCount, " allocations in ",
+                     stats.total.statistics.blockCount, " blocks (",
+                     stats.total.statistics.allocationBytes / (1024 * 1024), " MB)");
+            // The detailed JSON names every surviving allocation's size and
+            // memory type, which is what identifies the owner -- a handful of
+            // distinctive sizes is usually enough to point at one subsystem.
+            if (stats.total.statistics.allocationCount > 0) {
+                char* statsJson = nullptr;
+                vmaBuildStatsString(allocator, &statsJson, VK_TRUE);
+                if (statsJson) {
+                    const auto path = std::filesystem::temp_directory_path() / "wowee-vma-leak.json";
+                    if (std::ofstream out(path); out) {
+                        out << statsJson;
+                        LOG_INFO("shutdown: surviving VMA allocations dumped to ", path.string());
+                    }
+                    vmaFreeStatsString(allocator, statsJson);
+                }
+            }
             LOG_INFO("Validation active - destroying VMA allocator (slow, but keeps the exit clean)");
             vmaDestroyAllocator(allocator);
         }
