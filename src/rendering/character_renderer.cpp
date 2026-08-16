@@ -1401,6 +1401,15 @@ VkTexture* CharacterRenderer::compositeTextures(const std::vector<std::string>& 
     // collarbone, becomes a ridge - and on a character that reads as stretch
     // marks. Art authored as a surface gets one; art authored as a person does
     // not.
+    // Checked before emplacing, not after. emplace builds its node from the
+    // arguments and then destroys that node if the key is already present --
+    // and ~VkTexture frees nothing, so the texture goes in, comes back out
+    // destroyed-but-not-freed, and there is no longer a pointer to free it by.
+    if (auto existing = textureCache.find(cacheKey); existing != textureCache.end()) {
+        e.texture->destroy(vkCtx_->getDevice(), vkCtx_->getAllocator());
+        existing->second.lastUse = ++textureCacheCounter_;
+        return existing->second.texture.get();
+    }
     textureCache.emplace(cacheKey, std::move(e));
 
     core::Logger::getInstance().info("Composite texture created: ", width, "x", height, " from ", layerPaths.size(), " layers");
@@ -1698,13 +1707,17 @@ VkTexture* CharacterRenderer::compositeWithRegions(const std::string& basePath,
     entry.colorKeyBlack = false;
     texturePropsByPtr_[texPtr] = {hasAlpha, false};
     // Skin again, with armour composited onto it. Same reason as above.
-    auto ins = textureCache.emplace(storageKey, std::move(entry));
-    if (!ins.second) {
-        // Existing texture already owns this key; keep pointer stable.
-        ins.first->second.lastUse = ++textureCacheCounter_;
-        compositeCache_[cacheKey] = ins.first->second.texture.get();
-        return ins.first->second.texture.get();
+    // Checked before emplacing: see the note in compositeTexture. Testing
+    // ins.second afterwards is too late -- by then the texture has been moved
+    // into a node that emplace already destroyed, leaking it with no handle
+    // left to free.
+    if (auto existing = textureCache.find(storageKey); existing != textureCache.end()) {
+        entry.texture->destroy(vkCtx_->getDevice(), vkCtx_->getAllocator());
+        existing->second.lastUse = ++textureCacheCounter_;
+        compositeCache_[cacheKey] = existing->second.texture.get();
+        return existing->second.texture.get();
     }
+    textureCache.emplace(storageKey, std::move(entry));
 
     core::Logger::getInstance().debug("compositeWithRegions: created ", width, "x", height,
         " texture with ", regionLayers.size(), " equipment regions");

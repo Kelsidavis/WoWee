@@ -1,4 +1,6 @@
 #include "rendering/vk_utils.hpp"
+
+#include <cstdio>
 #include "rendering/vk_context.hpp"
 #include "core/logger.hpp"
 #include <cstring>
@@ -63,6 +65,15 @@ AllocatedImage createImage(VkDevice device, VmaAllocator allocator,
             &result.image, &result.allocation, nullptr) != VK_SUCCESS) {
         LOG_ERROR("Failed to create VMA image (", width, "x", height, ")");
         return result;
+    }
+
+    // Name it by shape, so an allocation that survives shutdown can be traced
+    // back from the leak dump to whatever asked for an image this size.
+    {
+        char name[64];
+        std::snprintf(name, sizeof(name), "img %ux%u mips=%u fmt=%d",
+                      width, height, mipLevels, static_cast<int>(format));
+        vmaSetAllocationName(allocator, result.allocation, name);
     }
 
     // Create image view
