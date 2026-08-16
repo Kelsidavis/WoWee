@@ -1,0 +1,21 @@
+# Inherits the repository configuration, then turns off one check.
+#
+# modernize-use-designated-initializers
+#     Every .cpp in this directory is read as text by tools that glob it:
+#     framexml_provides.py, api_shadowing_check.py, framexml_nil_use_check.py
+#     and framexml_presence_test_check.py all do ROOT / "src/addons" then
+#     glob("*.cpp"), and all of them match on the shape {"Name", ... - the Lua
+#     API registration tables, and any other table whose first field is a
+#     string. settings_without_a_control.py and cvar_slider_range_fit.py read
+#     kClientCVars in lua_system_api.cpp the same way.
+#
+#     Naming those fields makes the tables invisible to all of them.
+#     framexml_provides went from 2356 globals to 1991 on one directory's
+#     worth of the fix, and the test suite did not notice: these tools report
+#     rather than assert, and the checks that consume them skip when
+#     Data/interface is not extracted, which it is not on a plain checkout.
+#
+#     Off for the directory rather than per table, because the shape is
+#     everywhere here and the next table added would not know to avoid it.
+InheritParentConfig: true
+Checks: '-modernize-use-designated-initializers'

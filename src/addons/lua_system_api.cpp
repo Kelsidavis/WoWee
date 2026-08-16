@@ -323,25 +323,25 @@ static int lua_PlaySound(lua_State* L) {
         struct Mapping { const char* name; void (audio::UiSoundManager::*play)(); };
         static const Mapping kMappings[] = {
             // A click is a click, and these are all buttons.
-            {.name = "IGMAINMENUOPTION",            .play = &audio::UiSoundManager::playButtonClick},
-            {.name = "IGMAINMENUOPTIONCHECKBOXON",  .play = &audio::UiSoundManager::playButtonClick},
-            {.name = "IGMAINMENUOPTIONCHECKBOXOFF", .play = &audio::UiSoundManager::playButtonClick},
-            {.name = "IGPLAYERINVITEACCEPTED",      .play = &audio::UiSoundManager::playButtonClick},
-            {.name = "IGCHARACTERINFOTAB",          .play = &audio::UiSoundManager::playButtonClick},
-            {.name = "UCHATSCROLLBUTTON",           .play = &audio::UiSoundManager::playButtonClick},
-            {.name = "IGCHATSCROLLUP",              .play = &audio::UiSoundManager::playButtonClick},
-            {.name = "IGCHATSCROLLDOWN",            .play = &audio::UiSoundManager::playButtonClick},
-            {.name = "IGCHATBOTTOM",                .play = &audio::UiSoundManager::playButtonClick},
-            {.name = "IGMAINMENUOPEN",              .play = &audio::UiSoundManager::playMenuButtonClick},
-            {.name = "IGMAINMENUCLOSE",             .play = &audio::UiSoundManager::playMenuButtonClick},
-            {.name = "IGMAINMENUCONTINUE",          .play = &audio::UiSoundManager::playMenuButtonClick},
-            {.name = "GSTITLEOPTIONOK",             .play = &audio::UiSoundManager::playButtonClick},
-            {.name = "GSTITLEOPTIONEXIT",           .play = &audio::UiSoundManager::playButtonClick},
+            {"IGMAINMENUOPTION",            &audio::UiSoundManager::playButtonClick},
+            {"IGMAINMENUOPTIONCHECKBOXON",  &audio::UiSoundManager::playButtonClick},
+            {"IGMAINMENUOPTIONCHECKBOXOFF", &audio::UiSoundManager::playButtonClick},
+            {"IGPLAYERINVITEACCEPTED",      &audio::UiSoundManager::playButtonClick},
+            {"IGCHARACTERINFOTAB",          &audio::UiSoundManager::playButtonClick},
+            {"UCHATSCROLLBUTTON",           &audio::UiSoundManager::playButtonClick},
+            {"IGCHATSCROLLUP",              &audio::UiSoundManager::playButtonClick},
+            {"IGCHATSCROLLDOWN",            &audio::UiSoundManager::playButtonClick},
+            {"IGCHATBOTTOM",                &audio::UiSoundManager::playButtonClick},
+            {"IGMAINMENUOPEN",              &audio::UiSoundManager::playMenuButtonClick},
+            {"IGMAINMENUCLOSE",             &audio::UiSoundManager::playMenuButtonClick},
+            {"IGMAINMENUCONTINUE",          &audio::UiSoundManager::playMenuButtonClick},
+            {"GSTITLEOPTIONOK",             &audio::UiSoundManager::playButtonClick},
+            {"GSTITLEOPTIONEXIT",           &audio::UiSoundManager::playButtonClick},
             // The panels, each of which has its own pair here already.
-            {.name = "IGCHARACTERINFOOPEN",         .play = &audio::UiSoundManager::playCharacterSheetOpen},
-            {.name = "IGCHARACTERINFOCLOSE",        .play = &audio::UiSoundManager::playCharacterSheetClose},
-            {.name = "TALENTSCREENOPEN",            .play = &audio::UiSoundManager::playCharacterSheetOpen},
-            {.name = "TALENTSCREENCLOSE",           .play = &audio::UiSoundManager::playCharacterSheetClose},
+            {"IGCHARACTERINFOOPEN",         &audio::UiSoundManager::playCharacterSheetOpen},
+            {"IGCHARACTERINFOCLOSE",        &audio::UiSoundManager::playCharacterSheetClose},
+            {"TALENTSCREENOPEN",            &audio::UiSoundManager::playCharacterSheetOpen},
+            {"TALENTSCREENCLOSE",           &audio::UiSoundManager::playCharacterSheetClose},
             // The guild vault, which was not silent: GuildVaultOpen and
             // GuildVaultClose are rows in SoundEntries.dbc, so playByName above
             // has been finding and playing them all along.
@@ -351,39 +351,39 @@ static int lua_PlaySound(lua_State* L) {
             // reach them, so an install with the wavs but no SoundEntries.dbc -
             // the case the table exists to cover - had them in memory and no
             // way to ask for them.
-            {.name = "GUILDVAULTOPEN",              .play = &audio::UiSoundManager::playGuildBankOpen},
-            {.name = "GUILDVAULTCLOSE",             .play = &audio::UiSoundManager::playGuildBankClose},
-            {.name = "IGBACKPACKOPEN",              .play = &audio::UiSoundManager::playBagOpen},
-            {.name = "IGBACKPACKCLOSE",             .play = &audio::UiSoundManager::playBagClose},
-            {.name = "KEYRINGOPEN",                 .play = &audio::UiSoundManager::playBagOpen},
-            {.name = "KEYRINGCLOSE",                .play = &audio::UiSoundManager::playBagClose},
-            {.name = "IGQUESTLOGOPEN",              .play = &audio::UiSoundManager::playQuestLogOpen},
-            {.name = "IGQUESTLOGCLOSE",             .play = &audio::UiSoundManager::playQuestLogClose},
-            {.name = "IGQUESTLISTOPEN",             .play = &audio::UiSoundManager::playQuestActivate},
-            {.name = "IGQUESTLISTCOMPLETE",         .play = &audio::UiSoundManager::playQuestComplete},
-            {.name = "IGQUESTLOGABANDONQUEST",      .play = &audio::UiSoundManager::playQuestFailed},
-            {.name = "IGQUESTCANCEL",               .play = &audio::UiSoundManager::playQuestFailed},
-            {.name = "WRITEQUEST",                  .play = &audio::UiSoundManager::playQuestUpdate},
-            {.name = "IGSPELLBOOKOPEN",             .play = &audio::UiSoundManager::playPickupBook},
-            {.name = "IGSPELLBOOKCLOSE",            .play = &audio::UiSoundManager::playPickupBook},
-            {.name = "IGABILITYOPEN",               .play = &audio::UiSoundManager::playPickupBook},
-            {.name = "IGABILITYCLOSE",              .play = &audio::UiSoundManager::playPickupBook},
-            {.name = "IGABILIITYPAGETURN",          .play = &audio::UiSoundManager::playPickupBook},
-            {.name = "AUCTIONWINDOWOPEN",           .play = &audio::UiSoundManager::playAuctionHouseOpen},
-            {.name = "AUCTIONWINDOWCLOSE",          .play = &audio::UiSoundManager::playAuctionHouseClose},
+            {"GUILDVAULTOPEN",              &audio::UiSoundManager::playGuildBankOpen},
+            {"GUILDVAULTCLOSE",             &audio::UiSoundManager::playGuildBankClose},
+            {"IGBACKPACKOPEN",              &audio::UiSoundManager::playBagOpen},
+            {"IGBACKPACKCLOSE",             &audio::UiSoundManager::playBagClose},
+            {"KEYRINGOPEN",                 &audio::UiSoundManager::playBagOpen},
+            {"KEYRINGCLOSE",                &audio::UiSoundManager::playBagClose},
+            {"IGQUESTLOGOPEN",              &audio::UiSoundManager::playQuestLogOpen},
+            {"IGQUESTLOGCLOSE",             &audio::UiSoundManager::playQuestLogClose},
+            {"IGQUESTLISTOPEN",             &audio::UiSoundManager::playQuestActivate},
+            {"IGQUESTLISTCOMPLETE",         &audio::UiSoundManager::playQuestComplete},
+            {"IGQUESTLOGABANDONQUEST",      &audio::UiSoundManager::playQuestFailed},
+            {"IGQUESTCANCEL",               &audio::UiSoundManager::playQuestFailed},
+            {"WRITEQUEST",                  &audio::UiSoundManager::playQuestUpdate},
+            {"IGSPELLBOOKOPEN",             &audio::UiSoundManager::playPickupBook},
+            {"IGSPELLBOOKCLOSE",            &audio::UiSoundManager::playPickupBook},
+            {"IGABILITYOPEN",               &audio::UiSoundManager::playPickupBook},
+            {"IGABILITYCLOSE",              &audio::UiSoundManager::playPickupBook},
+            {"IGABILIITYPAGETURN",          &audio::UiSoundManager::playPickupBook},
+            {"AUCTIONWINDOWOPEN",           &audio::UiSoundManager::playAuctionHouseOpen},
+            {"AUCTIONWINDOWCLOSE",          &audio::UiSoundManager::playAuctionHouseClose},
             // The rest, each with an exact counterpart.
-            {.name = "LEVELUPSOUND",                .play = &audio::UiSoundManager::playLevelUp},
-            {.name = "MAPPING",                     .play = &audio::UiSoundManager::playMinimapPing},
-            {.name = "TELLMESSAGE",                 .play = &audio::UiSoundManager::playWhisperReceived},
-            {.name = "IGCHARACTERNPCSELECT",        .play = &audio::UiSoundManager::playTargetSelect},
-            {.name = "IGCREATUREAGGROSELECT",       .play = &audio::UiSoundManager::playTargetSelect},
-            {.name = "IGCREATURENEUTRALSELECT",     .play = &audio::UiSoundManager::playTargetSelect},
-            {.name = "INTERFACESOUND_LOSTTARGETUNIT", .play = &audio::UiSoundManager::playTargetDeselect},
-            {.name = "IGBACKPACKCOINSELECT",        .play = &audio::UiSoundManager::playLootCoinSmall},
-            {.name = "IGBACKPACKCOINOK",            .play = &audio::UiSoundManager::playLootCoinSmall},
-            {.name = "LOOTWINDOWOPENEMPTY",         .play = &audio::UiSoundManager::playError},
-            {.name = "LFG_DENIED",                  .play = &audio::UiSoundManager::playError},
-            {.name = "LFG_REWARDS",                 .play = &audio::UiSoundManager::playQuestComplete},
+            {"LEVELUPSOUND",                &audio::UiSoundManager::playLevelUp},
+            {"MAPPING",                     &audio::UiSoundManager::playMinimapPing},
+            {"TELLMESSAGE",                 &audio::UiSoundManager::playWhisperReceived},
+            {"IGCHARACTERNPCSELECT",        &audio::UiSoundManager::playTargetSelect},
+            {"IGCREATUREAGGROSELECT",       &audio::UiSoundManager::playTargetSelect},
+            {"IGCREATURENEUTRALSELECT",     &audio::UiSoundManager::playTargetSelect},
+            {"INTERFACESOUND_LOSTTARGETUNIT", &audio::UiSoundManager::playTargetDeselect},
+            {"IGBACKPACKCOINSELECT",        &audio::UiSoundManager::playLootCoinSmall},
+            {"IGBACKPACKCOINOK",            &audio::UiSoundManager::playLootCoinSmall},
+            {"LOOTWINDOWOPENEMPTY",         &audio::UiSoundManager::playError},
+            {"LFG_DENIED",                  &audio::UiSoundManager::playError},
+            {"LFG_REWARDS",                 &audio::UiSoundManager::playQuestComplete},
         };
         bool mapped = false;
         for (const Mapping& m : kMappings) {
@@ -4488,28 +4488,28 @@ constexpr CVarRange kCVarRanges[] = {
     // interface's own frames no longer fit on screen, options frame included,
     // and a scale you cannot undo from inside the game is worse than one that
     // is merely too small.
-    {.cvar = "uiscale", .minValue = 0.64f, .maxValue = ui::WidgetTree::kMaxUserScale},
+    {"uiscale", 0.64f, ui::WidgetTree::kMaxUserScale},
     // View distance. The shipped table stops at 1277 - the number the original
     // client's own renderer could reach - and this one draws to 2400, so the
     // slider could not ask for the range the engine has. Both ends are what
     // Renderer::setViewDistance clamps to, so the control now covers exactly
     // what the client can do and nothing it cannot.
-    {.cvar = "farclip", .minValue = 400.0f, .maxValue = 2400.0f},
+    {"farclip", 400.0f, 2400.0f},
     // Mouse Look Speed, over the range this client's own mouse slider uses.
-    {.cvar = "camerayawmovespeed", .minValue = 0.05f, .maxValue = 1.0f},
+    {"camerayawmovespeed", 0.05f, 1.0f},
     // Mouse Sensitivity, which writes the same setting as Mouse Look Speed
     // above and so has to offer the same range. Shipped as 0.5 to 1.5, a
     // multiplier around 1.0, against a setting that sits at 0.2 and stops at 1.
-    {.cvar = "mousespeed", .minValue = 0.05f, .maxValue = 1.0f},
+    {"mousespeed", 0.05f, 1.0f},
     // Camera Following Speed. Not the shipped range: see the note in
     // applyCVarSideEffects - these are the bounds the camera itself clamps to,
     // so every position on the slider is a speed this client can actually run.
-    {.cvar = "camerayawsmoothspeed", .minValue = 5.0f, .maxValue = 100.0f},
+    {"camerayawsmoothspeed", 5.0f, 100.0f},
     // Max camera distance, as a multiple of the original client's limit. The
     // shipped table stops at 2; this client has always been willing to go
     // further, and did it through a checkbox of its own until this slider was
     // wired to mean it.
-    {.cvar = "cameradistancemaxfactor", .minValue = 1.0f, .maxValue = rendering::CameraController::kMaxDistanceFactorLimit},
+    {"cameradistancemaxfactor", 1.0f, rendering::CameraController::kMaxDistanceFactorLimit},
 };
 
 const CVarRange* findCVarRange(lua_State* L) {
@@ -4727,33 +4727,33 @@ void registerSystemLuaAPI(lua_State* L) {
     loadStoredCVars();
     loadInterfaceState();
     static const struct { const char* name; lua_CFunction func; } api[] = {
-                {.name = "Screenshot",               .func = lua_Screenshot},
-                {.name = "WoweeShowSettings",        .func = lua_WoweeShowSettings},
-                {.name = "WoweeSettingList",         .func = lua_WoweeSettingList},
-                {.name = "WoweeVersion",             .func = lua_WoweeVersion},
-                {.name = "WoweeGetSetting",          .func = lua_WoweeGetSetting},
-                {.name = "WoweeSetSetting",          .func = lua_WoweeSetSetting},
-                {.name = "HasLFGRestrictions",       .func = lua_HasLFGRestrictions},
-                {.name = "GetLFGProposal",           .func = lua_GetLFGProposal},
-                {.name = "GetLFGInfoServer",         .func = lua_GetLFGInfoServer},
-                {.name = "GetLFGRoleUpdate",         .func = lua_GetLFGRoleUpdate},
-                {.name = "IsListedInLFR",            .func = lua_IsListedInLFR},
-                {.name = "IsPartyLFG",               .func = lua_IsPartyLFG},
-                {.name = "GetLFGDeserterExpiration", .func = lua_GetLFGDeserterExpiration},
-                {.name = "GetLFGRandomCooldownExpiration", .func = lua_GetLFGRandomCooldownExpiration},
-                {.name = "RefreshLFGList",           .func = lua_RefreshLFGList},
-                {.name = "GetTrackedAchievements",   .func = lua_GetTrackedAchievements},
-                {.name = "RequestRaidInfo",          .func = lua_RequestRaidInfo},
-                {.name = "IsPVPTimerRunning",        .func = lua_IsPVPTimerRunning},
-                {.name = "GetPVPTimer",              .func = lua_GetPVPTimer},
-                {.name = "GetCurrentArenaSeason",    .func = lua_GetCurrentArenaSeason},
-                {.name = "GetPVPRankProgress",       .func = lua_GetPVPRankProgress},
-                {.name = "ArenaTeamRoster",              .func = lua_ArenaTeamRoster},
-                {.name = "GetArenaTeamRosterInfo",       .func = lua_GetArenaTeamRosterInfo},
+                {"Screenshot",               lua_Screenshot},
+                {"WoweeShowSettings",        lua_WoweeShowSettings},
+                {"WoweeSettingList",         lua_WoweeSettingList},
+                {"WoweeVersion",             lua_WoweeVersion},
+                {"WoweeGetSetting",          lua_WoweeGetSetting},
+                {"WoweeSetSetting",          lua_WoweeSetSetting},
+                {"HasLFGRestrictions",       lua_HasLFGRestrictions},
+                {"GetLFGProposal",           lua_GetLFGProposal},
+                {"GetLFGInfoServer",         lua_GetLFGInfoServer},
+                {"GetLFGRoleUpdate",         lua_GetLFGRoleUpdate},
+                {"IsListedInLFR",            lua_IsListedInLFR},
+                {"IsPartyLFG",               lua_IsPartyLFG},
+                {"GetLFGDeserterExpiration", lua_GetLFGDeserterExpiration},
+                {"GetLFGRandomCooldownExpiration", lua_GetLFGRandomCooldownExpiration},
+                {"RefreshLFGList",           lua_RefreshLFGList},
+                {"GetTrackedAchievements",   lua_GetTrackedAchievements},
+                {"RequestRaidInfo",          lua_RequestRaidInfo},
+                {"IsPVPTimerRunning",        lua_IsPVPTimerRunning},
+                {"GetPVPTimer",              lua_GetPVPTimer},
+                {"GetCurrentArenaSeason",    lua_GetCurrentArenaSeason},
+                {"GetPVPRankProgress",       lua_GetPVPRankProgress},
+                {"ArenaTeamRoster",              lua_ArenaTeamRoster},
+                {"GetArenaTeamRosterInfo",       lua_GetArenaTeamRosterInfo},
                 // How many rows that reader has. Unbound, so opening a team's
                 // details called a nil global and raised before the first row
                 // was read - the reader beside it worked the whole time.
-                {.name = "GetNumArenaTeamMembers", .func = [](lua_State* L) -> int {
+                {"GetNumArenaTeamMembers", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const uint32_t teamId =
                 arenaTeamIdAtIndex(gh, static_cast<int>(luaL_optnumber(L, 1, 0)));
@@ -4764,30 +4764,30 @@ void registerSystemLuaAPI(lua_State* L) {
         }},
                 // SortArenaTeamRoster(column) - the details frame's column
                 // headers. Unbound, every one of them raised on click.
-                {.name = "SortArenaTeamRoster", .func = [](lua_State* L) -> int {
+                {"SortArenaTeamRoster", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* key = luaL_optstring(L, 1, "");
             if (gh && key && *key) gh->sortArenaTeamRosters(key);
             return 0;
         }},
-                {.name = "GetArenaTeamRosterSelection",  .func = lua_GetArenaTeamRosterSelection},
-                {.name = "SetArenaTeamRosterSelection",  .func = lua_SetArenaTeamRosterSelection},
-                {.name = "CloseArenaTeamRoster",         .func = lua_CloseArenaTeamRoster},
-                {.name = "IsArenaTeamCaptain",           .func = lua_IsArenaTeamCaptain},
-                {.name = "CloseBattlefield",             .func = lua_CloseBattlefield},
-                {.name = "CanExitVehicle",               .func = lua_CanExitVehicle},
-                {.name = "IsVehicleAimAngleAdjustable",  .func = lua_IsVehicleAimAngleAdjustable},
-                {.name = "HasKey",                       .func = lua_HasKey},
-                {.name = "GetArenaTeam",             .func = lua_GetArenaTeam},
-                {.name = "GetRandomBGHonorCurrencyBonuses",  .func = lua_BattlegroundHonorBonusesNone},
-                {.name = "GetHolidayBGHonorCurrencyBonuses", .func = lua_BattlegroundHonorBonusesNone},
-                {.name = "GetBattlefieldInstanceInfo",       .func = lua_GetBattlefieldInstanceInfo},
-                {.name = "GetNumBattlefields",       .func = lua_GetNumBattlefields},
+                {"GetArenaTeamRosterSelection",  lua_GetArenaTeamRosterSelection},
+                {"SetArenaTeamRosterSelection",  lua_SetArenaTeamRosterSelection},
+                {"CloseArenaTeamRoster",         lua_CloseArenaTeamRoster},
+                {"IsArenaTeamCaptain",           lua_IsArenaTeamCaptain},
+                {"CloseBattlefield",             lua_CloseBattlefield},
+                {"CanExitVehicle",               lua_CanExitVehicle},
+                {"IsVehicleAimAngleAdjustable",  lua_IsVehicleAimAngleAdjustable},
+                {"HasKey",                       lua_HasKey},
+                {"GetArenaTeam",             lua_GetArenaTeam},
+                {"GetRandomBGHonorCurrencyBonuses",  lua_BattlegroundHonorBonusesNone},
+                {"GetHolidayBGHonorCurrencyBonuses", lua_BattlegroundHonorBonusesNone},
+                {"GetBattlefieldInstanceInfo",       lua_GetBattlefieldInstanceInfo},
+                {"GetNumBattlefields",       lua_GetNumBattlefields},
                 // Sorting the battleground list. This client sorts its own, so
                 // there is nothing to do - but the name has to exist, because
                 // PVPBattlegroundFrame_OnShow calls it and a nil global raises
                 // as the panel opens.
-                {.name = "SortBGList",               .func = lua_ReturnNothing},
+                {"SortBGList",               lua_ReturnNothing},
                 // Stationery for a letter. None is carried, and the picker
                 // draws the default when the count is zero - which it could
                 // not do while the count raised.
@@ -4795,48 +4795,48 @@ void registerSystemLuaAPI(lua_State* L) {
                 // empty, and SendMailFrame_CanSend will not enable the Send
                 // button until a stationery has been picked - so with none to
                 // pick, no letter could be sent. See GetStationeryInfo.
-                {.name = "GetNumStationeries",       .func = [](lua_State* L) -> int {
+                {"GetNumStationeries",       [](lua_State* L) -> int {
                     lua_pushnumber(L, 1);
                     return 1;
                 }},
                 // Voice mutes, which this client has no voice chat to keep.
                 // Read while the ignore list is drawn, so a nil global took
                 // the whole ignore tab with it.
-                {.name = "GetNumMutes",              .func = lua_ReturnZero},
-                {.name = "IsInLFGDungeon",           .func = lua_IsInLFGDungeon},
-                {.name = "LFGTeleport",              .func = lua_LFGTeleport},
-                {.name = "IsBattlefieldArena",       .func = lua_IsBattlefieldArena},
-                {.name = "IsActiveBattlefieldArena", .func = lua_IsActiveBattlefieldArena},
-                {.name = "CanHearthAndResurrectFromArea", .func = lua_CanHearthAndResurrectFromArea},
-                {.name = "GetWorldPVPQueueStatus",   .func = lua_GetWorldPVPQueueStatus},
-                {.name = "LeaveBattlefield",         .func = lua_LeaveBattlefield},
-                {.name = "CreateWorldMapArrowFrame",   .func = lua_CreateWorldMapArrowFrame},
-                {.name = "ShowWorldMapArrowFrame",     .func = lua_ShowWorldMapArrowFrame},
-                {.name = "PositionWorldMapArrowFrame", .func = lua_PositionWorldMapArrowFrame},
-                {.name = "InitWorldMapPing",           .func = lua_InitWorldMapPing},
-                {.name = "CreateMiniWorldMapArrowFrame",   .func = lua_CreateMiniWorldMapArrowFrame},
-                {.name = "PositionMiniWorldMapArrowFrame", .func = lua_PositionMiniWorldMapArrowFrame},
-                {.name = "ShowMiniWorldMapArrowFrame",     .func = lua_ShowMiniWorldMapArrowFrame},
-                {.name = "GetBattlefieldMapIconScale",     .func = lua_GetBattlefieldMapIconScale},
-                {.name = "PlayerIsPVPInactive",            .func = lua_PlayerIsPVPInactive},
-                {.name = "CombatTextSetActiveUnit",        .func = lua_CombatTextSetActiveUnit},
-                {.name = "CombatLogGetNumEntries",         .func = lua_CombatLogGetNumEntries},
-                {.name = "CombatLogGetCurrentEntry",       .func = lua_CombatLogGetCurrentEntry},
-                {.name = "CombatLogAdvanceEntry",          .func = lua_CombatLogAdvanceEntry},
-                {.name = "CombatLogSetCurrentEntry",       .func = lua_CombatLogSetCurrentEntry},
-                {.name = "CombatLogAddFilter",             .func = lua_CombatLogAddFilter},
-                {.name = "CombatLogResetFilter",           .func = lua_CombatLogResetFilter},
-                {.name = "GetBattlefieldInfo",       .func = lua_GetBattlefieldInfo},
-                {.name = "SetSelectedBattlefield",   .func = lua_SetSelectedBattlefield},
-                {.name = "GetSelectedBattlefield",   .func = lua_GetSelectedBattlefield},
-                {.name = "JoinBattlefield",          .func = lua_JoinBattlefield},
-                {.name = "GetLFGCompletionReward",     .func = lua_GetLFGCompletionReward},
-                {.name = "GetLFGCompletionRewardItem", .func = lua_GetLFGCompletionRewardItem},
-                {.name = "RunMacroText",             .func = lua_RunMacroText},
+                {"GetNumMutes",              lua_ReturnZero},
+                {"IsInLFGDungeon",           lua_IsInLFGDungeon},
+                {"LFGTeleport",              lua_LFGTeleport},
+                {"IsBattlefieldArena",       lua_IsBattlefieldArena},
+                {"IsActiveBattlefieldArena", lua_IsActiveBattlefieldArena},
+                {"CanHearthAndResurrectFromArea", lua_CanHearthAndResurrectFromArea},
+                {"GetWorldPVPQueueStatus",   lua_GetWorldPVPQueueStatus},
+                {"LeaveBattlefield",         lua_LeaveBattlefield},
+                {"CreateWorldMapArrowFrame",   lua_CreateWorldMapArrowFrame},
+                {"ShowWorldMapArrowFrame",     lua_ShowWorldMapArrowFrame},
+                {"PositionWorldMapArrowFrame", lua_PositionWorldMapArrowFrame},
+                {"InitWorldMapPing",           lua_InitWorldMapPing},
+                {"CreateMiniWorldMapArrowFrame",   lua_CreateMiniWorldMapArrowFrame},
+                {"PositionMiniWorldMapArrowFrame", lua_PositionMiniWorldMapArrowFrame},
+                {"ShowMiniWorldMapArrowFrame",     lua_ShowMiniWorldMapArrowFrame},
+                {"GetBattlefieldMapIconScale",     lua_GetBattlefieldMapIconScale},
+                {"PlayerIsPVPInactive",            lua_PlayerIsPVPInactive},
+                {"CombatTextSetActiveUnit",        lua_CombatTextSetActiveUnit},
+                {"CombatLogGetNumEntries",         lua_CombatLogGetNumEntries},
+                {"CombatLogGetCurrentEntry",       lua_CombatLogGetCurrentEntry},
+                {"CombatLogAdvanceEntry",          lua_CombatLogAdvanceEntry},
+                {"CombatLogSetCurrentEntry",       lua_CombatLogSetCurrentEntry},
+                {"CombatLogAddFilter",             lua_CombatLogAddFilter},
+                {"CombatLogResetFilter",           lua_CombatLogResetFilter},
+                {"GetBattlefieldInfo",       lua_GetBattlefieldInfo},
+                {"SetSelectedBattlefield",   lua_SetSelectedBattlefield},
+                {"GetSelectedBattlefield",   lua_GetSelectedBattlefield},
+                {"JoinBattlefield",          lua_JoinBattlefield},
+                {"GetLFGCompletionReward",     lua_GetLFGCompletionReward},
+                {"GetLFGCompletionRewardItem", lua_GetLFGCompletionRewardItem},
+                {"RunMacroText",             lua_RunMacroText},
                 // This client's own slash commands, for the bootstrap chunk
                 // that puts them into SlashCmdList. Not WoW API - the names
                 // are prefixed so nothing in FrameXML can collide with them.
-                {.name = "__WoweeClientCommandNames", .func = [](lua_State* L) -> int {
+                {"__WoweeClientCommandNames", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             lua_newtable(L);
             if (!svc || !svc->clientChatCommandNames) return 1;
@@ -4846,7 +4846,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 lua_rawseti(L, -2, i++);
             }
             return 1; }},
-                {.name = "__WoweeRunClientCommand", .func = [](lua_State* L) -> int {
+                {"__WoweeRunClientCommand", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             const char* alias = luaL_optstring(L, 1, "");
             const char* args  = luaL_optstring(L, 2, "");
@@ -4855,67 +4855,67 @@ void registerSystemLuaAPI(lua_State* L) {
                 ok = svc->runClientChatCommand(alias, args);
             lua_pushboolean(L, ok ? 1 : 0);
             return 1; }},
-                {.name = "RunMacro",                 .func = lua_RunMacro},
-                {.name = "TriggerTutorial",          .func = lua_TriggerTutorial},
-                {.name = "Quit",                     .func = lua_Quit},
-                {.name = "ForceQuit",                .func = lua_ForceQuit},
-                {.name = "ForceLogout",              .func = lua_ForceLogout},
-                {.name = "ReloadUI",                 .func = lua_ReloadUI},
-                {.name = "GetGamma",                 .func = lua_GetGamma},
-                {.name = "GetTerrainMip",            .func = lua_GetTerrainMip},
-                {.name = "SetTerrainMip",            .func = lua_SetTerrainMip},
-                {.name = "SetGamma",                 .func = lua_SetGamma},
-                {.name = "WoweeReportMissingFixedControls",
-                                             .func = lua_WoweeReportMissingFixedControls},
-                {.name = "GetVideoCaps",             .func = lua_GetVideoCaps},
-                {.name = "GetCVarMin",               .func = lua_GetCVarMin},
-                {.name = "GetCVarMax",               .func = lua_GetCVarMax},
-                {.name = "IsVoiceChatAllowedByServer", .func = lua_IsVoiceChatAllowedByServer},
-                {.name = "VoiceChat_IsRecordingLoopbackSound", .func = lua_VoiceChat_IsRecordingLoopbackSound},
-                {.name = "VoiceChat_IsPlayingLoopbackSound",   .func = lua_VoiceChat_IsPlayingLoopbackSound},
-                {.name = "VoiceChat_GetCurrentMicrophoneSignalLevel", .func = lua_VoiceChat_GetCurrentMicrophoneSignalLevel},
-                {.name = "GetVoiceSessionInfo",      .func = lua_GetVoiceSessionInfo},
-                {.name = "GetNumVoiceSessionMembersBySessionID", .func = lua_GetNumVoiceSessionMembersBySessionID},
-                {.name = "CanShowAchievementUI",     .func = lua_CanShowAchievementUI},
-                {.name = "IsXPUserDisabled",         .func = lua_IsXPUserDisabled},
-                {.name = "GetAddOnMemoryUsage",      .func = lua_GetAddOnMemoryUsage},
-                {.name = "UpdateAddOnMemoryUsage",   .func = lua_ReturnNothing},
-                {.name = "RunScript",                .func = lua_RunScript},
-                {.name = "IsMouseButtonDown",        .func = lua_IsMouseButtonDown},
-                {.name = "GetCVarDefault",           .func = lua_GetCVarDefault},
-                {.name = "IsAddOnLoaded",            .func = lua_IsAddOnLoaded},
-                {.name = "LoadAddOn",                .func = lua_LoadAddOn},
-                {.name = "UIParentLoadAddOn",        .func = lua_LoadAddOn},
+                {"RunMacro",                 lua_RunMacro},
+                {"TriggerTutorial",          lua_TriggerTutorial},
+                {"Quit",                     lua_Quit},
+                {"ForceQuit",                lua_ForceQuit},
+                {"ForceLogout",              lua_ForceLogout},
+                {"ReloadUI",                 lua_ReloadUI},
+                {"GetGamma",                 lua_GetGamma},
+                {"GetTerrainMip",            lua_GetTerrainMip},
+                {"SetTerrainMip",            lua_SetTerrainMip},
+                {"SetGamma",                 lua_SetGamma},
+                {"WoweeReportMissingFixedControls",
+                                             lua_WoweeReportMissingFixedControls},
+                {"GetVideoCaps",             lua_GetVideoCaps},
+                {"GetCVarMin",               lua_GetCVarMin},
+                {"GetCVarMax",               lua_GetCVarMax},
+                {"IsVoiceChatAllowedByServer", lua_IsVoiceChatAllowedByServer},
+                {"VoiceChat_IsRecordingLoopbackSound", lua_VoiceChat_IsRecordingLoopbackSound},
+                {"VoiceChat_IsPlayingLoopbackSound",   lua_VoiceChat_IsPlayingLoopbackSound},
+                {"VoiceChat_GetCurrentMicrophoneSignalLevel", lua_VoiceChat_GetCurrentMicrophoneSignalLevel},
+                {"GetVoiceSessionInfo",      lua_GetVoiceSessionInfo},
+                {"GetNumVoiceSessionMembersBySessionID", lua_GetNumVoiceSessionMembersBySessionID},
+                {"CanShowAchievementUI",     lua_CanShowAchievementUI},
+                {"IsXPUserDisabled",         lua_IsXPUserDisabled},
+                {"GetAddOnMemoryUsage",      lua_GetAddOnMemoryUsage},
+                {"UpdateAddOnMemoryUsage",   lua_ReturnNothing},
+                {"RunScript",                lua_RunScript},
+                {"IsMouseButtonDown",        lua_IsMouseButtonDown},
+                {"GetCVarDefault",           lua_GetCVarDefault},
+                {"IsAddOnLoaded",            lua_IsAddOnLoaded},
+                {"LoadAddOn",                lua_LoadAddOn},
+                {"UIParentLoadAddOn",        lua_LoadAddOn},
                 // This is the whole of whether the achievement micro button is
                 // clickable: mainmenubarmicrobuttons.lua disables it unless
                 // this and CanShowAchievementUI both answer yes, and the other
                 // already did. A flat false left the button greyed out while
                 // the client knew exactly which achievements were earned.
-                {.name = "HasCompletedAnyAchievement", .func = [](lua_State* L) -> int {
+                {"HasCompletedAnyAchievement", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushboolean(L, gh && !gh->getEarnedAchievements().empty() ? 1 : 0);
             return 1;
         }},
-                {.name = "TurnInGuildCharter",       .func = lua_ReturnNothing},
+                {"TurnInGuildCharter",       lua_ReturnNothing},
                 // Nothing is being driven, so aiming it does nothing
                 // and there is nothing to climb out of.
-                {.name = "VehicleAimUpStart",        .func = lua_ReturnNothing},
-                {.name = "VehicleAimUpStop",         .func = lua_ReturnNothing},
-                {.name = "VehicleAimDownStart",      .func = lua_ReturnNothing},
-                {.name = "VehicleAimDownStop",       .func = lua_ReturnNothing},
+                {"VehicleAimUpStart",        lua_ReturnNothing},
+                {"VehicleAimUpStop",         lua_ReturnNothing},
+                {"VehicleAimDownStart",      lua_ReturnNothing},
+                {"VehicleAimDownStop",       lua_ReturnNothing},
                 // The button and the slash command both end here, and it did
                 // nothing - so /leavevehicle, the main bar's button and the
                 // unit menu's entry were three ways of not getting off.
                 // CMSG_REQUEST_VEHICLE_EXIT was already written and had no
                 // caller outside this client's own bar.
-                {.name = "VehicleExit", .func = [](lua_State* L) -> int {
+                {"VehicleExit", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->sendRequestVehicleExit();
             return 0;
         }},
-                {.name = "VehicleAimGetNormAngle",   .func = lua_ReturnZero},
-                {.name = "VehicleAimGetNormPower",   .func = lua_ReturnZero},
-                {.name = "GetMapInfo",               .func = lua_GetMapInfo},
-                {.name = "GetExpansionLevel",        .func = lua_GetExpansionLevel},
+                {"VehicleAimGetNormAngle",   lua_ReturnZero},
+                {"VehicleAimGetNormPower",   lua_ReturnZero},
+                {"GetMapInfo",               lua_GetMapInfo},
+                {"GetExpansionLevel",        lua_GetExpansionLevel},
                 // The difficulty the player is set to, which this client is
                 // told by SMSG_INSTANCE_DIFFICULTY and kept answering as one.
                 // A dropdown reading a constant shows the wrong tick and, worse,
@@ -4932,28 +4932,28 @@ void registerSystemLuaAPI(lua_State* L) {
                 // Both answer from the one value this client tracks. Only one
                 // of the two applies at a time, so that holds until a party
                 // sets a raid difficulty while standing in a dungeon.
-                {.name = "GetDungeonDifficulty", .func = [](lua_State* L) -> int {
+                {"GetDungeonDifficulty", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, (gh ? gh->getInstanceDifficulty() : 0u) + 1u);
             return 1;
         }},
-                {.name = "GetRaidDifficulty", .func = [](lua_State* L) -> int {
+                {"GetRaidDifficulty", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, (gh ? gh->getInstanceDifficulty() : 0u) + 1u);
             return 1;
         }},
-                {.name = "GetChatTypeIndex",         .func = lua_ReturnOne},
-                {.name = "GetDefaultLanguage",       .func = lua_GetDefaultLanguage},
-                {.name = "GetWeaponEnchantInfo",     .func = lua_GetWeaponEnchantInfo},
+                {"GetChatTypeIndex",         lua_ReturnOne},
+                {"GetDefaultLanguage",       lua_GetDefaultLanguage},
+                {"GetWeaponEnchantInfo",     lua_GetWeaponEnchantInfo},
                 // The PvP reclaim timer, which this client already tracks.
                 // Stubbed to zero this read as "reclaim now" and made the
                 // delay text on FrameXML's corpse prompt always empty.
-                {.name = "GetCorpseRecoveryDelay", .func = [](lua_State* L) -> int {
+                {"GetCorpseRecoveryDelay", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? gh->getCorpseReclaimDelaySec() : 0.0);
             return 1;
         }},
-                {.name = "GetAdjustedSkillPoints",   .func = lua_ReturnZero},
+                {"GetAdjustedSkillPoints",   lua_ReturnZero},
                 // Which party slot holds the leader, in the same 1-to-4
                 // ordering resolveUnitGuid gives "party1".."party4": members
                 // other than the player, in order. Zero means the player leads
@@ -4964,7 +4964,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // icon on every frame it ran for, so no party ever showed who
                 // was leading it - while partyData has carried leaderGuid all
                 // along.
-                {.name = "GetPartyLeaderIndex", .func = [](lua_State* L) -> int {
+                {"GetPartyLeaderIndex", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushnumber(L, 0); return 1; }
             const auto& pd = gh->getPartyData();
@@ -4981,8 +4981,8 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushnumber(L, 0);
             return 1;
         }},
-                {.name = "GetNumArenaOpponents",     .func = lua_ReturnZero},
-                {.name = "GetCurrentMultisampleFormat", .func = lua_GetCurrentMultisampleFormat},
+                {"GetNumArenaOpponents",     lua_ReturnZero},
+                {"GetCurrentMultisampleFormat", lua_GetCurrentMultisampleFormat},
                 // These hand back a list, not a value: the caller walks it with
                 // select("#", ...) and reads it in groups. One number makes the
                 // loop run once against nils, which is worse than an empty
@@ -5002,8 +5002,8 @@ void registerSystemLuaAPI(lua_State* L) {
                 // disables itself there - but the choice is still recorded and
                 // still takes effect when FSR is off, which is what that combo
                 // does with it too.
-                {.name = "GetMultisampleFormats",    .func = lua_GetMultisampleFormats},
-                {.name = "GetRefreshRates",          .func = lua_GetRefreshRates},
+                {"GetMultisampleFormats",    lua_GetMultisampleFormats},
+                {"GetRefreshRates",          lua_GetRefreshRates},
                 // ---- The options panels behind the game menu ----
                 //
                 // Every reader here was bound and none of the writers were, so
@@ -5019,16 +5019,16 @@ void registerSystemLuaAPI(lua_State* L) {
                 // none, so choosing from either list can only ever re-choose
                 // what is set. These accept the call and change nothing, which
                 // is the truth rather than a stub.
-                {.name = "SetScreenResolution",      .func = lua_SetScreenResolution},
-                {.name = "SetMultisampleFormat",     .func = lua_SetMultisampleFormat},
+                {"SetScreenResolution",      lua_SetScreenResolution},
+                {"SetMultisampleFormat",     lua_SetMultisampleFormat},
                 // Resolution and windowed mode are settable now, so this one
                 // has something to put back and does not do it. Left rather
                 // than guessed: the defaults live as function-local constants
                 // in the settings panel, and a Restore that picks its own would
                 // disagree with the Defaults button beside it.
-                {.name = "RestoreVideoResolutionDefaults", .func = lua_ReturnNothing},
-                {.name = "RestoreVideoEffectsDefaults",    .func = lua_ReturnNothing},
-                {.name = "RestoreVideoStereoDefaults",     .func = lua_ReturnNothing},
+                {"RestoreVideoResolutionDefaults", lua_ReturnNothing},
+                {"RestoreVideoEffectsDefaults",    lua_ReturnNothing},
+                {"RestoreVideoStereoDefaults",     lua_ReturnNothing},
                 // Applying video settings restarts the graphics device on the
                 // real client. This one applies what it can as it goes and has
                 // no device to tear down.
@@ -5045,7 +5045,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // value format has not been read off the control here, and a
                 // resolution applied from a misread string is a window nobody
                 // can put back.
-                {.name = "RestartGx", .func = [](lua_State* L) -> int {
+                {"RestartGx", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             if (!svc || !svc->setFullscreen) return 0;
             lua_getglobal(L, "GetCVar");
@@ -5057,11 +5057,11 @@ void registerSystemLuaAPI(lua_State* L) {
             svc->setFullscreen(wantFullscreen);
             return 0;
         }},
-                {.name = "Sound_GameSystem_RestartSoundSystem", .func = lua_ReturnNothing},
+                {"Sound_GameSystem_RestartSoundSystem", lua_ReturnNothing},
                 // A separate render scale for the player model, which this
                 // client does not have. False disables the control rather than
                 // leaving it offering something that would do nothing.
-                {.name = "IsPlayerResolutionAvailable", .func = lua_ReturnFalse},
+                {"IsPlayerResolutionAvailable", lua_ReturnFalse},
                 // Which extra action bars are shown. FrameXML draws the bars
                 // and MultiActionBar_Update decides from the SHOW_MULTI_ACTIONBAR_*
                 // globals, which are CVars and persist on their own - so the
@@ -5087,7 +5087,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // Right and Right Bar 2 have nothing to drive, so they are
                 // still remembered but move nothing - saying so here rather
                 // than mapping them onto a bar that is not theirs.
-                {.name = "SetActionBarToggles", .func = [](lua_State* L) -> int {
+                {"SetActionBarToggles", [](lua_State* L) -> int {
             auto& shown = actionBarToggles();
             shown[0] = lua_toboolean(L, 1) != 0;   // Bottom Left
             shown[1] = lua_toboolean(L, 2) != 0;   // Bottom Right
@@ -5117,7 +5117,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // drive a bar, so the checkbox shows what is on screen rather
                 // than what this file last stored. The two disagreed whenever
                 // the bar was turned on from the client's own settings window.
-                {.name = "GetActionBarToggles", .func = [](lua_State* L) -> int {
+                {"GetActionBarToggles", [](lua_State* L) -> int {
             auto shown = actionBarToggles();
             if (auto* svc = getLuaServices(L); svc && svc->getClientSetting) {
                 const auto readBool = [&svc](const char* key, bool fallback) {
@@ -5134,19 +5134,19 @@ void registerSystemLuaAPI(lua_State* L) {
                 // Voice chat, which this client has none of. The enumerations
                 // hand back lists, so they answer with nothing rather than with
                 // a zero; IsVoiceChatEnabled already answers false beside them.
-                {.name = "VoiceIsDisabledByClient",  .func = lua_ReturnTrue},
-                {.name = "VoiceEnumerateCaptureDevices", .func = lua_ReturnNothing},
-                {.name = "VoiceEnumerateOutputDevices",  .func = lua_ReturnNothing},
-                {.name = "VoiceSelectCaptureDevice", .func = lua_ReturnNothing},
-                {.name = "VoiceSelectOutputDevice",  .func = lua_ReturnNothing},
-                {.name = "VoiceChat_StopPlayingLoopbackSound",   .func = lua_ReturnNothing},
-                {.name = "VoiceChat_StopRecordingLoopbackSound", .func = lua_ReturnNothing},
+                {"VoiceIsDisabledByClient",  lua_ReturnTrue},
+                {"VoiceEnumerateCaptureDevices", lua_ReturnNothing},
+                {"VoiceEnumerateOutputDevices",  lua_ReturnNothing},
+                {"VoiceSelectCaptureDevice", lua_ReturnNothing},
+                {"VoiceSelectOutputDevice",  lua_ReturnNothing},
+                {"VoiceChat_StopPlayingLoopbackSound",   lua_ReturnNothing},
+                {"VoiceChat_StopRecordingLoopbackSound", lua_ReturnNothing},
                 // GetCompanionInfo(type, index) → creatureID, creatureName,
                 // spellID, icon, active
                 //
                 // "MOUNT" or "CRITTER". Both are spells the player knows, told
                 // apart by what the spell does - see rebuildCompanions.
-                {.name = "GetCompanionInfo", .func = [](lua_State* L) -> int {
+                {"GetCompanionInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* kind = luaL_optstring(L, 1, "");
             const int index = static_cast<int>(luaL_optnumber(L, 2, 0));
@@ -5204,10 +5204,10 @@ void registerSystemLuaAPI(lua_State* L) {
                 // 1..GetNumTitles() calling IsTitleKnown on each, so this is
                 // the size of the space: KNOWN_TITLES_SIZE * 64 in
                 // AzerothCore's Player.h, three uint64 fields.
-                {.name = "GetNumTitles", .func = [](lua_State* L) -> int {
+                {"GetNumTitles", [](lua_State* L) -> int {
             lua_pushnumber(L, 192); return 1;
         }},
-                {.name = "GetNumCompanions", .func = [](lua_State* L) -> int {
+                {"GetNumCompanions", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* kind = luaL_optstring(L, 1, "");
             const bool mounts = std::string(kind) == "MOUNT";
@@ -5218,8 +5218,8 @@ void registerSystemLuaAPI(lua_State* L) {
                 // server here answering for it. Its category dropdown is
                 // reached from the "?" micro button beside the action bar, so
                 // the raise was one click away rather than in a corner.
-                {.name = "KBSetup_GetCategoryCount",    .func = lua_ReturnZero},
-                {.name = "KBSetup_GetSubCategoryCount", .func = lua_ReturnZero},
+                {"KBSetup_GetCategoryCount",    lua_ReturnZero},
+                {"KBSetup_GetSubCategoryCount", lua_ReturnZero},
                 // The other thirteen, which the note above should have covered
                 // and did not: two counts were bound and the rest of the same
                 // window was not, so the "?" button still raised - on
@@ -5231,19 +5231,19 @@ void registerSystemLuaAPI(lua_State* L) {
                 // returns early unless KBSetup_IsLoaded, the MOTD and notice
                 // are both `if ( x )`, and the article lists are walked by the
                 // counts. Never loaded, nothing in it.
-                {.name = "KBSetup_IsLoaded",            .func = lua_ReturnFalse},
-                {.name = "KBSetup_BeginLoading",        .func = lua_ReturnNothing},
-                {.name = "KBQuery_BeginLoading",        .func = lua_ReturnNothing},
-                {.name = "KBArticle_BeginLoading",      .func = lua_ReturnNothing},
-                {.name = "KBSetup_GetArticleHeaderCount", .func = lua_ReturnZero},
-                {.name = "KBSetup_GetTotalArticleCount",  .func = lua_ReturnZero},
-                {.name = "KBQuery_GetArticleHeaderCount", .func = lua_ReturnZero},
-                {.name = "KBQuery_GetTotalArticleCount",  .func = lua_ReturnZero},
-                {.name = "KBSetup_GetCategoryData",     .func = lua_ReturnNil},
-                {.name = "KBSetup_GetSubCategoryData",  .func = lua_ReturnNil},
-                {.name = "KBArticle_GetData",           .func = lua_ReturnNil},
-                {.name = "KBSystem_GetMOTD",            .func = lua_ReturnNil},
-                {.name = "KBSystem_GetServerNotice",    .func = lua_ReturnNil},
+                {"KBSetup_IsLoaded",            lua_ReturnFalse},
+                {"KBSetup_BeginLoading",        lua_ReturnNothing},
+                {"KBQuery_BeginLoading",        lua_ReturnNothing},
+                {"KBArticle_BeginLoading",      lua_ReturnNothing},
+                {"KBSetup_GetArticleHeaderCount", lua_ReturnZero},
+                {"KBSetup_GetTotalArticleCount",  lua_ReturnZero},
+                {"KBQuery_GetArticleHeaderCount", lua_ReturnZero},
+                {"KBQuery_GetTotalArticleCount",  lua_ReturnZero},
+                {"KBSetup_GetCategoryData",     lua_ReturnNil},
+                {"KBSetup_GetSubCategoryData",  lua_ReturnNil},
+                {"KBArticle_GetData",           lua_ReturnNil},
+                {"KBSystem_GetMOTD",            lua_ReturnNil},
+                {"KBSystem_GetServerNotice",    lua_ReturnNil},
                 // Three more counts read straight into a comparison or a
                 // format, with the same result: the socketing window walks
                 // `i <= numSockets`, the PvP frame formats the season number
@@ -5262,7 +5262,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // queue slot carries each in seconds and this answered zero for
                 // both - a queue that always read as just-joined with no
                 // estimate, which is the whole content of that window.
-                {.name = "GetBattlefieldTimeWaited", .func = [](lua_State* L) -> int {
+                {"GetBattlefieldTimeWaited", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 1));
             double ms = 0.0;
@@ -5271,7 +5271,7 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushnumber(L, ms);
             return 1;
         }},
-                {.name = "GetBattlefieldEstimatedWaitTime", .func = [](lua_State* L) -> int {
+                {"GetBattlefieldEstimatedWaitTime", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 1));
             double ms = 0.0;
@@ -5286,7 +5286,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // The server decides for itself when the request arrives; this
                 // only says whether it is worth offering, which is a party the
                 // player leads. Solo, there is no group to bring.
-                {.name = "CanJoinBattlefieldAsGroup", .func = [](lua_State* L) -> int {
+                {"CanJoinBattlefieldAsGroup", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushboolean(L, 0); return 1; }
             const auto& pd = gh->getPartyData();
@@ -5294,8 +5294,8 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushboolean(L, leadsAParty ? 1 : 0);
             return 1;
         }},
-                {.name = "GetBattlefieldInstanceExpiration", .func = lua_ReturnZero},
-                {.name = "GetBattlefieldInstanceRunTime",    .func = lua_ReturnZero},
+                {"GetBattlefieldInstanceExpiration", lua_ReturnZero},
+                {"GetBattlefieldInstanceRunTime",    lua_ReturnZero},
                 // The aspect ratio the Mac options panel builds its recording
                 // resolution from: `"640x"..floor(640*ratio)`. Answering the
                 // window's own ratio is both truthful and what makes that read
@@ -5310,12 +5310,12 @@ void registerSystemLuaAPI(lua_State* L) {
                 // binding is dispatched by name at the moment a key is pressed
                 // and answering nothing there raises in the key handler, which
                 // is a bad place to find out the filter was not applied.
-                {.name = "MovieRecording_IsRecording",   .func = lua_ReturnFalse},
-                {.name = "MovieRecording_IsCompressing", .func = lua_ReturnFalse},
-                {.name = "MovieRecording_Toggle",        .func = lua_ReturnNothing},
-                {.name = "MovieRecording_ToggleGUI",     .func = lua_ReturnNothing},
-                {.name = "MovieRecording_Cancel",        .func = lua_ReturnNothing},
-                {.name = "MovieRecording_GetAspectRatio", .func = [](lua_State* L) -> int {
+                {"MovieRecording_IsRecording",   lua_ReturnFalse},
+                {"MovieRecording_IsCompressing", lua_ReturnFalse},
+                {"MovieRecording_Toggle",        lua_ReturnNothing},
+                {"MovieRecording_ToggleGUI",     lua_ReturnNothing},
+                {"MovieRecording_Cancel",        lua_ReturnNothing},
+                {"MovieRecording_GetAspectRatio", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             auto* win = svc ? svc->window : nullptr;
             const float w = win ? static_cast<float>(win->getWidth())  : 1920.0f;
@@ -5325,11 +5325,11 @@ void registerSystemLuaAPI(lua_State* L) {
         }},
                 // GetNumSockets answered zero here, which said every item has
                 // no sockets. It is real now, and in lua_socket_api.cpp.
-                {.name = "GetPreviousArenaSeason",      .func = lua_ReturnZero},
+                {"GetPreviousArenaSeason",      lua_ReturnZero},
                 // GetInstanceBootTimeRemaining() - the countdown on the
                 // "you are not in this instance's group" dialog, which reads
                 // it on show and hides itself when it is not positive.
-                {.name = "GetInstanceBootTimeRemaining", .func = [](lua_State* L) -> int {
+                {"GetInstanceBootTimeRemaining", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? gh->getInstanceBootTimeRemaining() : 0);
             return 1;
@@ -5338,7 +5338,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // FlagTutorial from TutorialFrame_Update as a tutorial is
                 // shown, IsTutorialFlagged from TutorialFrame_NewTutorial
                 // before one is queued.
-                {.name = "FlagTutorial", .func = [](lua_State* L) -> int {
+                {"FlagTutorial", [](lua_State* L) -> int {
             flagTutorial(static_cast<int>(luaL_optnumber(L, 1, 0)));
             return 0;
         }},
@@ -5346,14 +5346,14 @@ void registerSystemLuaAPI(lua_State* L) {
                 // nothing, and nothing is what disables the button - so a
                 // wrong answer here is a button that looks available and does
                 // not move.
-                {.name = "GetNextCompleatedTutorial", .func = [](lua_State* L) -> int {
+                {"GetNextCompleatedTutorial", [](lua_State* L) -> int {
             const int from = static_cast<int>(luaL_optnumber(L, 1, 0));
             for (int id : tutorialIds()) {
                 if (id > from) { lua_pushnumber(L, id); return 1; }
             }
             return 0;
         }},
-                {.name = "GetPrevCompleatedTutorial", .func = [](lua_State* L) -> int {
+                {"GetPrevCompleatedTutorial", [](lua_State* L) -> int {
             const int from = static_cast<int>(luaL_optnumber(L, 1, 0));
             const auto ids = tutorialIds();
             for (int id : std::views::reverse(ids)) {
@@ -5361,7 +5361,7 @@ void registerSystemLuaAPI(lua_State* L) {
             }
             return 0;
         }},
-                {.name = "IsTutorialFlagged", .func = [](lua_State* L) -> int {
+                {"IsTutorialFlagged", [](lua_State* L) -> int {
             lua_pushboolean(L, tutorialFlagged(
                 static_cast<int>(luaL_optnumber(L, 1, 0))) ? 1 : 0);
             return 1;
@@ -5369,7 +5369,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // GetDebugStats() fills the debug stats overlay, which is one
                 // SetText of whatever string this hands back. Framerate is the
                 // part of it this client actually knows.
-                {.name = "GetDebugStats", .func = [](lua_State* L) -> int {
+                {"GetDebugStats", [](lua_State* L) -> int {
             const double fps = static_cast<double>(ImGui::GetIO().Framerate);
             char line[64];
             std::snprintf(line, sizeof(line), "%.1f fps", fps);
@@ -5381,21 +5381,21 @@ void registerSystemLuaAPI(lua_State* L) {
                 // so there is never one in progress: nil questions means the
                 // frame counts zero of them and draws empty, which is what an
                 // account with no survey pending should see.
-                {.name = "GMSurveyQuestion",            .func = lua_ReturnNil},
-                {.name = "GMSurveyAnswer",              .func = lua_ReturnNil},
+                {"GMSurveyQuestion",            lua_ReturnNil},
+                {"GMSurveyAnswer",              lua_ReturnNil},
                 // Movie recording, which is a Mac client feature this build
                 // does not have. Its siblings above already answer; these are
                 // the ones MacOptionsFrame reaches as it loads, so each one
                 // was a raise on opening the Mac options panel.
-                {.name = "MovieRecording_IsSupported",  .func = lua_ReturnFalse},
-                {.name = "MovieRecording_IsCursorRecordingSupported", .func = lua_ReturnFalse},
-                {.name = "MovieRecording_DataRate",     .func = lua_ReturnZero},
-                {.name = "MovieRecording_MaxLength",    .func = lua_ReturnZero},
-                {.name = "MovieRecording_GetMovieFullPath", .func = [](lua_State* L) -> int {
+                {"MovieRecording_IsSupported",  lua_ReturnFalse},
+                {"MovieRecording_IsCursorRecordingSupported", lua_ReturnFalse},
+                {"MovieRecording_DataRate",     lua_ReturnZero},
+                {"MovieRecording_MaxLength",    lua_ReturnZero},
+                {"MovieRecording_GetMovieFullPath", [](lua_State* L) -> int {
             lua_pushstring(L, "");
             return 1;
         }},
-                {.name = "MovieRecording_GetViewportWidth", .func = [](lua_State* L) -> int {
+                {"MovieRecording_GetViewportWidth", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             auto* win = svc ? svc->window : nullptr;
             lua_pushnumber(L, win ? win->getWidth() : 1920);
@@ -5405,7 +5405,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // value, which the summary puts straight into a bar and a
                 // "n/total" label beside the player's own. Zero for everyone
                 // drew their bar empty however much they had done.
-                {.name = "GetComparisonCategoryNumAchievements", .func = [](lua_State* L) -> int {
+                {"GetComparisonCategoryNumAchievements", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto category = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (!gh) { lua_pushnumber(L, 0); return 1; }
@@ -5419,12 +5419,12 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushnumber(L, done);
             return 1;
         }},
-                {.name = "GetMultiCastTotemSpells",  .func = lua_ReturnNil},
-                {.name = "GetVoiceStatus",           .func = lua_ReturnFalse},
-                {.name = "GetMuteStatus",            .func = lua_ReturnFalse},
-                {.name = "GetActiveVoiceChannel",    .func = lua_ReturnNil},
-                {.name = "GetVoiceCurrentSessionID", .func = lua_ReturnNil},
-                {.name = "GetPartyMember",           .func = lua_ReturnFalse},
+                {"GetMultiCastTotemSpells",  lua_ReturnNil},
+                {"GetVoiceStatus",           lua_ReturnFalse},
+                {"GetMuteStatus",            lua_ReturnFalse},
+                {"GetActiveVoiceChannel",    lua_ReturnNil},
+                {"GetVoiceCurrentSessionID", lua_ReturnNil},
+                {"GetPartyMember",           lua_ReturnFalse},
                 // GetZonePVPInfo() → pvpType, isSubZonePvP, factionName
                 //
                 // minimap.lua unpacks three and answered nil for all of them,
@@ -5432,7 +5432,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // colour and its tooltip never said whose territory it was.
                 // Middle value stays nil: it is for a sub-zone that differs
                 // from its parent, which this reads at zone granularity.
-                {.name = "GetZonePVPInfo", .func = [](lua_State* L) -> int {
+                {"GetZonePVPInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushnil(L); return 1; }
             const auto [type, faction] = gh->getZonePvpInfo(gh->getWorldStateZoneId());
@@ -5442,34 +5442,34 @@ void registerSystemLuaAPI(lua_State* L) {
             if (faction.empty()) lua_pushnil(L); else lua_pushstring(L, faction.c_str());
             return 3;
         }},
-                {.name = "GetMouseButtonClicked",    .func = lua_ReturnNil},
-                {.name = "GetChatWindowSavedPosition",   .func = lua_GetChatWindowSavedPosition},
-                {.name = "GetChatWindowSavedDimensions", .func = lua_GetChatWindowSavedDimensions},
-                {.name = "SetChatWindowSavedPosition",   .func = lua_SetChatWindowSavedPosition},
-                {.name = "SetChatWindowSavedDimensions", .func = lua_SetChatWindowSavedDimensions},
-                {.name = "SetChatWindowSize",            .func = lua_SetChatWindowSize},
-                {.name = "SetChatWindowColor",           .func = lua_SetChatWindowColor},
-                {.name = "SetChatWindowAlpha",           .func = lua_SetChatWindowAlpha},
-                {.name = "SetChatWindowShown",           .func = lua_SetChatWindowShown},
-                {.name = "SetChatWindowLocked",          .func = lua_SetChatWindowLocked},
-                {.name = "SetChatWindowDocked",          .func = lua_SetChatWindowDocked},
-                {.name = "SetChatWindowUninteractable",  .func = lua_SetChatWindowUninteractable},
-                {.name = "ResetChatWindows",             .func = lua_ResetChatWindows},
-                {.name = "SetChatColorNameByClass",      .func = lua_SetChatColorNameByClass},
-                {.name = "GetChatColorNameByClass",      .func = lua_GetChatColorNameByClass},
-                {.name = "GetExistingLocales",       .func = lua_ReturnNil},
+                {"GetMouseButtonClicked",    lua_ReturnNil},
+                {"GetChatWindowSavedPosition",   lua_GetChatWindowSavedPosition},
+                {"GetChatWindowSavedDimensions", lua_GetChatWindowSavedDimensions},
+                {"SetChatWindowSavedPosition",   lua_SetChatWindowSavedPosition},
+                {"SetChatWindowSavedDimensions", lua_SetChatWindowSavedDimensions},
+                {"SetChatWindowSize",            lua_SetChatWindowSize},
+                {"SetChatWindowColor",           lua_SetChatWindowColor},
+                {"SetChatWindowAlpha",           lua_SetChatWindowAlpha},
+                {"SetChatWindowShown",           lua_SetChatWindowShown},
+                {"SetChatWindowLocked",          lua_SetChatWindowLocked},
+                {"SetChatWindowDocked",          lua_SetChatWindowDocked},
+                {"SetChatWindowUninteractable",  lua_SetChatWindowUninteractable},
+                {"ResetChatWindows",             lua_ResetChatWindows},
+                {"SetChatColorNameByClass",      lua_SetChatColorNameByClass},
+                {"GetChatColorNameByClass",      lua_GetChatColorNameByClass},
+                {"GetExistingLocales",       lua_ReturnNil},
                 // Read from the real keyboard: a shift-click means something
                 // different from a click, and FrameXML asks on every press.
-                {.name = "IsShiftKeyDown",           .func = lua_IsShiftKeyDown},
-                {.name = "IsLeftShiftKeyDown",       .func = lua_IsShiftKeyDown},
-                {.name = "IsRightShiftKeyDown",      .func = lua_IsShiftKeyDown},
-                {.name = "IsControlKeyDown",         .func = lua_IsControlKeyDown},
-                {.name = "IsLeftControlKeyDown",     .func = lua_IsControlKeyDown},
-                {.name = "IsRightControlKeyDown",    .func = lua_IsControlKeyDown},
-                {.name = "IsAltKeyDown",             .func = lua_IsAltKeyDown},
-                {.name = "IsLeftAltKeyDown",         .func = lua_IsAltKeyDown},
-                {.name = "IsRightAltKeyDown",        .func = lua_IsAltKeyDown},
-                {.name = "IsModifierKeyDown",        .func = lua_IsModifierKeyDown},
+                {"IsShiftKeyDown",           lua_IsShiftKeyDown},
+                {"IsLeftShiftKeyDown",       lua_IsShiftKeyDown},
+                {"IsRightShiftKeyDown",      lua_IsShiftKeyDown},
+                {"IsControlKeyDown",         lua_IsControlKeyDown},
+                {"IsLeftControlKeyDown",     lua_IsControlKeyDown},
+                {"IsRightControlKeyDown",    lua_IsControlKeyDown},
+                {"IsAltKeyDown",             lua_IsAltKeyDown},
+                {"IsLeftAltKeyDown",         lua_IsAltKeyDown},
+                {"IsRightAltKeyDown",        lua_IsAltKeyDown},
+                {"IsModifierKeyDown",        lua_IsModifierKeyDown},
                 // The four predicates actionbutton.lua asks about a slot.
                 //
                 // All answered false, and the pair below the first is why a
@@ -5477,7 +5477,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // drawn only inside `if ( IsConsumableAction(action) or
                 // IsStackableAction(action) )`, and GetActionCount underneath
                 // it has been counting across every bag the whole time.
-                {.name = "IsAttackAction", .func = [](lua_State* L) -> int {
+                {"IsAttackAction", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int slot = static_cast<int>(luaL_optnumber(L, 1, 0)) - 1;
             if (!gh || slot < 0) { lua_pushboolean(L, 0); return 1; }
@@ -5490,7 +5490,7 @@ void registerSystemLuaAPI(lua_State* L) {
                                bar[slot].id == kAutoAttack);
             return 1;
         }},
-                {.name = "IsConsumableAction", .func = [](lua_State* L) -> int {
+                {"IsConsumableAction", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int slot = static_cast<int>(luaL_optnumber(L, 1, 0)) - 1;
             if (!gh || slot < 0) { lua_pushboolean(L, 0); return 1; }
@@ -5504,7 +5504,7 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushboolean(L, consumable);
             return 1;
         }},
-                {.name = "IsEquippedAction", .func = [](lua_State* L) -> int {
+                {"IsEquippedAction", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int slot = static_cast<int>(luaL_optnumber(L, 1, 0)) - 1;
             if (!gh || slot < 0) { lua_pushboolean(L, 0); return 1; }
@@ -5521,7 +5521,7 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushboolean(L, worn);
             return 1;
         }},
-                {.name = "IsStackableAction", .func = [](lua_State* L) -> int {
+                {"IsStackableAction", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int slot = static_cast<int>(luaL_optnumber(L, 1, 0)) - 1;
             if (!gh || slot < 0) { lua_pushboolean(L, 0); return 1; }
@@ -5535,30 +5535,30 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushboolean(L, stackable);
             return 1;
         }},
-                {.name = "IsFlyableArea",            .func = lua_ReturnFalse},
+                {"IsFlyableArea",            lua_ReturnFalse},
                 // The renderer knows whether the camera is inside a WMO, and
                 // the macro conditionals [indoors] / [outdoors] have read it
                 // all along. These two answered a flat false and a flat true.
-                {.name = "IsIndoors", .func = [](lua_State* L) -> int {
+                {"IsIndoors", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             lua_pushboolean(L, svc && svc->isPlayerIndoors && svc->isPlayerIndoors());
             return 1;
         }},
-                {.name = "IsOutdoors", .func = [](lua_State* L) -> int {
+                {"IsOutdoors", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             lua_pushboolean(L, !(svc && svc->isPlayerIndoors && svc->isPlayerIndoors()));
             return 1;
         }},
-                {.name = "IsHarmfulItem",            .func = lua_ReturnFalse},
-                {.name = "IsHelpfulItem",            .func = lua_ReturnFalse},
-                {.name = "IsHarmfulSpell",           .func = lua_ReturnFalse},
-                {.name = "IsHelpfulSpell",           .func = lua_ReturnFalse},
+                {"IsHarmfulItem",            lua_ReturnFalse},
+                {"IsHelpfulItem",            lua_ReturnFalse},
+                {"IsHarmfulSpell",           lua_ReturnFalse},
+                {"IsHelpfulSpell",           lua_ReturnFalse},
                 // Shown only while there is something to possess *and* a way
                 // out of it. The bar's second button is the escape - see
                 // GetPossessInfo below - so offering the bar without being
                 // able to name the aura it cancels would be a bar that traps
                 // rather than releases.
-                {.name = "IsPossessBarVisible", .func = [](lua_State* L) -> int {
+                {"IsPossessBarVisible", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             bool possessing = false;
             if (gh) {
@@ -5606,7 +5606,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // that function skips every slot but the one it was given. So
                 // the possessed creature's first spell is bar slot zero, which
                 // is the slot this button is for.
-                {.name = "GetPossessInfo", .func = [](lua_State* L) -> int {
+                {"GetPossessInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int slot = static_cast<int>(luaL_optnumber(L, 1, 0));
             constexpr int kCancelSlot = 2;
@@ -5650,7 +5650,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // It gates the assistant-only entries on the unit menus and,
                 // with IsPartyLeader beside it, whether the chat frame offers
                 // to send a raid warning at all.
-                {.name = "IsRaidOfficer", .func = [](lua_State* L) -> int {
+                {"IsRaidOfficer", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushboolean(L, 0); return 1; }
             const uint64_t self = gh->getPlayerGuid();
@@ -5664,37 +5664,37 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushboolean(L, 0);
             return 1;
         }},
-                {.name = "IsReferAFriendLinked",     .func = lua_ReturnFalse},
-                {.name = "IsStereoVideoAvailable",   .func = lua_ReturnFalse},
-                {.name = "IsVoiceChatEnabled",       .func = lua_ReturnFalse},
+                {"IsReferAFriendLinked",     lua_ReturnFalse},
+                {"IsStereoVideoAvailable",   lua_ReturnFalse},
+                {"IsVoiceChatEnabled",       lua_ReturnFalse},
                 // False always, which is what disabled the zoom-out button at
                 // every level of the map. The only way back out of a zone was
                 // the right-click that reaches the same handler without
                 // asking this first.
-                {.name = "IsZoomOutAvailable", .func = [](lua_State* L) -> int {
+                {"IsZoomOutAvailable", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             const bool can = svc && svc->canZoomMapOut && svc->canZoomMapOut();
             lua_pushboolean(L, can ? 1 : 0);
             return 1;
         }},
-                {.name = "HasDebugZoneMap",          .func = lua_ReturnFalse},
-                {.name = "CanQueueForWintergrasp",   .func = lua_ReturnFalse},
-                {.name = "CancelSkillUps",           .func = lua_ReturnNothing},
-                {.name = "ConvertToRaid",            .func = lua_ReturnNothing},
-                {.name = "FillLocalizedClassList",   .func = lua_ReturnNothing},
+                {"HasDebugZoneMap",          lua_ReturnFalse},
+                {"CanQueueForWintergrasp",   lua_ReturnFalse},
+                {"CancelSkillUps",           lua_ReturnNothing},
+                {"ConvertToRaid",            lua_ReturnNothing},
+                {"FillLocalizedClassList",   lua_ReturnNothing},
                 // Sends the request rather than doing nothing. The reply is
                 // parsed, fires GUILD_EVENT_LOG_UPDATE and friendsframe
                 // listens for it, so answering nothing here was the one link
                 // missing at this end - and FrameXML's own call to it is
                 // commented out, which is the link missing at the other.
-                {.name = "QueryGuildEventLog", .func = [](lua_State* L) -> int {
+                {"QueryGuildEventLog", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->requestGuildEventLog();
             return 0;
         }},
-                {.name = "RegisterForSave",          .func = lua_ReturnNothing},
-                {.name = "RegisterStaticConstants",  .func = lua_ReturnNothing},
-                {.name = "SetChatWindowName",        .func = lua_SetChatWindowName},
-                {.name = "SetupFullscreenScale",     .func = lua_ReturnNothing},
+                {"RegisterForSave",          lua_ReturnNothing},
+                {"RegisterStaticConstants",  lua_ReturnNothing},
+                {"SetChatWindowName",        lua_SetChatWindowName},
+                {"SetupFullscreenScale",     lua_ReturnNothing},
                 // DropCursorMoney is real now, and lives with the rest of the
                 // money cursor in lua_inventory_api.cpp. Two registrations of
                 // one name would be settled by load order.
@@ -5704,14 +5704,14 @@ void registerSystemLuaAPI(lua_State* L) {
                 // in this FrameXML rather than a binding this client owes. A
                 // no-op, because what it would do is show a micro button that
                 // is hidden, and leaving it hidden is the honest outcome.
-                {.name = "AchievementMicroButton_Update", .func = [](lua_State* L) -> int {
+                {"AchievementMicroButton_Update", [](lua_State* L) -> int {
             (void)L; return 0; }},
-                {.name = "BNFeaturesEnabled",        .func = lua_ReturnFalse},
-                {.name = "BNFeaturesEnabledAndConnected", .func = lua_ReturnFalse},
-                {.name = "BNGetMaxPlayersInConversation", .func = lua_ReturnZero},
-                {.name = "GetSummonFriendCooldown",  .func = lua_ReturnNoCooldown},
-                {.name = "GetScreenResolutions",     .func = lua_GetScreenResolutions},
-                {.name = "GetCurrentResolution",     .func = lua_GetCurrentResolution},
+                {"BNFeaturesEnabled",        lua_ReturnFalse},
+                {"BNFeaturesEnabledAndConnected", lua_ReturnFalse},
+                {"BNGetMaxPlayersInConversation", lua_ReturnZero},
+                {"GetSummonFriendCooldown",  lua_ReturnNoCooldown},
+                {"GetScreenResolutions",     lua_GetScreenResolutions},
+                {"GetCurrentResolution",     lua_GetCurrentResolution},
                 // Counts a loop bounds itself with. FrameXML writes
                 // "for i = 0, num-1" straight after asking, so nothing is not
                 // an answer - it is arithmetic on nil and the file is lost.
@@ -5720,23 +5720,23 @@ void registerSystemLuaAPI(lua_State* L) {
                 // channels the player had joined - GetChannelList reports them
                 // from the same vector. A stub saying empty is how a working
                 // panel shows nothing.
-                {.name = "GetNumDisplayChannels", .func = [](lua_State* L) -> int {
+                {"GetNumDisplayChannels", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? static_cast<double>(gh->getJoinedChannels().size()) : 0.0);
             return 1;
         }},
-                {.name = "GetNumMapOverlays",        .func = lua_GetNumMapOverlays},
-                {.name = "GetNumMapDebugObjects",    .func = lua_ReturnZero},
+                {"GetNumMapOverlays",        lua_GetNumMapOverlays},
+                {"GetNumMapDebugObjects",    lua_ReturnZero},
                 // How many team mates the battleground has reported. The loop
                 // that draws them does not use this - it walks to
                 // MAX_RAID_MEMBERS and hides whatever answers zero - but the
                 // count is asked for beside it and a flat zero said the
                 // positions were not there while they were.
-                {.name = "GetNumBattlefieldPositions", .func = [](lua_State* L) -> int {
+                {"GetNumBattlefieldPositions", [](lua_State* L) -> int {
             lua_pushnumber(L, bgCount(getGameHandler(L), 0));
             return 1;
         }},
-                {.name = "GetBattlefieldPosition",   .func = lua_GetBattlefieldPosition},
+                {"GetBattlefieldPosition",   lua_GetBattlefieldPosition},
                 // Both of these want a position normalised to the map frame
                 // currently on screen, which only the map that is drawing knows
                 // - and this client draws its own, so FrameXML's WorldMapFrame
@@ -5748,11 +5748,11 @@ void registerSystemLuaAPI(lua_State* L) {
                 // own map, from getCorpseCanonicalPos and
                 // getDeathReleaseLocation. Handing the world map over means
                 // giving these the projection, not just filling them in.
-                {.name = "GetCorpseMapPosition",     .func = lua_GetBattlefieldPosition},
-                {.name = "GetDeathReleasePosition",  .func = lua_GetBattlefieldPosition},
-                {.name = "GetNumBattlefieldVehicles", .func = lua_ReturnZero},
-                {.name = "GetBattlefieldVehicleInfo", .func = lua_ReturnNil},
-                {.name = "GetChatWindowInfo",        .func = lua_GetChatWindowInfo},
+                {"GetCorpseMapPosition",     lua_GetBattlefieldPosition},
+                {"GetDeathReleasePosition",  lua_GetBattlefieldPosition},
+                {"GetNumBattlefieldVehicles", lua_ReturnZero},
+                {"GetBattlefieldVehicleInfo", lua_ReturnNil},
+                {"GetChatWindowInfo",        lua_GetChatWindowInfo},
                 // What a chat window listens to, and the whole reason chat
                 // shows anything. ChatFrame_OnLoad registers a chat frame for
                 // no CHAT_MSG_ event at all - every one of them comes from
@@ -5761,7 +5761,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // so every message the client parsed, coloured and routed
                 // arrived at a frame that had not asked for it: the chat
                 // window stayed empty from login to logout.
-                {.name = "GetChatWindowMessages", .func = [](lua_State* L) -> int {
+                {"GetChatWindowMessages", [](lua_State* L) -> int {
             const ChatWindowSettings* w = chatWindow(L, 1);
             if (!w) return 0;
             // An empty General is unset, not configured, and answers the
@@ -5790,7 +5790,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // Name and zone-channel id in pairs, which is the shape
                 // ChatFrame_RegisterForChannels reads: it steps two at a time
                 // and fills channelList and zoneChannelList together.
-                {.name = "GetChatWindowChannels", .func = [](lua_State* L) -> int {
+                {"GetChatWindowChannels", [](lua_State* L) -> int {
             const ChatWindowSettings* w = chatWindow(L, 1);
             if (!w) return 0;
             // Same rule, same reason: ChatFrame_RemoveAllChannels runs beside
@@ -5815,7 +5815,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // nothing - so a change made in the panel lasted until the
                 // frame was next asked what it listened to, which is the next
                 // login, and then went back.
-                {.name = "AddChatWindowMessages", .func = [](lua_State* L) -> int {
+                {"AddChatWindowMessages", [](lua_State* L) -> int {
             ChatWindowSettings* w = chatWindow(L, 1);
             const char* group = lua_isstring(L, 2) ? lua_tostring(L, 2) : nullptr;
             if (!w || !group) return 0;
@@ -5824,7 +5824,7 @@ void registerSystemLuaAPI(lua_State* L) {
             saveInterfaceState();
             return 0;
         }},
-                {.name = "RemoveChatWindowMessages", .func = [](lua_State* L) -> int {
+                {"RemoveChatWindowMessages", [](lua_State* L) -> int {
             ChatWindowSettings* w = chatWindow(L, 1);
             const char* group = lua_isstring(L, 2) ? lua_tostring(L, 2) : nullptr;
             if (!w || !group) return 0;
@@ -5839,7 +5839,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // recorded here and never reached the frame that shows it.
                 // Zero is a real answer for a channel that is not zone based,
                 // and passes that test - zero being true in Lua.
-                {.name = "AddChatWindowChannel", .func = [](lua_State* L) -> int {
+                {"AddChatWindowChannel", [](lua_State* L) -> int {
             ChatWindowSettings* w = chatWindow(L, 1);
             const char* name = lua_isstring(L, 2) ? lua_tostring(L, 2) : nullptr;
             if (!w || !name) return 0;
@@ -5855,7 +5855,7 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushnumber(L, zone);
             return 1;
         }},
-                {.name = "RemoveChatWindowChannel", .func = [](lua_State* L) -> int {
+                {"RemoveChatWindowChannel", [](lua_State* L) -> int {
             ChatWindowSettings* w = chatWindow(L, 1);
             const char* name = lua_isstring(L, 2) ? lua_tostring(L, 2) : nullptr;
             if (!w || !name) return 0;
@@ -5866,7 +5866,7 @@ void registerSystemLuaAPI(lua_State* L) {
             saveInterfaceState();
             return 0;
         }},
-                {.name = "GetNumBattlefieldFlagPositions", .func = [](lua_State* L) -> int {
+                {"GetNumBattlefieldFlagPositions", [](lua_State* L) -> int {
             // Only when both are carried, for the reason the accessor gives:
             // one carrier cannot be told from the other, and the loop this
             // bounds draws a named flag texture per entry.
@@ -5875,14 +5875,14 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushnumber(L, n == 2 ? 2 : 0);
             return 1;
         }},
-                {.name = "GetBattlefieldFlagPosition",     .func = lua_GetBattlefieldFlagPosition},
+                {"GetBattlefieldFlagPosition",     lua_GetBattlefieldFlagPosition},
                 // Time left on a loot roll that is not running, which
                 // GroupLootFrame compares against a bar range at once.
-                {.name = "GetNumDungeonMapLevels",   .func = lua_ReturnZero},
+                {"GetNumDungeonMapLevels",   lua_ReturnZero},
                 // Bar offsets, added to a page number the line they
                 // are read on. No bonus or multi-cast bar is showing,
                 // and that is zero rather than nothing.
-                {.name = "GetMultiCastBarOffset",    .func = lua_ReturnZero},
+                {"GetMultiCastBarOffset",    lua_ReturnZero},
                 // Which extra action bar the current form or stance uses.
                 // actionbutton.lua adds it to NUM_ACTIONBAR_PAGES to pick the
                 // page a bonus button reads from, so a flat zero left a druid
@@ -5892,20 +5892,20 @@ void registerSystemLuaAPI(lua_State* L) {
                 // out here - a table of class-and-form guesses is not
                 // checkable, and this one is: cat 1, bear 3, moonkin 4, the
                 // three warrior stances 1 to 3, 0 for the travel forms.
-                {.name = "GetBonusBarOffset", .func = [](lua_State* L) -> int {
+                {"GetBonusBarOffset", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? static_cast<double>(gh->getBonusActionBarOffset()) : 0.0);
             return 1;
         }},
-                {.name = "GetNumBattlegroundTypes",  .func = lua_GetNumBattlegroundTypes},
-                {.name = "GetBattlegroundInfo",      .func = lua_GetBattlegroundInfo},
-                {.name = "RequestBattlegroundInstanceInfo", .func = lua_RequestBattlegroundInstanceInfo},
-                {.name = "GetCurrentMapDungeonLevel", .func = lua_ReturnZero},
-                {.name = "Sound_GameSystem_GetNumOutputDrivers", .func = lua_Sound_GetNumOutputDrivers},
-                {.name = "Sound_ChatSystem_GetNumInputDrivers",  .func = lua_ReturnZero},
-                {.name = "Sound_ChatSystem_GetNumOutputDrivers", .func = lua_ReturnZero},
-                {.name = "Sound_ChatSystem_GetInputDriverNameByIndex",  .func = lua_ReturnNil},
-                {.name = "Sound_ChatSystem_GetOutputDriverNameByIndex", .func = lua_ReturnNil},
+                {"GetNumBattlegroundTypes",  lua_GetNumBattlegroundTypes},
+                {"GetBattlegroundInfo",      lua_GetBattlegroundInfo},
+                {"RequestBattlegroundInstanceInfo", lua_RequestBattlegroundInstanceInfo},
+                {"GetCurrentMapDungeonLevel", lua_ReturnZero},
+                {"Sound_GameSystem_GetNumOutputDrivers", lua_Sound_GetNumOutputDrivers},
+                {"Sound_ChatSystem_GetNumInputDrivers",  lua_ReturnZero},
+                {"Sound_ChatSystem_GetNumOutputDrivers", lua_ReturnZero},
+                {"Sound_ChatSystem_GetInputDriverNameByIndex",  lua_ReturnNil},
+                {"Sound_ChatSystem_GetOutputDriverNameByIndex", lua_ReturnNil},
                 // Nothing selected, which is a number rather than
                 // nothing: SkillFrame passes the result straight to
                 // GetSkillLineInfo as an index.
@@ -5917,9 +5917,9 @@ void registerSystemLuaAPI(lua_State* L) {
                 // the list is one-based: SkillFrame_SetStatusBar compares each
                 // row against this to decide which border to light, so nothing
                 // ever looked selected however many times it was clicked.
-                {.name = "GetSelectedSkill", .func = [](lua_State* L) -> int {
+                {"GetSelectedSkill", [](lua_State* L) -> int {
             lua_pushnumber(L, selectedSkill()); return 1; }},
-                {.name = "DungeonUsesTerrainMap",    .func = lua_ReturnFalse},
+                {"DungeonUsesTerrainMap",    lua_ReturnFalse},
                 // GetChannelDisplayInfo(i) → name, header, collapsed,
                 //   channelNumber, count, active, category, voiceEnabled,
                 //   voiceActive
@@ -5928,7 +5928,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // returning one marks every channel as a category header:
                 // channelframe.lua does `if ( self.header )` and would draw
                 // each row as a heading, then call ExpandChannelHeader on it.
-                {.name = "GetChannelDisplayInfo", .func = [](lua_State* L) -> int {
+                {"GetChannelDisplayInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh || index < 1) { lua_pushnil(L); return 1; }
@@ -5952,7 +5952,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // indicator, which is the threatWarning CVar read against
                 // where the player is. A flat false meant the Display panel's
                 // aggro-warning dropdown set a value nothing ever looked at.
-                {.name = "IsThreatWarningEnabled", .func = [](lua_State* L) -> int {
+                {"IsThreatWarningEnabled", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             int setting = 3;
             if (auto it = cvarStore().find("threatwarning"); it != cvarStore().end()) {
@@ -5973,7 +5973,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // Auto Shot and the wand's Shoot, which is how IsAttackAction
                 // beside it identifies auto-attack: by id rather than by an
                 // attribute word this client does not cache.
-                {.name = "IsAutoRepeatAction", .func = [](lua_State* L) -> int {
+                {"IsAutoRepeatAction", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int slot = static_cast<int>(luaL_optnumber(L, 1, 0)) - 1;
             bool repeating = false;
@@ -5998,7 +5998,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // cosmetic and wrong in the smaller direction.
                 //
                 // Turn this on with the recorder, not before it.
-                {.name = "IsMacClient",              .func = lua_ReturnFalse},
+                {"IsMacClient",              lua_ReturnFalse},
                 // IsPartyLeader() - whether *this* player leads the group.
                 //
                 // The client has known this all along: the party data carries a
@@ -6006,14 +6006,14 @@ void registerSystemLuaAPI(lua_State* L) {
                 // Answering a flat false told FrameXML the player never leads,
                 // which is what gates the leader-only entries on the unit
                 // right-click menus and the loot-method controls.
-                {.name = "IsPartyLeader", .func = [](lua_State* L) -> int {
+                {"IsPartyLeader", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushboolean(L, 0); return 1; }
             const uint64_t leader = gh->getPartyData().leaderGuid;
             lua_pushboolean(L, leader != 0 && leader == gh->getPlayerGuid());
             return 1;
         }},
-                {.name = "UnitFactionGroup",         .func = lua_UnitFactionGroup},
+                {"UnitFactionGroup",         lua_UnitFactionGroup},
                 // HasPetSpells() → numSpells, petToken
                 //
                 // Answering nil meant the pet tab was never set up, so a hunter
@@ -6025,7 +6025,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // _G["PET_TYPE_"..token], which raises on a nil token. Only two
                 // of those globals exist, DEMON and PET, and WoW picks the
                 // first for warlocks and the second for everyone else.
-                {.name = "HasPetSpells", .func = [](lua_State* L) -> int {
+                {"HasPetSpells", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushnil(L); return 1; }
             const auto& spells = gh->getPetSpells();
@@ -6043,7 +6043,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 //
                 // RuneType here is Blood, Unholy, Frost, Death from zero;
                 // runeframe.lua numbers the same four from one.
-                {.name = "GetRuneType", .func = [](lua_State* L) -> int {
+                {"GetRuneType", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int id = static_cast<int>(luaL_optinteger(L, 1, 0));
             if (!gh || id < 1 || id > 6) { lua_pushnil(L); return 1; }
@@ -6059,7 +6059,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // has to come off the same clock GetTime answers with, or the
                 // sweep is drawn against a different origin than it was
                 // measured on - CooldownFrame_SetTimer compares the two.
-                {.name = "GetRuneCooldown", .func = [](lua_State* L) -> int {
+                {"GetRuneCooldown", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int id = static_cast<int>(luaL_optinteger(L, 1, 0));
             if (!gh || id < 1 || id > 6) return 0;
@@ -6081,7 +6081,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // The selection is the panel's own state and nothing else
                 // reads it, so it lives here and round-trips. Answering nil
                 // for the getter meant the highlight never moved.
-                {.name = "GetSelectedDisplayChannel", .func = [](lua_State* L) -> int {
+                {"GetSelectedDisplayChannel", [](lua_State* L) -> int {
             lua_pushnumber(L, selectedDisplayChannel());
             return 1;
         }},
@@ -6095,7 +6095,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // whose guid is the new owner's: Channel::MakeOwnerChanged
                 // writes _ownerGUID into it. The index is the panel's own
                 // one-based one, the same GetChannelDisplayInfo reads.
-                {.name = "IsDisplayChannelOwner", .func = [](lua_State* L) -> int {
+                {"IsDisplayChannelOwner", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int sel = selectedDisplayChannel();
             if (!gh || sel < 1) { lua_pushboolean(L, 0); return 1; }
@@ -6104,15 +6104,15 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushboolean(L, gh->ownsChatChannel(joined[static_cast<size_t>(sel) - 1]) ? 1 : 0);
             return 1;
         }},
-                {.name = "SetSelectedDisplayChannel", .func = [](lua_State* L) -> int {
+                {"SetSelectedDisplayChannel", [](lua_State* L) -> int {
             selectedDisplayChannel() = static_cast<int>(luaL_optnumber(L, 1, 0));
             return 0;
         }},
                 // No categories exist to open or close - see the header note
                 // on GetChannelDisplayInfo - but the row click handler calls
                 // one of these on whatever it was given.
-                {.name = "ExpandChannelHeader",      .func = lua_ReturnNothing},
-                {.name = "CollapseChannelHeader",    .func = lua_ReturnNothing},
+                {"ExpandChannelHeader",      lua_ReturnNothing},
+                {"CollapseChannelHeader",    lua_ReturnNothing},
                 // Who is in a channel. The server sends a roster only on
                 // request and this client never asks, so there is nobody to
                 // report; the count above is zero for the same reason.
@@ -6120,7 +6120,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // the request that makes that true. The panel calls this in
                 // statement position when a channel row is clicked, which is
                 // the only thing that asks the server for a roster at all.
-                {.name = "GetNumChannelMembers", .func = [](lua_State* L) -> int {
+                {"GetNumChannelMembers", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int channel = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh || channel < 1) { lua_pushnumber(L, 0); return 1; }
@@ -6138,7 +6138,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // panel had nothing to draw and reported every channel as
                 // empty. The last two are about voice chat, which this client
                 // has none of.
-                {.name = "GetChannelRosterInfo", .func = [](lua_State* L) -> int {
+                {"GetChannelRosterInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int channel = static_cast<int>(luaL_optnumber(L, 1, 0));
             const int member = static_cast<int>(luaL_optnumber(L, 2, 0));
@@ -6156,9 +6156,9 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushboolean(L, 0);                      // 6: enabled (voice)
             return 6;
         }},
-                {.name = "GetWintergraspWaitTime",   .func = lua_ReturnNil},
-                {.name = "GetNumWorldStateUI",       .func = lua_GetNumWorldStateUI},
-                {.name = "GetWorldStateUIInfo",      .func = lua_GetWorldStateUIInfo},
+                {"GetWintergraspWaitTime",   lua_ReturnNil},
+                {"GetNumWorldStateUI",       lua_GetNumWorldStateUI},
+                {"GetWorldStateUIInfo",      lua_GetWorldStateUIInfo},
                 // Whether the player is standing on a world PvP objective.
                 //
                 // This gates the whole of uiType 1 in worldstateframe, and the
@@ -6174,36 +6174,36 @@ void registerSystemLuaAPI(lua_State* L) {
                 // Halaa, The Overlook, the Plaguelands towers - and resolving
                 // to the zone loses it. Wintergrasp is marked with a flag of
                 // its own and is the one that would have survived either way.
-                {.name = "IsSubZonePVPPOI", .func = [](lua_State* L) -> int {
+                {"IsSubZonePVPPOI", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             const bool on = svc && svc->isOnOutdoorPvpObjective &&
                             svc->isOnOutdoorPvpObjective();
             lua_pushboolean(L, on ? 1 : 0);
             return 1;
         }},
-                {.name = "GetNumVoiceSessions",      .func = lua_ReturnZero},
+                {"GetNumVoiceSessions",      lua_ReturnZero},
                 // Asked from WorldMapFrame_OnUpdate, so every frame the map is
                 // open. The handler throttles and refuses outside a
                 // battleground; before this nothing ever asked, and the reply
                 // that fills the position list is only ever sent on request -
                 // so the list was empty for FrameXML's map and for this
                 // client's own minimap alike.
-                {.name = "RequestBattlefieldPositions", .func = [](lua_State* L) -> int {
+                {"RequestBattlefieldPositions", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->requestBattlefieldPositions();
             return 0;
         }},
-                {.name = "UpdateWorldMapArrowFrames",   .func = lua_ReturnNothing},
-                {.name = "SetSelectedSkill", .func = [](lua_State* L) -> int {
+                {"UpdateWorldMapArrowFrames",   lua_ReturnNothing},
+                {"SetSelectedSkill", [](lua_State* L) -> int {
             selectedSkill() = static_cast<int>(luaL_optnumber(L, 1, 0)); return 0; }},
-                {.name = "Sound_GameSystem_GetOutputDriverNameByIndex", .func = lua_Sound_GetOutputDriverNameByIndex},
-                {.name = "PlaySound",           .func = lua_PlaySound},
-                {.name = "PlaySoundFile",       .func = lua_PlaySoundFile},
-                {.name = "GetPlayerMapPosition", .func = lua_GetPlayerMapPosition},
-                {.name = "GetPlayerFacing",     .func = lua_GetPlayerFacing},
-                {.name = "GetCVar",             .func = lua_GetCVar},
-                {.name = "GetCVarBool",         .func = lua_GetCVarBool},
-                {.name = "SetCVar",             .func = lua_SetCVar},
-                {.name = "GetLocale",         .func = lua_GetLocale},
+                {"Sound_GameSystem_GetOutputDriverNameByIndex", lua_Sound_GetOutputDriverNameByIndex},
+                {"PlaySound",           lua_PlaySound},
+                {"PlaySoundFile",       lua_PlaySoundFile},
+                {"GetPlayerMapPosition", lua_GetPlayerMapPosition},
+                {"GetPlayerFacing",     lua_GetPlayerFacing},
+                {"GetCVar",             lua_GetCVar},
+                {"GetCVarBool",         lua_GetCVarBool},
+                {"SetCVar",             lua_SetCVar},
+                {"GetLocale",         lua_GetLocale},
                 // Gender-aware lookup of a global string by token name.
                 //
                 // The reputation list is the caller that matters:
@@ -6211,7 +6211,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // GetText("FACTION_STANDING_LABEL"..standingID, gender), and an
                 // unbound global there is not a blank label but an error that
                 // takes the whole list down with it.
-                {.name = "GetText", .func = [](lua_State* L) -> int {
+                {"GetText", [](lua_State* L) -> int {
             const char* token = luaL_optstring(L, 1, nullptr);
             if (!token) { lua_pushstring(L, ""); return 1; }
             // globalstrings.lua carries FACTION_STANDING_LABEL3_FEMALE beside
@@ -6231,15 +6231,15 @@ void registerSystemLuaAPI(lua_State* L) {
             // nil, which would clear whatever label asked for it.
             lua_pushstring(L, token);
             return 1; }},
-                {.name = "GetBuildInfo",      .func = lua_GetBuildInfo},
-                {.name = "GetCurrentMapAreaID", .func = lua_GetCurrentMapAreaID},
-                {.name = "SetMapToCurrentZone", .func = lua_SetMapToCurrentZone},
-                {.name = "GetCurrentMapContinent", .func = lua_GetCurrentMapContinent},
-                {.name = "GetCurrentMapZone",   .func = lua_GetCurrentMapZone},
-                {.name = "SetMapZoom",          .func = lua_SetMapZoom},
-                {.name = "GetMapContinents",    .func = lua_GetMapContinents},
-                {.name = "GetMapZones",         .func = lua_GetMapZones},
-                {.name = "GetNumMapLandmarks",  .func = lua_GetNumMapLandmarks},
+                {"GetBuildInfo",      lua_GetBuildInfo},
+                {"GetCurrentMapAreaID", lua_GetCurrentMapAreaID},
+                {"SetMapToCurrentZone", lua_SetMapToCurrentZone},
+                {"GetCurrentMapContinent", lua_GetCurrentMapContinent},
+                {"GetCurrentMapZone",   lua_GetCurrentMapZone},
+                {"SetMapZoom",          lua_SetMapZoom},
+                {"GetMapContinents",    lua_GetMapContinents},
+                {"GetMapZones",         lua_GetMapZones},
+                {"GetNumMapLandmarks",  lua_GetNumMapLandmarks},
                 // The rest of the world map's own calls. None of them was
                 // bound, and two run on every open: WorldMapFrame_OnUpdate
                 // asks UpdateMapHighlight for whatever is under the cursor on
@@ -6266,7 +6266,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // needs the per-zone highlight art the client's own map layer
                 // loads on demand - nil leaves the label named and the glow
                 // off, which is the honest half.
-                {.name = "UpdateMapHighlight", .func = [](lua_State* L) -> int {
+                {"UpdateMapHighlight", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             const float u = static_cast<float>(luaL_optnumber(L, 1, -1.0));
             const float v = static_cast<float>(luaL_optnumber(L, 2, -1.0));
@@ -6282,7 +6282,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // that does not zoom rather than one that zooms wrongly.
                 // Clicking a continent drills into the zone under the point,
                 // which is the same ZMP lookup the hover uses.
-                {.name = "ProcessMapClick", .func = [](lua_State* L) -> int {
+                {"ProcessMapClick", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             if (svc && svc->clickMapPoint) {
                 svc->clickMapPoint(static_cast<float>(luaL_optnumber(L, 1, -1.0)),
@@ -6295,7 +6295,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // cosmic cases beside it; this is the dungeon-floor and cosmic
                 // step, and neither is reachable while GetNumDungeonMapLevels
                 // answers none.
-                {.name = "ZoomOut", .func = [](lua_State* L) -> int {
+                {"ZoomOut", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             if (svc && svc->zoomMapOut) svc->zoomMapOut();
             fireWorldMapUpdate(L);
@@ -6305,19 +6305,19 @@ void registerSystemLuaAPI(lua_State* L) {
                 // which is how the quest log's "show on map" and the map's own
                 // windowed-size toggle both landed wherever the map already
                 // was.
-                {.name = "SetMapByID", .func = [](lua_State* L) -> int {
+                {"SetMapByID", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (svc && svc->setMapWorldAreaId && id != 0) svc->setMapWorldAreaId(id);
             fireWorldMapUpdate(L);
             return 0;
         }},
-                {.name = "SetDungeonMapLevel",  .func = lua_ReturnNothing},
-                {.name = "ClickLandmark",       .func = lua_ReturnNothing},
+                {"SetDungeonMapLevel",  lua_ReturnNothing},
+                {"ClickLandmark",       lua_ReturnNothing},
                 // Landmark rows, which GetNumMapLandmarks already reports none
                 // of. Bound so that stays true if it ever reports some.
-                {.name = "GetMapLandmarkInfo",  .func = lua_GetMapLandmarkInfo},
-                {.name = "GetMapOverlayInfo",   .func = lua_GetMapOverlayInfo},
+                {"GetMapLandmarkInfo",  lua_GetMapLandmarkInfo},
+                {"GetMapOverlayInfo",   lua_GetMapOverlayInfo},
                 // Which map a quest's objectives are on, and what a quest item
                 // drops from. Both are read while building the map's quest
                 // list; nil is "not on this map", which is what the list does
@@ -6331,34 +6331,34 @@ void registerSystemLuaAPI(lua_State* L) {
                 // quest tracker takes every time a tracked quest is clicked.
                 // SetMapByID drops a zero id and SetDungeonMapLevel does
                 // nothing at all, so it was inert; it was inert by luck.
-                {.name = "GetQuestWorldMapAreaID", .func = [](lua_State* L) -> int {
+                {"GetQuestWorldMapAreaID", [](lua_State* L) -> int {
             lua_pushnumber(L, 0);   // mapID
             lua_pushnumber(L, 0);   // floorNumber
             return 2; }},
-                {.name = "GetQuestLogItemDrop",    .func = lua_ReturnNil},
+                {"GetQuestLogItemDrop",    lua_ReturnNil},
                 // How many of those there are. Unbound, so the world map's
                 // quest tooltip called a nil global and raised - the guard
                 // beneath it reads the count and would have taken the right
                 // branch, but the call never got that far. Zero, matching the
                 // reader above, which has no item drops to describe.
-                {.name = "GetNumQuestItemDrops",   .func = lua_ReturnZero},
+                {"GetNumQuestItemDrops",   lua_ReturnZero},
                 // Two debug readers, for the zone-map overlay Blizzard ships
                 // switched off. Nothing here has a debug zone map at all.
-                {.name = "GetDebugZoneMap",        .func = lua_ReturnNil},
-                {.name = "GetMapDebugObjectInfo",  .func = lua_ReturnNil},
-                {.name = "GetTrackingTexture",  .func = lua_GetTrackingTexture},
-                {.name = "GetNumTrackingTypes", .func = lua_GetNumTrackingTypes},
-                {.name = "GetTrackingInfo",     .func = lua_GetTrackingInfo},
-                {.name = "SetTracking",         .func = lua_SetTracking},
-                {.name = "GetZoneText",          .func = lua_GetZoneText},
-                {.name = "GetRealZoneText",      .func = lua_GetZoneText},
-                {.name = "GetSubZoneText",       .func = lua_GetSubZoneText},
-                {.name = "GetMinimapZoneText",   .func = lua_GetMinimapZoneText},
-                {.name = "GetGameTime",             .func = lua_GetGameTime},
-                {.name = "GetServerTime",           .func = lua_GetServerTime},
-                {.name = "CombatLog_Object_IsA", .func = lua_CombatLog_Object_IsA},
-                {.name = "GetNumAddOns",      .func = lua_GetNumAddOns},
-                {.name = "GetAddOnInfo",      .func = lua_GetAddOnInfo},
+                {"GetDebugZoneMap",        lua_ReturnNil},
+                {"GetMapDebugObjectInfo",  lua_ReturnNil},
+                {"GetTrackingTexture",  lua_GetTrackingTexture},
+                {"GetNumTrackingTypes", lua_GetNumTrackingTypes},
+                {"GetTrackingInfo",     lua_GetTrackingInfo},
+                {"SetTracking",         lua_SetTracking},
+                {"GetZoneText",          lua_GetZoneText},
+                {"GetRealZoneText",      lua_GetZoneText},
+                {"GetSubZoneText",       lua_GetSubZoneText},
+                {"GetMinimapZoneText",   lua_GetMinimapZoneText},
+                {"GetGameTime",             lua_GetGameTime},
+                {"GetServerTime",           lua_GetServerTime},
+                {"CombatLog_Object_IsA", lua_CombatLog_Object_IsA},
+                {"GetNumAddOns",      lua_GetNumAddOns},
+                {"GetAddOnInfo",      lua_GetAddOnInfo},
                 // Turning an addon off, which the "an addon did something it
                 // is not allowed to" popup offers as its first button before
                 // reloading. Answered with nothing, that button reloaded and
@@ -6367,37 +6367,37 @@ void registerSystemLuaAPI(lua_State* L) {
                 // The change lands on the next run rather than at once: an
                 // addon already loaded has its functions in the state and its
                 // frames on screen, and neither can be taken back out.
-                {.name = "DisableAddOn", .func = [](lua_State* L) -> int {
+                {"DisableAddOn", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             const char* name = luaL_optstring(L, 1, nullptr);
             if (svc && svc->setAddOnEnabled && name && *name)
                 svc->setAddOnEnabled(name, false);
             return 0;
         }},
-                {.name = "EnableAddOn", .func = [](lua_State* L) -> int {
+                {"EnableAddOn", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             const char* name = luaL_optstring(L, 1, nullptr);
             if (svc && svc->setAddOnEnabled && name && *name)
                 svc->setAddOnEnabled(name, true);
             return 0;
         }},
-                {.name = "GetAddOnMetadata",  .func = lua_GetAddOnMetadata},
-                {.name = "IsInInstance",         .func = lua_IsInInstance},
-                {.name = "GetInstanceInfo",      .func = lua_GetInstanceInfo},
-                {.name = "GetInstanceDifficulty", .func = lua_GetInstanceDifficulty},
-                {.name = "strsplit",          .func = lua_strsplit},
-                {.name = "strtrim",           .func = lua_strtrim},
-                {.name = "strlenutf8",        .func = lua_strlenutf8},
-                {.name = "wipe",              .func = lua_wipe},
-                {.name = "date",              .func = lua_wow_date},
-                {.name = "time",              .func = lua_wow_time},
-                {.name = "GetTime",           .func = lua_wow_gettime},
-                {.name = "IsConnectedToServer", .func = [](lua_State* L) -> int {
+                {"GetAddOnMetadata",  lua_GetAddOnMetadata},
+                {"IsInInstance",         lua_IsInInstance},
+                {"GetInstanceInfo",      lua_GetInstanceInfo},
+                {"GetInstanceDifficulty", lua_GetInstanceDifficulty},
+                {"strsplit",          lua_strsplit},
+                {"strtrim",           lua_strtrim},
+                {"strlenutf8",        lua_strlenutf8},
+                {"wipe",              lua_wipe},
+                {"date",              lua_wow_date},
+                {"time",              lua_wow_time},
+                {"GetTime",           lua_wow_gettime},
+                {"IsConnectedToServer", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushboolean(L, gh && gh->isConnected() ? 1 : 0);
             return 1;
         }},
-                {.name = "GetRealmName", .func = [](lua_State* L) -> int {
+                {"GetRealmName", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) {
                 const auto* ac = gh->getActiveCharacter();
@@ -6405,7 +6405,7 @@ void registerSystemLuaAPI(lua_State* L) {
             } else lua_pushstring(L, "Unknown");
             return 1;
         }},
-                {.name = "GetNormalizedRealmName", .func = [](lua_State* L) -> int {
+                {"GetNormalizedRealmName", [](lua_State* L) -> int {
             lua_pushstring(L, "WoWee");
             return 1;
         }},
@@ -6425,12 +6425,12 @@ void registerSystemLuaAPI(lua_State* L) {
                 // have worked all along - so the checkbox wrote the setting
                 // correctly and could not show it, and reading it raised as
                 // the Display panel was built.
-                {.name = "ShowingHelm", .func = [](lua_State* L) -> int {
+                {"ShowingHelm", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushboolean(L, (gh && gh->isHelmVisible()) ? 1 : 0);
             return 1;
         }},
-                {.name = "ShowingCloak", .func = [](lua_State* L) -> int {
+                {"ShowingCloak", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushboolean(L, (gh && gh->isCloakVisible()) ? 1 : 0);
             return 1;
@@ -6438,22 +6438,22 @@ void registerSystemLuaAPI(lua_State* L) {
                 // The equipment manager exists here - GetNumEquipmentSets and
                 // the rest of its API are bound - so the panel's checkbox is
                 // offering something real.
-                {.name = "CanUseEquipmentSets",         .func = lua_ReturnTrue},
+                {"CanUseEquipmentSets",         lua_ReturnTrue},
                 // Tutorials can be reset because they are kept: the flags live
                 // in the CVar file. Answering false would grey out a button
                 // that would have worked.
-                {.name = "CanResetTutorials",           .func = lua_ReturnTrue},
-                {.name = "ResetTutorials", .func = [](lua_State* L) -> int {
+                {"CanResetTutorials",           lua_ReturnTrue},
+                {"ResetTutorials", [](lua_State* L) -> int {
             (void)L;
             cvarStore()[kTutorialCVar].clear();
             saveStoredCVars();
             return 0;
         }},
                 // A Mac-only mouse this build does not look for.
-                {.name = "DetectWowMouse",              .func = lua_ReturnFalse},
+                {"DetectWowMouse",              lua_ReturnFalse},
                 // No Battle.net, so no chat to filter.
-                {.name = "BNSetMatureLanguageFilter",   .func = lua_ReturnNothing},
-                {.name = "ShowHelm", .func = [](lua_State* L) -> int {
+                {"BNSetMatureLanguageFilter",   lua_ReturnNothing},
+                {"ShowHelm", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const bool want = lua_isnumber(L, 1) ? (lua_tonumber(L, 1) != 0)
@@ -6461,7 +6461,7 @@ void registerSystemLuaAPI(lua_State* L) {
             if (want != gh->isHelmVisible()) gh->toggleHelm();
             return 0;
         }},
-                {.name = "ShowCloak", .func = [](lua_State* L) -> int {
+                {"ShowCloak", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const bool want = lua_isnumber(L, 1) ? (lua_tonumber(L, 1) != 0)
@@ -6469,38 +6469,38 @@ void registerSystemLuaAPI(lua_State* L) {
             if (want != gh->isCloakVisible()) gh->toggleCloak();
             return 0;
         }},
-                {.name = "TogglePVP", .func = [](lua_State* L) -> int {
+                {"TogglePVP", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->togglePvp();
             return 0;
         }},
-                {.name = "Minimap_Ping", .func = [](lua_State* L) -> int {
+                {"Minimap_Ping", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             float x = static_cast<float>(luaL_optnumber(L, 1, 0));
             float y = static_cast<float>(luaL_optnumber(L, 2, 0));
             if (gh) gh->sendMinimapPing(x, y);
             return 0;
         }},
-                {.name = "RequestTimePlayed", .func = [](lua_State* L) -> int {
+                {"RequestTimePlayed", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->requestPlayedTime();
             return 0;
         }},
-                {.name = "Logout", .func = [](lua_State* L) -> int {
+                {"Logout", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->requestLogout();
             return 0;
         }},
-                {.name = "CancelLogout", .func = [](lua_State* L) -> int {
+                {"CancelLogout", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->cancelLogout();
             return 0;
         }},
-                {.name = "NumTaxiNodes", .func = [](lua_State* L) -> int {
+                {"NumTaxiNodes", [](lua_State* L) -> int {
             lua_pushnumber(L, static_cast<double>(taxiNodeOrder(getGameHandler(L)).size()));
             return 1;
         }},
-                {.name = "TaxiNodeName", .func = [](lua_State* L) -> int {
+                {"TaxiNodeName", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const uint32_t id = taxiNodeAt(gh, static_cast<int>(luaL_optnumber(L, 1, 0)));
             if (id == 0) { lua_pushstring(L, ""); return 1; }
@@ -6516,7 +6516,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // to decide whether the node is on the map at all. Answering 0
                 // or 1 is never equal to any of them, so every node counted as
                 // shown, including the ones the player has never been to.
-                {.name = "TaxiNodeGetType", .func = [](lua_State* L) -> int {
+                {"TaxiNodeGetType", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const uint32_t id = taxiNodeAt(gh, static_cast<int>(luaL_optnumber(L, 1, 0)));
             if (id == 0) { lua_pushstring(L, "NONE"); return 1; }
@@ -6528,14 +6528,14 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushstring(L, gh->hasTaxiRouteTo(id) ? "REACHABLE" : "DISTANT");
             return 1;
         }},
-                {.name = "TakeTaxiNode", .func = [](lua_State* L) -> int {
+                {"TakeTaxiNode", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const uint32_t id = taxiNodeAt(gh, static_cast<int>(luaL_optnumber(L, 1, 0)));
             if (id != 0) gh->activateTaxi(id);
             return 0;
         }},
                 // TaxiNodePosition(index) → x, y as fractions of the map.
-                {.name = "TaxiNodePosition", .func = [](lua_State* L) -> int {
+                {"TaxiNodePosition", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const uint32_t id = taxiNodeAt(gh, static_cast<int>(luaL_optnumber(L, 1, 0)));
             float u = 0, v = 0;
@@ -6547,7 +6547,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // TaxiNodeSetCurrent(index) - the node the map is drawing a
                 // route to. Works out the journey once; the frame then asks
                 // about each leg of it.
-                {.name = "TaxiNodeSetCurrent", .func = [](lua_State* L) -> int {
+                {"TaxiNodeSetCurrent", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const uint32_t id = taxiNodeAt(gh, static_cast<int>(luaL_optnumber(L, 1, 0)));
             taxiRouteShown() = (id != 0 && gh) ? gh->getTaxiRouteTo(id)
@@ -6560,7 +6560,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // many. It also asks about every node in the list to find the
                 // ones a single hop away, so this answers for the node asked
                 // about rather than for whatever was last set current.
-                {.name = "GetNumRoutes", .func = [](lua_State* L) -> int {
+                {"GetNumRoutes", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const uint32_t id = taxiNodeAt(gh, static_cast<int>(luaL_optnumber(L, 1, 0)));
             if (id == 0 || !gh) { lua_pushnumber(L, 0); return 1; }
@@ -6578,10 +6578,10 @@ void registerSystemLuaAPI(lua_State* L) {
                 // these route afresh rather than trusting whatever was last set
                 // current: DrawOneHopLines walks every node without ever
                 // calling TaxiNodeSetCurrent.
-                {.name = "TaxiGetSrcX",  .func = lua_TaxiLegCoord<0, true>},
-                {.name = "TaxiGetSrcY",  .func = lua_TaxiLegCoord<0, false>},
-                {.name = "TaxiGetDestX", .func = lua_TaxiLegCoord<1, true>},
-                {.name = "TaxiGetDestY", .func = lua_TaxiLegCoord<1, false>},
+                {"TaxiGetSrcX",  lua_TaxiLegCoord<0, true>},
+                {"TaxiGetSrcY",  lua_TaxiLegCoord<0, false>},
+                {"TaxiGetDestX", lua_TaxiLegCoord<1, true>},
+                {"TaxiGetDestY", lua_TaxiLegCoord<1, false>},
                 // SetTaxiMap(texture) - the flight map's own picture.
                 //
                 // This client has continent artwork, but not in the shape this
@@ -6607,7 +6607,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // whole of the lookup and no table of continent names is
                 // needed, which is as well, because a name table would be a
                 // second place for the same fact to be written down.
-                {.name = "SetTaxiMap", .func = [](lua_State* L) -> int {
+                {"SetTaxiMap", [](lua_State* L) -> int {
             auto* tree = getWidgetTree(L);
             if (!tree || !lua_istable(L, 1)) return 0;
             // The widget id the frame table carries, read the same way
@@ -6629,18 +6629,18 @@ void registerSystemLuaAPI(lua_State* L) {
                              std::to_string(gh ? gh->getCurrentMapId() : 0u);
             return 0;
         }},
-                {.name = "CloseTaxiMap", .func = [](lua_State* L) -> int {
+                {"CloseTaxiMap", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->closeTaxi();
             return 0;
         }},
                 // TaxiNodeCost(index) → the fare in copper, for the tooltip.
-                {.name = "TaxiNodeCost", .func = [](lua_State* L) -> int {
+                {"TaxiNodeCost", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const uint32_t id = taxiNodeAt(gh, static_cast<int>(luaL_optnumber(L, 1, 0)));
             lua_pushnumber(L, id != 0 ? static_cast<double>(gh->getTaxiCostTo(id)) : 0.0);
             return 1;
         }},
-                {.name = "GetNetStats", .func = [](lua_State* L) -> int {
+                {"GetNetStats", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             uint32_t ms = gh ? gh->getLatencyMs() : 0;
             lua_pushnumber(L, 0);   // bandwidthIn
@@ -6649,12 +6649,12 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushnumber(L, ms);  // latencyWorld
             return 4;
         }},
-                {.name = "GetCurrentTitle", .func = [](lua_State* L) -> int {
+                {"GetCurrentTitle", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? gh->getChosenTitleBit() : -1);
             return 1;
         }},
-                {.name = "GetTitleName", .func = [](lua_State* L) -> int {
+                {"GetTitleName", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             int bit = static_cast<int>(luaL_checknumber(L, 1));
             if (!gh || bit < 0) { return luaReturnNil(L); }
@@ -6671,12 +6671,12 @@ void registerSystemLuaAPI(lua_State* L) {
                 // the character does not own and silently sets none, so there
                 // is nothing to check here that the server does not check
                 // better.
-                {.name = "SetCurrentTitle", .func = [](lua_State* L) -> int {
+                {"SetCurrentTitle", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->sendSetTitle(static_cast<int32_t>(luaL_optnumber(L, 1, -1)));
             return 0;
         }},
-                {.name = "GetInspectSpecialization", .func = [](lua_State* L) -> int {
+                {"GetInspectSpecialization", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto* ir = gh ? gh->getInspectResult() : nullptr;
             lua_pushnumber(L, ir ? ir->activeTalentGroup : 0);
@@ -6688,7 +6688,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 //
                 // Real: the inspect reply carries these and this client already
                 // parses them into InspectResult.
-                {.name = "GetInspectArenaTeamData", .func = [](lua_State* L) -> int {
+                {"GetInspectArenaTeamData", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto* ir = gh ? gh->getInspectResult() : nullptr;
             const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
@@ -6711,7 +6711,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // CanInspect(unit [, showError]) - a player other than a
                 // corpse, which is as much as this client can judge; the server
                 // refuses the rest and the reply simply does not arrive.
-                {.name = "CanInspect", .func = [](lua_State* L) -> int {
+                {"CanInspect", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* uid = luaL_optstring(L, 1, "target");
             if (!gh) { lua_pushboolean(L, 0); return 1; }
@@ -6732,7 +6732,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // zeros as though they were the answer: HasInspectHonorData is
                 // false, and the panel's honour section stays empty instead of
                 // claiming the player has never won anything.
-                {.name = "HasInspectHonorData", .func = [](lua_State* L) -> int {
+                {"HasInspectHonorData", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto* r = gh ? gh->getInspectResult() : nullptr;
             lua_pushboolean(L, (r && r->hasHonorData) ? 1 : 0);
@@ -6742,13 +6742,13 @@ void registerSystemLuaAPI(lua_State* L) {
                 // INSPECT_HONOR_UPDATE. It did nothing, so the answer never
                 // came and the tab sat empty behind a HasInspectHonorData that
                 // was false for good.
-                {.name = "RequestInspectHonorData", .func = [](lua_State* L) -> int {
+                {"RequestInspectHonorData", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto* r = gh ? gh->getInspectResult() : nullptr;
             if (gh && r && r->guid != 0) gh->requestInspectHonorData(r->guid);
             return 0;
         }},
-                {.name = "GetInspectHonorData", .func = [](lua_State* L) -> int {
+                {"GetInspectHonorData", [](lua_State* L) -> int {
             // Six: today's kills and honour, yesterday's, lifetime kills, and
             // the lifetime *rank*, which inspecthonorframe feeds straight into
             // GetPVPRankInfo and shows NONE for when that answers nothing.
@@ -6772,13 +6772,13 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushnumber(L, r->honorRank);
             return 6;
         }},
-                {.name = "GetInspectPVPRankProgress", .func = [](lua_State* L) -> int {
+                {"GetInspectPVPRankProgress", [](lua_State* L) -> int {
             lua_pushnumber(L, 0);
             return 1;
         }},
                 // UnitPVPRank(unit) - the old honour rank, which no WotLK
                 // server sends; GetPVPRankInfo is fed from it and handles zero.
-                {.name = "UnitPVPRank", .func = [](lua_State* L) -> int {
+                {"UnitPVPRank", [](lua_State* L) -> int {
             (void)L;
             lua_pushnumber(L, 0);
             return 1;
@@ -6798,14 +6798,14 @@ void registerSystemLuaAPI(lua_State* L) {
                 //
                 // inspectUnit sends the achievements query alongside on Wrath,
                 // which is what the comparison tab reads.
-                {.name = "NotifyInspect", .func = [](lua_State* L) -> int {
+                {"NotifyInspect", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const uint64_t guid = resolveUnitGuid(gh, luaL_optstring(L, 1, "target"));
             if (guid) gh->inspectUnit(guid);
             return 0;
         }},
-                {.name = "ClearInspectPlayer", .func = [](lua_State* L) -> int {
+                {"ClearInspectPlayer", [](lua_State* L) -> int {
             (void)L;
             return 0;
         }},
@@ -6819,26 +6819,26 @@ void registerSystemLuaAPI(lua_State* L) {
                 // not something the server sends: 75000 honour, 5000 arena
                 // points. They are only ever used to warn that a refund would
                 // overflow, which is exactly what they are right for.
-                {.name = "GetHonorCurrency", .func = [](lua_State* L) -> int {
+                {"GetHonorCurrency", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? gh->getHonorPoints() : 0);
             lua_pushnumber(L, 75000);
             return 2;
         }},
-                {.name = "GetArenaCurrency", .func = [](lua_State* L) -> int {
+                {"GetArenaCurrency", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? gh->getArenaPoints() : 0);
             lua_pushnumber(L, 5000);
             return 2;
         }},
-                {.name = "GetTimePlayed", .func = [](lua_State* L) -> int {
+                {"GetTimePlayed", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushnumber(L, 0); lua_pushnumber(L, 0); return 2; }
             lua_pushnumber(L, gh->getTotalTimePlayed());
             lua_pushnumber(L, gh->getLevelTimePlayed());
             return 2;
         }},
-                {.name = "GetBindLocation", .func = [](lua_State* L) -> int {
+                {"GetBindLocation", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushstring(L, "Unknown"); return 1; }
             lua_pushstring(L, gh->getWhoAreaName(gh->getHomeBindZoneId()).c_str());
@@ -6852,7 +6852,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // The call gives a position in the list and the wire wants the
                 // map and difficulty, which is what the lockout at that
                 // position holds.
-                {.name = "SetSavedInstanceExtend", .func = [](lua_State* L) -> int {
+                {"SetSavedInstanceExtend", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh || index < 1) return 0;
@@ -6862,12 +6862,12 @@ void registerSystemLuaAPI(lua_State* L) {
             gh->setSavedInstanceExtend(l.mapId, l.difficulty, lua_toboolean(L, 2) != 0);
             return 0;
         }},
-                {.name = "GetNumSavedInstances", .func = [](lua_State* L) -> int {
+                {"GetNumSavedInstances", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? gh->getInstanceLockouts().size() : 0);
             return 1;
         }},
-                {.name = "GetSavedInstanceInfo", .func = [](lua_State* L) -> int {
+                {"GetSavedInstanceInfo", [](lua_State* L) -> int {
             // GetSavedInstanceInfo(index) → name, id, reset, difficulty, locked, extended, instanceIDMostSig, isRaid, maxPlayers
             auto* gh = getGameHandler(L);
             int index = static_cast<int>(luaL_checknumber(L, 1));
@@ -6891,7 +6891,7 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushstring(L, diffName ? diffName : "Normal");
             return 10;
         }},
-                {.name = "CalendarGetDate", .func = [](lua_State* L) -> int {
+                {"CalendarGetDate", [](lua_State* L) -> int {
             // CalendarGetDate() → weekday, month, day, year
             time_t now = time(nullptr);
             const std::tm t = core::localTime(now);
@@ -6907,12 +6907,12 @@ void registerSystemLuaAPI(lua_State* L) {
                 // minimap's date button, and that file is core FrameXML. A
                 // constant zero left the button dark however many invites had
                 // arrived.
-                {.name = "CalendarGetNumPendingInvites", .func = [](lua_State* L) -> int {
+                {"CalendarGetNumPendingInvites", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? static_cast<double>(gh->getCalendarPendingInvites()) : 0);
             return 1;
         }},
-                {.name = "CalendarGetNumDayEvents", .func = [](lua_State* L) -> int {
+                {"CalendarGetNumDayEvents", [](lua_State* L) -> int {
             lua_pushnumber(L, static_cast<double>(calendarDayRows(L).size()));
             return 1;
         }},
@@ -6926,7 +6926,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // `if ( title and sequenceType ~= "ONGOING" )` - so an index
                 // past the day's rows answers nothing at all rather than a row
                 // of blanks, which would draw an empty button on every day.
-                {.name = "CalendarGetDayEvent", .func = [](lua_State* L) -> int {
+                {"CalendarGetDayEvent", [](lua_State* L) -> int {
             const auto rows = calendarDayRows(L);
             const int index = static_cast<int>(luaL_optnumber(L, 3, 0));
             if (index < 1 || static_cast<size_t>(index) > rows.size()) return 0;
@@ -6997,7 +6997,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // name, description, texture - indexed into the same day list
                 // as CalendarGetDayEvent, so a row that is not a holiday
                 // answers nothing rather than the wrong holiday.
-                {.name = "CalendarGetHolidayInfo", .func = [](lua_State* L) -> int {
+                {"CalendarGetHolidayInfo", [](lua_State* L) -> int {
             const auto rows = calendarDayRows(L);
             const int index = static_cast<int>(luaL_optnumber(L, 3, 0));
             if (index < 1 || static_cast<size_t>(index) > rows.size()) return 0;
@@ -7016,7 +7016,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // into the same day list as the other two readers, so a row
                 // that is not a lockout answers nothing rather than the wrong
                 // raid.
-                {.name = "CalendarGetRaidInfo", .func = [](lua_State* L) -> int {
+                {"CalendarGetRaidInfo", [](lua_State* L) -> int {
             const auto rows = calendarDayRows(L);
             const int index = static_cast<int>(luaL_optnumber(L, 3, 0));
             if (index < 1 || static_cast<size_t>(index) > rows.size()) return 0;
@@ -7036,7 +7036,7 @@ void registerSystemLuaAPI(lua_State* L) {
         }},
                 // Ask the server for the calendar. The addon's OnShow calls
                 // this, and the answer arrives as CALENDAR_UPDATE_EVENT_LIST.
-                {.name = "OpenCalendar", .func = [](lua_State* L) -> int {
+                {"OpenCalendar", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->requestCalendar();
             return 0;
         }},
@@ -7044,14 +7044,14 @@ void registerSystemLuaAPI(lua_State* L) {
                 // the answer is no - and false rather than nothing, because
                 // the interface disables buttons on it and nil would read the
                 // same as false only by accident.
-                {.name = "CalendarIsActionPending", .func = [](lua_State* L) -> int {
+                {"CalendarIsActionPending", [](lua_State* L) -> int {
             lua_pushboolean(L, 0);
             return 1;
         }},
                 // minLevel, maxLevel, rank - the default filter a guild event
                 // is created with. The whole guild, which is what the server
                 // defaults to as well.
-                {.name = "CalendarDefaultGuildFilter", .func = [](lua_State* L) -> int {
+                {"CalendarDefaultGuildFilter", [](lua_State* L) -> int {
             lua_pushnumber(L, 1);
             lua_pushnumber(L, 80);
             lua_pushnumber(L, 0);
@@ -7060,7 +7060,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // Whether the player may put an event on the guild's calendar.
                 // The server decides for real; this is the guild-membership
                 // half of it, which is the half that gates the button.
-                {.name = "CanEditGuildEvent", .func = [](lua_State* L) -> int {
+                {"CanEditGuildEvent", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushboolean(L, (gh && !gh->getGuildName().empty()) ? 1 : 0);
             return 1;
@@ -7068,7 +7068,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // Arena team events need a team. No arena team is tracked, so
                 // the honest answer is no and the option stays out of the
                 // create menu rather than leading to a request that fails.
-                {.name = "IsInArenaTeam", .func = [](lua_State* L) -> int {
+                {"IsInArenaTeam", [](lua_State* L) -> int {
             lua_pushboolean(L, 0);
             return 1;
         }},
@@ -7077,7 +7077,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // The interface names a row, this turns it into an event id
                 // and asks the server; the answer arrives as
                 // CALENDAR_UPDATE_EVENT and CalendarGetEventInfo reads it.
-                {.name = "CalendarOpenEvent", .func = [](lua_State* L) -> int {
+                {"CalendarOpenEvent", [](lua_State* L) -> int {
             const auto rows = calendarDayRows(L);
             const int index = static_cast<int>(luaL_optnumber(L, 3, 0));
             auto* gh = getGameHandler(L);
@@ -7087,7 +7087,7 @@ void registerSystemLuaAPI(lua_State* L) {
             gh->requestCalendarEvent(gh->getCalendarData().events[row.index].eventId);
             return 0;
         }},
-                {.name = "CalendarCloseEvent", .func = [](lua_State* L) -> int {
+                {"CalendarCloseEvent", [](lua_State* L) -> int {
             (void)L;
             return 0;
         }},
@@ -7095,7 +7095,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // them. A nil title is how it knows there is nothing to show -
                 // `if ( not title ) then return end` - so an unopened event
                 // answers nothing rather than a row of blanks.
-                {.name = "CalendarGetEventInfo", .func = [](lua_State* L) -> int {
+                {"CalendarGetEventInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const auto& ev = gh->getCalendarEventDetail();
@@ -7152,7 +7152,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // CALENDAR_RANK_PLAYER 0, MODERATOR 1, OWNER 2, from
                 // CalendarMgr.h. The rank is per invitee rather than on the
                 // event, so it is this player's row that answers.
-                {.name = "CalendarCanSendInvite", .func = [](lua_State* L) -> int {
+                {"CalendarCanSendInvite", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushboolean(L, 0); return 1; }
             const auto& ev = gh->getCalendarEventDetail();
@@ -7168,7 +7168,7 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushboolean(L, can ? 1 : 0);
             return 1;
         }},
-                {.name = "CalendarEventGetNumInvites", .func = [](lua_State* L) -> int {
+                {"CalendarEventGetNumInvites", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? static_cast<double>(
                 gh->getCalendarEventDetail().invitees.size()) : 0);
@@ -7176,7 +7176,7 @@ void registerSystemLuaAPI(lua_State* L) {
         }},
                 // name, level, className, classFilename, inviteStatus - the
                 // five the invite list reads.
-                {.name = "CalendarEventGetInvite", .func = [](lua_State* L) -> int {
+                {"CalendarEventGetInvite", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh) return 0;
@@ -7199,7 +7199,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // none of them talks to the server on its own, which is what
                 // lets the create form be filled in in any order and cancelled
                 // without trace.
-                {.name = "CalendarNewEvent", .func = [](lua_State* L) -> int {
+                {"CalendarNewEvent", [](lua_State* L) -> int {
             (void)L;
             calendarDraft() = wowee::game::CalendarEventDraft{};
             // Today, so an event committed without touching the date lands
@@ -7214,7 +7214,7 @@ void registerSystemLuaAPI(lua_State* L) {
             d.eventTime.hour = 12;
             return 0;
         }},
-                {.name = "CalendarNewGuildEvent", .func = [](lua_State* L) -> int {
+                {"CalendarNewGuildEvent", [](lua_State* L) -> int {
             (void)L;
             calendarDraft() = wowee::game::CalendarEventDraft{};
             // CALENDAR_FLAG_GUILD_EVENT, which is what the server reads to
@@ -7222,7 +7222,7 @@ void registerSystemLuaAPI(lua_State* L) {
             calendarDraft().flags |= 0x0400u;
             return 0;
         }},
-                {.name = "CalendarEventSetTitle", .func = [](lua_State* L) -> int {
+                {"CalendarEventSetTitle", [](lua_State* L) -> int {
             // Clipped to what the server accepts. It refuses the whole packet
             // over 31 characters rather than truncating, so a long title would
             // silently create nothing at all.
@@ -7231,7 +7231,7 @@ void registerSystemLuaAPI(lua_State* L) {
             calendarDraft().title = std::move(title);
             return 0;
         }},
-                {.name = "CalendarEventSetDescription", .func = [](lua_State* L) -> int {
+                {"CalendarEventSetDescription", [](lua_State* L) -> int {
             std::string desc(luaL_optstring(L, 1, ""));
             if (desc.size() > 255) desc.resize(255);
             calendarDraft().description = std::move(desc);
@@ -7243,13 +7243,13 @@ void registerSystemLuaAPI(lua_State* L) {
                 // CALENDAR_TYPE_RAID = 0. Passed straight through, every event
                 // would be created as the next type along - a raid saved as a
                 // dungeon, with nothing to see but the wrong icon.
-                {.name = "CalendarEventSetType", .func = [](lua_State* L) -> int {
+                {"CalendarEventSetType", [](lua_State* L) -> int {
             const int uiType = static_cast<int>(luaL_optnumber(L, 1, 1));
             calendarDraft().type =
                 static_cast<uint8_t>(uiType > 0 ? uiType - 1 : 0);
             return 0;
         }},
-                {.name = "CalendarEventSetDate", .func = [](lua_State* L) -> int {
+                {"CalendarEventSetDate", [](lua_State* L) -> int {
             auto& d = calendarDraft();
             d.eventTime.month = static_cast<int>(luaL_optnumber(L, 1, d.eventTime.month));
             d.eventTime.day   = static_cast<int>(luaL_optnumber(L, 2, d.eventTime.day));
@@ -7261,7 +7261,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 d.eventTime.month, d.eventTime.day, d.eventTime.fullYear()) - 1;
             return 0;
         }},
-                {.name = "CalendarEventSetTime", .func = [](lua_State* L) -> int {
+                {"CalendarEventSetTime", [](lua_State* L) -> int {
             auto& d = calendarDraft();
             d.eventTime.hour   = static_cast<int>(luaL_optnumber(L, 1, d.eventTime.hour));
             d.eventTime.minute = static_cast<int>(luaL_optnumber(L, 2, d.eventTime.minute));
@@ -7271,13 +7271,13 @@ void registerSystemLuaAPI(lua_State* L) {
                 // dropdown button id, which counts from one, and the wire's
                 // CalendarRepeatType counts from zero - so "Never" would have
                 // been sent as "Weekly".
-                {.name = "CalendarEventSetRepeatOption", .func = [](lua_State* L) -> int {
+                {"CalendarEventSetRepeatOption", [](lua_State* L) -> int {
             const int uiOption = static_cast<int>(luaL_optnumber(L, 1, 1));
             calendarDraft().repeatOption =
                 static_cast<uint8_t>(uiOption > 0 ? uiOption - 1 : 0);
             return 0;
         }},
-                {.name = "CalendarEventSetTextureID", .func = [](lua_State* L) -> int {
+                {"CalendarEventSetTextureID", [](lua_State* L) -> int {
             calendarDraft().dungeonId =
                 static_cast<int32_t>(luaL_optnumber(L, 1, -1));
             return 0;
@@ -7289,7 +7289,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // filled from the open event and CalendarUpdateEvent commits
                 // it back. With nothing open there is nothing to change, so
                 // both do nothing rather than inventing an id.
-                {.name = "CalendarUpdateEvent", .func = [](lua_State* L) -> int {
+                {"CalendarUpdateEvent", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const auto& open = gh->getCalendarEventDetail();
@@ -7297,7 +7297,7 @@ void registerSystemLuaAPI(lua_State* L) {
             gh->updateCalendarEvent(open.eventId, 0, calendarDraft());
             return 0;
         }},
-                {.name = "CalendarRemoveEvent", .func = [](lua_State* L) -> int {
+                {"CalendarRemoveEvent", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const auto& open = gh->getCalendarEventDetail();
@@ -7308,7 +7308,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // Whether the edit form has anything to commit. The interface
                 // greys its save button on this, so answering true always
                 // would offer to save an event nobody had touched.
-                {.name = "CalendarEventHaveSettingsChanged", .func = [](lua_State* L) -> int {
+                {"CalendarEventHaveSettingsChanged", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushboolean(L, 0); return 1; }
             const auto& open = gh->getCalendarEventDetail();
@@ -7332,7 +7332,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // The index is into the open event's invite list, and the
                 // status arrives one-based from the interface where the wire
                 // counts from zero.
-                {.name = "CalendarEventSetStatus", .func = [](lua_State* L) -> int {
+                {"CalendarEventSetStatus", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
             const int uiStatus = static_cast<int>(luaL_optnumber(L, 2, 1));
@@ -7344,7 +7344,7 @@ void registerSystemLuaAPI(lua_State* L) {
                                         static_cast<uint8_t>(uiStatus > 0 ? uiStatus - 1 : 0));
             return 0;
         }},
-                {.name = "CalendarEventSetModerator", .func = [](lua_State* L) -> int {
+                {"CalendarEventSetModerator", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh) return 0;
@@ -7354,7 +7354,7 @@ void registerSystemLuaAPI(lua_State* L) {
             gh->setCalendarInviteModerator(inv.guid, ev.eventId, inv.inviteId, 1);
             return 0;
         }},
-                {.name = "CalendarEventClearModerator", .func = [](lua_State* L) -> int {
+                {"CalendarEventClearModerator", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh) return 0;
@@ -7372,7 +7372,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // and the server holds it against the creator until the event
                 // is committed. Telling them apart by whether an event is
                 // open, which is the same thing the interface means.
-                {.name = "CalendarEventInvite", .func = [](lua_State* L) -> int {
+                {"CalendarEventInvite", [](lua_State* L) -> int {
             const char* name = luaL_optstring(L, 1, "");
             auto* gh = getGameHandler(L);
             if (!gh || !name || !*name) return 0;
@@ -7386,7 +7386,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // The three bounds go on the wire: this has its own opcode
                 // rather than being an invitation with the name left out, and
                 // the server picks the members from them.
-                {.name = "CalendarMassInviteGuild", .func = [](lua_State* L) -> int {
+                {"CalendarMassInviteGuild", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             gh->massInviteGuildToCalendarEvent(
@@ -7396,7 +7396,7 @@ void registerSystemLuaAPI(lua_State* L) {
             return 0;
         }},
                 // And the commit.
-                {.name = "CalendarAddEvent", .func = [](lua_State* L) -> int {
+                {"CalendarAddEvent", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) {
                 gh->createCalendarEvent(calendarDraft());
             }
@@ -7408,14 +7408,14 @@ void registerSystemLuaAPI(lua_State* L) {
                 // and every verb below acts on that one. Kept as state because
                 // the menu asks for it back - the dropdown is built in one
                 // call and clicked in another, with nothing carried between.
-                {.name = "CalendarContextSelectEvent", .func = [](lua_State* L) -> int {
+                {"CalendarContextSelectEvent", [](lua_State* L) -> int {
             calendarContextRow() = {
                 .monthOffset = static_cast<int>(luaL_optnumber(L, 1, 0)),
                 .day = static_cast<int>(luaL_optnumber(L, 2, 0)),
                 .index = static_cast<int>(luaL_optnumber(L, 3, 0))};
             return 0;
         }},
-                {.name = "CalendarContextGetEventIndex", .func = [](lua_State* L) -> int {
+                {"CalendarContextGetEventIndex", [](lua_State* L) -> int {
             const auto& row = calendarContextRow();
             if (row.day < 1 || row.index < 1) {
                 // Three nils rather than none: the interface unpacks this as a
@@ -7432,23 +7432,23 @@ void registerSystemLuaAPI(lua_State* L) {
                 // Answering an invitation, which is the one calendar action
                 // that needs nothing staged first. The status values are the
                 // server's CalendarInviteStatus (CalendarMgr.h:73).
-                {.name = "CalendarContextInviteAvailable", .func = [](lua_State* L) -> int {
+                {"CalendarContextInviteAvailable", [](lua_State* L) -> int {
             return calendarRespondToContextInvite(L, 1);   // accepted
         }},
-                {.name = "CalendarContextInviteDecline", .func = [](lua_State* L) -> int {
+                {"CalendarContextInviteDecline", [](lua_State* L) -> int {
             return calendarRespondToContextInvite(L, 2);   // declined
         }},
-                {.name = "CalendarContextInviteTentative", .func = [](lua_State* L) -> int {
+                {"CalendarContextInviteTentative", [](lua_State* L) -> int {
             return calendarRespondToContextInvite(L, 8);   // tentative
         }},
-                {.name = "CalendarContextInviteRemove", .func = [](lua_State* L) -> int {
+                {"CalendarContextInviteRemove", [](lua_State* L) -> int {
             return calendarRespondToContextInvite(L, 9);   // removed
         }},
                 // Whether the player may edit or delete the row the menu is
                 // about, which is whether they created it. The server decides
                 // for real and refuses otherwise; this is what greys the menu
                 // entry rather than letting it be clicked and rejected.
-                {.name = "CalendarContextEventCanEdit", .func = [](lua_State* L) -> int {
+                {"CalendarContextEventCanEdit", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushboolean(L, 0); return 1; }
             const auto rows = calendarDayRows(L);
@@ -7471,12 +7471,12 @@ void registerSystemLuaAPI(lua_State* L) {
                 // packet for. False rather than nothing: the menu tests it to
                 // decide whether to draw the entry, and a stand-in would draw
                 // one that does nothing when clicked.
-                {.name = "CalendarContextEventCanComplain", .func = [](lua_State* L) -> int {
+                {"CalendarContextEventCanComplain", [](lua_State* L) -> int {
             lua_pushboolean(L, 0);
             return 1;
         }},
                 // Delete the row the menu is about.
-                {.name = "CalendarContextEventRemove", .func = [](lua_State* L) -> int {
+                {"CalendarContextEventRemove", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const auto& row = calendarContextRow();
@@ -7490,13 +7490,13 @@ void registerSystemLuaAPI(lua_State* L) {
         }},
                 // Signing up to a guild event, which is an RSVP with the
                 // signed-up status rather than a separate request.
-                {.name = "CalendarContextEventSignUp", .func = [](lua_State* L) -> int {
+                {"CalendarContextEventSignUp", [](lua_State* L) -> int {
             return calendarRespondToContextInvite(L, 6);   // SIGNED_UP
         }},
                 // Which of the six kinds the menu's row is, so the menu can
                 // offer the right verbs. Read from the same day list the row
                 // was chosen out of.
-                {.name = "CalendarContextEventGetCalendarType", .func = [](lua_State* L) -> int {
+                {"CalendarContextEventGetCalendarType", [](lua_State* L) -> int {
             const auto& row = calendarContextRow();
             auto* gh = getGameHandler(L);
             // Nil rather than nothing, for the same reason as
@@ -7525,7 +7525,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // binding that answers short is the shape framexml_short_returns
                 // is pinned at zero to catch: it reads as correct here only
                 // because Lua happens to fill the rest with nil.
-                {.name = "CalendarGetEventIndex", .func = [](lua_State* L) -> int {
+                {"CalendarGetEventIndex", [](lua_State* L) -> int {
             lua_pushnil(L);
             lua_pushnil(L);
             lua_pushnil(L);
@@ -7538,7 +7538,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // guard in front - so nil raises rather than reading as "no
                 // invite". The invite list the server sends is not per-day, so
                 // a day has one only when one of its events is in it.
-                {.name = "CalendarGetFirstPendingInvite", .func = [](lua_State* L) -> int {
+                {"CalendarGetFirstPendingInvite", [](lua_State* L) -> int {
             const auto rows = calendarDayRows(L);
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushnumber(L, 0); return 1; }
@@ -7564,7 +7564,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // CalendarGetMonth reads it back, so it is kept here rather
                 // than recomputed from the clock on every call - which would
                 // make the previous-month button do nothing.
-                {.name = "CalendarGetMonth", .func = [](lua_State* L) -> int {
+                {"CalendarGetMonth", [](lua_State* L) -> int {
             // The offset is optional: CalendarGetMonth() means the viewed
             // month, and the interface calls it that way and with -1 and 1 in
             // the same breath to fill the leading and trailing cells.
@@ -7578,7 +7578,7 @@ void registerSystemLuaAPI(lua_State* L) {
             lua_pushnumber(L, info.firstWeekday);
             return 4;
         }},
-                {.name = "CalendarSetMonth", .func = [](lua_State* L) -> int {
+                {"CalendarSetMonth", [](lua_State* L) -> int {
             const int offset = static_cast<int>(luaL_checknumber(L, 1));
             const auto viewed = calendarViewedMonth();
             const auto info = wowee::game::calendarMonthAt(
@@ -7586,7 +7586,7 @@ void registerSystemLuaAPI(lua_State* L) {
             calendarSetViewedMonth(info.month, info.year);
             return 0;
         }},
-                {.name = "CalendarSetAbsMonth", .func = [](lua_State* L) -> int {
+                {"CalendarSetAbsMonth", [](lua_State* L) -> int {
             calendarSetViewedMonth(static_cast<int>(luaL_checknumber(L, 1)),
                                    static_cast<int>(luaL_checknumber(L, 2)));
             return 0;
@@ -7599,23 +7599,23 @@ void registerSystemLuaAPI(lua_State* L) {
                 // already has a string for - CALENDAR_ERROR_CREATEDATE_AFTER_MAX
                 // - and the same span back keeps past events reachable, which
                 // is what the previous-month button is for.
-                {.name = "CalendarGetMinDate", .func = [](lua_State* L) -> int {
+                {"CalendarGetMinDate", [](lua_State* L) -> int {
             return pushCalendarBoundDate(L, -12);
         }},
-                {.name = "CalendarGetMaxCreateDate", .func = [](lua_State* L) -> int {
+                {"CalendarGetMaxCreateDate", [](lua_State* L) -> int {
             return pushCalendarBoundDate(L, 12);
         }},
-                {.name = "GetDifficultyInfo", .func = [](lua_State* L) -> int {
+                {"GetDifficultyInfo", [](lua_State* L) -> int {
             // GetDifficultyInfo(id) → name, groupType, isHeroic, maxPlayers
             int diff = static_cast<int>(luaL_checknumber(L, 1));
             struct DiffInfo { const char* name; const char* group; int heroic; int maxPlayers; };
             static const DiffInfo infos[] = {
-                {.name = "5 Player", .group = "party", .heroic = 0, .maxPlayers = 5},          // 0: Normal 5-man
-                {.name = "5 Player (Heroic)", .group = "party", .heroic = 1, .maxPlayers = 5},  // 1: Heroic 5-man
-                {.name = "10 Player", .group = "raid", .heroic = 0, .maxPlayers = 10},          // 2: 10-man Normal
-                {.name = "25 Player", .group = "raid", .heroic = 0, .maxPlayers = 25},          // 3: 25-man Normal
-                {.name = "10 Player (Heroic)", .group = "raid", .heroic = 1, .maxPlayers = 10}, // 4: 10-man Heroic
-                {.name = "25 Player (Heroic)", .group = "raid", .heroic = 1, .maxPlayers = 25}, // 5: 25-man Heroic
+                {"5 Player", "party", 0, 5},          // 0: Normal 5-man
+                {"5 Player (Heroic)", "party", 1, 5},  // 1: Heroic 5-man
+                {"10 Player", "raid", 0, 10},          // 2: 10-man Normal
+                {"25 Player", "raid", 0, 25},          // 3: 25-man Normal
+                {"10 Player (Heroic)", "raid", 1, 10}, // 4: 10-man Heroic
+                {"25 Player (Heroic)", "raid", 1, 25}, // 5: 25-man Heroic
             };
             if (diff >= 0 && diff < 6) {
                 lua_pushstring(L, infos[diff].name);
@@ -7630,14 +7630,14 @@ void registerSystemLuaAPI(lua_State* L) {
             }
             return 4;
         }},
-                {.name = "GetWeatherInfo", .func = [](lua_State* L) -> int {
+                {"GetWeatherInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushnumber(L, 0); lua_pushnumber(L, 0); return 2; }
             lua_pushnumber(L, gh->getWeatherType());
             lua_pushnumber(L, gh->getWeatherIntensity());
             return 2;
         }},
-                {.name = "GetMaxPlayerLevel", .func = [](lua_State* L) -> int {
+                {"GetMaxPlayerLevel", [](lua_State* L) -> int {
             auto* svc = getLuaServices(L);
             auto* reg = svc ? svc->expansionRegistry : nullptr;
             auto* prof = reg ? reg->getActive() : nullptr;
@@ -7655,7 +7655,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 // `newLevel < MAX_PLAYER_LEVEL` then raised on every level gained.
                 // On the earlier two it simply came out an expansion too high,
                 // and a level 60 was never treated as capped.
-                {.name = "GetAccountExpansionLevel", .func = [](lua_State* L) -> int {
+                {"GetAccountExpansionLevel", [](lua_State* L) -> int {
             lua_pushnumber(L, expansionLevelZeroBased(L));
             return 1;
         }},

@@ -2317,22 +2317,22 @@ static int lua_UnitIsConnected(lua_State* L) {
 
 void registerUnitLuaAPI(lua_State* L) {
     static const struct { const char* name; lua_CFunction func; } api[] = {
-                {.name = "UnitName",      .func = lua_UnitName},
-                {.name = "UnitFullName",  .func = lua_UnitName},
-                {.name = "GetUnitName",   .func = lua_UnitName},
-                {.name = "UnitHealth",    .func = lua_UnitHealth},
-                {.name = "UnitHealthMax", .func = lua_UnitHealthMax},
-                {.name = "UnitPower",     .func = lua_UnitPower},
-                {.name = "UnitPowerMax",  .func = lua_UnitPowerMax},
-                {.name = "UnitMana",      .func = lua_UnitPower},
-                {.name = "UnitManaMax",   .func = lua_UnitPowerMax},
-                {.name = "UnitRage",      .func = lua_UnitPower},
-                {.name = "UnitEnergy",    .func = lua_UnitPower},
-                {.name = "UnitFocus",     .func = lua_UnitPower},
-                {.name = "UnitRunicPower", .func = lua_UnitPower},
-                {.name = "UnitLevel",     .func = lua_UnitLevel},
-                {.name = "UnitExists",    .func = lua_UnitExists},
-                {.name = "UnitIsDead",    .func = lua_UnitIsDead},
+                {"UnitName",      lua_UnitName},
+                {"UnitFullName",  lua_UnitName},
+                {"GetUnitName",   lua_UnitName},
+                {"UnitHealth",    lua_UnitHealth},
+                {"UnitHealthMax", lua_UnitHealthMax},
+                {"UnitPower",     lua_UnitPower},
+                {"UnitPowerMax",  lua_UnitPowerMax},
+                {"UnitMana",      lua_UnitPower},
+                {"UnitManaMax",   lua_UnitPowerMax},
+                {"UnitRage",      lua_UnitPower},
+                {"UnitEnergy",    lua_UnitPower},
+                {"UnitFocus",     lua_UnitPower},
+                {"UnitRunicPower", lua_UnitPower},
+                {"UnitLevel",     lua_UnitLevel},
+                {"UnitExists",    lua_UnitExists},
+                {"UnitIsDead",    lua_UnitIsDead},
                 // UnitUsingVehicle(unit) - in a vehicle, or moving between its
                 // seats. This client models the vehicle a player is in and not
                 // its seats, so the second half never happens and the first is
@@ -2341,7 +2341,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // Only the player: a vehicle another unit is riding is not
                 // something this client is told about, and answering false for
                 // one is the truth as far as it knows rather than a guess.
-                {.name = "UnitUsingVehicle", .func = [](lua_State* L) -> int {
+                {"UnitUsingVehicle", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             std::string uid(luaL_optstring(L, 1, "player"));
             toLowerInPlace(uid);
@@ -2355,29 +2355,29 @@ void registerUnitLuaAPI(lua_State* L) {
                 // vehicle a player is in and nothing about who else is aboard.
                 // Nothing rather than an invented seat - the caller shows an
                 // occupant's name from it, and a made-up one would be a name.
-                {.name = "UnitVehicleSeatInfo", .func = [](lua_State* L) -> int {
+                {"UnitVehicleSeatInfo", [](lua_State* L) -> int {
             for (int i = 0; i < 5; ++i) lua_pushnil(L);
             return 5;
         }},
-                {.name = "UnitIsGhost",   .func = lua_UnitIsGhost},
-                {.name = "UnitIsDeadOrGhost", .func = lua_UnitIsDeadOrGhost},
-                {.name = "UnitIsAFK",     .func = lua_UnitIsAFK},
-                {.name = "UnitIsDND",     .func = lua_UnitIsDND},
-                {.name = "UnitPlayerControlled", .func = lua_UnitPlayerControlled},
-                {.name = "UnitIsTapped",        .func = lua_UnitIsTapped},
-                {.name = "UnitIsTappedByPlayer", .func = lua_UnitIsTappedByPlayer},
-                {.name = "UnitIsTappedByAllThreatList", .func = lua_UnitIsTappedByAllThreatList},
-                {.name = "UnitIsVisible",       .func = lua_UnitIsVisible},
-                {.name = "UnitGroupRolesAssigned", .func = lua_UnitGroupRolesAssigned},
-                {.name = "UnitCanAttack",       .func = lua_UnitCanAttack},
-                {.name = "UnitCanCooperate",    .func = lua_UnitCanCooperate},
-                {.name = "UnitCreatureFamily",  .func = lua_UnitCreatureFamily},
-                {.name = "UnitOnTaxi",          .func = lua_UnitOnTaxi},
-                {.name = "UnitThreatSituation", .func = lua_UnitThreatSituation},
-                {.name = "UnitDetailedThreatSituation", .func = lua_UnitDetailedThreatSituation},
-                {.name = "UnitSex",       .func = lua_UnitSex},
-                {.name = "UnitClass",     .func = lua_UnitClass},
-                {.name = "UnitArmor",     .func = [](lua_State* L) -> int {
+                {"UnitIsGhost",   lua_UnitIsGhost},
+                {"UnitIsDeadOrGhost", lua_UnitIsDeadOrGhost},
+                {"UnitIsAFK",     lua_UnitIsAFK},
+                {"UnitIsDND",     lua_UnitIsDND},
+                {"UnitPlayerControlled", lua_UnitPlayerControlled},
+                {"UnitIsTapped",        lua_UnitIsTapped},
+                {"UnitIsTappedByPlayer", lua_UnitIsTappedByPlayer},
+                {"UnitIsTappedByAllThreatList", lua_UnitIsTappedByAllThreatList},
+                {"UnitIsVisible",       lua_UnitIsVisible},
+                {"UnitGroupRolesAssigned", lua_UnitGroupRolesAssigned},
+                {"UnitCanAttack",       lua_UnitCanAttack},
+                {"UnitCanCooperate",    lua_UnitCanCooperate},
+                {"UnitCreatureFamily",  lua_UnitCreatureFamily},
+                {"UnitOnTaxi",          lua_UnitOnTaxi},
+                {"UnitThreatSituation", lua_UnitThreatSituation},
+                {"UnitDetailedThreatSituation", lua_UnitDetailedThreatSituation},
+                {"UnitSex",       lua_UnitSex},
+                {"UnitClass",     lua_UnitClass},
+                {"UnitArmor",     [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             // Whose armour. PaperDollFrame_SetArmor is shared between the two
             // sheets and the pet tab calls it with "Pet" - capitalised, which
@@ -2397,7 +2397,7 @@ void registerUnitLuaAPI(lua_State* L) {
             lua_pushnumber(L, 0);     // negBuff
             return 5;
         }},
-                {.name = "UnitResistance", .func = [](lua_State* L) -> int {
+                {"UnitResistance", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             int school = static_cast<int>(luaL_optnumber(L, 2, 0));
             int32_t val = 0;
@@ -2419,21 +2419,21 @@ void registerUnitLuaAPI(lua_State* L) {
             lua_pushnumber(L, 0);   // negBuff
             return 4;
         }},
-                {.name = "UnitStat",      .func = lua_UnitStat},
-                {.name = "GetDodgeChance",    .func = lua_GetDodgeChance},
-                {.name = "GetParryChance",    .func = lua_GetParryChance},
-                {.name = "GetBlockChance",    .func = lua_GetBlockChance},
-                {.name = "GetCritChance",     .func = lua_GetCritChance},
-                {.name = "GetRangedCritChance", .func = lua_GetRangedCritChance},
-                {.name = "GetSpellCritChance",  .func = lua_GetSpellCritChance},
-                {.name = "GetCombatRating",     .func = lua_GetCombatRating},
-                {.name = "GetSpellBonusDamage", .func = lua_GetSpellBonusDamage},
-                {.name = "GetSpellBonusHealing", .func = lua_GetSpellBonusHealing},
-                {.name = "GetAttackPowerForStat", .func = lua_GetAttackPower},
-                {.name = "GetRangedAttackPower",  .func = lua_GetRangedAttackPower},
-                {.name = "IsInGroup",     .func = lua_IsInGroup},
-                {.name = "IsInRaid",      .func = lua_IsInRaid},
-                {.name = "GetShapeshiftFormInfo", .func = [](lua_State* L) -> int {
+                {"UnitStat",      lua_UnitStat},
+                {"GetDodgeChance",    lua_GetDodgeChance},
+                {"GetParryChance",    lua_GetParryChance},
+                {"GetBlockChance",    lua_GetBlockChance},
+                {"GetCritChance",     lua_GetCritChance},
+                {"GetRangedCritChance", lua_GetRangedCritChance},
+                {"GetSpellCritChance",  lua_GetSpellCritChance},
+                {"GetCombatRating",     lua_GetCombatRating},
+                {"GetSpellBonusDamage", lua_GetSpellBonusDamage},
+                {"GetSpellBonusHealing", lua_GetSpellBonusHealing},
+                {"GetAttackPowerForStat", lua_GetAttackPower},
+                {"GetRangedAttackPower",  lua_GetRangedAttackPower},
+                {"IsInGroup",     lua_IsInGroup},
+                {"IsInRaid",      lua_IsInRaid},
+                {"GetShapeshiftFormInfo", [](lua_State* L) -> int {
             // GetShapeshiftFormInfo(index) → icon, name, isActive, isCastable
             auto* gh = getGameHandler(L);
             int index = static_cast<int>(luaL_checknumber(L, 1));
@@ -2454,7 +2454,7 @@ void registerUnitLuaAPI(lua_State* L) {
             lua_pushboolean(L, 1);                               // isCastable
             return 4;
         }},
-                {.name = "UnitIsPVP", .func = [](lua_State* L) -> int {
+                {"UnitIsPVP", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* uid = luaL_optstring(L, 1, "player");
             if (!gh) { return luaReturnFalse(L); }
@@ -2467,7 +2467,7 @@ void registerUnitLuaAPI(lua_State* L) {
             lua_pushboolean(L, (flags & 0x00001000) ? 1 : 0);
             return 1;
         }},
-                {.name = "UnitIsPVPFreeForAll", .func = [](lua_State* L) -> int {
+                {"UnitIsPVPFreeForAll", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* uid = luaL_optstring(L, 1, "player");
             if (!gh) { return luaReturnFalse(L); }
@@ -2488,7 +2488,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // Whether the off hand holds a weapon rather than a shield or
                 // a held item. DurabilityFrame_SetAlerts branches on it to
                 // decide which of its two off-hand icons to show.
-                {.name = "OffhandHasWeapon", .func = [](lua_State* L) -> int {
+                {"OffhandHasWeapon", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushboolean(L, 0); return 1; }
             const auto& slot = gh->getInventory().getEquipSlot(game::EquipSlot::OFF_HAND);
@@ -2504,7 +2504,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // The colour a unit's name is drawn in: red for hostile, green
                 // for friendly, yellow for neutral. Unit frames read all four
                 // components straight into SetTextColor.
-                {.name = "UnitSelectionColor", .func = [](lua_State* L) -> int {
+                {"UnitSelectionColor", [](lua_State* L) -> int {
             const char* uid = luaL_optstring(L, 1, "player");
             auto* unit = resolveUnit(L, uid);
             float r = 0.0f, g = 1.0f, b = 0.0f;
@@ -2515,7 +2515,7 @@ void registerUnitLuaAPI(lua_State* L) {
             lua_pushnumber(L, 1.0);
             return 4;
         }},
-                {.name = "UnitIsPartyLeader", .func = [](lua_State* L) -> int {
+                {"UnitIsPartyLeader", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* uid = luaL_optstring(L, 1, "player");
             std::string uidStr(uid);
@@ -2525,7 +2525,7 @@ void registerUnitLuaAPI(lua_State* L) {
                                 gh->getPartyData().leaderGuid == guid) ? 1 : 0);
             return 1;
         }},
-                {.name = "UnitIsCorpse", .func = [](lua_State* L) -> int {
+                {"UnitIsCorpse", [](lua_State* L) -> int {
             const char* uid = luaL_optstring(L, 1, "player");
             auto* unit = resolveUnit(L, uid);
             lua_pushboolean(L, (unit && unit->getHealth() == 0) ? 1 : 0);
@@ -2533,12 +2533,12 @@ void registerUnitLuaAPI(lua_State* L) {
         }},
                 // Whether the first unit may help the second - true between
                 // anything not hostile to each other.
-                {.name = "UnitCanAssist", .func = [](lua_State* L) -> int {
+                {"UnitCanAssist", [](lua_State* L) -> int {
             auto* other = resolveUnit(L, luaL_optstring(L, 2, "target"));
             lua_pushboolean(L, (other && !other->isHostile()) ? 1 : 0);
             return 1;
         }},
-                {.name = "GetPVPRankInfo", .func = [](lua_State* L) -> int {
+                {"GetPVPRankInfo", [](lua_State* L) -> int {
             const int rank = static_cast<int>(luaL_optnumber(L, 1, 0));
             lua_pushstring(L, "");          // rank name
             lua_pushnumber(L, rank > 0 ? rank : 0);
@@ -2547,15 +2547,15 @@ void registerUnitLuaAPI(lua_State* L) {
                 // Honour and arena totals, in the shapes their panels expect.
                 // Zeroes rather than nothing: every one of these is read
                 // straight into arithmetic or a format string.
-                {.name = "GetPVPLifetimeStats", .func = [](lua_State* L) -> int {
+                {"GetPVPLifetimeStats", [](lua_State* L) -> int {
             lua_pushnumber(L, 0); lua_pushnumber(L, 0); lua_pushnumber(L, 0);
             return 3;
         }},
-                {.name = "GetPVPSessionStats", .func = [](lua_State* L) -> int {
+                {"GetPVPSessionStats", [](lua_State* L) -> int {
             lua_pushnumber(L, 0); lua_pushnumber(L, 0);
             return 2;
         }},
-                {.name = "GetPVPYesterdayStats", .func = [](lua_State* L) -> int {
+                {"GetPVPYesterdayStats", [](lua_State* L) -> int {
             lua_pushnumber(L, 0); lua_pushnumber(L, 0);
             return 2;
         }},
@@ -2577,7 +2577,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // the queue, 2 invited and waiting to accept, 3 in progress, 4
                 // ending. Four reads as active because the battleground is
                 // still the one the player is standing in.
-                {.name = "GetBattlefieldStatus", .func = [](lua_State* L) -> int {
+                {"GetBattlefieldStatus", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int idx = static_cast<int>(luaL_optnumber(L, 1, 0));
             const char* status = "none";
@@ -2660,7 +2660,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // two functions below, because the rows the frame draws are
                 // the rows they hand back - the frame does no filtering of its
                 // own and would otherwise show everyone under either tab.
-                {.name = "SetBattlefieldScoreFaction", .func = [](lua_State* L) -> int {
+                {"SetBattlefieldScoreFaction", [](lua_State* L) -> int {
             if (lua_isnoneornil(L, 1)) battlefieldScoreFaction() = -1;
             else battlefieldScoreFaction() = static_cast<int>(lua_tonumber(L, 1));
             return 0;
@@ -2673,7 +2673,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 //
                 // A name is sensible ascending and a score is not, so a fresh
                 // column starts descending for everything but the name.
-                {.name = "SortBattlefieldScoreData", .func = [](lua_State* L) -> int {
+                {"SortBattlefieldScoreData", [](lua_State* L) -> int {
             std::string column(luaL_optstring(L, 1, ""));
             if (column.empty()) return 0;
             if (column == battlefieldSortColumn()) {
@@ -2684,13 +2684,13 @@ void registerUnitLuaAPI(lua_State* L) {
             }
             return 0;
         }},
-                {.name = "GetNumBattlefieldScores", .func = [](lua_State* L) -> int {
+                {"GetNumBattlefieldScores", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto* sb = gh ? gh->getBgScoreboard() : nullptr;
             lua_pushnumber(L, sb ? static_cast<double>(filteredBgScores(*sb).size()) : 0.0);
             return 1;
         }},
-                {.name = "GetBattlefieldScore", .func = [](lua_State* L) -> int {
+                {"GetBattlefieldScore", [](lua_State* L) -> int {
             // GetBattlefieldScore(index) → name, killingBlows, honorableKills, deaths, honorGained, faction, rank, race, class, classToken, damageDone, healingDone
             auto* gh = getGameHandler(L);
             int index = static_cast<int>(luaL_checknumber(L, 1));
@@ -2731,7 +2731,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // - nothing read them, and GetNumBattlefieldStats answered zero
                 // from the counting stub, so the scoreboard drew the common
                 // columns and stopped.
-                {.name = "GetNumBattlefieldStats", .func = [](lua_State* L) -> int {
+                {"GetNumBattlefieldStats", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto* sb = gh ? gh->getBgScoreboard() : nullptr;
             size_t columns = 0;
@@ -2747,7 +2747,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // with ~= "" and then concatenates the faction onto it, so nil
                 // passes the test and dies on the concatenation. This client
                 // has no artwork per column, and "" is how the frame is told so.
-                {.name = "GetBattlefieldStatInfo", .func = [](lua_State* L) -> int {
+                {"GetBattlefieldStatInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_checknumber(L, 1));
             const auto* sb = gh ? gh->getBgScoreboard() : nullptr;
@@ -2773,7 +2773,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 //
                 // Always a number. The frame compares it against zero the line
                 // after it asks, so nil is not "no value" there, it is an error.
-                {.name = "GetBattlefieldStatData", .func = [](lua_State* L) -> int {
+                {"GetBattlefieldStatData", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int playerIndex = static_cast<int>(luaL_checknumber(L, 1));
             const int statIndex   = static_cast<int>(luaL_checknumber(L, 2));
@@ -2797,7 +2797,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // The matchmaker rating is not parsed, and nil is the right
                 // answer for it: the frame prints "-------" for a rating it was
                 // not given, where a zero would read as a real one.
-                {.name = "GetBattlefieldTeamInfo", .func = [](lua_State* L) -> int {
+                {"GetBattlefieldTeamInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int faction = static_cast<int>(luaL_checknumber(L, 1));
             const auto* sb = gh ? gh->getBgScoreboard() : nullptr;
@@ -2817,7 +2817,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // the scoreboard this client already holds. A name that is not
                 // on it cannot be reported, which is also true in the real
                 // client - the report is only offered from a row.
-                {.name = "ReportPlayerIsPVPAFK", .func = [](lua_State* L) -> int {
+                {"ReportPlayerIsPVPAFK", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* name = lua_isstring(L, 1) ? lua_tostring(L, 1) : nullptr;
             const auto* sb = gh ? gh->getBgScoreboard() : nullptr;
@@ -2827,19 +2827,19 @@ void registerUnitLuaAPI(lua_State* L) {
             }
             return 0;
         }},
-                {.name = "GetBattlefieldWinner", .func = [](lua_State* L) -> int {
+                {"GetBattlefieldWinner", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto* sb = gh ? gh->getBgScoreboard() : nullptr;
             if (sb && sb->hasWinner) lua_pushnumber(L, sb->winner);
             else lua_pushnil(L);
             return 1;
         }},
-                {.name = "RequestBattlefieldScoreData", .func = [](lua_State* L) -> int {
+                {"RequestBattlefieldScoreData", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->requestPvpLog();
             return 0;
         }},
-                {.name = "AcceptBattlefieldPort", .func = [](lua_State* L) -> int {
+                {"AcceptBattlefieldPort", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             int accept = lua_toboolean(L, 2);
             if (gh) {
@@ -2848,21 +2848,21 @@ void registerUnitLuaAPI(lua_State* L) {
             }
             return 0;
         }},
-                {.name = "UnitRace",          .func = lua_UnitRace},
-                {.name = "UnitPowerType",     .func = lua_UnitPowerType},
-                {.name = "GetNumGroupMembers", .func = lua_GetNumGroupMembers},
-                {.name = "UnitGUID",          .func = lua_UnitGUID},
-                {.name = "UnitIsPlayer",      .func = lua_UnitIsPlayer},
-                {.name = "UnitPVPName",       .func = lua_UnitPVPName},
-                {.name = "InCombatLockdown",  .func = lua_InCombatLockdown},
-                {.name = "UnitDistanceSquared", .func = lua_UnitDistanceSquared},
-                {.name = "CheckInteractDistance", .func = lua_CheckInteractDistance},
-                {.name = "UnitInRange",           .func = lua_UnitInRange},
-                {.name = "IsRaidLeader",          .func = lua_IsRaidLeader},
+                {"UnitRace",          lua_UnitRace},
+                {"UnitPowerType",     lua_UnitPowerType},
+                {"GetNumGroupMembers", lua_GetNumGroupMembers},
+                {"UnitGUID",          lua_UnitGUID},
+                {"UnitIsPlayer",      lua_UnitIsPlayer},
+                {"UnitPVPName",       lua_UnitPVPName},
+                {"InCombatLockdown",  lua_InCombatLockdown},
+                {"UnitDistanceSquared", lua_UnitDistanceSquared},
+                {"CheckInteractDistance", lua_CheckInteractDistance},
+                {"UnitInRange",           lua_UnitInRange},
+                {"IsRaidLeader",          lua_IsRaidLeader},
                 // The class token without the localised name beside it, which
                 // is all UnitClassBase is: the same second return UnitClass
                 // already computes.
-                {.name = "UnitClassBase",         .func = [](lua_State* L) -> int {
+                {"UnitClassBase",         [](lua_State* L) -> int {
             lua_getglobal(L, "UnitClass");
             lua_pushvalue(L, 1);
             if (lua_pcall(L, 1, 3, 0) != 0) { lua_pop(L, 1); lua_pushnil(L); return 1; }
@@ -2871,31 +2871,31 @@ void registerUnitLuaAPI(lua_State* L) {
             lua_pop(L, 1);
             return 1;
         }},
-                {.name = "IsMounted",         .func = lua_IsMounted},
-                {.name = "IsFlying",          .func = lua_IsFlying},
-                {.name = "IsSwimming",        .func = lua_IsSwimming},
-                {.name = "IsResting",         .func = lua_IsResting},
-                {.name = "IsFalling",         .func = lua_IsFalling},
-                {.name = "IsStealthed",       .func = lua_IsStealthed},
-                {.name = "GetUnitSpeed",      .func = lua_GetUnitSpeed},
-                {.name = "UnitAffectingCombat", .func = lua_UnitAffectingCombat},
-                {.name = "GetNumRaidMembers",   .func = lua_GetNumRaidMembers},
-                {.name = "GetNumPartyMembers",  .func = lua_GetNumPartyMembers},
+                {"IsMounted",         lua_IsMounted},
+                {"IsFlying",          lua_IsFlying},
+                {"IsSwimming",        lua_IsSwimming},
+                {"IsResting",         lua_IsResting},
+                {"IsFalling",         lua_IsFalling},
+                {"IsStealthed",       lua_IsStealthed},
+                {"GetUnitSpeed",      lua_GetUnitSpeed},
+                {"UnitAffectingCombat", lua_UnitAffectingCombat},
+                {"GetNumRaidMembers",   lua_GetNumRaidMembers},
+                {"GetNumPartyMembers",  lua_GetNumPartyMembers},
                 // The counts before the dungeon finder inflates them. There is
                 // no dungeon finder here, so they are the same number - and
                 // UIParent does arithmetic on them, where absent is an error
                 // rather than a zero.
-                {.name = "GetRealNumRaidMembers",  .func = lua_GetNumRaidMembers},
-                {.name = "GetRealNumPartyMembers", .func = lua_GetNumPartyMembers},
-                {.name = "HasFullControl",      .func = lua_HasFullControl},
-                {.name = "GetPetSpellBonusDamage", .func = lua_GetPetSpellBonusDamage},
-                {.name = "RetrieveCorpse",      .func = lua_RetrieveCorpse},
-                {.name = "Dismount",            .func = lua_Dismount},
-                {.name = "StartAttack",         .func = lua_StartAttack},
-                {.name = "StopAttack",          .func = lua_StopAttack},
-                {.name = "UnitInParty",         .func = lua_UnitInParty},
-                {.name = "UnitInRaid",          .func = lua_UnitInRaid},
-                {.name = "UnitHasVehicleUI",    .func = lua_UnitHasVehicleUI},
+                {"GetRealNumRaidMembers",  lua_GetNumRaidMembers},
+                {"GetRealNumPartyMembers", lua_GetNumPartyMembers},
+                {"HasFullControl",      lua_HasFullControl},
+                {"GetPetSpellBonusDamage", lua_GetPetSpellBonusDamage},
+                {"RetrieveCorpse",      lua_RetrieveCorpse},
+                {"Dismount",            lua_Dismount},
+                {"StartAttack",         lua_StartAttack},
+                {"StopAttack",          lua_StopAttack},
+                {"UnitInParty",         lua_UnitInParty},
+                {"UnitInRaid",          lua_UnitInRaid},
+                {"UnitHasVehicleUI",    lua_UnitHasVehicleUI},
                 // Which vehicle art a unit's frame should wear. Reached only
                 // behind UnitHasVehicleUI, which answers false here because no
                 // vehicle is modelled - so this is unreachable today and nil
@@ -2903,63 +2903,63 @@ void registerUnitLuaAPI(lua_State* L) {
                 // bound because leaving it out is the difference between the
                 // party frames calling nothing this client lacks and calling
                 // one thing it does.
-                {.name = "UnitVehicleSkin",     .func = [](lua_State* L) -> int { return luaReturnNil(L); }},
-                {.name = "UnitInVehicle",       .func = lua_UnitInVehicle},
-                {.name = "UnitControllingVehicle", .func = lua_UnitControllingVehicle},
-                {.name = "UnitIsPossessed",     .func = lua_UnitIsPossessed},
-                {.name = "UnitIsCharmed",       .func = lua_UnitIsCharmed},
-                {.name = "UnitIsTalking",       .func = lua_UnitIsTalking},
-                {.name = "UnitInBattleground",  .func = lua_UnitInBattleground},
-                {.name = "UnitPlayerOrPetInParty", .func = lua_UnitPlayerOrPetInParty},
-                {.name = "UnitPlayerOrPetInRaid",  .func = lua_UnitPlayerOrPetInRaid},
-                {.name = "UnitCharacterPoints", .func = lua_UnitCharacterPoints},
-                {.name = "PetHasActionBar",     .func = lua_PetHasActionBar},
-                {.name = "PetCanBeDismissed",   .func = lua_PetCanBeDismissed},
-                {.name = "PetCanBeAbandoned",   .func = lua_PetCanBeAbandoned},
-                {.name = "GetRaidRosterInfo",   .func = lua_GetRaidRosterInfo},
-                {.name = "GetThreatStatusColor", .func = lua_GetThreatStatusColor},
-                {.name = "GetReadyCheckStatus", .func = lua_GetReadyCheckStatus},
-                {.name = "RegisterUnitWatch",   .func = lua_RegisterUnitWatch},
-                {.name = "UnregisterUnitWatch", .func = lua_UnregisterUnitWatch},
-                {.name = "UnitIsUnit",          .func = lua_UnitIsUnit},
-                {.name = "UnitIsFriend",        .func = lua_UnitIsFriend},
-                {.name = "UnitIsEnemy",         .func = lua_UnitIsEnemy},
-                {.name = "UnitCreatureType",    .func = lua_UnitCreatureType},
-                {.name = "UnitClassification",  .func = lua_UnitClassification},
-                {.name = "UnitReaction",        .func = lua_UnitReaction},
-                {.name = "UnitIsConnected",     .func = lua_UnitIsConnected},
-                {.name = "GetComboPoints",      .func = lua_GetComboPoints},
-                {.name = "GetPlayerInfoByGUID",  .func = lua_GetPlayerInfoByGUID},
-                {.name = "UnitXP",                  .func = lua_UnitXP},
-                {.name = "UnitXPMax",               .func = lua_UnitXPMax},
-                {.name = "GetXPExhaustion",         .func = lua_GetXPExhaustion},
-                {.name = "GetTimeToWellRested",     .func = lua_GetTimeToWellRested},
-                {.name = "UnitAttackPower",         .func = lua_UnitAttackPower},
-                {.name = "UnitRangedAttackPower",   .func = lua_UnitRangedAttackPower},
-                {.name = "UnitDefense",             .func = lua_UnitDefense},
-                {.name = "UnitAttackSpeed",         .func = lua_UnitAttackSpeed},
-                {.name = "UnitDamage",              .func = lua_UnitDamage},
-                {.name = "UnitRangedDamage",        .func = lua_UnitRangedDamage},
-                {.name = "UnitRangedAttack",        .func = lua_UnitRangedAttack},
-                {.name = "UnitAttackBothHands",     .func = lua_UnitAttackBothHands},
-                {.name = "GetManaRegen",            .func = lua_GetManaRegen},
-                {.name = "GetMaxCombatRatingBonus", .func = lua_GetMaxCombatRatingBonus},
-                {.name = "GetUnitMaxHealthModifier", .func = lua_GetUnitMaxHealthModifier},
-                {.name = "GetInventoryItemCooldown", .func = lua_GetInventoryItemCooldown},
-                {.name = "SetPortraitTexture",         .func = lua_SetPortraitTexture},
-                {.name = "GetHairCustomization",       .func = lua_GetHairCustomization},
-                {.name = "GetFacialHairCustomization", .func = lua_GetFacialHairCustomization},
-                {.name = "CanAlterSkin",               .func = lua_CanAlterSkin},
-                {.name = "GetBarberShopStyleInfo",     .func = lua_GetBarberShopStyleInfo},
-                {.name = "SetNextBarberShopStyle",     .func = lua_SetNextBarberShopStyle},
-                {.name = "GetBarberShopTotalCost",     .func = lua_GetBarberShopTotalCost},
-                {.name = "BarberShopReset",            .func = lua_BarberShopReset},
-                {.name = "CancelBarberShop",           .func = lua_CancelBarberShop},
+                {"UnitVehicleSkin",     [](lua_State* L) -> int { return luaReturnNil(L); }},
+                {"UnitInVehicle",       lua_UnitInVehicle},
+                {"UnitControllingVehicle", lua_UnitControllingVehicle},
+                {"UnitIsPossessed",     lua_UnitIsPossessed},
+                {"UnitIsCharmed",       lua_UnitIsCharmed},
+                {"UnitIsTalking",       lua_UnitIsTalking},
+                {"UnitInBattleground",  lua_UnitInBattleground},
+                {"UnitPlayerOrPetInParty", lua_UnitPlayerOrPetInParty},
+                {"UnitPlayerOrPetInRaid",  lua_UnitPlayerOrPetInRaid},
+                {"UnitCharacterPoints", lua_UnitCharacterPoints},
+                {"PetHasActionBar",     lua_PetHasActionBar},
+                {"PetCanBeDismissed",   lua_PetCanBeDismissed},
+                {"PetCanBeAbandoned",   lua_PetCanBeAbandoned},
+                {"GetRaidRosterInfo",   lua_GetRaidRosterInfo},
+                {"GetThreatStatusColor", lua_GetThreatStatusColor},
+                {"GetReadyCheckStatus", lua_GetReadyCheckStatus},
+                {"RegisterUnitWatch",   lua_RegisterUnitWatch},
+                {"UnregisterUnitWatch", lua_UnregisterUnitWatch},
+                {"UnitIsUnit",          lua_UnitIsUnit},
+                {"UnitIsFriend",        lua_UnitIsFriend},
+                {"UnitIsEnemy",         lua_UnitIsEnemy},
+                {"UnitCreatureType",    lua_UnitCreatureType},
+                {"UnitClassification",  lua_UnitClassification},
+                {"UnitReaction",        lua_UnitReaction},
+                {"UnitIsConnected",     lua_UnitIsConnected},
+                {"GetComboPoints",      lua_GetComboPoints},
+                {"GetPlayerInfoByGUID",  lua_GetPlayerInfoByGUID},
+                {"UnitXP",                  lua_UnitXP},
+                {"UnitXPMax",               lua_UnitXPMax},
+                {"GetXPExhaustion",         lua_GetXPExhaustion},
+                {"GetTimeToWellRested",     lua_GetTimeToWellRested},
+                {"UnitAttackPower",         lua_UnitAttackPower},
+                {"UnitRangedAttackPower",   lua_UnitRangedAttackPower},
+                {"UnitDefense",             lua_UnitDefense},
+                {"UnitAttackSpeed",         lua_UnitAttackSpeed},
+                {"UnitDamage",              lua_UnitDamage},
+                {"UnitRangedDamage",        lua_UnitRangedDamage},
+                {"UnitRangedAttack",        lua_UnitRangedAttack},
+                {"UnitAttackBothHands",     lua_UnitAttackBothHands},
+                {"GetManaRegen",            lua_GetManaRegen},
+                {"GetMaxCombatRatingBonus", lua_GetMaxCombatRatingBonus},
+                {"GetUnitMaxHealthModifier", lua_GetUnitMaxHealthModifier},
+                {"GetInventoryItemCooldown", lua_GetInventoryItemCooldown},
+                {"SetPortraitTexture",         lua_SetPortraitTexture},
+                {"GetHairCustomization",       lua_GetHairCustomization},
+                {"GetFacialHairCustomization", lua_GetFacialHairCustomization},
+                {"CanAlterSkin",               lua_CanAlterSkin},
+                {"GetBarberShopStyleInfo",     lua_GetBarberShopStyleInfo},
+                {"SetNextBarberShopStyle",     lua_SetNextBarberShopStyle},
+                {"GetBarberShopTotalCost",     lua_GetBarberShopTotalCost},
+                {"BarberShopReset",            lua_BarberShopReset},
+                {"CancelBarberShop",           lua_CancelBarberShop},
                 // The Okay button, named as an OnClick attribute rather than
                 // called from a script body - which is exactly why the
                 // readiness report called this element finished while its one
                 // committing action raised.
-                {.name = "ApplyBarberShopStyle", .func = [](lua_State* L) -> int {
+                {"ApplyBarberShopStyle", [](lua_State* L) -> int {
             if (auto* svc = getLuaServices(L); svc && svc->barberApply) svc->barberApply();
             return 0;
         }},
@@ -2972,7 +2972,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 //
                 // Weapon class 2, subclass 19, off the same table the client's
                 // own subclass names come from.
-                {.name = "HasWandEquipped",         .func = [](lua_State* L) -> int {
+                {"HasWandEquipped",         [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushboolean(L, 0); return 1; }
             const auto& sl = gh->getInventory().getEquipSlot(game::EquipSlot::RANGED);
@@ -2990,7 +2990,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // knight sigils, shaman totems and druid idols. Answering no
                 // for all of them made the paperdoll label that slot "Ranged"
                 // and read its stats as a ranged weapon's.
-                {.name = "UnitHasRelicSlot",        .func = [](lua_State* L) -> int {
+                {"UnitHasRelicSlot",        [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* uid = luaL_optstring(L, 1, "player");
             // Only the player's class is known well enough to answer this.
@@ -3003,7 +3003,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // merchant's repair button re-armed on every click instead of
                 // toggling, and neither the bag nor the paperdoll tooltip ever
                 // showed an item's repair cost.
-                {.name = "InRepairMode", .func = [](lua_State* L) -> int {
+                {"InRepairMode", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const bool active = repairCursorUp() && gh && gh->isVendorWindowOpen();
             lua_pushboolean(L, active ? 1 : 0);
@@ -3018,7 +3018,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // SetItemButtonDesaturated reads the return value as
                 // "shaderSupported" and greys with SetVertexColor(0.5) when it
                 // is falsy, which is the branch a no-op takes.
-                {.name = "IsInventoryItemLocked",   .func = [](lua_State* L) -> int {
+                {"IsInventoryItemLocked",   [](lua_State* L) -> int {
             const int slot = static_cast<int>(luaL_optnumber(L, 1, 0));
             lua_pushboolean(L, slot > 0 && cursorEquipSlot() == slot);
             return 1;
@@ -3027,7 +3027,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // paperdoll draws that slot's icon red. The durability is
                 // already tracked and already answered by
                 // GetInventoryItemDurability; only this was left saying no.
-                {.name = "GetInventoryItemBroken",  .func = [](lua_State* L) -> int {
+                {"GetInventoryItemBroken",  [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int slotId = static_cast<int>(luaL_optnumber(L, 2, 0));
             if (!gh || slotId < 1 || slotId > 19) { lua_pushboolean(L, 0); return 1; }
@@ -3047,7 +3047,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // different question from the one InventoryScreen answers when
                 // it picks a slot to equip into, so this does not go looking
                 // for that logic.
-                {.name = "CursorCanGoInSlot",       .func = [](lua_State* L) -> int {
+                {"CursorCanGoInSlot",       [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int slot = static_cast<int>(luaL_optnumber(L, 1, 0));
             const uint32_t held = cursorItemId();
@@ -3104,11 +3104,11 @@ void registerUnitLuaAPI(lua_State* L) {
                 //
                 // The two modifiers are multipliers, so one is the neutral
                 // answer; zero would have read as a pet with no health at all.
-                {.name = "GetUnitHealthModifier",   .func = [](lua_State* L) -> int {
+                {"GetUnitHealthModifier",   [](lua_State* L) -> int {
             lua_pushnumber(L, 1.0); return 1; }},
-                {.name = "GetUnitPowerModifier",    .func = [](lua_State* L) -> int {
+                {"GetUnitPowerModifier",    [](lua_State* L) -> int {
             lua_pushnumber(L, 1.0); return 1; }},
-                {.name = "GetPetExperience", .func = [](lua_State* L) -> int {
+                {"GetPetExperience", [](lua_State* L) -> int {
             // currXP, nextXP - off the pet unit's own fields, not the player's.
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? gh->getPetExperience() : 0);
@@ -3127,7 +3127,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // (start, duration), not (now, remaining): the cooldown frame
                 // draws a sweep of `duration` beginning at `start`, so the
                 // start is wound back by however much has already run.
-                {.name = "GetCompanionCooldown", .func = [](lua_State* L) -> int {
+                {"GetCompanionCooldown", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* kind = luaL_optstring(L, 1, "");
             const int index = static_cast<int>(luaL_optnumber(L, 2, 0));
@@ -3154,7 +3154,7 @@ void registerUnitLuaAPI(lua_State* L) {
         }},
                 // Summoning a mount or a critter is casting its spell - there
                 // is no separate companion message on the wire in 3.3.5.
-                {.name = "CallCompanion", .func = [](lua_State* L) -> int {
+                {"CallCompanion", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* kind = luaL_optstring(L, 1, "");
             const int index = static_cast<int>(luaL_optnumber(L, 2, 0));
@@ -3167,7 +3167,7 @@ void registerUnitLuaAPI(lua_State* L) {
         }},
                 // Putting one away is cancelling its aura, which is the same
                 // thing right-clicking the buff does.
-                {.name = "DismissCompanion", .func = [](lua_State* L) -> int {
+                {"DismissCompanion", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* kind = luaL_optstring(L, 1, "");
             if (!gh) return 0;
@@ -3181,16 +3181,16 @@ void registerUnitLuaAPI(lua_State* L) {
             }
             return 0;
         }},
-                {.name = "IsTitleKnown",            .func = [](lua_State* L) -> int {
+                {"IsTitleKnown",            [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int bit = static_cast<int>(luaL_optnumber(L, 1, -1));
             const bool known = gh && bit >= 0 &&
                                gh->getKnownTitleBits().count(static_cast<uint32_t>(bit)) > 0;
             lua_pushnumber(L, known ? 1 : 0);
             return 1; }},
-                {.name = "GetCombatRatingBonus",    .func = lua_GetCombatRatingBonus},
-                {.name = "GetCritChanceFromAgility", .func = lua_GetCritChanceFromAgility},
-                {.name = "GetSpellCritChanceFromIntellect", .func = lua_GetSpellCritChanceFromIntellect},
+                {"GetCombatRatingBonus",    lua_GetCombatRatingBonus},
+                {"GetCritChanceFromAgility", lua_GetCritChanceFromAgility},
+                {"GetSpellCritChanceFromIntellect", lua_GetSpellCritChanceFromIntellect},
                 // Three values - main hand, off hand, ranged - because the
                 // character sheet reads the second and concatenates it. One
                 // value left it nil, and the line that prints "expertise /
@@ -3203,7 +3203,7 @@ void registerUnitLuaAPI(lua_State* L) {
                 // swung. The third was never read, and both of the first two
                 // were zero for everyone - the server sends them, in points,
                 // and nothing here was reading the fields.
-                {.name = "GetExpertise", .func = [](lua_State* L) -> int {
+                {"GetExpertise", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? gh->getExpertise() : 0);
             lua_pushnumber(L, gh ? gh->getOffhandExpertise() : 0);
@@ -3218,26 +3218,26 @@ void registerUnitLuaAPI(lua_State* L) {
                 // chance to be dodged or parried, which is the arithmetic the
                 // sheet's tooltip line does not do for itself - it formats
                 // whatever it is given with two decimal places and a % sign.
-                {.name = "GetExpertisePercent", .func = [](lua_State* L) -> int {
+                {"GetExpertisePercent", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, (gh ? gh->getExpertise() : 0) * 0.25);
             lua_pushnumber(L, (gh ? gh->getOffhandExpertise() : 0) * 0.25);
             return 2;
         }},
-                {.name = "GetArmorPenetration",     .func = lua_GetArmorPenetration},
+                {"GetArmorPenetration",     lua_GetArmorPenetration},
                 // Spell penetration and shield block value are summed from equipped-item
                 // stat mods (ITEM_MOD_SPELL_PENETRATION, the shield's block value), not
                 // any player field the server sends - the inventory does not yet total
                 // item stat mods, so these stay a genuine zero rather than a stale stub.
-                {.name = "GetSpellPenetration",     .func = lua_ZeroPercent},
-                {.name = "GetShieldBlock",          .func = lua_ZeroPercent},
-                {.name = "GetUnitHealthRegenRateFromSpirit", .func = lua_GetUnitHealthRegenRateFromSpirit},
-                {.name = "GetUnitManaRegenRateFromSpirit",   .func = lua_GetUnitManaRegenRateFromSpirit},
-                {.name = "GetWatchedFactionInfo",   .func = lua_GetWatchedFactionInfo},
-                {.name = "GetNumBagSlots",          .func = lua_GetNumBagSlots},
-                {.name = "GetMirrorTimerProgress",  .func = lua_GetMirrorTimerProgress},
-                {.name = "GetRestState",            .func = lua_GetRestState},
-                {.name = "HasFocus", .func = [](lua_State* L) -> int {
+                {"GetSpellPenetration",     lua_ZeroPercent},
+                {"GetShieldBlock",          lua_ZeroPercent},
+                {"GetUnitHealthRegenRateFromSpirit", lua_GetUnitHealthRegenRateFromSpirit},
+                {"GetUnitManaRegenRateFromSpirit",   lua_GetUnitManaRegenRateFromSpirit},
+                {"GetWatchedFactionInfo",   lua_GetWatchedFactionInfo},
+                {"GetNumBagSlots",          lua_GetNumBagSlots},
+                {"GetMirrorTimerProgress",  lua_GetMirrorTimerProgress},
+                {"GetRestState",            lua_GetRestState},
+                {"HasFocus", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushboolean(L, gh && gh->hasFocus() ? 1 : 0);
             return 1;

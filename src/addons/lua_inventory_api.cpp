@@ -2351,33 +2351,33 @@ static int lua_GetInventorySlotInfo(lua_State* L) {
     // WoW inventory slots are 1-indexed
     struct SlotMap { const char* name; int id; const char* texture; };
     static const SlotMap mapping[] = {
-        {.name = "HEAD",          .id = 1,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Head"},
-        {.name = "NECK",          .id = 2,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Neck"},
-        {.name = "SHOULDER",      .id = 3,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Shoulder"},
-        {.name = "SHIRT",         .id = 4,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Shirt"},
-        {.name = "CHEST",         .id = 5,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Chest"},
-        {.name = "WAIST",         .id = 6,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Waist"},
-        {.name = "LEGS",          .id = 7,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Legs"},
-        {.name = "FEET",          .id = 8,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Feet"},
-        {.name = "WRIST",         .id = 9,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Wrists"},
-        {.name = "HANDS",        .id = 10,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Hands"},
-        {.name = "FINGER0",      .id = 11,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Finger"},
-        {.name = "FINGER1",      .id = 12,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Finger"},
-        {.name = "TRINKET0",     .id = 13,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Trinket"},
-        {.name = "TRINKET1",     .id = 14,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Trinket"},
-        {.name = "BACK",         .id = 15,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Chest"},
-        {.name = "MAINHAND",     .id = 16,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-MainHand"},
-        {.name = "SECONDARYHAND",.id = 17,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-SecondaryHand"},
-        {.name = "RANGED",       .id = 18,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Ranged"},
-        {.name = "TABARD",       .id = 19,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Tabard"},
+        {"HEAD",          1,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Head"},
+        {"NECK",          2,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Neck"},
+        {"SHOULDER",      3,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Shoulder"},
+        {"SHIRT",         4,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Shirt"},
+        {"CHEST",         5,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Chest"},
+        {"WAIST",         6,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Waist"},
+        {"LEGS",          7,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Legs"},
+        {"FEET",          8,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Feet"},
+        {"WRIST",         9,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Wrists"},
+        {"HANDS",        10,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Hands"},
+        {"FINGER0",      11,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Finger"},
+        {"FINGER1",      12,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Finger"},
+        {"TRINKET0",     13,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Trinket"},
+        {"TRINKET1",     14,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Trinket"},
+        {"BACK",         15,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Chest"},
+        {"MAINHAND",     16,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-MainHand"},
+        {"SECONDARYHAND",17,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-SecondaryHand"},
+        {"RANGED",       18,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Ranged"},
+        {"TABARD",       19,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Tabard"},
         // The bag buttons along the main bar ask for these by name at load, and
         // paperdollframe.lua does it in an OnLoad - so a gap here does not just
         // lose the bags, it loses the file.
-        {.name = "BAG0",         .id = 20,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"},
-        {.name = "BAG1",         .id = 21,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"},
-        {.name = "BAG2",         .id = 22,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"},
-        {.name = "BAG3",         .id = 23,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"},
-        {.name = "AMMO",          .id = 0,  .texture = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Ammo"},
+        {"BAG0",         20,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"},
+        {"BAG1",         21,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"},
+        {"BAG2",         22,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"},
+        {"BAG3",         23,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"},
+        {"AMMO",          0,  "Interface\\PaperDoll\\UI-PaperDoll-Slot-Ammo"},
     };
     for (const auto& m : mapping) {
         if (slot == m.name) {
@@ -3175,51 +3175,51 @@ static int lua_GetItemLink(lua_State* L) {
 
 void registerInventoryLuaAPI(lua_State* L) {
     static const struct { const char* name; lua_CFunction func; } api[] = {
-                {.name = "GetMoney",      .func = lua_GetMoney},
+                {"GetMoney",      lua_GetMoney},
                 // The money cursor. A drag of money is routed entirely by the
                 // interface - the frame it lands on reads the amount, puts it
                 // where it belongs, and clears the cursor - so the client's
                 // whole part is holding the number. It held nothing, so money
                 // could not be dragged into a mail, a trade, a guild bank
                 // deposit or an auction bid.
-                {.name = "GetCursorMoney", .func = [](lua_State* L) -> int {
+                {"GetCursorMoney", [](lua_State* L) -> int {
             lua_pushnumber(L, static_cast<lua_Number>(cursorMoney()));
             return 1;
         }},
-                {.name = "DropCursorMoney", .func = [](lua_State* L) -> int {
+                {"DropCursorMoney", [](lua_State* L) -> int {
             setCursorMoney(L, 0);
             return 0;
         }},
-                {.name = "GetPlayerTradeMoney", .func = lua_GetPlayerTradeMoney},
-                {.name = "GetTargetTradeMoney", .func = lua_GetTargetTradeMoney},
-                {.name = "GetMerchantNumItems",  .func = lua_GetMerchantNumItems},
-                {.name = "GetMerchantItemInfo",  .func = lua_GetMerchantItemInfo},
-                {.name = "GetMerchantItemLink",  .func = lua_GetMerchantItemLink},
-                {.name = "CanMerchantRepair",    .func = lua_CanMerchantRepair},
-                {.name = "GetContainerItemCooldown",  .func = lua_GetContainerItemCooldown},
-                {.name = "GetBankSlotCost",        .func = lua_GetBankSlotCost},
-                {.name = "GetNumBankSlots",        .func = lua_GetNumBankSlots},
-                {.name = "GetInventoryAlertStatus",   .func = lua_GetInventoryAlertStatus},
-                {.name = "GetContainerItemQuestInfo", .func = lua_GetContainerItemQuestInfo},
-                {.name = "KeyRingButtonIDToInvSlotID", .func = lua_KeyRingButtonIDToInvSlotID},
-                {.name = "SetPortraitToTexture",  .func = lua_SetPortraitToTexture},
+                {"GetPlayerTradeMoney", lua_GetPlayerTradeMoney},
+                {"GetTargetTradeMoney", lua_GetTargetTradeMoney},
+                {"GetMerchantNumItems",  lua_GetMerchantNumItems},
+                {"GetMerchantItemInfo",  lua_GetMerchantItemInfo},
+                {"GetMerchantItemLink",  lua_GetMerchantItemLink},
+                {"CanMerchantRepair",    lua_CanMerchantRepair},
+                {"GetContainerItemCooldown",  lua_GetContainerItemCooldown},
+                {"GetBankSlotCost",        lua_GetBankSlotCost},
+                {"GetNumBankSlots",        lua_GetNumBankSlots},
+                {"GetInventoryAlertStatus",   lua_GetInventoryAlertStatus},
+                {"GetContainerItemQuestInfo", lua_GetContainerItemQuestInfo},
+                {"KeyRingButtonIDToInvSlotID", lua_KeyRingButtonIDToInvSlotID},
+                {"SetPortraitToTexture",  lua_SetPortraitToTexture},
                 // The "you can't do that when you're dead" line, which
                 // containerframe.lua and uiparent.lua raise when a panel is
                 // asked for while dead. A no-op meant the bags simply refused
                 // to open with nothing said about why.
-                {.name = "NotWhileDeadError", .func = [](lua_State* L) -> int {
+                {"NotWhileDeadError", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) {
                 gh->addUIError("You can't do that when you're dead.");
             }
             return 0;
         }},
-                {.name = "ShowContainerSellCursor", .func = lua_ContainerNoOp},
-                {.name = "ShowBuybackSellCursor", .func = lua_ContainerNoOp},
+                {"ShowContainerSellCursor", lua_ContainerNoOp},
+                {"ShowBuybackSellCursor", lua_ContainerNoOp},
                 // A left-click on a vendor's item goes here, and it was a
                 // no-op - so at a merchant only right-click bought anything.
                 // The cursor state lives in lua_action_api.cpp with everything
                 // else that picks up and puts down, so this hands off to it.
-                {.name = "PickupMerchantItem", .func = [](lua_State* L) -> int {
+                {"PickupMerchantItem", [](lua_State* L) -> int {
             pickupMerchantItem(L, static_cast<int>(luaL_optnumber(L, 1, 0)));
             return 0;
         }},
@@ -3230,7 +3230,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // them - and both live in lua_socket_api.cpp now with the rest
                 // of the socketing surface. Two registrations of one name would
                 // be settled by load order.
-                {.name = "SpellCanTargetItem",    .func = lua_SpellCanTargetItem},
+                {"SpellCanTargetItem",    lua_SpellCanTargetItem},
                 // CanGuildBankRepair() - whether the guild-repair button
                 // appears beside the merchant's own.
                 //
@@ -3243,7 +3243,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 //
                 // RepairAllItems already sends the guild flag, so this gate was
                 // the whole of what was missing.
-                {.name = "CanGuildBankRepair", .func = [](lua_State* L) -> int {
+                {"CanGuildBankRepair", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh || gh->getGuildBankData().money == 0) { return luaReturnFalse(L); }
             const auto& roster = gh->getGuildRoster();
@@ -3259,28 +3259,28 @@ void registerInventoryLuaAPI(lua_State* L) {
             }
             return luaReturnFalse(L);
         }},
-                {.name = "GetBuybackItemInfo",      .func = lua_GetBuybackItemInfo},
-                {.name = "GetBuybackItemLink",      .func = lua_GetBuybackItemLink},
-                {.name = "BuybackItem",             .func = lua_BuybackItem},
-                {.name = "GetRepairAllCost",        .func = lua_GetRepairAllCost},
-                {.name = "CloseMerchant",           .func = lua_CloseMerchant},
-                {.name = "GetMerchantItemMaxStack", .func = lua_GetMerchantItemMaxStack},
-                {.name = "GetMerchantItemCostInfo", .func = lua_GetMerchantItemCostInfo},
-                {.name = "GetMerchantItemCostItem", .func = lua_GetMerchantItemCostItem},
-                {.name = "GetItemInfo",       .func = lua_GetItemInfo},
-                {.name = "__WoweeTryOn",   .func = lua_WoweeTryOn},
-                {.name = "__WoweeSetModelCreature", .func = lua_WoweeSetModelCreature},
-                {.name = "__WoweeUndress", .func = lua_WoweeUndress},
-                {.name = "IsDressableItem",   .func = lua_IsDressableItem},
-                {.name = "GetItemQualityColor", .func = lua_GetItemQualityColor},
-                {.name = "_GetItemTooltipData", .func = lua_GetItemTooltipData},
+                {"GetBuybackItemInfo",      lua_GetBuybackItemInfo},
+                {"GetBuybackItemLink",      lua_GetBuybackItemLink},
+                {"BuybackItem",             lua_BuybackItem},
+                {"GetRepairAllCost",        lua_GetRepairAllCost},
+                {"CloseMerchant",           lua_CloseMerchant},
+                {"GetMerchantItemMaxStack", lua_GetMerchantItemMaxStack},
+                {"GetMerchantItemCostInfo", lua_GetMerchantItemCostInfo},
+                {"GetMerchantItemCostItem", lua_GetMerchantItemCostItem},
+                {"GetItemInfo",       lua_GetItemInfo},
+                {"__WoweeTryOn",   lua_WoweeTryOn},
+                {"__WoweeSetModelCreature", lua_WoweeSetModelCreature},
+                {"__WoweeUndress", lua_WoweeUndress},
+                {"IsDressableItem",   lua_IsDressableItem},
+                {"GetItemQualityColor", lua_GetItemQualityColor},
+                {"_GetItemTooltipData", lua_GetItemTooltipData},
                 // GetItemSpell(item) → spellName, spellRank
                 //
                 // The "Use:" spell on an item, which is what /use and the chat
                 // macro parser look for to tell a usable item from an inert
                 // one. Trigger 0 is on-use; equip and proc effects are not what
                 // is being asked for.
-                {.name = "GetItemSpell", .func = [](lua_State* L) -> int {
+                {"GetItemSpell", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return luaReturnNil(L);
             // Either an item id or a name, as everywhere else an item is named.
@@ -3316,12 +3316,12 @@ void registerInventoryLuaAPI(lua_State* L) {
             return luaReturnNil(L);
         }},
                 // ---- Currency tab ----
-                {.name = "GetContainerItemPurchaseInfo", .func = lua_GetContainerItemPurchaseInfo},
-                {.name = "GetContainerItemPurchaseItem", .func = lua_GetContainerItemPurchaseItem},
+                {"GetContainerItemPurchaseInfo", lua_GetContainerItemPurchaseInfo},
+                {"GetContainerItemPurchaseItem", lua_GetContainerItemPurchaseItem},
                 // ContainerRefundItemPurchase(bag, slot) - the Accept on
                 // "hand this back for what you paid". It sat on a popup that
                 // could not be raised, because the call above answered nil.
-                {.name = "ContainerRefundItemPurchase", .func = [](lua_State* L) -> int {
+                {"ContainerRefundItemPurchase", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int bag = static_cast<int>(luaL_optnumber(L, 1, 0));
             const int slot = static_cast<int>(luaL_optnumber(L, 2, 0));
@@ -3332,7 +3332,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // Clamped to what the player has: the dialog does not check,
                 // and a cursor carrying more than the purse would be spent by
                 // whatever it was dropped on.
-                {.name = "PickupPlayerMoney", .func = [](lua_State* L) -> int {
+                {"PickupPlayerMoney", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const double asked = luaL_optnumber(L, 1, 0);
             if (!gh || asked <= 0) { setCursorMoney(L, 0); return 0; }
@@ -3341,18 +3341,18 @@ void registerInventoryLuaAPI(lua_State* L) {
             setCursorMoney(L, want < have ? want : have);
             return 0;
         }},
-                {.name = "PickupTradeMoney",        .func = lua_PickupTradeMoney},
-                {.name = "PickupSendMailMoney",     .func = lua_PickupSendMailMoney},
-                {.name = "PickupSendMailCOD",       .func = lua_MoneyCursorNoop},
-                {.name = "PickupGuildBankMoney",    .func = lua_MoneyCursorNoop},
-                {.name = "AddTradeMoney",           .func = lua_AddTradeMoney},
-                {.name = "GetCurrencyListSize", .func = [](lua_State* L) -> int {
+                {"PickupTradeMoney",        lua_PickupTradeMoney},
+                {"PickupSendMailMoney",     lua_PickupSendMailMoney},
+                {"PickupSendMailCOD",       lua_MoneyCursorNoop},
+                {"PickupGuildBankMoney",    lua_MoneyCursorNoop},
+                {"AddTradeMoney",           lua_AddTradeMoney},
+                {"GetCurrencyListSize", [](lua_State* L) -> int {
             lua_pushnumber(L, static_cast<lua_Number>(buildCurrencyList(L).size()));
             return 1;
         }},
                 // GetCurrencyListInfo(index) → name, isHeader, isExpanded,
                 //   isUnused, isWatched, count, extraCurrencyType, icon, itemID
-                {.name = "GetCurrencyListInfo", .func = [](lua_State* L) -> int {
+                {"GetCurrencyListInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int idx = static_cast<int>(luaL_optnumber(L, 1, 0));
             const auto rows = buildCurrencyList(L);
@@ -3382,78 +3382,78 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // Nothing is pinned to the backpack: that is a saved choice the
                 // client does not keep, and answering with the whole list would
                 // put every currency under the bags.
-                {.name = "GetBackpackCurrencyInfo", .func = [](lua_State* L) -> int { return luaReturnNil(L); }},
+                {"GetBackpackCurrencyInfo", [](lua_State* L) -> int { return luaReturnNil(L); }},
                 // The three that change how the list is displayed. Each is a
                 // saved preference with nowhere to be saved, so they are
                 // accepted and forgotten rather than left to raise.
-                {.name = "ExpandCurrencyList",  .func = [](lua_State* L) -> int { (void)L; return 0; }},
-                {.name = "SetCurrencyBackpack", .func = [](lua_State* L) -> int { (void)L; return 0; }},
-                {.name = "SetCurrencyUnused",   .func = [](lua_State* L) -> int { (void)L; return 0; }},
-                {.name = "GetItemCount",      .func = lua_GetItemCount},
-                {.name = "UseContainerItem",  .func = lua_UseContainerItem},
+                {"ExpandCurrencyList",  [](lua_State* L) -> int { (void)L; return 0; }},
+                {"SetCurrencyBackpack", [](lua_State* L) -> int { (void)L; return 0; }},
+                {"SetCurrencyUnused",   [](lua_State* L) -> int { (void)L; return 0; }},
+                {"GetItemCount",      lua_GetItemCount},
+                {"UseContainerItem",  lua_UseContainerItem},
                 // SortBags() - merge partial stacks, then order every bag slot.
                 //
                 // Not a 3.3.5 function: sorting arrived years later, so nothing
                 // in FrameXML calls this. It is here for the bundled all-bags
                 // addon, and it is the same sort this client's own bag window
                 // has always had rather than a second implementation of it.
-                {.name = "SortBags", .func = [](lua_State* L) -> int {
+                {"SortBags", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->sortBags();
             return 0;
         }},
                 // Whether that sort is still sending its moves, so a button can
                 // say so rather than looking dead while dozens of swaps go out
                 // a tick at a time.
-                {.name = "IsSortingBags", .func = [](lua_State* L) -> int {
+                {"IsSortingBags", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushboolean(L, (gh && gh->isSortingItems()) ? 1 : 0);
             return 1;
         }},
-                {.name = "GetContainerNumSlots",    .func = lua_GetContainerNumSlots},
-                {.name = "GetKeyRingSize",          .func = lua_GetKeyRingSize},
+                {"GetContainerNumSlots",    lua_GetContainerNumSlots},
+                {"GetKeyRingSize",          lua_GetKeyRingSize},
                 // PurchaseSlot() - buying the next bank bag slot, which the
                 // confirmation dialog's Okay calls. Unbound, so the dialog
                 // asked, took the answer and bought nothing. GetBankSlotCost
                 // and GetNumBankSlots beside it were both already bound, which
                 // is what let the dialog price the slot it could not buy.
-                {.name = "PurchaseSlot", .func = [](lua_State* L) -> int {
+                {"PurchaseSlot", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->buyBankSlot();
             return 0;
         }},
-                {.name = "ContainerIDToInventoryID", .func = lua_ContainerIDToInventoryID},
-                {.name = "PutItemInBackpack",       .func = lua_PutItemInBackpack},
-                {.name = "GetBagName",              .func = lua_GetBagName},
-                {.name = "SetBagPortraitTexture",   .func = lua_SetBagPortraitTexture},
-                {.name = "PutItemInBag",            .func = lua_PutItemInBag},
-                {.name = "ResetCursor",             .func = lua_ResetCursor},
-                {.name = "GetContainerItemID",    .func = lua_GetContainerItemID},
-                {.name = "GetContainerFreeSlots", .func = lua_GetContainerFreeSlots},
-                {.name = "GetLatestThreeSenders", .func = lua_GetLatestThreeSenders},
-                {.name = "PickupEquipmentSetByName", .func = lua_PickupEquipmentSetByName},
-                {.name = "GetContainerItemDurability", .func = lua_GetContainerItemDurability},
-                {.name = "GetContainerItemGems",  .func = lua_ItemGemsNone},
-                {.name = "GetInventoryItemGems",  .func = lua_ItemGemsNone},
-                {.name = "GetContainerItemInfo",    .func = lua_GetContainerItemInfo},
-                {.name = "GetContainerItemLink",    .func = lua_GetContainerItemLink},
-                {.name = "GetContainerNumFreeSlots", .func = lua_GetContainerNumFreeSlots},
-                {.name = "GetInventorySlotInfo",    .func = lua_GetInventorySlotInfo},
-                {.name = "GetInventoryItemLink",    .func = lua_GetInventoryItemLink},
-                {.name = "GetInventoryItemCount",   .func = lua_GetInventoryItemCount},
+                {"ContainerIDToInventoryID", lua_ContainerIDToInventoryID},
+                {"PutItemInBackpack",       lua_PutItemInBackpack},
+                {"GetBagName",              lua_GetBagName},
+                {"SetBagPortraitTexture",   lua_SetBagPortraitTexture},
+                {"PutItemInBag",            lua_PutItemInBag},
+                {"ResetCursor",             lua_ResetCursor},
+                {"GetContainerItemID",    lua_GetContainerItemID},
+                {"GetContainerFreeSlots", lua_GetContainerFreeSlots},
+                {"GetLatestThreeSenders", lua_GetLatestThreeSenders},
+                {"PickupEquipmentSetByName", lua_PickupEquipmentSetByName},
+                {"GetContainerItemDurability", lua_GetContainerItemDurability},
+                {"GetContainerItemGems",  lua_ItemGemsNone},
+                {"GetInventoryItemGems",  lua_ItemGemsNone},
+                {"GetContainerItemInfo",    lua_GetContainerItemInfo},
+                {"GetContainerItemLink",    lua_GetContainerItemLink},
+                {"GetContainerNumFreeSlots", lua_GetContainerNumFreeSlots},
+                {"GetInventorySlotInfo",    lua_GetInventorySlotInfo},
+                {"GetInventoryItemLink",    lua_GetInventoryItemLink},
+                {"GetInventoryItemCount",   lua_GetInventoryItemCount},
                 // How many rows the buyback tab has. The merchant window walks
                 // this to build the tab, and without it the tab was empty even
                 // with items sitting in the buyback ring the client tracks.
-                {.name = "GetNumBuybackItems", .func = [](lua_State* L) -> int {
+                {"GetNumBuybackItems", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? static_cast<lua_Number>(gh->getBuybackItems().size()) : 0);
             return 1;
         }},
-                {.name = "GetInventoryItemID",      .func = lua_GetInventoryItemID},
-                {.name = "GetInventoryItemTexture", .func = lua_GetInventoryItemTexture},
-                {.name = "GetItemLink",          .func = lua_GetItemLink},
-                {.name = "GetNumLootItems",     .func = lua_GetNumLootItems},
-                {.name = "GetLootSlotInfo",     .func = lua_GetLootSlotInfo},
-                {.name = "GetLootSlotLink",     .func = lua_GetLootSlotLink},
-                {.name = "LootSlot",            .func = lua_LootSlot},
+                {"GetInventoryItemID",      lua_GetInventoryItemID},
+                {"GetInventoryItemTexture", lua_GetInventoryItemTexture},
+                {"GetItemLink",          lua_GetItemLink},
+                {"GetNumLootItems",     lua_GetNumLootItems},
+                {"GetLootSlotInfo",     lua_GetLootSlotInfo},
+                {"GetLootSlotLink",     lua_GetLootSlotLink},
+                {"LootSlot",            lua_LootSlot},
                 // ConfirmLootSlot(slot) - the Accept on "this will bind to
                 // you", raised from LOOT_BIND_CONFIRM.
                 //
@@ -3461,7 +3461,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // answering it that way asks the same question forever. The
                 // held request is sent instead, and the slot the dialog passes
                 // is not read - only one can be waiting.
-                {.name = "ConfirmLootSlot", .func = [](lua_State* L) -> int {
+                {"ConfirmLootSlot", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->confirmPendingLoot();
             return 0;
         }},
@@ -3492,11 +3492,11 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // The same held request ReplaceEnchant answers: only one
                 // enchant can be waiting, and the two prompts are raised from
                 // the same place for the same pending cast.
-                {.name = "BindEnchant", .func = [](lua_State* L) -> int {
+                {"BindEnchant", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->replaceEnchant();
             return 0;
         }},
-                {.name = "ReplaceEnchant", .func = [](lua_State* L) -> int {
+                {"ReplaceEnchant", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->replaceEnchant();
             return 0;
         }},
@@ -3506,7 +3506,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 //
                 // MAIL_UNLOCK_SEND_ITEMS either way: the lock is the dialog
                 // being up, and it comes down whichever button was pressed.
-                {.name = "RespondMailLockSendItem", .func = [](lua_State* L) -> int {
+                {"RespondMailLockSendItem", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int slot = static_cast<int>(luaL_optnumber(L, 1, 0));
             const bool keep = lua_toboolean(L, 2) != 0;
@@ -3515,74 +3515,74 @@ void registerInventoryLuaAPI(lua_State* L) {
             gh->fireAddonEvent("MAIL_UNLOCK_SEND_ITEMS", {});
             return 0;
         }},
-                {.name = "ConfirmBindOnUse", .func = [](lua_State* L) -> int {
+                {"ConfirmBindOnUse", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->confirmBindOnUse();
             return 0;
         }},
-                {.name = "EquipPendingItem", .func = [](lua_State* L) -> int {
+                {"EquipPendingItem", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->equipPendingItem();
             return 0;
         }},
-                {.name = "CancelPendingEquip", .func = [](lua_State* L) -> int {
+                {"CancelPendingEquip", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->cancelPendingEquip();
             return 0;
         }},
-                {.name = "SplitContainerItem",  .func = lua_SplitContainerItem},
-                {.name = "BankButtonIDToInvSlotID", .func = lua_BankButtonIDToInvSlotID},
-                {.name = "CloseBankFrame",      .func = lua_CloseBankFrame},
-                {.name = "GetInboxItem",        .func = lua_GetInboxItem},
-                {.name = "GetInboxItemLink",    .func = lua_GetInboxItemLink},
-                {.name = "TakeInboxItem",       .func = lua_TakeInboxItem},
-                {.name = "TakeInboxMoney",      .func = lua_TakeInboxMoney},
-                {.name = "DeleteInboxItem",     .func = lua_DeleteInboxItem},
-                {.name = "InboxItemCanDelete",  .func = lua_InboxItemCanDelete},
-                {.name = "AutoLootMailItem",    .func = lua_AutoLootMailItem},
-                {.name = "GetSendMailItem",     .func = lua_GetSendMailItem},
-                {.name = "CheckInbox",          .func = lua_CheckInbox},
-                {.name = "ReturnInboxItem",      .func = lua_ReturnInboxItem},
-                {.name = "GetCoinIcon",          .func = lua_GetCoinIcon},
-                {.name = "CloseMail",           .func = lua_CloseMail},
-                {.name = "SendMail",            .func = lua_SendMail},
-                {.name = "SetSendMailMoney",    .func = lua_SetSendMailMoney},
-                {.name = "SetSendMailCOD",      .func = lua_SetSendMailCOD},
-                {.name = "AddSendMailMoney",    .func = lua_AddSendMailMoney},
-                {.name = "AddSendMailCOD",      .func = lua_AddSendMailCOD},
-                {.name = "GetSendMailMoney",    .func = lua_GetSendMailMoney},
-                {.name = "GetSendMailCOD",      .func = lua_GetSendMailCOD},
-                {.name = "UseInventoryItem",    .func = lua_UseInventoryItem},
-                {.name = "GetInventoryItemDurability", .func = lua_GetInventoryItemDurability},
-                {.name = "UseItemByName",       .func = lua_UseItemByName},
-                {.name = "EquipItemByName",     .func = lua_EquipItemByName},
-                {.name = "IsEquippableItem",    .func = lua_IsEquippableItem},
-                {.name = "IsEquippedItem",      .func = lua_IsEquippedItem},
-                {.name = "GetInventoryItemsForSlot", .func = lua_GetInventoryItemsForSlot},
-                {.name = "GetNumEquipmentSets", .func = lua_GetNumEquipmentSets},
-                {.name = "GetEquipmentSetInfo", .func = lua_GetEquipmentSetInfo},
-                {.name = "GetEquipmentSetInfoByName", .func = lua_GetEquipmentSetInfoByName},
-                {.name = "GetEquipmentSetItemIDs", .func = lua_GetEquipmentSetItemIDs},
-                {.name = "SaveEquipmentSet",    .func = lua_SaveEquipmentSet},
-                {.name = "DeleteEquipmentSet",  .func = lua_DeleteEquipmentSet},
-                {.name = "UseEquipmentSet",     .func = lua_UseEquipmentSet},
-                {.name = "EquipmentSetContainsLockedItems", .func = lua_EquipmentSetContainsLockedItems},
-                {.name = "EquipmentManagerIgnoreSlotForSave",   .func = lua_EquipmentManagerIgnoreSlotForSave},
-                {.name = "EquipmentManagerUnignoreSlotForSave", .func = lua_EquipmentManagerUnignoreSlotForSave},
-                {.name = "EquipmentManagerClearIgnoredSlotsForSave", .func = lua_EquipmentManagerClearIgnoredSlotsForSave},
-                {.name = "LootSlotIsCoin",      .func = lua_LootSlotIsCoin},
-                {.name = "LootSlotIsItem",      .func = lua_LootSlotIsItem},
-                {.name = "IsFishingLoot",       .func = lua_IsFishingLoot},
-                {.name = "CloseLoot",           .func = lua_CloseLoot},
-                {.name = "GiveMasterLoot",      .func = lua_GiveMasterLoot},
-                {.name = "GetLootRollItemInfo", .func = lua_GetLootRollItemInfo},
-                {.name = "GetLootRollItemLink", .func = lua_GetLootRollItemLink},
-                {.name = "GetLootRollTimeLeft", .func = lua_GetLootRollTimeLeft},
-                {.name = "RollOnLoot",          .func = lua_RollOnLoot},
-                {.name = "ConfirmLootRoll",     .func = lua_ConfirmLootRoll},
-                {.name = "GetLootMethod",       .func = lua_GetLootMethod},
-                {.name = "GetMasterLootCandidate", .func = lua_GetMasterLootCandidate},
-                {.name = "GetLootThreshold",    .func = lua_GetLootThreshold},
-                {.name = "GetTabardCreationCost", .func = lua_GetTabardCreationCost},
-                {.name = "GetSendMailPrice",    .func = lua_GetSendMailPrice},
-                {.name = "BuyMerchantItem", .func = [](lua_State* L) -> int {
+                {"SplitContainerItem",  lua_SplitContainerItem},
+                {"BankButtonIDToInvSlotID", lua_BankButtonIDToInvSlotID},
+                {"CloseBankFrame",      lua_CloseBankFrame},
+                {"GetInboxItem",        lua_GetInboxItem},
+                {"GetInboxItemLink",    lua_GetInboxItemLink},
+                {"TakeInboxItem",       lua_TakeInboxItem},
+                {"TakeInboxMoney",      lua_TakeInboxMoney},
+                {"DeleteInboxItem",     lua_DeleteInboxItem},
+                {"InboxItemCanDelete",  lua_InboxItemCanDelete},
+                {"AutoLootMailItem",    lua_AutoLootMailItem},
+                {"GetSendMailItem",     lua_GetSendMailItem},
+                {"CheckInbox",          lua_CheckInbox},
+                {"ReturnInboxItem",      lua_ReturnInboxItem},
+                {"GetCoinIcon",          lua_GetCoinIcon},
+                {"CloseMail",           lua_CloseMail},
+                {"SendMail",            lua_SendMail},
+                {"SetSendMailMoney",    lua_SetSendMailMoney},
+                {"SetSendMailCOD",      lua_SetSendMailCOD},
+                {"AddSendMailMoney",    lua_AddSendMailMoney},
+                {"AddSendMailCOD",      lua_AddSendMailCOD},
+                {"GetSendMailMoney",    lua_GetSendMailMoney},
+                {"GetSendMailCOD",      lua_GetSendMailCOD},
+                {"UseInventoryItem",    lua_UseInventoryItem},
+                {"GetInventoryItemDurability", lua_GetInventoryItemDurability},
+                {"UseItemByName",       lua_UseItemByName},
+                {"EquipItemByName",     lua_EquipItemByName},
+                {"IsEquippableItem",    lua_IsEquippableItem},
+                {"IsEquippedItem",      lua_IsEquippedItem},
+                {"GetInventoryItemsForSlot", lua_GetInventoryItemsForSlot},
+                {"GetNumEquipmentSets", lua_GetNumEquipmentSets},
+                {"GetEquipmentSetInfo", lua_GetEquipmentSetInfo},
+                {"GetEquipmentSetInfoByName", lua_GetEquipmentSetInfoByName},
+                {"GetEquipmentSetItemIDs", lua_GetEquipmentSetItemIDs},
+                {"SaveEquipmentSet",    lua_SaveEquipmentSet},
+                {"DeleteEquipmentSet",  lua_DeleteEquipmentSet},
+                {"UseEquipmentSet",     lua_UseEquipmentSet},
+                {"EquipmentSetContainsLockedItems", lua_EquipmentSetContainsLockedItems},
+                {"EquipmentManagerIgnoreSlotForSave",   lua_EquipmentManagerIgnoreSlotForSave},
+                {"EquipmentManagerUnignoreSlotForSave", lua_EquipmentManagerUnignoreSlotForSave},
+                {"EquipmentManagerClearIgnoredSlotsForSave", lua_EquipmentManagerClearIgnoredSlotsForSave},
+                {"LootSlotIsCoin",      lua_LootSlotIsCoin},
+                {"LootSlotIsItem",      lua_LootSlotIsItem},
+                {"IsFishingLoot",       lua_IsFishingLoot},
+                {"CloseLoot",           lua_CloseLoot},
+                {"GiveMasterLoot",      lua_GiveMasterLoot},
+                {"GetLootRollItemInfo", lua_GetLootRollItemInfo},
+                {"GetLootRollItemLink", lua_GetLootRollItemLink},
+                {"GetLootRollTimeLeft", lua_GetLootRollTimeLeft},
+                {"RollOnLoot",          lua_RollOnLoot},
+                {"ConfirmLootRoll",     lua_ConfirmLootRoll},
+                {"GetLootMethod",       lua_GetLootMethod},
+                {"GetMasterLootCandidate", lua_GetMasterLootCandidate},
+                {"GetLootThreshold",    lua_GetLootThreshold},
+                {"GetTabardCreationCost", lua_GetTabardCreationCost},
+                {"GetSendMailPrice",    lua_GetSendMailPrice},
+                {"BuyMerchantItem", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             int index = static_cast<int>(luaL_checknumber(L, 1));
             int count = static_cast<int>(luaL_optnumber(L, 2, 1));
@@ -3593,7 +3593,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             gh->buyItem(gh->getVendorGuid(), vi.itemId, vi.slot, count);
             return 0;
         }},
-                {.name = "SellContainerItem", .func = [](lua_State* L) -> int {
+                {"SellContainerItem", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             int bag = static_cast<int>(luaL_checknumber(L, 1));
             int slot = static_cast<int>(luaL_checknumber(L, 2));
@@ -3602,7 +3602,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             else if (bag >= 1 && bag <= 4) gh->sellItemInBag(bag - 1, slot - 1);
             return 0;
         }},
-                {.name = "RepairAllItems", .func = [](lua_State* L) -> int {
+                {"RepairAllItems", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh && gh->getVendorItems().canRepair) {
                 bool useGuildBank = lua_toboolean(L, 1) != 0;
@@ -3610,24 +3610,24 @@ void registerInventoryLuaAPI(lua_State* L) {
             }
             return 0;
         }},
-                {.name = "UnequipItemSlot", .func = [](lua_State* L) -> int {
+                {"UnequipItemSlot", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             int slot = static_cast<int>(luaL_checknumber(L, 1));
             if (gh && slot >= 1 && slot <= 19)
                 gh->unequipToBackpack(static_cast<game::EquipSlot>(slot - 1));
             return 0;
         }},
-                {.name = "AcceptTrade", .func = [](lua_State* L) -> int {
+                {"AcceptTrade", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->acceptTrade();
             return 0;
         }},
-                {.name = "CancelTrade", .func = [](lua_State* L) -> int {
+                {"CancelTrade", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh && gh->isTradeOpen()) gh->cancelTrade();
             return 0;
         }},
-                {.name = "InitiateTrade", .func = [](lua_State* L) -> int {
+                {"InitiateTrade", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* uid = luaL_checkstring(L, 1);
             if (gh) {
@@ -3641,13 +3641,13 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // The client opens it, queries a tab, moves items and money in
                 // and out, and holds what came back. None of it reached the
                 // interface.
-                {.name = "GetGuildBankMoney", .func = [](lua_State* L) -> int {
+                {"GetGuildBankMoney", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? static_cast<double>(
                 gh->getGuildBankData().money) : 0.0);
             return 1;
         }},
-                {.name = "GetGuildBankWithdrawMoney", .func = [](lua_State* L) -> int {
+                {"GetGuildBankWithdrawMoney", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             // -1 is the server saying "no limit", and the panel reads that as
             // a number to compare against - a large one keeps the comparison
@@ -3656,18 +3656,18 @@ void registerInventoryLuaAPI(lua_State* L) {
             lua_pushnumber(L, w < 0 ? 100000000.0 : static_cast<double>(w));
             return 1;
         }},
-                {.name = "CanWithdrawGuildBankMoney", .func = [](lua_State* L) -> int {
+                {"CanWithdrawGuildBankMoney", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int32_t w = gh ? gh->getGuildBankData().withdrawAmount : 0;
             lua_pushboolean(L, (w != 0) ? 1 : 0);
             return 1;
         }},
-                {.name = "GetCurrentGuildBankTab", .func = [](lua_State* L) -> int {
+                {"GetCurrentGuildBankTab", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? (gh->getGuildBankActiveTab() + 1) : 1);
             return 1;
         }},
-                {.name = "SetCurrentGuildBankTab", .func = [](lua_State* L) -> int {
+                {"SetCurrentGuildBankTab", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab = static_cast<int>(luaL_optnumber(L, 1, 1));
             if (gh && tab >= 1) {
@@ -3675,7 +3675,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             }
             return 0;
         }},
-                {.name = "QueryGuildBankTab", .func = [](lua_State* L) -> int {
+                {"QueryGuildBankTab", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab = static_cast<int>(luaL_optnumber(L, 1, 1));
             if (gh && tab >= 1) gh->queryGuildBankTab(static_cast<uint8_t>(tab - 1));
@@ -3688,14 +3688,14 @@ void registerInventoryLuaAPI(lua_State* L) {
                 //
                 // The list it counts is the same one GetGuildBankTabInfo
                 // indexes, so the two cannot disagree.
-                {.name = "GetNumGuildBankTabs", .func = [](lua_State* L) -> int {
+                {"GetNumGuildBankTabs", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? static_cast<lua_Number>(gh->getGuildBankData().tabs.size()) : 0);
             return 1;
         }},
                 // GetGuildBankTabInfo(tab) → name, icon, viewable, canDeposit,
                 //                            numWithdrawals, remaining
-                {.name = "GetGuildBankTabInfo", .func = [](lua_State* L) -> int {
+                {"GetGuildBankTabInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab = static_cast<int>(luaL_optnumber(L, 1, 0));
             const auto* tabs = gh ? &gh->getGuildBankData().tabs : nullptr;
@@ -3732,7 +3732,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             return 6;
         }},
                 // GetGuildBankItemInfo(tab, slot) → texture, count, locked
-                {.name = "GetGuildBankItemInfo", .func = [](lua_State* L) -> int {
+                {"GetGuildBankItemInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab  = static_cast<int>(luaL_optnumber(L, 1, 0));
             const int slot = static_cast<int>(luaL_optnumber(L, 2, 0));
@@ -3751,7 +3751,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             return 3;
         }},
                 // GetGuildBankItemLink(tab, slot) → hyperlink
-                {.name = "GetGuildBankItemLink", .func = [](lua_State* L) -> int {
+                {"GetGuildBankItemLink", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab  = static_cast<int>(luaL_optnumber(L, 1, 0));
             const int slot = static_cast<int>(luaL_optnumber(L, 2, 0));
@@ -3776,23 +3776,23 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // withdraw and deposit packets move an item straight to or
                 // from a bag. AutoStoreGuildBankItem does that and works;
                 // these two say nothing rather than half-moving something.
-                {.name = "CloseGuildBankFrame", .func = [](lua_State* L) -> int {
+                {"CloseGuildBankFrame", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->closeGuildBank();
             return 0;
         }},
-                {.name = "DepositGuildBankMoney", .func = [](lua_State* L) -> int {
+                {"DepositGuildBankMoney", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->depositGuildBankMoney(
                 static_cast<uint32_t>(luaL_optnumber(L, 1, 0)));
             return 0;
         }},
-                {.name = "WithdrawGuildBankMoney", .func = [](lua_State* L) -> int {
+                {"WithdrawGuildBankMoney", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->withdrawGuildBankMoney(
                 static_cast<uint32_t>(luaL_optnumber(L, 1, 0)));
             return 0;
         }},
-                {.name = "AutoStoreGuildBankItem", .func = [](lua_State* L) -> int {
+                {"AutoStoreGuildBankItem", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab  = static_cast<int>(luaL_optnumber(L, 1, 1));
             const int slot = static_cast<int>(luaL_optnumber(L, 2, 1));
@@ -3808,7 +3808,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // comment that used to sit here said otherwise, and answering
                 // no meant a guild master was offered none of what is theirs.
                 // Rank zero is the guild master; an unknown rank is not.
-                {.name = "IsGuildLeader", .func = [](lua_State* L) -> int {
+                {"IsGuildLeader", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushboolean(L, gh && gh->getPlayerGuildRankIndex() == 0 ? 1 : 0);
             return 1;
@@ -3820,7 +3820,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // This accepted the ask and sent nothing, so the walk below
                 // always found none - an empty page over a log the server
                 // keeps. Tab seven in FrameXML's numbering is the money log.
-                {.name = "QueryGuildBankLog", .func = [](lua_State* L) -> int {
+                {"QueryGuildBankLog", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab = static_cast<int>(luaL_optnumber(L, 1, 1));
             if (gh && tab >= 1) gh->requestGuildBankLog(static_cast<uint8_t>(tab - 1));
@@ -3828,7 +3828,7 @@ void registerInventoryLuaAPI(lua_State* L) {
         }},
                 // Ask for a tab's info text. The panel calls this when a tab is
                 // opened and reads the answer with GetGuildBankText below.
-                {.name = "QueryGuildBankText",  .func = [](lua_State* L) -> int {
+                {"QueryGuildBankText",  [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (gh && tab >= 1) gh->queryGuildBankText(static_cast<uint8_t>(tab - 1));
@@ -3838,7 +3838,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // has answered for yet. Still nil rather than "": the panel
                 // does `if ( text )` and its else branch clears the box, so an
                 // empty string would claim to know the tab has none.
-                {.name = "GetGuildBankText",    .func = [](lua_State* L) -> int {
+                {"GetGuildBankText",    [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (gh && tab >= 1) {
@@ -3853,7 +3853,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // edit box saved nothing. FrameXML counts tabs from one and
                 // the wire counts from zero, the same offset
                 // GetCurrentGuildBankTab already applies in reverse.
-                {.name = "SetGuildBankText", .func = [](lua_State* L) -> int {
+                {"SetGuildBankText", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab = static_cast<int>(luaL_optnumber(L, 1, 0));
             const char* text = luaL_optstring(L, 2, "");
@@ -3861,7 +3861,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 gh->setGuildBankTabText(static_cast<uint8_t>(tab - 1), text ? text : "");
             return 0;
         }},
-                {.name = "GetNumGuildBankTransactions", .func = [](lua_State* L) -> int {
+                {"GetNumGuildBankTransactions", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab = static_cast<int>(luaL_optnumber(L, 1, 1));
             lua_pushnumber(L, (gh && tab >= 1)
@@ -3869,7 +3869,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 : 0);
             return 1;
         }},
-                {.name = "GetNumGuildBankMoneyTransactions", .func = [](lua_State* L) -> int {
+                {"GetNumGuildBankMoneyTransactions", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh
                 ? static_cast<lua_Number>(gh->getGuildBankLog(kGuildBankMoneyTab).size())
@@ -3877,7 +3877,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             return 1;
         }},
                 // type, name, itemLink, count, tab1, tab2, year, month, day, hour
-                {.name = "GetGuildBankTransaction", .func = [](lua_State* L) -> int {
+                {"GetGuildBankTransaction", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab = static_cast<int>(luaL_optnumber(L, 1, 1));
             const int index = static_cast<int>(luaL_optnumber(L, 2, 0));
@@ -3896,7 +3896,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             return 10;
         }},
                 // type, name, amount, year, month, day, hour
-                {.name = "GetGuildBankMoneyTransaction", .func = [](lua_State* L) -> int {
+                {"GetGuildBankMoneyTransaction", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh || index < 1) return 0;
@@ -3936,7 +3936,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // no emblem chosen. The guild bank guards for that and falls
                 // back to its own default background - so a wrong name would be
                 // worse than no name, since a non-nil one stops that fallback.
-                {.name = "GetGuildTabardFileNames", .func = [](lua_State* L) -> int {
+                {"GetGuildTabardFileNames", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const auto& g = gh->getGuildQueryData();
@@ -3975,14 +3975,14 @@ void registerInventoryLuaAPI(lua_State* L) {
                 //
                 // AzerothCore does not gate the rename by rank at all, so this
                 // is the client being stricter than the server, as retail is.
-                {.name = "CanEditGuildTabInfo", .func = [](lua_State* L) -> int {
+                {"CanEditGuildTabInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushboolean(L, gh && gh->getPlayerGuildRankIndex() == 0 ? 1 : 0);
             return 1;
         }},
                 // SetGuildBankTabInfo(tab, name, icon) - the rename popup's
                 // Okay. The tab is FrameXML's, counted from one.
-                {.name = "SetGuildBankTabInfo", .func = [](lua_State* L) -> int {
+                {"SetGuildBankTabInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int tab = static_cast<int>(luaL_optnumber(L, 1, 0));
             const char* name = luaL_optstring(L, 2, "");
@@ -4003,7 +4003,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // anything the server sends, and AzerothCore's defaults are the
                 // same figures - 100g, 250g, 500g, 1000g, 2500g, 5000g - though
                 // Guild.BankTabCost0-5 can be configured away from them.
-                {.name = "GetGuildBankTabCost", .func = [](lua_State* L) -> int {
+                {"GetGuildBankTabCost", [](lua_State* L) -> int {
             static constexpr uint32_t kTabCost[6] = {
                 1000000u, 2500000u, 5000000u, 10000000u, 25000000u, 50000000u
             };
@@ -4018,7 +4018,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // The listing half was already here; these are the calls that
                 // search, bid, sell and cancel, all of which the client can
                 // send and none of which the interface could reach.
-                {.name = "CanSendAuctionQuery", .func = [](lua_State* L) -> int {
+                {"CanSendAuctionQuery", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             // Two returns: whether a search may be sent, and whether a
             // getAll sweep may be. The second is always no - it asks the
@@ -4031,7 +4031,7 @@ void registerInventoryLuaAPI(lua_State* L) {
         }},
                 // QueryAuctionItems(name, minLevel, maxLevel, invType, class,
                 //                   subclass, page, isUsable, quality)
-                {.name = "QueryAuctionItems", .func = [](lua_State* L) -> int {
+                {"QueryAuctionItems", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const char* name = luaL_optstring(L, 1, "");
@@ -4087,17 +4087,17 @@ void registerInventoryLuaAPI(lua_State* L) {
                               page * 50, wireAuctionSort("list"));
             return 0;
         }},
-                {.name = "GetOwnerAuctionItems", .func = [](lua_State* L) -> int {
+                {"GetOwnerAuctionItems", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->auctionListOwnerItems(0);
             return 0;
         }},
-                {.name = "GetBidderAuctionItems", .func = [](lua_State* L) -> int {
+                {"GetBidderAuctionItems", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->auctionListBidderItems(0);
             return 0;
         }},
                 // PlaceAuctionBid(list, index, bid) - a bid equal to the
                 // buyout is a buyout, which is how the panel asks for one.
-                {.name = "PlaceAuctionBid", .func = [](lua_State* L) -> int {
+                {"PlaceAuctionBid", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* list = luaL_optstring(L, 1, "list");
             const int index = static_cast<int>(luaL_optnumber(L, 2, 0));
@@ -4113,7 +4113,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             }
             return 0;
         }},
-                {.name = "CancelAuction", .func = [](lua_State* L) -> int {
+                {"CancelAuction", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh) return 0;
@@ -4122,7 +4122,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             gh->auctionCancelItem(res.auctions[index - 1].auctionId);
             return 0;
         }},
-                {.name = "CanCancelAuction", .func = [](lua_State* L) -> int {
+                {"CanCancelAuction", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
             const auto* res = gh ? &gh->getAuctionOwnerResults() : nullptr;
@@ -4135,7 +4135,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             return 1;
         }},
                 // StartAuction(minBid, buyout, duration, stackSize, numStacks)
-                {.name = "StartAuction", .func = [](lua_State* L) -> int {
+                {"StartAuction", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const uint32_t bid = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             const uint32_t buy = static_cast<uint32_t>(luaL_optnumber(L, 2, 0));
@@ -4162,7 +4162,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // The sell slot: the item the player dropped on it, held here
                 // because it is the panel's own state until StartAuction sends
                 // it.
-                {.name = "ClickAuctionSellItemButton", .func = [](lua_State* L) -> int {
+                {"ClickAuctionSellItemButton", [](lua_State* L) -> int {
             // The slot had state and StartAuction read it, but nothing ever
             // set it: this was a no-op, so no item could be put up for auction
             // at all. What it needed was a drop target, and the cursor bridge
@@ -4188,12 +4188,12 @@ void registerInventoryLuaAPI(lua_State* L) {
             wowee::ui::frameXmlPutCursorDown();
             return 0;
         }},
-                {.name = "CancelSell", .func = [](lua_State* L) -> int {
+                {"CancelSell", [](lua_State* L) -> int {
             auctionSellSlot() = AuctionSellSlot{};
             (void)L;
             return 0;
         }},
-                {.name = "GetAuctionSellItemInfo", .func = [](lua_State* L) -> int {
+                {"GetAuctionSellItemInfo", [](lua_State* L) -> int {
             // name, texture, count, quality, canUse, price, pricePerUnit,
             // stackCount, totalCount - what the sell tab draws in its slot and
             // what its deposit and stack controls are figured from.
@@ -4230,7 +4230,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             lua_pushnumber(L, countItemInBags(gh, s.item.itemId));
             return 9;
         }},
-                {.name = "CloseAuctionHouse", .func = [](lua_State* L) -> int {
+                {"CloseAuctionHouse", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->closeAuctionHouse();
             return 0;
         }},
@@ -4253,7 +4253,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // A number is still accepted, because an addon written against
                 // the older shape of this binding would otherwise start raising
                 // where it used to work.
-                {.name = "SetAuctionsTabShowing", .func = [](lua_State* L) -> int {
+                {"SetAuctionsTabShowing", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             if (lua_isboolean(L, 1)) {
@@ -4265,11 +4265,11 @@ void registerInventoryLuaAPI(lua_State* L) {
             }
             return 0;
         }},
-                {.name = "SetSelectedAuctionItem", .func = [](lua_State* L) -> int {
+                {"SetSelectedAuctionItem", [](lua_State* L) -> int {
             auctionSelection() = static_cast<int>(luaL_optnumber(L, 2, 0));
             return 0;
         }},
-                {.name = "GetSelectedAuctionItem", .func = [](lua_State* L) -> int {
+                {"GetSelectedAuctionItem", [](lua_State* L) -> int {
             lua_pushnumber(L, auctionSelection());
             return 1;
         }},
@@ -4288,7 +4288,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 //
                 // It reported zero before, which was honest while the sell slot
                 // could not hold anything. It can now.
-                {.name = "CalculateAuctionDeposit", .func = [](lua_State* L) -> int {
+                {"CalculateAuctionDeposit", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             // The same duration the dropdown hands StartAuction, and in the
             // same 1..3 shape: read as minutes it made `blocks` zero below, so
@@ -4322,14 +4322,14 @@ void registerInventoryLuaAPI(lua_State* L) {
             return 1;
         }},
                 // Sorting is the panel's own, applied to what the server sent.
-                {.name = "SortAuctionSetSort", .func = [](lua_State* L) -> int {
+                {"SortAuctionSetSort", [](lua_State* L) -> int {
             const std::string which = luaL_optstring(L, 1, "list");
             const char* column = luaL_optstring(L, 2, "");
             if (!column || !*column) return 0;
             auctionSortState()[which].push_back({column, lua_toboolean(L, 3) != 0});
             return 0;
         }},
-                {.name = "SortAuctionClearSort", .func = [](lua_State* L) -> int {
+                {"SortAuctionClearSort", [](lua_State* L) -> int {
             auctionSortState()[luaL_optstring(L, 1, "list")].clear();
             return 0;
         }},
@@ -4337,7 +4337,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 //
                 // Index one is the primary, and the primary is the key set
                 // *last* - FrameXML pushes them least significant first.
-                {.name = "GetAuctionSort", .func = [](lua_State* L) -> int {
+                {"GetAuctionSort", [](lua_State* L) -> int {
             const auto& keys = auctionSortState()[luaL_optstring(L, 1, "list")];
             const int index = static_cast<int>(luaL_optnumber(L, 2, 1));
             if (index < 1 || index > static_cast<int>(keys.size())) return 0;
@@ -4348,7 +4348,7 @@ void registerInventoryLuaAPI(lua_State* L) {
         }},
                 // Applied least significant first, each pass stable, which is
                 // how a multi-column sort is built out of single-column ones.
-                {.name = "SortAuctionApplySort", .func = [](lua_State* L) -> int {
+                {"SortAuctionApplySort", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const std::string which = luaL_optstring(L, 1, "list");
             auto* list = auctionListForSort(gh, which);
@@ -4377,12 +4377,12 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // makes FrameXML's 1-based index land on the right row of the
                 // shared table, and an unselected filter arrive as zero and
                 // read as "any" without a special case.
-                {.name = "GetAuctionItemClasses", .func = [](lua_State* L) -> int {
+                {"GetAuctionItemClasses", [](lua_State* L) -> int {
             for (int i = 1; i < game::kNumAuctionClasses; ++i)
                 lua_pushstring(L, game::kAuctionClasses[i].label);
             return game::kNumAuctionClasses - 1;
         }},
-                {.name = "GetAuctionItemSubClasses", .func = [](lua_State* L) -> int {
+                {"GetAuctionItemSubClasses", [](lua_State* L) -> int {
             const int ci = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (ci < 1 || ci >= game::kNumAuctionClasses) return 0;
             int count = 0;
@@ -4408,7 +4408,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // so a renumbered subset would search a slot other than the
                 // one clicked, silently. auctionSlotsFor answers positions for
                 // exactly that reason.
-                {.name = "GetAuctionInvTypes", .func = [](lua_State* L) -> int {
+                {"GetAuctionInvTypes", [](lua_State* L) -> int {
             const int ci = static_cast<int>(luaL_optnumber(L, 1, 0));
             const int si = static_cast<int>(luaL_optnumber(L, 2, 0));
             if (ci < 1 || ci >= game::kNumAuctionClasses) return 0;
@@ -4431,7 +4431,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             }
             return pushed;
         }},
-                {.name = "GetNumAuctionItems", .func = [](lua_State* L) -> int {
+                {"GetNumAuctionItems", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* listType = luaL_optstring(L, 1, "list");
             if (!gh) { lua_pushnumber(L, 0); lua_pushnumber(L, 0); return 2; }
@@ -4444,7 +4444,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             lua_pushnumber(L, r ? r->totalCount : 0);
             return 2;
         }},
-                {.name = "GetAuctionItemInfo", .func = [](lua_State* L) -> int {
+                {"GetAuctionItemInfo", [](lua_State* L) -> int {
             // GetAuctionItemInfo(type, index) → name, texture, count, quality,
             // canUse, level, minBid, minIncrement, buyoutPrice, bidAmount,
             // highBidder, owner, saleStatus
@@ -4506,7 +4506,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             lua_pushnumber(L, 0);                   // saleStatus
             return 13;
         }},
-                {.name = "GetAuctionItemTimeLeft", .func = [](lua_State* L) -> int {
+                {"GetAuctionItemTimeLeft", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* listType = luaL_checkstring(L, 1);
             int index = static_cast<int>(luaL_checknumber(L, 2));
@@ -4523,7 +4523,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             lua_pushnumber(L, cat);
             return 1;
         }},
-                {.name = "GetAuctionItemLink", .func = [](lua_State* L) -> int {
+                {"GetAuctionItemLink", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* listType = luaL_checkstring(L, 1);
             int index = static_cast<int>(luaL_checknumber(L, 2));
@@ -4548,14 +4548,14 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // than fits - so one value was an error every time mail
                 // arrived. They are equal here: this client holds every mail it
                 // has been sent, so none is waiting out of view.
-                {.name = "GetInboxNumItems", .func = [](lua_State* L) -> int {
+                {"GetInboxNumItems", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const double n = gh ? static_cast<double>(gh->getMailInbox().size()) : 0.0;
             lua_pushnumber(L, n);
             lua_pushnumber(L, n);
             return 2;
         }},
-                {.name = "GetInboxHeaderInfo", .func = [](lua_State* L) -> int {
+                {"GetInboxHeaderInfo", [](lua_State* L) -> int {
             // GetInboxHeaderInfo(index) → packageIcon, stationeryIcon, sender, subject, money, COD, daysLeft, hasItem, wasRead, wasReturned, textCreated, canReply, isGM
             auto* gh = getGameHandler(L);
             int index = static_cast<int>(luaL_checknumber(L, 1));
@@ -4616,7 +4616,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // means "the body is being shown": OpenMail_Update asks for it
                 // as the letter opens, and the real client marks read at the
                 // same point.
-                {.name = "GetInboxText", .func = [](lua_State* L) -> int {
+                {"GetInboxText", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto* mail = mailAt(gh, static_cast<int>(luaL_optnumber(L, 1, 0)));
             if (!mail) { return luaReturnNil(L); }
@@ -4651,7 +4651,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 // The list still gets a look, for the other direction: at the
                 // mailbox the flag is cleared on arrival, and what is unread
                 // there is what the letters themselves say.
-                {.name = "HasNewMail", .func = [](lua_State* L) -> int {
+                {"HasNewMail", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { return luaReturnFalse(L); }
             bool hasNew = gh->hasNewMail();

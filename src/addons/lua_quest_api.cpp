@@ -2785,7 +2785,7 @@ static int lua_GetQuestSpellLink(lua_State* L) {
 
 void registerQuestLuaAPI(lua_State* L) {
     static const struct { const char* name; lua_CFunction func; } api[] = {
-                {.name = "GetNumQuestLogEntries",   .func = lua_GetNumQuestLogEntries},
+                {"GetNumQuestLogEntries",   lua_GetNumQuestLogEntries},
                 // Whether a quest has been finished, ever.
                 //
                 // The client asks the server for this list on entering the
@@ -2794,7 +2794,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // the two names that ask, which every quest addon uses and
                 // which is how a quest giver knows to grey an offer out, were
                 // not bound at all.
-                {.name = "IsQuestFlaggedCompleted", .func = [](lua_State* L) -> int {
+                {"IsQuestFlaggedCompleted", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             lua_pushboolean(L, (gh && id && gh->isQuestCompleted(id)) ? 1 : 0);
@@ -2804,7 +2804,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // quest id, which is the shape the caller indexes. Fills the
                 // table it is given, as WoW does, so a caller reusing one does
                 // not allocate per call.
-                {.name = "GetQuestsCompleted", .func = [](lua_State* L) -> int {
+                {"GetQuestsCompleted", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!lua_istable(L, 1)) lua_newtable(L);
             else                    lua_pushvalue(L, 1);
@@ -2820,26 +2820,26 @@ void registerQuestLuaAPI(lua_State* L) {
             }
             return 1;
         }},
-                {.name = "GetQuestLogTimeLeft",     .func = lua_GetQuestLogTimeLeft},
-                {.name = "IsCurrentQuestFailed",    .func = lua_IsCurrentQuestFailed},
-                {.name = "GetQuestLogRewardSpell",  .func = lua_GetQuestLogRewardSpell},
-                {.name = "GetRewardSpell",          .func = lua_GetQuestRewardSpell},
-                {.name = "GetRewardTitle",          .func = lua_GetQuestRewardTitle},
-                {.name = "GetQuestLogRewardTitle",  .func = lua_GetQuestRewardTitle},
-                {.name = "ProcessQuestLogRewardFactions", .func = lua_ProcessQuestLogRewardFactions},
-                {.name = "GetNumQuestLogRewardFactions",  .func = lua_GetNumQuestLogRewardFactions},
-                {.name = "GetQuestLogRewardFactionInfo",  .func = lua_GetQuestLogRewardFactionInfo},
-                {.name = "GetFactionInfoByID",      .func = lua_GetFactionInfoByID},
-                {.name = "GetQuestWatchIndex",      .func = lua_GetQuestWatchIndex},
-                {.name = "SortQuestWatches",        .func = lua_SortQuestWatches},
-                {.name = "ShiftQuestWatches",       .func = lua_ShiftQuestWatches},
-                {.name = "GetQuestSortIndex",       .func = lua_GetQuestSortIndex},
-                {.name = "IsQuestLogSpecialItemInRange", .func = lua_IsQuestLogSpecialItemInRange},
-                {.name = "UseQuestLogSpecialItem",  .func = lua_UseQuestLogSpecialItem},
-                {.name = "GetQuestLogSpecialItemCooldown", .func = lua_GetQuestLogSpecialItemCooldown},
-                {.name = "GetQuestTimers",          .func = lua_GetQuestTimers},
-                {.name = "GetQuestIndexForTimer",   .func = lua_GetQuestIndexForTimer},
-                {.name = "GetQuestLogTitle",        .func = lua_GetQuestLogTitle},
+                {"GetQuestLogTimeLeft",     lua_GetQuestLogTimeLeft},
+                {"IsCurrentQuestFailed",    lua_IsCurrentQuestFailed},
+                {"GetQuestLogRewardSpell",  lua_GetQuestLogRewardSpell},
+                {"GetRewardSpell",          lua_GetQuestRewardSpell},
+                {"GetRewardTitle",          lua_GetQuestRewardTitle},
+                {"GetQuestLogRewardTitle",  lua_GetQuestRewardTitle},
+                {"ProcessQuestLogRewardFactions", lua_ProcessQuestLogRewardFactions},
+                {"GetNumQuestLogRewardFactions",  lua_GetNumQuestLogRewardFactions},
+                {"GetQuestLogRewardFactionInfo",  lua_GetQuestLogRewardFactionInfo},
+                {"GetFactionInfoByID",      lua_GetFactionInfoByID},
+                {"GetQuestWatchIndex",      lua_GetQuestWatchIndex},
+                {"SortQuestWatches",        lua_SortQuestWatches},
+                {"ShiftQuestWatches",       lua_ShiftQuestWatches},
+                {"GetQuestSortIndex",       lua_GetQuestSortIndex},
+                {"IsQuestLogSpecialItemInRange", lua_IsQuestLogSpecialItemInRange},
+                {"UseQuestLogSpecialItem",  lua_UseQuestLogSpecialItem},
+                {"GetQuestLogSpecialItemCooldown", lua_GetQuestLogSpecialItemCooldown},
+                {"GetQuestTimers",          lua_GetQuestTimers},
+                {"GetQuestIndexForTimer",   lua_GetQuestIndexForTimer},
+                {"GetQuestLogTitle",        lua_GetQuestLogTitle},
                 // IsUnitOnQuest(questIndex, unit) - whether that unit is also
                 // on the quest, which the log prints as "[2]" beside an entry
                 // to say how many group mates share it.
@@ -2849,7 +2849,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // here tracks them. False for everyone else is the truthful
                 // answer and is what leaves the counter hidden, rather than
                 // claiming a number nobody can stand behind.
-                {.name = "IsUnitOnQuest", .func = [](lua_State* L) -> int {
+                {"IsUnitOnQuest", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
             const char* uid = luaL_optstring(L, 2, "player");
@@ -2859,7 +2859,7 @@ void registerQuestLuaAPI(lua_State* L) {
             lua_pushboolean(L, questAtRow(gh, index) != nullptr ? 1 : 0);
             return 1;
         }},
-                {.name = "GetQuestLogQuestText",    .func = lua_GetQuestLogQuestText},
+                {"GetQuestLogQuestText",    lua_GetQuestLogQuestText},
                 // GetQuestLogCompletionText(index) → what to do now it is done.
                 //
                 // An empty string rather than nothing when there is none,
@@ -2873,7 +2873,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // "" left the row blank where "Return to Marshal Dughan"
                 // belongs. It is the fifth string in SMSG_QUEST_QUERY_RESPONSE
                 // and was being walked past.
-                {.name = "GetQuestLogCompletionText", .func = [](lua_State* L) -> int {
+                {"GetQuestLogCompletionText", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const game::GameHandler::QuestLogEntry* q = nullptr;
             if (gh && lua_isnumber(L, 1)) {
@@ -2894,7 +2894,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // Still a string and never nil: the page is drawn as
                 // "\n"..ItemTextGetText()..creator, and a nil there takes the
                 // whole window down rather than leaving it empty.
-                {.name = "ItemTextGetText", .func = [](lua_State* L) -> int {
+                {"ItemTextGetText", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushstring(L, ""); return 1; }
             // Two things arrive on this frame and they come by different
@@ -2919,7 +2919,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // name out of its query cache, or the item's out of the bag.
                 // It used to answer nil and the frame headed every book, sign
                 // and plaque with nothing.
-                {.name = "ItemTextGetItem", .func = [](lua_State* L) -> int {
+                {"ItemTextGetItem", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const std::string title = gh ? gh->getBookTitle() : std::string();
             if (title.empty()) return luaReturnNil(L);
@@ -2930,7 +2930,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // SMSG_ITEM_TEXT_QUERY_RESPONSE is an id and the words - and
                 // the frame drops the "from" line on a nil, which is honest
                 // where an invented name would not be.
-                {.name = "ItemTextGetCreator",  .func = [](lua_State* L) -> int { return luaReturnNil(L); }},
+                {"ItemTextGetCreator",  [](lua_State* L) -> int { return luaReturnNil(L); }},
                 // The material is carried, and the claim that it was not stood
                 // beside the line discarding it: the item query's four
                 // post-description words are PageText, LanguageID,
@@ -2942,7 +2942,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // is what itemtextframe wants - it picks both the frame's
                 // texture and the text colour by that word, so every letter
                 // and tablet was drawn on parchment.
-                {.name = "ItemTextGetMaterial", .func = [](lua_State* L) -> int {
+                {"ItemTextGetMaterial", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return luaReturnNil(L);
             const std::string& name = gh->getPageTextMaterialName(gh->getBookMaterial());
@@ -2957,21 +2957,21 @@ void registerQuestLuaAPI(lua_State* L) {
                 // turning one is a move through what is in hand rather than a
                 // request - and the frame redraws on ITEM_TEXT_READY, which is
                 // what makes the move visible.
-                {.name = "ItemTextGetPage", .func = [](lua_State* L) -> int {
+                {"ItemTextGetPage", [](lua_State* L) -> int {
             lua_pushnumber(L, bookPage() + 1);
             return 1;
         }},
-                {.name = "ItemTextHasNextPage", .func = [](lua_State* L) -> int {
+                {"ItemTextHasNextPage", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const size_t pages = gh ? gh->getBookPages().size() : 0;
             lua_pushboolean(L, static_cast<size_t>(bookPage() + 1) < pages ? 1 : 0);
             return 1;
         }},
-                {.name = "ItemTextPrevPage", .func = [](lua_State* L) -> int {
+                {"ItemTextPrevPage", [](lua_State* L) -> int {
             if (bookPage() > 0) { --bookPage(); fireItemTextReady(L); }
             return 0;
         }},
-                {.name = "ItemTextNextPage", .func = [](lua_State* L) -> int {
+                {"ItemTextNextPage", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const size_t pages = gh ? gh->getBookPages().size() : 0;
             if (static_cast<size_t>(bookPage() + 1) < pages) {
@@ -2982,7 +2982,7 @@ void registerQuestLuaAPI(lua_State* L) {
         }},
                 // Closing is a state change this client owns, and the frame
                 // calls it on hide as well as from its close button.
-                {.name = "CloseItemText", .func = [](lua_State* L) -> int {
+                {"CloseItemText", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) {
                 gh->closeItemText();
                 // The pages go with the book, and so does the place in it -
@@ -2993,74 +2993,74 @@ void registerQuestLuaAPI(lua_State* L) {
             bookPage() = 0;
             return 0;
         }},
-                {.name = "IsQuestComplete",         .func = lua_IsQuestComplete},
-                {.name = "SelectQuestLogEntry",     .func = lua_SelectQuestLogEntry},
-                {.name = "GetQuestLogSelection",    .func = lua_GetQuestLogSelection},
-                {.name = "GetQuestLogPushable",     .func = lua_GetQuestLogPushable},
-                {.name = "QuestLogPushQuest",       .func = lua_QuestLogPushQuest},
-                {.name = "GetNumQuestWatches",      .func = lua_GetNumQuestWatches},
-                {.name = "GetQuestIndexForWatch",   .func = lua_GetQuestIndexForWatch},
-                {.name = "AddQuestWatch",           .func = lua_AddQuestWatch},
-                {.name = "RemoveQuestWatch",        .func = lua_RemoveQuestWatch},
-                {.name = "IsQuestWatched",          .func = lua_IsQuestWatched},
-                {.name = "GetQuestLink",            .func = lua_GetQuestLink},
-                {.name = "GetNumQuestLeaderBoards", .func = lua_GetNumQuestLeaderBoards},
-                {.name = "GetQuestLogLeaderBoard",  .func = lua_GetQuestLogLeaderBoard},
-                {.name = "QuestMapUpdateAllQuests", .func = lua_QuestMapUpdateAllQuests},
-                {.name = "QuestPOIGetQuestIDByVisibleIndex", .func = lua_QuestPOIGetQuestIDByVisibleIndex},
-                {.name = "QuestPOIGetIconInfo",     .func = lua_QuestPOIGetIconInfo},
-                {.name = "QuestPOIUpdateIcons",     .func = lua_QuestPOIUpdateIcons},
-                {.name = "GetQuestPOILeaderBoard",  .func = lua_GetQuestPOILeaderBoard},
-                {.name = "ExpandQuestHeader",       .func = lua_ExpandQuestHeader},
-                {.name = "CollapseQuestHeader",     .func = lua_CollapseQuestHeader},
-                {.name = "GetQuestLogSpecialItemInfo", .func = lua_GetQuestLogSpecialItemInfo},
-                {.name = "GetNumSkillLines",        .func = lua_GetNumSkillLines},
-                {.name = "GetStablePetInfo",       .func = lua_GetStablePetInfo},
-                {.name = "GetNumStablePets",       .func = lua_GetNumStablePets},
-                {.name = "GetNumStableSlots",      .func = lua_GetNumStableSlots},
-                {.name = "GetSelectedStablePet",   .func = lua_GetSelectedStablePet},
-                {.name = "ClickStablePet",         .func = lua_ClickStablePet},
-                {.name = "GetPetIcon",             .func = lua_GetPetIcon},
-                {.name = "GetPetTalentTree",       .func = lua_GetPetTalentTree},
-                {.name = "GetPetFoodTypes",        .func = lua_GetPetFoodTypes},
-                {.name = "GetStablePetFoodTypes",  .func = lua_GetStablePetFoodTypes},
-                {.name = "SetPetStablePaperdoll",  .func = lua_SetPetStablePaperdoll},
-                {.name = "PickupStablePet",        .func = lua_PickupStablePet},
-                {.name = "ClosePetStables",        .func = lua_ClosePetStables},
-                {.name = "IsAtStableMaster",       .func = lua_IsAtStableMaster},
-                {.name = "GetNextStableSlotCost",  .func = lua_GetNextStableSlotCost},
-                {.name = "GetSkillLineInfo",        .func = lua_GetSkillLineInfo},
+                {"IsQuestComplete",         lua_IsQuestComplete},
+                {"SelectQuestLogEntry",     lua_SelectQuestLogEntry},
+                {"GetQuestLogSelection",    lua_GetQuestLogSelection},
+                {"GetQuestLogPushable",     lua_GetQuestLogPushable},
+                {"QuestLogPushQuest",       lua_QuestLogPushQuest},
+                {"GetNumQuestWatches",      lua_GetNumQuestWatches},
+                {"GetQuestIndexForWatch",   lua_GetQuestIndexForWatch},
+                {"AddQuestWatch",           lua_AddQuestWatch},
+                {"RemoveQuestWatch",        lua_RemoveQuestWatch},
+                {"IsQuestWatched",          lua_IsQuestWatched},
+                {"GetQuestLink",            lua_GetQuestLink},
+                {"GetNumQuestLeaderBoards", lua_GetNumQuestLeaderBoards},
+                {"GetQuestLogLeaderBoard",  lua_GetQuestLogLeaderBoard},
+                {"QuestMapUpdateAllQuests", lua_QuestMapUpdateAllQuests},
+                {"QuestPOIGetQuestIDByVisibleIndex", lua_QuestPOIGetQuestIDByVisibleIndex},
+                {"QuestPOIGetIconInfo",     lua_QuestPOIGetIconInfo},
+                {"QuestPOIUpdateIcons",     lua_QuestPOIUpdateIcons},
+                {"GetQuestPOILeaderBoard",  lua_GetQuestPOILeaderBoard},
+                {"ExpandQuestHeader",       lua_ExpandQuestHeader},
+                {"CollapseQuestHeader",     lua_CollapseQuestHeader},
+                {"GetQuestLogSpecialItemInfo", lua_GetQuestLogSpecialItemInfo},
+                {"GetNumSkillLines",        lua_GetNumSkillLines},
+                {"GetStablePetInfo",       lua_GetStablePetInfo},
+                {"GetNumStablePets",       lua_GetNumStablePets},
+                {"GetNumStableSlots",      lua_GetNumStableSlots},
+                {"GetSelectedStablePet",   lua_GetSelectedStablePet},
+                {"ClickStablePet",         lua_ClickStablePet},
+                {"GetPetIcon",             lua_GetPetIcon},
+                {"GetPetTalentTree",       lua_GetPetTalentTree},
+                {"GetPetFoodTypes",        lua_GetPetFoodTypes},
+                {"GetStablePetFoodTypes",  lua_GetStablePetFoodTypes},
+                {"SetPetStablePaperdoll",  lua_SetPetStablePaperdoll},
+                {"PickupStablePet",        lua_PickupStablePet},
+                {"ClosePetStables",        lua_ClosePetStables},
+                {"IsAtStableMaster",       lua_IsAtStableMaster},
+                {"GetNextStableSlotCost",  lua_GetNextStableSlotCost},
+                {"GetSkillLineInfo",        lua_GetSkillLineInfo},
                 // Opening and closing a heading. The index is a position in
                 // the drawn rows, and a click on a skill row rather than a
                 // heading is ignored rather than refused - the tab calls these
                 // from the row label template whatever the row turns out to be.
-                {.name = "ExpandSkillHeader",   .func = [](lua_State* L) -> int {
+                {"ExpandSkillHeader",   [](lua_State* L) -> int {
             return skillHeaderSetCollapsed(L, false);
         }},
-                {.name = "CollapseSkillHeader", .func = [](lua_State* L) -> int {
+                {"CollapseSkillHeader", [](lua_State* L) -> int {
             return skillHeaderSetCollapsed(L, true);
         }},
-                {.name = "GetNumTalentTabs",        .func = lua_GetNumTalentTabs},
-                {.name = "GetTalentTabInfo",        .func = lua_GetTalentTabInfo},
-                {.name = "GetNumTalents",           .func = lua_GetNumTalents},
-                {.name = "GetTalentInfo",           .func = lua_GetTalentInfo},
-                {.name = "GetTalentPrereqs",        .func = lua_GetTalentPrereqs},
-                {.name = "AddPreviewTalentPoints",  .func = lua_AddPreviewTalentPoints},
-                {.name = "GetGroupPreviewTalentPointsSpent", .func = lua_GetGroupPreviewTalentPointsSpent},
-                {.name = "ResetGroupPreviewTalentPoints",    .func = lua_ResetGroupPreviewTalentPoints},
-                {.name = "LearnPreviewTalents",     .func = lua_LearnPreviewTalents},
-                {.name = "LearnTalent",             .func = lua_LearnTalent},
-                {.name = "GetUnspentTalentPoints",  .func = lua_GetUnspentTalentPoints},
-                {.name = "GetNumTalentGroups",      .func = lua_GetNumTalentGroups},
-                {.name = "SetActiveTalentGroup",    .func = lua_SetActiveTalentGroup},
-                {.name = "GetTalentLink",           .func = lua_GetTalentLink},
-                {.name = "GetActiveTalentGroup",    .func = lua_GetActiveTalentGroup},
-                {.name = "AcceptQuest", .func = [](lua_State* L) -> int {
+                {"GetNumTalentTabs",        lua_GetNumTalentTabs},
+                {"GetTalentTabInfo",        lua_GetTalentTabInfo},
+                {"GetNumTalents",           lua_GetNumTalents},
+                {"GetTalentInfo",           lua_GetTalentInfo},
+                {"GetTalentPrereqs",        lua_GetTalentPrereqs},
+                {"AddPreviewTalentPoints",  lua_AddPreviewTalentPoints},
+                {"GetGroupPreviewTalentPointsSpent", lua_GetGroupPreviewTalentPointsSpent},
+                {"ResetGroupPreviewTalentPoints",    lua_ResetGroupPreviewTalentPoints},
+                {"LearnPreviewTalents",     lua_LearnPreviewTalents},
+                {"LearnTalent",             lua_LearnTalent},
+                {"GetUnspentTalentPoints",  lua_GetUnspentTalentPoints},
+                {"GetNumTalentGroups",      lua_GetNumTalentGroups},
+                {"SetActiveTalentGroup",    lua_SetActiveTalentGroup},
+                {"GetTalentLink",           lua_GetTalentLink},
+                {"GetActiveTalentGroup",    lua_GetActiveTalentGroup},
+                {"AcceptQuest", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->acceptQuest();
             return 0;
         }},
-                {.name = "DeclineQuest", .func = [](lua_State* L) -> int {
+                {"DeclineQuest", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             // Announcing: the button was pressed, and the frame has not hidden
             // itself yet. QUEST_FINISHED is what hides it.
@@ -3071,12 +3071,12 @@ void registerQuestLuaAPI(lua_State* L) {
                 // StaticPopup "QUEST_ACCEPT" calls this from OnAccept, so it
                 // has to exist before QUEST_ACCEPT_CONFIRM is fired at all:
                 // the popup would come up and raise on the yes.
-                {.name = "ConfirmAcceptQuest", .func = [](lua_State* L) -> int {
+                {"ConfirmAcceptQuest", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->acceptSharedQuest();
             return 0;
         }},
-                {.name = "CompleteQuest", .func = [](lua_State* L) -> int {
+                {"CompleteQuest", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (gh) gh->completeQuest();
             return 0;
@@ -3087,14 +3087,14 @@ void registerQuestLuaAPI(lua_State* L) {
                 // the interface, and requiring one raised a Lua error on every
                 // attempt - the id is accepted when given so anything already
                 // passing one keeps working.
-                {.name = "SetAbandonQuest", .func = [](lua_State* L) -> int {
+                {"SetAbandonQuest", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const auto* q = selectedLogEntry(gh);
             pendingAbandonQuest() = q ? q->questId : 0;
             return 0;
         }},
-                {.name = "GetAbandonQuestName", .func = [](lua_State* L) -> int {
+                {"GetAbandonQuestName", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const uint32_t id = pendingAbandonQuest();
             if (gh && id != 0) {
@@ -3121,7 +3121,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // Items gathered for the quest are not named: which of those
                 // the server destroys depends on flags this client does not
                 // parse, and listing the wrong ones is worse than listing none.
-                {.name = "GetAbandonQuestItems", .func = [](lua_State* L) -> int {
+                {"GetAbandonQuestItems", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const uint32_t id = pendingAbandonQuest();
             if (!gh || id == 0) { lua_pushnil(L); return 1; }
@@ -3136,7 +3136,7 @@ void registerQuestLuaAPI(lua_State* L) {
             lua_pushnil(L);
             return 1;
         }},
-                {.name = "AbandonQuest", .func = [](lua_State* L) -> int {
+                {"AbandonQuest", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const uint32_t questId = lua_isnoneornil(L, 1)
@@ -3149,7 +3149,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // Both of these answer for the quest giver's dialog while one
                 // is open and for the log's selection otherwise, which is the
                 // same rule the text accessors follow.
-                {.name = "GetNumQuestRewards", .func = [](lua_State* L) -> int {
+                {"GetNumQuestRewards", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { return luaReturnZero(L); }
             if (const auto* v = currentQuestSource(gh).rewards) {
@@ -3163,7 +3163,7 @@ void registerQuestLuaAPI(lua_State* L) {
             lua_pushnumber(L, countRewards(&ql[idx-1].rewardItems));
             return 1;
         }},
-                {.name = "GetNumQuestChoices", .func = [](lua_State* L) -> int {
+                {"GetNumQuestChoices", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { return luaReturnZero(L); }
             if (const auto* v = currentQuestSource(gh).choices) {
@@ -3177,31 +3177,31 @@ void registerQuestLuaAPI(lua_State* L) {
             lua_pushnumber(L, countRewards(&ql[idx-1].rewardChoiceItems));
             return 1;
         }},
-                {.name = "GetSuggestedGroupNum", .func = lua_GetSuggestedGroupNum},
-                {.name = "GetDailyQuestsCompleted", .func = lua_GetDailyQuestsCompleted},
-                {.name = "GetMaxDailyQuests",    .func = lua_GetMaxDailyQuests},
-                {.name = "GetQuestLogGroupNum",  .func = lua_GetQuestLogGroupNum},
-                {.name = "GetNumQuestLogRewards", .func = lua_GetNumQuestLogRewards},
-                {.name = "GetNumQuestLogChoices", .func = lua_GetNumQuestLogChoices},
-                {.name = "GetQuestLogRewardInfo", .func = lua_GetQuestLogRewardInfo},
-                {.name = "GetQuestLogChoiceInfo", .func = lua_GetQuestLogChoiceInfo},
-                {.name = "GetQuestLogItemLink",     .func = lua_GetQuestLogItemLink},
-                {.name = "GetQuestLogSpellLink",    .func = lua_GetQuestLogSpellLink},
-                {.name = "GetQuestLogRewardMoney", .func = lua_GetQuestLogRewardMoney},
-                {.name = "GetQuestLogRequiredMoney", .func = lua_GetQuestLogRequiredMoney},
-                {.name = "GetTitleText",         .func = lua_GetTitleText},
-                {.name = "GetQuestText",         .func = lua_GetQuestText},
-                {.name = "GetObjectiveText",     .func = lua_GetObjectiveText},
-                {.name = "GetProgressText",      .func = lua_GetProgressText},
-                {.name = "GetRewardText",        .func = lua_GetRewardText},
-                {.name = "GetGossipText",        .func = lua_GetGossipText},
-                {.name = "GetQuestItemInfo",     .func = lua_GetQuestItemInfo},
+                {"GetSuggestedGroupNum", lua_GetSuggestedGroupNum},
+                {"GetDailyQuestsCompleted", lua_GetDailyQuestsCompleted},
+                {"GetMaxDailyQuests",    lua_GetMaxDailyQuests},
+                {"GetQuestLogGroupNum",  lua_GetQuestLogGroupNum},
+                {"GetNumQuestLogRewards", lua_GetNumQuestLogRewards},
+                {"GetNumQuestLogChoices", lua_GetNumQuestLogChoices},
+                {"GetQuestLogRewardInfo", lua_GetQuestLogRewardInfo},
+                {"GetQuestLogChoiceInfo", lua_GetQuestLogChoiceInfo},
+                {"GetQuestLogItemLink",     lua_GetQuestLogItemLink},
+                {"GetQuestLogSpellLink",    lua_GetQuestLogSpellLink},
+                {"GetQuestLogRewardMoney", lua_GetQuestLogRewardMoney},
+                {"GetQuestLogRequiredMoney", lua_GetQuestLogRequiredMoney},
+                {"GetTitleText",         lua_GetTitleText},
+                {"GetQuestText",         lua_GetQuestText},
+                {"GetObjectiveText",     lua_GetObjectiveText},
+                {"GetProgressText",      lua_GetProgressText},
+                {"GetRewardText",        lua_GetRewardText},
+                {"GetGossipText",        lua_GetGossipText},
+                {"GetQuestItemInfo",     lua_GetQuestItemInfo},
                 // How many items a quest wants handed in.
                 // QuestFrameProgressItems_Update reads it straight into
                 // `numRequiredItems > 0`, and comparing nil against a number
                 // raises - so opening the progress page of any quest that
                 // takes items took the page down.
-                {.name = "GetNumQuestItems", .func = [](lua_State* L) -> int {
+                {"GetNumQuestItems", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushnumber(L, 0); return 1; }
             const auto& req = gh->getQuestRequestItems().requiredItems;
@@ -3227,7 +3227,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // quest giver's own is not the quest's. Answering from the
                 // giver would be a guess dressed as data, and the caller's
                 // substitution of Parchment is what nearly every quest wants.
-                {.name = "GetQuestBackgroundMaterial", .func = [](lua_State* L) -> int { return luaReturnNil(L); }},
+                {"GetQuestBackgroundMaterial", [](lua_State* L) -> int { return luaReturnNil(L); }},
                 // Whether the quest is flagged PvP, and whether the giver
                 // opened it without being asked. Neither is parsed from the
                 // quest packets here, and false is what the interface does
@@ -3240,7 +3240,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // QuestDef.h; the offer packet carried it and the parser threw
                 // it away. Zero before Wrath, where the offer has no flags
                 // field for it to be in.
-                {.name = "QuestFlagsPVP", .func = [](lua_State* L) -> int {
+                {"QuestFlagsPVP", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             constexpr uint32_t kQuestFlagsPvp = 0x00002000u;
             lua_pushboolean(L, gh && (gh->getQuestDetails().questFlags & kQuestFlagsPvp) ? 1 : 0);
@@ -3251,45 +3251,45 @@ void registerQuestLuaAPI(lua_State* L) {
                 // AzerothCore's own note beside it says no 3.3.5a quest
                 // carries it. The flag is parsed now, so if one ever does this
                 // can read it from the same place.
-                {.name = "QuestGetAutoAccept", .func = [](lua_State* L) -> int { lua_pushboolean(L, 0); return 1; }},
+                {"QuestGetAutoAccept", [](lua_State* L) -> int { lua_pushboolean(L, 0); return 1; }},
                 // Shown when a reward is confirmed without one being picked.
                 // The message belongs to the server in the real client; there
                 // is nothing to say here, and the call is made for its effect
                 // rather than its answer.
-                {.name = "QuestChooseRewardError", .func = [](lua_State* L) -> int { (void)L; return 0; }},
-                {.name = "GetQuestItemLink",        .func = lua_GetQuestItemLink},
-                {.name = "GetQuestSpellLink",       .func = lua_GetQuestSpellLink},
-                {.name = "GetQuestMoneyToGet",   .func = lua_GetQuestMoneyToGet},
-                {.name = "GetRewardMoney",       .func = lua_GetRewardMoney},
-                {.name = "GetRewardXP",          .func = lua_GetRewardXP},
-                {.name = "GetRewardHonor",              .func = lua_GetRewardHonor},
-                {.name = "GetRewardArenaPoints",        .func = lua_GetRewardArenaPoints},
-                {.name = "GetRewardTalents",            .func = lua_GetRewardTalents},
-                {.name = "GetQuestLogRewardHonor",       .func = lua_GetQuestLogRewardHonor},
-                {.name = "GetQuestLogRewardArenaPoints", .func = lua_GetQuestLogRewardArenaPoints},
-                {.name = "GetQuestLogRewardTalents",     .func = lua_GetQuestLogRewardTalents},
-                {.name = "GetQuestLogRewardXP",          .func = lua_GetQuestLogRewardXP},
-                {.name = "IsQuestCompletable",   .func = lua_IsQuestCompletable},
-                {.name = "GetQuestReward",       .func = lua_GetQuestReward},
-                {.name = "CloseQuest",           .func = lua_CloseQuest},
+                {"QuestChooseRewardError", [](lua_State* L) -> int { (void)L; return 0; }},
+                {"GetQuestItemLink",        lua_GetQuestItemLink},
+                {"GetQuestSpellLink",       lua_GetQuestSpellLink},
+                {"GetQuestMoneyToGet",   lua_GetQuestMoneyToGet},
+                {"GetRewardMoney",       lua_GetRewardMoney},
+                {"GetRewardXP",          lua_GetRewardXP},
+                {"GetRewardHonor",              lua_GetRewardHonor},
+                {"GetRewardArenaPoints",        lua_GetRewardArenaPoints},
+                {"GetRewardTalents",            lua_GetRewardTalents},
+                {"GetQuestLogRewardHonor",       lua_GetQuestLogRewardHonor},
+                {"GetQuestLogRewardArenaPoints", lua_GetQuestLogRewardArenaPoints},
+                {"GetQuestLogRewardTalents",     lua_GetQuestLogRewardTalents},
+                {"GetQuestLogRewardXP",          lua_GetQuestLogRewardXP},
+                {"IsQuestCompletable",   lua_IsQuestCompletable},
+                {"GetQuestReward",       lua_GetQuestReward},
+                {"CloseQuest",           lua_CloseQuest},
                 // RemoveGlyphFromSocket(socket) - the Accept on the "remove
                 // this glyph?" popup, which is the only way to clear a socket.
                 // Unbound, the dialog appeared and answering it raised, so a
                 // glyph could be put in and never taken out.
                 //
                 // FrameXML counts sockets from one and the server from zero.
-                {.name = "RemoveGlyphFromSocket", .func = [](lua_State* L) -> int {
+                {"RemoveGlyphFromSocket", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int socket = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (gh && socket >= 1 && socket <= game::GameHandler::MAX_GLYPH_SLOTS)
                 gh->removeGlyphFromSocket(static_cast<uint32_t>(socket - 1));
             return 0;
         }},
-                {.name = "GetNumGlyphSockets", .func = [](lua_State* L) -> int {
+                {"GetNumGlyphSockets", [](lua_State* L) -> int {
             lua_pushnumber(L, game::GameHandler::MAX_GLYPH_SLOTS);
             return 1;
         }},
-                {.name = "GetGlyphSocketInfo", .func = [](lua_State* L) -> int {
+                {"GetGlyphSocketInfo", [](lua_State* L) -> int {
             // GetGlyphSocketInfo(index [, talentGroup]) → enabled, glyphType, glyphSpellID, icon
             auto* gh = getGameHandler(L);
             int index = static_cast<int>(luaL_checknumber(L, 1));
@@ -3330,7 +3330,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 //
                 // The recipe list comes from GameHandler so this panel and the
                 // client's own crafting window agree on every number.
-                {.name = "GetNumTradeSkills", .func = [](lua_State* L) -> int {
+                {"GetNumTradeSkills", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? static_cast<double>(
                 tradeSkillRows(gh).size()) : 0.0);
@@ -3338,7 +3338,7 @@ void registerQuestLuaAPI(lua_State* L) {
         }},
                 // GetTradeSkillInfo(i) → name, type, numAvailable, isExpanded,
                 //                        altVerb, numSkillUps
-                {.name = "GetTradeSkillInfo", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh) return luaReturnNil(L);
@@ -3371,7 +3371,7 @@ void registerQuestLuaAPI(lua_State* L) {
             lua_pushnumber(L, 1);       // numSkillUps
             return 6;
         }},
-                {.name = "GetTradeSkillIcon", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillIcon", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh) return luaReturnNil(L);
@@ -3392,7 +3392,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 ? "Interface\\Icons\\INV_Misc_QuestionMark" : icon.c_str());
             return 1;
         }},
-                {.name = "GetTradeSkillDescription", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillDescription", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh) return luaReturnNil(L);
@@ -3403,7 +3403,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 id, gh->getSpellDescription(id)).c_str());
             return 1;
         }},
-                {.name = "GetTradeSkillNumReagents", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillNumReagents", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             int n = 0;
@@ -3422,7 +3422,7 @@ void registerQuestLuaAPI(lua_State* L) {
             return 1;
         }},
                 // GetTradeSkillReagentInfo(i, n) → name, texture, needed, have
-                {.name = "GetTradeSkillReagentInfo", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillReagentInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             const int n = static_cast<int>(luaL_optnumber(L, 2, 1));
@@ -3448,7 +3448,7 @@ void registerQuestLuaAPI(lua_State* L) {
             }
             return luaReturnNil(L);
         }},
-                {.name = "GetTradeSkillNumMade", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillNumMade", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             int lo = 1, hi = 1;
@@ -3469,7 +3469,7 @@ void registerQuestLuaAPI(lua_State* L) {
             return 2;
         }},
                 // GetTradeSkillLine() → name, rank, maxRank
-                {.name = "GetTradeSkillLine", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillLine", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) {
                 // The same three values, not one nil. TradeSkillFrame_Update
@@ -3505,7 +3505,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // already existed and the client's own crafting window has been
                 // using it - one press per craft is not the same as a queue,
                 // because each craft has to wait for the last to finish.
-                {.name = "DoTradeSkill", .func = [](lua_State* L) -> int {
+                {"DoTradeSkill", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             int count = static_cast<int>(luaL_optnumber(L, 2, 1));
@@ -3528,19 +3528,19 @@ void registerQuestLuaAPI(lua_State* L) {
             gh->startCraftQueue(rec->spellId, count);
             return 0;
         }},
-                {.name = "CloseTradeSkill", .func = [](lua_State* L) -> int {
+                {"CloseTradeSkill", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->closeCraftingWindow();
             return 0;
         }},
-                {.name = "SelectTradeSkill", .func = [](lua_State* L) -> int {
+                {"SelectTradeSkill", [](lua_State* L) -> int {
             tradeSkillSelection() = static_cast<int>(luaL_optnumber(L, 1, 0));
             return 0;
         }},
-                {.name = "GetTradeSkillSelectionIndex", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillSelectionIndex", [](lua_State* L) -> int {
             lua_pushnumber(L, tradeSkillSelection());
             return 1;
         }},
-                {.name = "GetFirstTradeSkill", .func = [](lua_State* L) -> int {
+                {"GetFirstTradeSkill", [](lua_State* L) -> int {
             // The first row that is a recipe rather than a heading, which is
             // what the panel selects when it opens. One now that the list has
             // headings: row one is "Armor" or "Weapon", not something to make.
@@ -3558,7 +3558,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // shaker are the ones that have any - and this client has been
                 // tracking those all along. nil still means "not on cooldown",
                 // which is the branch that leaves the line blank.
-                {.name = "GetTradeSkillCooldown", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillCooldown", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh || i < 1) return luaReturnNil(L);
@@ -3569,7 +3569,7 @@ void registerQuestLuaAPI(lua_State* L) {
             lua_pushnumber(L, left);
             return 1;
         }},
-                {.name = "GetTradeSkillTools", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillTools", [](lua_State* L) -> int {
             // NOTHING, not a nil. The tool requirement is not in what this
             // client parses, and claiming a tool is missing would grey out
             // recipes that work - but answering one nil is not the same as
@@ -3600,7 +3600,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // list GetTradeSkillReagentInfo walks - so the panel could name
                 // and count them while answering nil to anyone asking for a
                 // link to the same thing.
-                {.name = "GetTradeSkillItemLink", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillItemLink", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh || i < 1) return luaReturnNil(L);
@@ -3619,8 +3619,8 @@ void registerQuestLuaAPI(lua_State* L) {
                 // A recipe link is an |Htrade: hyperlink carrying the whole
                 // skill list, which this client has no reader for - a link it
                 // cannot resolve on the way back in would be worse than none.
-                {.name = "GetTradeSkillRecipeLink",   .func = [](lua_State* L) -> int { return luaReturnNil(L); }},
-                {.name = "GetTradeSkillReagentItemLink", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillRecipeLink",   [](lua_State* L) -> int { return luaReturnNil(L); }},
+                {"GetTradeSkillReagentItemLink", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             const int n = static_cast<int>(luaL_optnumber(L, 2, 1));
@@ -3642,11 +3642,11 @@ void registerQuestLuaAPI(lua_State* L) {
             }
             return luaReturnNil(L);
         }},
-                {.name = "GetTradeSkillListLink",     .func = [](lua_State* L) -> int { return luaReturnNil(L); }},
-                {.name = "IsTradeSkillLinked",        .func = [](lua_State* L) -> int { lua_pushboolean(L, 0); return 1; }},
-                {.name = "NoPlayTime",                .func = [](lua_State* L) -> int { lua_pushboolean(L, 0); return 1; }},
-                {.name = "PartialPlayTime",           .func = [](lua_State* L) -> int { lua_pushboolean(L, 0); return 1; }},
-                {.name = "GetBillingTimeRested",      .func = [](lua_State* L) -> int { lua_pushnumber(L, 0); return 1; }},
+                {"GetTradeSkillListLink",     [](lua_State* L) -> int { return luaReturnNil(L); }},
+                {"IsTradeSkillLinked",        [](lua_State* L) -> int { lua_pushboolean(L, 0); return 1; }},
+                {"NoPlayTime",                [](lua_State* L) -> int { lua_pushboolean(L, 0); return 1; }},
+                {"PartialPlayTime",           [](lua_State* L) -> int { lua_pushboolean(L, 0); return 1; }},
+                {"GetBillingTimeRested",      [](lua_State* L) -> int { lua_pushnumber(L, 0); return 1; }},
                 // Filters and sub-classes: panel state, kept so it reads back.
                 // The trade skill window's two filter dropdowns. Both answered
                 // nothing and both are spread straight into a vararg call -
@@ -3657,32 +3657,32 @@ void registerQuestLuaAPI(lua_State* L) {
                 // Single-select, not a set of ticks: the click handler calls
                 // Set…Filter(id - 1, 1, 1) and nothing ever unticks, so the
                 // state is one index and zero is the "All" row.
-                {.name = "GetTradeSkillSubClasses", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillSubClasses", [](lua_State* L) -> int {
             const auto subs = tradeSkillSubClasses(getGameHandler(L));
             for (const auto& s : subs) lua_pushstring(L, s.c_str());
             return static_cast<int>(subs.size());
         }},
-                {.name = "GetTradeSkillInvSlots", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillInvSlots", [](lua_State* L) -> int {
             const auto slots = tradeSkillInvSlots(getGameHandler(L));
             for (const auto& s : slots) lua_pushstring(L, s.c_str());
             return static_cast<int>(slots.size());
         }},
-                {.name = "GetTradeSkillSubClassFilter", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillSubClassFilter", [](lua_State* L) -> int {
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             lua_pushboolean(L, i == tradeSkillSubClassPick() ? 1 : 0);
             return 1;
         }},
-                {.name = "GetTradeSkillInvSlotFilter", .func = [](lua_State* L) -> int {
+                {"GetTradeSkillInvSlotFilter", [](lua_State* L) -> int {
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             lua_pushboolean(L, i == tradeSkillInvSlotPick() ? 1 : 0);
             return 1;
         }},
-                {.name = "SetTradeSkillSubClassFilter", .func = [](lua_State* L) -> int {
+                {"SetTradeSkillSubClassFilter", [](lua_State* L) -> int {
             tradeSkillSubClassPick() = static_cast<int>(luaL_optnumber(L, 1, 0));
             ++tradeSkillRowsGeneration();
             return 0;
         }},
-                {.name = "SetTradeSkillInvSlotFilter", .func = [](lua_State* L) -> int {
+                {"SetTradeSkillInvSlotFilter", [](lua_State* L) -> int {
             tradeSkillInvSlotPick() = static_cast<int>(luaL_optnumber(L, 1, 0));
             ++tradeSkillRowsGeneration();
             return 0;
@@ -3690,7 +3690,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // The search box above the recipe list. It matched nothing
                 // because nothing read it; the panel calls TradeSkillFrame_Update
                 // straight after, so the list redraws against the new view.
-                {.name = "SetTradeSkillItemNameFilter", .func = [](lua_State* L) -> int {
+                {"SetTradeSkillItemNameFilter", [](lua_State* L) -> int {
             tradeSkillNameFilter() = luaL_optstring(L, 1, "");
             ++tradeSkillRowsGeneration();
             return 0;
@@ -3703,7 +3703,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 //
                 // The arguments arrive as the strings strmatch produced;
                 // luaL_optnumber reads those.
-                {.name = "SetTradeSkillItemLevelFilter", .func = [](lua_State* L) -> int {
+                {"SetTradeSkillItemLevelFilter", [](lua_State* L) -> int {
             const int lo = static_cast<int>(luaL_optnumber(L, 1, 0));
             const int hi = static_cast<int>(luaL_optnumber(L, 2, 0));
             tradeSkillLevelRange() = {lo, hi};
@@ -3713,15 +3713,15 @@ void registerQuestLuaAPI(lua_State* L) {
                 // The "Have Materials" checkbox, which had nothing behind it.
                 // canMake is the count this client already works out for the
                 // reagent lines, so the filter is the same number read twice.
-                {.name = "TradeSkillOnlyShowMakeable",  .func = [](lua_State* L) -> int {
+                {"TradeSkillOnlyShowMakeable",  [](lua_State* L) -> int {
             tradeSkillOnlyMakeable() = lua_toboolean(L, 1) != 0;
             ++tradeSkillRowsGeneration();
             return 0;
         }},
-                {.name = "CollapseTradeSkillSubClass",  .func = [](lua_State* L) -> int {
+                {"CollapseTradeSkillSubClass",  [](lua_State* L) -> int {
             return tradeSkillHeaderSetCollapsed(L, true);
         }},
-                {.name = "ExpandTradeSkillSubClass",    .func = [](lua_State* L) -> int {
+                {"ExpandTradeSkillSubClass",    [](lua_State* L) -> int {
             return tradeSkillHeaderSetCollapsed(L, false);
         }},
                 // GetTradeskillRepeatCount() → how many are still to be made.
@@ -3732,13 +3732,13 @@ void registerQuestLuaAPI(lua_State* L) {
                 // so answering zero pinned the quantity box at zero and Create
                 // asked for none however many the player typed. One when no
                 // queue is running, which is what a fresh selection should show.
-                {.name = "GetTradeskillRepeatCount", .func = [](lua_State* L) -> int {
+                {"GetTradeskillRepeatCount", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int left = gh ? gh->getCraftQueueRemaining() : 0;
             lua_pushnumber(L, left > 1 ? left : 1);
             return 1;
         }},
-                {.name = "StopTradeSkillRepeat", .func = [](lua_State* L) -> int {
+                {"StopTradeSkillRepeat", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->cancelCraftQueue();
             return 0;
         }},
@@ -3749,14 +3749,14 @@ void registerQuestLuaAPI(lua_State* L) {
                 // known - and fires TRAINER_SHOW when it arrives. None of it
                 // had a way into the interface, so the panel opened blank at
                 // every trainer in the game.
-                {.name = "GetNumTrainerServices", .func = [](lua_State* L) -> int {
+                {"GetNumTrainerServices", [](lua_State* L) -> int {
             // What the filters leave, not what the trainer sent.
             lua_pushnumber(L, static_cast<double>(
                 shownTrainerServices(getGameHandler(L)).size()));
             return 1;
         }},
                 // GetTrainerServiceInfo(i) → name, rank, category, expanded
-                {.name = "GetTrainerServiceInfo", .func = [](lua_State* L) -> int {
+                {"GetTrainerServiceInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             if (!gh) return luaReturnNil(L);
@@ -3809,7 +3809,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // slots are already spent. Both come free from the frame once
                 // the number is real, because UnitCharacterPoints already
                 // answers the free-slot count it is compared against.
-                {.name = "GetTrainerServiceCost", .func = [](lua_State* L) -> int {
+                {"GetTrainerServiceCost", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             const auto* svc = shownTrainerService(gh, i);
@@ -3818,7 +3818,7 @@ void registerQuestLuaAPI(lua_State* L) {
             lua_pushnumber(L, svc ? svc->profButton : 0);
             return 3;
         }},
-                {.name = "GetTrainerServiceLevelReq", .func = [](lua_State* L) -> int {
+                {"GetTrainerServiceLevelReq", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             const auto* svc = shownTrainerService(gh, i);
@@ -3830,7 +3830,7 @@ void registerQuestLuaAPI(lua_State* L) {
             return 1;
         }},
                 // GetTrainerServiceSkillReq(i) → skill name, required value
-                {.name = "GetTrainerServiceSkillReq", .func = [](lua_State* L) -> int {
+                {"GetTrainerServiceSkillReq", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             const auto* svc = shownTrainerService(gh, i);
@@ -3853,7 +3853,7 @@ void registerQuestLuaAPI(lua_State* L) {
             lua_pushboolean(L, met ? 1 : 0);
             return 3;
         }},
-                {.name = "GetTrainerServiceIcon", .func = [](lua_State* L) -> int {
+                {"GetTrainerServiceIcon", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             const auto* svc = shownTrainerService(gh, i);
@@ -3865,7 +3865,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 ? "Interface\\Icons\\INV_Misc_QuestionMark" : icon.c_str());
             return 1;
         }},
-                {.name = "GetTrainerServiceDescription", .func = [](lua_State* L) -> int {
+                {"GetTrainerServiceDescription", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             const auto* svc = shownTrainerService(gh, i);
@@ -3878,7 +3878,7 @@ void registerQuestLuaAPI(lua_State* L) {
             lua_pushstring(L, desc.c_str());
             return 1;
         }},
-                {.name = "GetTrainerServiceSkillLine", .func = [](lua_State* L) -> int {
+                {"GetTrainerServiceSkillLine", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             const auto* svc = shownTrainerService(gh, i);
@@ -3891,7 +3891,7 @@ void registerQuestLuaAPI(lua_State* L) {
         }},
                 // The prerequisite chain, which this list carries as up to
                 // three spell ids.
-                {.name = "GetTrainerServiceNumAbilityReq", .func = [](lua_State* L) -> int {
+                {"GetTrainerServiceNumAbilityReq", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             const auto* svc = shownTrainerService(gh, i);
@@ -3908,7 +3908,7 @@ void registerQuestLuaAPI(lua_State* L) {
             return 1;
         }},
                 // GetTrainerServiceAbilityReq(i, n) → name, hasIt
-                {.name = "GetTrainerServiceAbilityReq", .func = [](lua_State* L) -> int {
+                {"GetTrainerServiceAbilityReq", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             const int n = static_cast<int>(luaL_optnumber(L, 2, 1));
@@ -3936,25 +3936,25 @@ void registerQuestLuaAPI(lua_State* L) {
                 //
                 // No step requirement is tracked here, and saying so is both
                 // true and what removes the line.
-                {.name = "GetTrainerServiceStepReq", .func = [](lua_State* L) -> int {
+                {"GetTrainerServiceStepReq", [](lua_State* L) -> int {
             return luaReturnNil(L);
         }},
-                {.name = "GetTrainerServiceItemLink", .func = [](lua_State* L) -> int {
+                {"GetTrainerServiceItemLink", [](lua_State* L) -> int {
             return luaReturnNil(L);
         }},
-                {.name = "GetTrainerGreetingText", .func = [](lua_State* L) -> int {
+                {"GetTrainerGreetingText", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const std::string& g = gh ? gh->getTrainerSpells().greeting
                                       : std::string();
             lua_pushstring(L, g.c_str());
             return 1;
         }},
-                {.name = "IsTradeskillTrainer", .func = [](lua_State* L) -> int {
+                {"IsTradeskillTrainer", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushboolean(L, gh && gh->getTrainerSpells().trainerType == 2);
             return 1;
         }},
-                {.name = "BuyTrainerService", .func = [](lua_State* L) -> int {
+                {"BuyTrainerService", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int i = static_cast<int>(luaL_optnumber(L, 1, 0));
             // Through the filtered list like every other index, and this is
@@ -3964,27 +3964,27 @@ void registerQuestLuaAPI(lua_State* L) {
             if (svc) gh->trainSpell(svc->spellId);
             return 0;
         }},
-                {.name = "CloseTrainer", .func = [](lua_State* L) -> int {
+                {"CloseTrainer", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->closeTrainer();
             return 0;
         }},
                 // Selection and the type filter are the panel's own state; the
                 // client has no opinion about either, so they are kept here
                 // rather than pretended away - the panel reads back what it set.
-                {.name = "SelectTrainerService", .func = [](lua_State* L) -> int {
+                {"SelectTrainerService", [](lua_State* L) -> int {
             trainerSelection() = static_cast<int>(luaL_optnumber(L, 1, 0));
             return 0;
         }},
-                {.name = "GetTrainerSelectionIndex", .func = [](lua_State* L) -> int {
+                {"GetTrainerSelectionIndex", [](lua_State* L) -> int {
             lua_pushnumber(L, trainerSelection());
             return 1;
         }},
-                {.name = "SetTrainerServiceTypeFilter", .func = [](lua_State* L) -> int {
+                {"SetTrainerServiceTypeFilter", [](lua_State* L) -> int {
             const char* which = luaL_optstring(L, 1, "");
             trainerFilters()[which] = lua_toboolean(L, 2) != 0;
             return 0;
         }},
-                {.name = "GetTrainerServiceTypeFilter", .func = [](lua_State* L) -> int {
+                {"GetTrainerServiceTypeFilter", [](lua_State* L) -> int {
             const char* which = luaL_optstring(L, 1, "");
             auto it = trainerFilters().find(which);
             // Unset means showing, which is how a freshly opened panel looks.
@@ -4006,10 +4006,10 @@ void registerQuestLuaAPI(lua_State* L) {
                 // Checked against the table rather than argued from the packet,
                 // because the packet plainly *could* carry several and the
                 // question is whether any server sends them.
-                {.name = "CollapseTrainerSkillLine", .func = [](lua_State* L) -> int { (void)L; return 0; }},
-                {.name = "ExpandTrainerSkillLine",   .func = [](lua_State* L) -> int { (void)L; return 0; }},
+                {"CollapseTrainerSkillLine", [](lua_State* L) -> int { (void)L; return 0; }},
+                {"ExpandTrainerSkillLine",   [](lua_State* L) -> int { (void)L; return 0; }},
                 // GetGlyphLink(socket [, talentGroup]) → hyperlink, or nil
-                {.name = "GetGlyphLink", .func = [](lua_State* L) -> int {
+                {"GetGlyphLink", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
             const int spec  = static_cast<int>(luaL_optnumber(L, 2, 0));
@@ -4035,14 +4035,14 @@ void registerQuestLuaAPI(lua_State* L) {
                 // socket type - major glyphs go in three sockets and minor ones
                 // in the other three, and lighting all six would offer a drop
                 // the server then refuses.
-                {.name = "GlyphMatchesSocket", .func = [](lua_State* L) -> int {
+                {"GlyphMatchesSocket", [](lua_State* L) -> int {
             lua_pushboolean(L, 0);
             return 1;
         }},
                 
                 // SetCursor(art) - the pointer's own image, which this client
                 // does not change.
-                {.name = "SetCursor", .func = [](lua_State* L) -> int { (void)L; return 0; }},
+                {"SetCursor", [](lua_State* L) -> int { (void)L; return 0; }},
                 // How long until the daily quests reset, which the quest log
                 // prints in a tooltip through SecondsToTime. A nil there is
                 // arithmetic on nothing rather than a blank line.
@@ -4059,7 +4059,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // any realm that does not send one. Zero would be wrong in a
                 // way a wrong number is not: SecondsToTime renders it as "the
                 // reset is now", every time the tooltip is opened.
-                {.name = "GetQuestResetTime", .func = [](lua_State* L) -> int {
+                {"GetQuestResetTime", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) {
                 if (const uint32_t left = gh->getSecondsUntilDailyReset(); left > 0) {
                     lua_pushnumber(L, left);
@@ -4081,14 +4081,14 @@ void registerQuestLuaAPI(lua_State* L) {
                 // is what makes a typo look like a working call, and because a
                 // window that calls nothing undefined is the measure of
                 // whether it can be handed over.
-                {.name = "ShowMerchantSellCursor", .func = [](lua_State* L) -> int { (void)L; return 0; }},
+                {"ShowMerchantSellCursor", [](lua_State* L) -> int { (void)L; return 0; }},
                 // The merchant's repair-an-item button toggles between these
                 // two and reads the state back through InRepairMode. All three
                 // were stubs, so the button never latched and the per-item
                 // repair the bags and the paperdoll gate on it was dead.
-                {.name = "ShowRepairCursor",       .func = [](lua_State* L) -> int {
+                {"ShowRepairCursor",       [](lua_State* L) -> int {
             (void)L; repairCursorUp() = true; return 0; }},
-                {.name = "HideRepairCursor",       .func = [](lua_State* L) -> int {
+                {"HideRepairCursor",       [](lua_State* L) -> int {
             (void)L; repairCursorUp() = false; return 0; }},
                 // GetNumCompletedAchievements() → total, completed.
                 //
@@ -4098,7 +4098,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // AchievementFrameSummaryCategoriesStatusBar_Update then does
                 // SetText(completed.."/"..total), and concatenating nil raises,
                 // so opening the achievements panel took its own update down.
-                {.name = "GetNumCompletedAchievements", .func = [](lua_State* L) -> int {
+                {"GetNumCompletedAchievements", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushnumber(L, 0); lua_pushnumber(L, 0); return 2; }
             // The name cache is one entry per achievement in the DBC, which is
@@ -4114,7 +4114,7 @@ void registerQuestLuaAPI(lua_State* L) {
             return 2;
         }},
                 // GetCategoryList() → the achievement category ids, as a table.
-                {.name = "GetCategoryList", .func = [](lua_State* L) -> int {
+                {"GetCategoryList", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_newtable(L);
             if (!gh) return 1;
@@ -4136,7 +4136,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // raised rather than showing an empty tab. The list it wants is
                 // the half GetCategoryList used to return along with everything
                 // else, which put rows nothing can complete under Achievements.
-                {.name = "GetStatisticsCategoryList", .func = [](lua_State* L) -> int {
+                {"GetStatisticsCategoryList", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_newtable(L);
             if (!gh) return 1;
@@ -4150,7 +4150,7 @@ void registerQuestLuaAPI(lua_State* L) {
             return 1;
         }},
                 // GetCategoryInfo(id) → name, parentCategoryID, flags
-                {.name = "GetCategoryInfo", .func = [](lua_State* L) -> int {
+                {"GetCategoryInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (!gh) return luaReturnNil(L);
@@ -4163,7 +4163,7 @@ void registerQuestLuaAPI(lua_State* L) {
             return 3;
         }},
                 // GetCategoryNumAchievements(id) → total, completed, incomplete
-                {.name = "GetCategoryNumAchievements", .func = [](lua_State* L) -> int {
+                {"GetCategoryNumAchievements", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (!gh) { lua_pushnumber(L, 0); lua_pushnumber(L, 0); lua_pushnumber(L, 0); return 3; }
@@ -4177,7 +4177,7 @@ void registerQuestLuaAPI(lua_State* L) {
             lua_pushnumber(L, static_cast<lua_Number>(ids.size() - done));
             return 3;
         }},
-                {.name = "GetAchievementCategory", .func = [](lua_State* L) -> int {
+                {"GetAchievementCategory", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (!gh) return luaReturnNil(L);
@@ -4185,7 +4185,7 @@ void registerQuestLuaAPI(lua_State* L) {
             lua_pushnumber(L, gh->getAchievementCategory(id));
             return 1;
         }},
-                {.name = "GetAchievementNumCriteria", .func = [](lua_State* L) -> int {
+                {"GetAchievementNumCriteria", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (!gh) { lua_pushnumber(L, 0); return 1; }
@@ -4197,7 +4197,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 //   description, criteriaType, completed, quantity,
                 //   reqQuantity, charName, flags, assetID, quantityString,
                 //   criteriaID
-                {.name = "GetAchievementCriteriaInfo", .func = [](lua_State* L) -> int {
+                {"GetAchievementCriteriaInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id  = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             const int  idx = static_cast<int>(luaL_optnumber(L, 2, 0));
@@ -4240,7 +4240,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // these. The earn date is a WoW PackedTime - year in the low
                 // sixteen bits, then day, then month - so it does not sort as
                 // a plain integer and has to be unpacked first.
-                {.name = "GetLatestCompletedAchievements", .func = [](lua_State* L) -> int {
+                {"GetLatestCompletedAchievements", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             std::vector<std::pair<uint32_t, uint32_t>> byDate;  // sortKey, id
@@ -4263,7 +4263,7 @@ void registerQuestLuaAPI(lua_State* L) {
         }},
                 // GetAchievementInfoFromCriteria(criteriaID) → the achievement
                 // that criterion belongs to, in GetAchievementInfo's shape.
-                {.name = "GetAchievementInfoFromCriteria", .func = [](lua_State* L) -> int {
+                {"GetAchievementInfoFromCriteria", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto critId = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (!gh || critId == 0) return luaReturnNil(L);
@@ -4311,7 +4311,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // stops. So "Level 20" showed nothing of the "Level 10" behind
                 // it, and neither did any cooking, fishing or battleground
                 // series.
-                {.name = "GetPreviousAchievement", .func = [](lua_State* L) -> int {
+                {"GetPreviousAchievement", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (!gh || id == 0) return luaReturnNil(L);
@@ -4325,7 +4325,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // - AchievementFrameSummaryAchievement_OnClick walks
                 // `newID, completed = GetNextAchievement(nextID)` to find the
                 // furthest one earned, so the second value is what stops it.
-                {.name = "GetNextAchievement", .func = [](lua_State* L) -> int {
+                {"GetNextAchievement", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (!gh || id == 0) return luaReturnNil(L);
@@ -4349,7 +4349,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // while this answered "--" for every row. "--" is still the
                 // answer when nothing has been counted, because that is what
                 // the real client shows for a statistic never triggered.
-                {.name = "GetStatistic", .func = [](lua_State* L) -> int {
+                {"GetStatistic", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (!gh || id == 0) { lua_pushstring(L, "--"); return 1; }
@@ -4369,7 +4369,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // the inspect itself, and the reply has been parsed into a set
                 // per guid the whole time. What was missing was naming whose
                 // set to read.
-                {.name = "SetAchievementComparisonUnit", .func = [](lua_State* L) -> int {
+                {"SetAchievementComparisonUnit", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const char* uid = luaL_optstring(L, 1, "");
             if (!gh || !uid || !*uid) return 0;
@@ -4378,7 +4378,7 @@ void registerQuestLuaAPI(lua_State* L) {
             gh->setAchievementComparisonGuid(resolveUnitGuid(gh, unit));
             return 0;
         }},
-                {.name = "ClearAchievementComparisonUnit", .func = [](lua_State* L) -> int {
+                {"ClearAchievementComparisonUnit", [](lua_State* L) -> int {
             if (auto* gh = getGameHandler(L)) gh->setAchievementComparisonGuid(0);
             return 0;
         }},
@@ -4387,7 +4387,7 @@ void registerQuestLuaAPI(lua_State* L) {
                 // Nil when nobody is being compared, which is what the tab reads
                 // as "no data yet" - distinct from a false that would claim the
                 // other player has not earned it.
-                {.name = "GetAchievementComparisonInfo", .func = [](lua_State* L) -> int {
+                {"GetAchievementComparisonInfo", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (!gh || id == 0) return luaReturnNil(L);
@@ -4411,8 +4411,8 @@ void registerQuestLuaAPI(lua_State* L) {
                 // this client walks past to reach the end of the packet. Left
                 // as the dash until those are kept: a zero would read as a
                 // player who has never done the thing.
-                {.name = "GetComparisonStatistic",         .func = [](lua_State* L) -> int { lua_pushstring(L, "--"); return 1; }},
-                {.name = "GetComparisonAchievementPoints", .func = [](lua_State* L) -> int {
+                {"GetComparisonStatistic",         [](lua_State* L) -> int { lua_pushstring(L, "--"); return 1; }},
+                {"GetComparisonAchievementPoints", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) { lua_pushnumber(L, 0); return 1; }
             const auto* set = gh->getInspectedPlayerAchievements(
@@ -4427,12 +4427,12 @@ void registerQuestLuaAPI(lua_State* L) {
             lua_pushnumber(L, total);
             return 1;
         }},
-                {.name = "GetTotalAchievementPoints", .func = [](lua_State* L) -> int {
+                {"GetTotalAchievementPoints", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? gh->getTotalAchievementPoints() : 0);
             return 1;
         }},
-                {.name = "GetAchievementLink", .func = [](lua_State* L) -> int {
+                {"GetAchievementLink", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (!gh || id == 0) return luaReturnNil(L);
@@ -4445,30 +4445,30 @@ void registerQuestLuaAPI(lua_State* L) {
             return 1;
         }},
                 // ---- Achievement tracking (client-side, like the quest tracker)
-                {.name = "IsTrackedAchievement", .func = [](lua_State* L) -> int {
+                {"IsTrackedAchievement", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             lua_pushboolean(L, gh && gh->getTrackedAchievements().count(id) ? 1 : 0);
             return 1;
         }},
-                {.name = "AddTrackedAchievement", .func = [](lua_State* L) -> int {
+                {"AddTrackedAchievement", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (gh && id) { gh->setAchievementTracked(id, true); gh->fireAddonEvent("TRACKED_ACHIEVEMENT_UPDATE", {std::to_string(id)}); }
             return 0;
         }},
-                {.name = "RemoveTrackedAchievement", .func = [](lua_State* L) -> int {
+                {"RemoveTrackedAchievement", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const auto id = static_cast<uint32_t>(luaL_optnumber(L, 1, 0));
             if (gh && id) { gh->setAchievementTracked(id, false); gh->fireAddonEvent("TRACKED_ACHIEVEMENT_UPDATE", {std::to_string(id)}); }
             return 0;
         }},
-                {.name = "GetNumTrackedAchievements", .func = [](lua_State* L) -> int {
+                {"GetNumTrackedAchievements", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             lua_pushnumber(L, gh ? static_cast<lua_Number>(gh->getTrackedAchievements().size()) : 0);
             return 1;
         }},
-                {.name = "GetAchievementInfo", .func = [](lua_State* L) -> int {
+                {"GetAchievementInfo", [](lua_State* L) -> int {
             // GetAchievementInfo(id) → id, name, points, completed, month, day, year, description, flags, icon, rewardText, isGuildAch
             auto* gh = getGameHandler(L);
             uint32_t id = static_cast<uint32_t>(luaL_checknumber(L, 1));
