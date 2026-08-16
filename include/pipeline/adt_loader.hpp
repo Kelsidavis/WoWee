@@ -1,5 +1,6 @@
 #pragma once
 
+#include <span>
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -191,25 +192,25 @@ private:
         uint32_t size;
     };
 
-    static bool readChunkHeader(const uint8_t* data, size_t offset, size_t dataSize, ChunkHeader& header);
-    static uint32_t readUInt32(const uint8_t* data, size_t offset);
-    static uint16_t readUInt16(const uint8_t* data, size_t offset);
-    static float readFloat(const uint8_t* data, size_t offset);
+    static bool readChunkHeader(std::span<const uint8_t> data, size_t offset, ChunkHeader& header);
+    static uint32_t readUInt32(std::span<const uint8_t> data, size_t offset);
+    static uint16_t readUInt16(std::span<const uint8_t> data, size_t offset);
+    static float readFloat(std::span<const uint8_t> data, size_t offset);
 
-    static void parseMVER(const uint8_t* data, size_t size, ADTTerrain& terrain);
-    static void parseMTEX(const uint8_t* data, size_t size, ADTTerrain& terrain);
-    static void parseMMDX(const uint8_t* data, size_t size, ADTTerrain& terrain);
-    static void parseMWMO(const uint8_t* data, size_t size, ADTTerrain& terrain);
-    static void parseMDDF(const uint8_t* data, size_t size, ADTTerrain& terrain);
-    static void parseMODF(const uint8_t* data, size_t size, ADTTerrain& terrain);
-    static void parseMCNK(const uint8_t* data, size_t size, int chunkIndex, ADTTerrain& terrain);
+    static void parseMVER(std::span<const uint8_t> data, ADTTerrain& terrain);
+    static void parseMTEX(std::span<const uint8_t> data, ADTTerrain& terrain);
+    static void parseMMDX(std::span<const uint8_t> data, ADTTerrain& terrain);
+    static void parseMWMO(std::span<const uint8_t> data, ADTTerrain& terrain);
+    static void parseMDDF(std::span<const uint8_t> data, ADTTerrain& terrain);
+    static void parseMODF(std::span<const uint8_t> data, ADTTerrain& terrain);
+    static void parseMCNK(std::span<const uint8_t> data, int chunkIndex, ADTTerrain& terrain);
 
-    static void parseMCVT(const uint8_t* data, size_t size, MapChunk& chunk);
-    static void parseMCNR(const uint8_t* data, size_t size, MapChunk& chunk);
-    static void parseMCLY(const uint8_t* data, size_t size, MapChunk& chunk);
-    static void parseMCAL(const uint8_t* data, size_t size, MapChunk& chunk);
-    static void parseMH2O(const uint8_t* data, size_t size, ADTTerrain& terrain);
-    static void parseMCLQ(const uint8_t* data, size_t size, int chunkIndex,
+    static void parseMCVT(std::span<const uint8_t> data, MapChunk& chunk);
+    static void parseMCNR(std::span<const uint8_t> data, MapChunk& chunk);
+    static void parseMCLY(std::span<const uint8_t> data, MapChunk& chunk);
+    static void parseMCAL(std::span<const uint8_t> data, MapChunk& chunk);
+    static void parseMH2O(std::span<const uint8_t> data, ADTTerrain& terrain);
+    static void parseMCLQ(std::span<const uint8_t> data, int chunkIndex,
                           uint32_t mcnkFlags, ADTTerrain& terrain);
 };
 

@@ -1,4 +1,6 @@
 #include "pipeline/adt_loader.hpp"
+
+#include <span>
 #include "core/logger.hpp"
 #include "core/profiler.hpp"
 #include <cstring>
@@ -45,38 +47,38 @@ ADTTerrain ADTLoader::load(const std::vector<uint8_t>& adtData) {
     // Parse chunks
     while (offset < adtData.size()) {
         ChunkHeader header;
-        if (!readChunkHeader(adtData.data(), offset, adtData.size(), header)) {
+        if (!readChunkHeader(adtData, offset, header)) {
             break;
         }
 
-        const uint8_t* chunkData = adtData.data() + offset + 8;
-        size_t chunkSize = header.size;
+        const size_t chunkSize = header.size;
+        const std::span<const uint8_t> chunkData(adtData.data() + offset + 8, chunkSize);
 
         // Parse based on chunk type
         if (header.magic == MVER) {
-            parseMVER(chunkData, chunkSize, terrain);
+            parseMVER(chunkData, terrain);
         }
         else if (header.magic == MTEX) {
-            parseMTEX(chunkData, chunkSize, terrain);
+            parseMTEX(chunkData, terrain);
         }
         else if (header.magic == MMDX) {
-            parseMMDX(chunkData, chunkSize, terrain);
+            parseMMDX(chunkData, terrain);
         }
         else if (header.magic == MWMO) {
-            parseMWMO(chunkData, chunkSize, terrain);
+            parseMWMO(chunkData, terrain);
         }
         else if (header.magic == MDDF) {
-            parseMDDF(chunkData, chunkSize, terrain);
+            parseMDDF(chunkData, terrain);
         }
         else if (header.magic == MODF) {
-            parseMODF(chunkData, chunkSize, terrain);
+            parseMODF(chunkData, terrain);
         }
         else if (header.magic == MH2O) {
             LOG_DEBUG("Found MH2O chunk (", chunkSize, " bytes)");
-            parseMH2O(chunkData, chunkSize, terrain);
+            parseMH2O(chunkData, terrain);
         }
         else if (header.magic == MCNK) {
-            parseMCNK(chunkData, chunkSize, chunkIndex++, terrain);
+            parseMCNK(chunkData, chunkIndex++, terrain);
         }
 
         // Move to next chunk
@@ -88,8 +90,8 @@ ADTTerrain ADTLoader::load(const std::vector<uint8_t>& adtData) {
     return terrain;
 }
 
-bool ADTLoader::readChunkHeader(const uint8_t* data, size_t offset, size_t dataSize, ChunkHeader& header) {
-    if (offset + 8 > dataSize) {
+bool ADTLoader::readChunkHeader(std::span<const uint8_t> data, size_t offset, ChunkHeader& header) {
+    if (offset + 8 > data.size()) {
         return false;
     }
 
@@ -97,7 +99,7 @@ bool ADTLoader::readChunkHeader(const uint8_t* data, size_t offset, size_t dataS
     header.size = readUInt32(data, offset + 4);
 
     // Validate chunk size
-    if (offset + 8 + header.size > dataSize) {
+    if (offset + 8 + header.size > data.size()) {
         LOG_WARNING("Chunk extends beyond file: magic=0x", std::hex, header.magic,
                     ", size=", std::dec, header.size);
         return false;
@@ -106,26 +108,35 @@ bool ADTLoader::readChunkHeader(const uint8_t* data, size_t offset, size_t dataS
     return true;
 }
 
-uint32_t ADTLoader::readUInt32(const uint8_t* data, size_t offset) {
+uint32_t ADTLoader::readUInt32(std::span<const uint8_t> data, size_t offset) {
+    if (offset + sizeof(uint32_t) > data.size()) {
+        return uint32_t{};
+    }
     uint32_t value;
-    std::memcpy(&value, data + offset, sizeof(uint32_t));
+    std::memcpy(&value, data.data() + offset, sizeof(uint32_t));
     return value;
 }
 
-float ADTLoader::readFloat(const uint8_t* data, size_t offset) {
+float ADTLoader::readFloat(std::span<const uint8_t> data, size_t offset) {
+    if (offset + sizeof(float) > data.size()) {
+        return float{};
+    }
     float value;
-    std::memcpy(&value, data + offset, sizeof(float));
+    std::memcpy(&value, data.data() + offset, sizeof(float));
     return value;
 }
 
-uint16_t ADTLoader::readUInt16(const uint8_t* data, size_t offset) {
+uint16_t ADTLoader::readUInt16(std::span<const uint8_t> data, size_t offset) {
+    if (offset + sizeof(uint16_t) > data.size()) {
+        return uint16_t{};
+    }
     uint16_t value;
-    std::memcpy(&value, data + offset, sizeof(uint16_t));
+    std::memcpy(&value, data.data() + offset, sizeof(uint16_t));
     return value;
 }
 
-void ADTLoader::parseMVER(const uint8_t* data, size_t size, ADTTerrain& terrain) {
-    if (size < 4) {
+void ADTLoader::parseMVER(std::span<const uint8_t> data, ADTTerrain& terrain) {
+    if (data.size() < 4) {
         LOG_WARNING("MVER chunk too small");
         return;
     }
@@ -134,15 +145,15 @@ void ADTLoader::parseMVER(const uint8_t* data, size_t size, ADTTerrain& terrain)
     LOG_DEBUG("ADT version: ", terrain.version);
 }
 
-void ADTLoader::parseMTEX(const uint8_t* data, size_t size, ADTTerrain& terrain) {
+void ADTLoader::parseMTEX(std::span<const uint8_t> data, ADTTerrain& terrain) {
     // MTEX contains null-terminated texture filenames.
     // Use bounded scan instead of strlen to avoid reading past the chunk
     // boundary if the last string is not null-terminated (truncated file).
     size_t offset = 0;
 
-    while (offset < size) {
-        const char* textureName = reinterpret_cast<const char*>(data + offset);
-        size_t maxLen = size - offset;
+    while (offset < data.size()) {
+        const char* textureName = reinterpret_cast<const char*>(data.data() + offset);
+        size_t maxLen = data.size() - offset;
         size_t nameLen = strnlen(textureName, maxLen);
 
         if (nameLen == 0) {
@@ -156,13 +167,13 @@ void ADTLoader::parseMTEX(const uint8_t* data, size_t size, ADTTerrain& terrain)
     LOG_DEBUG("Loaded ", terrain.textures.size(), " texture names");
 }
 
-void ADTLoader::parseMMDX(const uint8_t* data, size_t size, ADTTerrain& terrain) {
+void ADTLoader::parseMMDX(std::span<const uint8_t> data, ADTTerrain& terrain) {
     // MMDX contains null-terminated M2 model filenames
     size_t offset = 0;
 
-    while (offset < size) {
-        const char* modelName = reinterpret_cast<const char*>(data + offset);
-        size_t nameLen = strnlen(modelName, size - offset);
+    while (offset < data.size()) {
+        const char* modelName = reinterpret_cast<const char*>(data.data() + offset);
+        size_t nameLen = strnlen(modelName, data.size() - offset);
 
         if (nameLen == 0) {
             break;
@@ -175,13 +186,13 @@ void ADTLoader::parseMMDX(const uint8_t* data, size_t size, ADTTerrain& terrain)
     LOG_DEBUG("Loaded ", terrain.doodadNames.size(), " doodad names");
 }
 
-void ADTLoader::parseMWMO(const uint8_t* data, size_t size, ADTTerrain& terrain) {
+void ADTLoader::parseMWMO(std::span<const uint8_t> data, ADTTerrain& terrain) {
     // MWMO contains null-terminated WMO filenames
     size_t offset = 0;
 
-    while (offset < size) {
-        const char* wmoName = reinterpret_cast<const char*>(data + offset);
-        size_t nameLen = strnlen(wmoName, size - offset);
+    while (offset < data.size()) {
+        const char* wmoName = reinterpret_cast<const char*>(data.data() + offset);
+        size_t nameLen = strnlen(wmoName, data.size() - offset);
 
         if (nameLen == 0) {
             break;
@@ -194,10 +205,10 @@ void ADTLoader::parseMWMO(const uint8_t* data, size_t size, ADTTerrain& terrain)
     LOG_DEBUG("Loaded ", terrain.wmoNames.size(), " WMO names from MWMO chunk");
 }
 
-void ADTLoader::parseMDDF(const uint8_t* data, size_t size, ADTTerrain& terrain) {
+void ADTLoader::parseMDDF(std::span<const uint8_t> data, ADTTerrain& terrain) {
     // MDDF contains doodad placements (36 bytes each)
     const size_t entrySize = 36;
-    size_t count = size / entrySize;
+    size_t count = data.size() / entrySize;
 
     for (size_t i = 0; i < count; i++) {
         size_t offset = i * entrySize;
@@ -226,10 +237,10 @@ void ADTLoader::parseMDDF(const uint8_t* data, size_t size, ADTTerrain& terrain)
     LOG_DEBUG("Loaded ", terrain.doodadPlacements.size(), " doodad placements");
 }
 
-void ADTLoader::parseMODF(const uint8_t* data, size_t size, ADTTerrain& terrain) {
+void ADTLoader::parseMODF(std::span<const uint8_t> data, ADTTerrain& terrain) {
     // MODF contains WMO placements (64 bytes each)
     const size_t entrySize = 64;
-    size_t count = size / entrySize;
+    size_t count = data.size() / entrySize;
 
     for (size_t i = 0; i < count; i++) {
         size_t offset = i * entrySize;
@@ -253,7 +264,7 @@ void ADTLoader::parseMODF(const uint8_t* data, size_t size, ADTTerrain& terrain)
         placement.doodadSet = readUInt16(data, offset + 58);
         // WotLK MODF entries include trailing nameSet + scale (4 bytes); older
         // expansions left them as padding.
-        if (offset + 64 <= size) {
+        if (offset + 64 <= data.size()) {
             placement.nameSet = readUInt16(data, offset + 60);
             placement.scale = readUInt16(data, offset + 62);
             if (placement.scale == 0) placement.scale = 1024;
@@ -273,7 +284,7 @@ void ADTLoader::parseMODF(const uint8_t* data, size_t size, ADTTerrain& terrain)
     LOG_DEBUG("Loaded ", terrain.wmoPlacements.size(), " WMO placements");
 }
 
-void ADTLoader::parseMCNK(const uint8_t* data, size_t size, int chunkIndex, ADTTerrain& terrain) {
+void ADTLoader::parseMCNK(std::span<const uint8_t> data, int chunkIndex, ADTTerrain& terrain) {
     if (chunkIndex < 0 || chunkIndex >= 256) {
         LOG_WARNING("Invalid chunk index: ", chunkIndex);
         return;
@@ -282,7 +293,7 @@ void ADTLoader::parseMCNK(const uint8_t* data, size_t size, int chunkIndex, ADTT
     MapChunk& chunk = terrain.chunks[chunkIndex];
 
     // Read MCNK header (128 bytes)
-    if (size < 128) {
+    if (data.size() < 128) {
         LOG_WARNING("MCNK chunk too small");
         return;
     }
@@ -309,7 +320,7 @@ void ADTLoader::parseMCNK(const uint8_t* data, size_t size, int chunkIndex, ADTT
         LOG_DEBUG("MCNK[0] offsets: nLayers=", nLayers,
                  " height=", ofsHeight, " normal=", ofsNormal,
                  " layer=", ofsLayer, " alpha=", ofsAlpha,
-                 " sizeAlpha=", sizeAlpha, " size=", size,
+                 " sizeAlpha=", sizeAlpha, " size=", data.size(),
                  " holes=0x", std::hex, chunk.holes, std::dec);
     }
 
@@ -329,7 +340,7 @@ void ADTLoader::parseMCNK(const uint8_t* data, size_t size, int chunkIndex, ADTT
     // Height map (MCVT) - 145 floats = 580 bytes.
     // Guard must include the potential 8-byte sub-chunk header, otherwise the
     // parser reads up to 8 bytes past the validated range.
-    if (ofsHeight > 0 && ofsHeight + 580 + 8 <= size) {
+    if (ofsHeight > 0 && ofsHeight + 580 + 8 <= data.size()) {
         uint32_t possibleMagic = readUInt32(data, ofsHeight);
         uint32_t headerSkip = 0;
         if (possibleMagic == MCVT) {
@@ -338,14 +349,14 @@ void ADTLoader::parseMCNK(const uint8_t* data, size_t size, int chunkIndex, ADTT
                 LOG_DEBUG("MCNK sub-chunks have headers (MCVT magic found at offset ", ofsHeight, ")");
             }
         }
-        parseMCVT(data + ofsHeight + headerSkip, 580, chunk);
+        parseMCVT(data.subspan(ofsHeight + headerSkip, 580), chunk);
     }
 
     // Normals (MCNR) - 145 normals (3 bytes each) + 13 padding = 448 bytes.
-    if (ofsNormal > 0 && ofsNormal + 448 + 8 <= size) {
+    if (ofsNormal > 0 && ofsNormal + 448 + 8 <= data.size()) {
         uint32_t possibleMagic = readUInt32(data, ofsNormal);
         uint32_t skip = (possibleMagic == MCNR) ? 8 : 0;
-        parseMCNR(data + ofsNormal + skip, 448, chunk);
+        parseMCNR(data.subspan(ofsNormal + skip, 448), chunk);
     }
 
     // Texture layers (MCLY) - 16 bytes per layer
@@ -353,33 +364,41 @@ void ADTLoader::parseMCNK(const uint8_t* data, size_t size, int chunkIndex, ADTT
         size_t layerSize = nLayers * 16;
         uint32_t possibleMagic = readUInt32(data, ofsLayer);
         uint32_t skip = (possibleMagic == MCLY) ? 8 : 0;
-        if (ofsLayer + skip + layerSize <= size) {
-            parseMCLY(data + ofsLayer + skip, layerSize, chunk);
+        if (ofsLayer + skip + layerSize <= data.size()) {
+            parseMCLY(data.subspan(ofsLayer + skip, layerSize), chunk);
         }
     }
 
-    // Alpha maps (MCAL) - variable size from header
-    if (ofsAlpha > 0 && sizeAlpha > 0 && ofsAlpha + sizeAlpha <= size) {
+    // Alpha maps (MCAL) - variable size from header.
+    // sizeAlpha is only known to be >= 1 here, so a four-byte chunk whose
+    // contents happen to spell MCAL would take skip to 8 and wrap
+    // sizeAlpha - skip to ~1.8e19. Drop the sub-chunk rather than hand a
+    // parser a length longer than the address space.
+    if (ofsAlpha > 0 && sizeAlpha > 0 && ofsAlpha + sizeAlpha <= data.size()) {
         uint32_t possibleMagic = readUInt32(data, ofsAlpha);
         uint32_t skip = (possibleMagic == MCAL) ? 8 : 0;
-        parseMCAL(data + ofsAlpha + skip, sizeAlpha - skip, chunk);
+        if (sizeAlpha > skip) {
+            parseMCAL(data.subspan(ofsAlpha + skip, sizeAlpha - skip), chunk);
+        }
     }
 
     // Liquid (MCLQ) - vanilla/TBC per-chunk water (no MH2O in these expansions)
     // ofsLiquid at MCNK header offset 0x60, sizeLiquid at 0x64
     uint32_t ofsLiquid = readUInt32(data, 0x60);
     uint32_t sizeLiquid = readUInt32(data, 0x64);
-    if (ofsLiquid > 0 && sizeLiquid > 8 && ofsLiquid + sizeLiquid <= size) {
+    if (ofsLiquid > 0 && sizeLiquid > 8 && ofsLiquid + sizeLiquid <= data.size()) {
         uint32_t possibleMagic = readUInt32(data, ofsLiquid);
         uint32_t skip = (possibleMagic == MCLQ) ? 8 : 0;
-        parseMCLQ(data + ofsLiquid + skip, sizeLiquid - skip,
-                  chunkIndex, chunk.flags, terrain);
+        if (sizeLiquid > skip) {
+            parseMCLQ(data.subspan(ofsLiquid + skip, sizeLiquid - skip),
+                      chunkIndex, chunk.flags, terrain);
+        }
     }
 }
 
-void ADTLoader::parseMCVT(const uint8_t* data, size_t size, MapChunk& chunk) {
-    if (size < kMCVTVertexCount * sizeof(float)) {
-        LOG_WARNING("MCVT chunk too small: ", size, " bytes");
+void ADTLoader::parseMCVT(std::span<const uint8_t> data, MapChunk& chunk) {
+    if (data.size() < kMCVTVertexCount * sizeof(float)) {
+        LOG_WARNING("MCVT chunk too small: ", data.size(), " bytes");
         return;
     }
 
@@ -407,10 +426,10 @@ void ADTLoader::parseMCVT(const uint8_t* data, size_t size, MapChunk& chunk) {
     }
 }
 
-void ADTLoader::parseMCNR(const uint8_t* data, size_t size, MapChunk& chunk) {
+void ADTLoader::parseMCNR(std::span<const uint8_t> data, MapChunk& chunk) {
     // MCNR: one signed XYZ normal per vertex (3 bytes each)
-    if (size < kMCVTVertexCount * 3) {
-        LOG_WARNING("MCNR chunk too small: ", size, " bytes");
+    if (data.size() < kMCVTVertexCount * 3) {
+        LOG_WARNING("MCNR chunk too small: ", data.size(), " bytes");
         return;
     }
 
@@ -419,9 +438,9 @@ void ADTLoader::parseMCNR(const uint8_t* data, size_t size, MapChunk& chunk) {
     }
 }
 
-void ADTLoader::parseMCLY(const uint8_t* data, size_t size, MapChunk& chunk) {
+void ADTLoader::parseMCLY(std::span<const uint8_t> data, MapChunk& chunk) {
     // MCLY contains texture layer definitions (16 bytes each)
-    size_t layerCount = size / 16;
+    size_t layerCount = data.size() / 16;
 
     if (layerCount > 4) {
         LOG_WARNING("More than 4 texture layers: ", layerCount);
@@ -450,14 +469,14 @@ void ADTLoader::parseMCLY(const uint8_t* data, size_t size, MapChunk& chunk) {
     }
 }
 
-void ADTLoader::parseMCAL(const uint8_t* data, size_t size, MapChunk& chunk) {
+void ADTLoader::parseMCAL(std::span<const uint8_t> data, MapChunk& chunk) {
     // MCAL contains alpha maps for texture layers
     // Store raw data; decompression happens per-layer during mesh generation
-    chunk.alphaMap.resize(size);
-    std::memcpy(chunk.alphaMap.data(), data, size);
+    chunk.alphaMap.resize(data.size());
+    std::memcpy(chunk.alphaMap.data(), data.data(), data.size());
 }
 
-void ADTLoader::parseMCLQ(const uint8_t* data, size_t size, int chunkIndex,
+void ADTLoader::parseMCLQ(std::span<const uint8_t> data, int chunkIndex,
                           uint32_t mcnkFlags, ADTTerrain& terrain) {
     // MCLQ: Vanilla/TBC per-chunk liquid data (inside MCNK)
     // Layout:
@@ -468,7 +487,7 @@ void ADTLoader::parseMCLQ(const uint8_t* data, size_t size, int chunkIndex,
     //   uint8 tiles[8*8]            (64 bytes)
     // Total minimum: 720 bytes
 
-    if (size < 720) {
+    if (data.size() < 720) {
         return;  // Not enough data for a valid MCLQ
     }
 
@@ -483,14 +502,14 @@ void ADTLoader::parseMCLQ(const uint8_t* data, size_t size, int chunkIndex,
     else if (mcnkFlags & 0x20) liquidType = 3;  // slime
 
     // Read 9x9 height values (skip depth/flow bytes, just read the float height)
-    const uint8_t* vertData = data + 8;
+    const std::span<const uint8_t> vertData = data.subspan(8);
     std::vector<float> heights(81);
     for (int i = 0; i < 81; i++) {
         heights[i] = readFloat(vertData, i * 8 + 4);  // float at offset 4 within each 8-byte vertex
     }
 
     // Read 8x8 tile flags
-    const uint8_t* tileData = data + 8 + 648;
+    const std::span<const uint8_t> tileData = data.subspan(8 + 648);
     std::vector<uint8_t> tileMask(64);
     bool anyVisible = false;
     for (int i = 0; i < 64; i++) {
@@ -552,7 +571,7 @@ void ADTLoader::parseMCLQ(const uint8_t* data, size_t size, int chunkIndex,
     }
 }
 
-void ADTLoader::parseMH2O(const uint8_t* data, size_t size, ADTTerrain& terrain) {
+void ADTLoader::parseMH2O(std::span<const uint8_t> data, ADTTerrain& terrain) {
     // MH2O contains water/liquid data for all 256 map chunks
     // Structure: 256 SMLiquidChunk headers followed by instance data
 
@@ -561,11 +580,11 @@ void ADTLoader::parseMH2O(const uint8_t* data, size_t size, ADTTerrain& terrain)
     // - uint32_t layerCount
     // - uint32_t offsetAttributes (offset from MH2O chunk start)
 
-    const size_t headerSize = 12;  // SMLiquidChunk size for WotLK
+    const size_t headerSize = 12;  // SMLiquidChunk data.size() for WotLK
     const size_t totalHeaderSize = 256 * headerSize;
 
-    if (size < totalHeaderSize) {
-        LOG_WARNING("MH2O chunk too small for headers: ", size, " bytes");
+    if (data.size() < totalHeaderSize) {
+        LOG_WARNING("MH2O chunk too small for headers: ", data.size(), " bytes");
         return;
     }
 
@@ -583,7 +602,7 @@ void ADTLoader::parseMH2O(const uint8_t* data, size_t size, ADTTerrain& terrain)
         }
 
         // Sanity checks
-        if (offsetInstances >= size) {
+        if (offsetInstances >= data.size()) {
             continue;
         }
         if (layerCount > 16) {
@@ -596,7 +615,7 @@ void ADTLoader::parseMH2O(const uint8_t* data, size_t size, ADTTerrain& terrain)
         for (uint32_t layerIdx = 0; layerIdx < layerCount; layerIdx++) {
             size_t instanceOffset = offsetInstances + layerIdx * 24;
 
-            if (instanceOffset + 24 > size) {
+            if (instanceOffset + 24 > data.size()) {
                 break;
             }
 
@@ -635,8 +654,8 @@ void ADTLoader::parseMH2O(const uint8_t* data, size_t size, ADTTerrain& terrain)
             bool anyTile = false;
             size_t packedBytes = (static_cast<size_t>(layer.width) * layer.height + 7) / 8;
             bool haveBitmap = offsetExistsBitmap > 0 &&
-                              offsetExistsBitmap + packedBytes <= size;
-            const uint8_t* bits = haveBitmap ? data + offsetExistsBitmap : nullptr;
+                              offsetExistsBitmap + packedBytes <= data.size();
+            const uint8_t* bits = haveBitmap ? data.data() + offsetExistsBitmap : nullptr;
             int bitPos = 0;
             for (int row = 0; row < layer.height; row++) {
                 for (int col = 0; col < layer.width; col++, bitPos++) {
@@ -665,7 +684,7 @@ void ADTLoader::parseMH2O(const uint8_t* data, size_t size, ADTTerrain& terrain)
                 size_t vertexOffset = offsetVertexData;
                 size_t vertexDataSize = numVertices * sizeof(float);
 
-                if (vertexOffset + vertexDataSize <= size) {
+                if (vertexOffset + vertexDataSize <= data.size()) {
                     layer.heights.resize(numVertices);
                     for (size_t i = 0; i < numVertices; i++) {
                         layer.heights[i] = readFloat(data, vertexOffset + i * sizeof(float));
@@ -687,7 +706,7 @@ void ADTLoader::parseMH2O(const uint8_t* data, size_t size, ADTTerrain& terrain)
         }
     }
 
-    LOG_DEBUG("Loaded MH2O water data: ", totalLayers, " liquid layers across ", size, " bytes");
+    LOG_DEBUG("Loaded MH2O water data: ", totalLayers, " liquid layers across ", data.size(), " bytes");
 }
 
 } // namespace pipeline
