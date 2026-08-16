@@ -49,6 +49,38 @@ std::set<std::string> namesIn(const std::string& source, const std::string& list
     return out;
 }
 
+
+// Whether a field is handed to something rather than merely mentioned.
+//
+// The field name appearing anywhere in the file is not enough: a comment, a
+// (void) cast or a line that writes it back to the config all contain it, and
+// a setting can be loaded, named and never applied. An occurrence counts when
+// the previous non-space character is '(' or ',' - it is an argument - or '='
+// with the field on the right, which assigns it into something live.
+bool handedToSomething(const std::string& source, const std::string& field) {
+    for (size_t at = source.find(field); at != std::string::npos;
+         at = source.find(field, at + 1)) {
+        const size_t lineStart = source.rfind('\n', at) + 1;
+        const std::string before = source.substr(lineStart, at - lineStart);
+        if (before.find("//") != std::string::npos) continue;  // in a comment
+
+        size_t back = at;
+        while (back > 0 && std::isspace(static_cast<unsigned char>(source[back - 1]))) --back;
+        // The qualifier in front of the member is part of the expression, not
+        // the thing that receives it.
+        static const std::string kQualifier = "settingsPanel_.";
+        if (back >= kQualifier.size() &&
+            source.compare(back - kQualifier.size(), kQualifier.size(), kQualifier) == 0) {
+            back -= kQualifier.size();
+            while (back > 0 && std::isspace(static_cast<unsigned char>(source[back - 1]))) --back;
+        }
+        if (back == 0) continue;
+        const char prev = source[back - 1];
+        if (prev == '(' || prev == ',' || prev == '=') return true;
+    }
+    return false;
+}
+
 }  // namespace
 
 TEST_CASE("the test can read the source it checks", "[settings]") {
@@ -201,7 +233,7 @@ TEST_CASE("every setting reaches its target at startup", "[settings]") {
         INFO(key << " is loaded into " << bound->second
                  << ", which nothing in game_screen.cpp hands to anything -"
                     " so the value is shown on the control and never applied");
-        CHECK(screen.find(bound->second) != std::string::npos);
+        CHECK(handedToSomething(screen, bound->second));
     }
 }
 
