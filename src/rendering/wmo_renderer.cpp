@@ -980,9 +980,12 @@ WMORenderer::ModelLoadResult WMORenderer::loadModelIncremental(
             " groups - geometry is missing from this model");
     }
 
+    // Read before the move: the log line below reports what was stored, and
+    // modelData no longer owns it afterwards.
+    const uint32_t loadedGroupCount = modelData.loadedGroups;
     loadedModels[id] = std::move(modelData);
     loadingModels_.erase(id);
-    core::Logger::getInstance().debug("WMO model ", id, " loaded successfully (", modelData.loadedGroups, " groups)");
+    core::Logger::getInstance().debug("WMO model ", id, " loaded successfully (", loadedGroupCount, " groups)");
     return ModelLoadResult::Complete;
 }
 

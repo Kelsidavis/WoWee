@@ -470,6 +470,11 @@ void CombatHandler::addCombatText(CombatTextEntry::Type type, int32_t amount, ui
                           : (isPlayerSource ? owner_.getTargetGuid() : owner_.getPlayerGuid());
     log.sourceName = owner_.lookupName(effectiveSrc);
     log.targetName = (effectiveDst != 0) ? owner_.lookupName(effectiveDst) : std::string{};
+    // Held for the addon event below. log is moved into combatLog_ here, which
+    // leaves both name strings empty, so reading them afterwards sent every
+    // COMBAT_LOG_EVENT_UNFILTERED to Lua with a blank source and target.
+    const std::string sourceName = log.sourceName;
+    const std::string targetName = log.targetName;
     if (combatLog_.size() >= MAX_COMBAT_LOG)
         combatLog_.pop_front();
     combatLog_.push_back(std::move(log));
@@ -495,8 +500,8 @@ void CombatHandler::addCombatText(CombatTextEntry::Type type, int32_t amount, ui
         std::string timestamp = std::to_string(static_cast<double>(std::time(nullptr)));
         owner_.addonEventCallbackRef()("COMBAT_LOG_EVENT_UNFILTERED", {
             timestamp, subevent,
-            srcBuf, log.sourceName, "0",
-            dstBuf, log.targetName, "0",
+            srcBuf, sourceName, "0",
+            dstBuf, targetName, "0",
             std::to_string(spellId), spellName,
             std::to_string(amount)
         });
