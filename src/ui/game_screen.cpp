@@ -728,11 +728,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
             [this](uint32_t id, pipeline::AssetManager* am) { return getSpellIcon(id, am); },
             inventoryScreen);
     }
-    if (!frameXmlOwns(UiElement::TradeSkill)) {
-        windowManager_.renderCraftingWindow(gameHandler,
-            [this](uint32_t id, pipeline::AssetManager* am) { return getSpellIcon(id, am); },
-            inventoryScreen);
-    }
     if (!frameXmlOwns(UiElement::BarberShop)) {
         windowManager_.renderBarberShopWindow(gameHandler);
     }

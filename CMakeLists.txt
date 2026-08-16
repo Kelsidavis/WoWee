@@ -936,7 +936,6 @@ set(WOWEE_SOURCES
     src/ui/social_panel.cpp
     src/ui/action_bar_panel.cpp
     src/ui/window_manager.cpp
-    src/ui/crafting_window.cpp
     src/ui/gm_command_screen.cpp
     src/ui/bis_gear_data.cpp
     src/ui/inventory_screen.cpp

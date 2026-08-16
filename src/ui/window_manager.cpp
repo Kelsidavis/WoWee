@@ -5347,5 +5347,34 @@ void WindowManager::renderSkillsWindow(game::GameHandler& gameHandler) {
 }
 
 
+
+// Recipe difficulty against the player's current skill, in the classic
+// tradeskill colours. The rank comes from GameHandler so this and the
+// interface's own trade skill panel cannot disagree about a recipe.
+namespace {
+constexpr ImVec4 kDiffOrange(1.0f, 0.5f, 0.0f, 1.0f);
+constexpr ImVec4 kDiffYellow(1.0f, 1.0f, 0.0f, 1.0f);
+constexpr ImVec4 kDiffGreen(0.3f, 0.8f, 0.3f, 1.0f);
+constexpr ImVec4 kDiffGray(0.5f, 0.5f, 0.5f, 1.0f);
+}  // namespace
+
+ImVec4 WindowManager::recipeDifficultyColor(game::GameHandler& gameHandler, uint32_t spellId) {
+    switch (gameHandler.getRecipeDifficulty(spellId)) {
+        case 3:  return kDiffGray;
+        case 2:  return kDiffGreen;
+        case 1:  return kDiffYellow;
+        default: return kDiffOrange;
+    }
+}
+
+const char* WindowManager::recipeDifficultyLabel(game::GameHandler& gameHandler, uint32_t spellId) {
+    switch (gameHandler.getRecipeDifficulty(spellId)) {
+        case 3:  return "Trivial";
+        case 2:  return "Easy";
+        case 1:  return "Medium";
+        default: return "Optimal";
+    }
+}
+
 } // namespace ui
 } // namespace wowee

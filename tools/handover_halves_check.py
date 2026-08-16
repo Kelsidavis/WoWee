@@ -39,8 +39,16 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TAKEOVER = ROOT / "src/ui/framexml_takeover.cpp"
 
-# Elements whose drawing this client never had, so there is nothing to gate.
-NOTHING_TO_GATE = set()
+# Elements this client does not draw, so there is nothing to gate. Either it
+# never had its own version, or that version has been removed now that
+# FrameXML's is the one on screen. An entry here is a deletion recorded, not an
+# exemption: the element must have no drawing left in src/ui at all.
+NOTHING_TO_GATE = {
+    # src/ui/crafting_window.cpp, removed once the trade skill window was
+    # FrameXML's. Its two difficulty helpers moved to window_manager.cpp,
+    # where the trainer list still uses them.
+    "TradeSkill",
+}
 
 
 def main():
