@@ -1,5 +1,30 @@
 # Changelog
 
+## [v3.1.4] - 2026-08-15
+
+### Fixed
+- **The flight map stayed open for the whole flight.** The taxi window's flag is cleared the moment the activation is sent, so the TAXIMAP_CLOSED fired on the server's reply saw an already-closed window and never went out. This client's own map and node list poll the flag and closed; the interface's own flight map only hides on the event
+- **The flight master had no portrait, and his window did not close when you walked away.** Two members left on GameHandler by the handler split were never assigned after it, and the guid the interact-NPC and walk-too-far checks read came from those. Of the four windows that close when the player leaves the NPC, the taxi one alone did not
+- **The quest dialog stayed on screen after the reward was taken.** Taking it put the fields back and announced nothing, and the interface's quest frame hides on QUEST_FINISHED and nothing else
+- **Bank slots kept showing an item after it was moved to the bags.** The slot was announced from the field parse, but what a slot holds is written by the inventory rebuild that runs after it, so the frame redrew from what the slot had held a moment earlier and was never told again. It took closing and reopening the bank
+- **Half the heals in the game refused instead of casting on you.** The self-cast fallback asked whether a spell's aim was 21, and measured over the shipped Spell.dbc, Holy Light and Healing Wave are 45 while Hand of Protection, Beacon of Light, Levitate and Intervene are 57. Those went out at whatever was selected and came back refused
+- **Scrolls and bandages were sent at the selected enemy.** The item path asked the same narrow question. A scroll now buffs whoever read it rather than raising a targeting cursor
+- **The character was re-aimed at its target five times a second.** Auto-attack pushed a facing update for as long as the attack lasted, so turning away with the mouse snapped straight back and backing away from something while fighting it was impossible. The turn happens once, where the attack is commanded
+- **The tailoring window was titled "Two-Handed Axes".** The skill name lookup read its argument as a spell id and followed SkillLineAbility, while every caller holds a skill line id: Tailoring is line 197, and spell 197 is a Two-Handed Axes rank. The trainer's required-skill text had the same fault
+- **Every recipe showed the same icon.** The trade skill pane drew the recipe spell's own icon, and a crafting spell carries its profession's picture rather than its product's - every tailoring spell in the shipped file is the same one. It now shows what the recipe makes
+- **A gap between the torso and the legs where a belt would be.** Geoset group 18 is erased and rebuilt on every equipment change, and the belt was the one group with no base variant to fall back to. The older human male carries nothing there to lose; the Legion model carries the waist itself
+- **Training costs read as three numbers in a row.** The coin pictures are taken off every money frame, the backpack's own art already drawing them, which left nothing to tell gold from silver. Each amount ends in the interface's own letter again
+- **Chat emptied itself while it was being read.** The chat frame template asks for lines to fade two minutes after they arrive
+- **The interface's fourth action bar checkbox did nothing.** It is labelled "Right Bar 2" and drives the left bar - action page 4 - so it was never matched to the setting behind it, and turning that bar on from this client's own panel left the checkbox unticked
+- **An action dragged off a bar went back to where it came from.** Dropping it away from the bar removes it now, as the real client does; a right-release puts it back
+
+### Changed
+- **A wand is not a gun.** One inventory type carries guns, crossbows and wands, and only the first two were told apart, so a wand was shouldered and fired like a rifle. WOWEE_WAND_ANIM overrides the shot animation while the right one is chosen on screen
+- **The mature language filter is gone**, list and control alike. It took its words from eleven English ones written into this client, so it filtered unevenly and filtered for players who had not asked. The spam filter beside it stays
+
+### Removed
+- **This client's own crafting, taxi, stable, book, achievement, GM ticket, gossip and quest giver windows.** All eight are drawn by the interface now, so none of them had appeared in a long time. Around 1,600 lines, with their state, and the openers that reached them route to the interface's own panels
+
 ## [v3.1.3] - 2026-08-15
 
 ### Fixed
