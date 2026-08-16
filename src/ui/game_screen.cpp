@@ -607,10 +607,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                 combatUI_.showBgScoreboard_ = !combatUI_.showBgScoreboard_;
         }
         if (cmds.showGmTicket) {
-            if (frameXmlOwns(UiElement::Help))
-                gameHandler.runInterfaceCommand("ToggleHelpFrame()");
-            else
-                windowManager_.showGmTicketWindow_ = true;
+            gameHandler.runInterfaceCommand("ToggleHelpFrame()");
         }
         // Tab two is the who list. The client's own who window is gated on
         // the social element like the rest of that panel's windows.
@@ -756,15 +753,9 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         socialPanel_.renderWhoWindow(gameHandler, chatPanel_);
     }
     combatUI_.renderCombatLog(gameHandler, spellbookScreen);
-    if (!frameXmlOwns(UiElement::Achievements)) {
-        windowManager_.renderAchievementWindow(gameHandler);
-    }
     windowManager_.renderSkillsWindow(gameHandler);
     windowManager_.renderTitlesWindow(gameHandler);
     windowManager_.renderEquipSetWindow(gameHandler);
-    if (!frameXmlOwns(UiElement::Help)) {
-        windowManager_.renderGmTicketWindow(gameHandler);
-    }
     if (!frameXmlOwns(UiElement::Inspect)) {
         socialPanel_.renderInspectWindow(gameHandler, inventoryScreen);
     }
@@ -1791,11 +1782,7 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
             }
 
             if (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_ACHIEVEMENTS)) {
-                if (frameXmlOwns(UiElement::Achievements)) {
-                    gameHandler.runInterfaceCommand("ToggleAchievementFrame()");
-                } else {
-                    windowManager_.showAchievementWindow_ = !windowManager_.showAchievementWindow_;
-                }
+                gameHandler.runInterfaceCommand("ToggleAchievementFrame()");
             }
             if (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_SKILLS)) {
                 // The skills list is a tab of the character sheet in FrameXML

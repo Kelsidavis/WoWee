@@ -89,8 +89,6 @@ public:
     void renderDeathScreen(game::GameHandler& gameHandler);
     void renderReclaimCorpseButton(game::GameHandler& gameHandler);
     void renderInstanceLockouts(game::GameHandler& gameHandler);
-    void renderAchievementWindow(game::GameHandler& gameHandler);
-    void renderGmTicketWindow(game::GameHandler& gameHandler);
     void renderTitlesWindow(game::GameHandler& gameHandler);
     void renderEquipSetWindow(game::GameHandler& gameHandler);
     void renderSkillsWindow(game::GameHandler& gameHandler);
@@ -128,13 +126,6 @@ public:
     // Instance lockouts
     bool showInstanceLockouts_ = false;
 
-    // Achievements
-    bool showAchievementWindow_ = false;
-    char achievementSearchBuf_[128] = {};
-    // Achievement artwork: SpellIcon.dbc ID → path, and resolved textures keyed by icon ID.
-    std::unordered_map<uint32_t, std::string> achievementIconPaths_;
-    std::unordered_map<uint32_t, VkDescriptorSet> achievementIconCache_;
-    bool achievementIconDbLoaded_ = false;
 
     // Skills / Professions
     bool showSkillsWindow_ = false;
@@ -146,9 +137,6 @@ public:
     bool showEquipSetWindow_ = false;
 
     // GM Ticket
-    bool showGmTicketWindow_     = false;
-    bool gmTicketWindowWasOpen_  = false;
-    char gmTicketBuf_[2048] = {};
 
     // Death screen
     float deathElapsed_ = 0.0f;
@@ -270,7 +258,6 @@ public:
 private:
     UIServices services_;
     // Resolve an achievement's SpellIcon.dbc ID to an ImGui texture (lazy BLP load + cache).
-    VkDescriptorSet getAchievementIcon(uint32_t spellIconId);
     std::string formatExtendedCost(uint32_t extendedCostId, game::GameHandler& gameHandler);
 };
 

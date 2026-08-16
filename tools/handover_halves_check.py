@@ -51,6 +51,10 @@ NOTHING_TO_GATE = {
     # src/ui/window_manager.cpp's renderStableWindow, removed once the stable
     # was FrameXML's. Its pet list comes from the same handler either way.
     "Stable",
+    # src/ui/window_manager.cpp's renderGmTicketWindow, removed once the help
+    # panel was FrameXML's. Both openers - the escape menu button and the slash
+    # command - call ToggleHelpFrame now.
+    "Help",
 }
 
 
