@@ -742,8 +742,8 @@ WMORenderer::ModelLoadResult WMORenderer::loadModelIncremental(
                 }
             }
 
-            BatchKey key{ reinterpret_cast<uintptr_t>(tex), alphaTest, unlit,
-                          isWindow, emissiveLevel };
+            BatchKey key{ .texPtr = reinterpret_cast<uintptr_t>(tex), .alphaTest = alphaTest, .unlit = unlit,
+                          .isWindow = isWindow, .emissiveLevel = emissiveLevel };
             auto& mb = batchMap[key];
             if (mb.draws.empty()) {
                 mb.texture = tex;
@@ -1868,7 +1868,7 @@ void WMORenderer::renderShadow(VkCommandBuffer cmd, const glm::mat4& lightSpaceM
         if (modelIt == loadedModels.end()) continue;
         const ModelData& model = modelIt->second;
 
-        ShadowPush push{lightSpaceMatrix, instance.modelMatrix};
+        ShadowPush push{.lightSpaceMatrix = lightSpaceMatrix, .model = instance.modelMatrix};
         vkCmdPushConstants(cmd, shadowPipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT,
                            0, 128, &push);
 
@@ -2133,7 +2133,7 @@ void WMORenderer::destroyGroupGPU(GroupResources& group, bool defer) {
         std::vector<MatSnapshot> mats;
         mats.reserve(group.mergedBatches.size());
         for (auto& mb : group.mergedBatches) {
-            mats.push_back({mb.materialSet, mb.materialUBO, mb.materialUBOAlloc});
+            mats.push_back({.set = mb.materialSet, .ubo = mb.materialUBO, .uboAlloc = mb.materialUBOAlloc});
             mb.materialSet = VK_NULL_HANDLE;
             mb.materialUBO = VK_NULL_HANDLE;
         }
@@ -2853,7 +2853,7 @@ void WMORenderer::GroupResources::buildCollisionGrid() {
         // Per-triangle Z bounds
         float triMinZ = std::min({v0.z, v1.z, v2.z});
         float triMaxZ = std::max({v0.z, v1.z, v2.z});
-        triBounds[i / 3] = { triMinZ, triMaxZ };
+        triBounds[i / 3] = { .minZ = triMinZ, .maxZ = triMaxZ };
 
         // Precompute and store unit normal
         glm::vec3 edge1 = v1 - v0;
@@ -3779,7 +3779,7 @@ uint32_t WMORenderer::gatherLavaLights(const glm::vec3& cameraPos,
                 if (distSq > 300.0f * 300.0f) continue;
                 const float worldRadius = std::clamp(localLight.w * instance.scale,
                                                      8.0f, 35.0f);
-                candidates.push_back({distSq, glm::vec4(worldPos, worldRadius)});
+                candidates.push_back({.distSq = distSq, .posRadius = glm::vec4(worldPos, worldRadius)});
             }
         }
     }

@@ -87,7 +87,7 @@ Ray Camera::screenToWorldRay(float screenX, float screenY, float screenW, float 
     nearPt /= nearPt.w;
     farPt  /= farPt.w;
 
-    return { glm::vec3(nearPt), glm::normalize(glm::vec3(farPt - nearPt)) };
+    return { .origin = glm::vec3(nearPt), .direction = glm::normalize(glm::vec3(farPt - nearPt)) };
 }
 
 } // namespace rendering

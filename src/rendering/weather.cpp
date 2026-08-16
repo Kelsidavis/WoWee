@@ -343,7 +343,7 @@ void Weather::shutdown() {
 // ---------------------------------------------------------------------------
 
 void Weather::setZoneWeather(uint32_t zoneId, Type type, float minIntensity, float maxIntensity, float probability) {
-    zoneWeatherTable_[zoneId] = {type, minIntensity, maxIntensity, probability};
+    zoneWeatherTable_[zoneId] = {.type = type, .minIntensity = minIntensity, .maxIntensity = maxIntensity, .probability = probability};
 }
 
 void Weather::initializeZoneWeatherDefaults() {

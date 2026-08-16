@@ -20,10 +20,10 @@ namespace rendering {
 
 /// What assets/shaders/terrain.vert.glsl declares, in its order.
 inline constexpr std::array<VertexAttribute, 4> kTerrainVertexAttributes = {{
-    {0, 3, static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, position))},
-    {1, 3, static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, normal))},
-    {2, 2, static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, texCoord))},
-    {3, 2, static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, layerUV))},
+    {.location = 0, .componentCount = 3, .offset = static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, position))},
+    {.location = 1, .componentCount = 3, .offset = static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, normal))},
+    {.location = 2, .componentCount = 2, .offset = static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, texCoord))},
+    {.location = 3, .componentCount = 2, .offset = static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, layerUV))},
 }};
 
 /// The same geometry through the shared shadow shader, which declares bone
@@ -33,10 +33,10 @@ inline constexpr std::array<VertexAttribute, 4> kTerrainVertexAttributes = {{
 /// bounds. useBones is 0 in the shadow pass, so nothing reads them; a declared
 /// input with no description would make the pipeline invalid.
 inline constexpr std::array<VertexAttribute, 4> kTerrainShadowVertexAttributes = {{
-    {0, 3, static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, position))},
-    {1, 2, static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, texCoord))},
-    {2, 4, static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, position))},
-    {3, 4, static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, position))},
+    {.location = 0, .componentCount = 3, .offset = static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, position))},
+    {.location = 1, .componentCount = 2, .offset = static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, texCoord))},
+    {.location = 2, .componentCount = 4, .offset = static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, position))},
+    {.location = 3, .componentCount = 4, .offset = static_cast<uint32_t>(offsetof(pipeline::TerrainVertex, position))},
 }};
 
 }  // namespace rendering

@@ -41,7 +41,7 @@ ImGuiTexture makeImGuiTexture(VkContext& ctx, const pipeline::BLPImage& image) {
         return {};
     }
 
-    return ImGuiTexture{std::move(texture), descriptorSet};
+    return ImGuiTexture{.texture = std::move(texture), .descriptorSet = descriptorSet};
 }
 
 ImGuiTexture loadImGuiTexture(pipeline::AssetManager& assets, VkContext& ctx,

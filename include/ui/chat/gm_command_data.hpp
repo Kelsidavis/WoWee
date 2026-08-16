@@ -23,6 +23,8 @@ struct GmCommandEntry {
 // Curated list of the most useful GM commands for a client emulator.
 // The full AzerothCore list has 500+ commands - this table covers the
 // ones players/GMs actually type regularly, organized by category.
+// NOLINTBEGIN(modernize-use-designated-initializers) - 206 rows whose four
+// columns are their field names, with the struct in view directly above.
 inline constexpr std::array kGmCommands = {
 
     // ── GM mode & info ──────────────────────────────────────
@@ -283,6 +285,7 @@ inline constexpr std::array kGmCommands = {
     GmCommandEntry{"ticket delete",   3, ".ticket delete #id",                 "Delete ticket permanently"},
     GmCommandEntry{"ticket viewid",   2, ".ticket viewid #id",                 "View ticket details"},
 };
+// NOLINTEND(modernize-use-designated-initializers)
 
 /// The dot-commands that start with `prefix`, sorted.
 ///

@@ -132,8 +132,8 @@ bool CompositeRenderer::initialize(VkContext* ctx, pipeline::AssetManager* am) {
     binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     std::vector<VkVertexInputAttributeDescription> attrs(2);
-    attrs[0] = { 0, 0, VK_FORMAT_R32G32_SFLOAT, 0 };
-    attrs[1] = { 1, 0, VK_FORMAT_R32G32_SFLOAT, 2 * sizeof(float) };
+    attrs[0] = { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 0 };
+    attrs[1] = { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 2 * sizeof(float) };
 
     // --- Load tile shaders and build pipeline ---
     {

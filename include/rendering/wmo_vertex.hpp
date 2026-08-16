@@ -29,11 +29,11 @@ struct WMOVertex {
 
 /// What assets/shaders/wmo.vert.glsl declares, in its order.
 inline constexpr std::array<VertexAttribute, 5> kWmoVertexAttributes = {{
-    {0, 3, static_cast<uint32_t>(offsetof(WMOVertex, position))},
-    {1, 3, static_cast<uint32_t>(offsetof(WMOVertex, normal))},
-    {2, 2, static_cast<uint32_t>(offsetof(WMOVertex, texCoord))},
-    {3, 4, static_cast<uint32_t>(offsetof(WMOVertex, color))},
-    {4, 4, static_cast<uint32_t>(offsetof(WMOVertex, tangent))},
+    {.location = 0, .componentCount = 3, .offset = static_cast<uint32_t>(offsetof(WMOVertex, position))},
+    {.location = 1, .componentCount = 3, .offset = static_cast<uint32_t>(offsetof(WMOVertex, normal))},
+    {.location = 2, .componentCount = 2, .offset = static_cast<uint32_t>(offsetof(WMOVertex, texCoord))},
+    {.location = 3, .componentCount = 4, .offset = static_cast<uint32_t>(offsetof(WMOVertex, color))},
+    {.location = 4, .componentCount = 4, .offset = static_cast<uint32_t>(offsetof(WMOVertex, tangent))},
 }};
 
 /// The same geometry through assets/shaders/shadow.vert.glsl, which is shared
@@ -46,10 +46,10 @@ inline constexpr std::array<VertexAttribute, 5> kWmoVertexAttributes = {{
 /// point at the colour, which is the right size and is never read through
 /// them.
 inline constexpr std::array<VertexAttribute, 4> kWmoShadowVertexAttributes = {{
-    {0, 3, static_cast<uint32_t>(offsetof(WMOVertex, position))},
-    {1, 2, static_cast<uint32_t>(offsetof(WMOVertex, texCoord))},
-    {2, 4, static_cast<uint32_t>(offsetof(WMOVertex, color))},
-    {3, 4, static_cast<uint32_t>(offsetof(WMOVertex, color))},
+    {.location = 0, .componentCount = 3, .offset = static_cast<uint32_t>(offsetof(WMOVertex, position))},
+    {.location = 1, .componentCount = 2, .offset = static_cast<uint32_t>(offsetof(WMOVertex, texCoord))},
+    {.location = 2, .componentCount = 4, .offset = static_cast<uint32_t>(offsetof(WMOVertex, color))},
+    {.location = 3, .componentCount = 4, .offset = static_cast<uint32_t>(offsetof(WMOVertex, color))},
 }};
 
 }  // namespace rendering

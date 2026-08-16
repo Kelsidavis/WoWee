@@ -138,7 +138,7 @@ VkFramebuffer PostProcessPipeline::getSceneFramebuffer() const {
 
 VkExtent2D PostProcessPipeline::getSceneRenderExtent() const {
     if (fsr2_.enabled && fsr2_.sceneFramebuffer)
-        return { fsr2_.internalWidth, fsr2_.internalHeight };
+        return { .width = fsr2_.internalWidth, .height = fsr2_.internalHeight };
     if (needsFXAAPass() && fxaa_.sceneFramebuffer)
         return vkCtx_->getSwapchainExtent();  // native resolution - no downscaling
     if (fsr_.enabled && fsr_.sceneFramebuffer)
@@ -1161,11 +1161,11 @@ bool PostProcessPipeline::initFSR2Resources() {
 
             // The accumulation shader already performs custom Lanczos reconstruction.
             // Use nearest here to avoid double filtering (linear + Lanczos) softening.
-            VkDescriptorImageInfo colorInfo{fsr2_.nearestSampler, fsr2_.sceneColor.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-            VkDescriptorImageInfo depthInfo{fsr2_.nearestSampler, fsr2_.sceneDepth.imageView, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
-            VkDescriptorImageInfo mvInfo{fsr2_.nearestSampler, fsr2_.motionVectors.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-            VkDescriptorImageInfo histInInfo{fsr2_.linearSampler, fsr2_.history[inputHistory].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-            VkDescriptorImageInfo histOutInfo{VK_NULL_HANDLE, fsr2_.history[outputHistory].imageView, VK_IMAGE_LAYOUT_GENERAL};
+            VkDescriptorImageInfo colorInfo{.sampler = fsr2_.nearestSampler, .imageView = fsr2_.sceneColor.imageView, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+            VkDescriptorImageInfo depthInfo{.sampler = fsr2_.nearestSampler, .imageView = fsr2_.sceneDepth.imageView, .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
+            VkDescriptorImageInfo mvInfo{.sampler = fsr2_.nearestSampler, .imageView = fsr2_.motionVectors.imageView, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+            VkDescriptorImageInfo histInInfo{.sampler = fsr2_.linearSampler, .imageView = fsr2_.history[inputHistory].imageView, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+            VkDescriptorImageInfo histOutInfo{.sampler = VK_NULL_HANDLE, .imageView = fsr2_.history[outputHistory].imageView, .imageLayout = VK_IMAGE_LAYOUT_GENERAL};
 
             VkWriteDescriptorSet writes[5] = {};
             for (int w = 0; w < 5; w++) {

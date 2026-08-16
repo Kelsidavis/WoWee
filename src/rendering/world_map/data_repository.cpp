@@ -516,11 +516,11 @@ void DataRepository::buildCosmicView(int /*expLevel*/) {
     cosmicEnabled_ = true;
 
     // Azeroth (EK + Kalimdor) - always present; bottom-right region of cosmic map
-    cosmicMaps_.push_back({0, "Azeroth", 0.58f, 0.05f, 0.95f, 0.95f});
+    cosmicMaps_.push_back({.mapId = 0, .label = "Azeroth", .uvLeft = 0.58f, .uvTop = 0.05f, .uvRight = 0.95f, .uvBottom = 0.95f});
 
     if (game::isActiveExpansion("tbc") || game::isActiveExpansion("wotlk")) {
         // TBC+: Add Outland - top-left region of cosmic map
-        cosmicMaps_.push_back({530, "Outland", 0.05f, 0.10f, 0.55f, 0.90f});
+        cosmicMaps_.push_back({.mapId = 530, .label = "Outland", .uvLeft = 0.05f, .uvTop = 0.10f, .uvRight = 0.55f, .uvBottom = 0.90f});
     }
 
     LOG_INFO("DataRepository: cosmic view built with ", cosmicMaps_.size(), " landmasses");
@@ -533,14 +533,14 @@ void DataRepository::buildAzerothView(int /*expLevel*/) {
     // UV coordinates are approximate positions of each landmass on the combined map.
 
     // Eastern Kingdoms - right side of the Azeroth map
-    azerothRegions_.push_back({0, mapDisplayName(0), 0.55f, 0.05f, 0.95f, 0.95f});
+    azerothRegions_.push_back({.mapId = 0, .label = mapDisplayName(0), .uvLeft = 0.55f, .uvTop = 0.05f, .uvRight = 0.95f, .uvBottom = 0.95f});
 
     // Kalimdor - left side of the Azeroth map
-    azerothRegions_.push_back({1, mapDisplayName(1), 0.05f, 0.10f, 0.45f, 0.95f});
+    azerothRegions_.push_back({.mapId = 1, .label = mapDisplayName(1), .uvLeft = 0.05f, .uvTop = 0.10f, .uvRight = 0.45f, .uvBottom = 0.95f});
 
     if (game::isActiveExpansion("wotlk")) {
         // WotLK: Northrend - top-center of the Azeroth map
-        azerothRegions_.push_back({571, mapDisplayName(571), 0.30f, 0.0f, 0.72f, 0.28f});
+        azerothRegions_.push_back({.mapId = 571, .label = mapDisplayName(571), .uvLeft = 0.30f, .uvTop = 0.0f, .uvRight = 0.72f, .uvBottom = 0.28f});
     }
 
     LOG_INFO("DataRepository: Azeroth view built with ", azerothRegions_.size(), " continent regions");

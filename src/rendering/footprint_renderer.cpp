@@ -241,7 +241,7 @@ bool FootprintRenderer::loadFootprintData(pipeline::AssetManager* assets) {
         // also quietly raise the cutoff and drop small creatures that used to
         // resolve a profile.
         if (path.empty() || length * 36.0f <= 0.6f || width * 36.0f <= 0.6f) continue;
-        Profile profile{textureIt->second, length, width};
+        Profile profile{.textureIndex = textureIt->second, .length = length, .width = width};
         profilesByPath_[path] = profile;
     }
     std::unordered_map<std::string, unsigned> basenameCounts;
@@ -307,9 +307,9 @@ void FootprintRenderer::spawn(const std::string& modelName, const glm::vec3& bas
 
     if (prints_.size() >= kMaxPrints) prints_.erase(prints_.begin());
     // A negative width mirrors the one-foot mask laterally for the opposite foot.
-    prints_.push_back({position, yawRadians, profile.length,
-                       leftFoot ? -profile.width : profile.width, 0.0f,
-                       profile.textureIndex});
+    prints_.push_back({.position = position, .yaw = yawRadians, .length = profile.length,
+                       .signedWidth = leftFoot ? -profile.width : profile.width, .age = 0.0f,
+                       .textureIndex = profile.textureIndex});
 }
 
 void FootprintRenderer::update(float deltaTime) {

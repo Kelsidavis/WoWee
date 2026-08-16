@@ -59,8 +59,8 @@ void Minimap::buildDisplayPipeline(VkDevice device,
     binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     std::vector<VkVertexInputAttributeDescription> attrs(2);
-    attrs[0] = { 0, 0, VK_FORMAT_R32G32_SFLOAT, 0 };
-    attrs[1] = { 1, 0, VK_FORMAT_R32G32_SFLOAT, 2 * sizeof(float) };
+    attrs[0] = { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 0 };
+    attrs[1] = { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 2 * sizeof(float) };
 
     displayPipeline = PipelineBuilder()
         .setShaders(vertStage, fragStage)
@@ -179,8 +179,8 @@ bool Minimap::initialize(VkContext* ctx, VkDescriptorSetLayout /*perFrameLayout*
     binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     std::vector<VkVertexInputAttributeDescription> attrs(2);
-    attrs[0] = { 0, 0, VK_FORMAT_R32G32_SFLOAT, 0 };                    // aPos
-    attrs[1] = { 1, 0, VK_FORMAT_R32G32_SFLOAT, 2 * sizeof(float) };    // aUV
+    attrs[0] = { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 0 };                    // aPos
+    attrs[1] = { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 2 * sizeof(float) };    // aUV
 
     // --- Load tile shaders ---
     {

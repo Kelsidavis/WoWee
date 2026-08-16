@@ -336,7 +336,7 @@ void SpellVisualSystem::playSpellVisualPrecast(uint32_t visualId, const glm::vec
             ? std::clamp(animDurMs / 1000.0f, 0.5f, SPELL_VISUAL_MAX_DURATION)
             : SPELL_VISUAL_DEFAULT_DURATION;
     }
-    activeSpellVisuals_.push_back({instanceId, 0.0f, duration, true, attachId, attachInstanceId});
+    activeSpellVisuals_.push_back({.instanceId = instanceId, .elapsed = 0.0f, .duration = duration, .isPrecast = true, .attachmentId = attachId, .attachInstanceId = attachInstanceId});
     LOG_INFO("SpellVisual: spawned precast visualId=", visualId, " instanceId=", instanceId,
              " duration=", duration, "s castTimeMs=", castTimeMs, " attach=", attachId,
              " model=", modelPath,
@@ -355,7 +355,7 @@ void SpellVisualSystem::playSpellVisualPrecast(uint32_t visualId, const glm::vec
         }
         uint32_t leftId = m2Renderer_->createInstance(modelId, leftPos, glm::vec3(0.0f), 1.0f);
         if (leftId != 0) {
-            activeSpellVisuals_.push_back({leftId, 0.0f, duration, true, 2 /* LeftHand */, attachInstanceId});
+            activeSpellVisuals_.push_back({.instanceId = leftId, .elapsed = 0.0f, .duration = duration, .isPrecast = true, .attachmentId = 2 /* LeftHand */, .attachInstanceId = attachInstanceId});
         }
     }
 }
@@ -480,7 +480,7 @@ void SpellVisualSystem::playSpellVisual(uint32_t visualId, const glm::vec3& worl
     float duration = (animDurMs > 100.0f)
         ? std::clamp(animDurMs / 1000.0f, 0.5f, SPELL_VISUAL_MAX_DURATION)
         : SPELL_VISUAL_DEFAULT_DURATION;
-    activeSpellVisuals_.push_back({instanceId, 0.0f, duration, false, attachId, attachInstanceId});
+    activeSpellVisuals_.push_back({.instanceId = instanceId, .elapsed = 0.0f, .duration = duration, .isPrecast = false, .attachmentId = attachId, .attachInstanceId = attachInstanceId});
     LOG_INFO("SpellVisual: spawned ", (useImpactKit ? "impact" : "cast"), " visualId=", visualId,
              " instanceId=", instanceId, " duration=", duration, "s animDurMs=", animDurMs,
              " attach=", attachId, " model=", modelPath, " active=", activeSpellVisuals_.size());
@@ -498,7 +498,7 @@ void SpellVisualSystem::playSpellVisual(uint32_t visualId, const glm::vec3& worl
         }
         uint32_t leftId = m2Renderer_->createInstance(modelId, leftPos, glm::vec3(0.0f), 1.0f);
         if (leftId != 0) {
-            activeSpellVisuals_.push_back({leftId, 0.0f, duration, false, 2 /* LeftHand */, attachInstanceId});
+            activeSpellVisuals_.push_back({.instanceId = leftId, .elapsed = 0.0f, .duration = duration, .isPrecast = false, .attachmentId = 2 /* LeftHand */, .attachInstanceId = attachInstanceId});
         }
     }
 }
@@ -552,8 +552,8 @@ void SpellVisualSystem::playPhysicalProjectile(const std::string& modelPath,
 
     const uint32_t instanceId = characterRenderer->createInstance(modelId, start, rotation, 1.0f);
     if (instanceId == 0) return;
-    physicalProjectiles_.push_back({instanceId, start, end, rotation, 0.0f,
-                                    std::max(duration, 0.05f), spin});
+    physicalProjectiles_.push_back({.instanceId = instanceId, .start = start, .end = end, .rotation = rotation, .elapsed = 0.0f,
+                                    .duration = std::max(duration, 0.05f), .spin = spin});
 }
 
 void SpellVisualSystem::update(float deltaTime) {

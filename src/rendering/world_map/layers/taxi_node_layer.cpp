@@ -157,7 +157,7 @@ void TaxiNodeLayer::renderFlightMap(const LayerContext& ctx,
 
         float px = ctx.imgMin.x + uv.x * ctx.displayW;
         float py = ctx.imgMin.y + uv.y * ctx.displayH;
-        visible.push_back({&node, px, py});
+        visible.push_back({.node = &node, .px = px, .py = py});
         posById[node.id] = ImVec2(px, py);
     }
     if (visible.empty()) return;

@@ -12,7 +12,7 @@ void ZoneMetadata::initialize() {
     // Populate known zone level ranges and faction alignment.
     // This covers major open-world zones for Vanilla/TBC/WotLK.
     auto add = [this](const char* name, uint8_t lo, uint8_t hi, ZoneFaction f) {
-        table_[name] = {lo, hi, f};
+        table_[name] = {.minLevel = lo, .maxLevel = hi, .faction = f};
     };
 
     // === Eastern Kingdoms ===

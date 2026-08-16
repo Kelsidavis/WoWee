@@ -332,7 +332,7 @@ void ChargeEffect::emit(const glm::vec3& position, const glm::vec3& direction) {
         // Trail spawns at character's mid-height (ribbon extends above and below)
         glm::vec3 trailCenter = position + glm::vec3(0.0f, 0.0f, 1.0f);
 
-        trail_.push_back({trailCenter, side, 0.0f});
+        trail_.push_back({.center = trailCenter, .side = side, .age = 0.0f});
         if (trail_.size() > MAX_TRAIL_POINTS) {
             trail_.pop_front();
         }

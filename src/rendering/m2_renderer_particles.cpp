@@ -487,7 +487,7 @@ void M2Renderer::renderM2Ribbons(VkCommandBuffer cmd, VkDescriptorSet perFrameSe
 
             uint32_t vertCount = static_cast<uint32_t>(written) - firstVert;
             if (vertCount >= 4) {
-                draws.push_back({texSet, pipe, firstVert, vertCount});
+                draws.push_back({.texSet = texSet, .pipeline = pipe, .firstVertex = firstVert, .vertexCount = vertCount});
             } else {
                 // Rollback if too few verts
                 written = firstVert;
@@ -605,7 +605,7 @@ void M2Renderer::renderM2Particles(VkCommandBuffer cmd, VkDescriptorSet perFrame
                 cachedTotalTiles = static_cast<uint32_t>(cachedTilesX) *
                                    static_cast<uint32_t>(cachedTilesY);
                 cachedBlendType = cachedEm->blendingType;
-                ParticleGroupKey key{cachedTex, static_cast<uint8_t>(cachedBlendType), cachedTilesX, cachedTilesY};
+                ParticleGroupKey key{.texture = cachedTex, .blendType = static_cast<uint8_t>(cachedBlendType), .tilesX = cachedTilesX, .tilesY = cachedTilesY};
                 cachedGroup = &groups[key];
                 cachedGroup->texture = cachedTex;
                 cachedGroup->blendType = cachedBlendType;
@@ -734,14 +734,14 @@ void M2Renderer::renderM2Particles(VkCommandBuffer cmd, VkDescriptorSet perFrame
         VkDescriptorSet texSet = group.preAllocSet;
         if (texSet == VK_NULL_HANDLE) {
             // Fallback: allocate per-frame (pool exhaustion risk - should not happen in practice)
-            VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+            VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
             ai.descriptorPool = materialDescPool_;
             ai.descriptorSetCount = 1;
             ai.pSetLayouts = &particleTexLayout_;
             if (vkAllocateDescriptorSets(vkCtx_->getDevice(), &ai, &texSet) == VK_SUCCESS) {
                 VkTexture* tex = group.texture ? group.texture : whiteTexture_.get();
                 VkDescriptorImageInfo imgInfo = tex->descriptorInfo();
-                VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                 write.dstSet = texSet;
                 write.dstBinding = 0;
                 write.descriptorCount = 1;
@@ -757,8 +757,8 @@ void M2Renderer::renderM2Particles(VkCommandBuffer cmd, VkDescriptorSet perFrame
 
         // Push constants: tileCount + alphaKey
         struct { float tileX, tileY; int alphaKey; } pc = {
-            static_cast<float>(group.tilesX), static_cast<float>(group.tilesY),
-            (blendType == 1) ? 1 : 0
+            .tileX = static_cast<float>(group.tilesX), .tileY = static_cast<float>(group.tilesY),
+            .alphaKey = (blendType == 1) ? 1 : 0
         };
         vkCmdPushConstants(cmd, particlePipelineLayout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                            sizeof(pc), &pc);

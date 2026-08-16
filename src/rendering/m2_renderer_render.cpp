@@ -109,10 +109,10 @@ uint32_t M2Renderer::createInstance(uint32_t modelId, const glm::vec3& position,
     // Uses hash map for O(1) lookup instead of O(N) scan.
     // Spell effects are exempt - transient visuals must always create fresh instances.
     if (allowPositionDedup && !mdlRef.isGroundDetail && !mdlRef.isSpellEffect) {
-        DedupKey dk{modelId,
-                    static_cast<int32_t>(std::round(position.x * 10.0f)),
-                    static_cast<int32_t>(std::round(position.y * 10.0f)),
-                    static_cast<int32_t>(std::round(position.z * 10.0f))};
+        DedupKey dk{.modelId = modelId,
+                    .qx = static_cast<int32_t>(std::round(position.x * 10.0f)),
+                    .qy = static_cast<int32_t>(std::round(position.y * 10.0f)),
+                    .qz = static_cast<int32_t>(std::round(position.z * 10.0f))};
         auto dit = instanceDedupMap_.find(dk);
         if (dit != instanceDedupMap_.end()) {
             return dit->second;
@@ -158,10 +158,10 @@ uint32_t M2Renderer::createInstance(uint32_t modelId, const glm::vec3& position,
     // Register in dedup map before pushing (uses original position, not ground-adjusted)
     // Spell effects are exempt from dedup tracking (transient, overlapping allowed).
     if (allowPositionDedup && !mdlRef.isGroundDetail && !mdlRef.isSpellEffect) {
-        DedupKey dk{modelId,
-                    static_cast<int32_t>(std::round(position.x * 10.0f)),
-                    static_cast<int32_t>(std::round(position.y * 10.0f)),
-                    static_cast<int32_t>(std::round(position.z * 10.0f))};
+        DedupKey dk{.modelId = modelId,
+                    .qx = static_cast<int32_t>(std::round(position.x * 10.0f)),
+                    .qy = static_cast<int32_t>(std::round(position.y * 10.0f)),
+                    .qz = static_cast<int32_t>(std::round(position.z * 10.0f))};
         instanceDedupMap_[dk] = instance.id;
     }
 
@@ -208,10 +208,10 @@ uint32_t M2Renderer::createInstanceWithMatrix(uint32_t modelId, const glm::mat4&
 
     // Deduplicate: O(1) hash lookup
     {
-        DedupKey dk{modelId,
-                    static_cast<int32_t>(std::round(position.x * 10.0f)),
-                    static_cast<int32_t>(std::round(position.y * 10.0f)),
-                    static_cast<int32_t>(std::round(position.z * 10.0f))};
+        DedupKey dk{.modelId = modelId,
+                    .qx = static_cast<int32_t>(std::round(position.x * 10.0f)),
+                    .qy = static_cast<int32_t>(std::round(position.y * 10.0f)),
+                    .qz = static_cast<int32_t>(std::round(position.z * 10.0f))};
         auto dit = instanceDedupMap_.find(dk);
         if (dit != instanceDedupMap_.end()) {
             return dit->second;
@@ -263,10 +263,10 @@ uint32_t M2Renderer::createInstanceWithMatrix(uint32_t modelId, const glm::mat4&
 
     // Register in dedup map
     {
-        DedupKey dk{modelId,
-                    static_cast<int32_t>(std::round(position.x * 10.0f)),
-                    static_cast<int32_t>(std::round(position.y * 10.0f)),
-                    static_cast<int32_t>(std::round(position.z * 10.0f))};
+        DedupKey dk{.modelId = modelId,
+                    .qx = static_cast<int32_t>(std::round(position.x * 10.0f)),
+                    .qy = static_cast<int32_t>(std::round(position.y * 10.0f)),
+                    .qz = static_cast<int32_t>(std::round(position.z * 10.0f))};
         instanceDedupMap_[dk] = instance.id;
     }
 
@@ -1088,7 +1088,7 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
                 if (distSq > effectiveMaxDistSq) continue;
             }
 
-            VisibleEntry visible{i, instance.modelId, distSq, effectiveMaxDistSq};
+            VisibleEntry visible{.index = i, .modelId = instance.modelId, .distSq = distSq, .effectiveMaxDistSq = effectiveMaxDistSq};
             out.opaque.push_back(visible);
             if (instance.cachedModel &&
                 (instance.cachedModel->hasTransparentBatches || instance.cachedModel->isSpellEffect)) {
@@ -1357,7 +1357,7 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
                 uint16_t targetLOD = desiredLOD;
                 if (desiredLOD > 0 && !(model.availableLODs & (1u << desiredLOD))) targetLOD = 0;
 
-                pending.push_back({entry.index, instanceFadeAlpha, needsBones, targetLOD});
+                pending.push_back({.instanceIdx = entry.index, .fadeAlpha = instanceFadeAlpha, .useBones = needsBones, .targetLOD = targetLOD});
             }
 
             if (pending.empty()) { visStart = groupEnd; continue; }
@@ -2046,10 +2046,10 @@ bool M2Renderer::initializeShadow(VkRenderPass shadowRenderPass) {
     vertBind.stride = 18 * sizeof(float);
     vertBind.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     std::vector<VkVertexInputAttributeDescription> vertAttrs = {
-        {0, 0, VK_FORMAT_R32G32B32_SFLOAT,    0},                     // aPos       -> position
-        {1, 0, VK_FORMAT_R32G32_SFLOAT,       6 * sizeof(float)},     // aTexCoord  -> texCoord0
-        {2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 10 * sizeof(float)},    // aBoneWeights
-        {3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 14 * sizeof(float)},    // aBoneIndicesF
+        {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT,    .offset = 0},                     // aPos       -> position
+        {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT,       .offset = 6 * sizeof(float)},     // aTexCoord  -> texCoord0
+        {.location = 2, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = 10 * sizeof(float)},    // aBoneWeights
+        {.location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = 14 * sizeof(float)},    // aBoneIndicesF
     };
 
     shadowPipeline_ = buildShadowPipeline(
@@ -2183,7 +2183,7 @@ void M2Renderer::renderShadow(VkCommandBuffer cmd, const glm::mat4& lightSpaceMa
                 vkCmdBindIndexBuffer(cmd, currentModel->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
             }
 
-            ShadowPush push{lightSpaceMatrix, instance.modelMatrix};
+            ShadowPush push{.lightSpaceMatrix = lightSpaceMatrix, .model = instance.modelMatrix};
             vkCmdPushConstants(cmd, shadowPipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT,
                                0, 128, &push);
 

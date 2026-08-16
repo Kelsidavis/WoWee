@@ -51,7 +51,7 @@ void LevelUpEffect::trigger(const glm::vec3& position) {
         return;
     }
 
-    activeEffects_.push_back({instanceId, 0.0f});
+    activeEffects_.push_back({.instanceId = instanceId, .elapsed = 0.0f});
 }
 
 void LevelUpEffect::update(float deltaTime) {

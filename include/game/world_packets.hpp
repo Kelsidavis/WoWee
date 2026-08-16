@@ -1947,7 +1947,7 @@ struct ItemQueryResponseData {
             case 6: spirit = statValue; break;
             case 7: stamina = statValue; break;
             default:
-                if (statValue != 0) extraStats.push_back({statType, statValue});
+                if (statValue != 0) extraStats.push_back({.statType = statType, .statValue = statValue});
                 break;
         }
     }

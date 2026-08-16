@@ -28,10 +28,10 @@ static constexpr uint32_t kStarVertexFloats = 6;
 
 static std::vector<VkVertexInputAttributeDescription> starVertexAttrs() {
     return {
-        {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0},                 // position
-        {1, 0, VK_FORMAT_R32_SFLOAT,       sizeof(float) * 3},  // brightness
-        {2, 0, VK_FORMAT_R32_SFLOAT,       sizeof(float) * 4},  // twinkle phase
-        {3, 0, VK_FORMAT_R32_SFLOAT,       sizeof(float) * 5},  // colour temperature
+        {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0},                 // position
+        {.location = 1, .binding = 0, .format = VK_FORMAT_R32_SFLOAT,       .offset = sizeof(float) * 3},  // brightness
+        {.location = 2, .binding = 0, .format = VK_FORMAT_R32_SFLOAT,       .offset = sizeof(float) * 4},  // twinkle phase
+        {.location = 3, .binding = 0, .format = VK_FORMAT_R32_SFLOAT,       .offset = sizeof(float) * 5},  // colour temperature
     };
 }
 

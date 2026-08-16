@@ -48,31 +48,31 @@ struct DarkZone {
 constexpr DarkZone kDarkZones[] = {
     // Duskwood: trapped beneath a dark, fog-heavy sky. Blue-black, and the
     // fog is close enough to hide the far side of the road.
-    {10, 22.0f,
-     {0.20f, 0.22f, 0.26f}, {0.26f, 0.28f, 0.32f},
-     {0.075f, 0.095f, 0.11f}, 35.0f, 525.0f, 0.006f,
-     {0.025f, 0.035f, 0.055f}, {0.055f, 0.070f, 0.085f},
-     {0.075f, 0.090f, 0.105f}, {0.095f, 0.105f, 0.115f},
-     0.88f, 0.08f},
+    {.zoneId = 10, .visualTimeHours = 22.0f,
+     .ambientCeiling = {0.20f, 0.22f, 0.26f}, .diffuseCeiling = {0.26f, 0.28f, 0.32f},
+     .fogColor = {0.075f, 0.095f, 0.11f}, .fogStartMax = 35.0f, .fogEndMax = 525.0f, .fogDensityMin = 0.006f,
+     .skyTop = {0.025f, 0.035f, 0.055f}, .skyMiddle = {0.055f, 0.070f, 0.085f},
+     .skyBand1 = {0.075f, 0.090f, 0.105f}, .skyBand2 = {0.095f, 0.105f, 0.115f},
+     .cloudDensityMin = 0.88f, .horizonGlowMax = 0.08f},
 
     // Tirisfal Glades: the day runs, and the sky is overcast through all of
     // it. Dark and shadowy rather than dark as night, with the sickly green
     // cast of the plague in the haze. The hour is not pinned.
-    {85, -1.0f,
-     {0.26f, 0.30f, 0.25f}, {0.34f, 0.38f, 0.31f},
-     {0.13f, 0.17f, 0.13f}, 60.0f, 460.0f, 0.005f,
-     {0.16f, 0.20f, 0.17f}, {0.20f, 0.24f, 0.20f},
-     {0.23f, 0.27f, 0.23f}, {0.26f, 0.29f, 0.25f},
-     0.80f, 0.10f},
+    {.zoneId = 85, .visualTimeHours = -1.0f,
+     .ambientCeiling = {0.26f, 0.30f, 0.25f}, .diffuseCeiling = {0.34f, 0.38f, 0.31f},
+     .fogColor = {0.13f, 0.17f, 0.13f}, .fogStartMax = 60.0f, .fogEndMax = 460.0f, .fogDensityMin = 0.005f,
+     .skyTop = {0.16f, 0.20f, 0.17f}, .skyMiddle = {0.20f, 0.24f, 0.20f},
+     .skyBand1 = {0.23f, 0.27f, 0.23f}, .skyBand2 = {0.26f, 0.29f, 0.25f},
+     .cloudDensityMin = 0.80f, .horizonGlowMax = 0.10f},
 
     // Silverpine Forest: the same overcast, greyer and a little less green
     // the further south it runs.
-    {130, -1.0f,
-     {0.25f, 0.28f, 0.26f}, {0.32f, 0.35f, 0.33f},
-     {0.13f, 0.15f, 0.14f}, 60.0f, 480.0f, 0.005f,
-     {0.17f, 0.19f, 0.19f}, {0.21f, 0.23f, 0.22f},
-     {0.24f, 0.26f, 0.25f}, {0.27f, 0.28f, 0.28f},
-     0.80f, 0.10f},
+    {.zoneId = 130, .visualTimeHours = -1.0f,
+     .ambientCeiling = {0.25f, 0.28f, 0.26f}, .diffuseCeiling = {0.32f, 0.35f, 0.33f},
+     .fogColor = {0.13f, 0.15f, 0.14f}, .fogStartMax = 60.0f, .fogEndMax = 480.0f, .fogDensityMin = 0.005f,
+     .skyTop = {0.17f, 0.19f, 0.19f}, .skyMiddle = {0.21f, 0.23f, 0.22f},
+     .skyBand1 = {0.24f, 0.26f, 0.25f}, .skyBand2 = {0.27f, 0.28f, 0.28f},
+     .cloudDensityMin = 0.80f, .horizonGlowMax = 0.10f},
 };
 
 const DarkZone* findDarkZone(uint32_t zoneId) {

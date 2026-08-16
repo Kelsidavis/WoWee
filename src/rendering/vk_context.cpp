@@ -1844,15 +1844,15 @@ VkDescriptorSet VkContext::uploadImGuiTexture(const uint8_t* rgba, int width, in
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.image = image;
-        barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        barrier.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         VkBufferImageCopy region{};
-        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        region.imageExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1};
+        region.imageSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
+        region.imageExtent = {.width = static_cast<uint32_t>(width), .height = static_cast<uint32_t>(height), .depth = 1};
         vkCmdCopyBufferToImage(cmd, stagingBuffer, image,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
@@ -1928,7 +1928,7 @@ VkDescriptorSet VkContext::uploadImGuiTexture(const uint8_t* rgba, int width, in
     }
 
     // Track for cleanup
-    uiTextures_.push_back({image, imageMemory, imageView});
+    uiTextures_.push_back({.image = image, .memory = imageMemory, .view = imageView});
 
     return ds;
 }
@@ -2672,7 +2672,7 @@ void VkContext::deferStagingCleanup(AllocatedBuffer staging) {
 }
 
 void VkContext::deferRawStagingCleanup(VkBuffer buffer, VkDeviceMemory memory) {
-    batchRawStaging_.push_back({buffer, memory});
+    batchRawStaging_.push_back({.buffer = buffer, .memory = memory});
 }
 
 void VkContext::freeRawStaging() {

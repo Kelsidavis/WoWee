@@ -287,12 +287,12 @@ void CharacterRenderer::buildMainPassPipelines(VkDevice device, VkRenderPass mai
     charBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     std::vector<VkVertexInputAttributeDescription> charAttrs = {
-        {0, 0, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(CharVertexGPU, position))},
-        {1, 0, VK_FORMAT_R8G8B8A8_UNORM,   static_cast<uint32_t>(offsetof(CharVertexGPU, boneWeights))},
-        {2, 0, VK_FORMAT_R8G8B8A8_UINT,     static_cast<uint32_t>(offsetof(CharVertexGPU, boneIndices))},
-        {3, 0, VK_FORMAT_R32G32B32_SFLOAT,  static_cast<uint32_t>(offsetof(CharVertexGPU, normal))},
-        {4, 0, VK_FORMAT_R32G32_SFLOAT,     static_cast<uint32_t>(offsetof(CharVertexGPU, texCoords))},
-        {5, 0, VK_FORMAT_R32G32B32A32_SFLOAT, static_cast<uint32_t>(offsetof(CharVertexGPU, tangent))},
+        {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = static_cast<uint32_t>(offsetof(CharVertexGPU, position))},
+        {.location = 1, .binding = 0, .format = VK_FORMAT_R8G8B8A8_UNORM,   .offset = static_cast<uint32_t>(offsetof(CharVertexGPU, boneWeights))},
+        {.location = 2, .binding = 0, .format = VK_FORMAT_R8G8B8A8_UINT,     .offset = static_cast<uint32_t>(offsetof(CharVertexGPU, boneIndices))},
+        {.location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT,  .offset = static_cast<uint32_t>(offsetof(CharVertexGPU, normal))},
+        {.location = 4, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT,     .offset = static_cast<uint32_t>(offsetof(CharVertexGPU, texCoords))},
+        {.location = 5, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = static_cast<uint32_t>(offsetof(CharVertexGPU, tangent))},
     };
 
     // --- Build pipelines ---
@@ -902,7 +902,7 @@ VkTexture* CharacterRenderer::loadTexture(const std::string& path) {
         blpImage.width, blpImage.height);
 
     textureCacheBytes_ += e.approxBytes;
-    texturePropsByPtr_[texPtr] = {hasAlpha, colorKeyBlackHint};
+    texturePropsByPtr_[texPtr] = {.hasAlpha = hasAlpha, .colorKeyBlack = colorKeyBlackHint};
     textureCache[key] = std::move(e);
     failedTextureCache_.erase(key);
     failedTextureRetryAt_.erase(key);
@@ -944,7 +944,7 @@ void CharacterRenderer::processPendingNormalMaps(int budget) {
             it->second.normalHeightMap = std::move(tex);
             if (it->second.texture) {
                 normalMapByTexPtr_[it->second.texture.get()] = {
-                    it->second.normalHeightMap.get(), it->second.heightMapVariance};
+                    .normalMap = it->second.normalHeightMap.get(), .heightMapVariance = it->second.heightMapVariance};
             }
         }
         vkCtx_->endUploadBatch();
@@ -1259,7 +1259,7 @@ VkTexture* CharacterRenderer::compositeTextures(const std::vector<std::string>& 
                 sawRegionLayer = true;
             }
         }
-        overlays.push_back({layerPaths[layer], std::move(overlay)});
+        overlays.push_back({.path = layerPaths[layer], .image = std::move(overlay)});
     }
 
     // Grow to the most demanding layer.
@@ -1394,7 +1394,7 @@ VkTexture* CharacterRenderer::compositeTextures(const std::vector<std::string>& 
     e.lastUse = ++textureCacheCounter_;
     e.hasAlpha = hasAlpha;
     e.colorKeyBlack = false;
-    texturePropsByPtr_[texPtr] = {hasAlpha, false};
+    texturePropsByPtr_[texPtr] = {.hasAlpha = hasAlpha, .colorKeyBlack = false};
     // No derived normal map for a composited body, and this is why: the
     // derivation reads luminance as height, which holds for stone and bark and
     // does not hold for skin. Every freckle, every painted shadow under a
@@ -1705,7 +1705,7 @@ VkTexture* CharacterRenderer::compositeWithRegions(const std::string& basePath,
     entry.lastUse = ++textureCacheCounter_;
     entry.hasAlpha = hasAlpha;
     entry.colorKeyBlack = false;
-    texturePropsByPtr_[texPtr] = {hasAlpha, false};
+    texturePropsByPtr_[texPtr] = {.hasAlpha = hasAlpha, .colorKeyBlack = false};
     // Skin again, with armour composited onto it. Same reason as above.
     // Checked before emplacing: see the note in compositeTexture. Testing
     // ins.second afterwards is too late -- by then the texture has been moved
@@ -2419,7 +2419,7 @@ void CharacterRenderer::prepareRender(uint32_t frameIndex) {
         if (numBones <= 0) continue;
 
         if (!instance.boneBuffer[frameIndex]) {
-            VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+            VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
             bci.size = MAX_BONES * sizeof(glm::mat4);
             bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
             VmaAllocationCreateInfo aci{};
@@ -2442,7 +2442,7 @@ void CharacterRenderer::prepareRender(uint32_t frameIndex) {
                 for (int j = 0; j < MAX_BONES; j++) dst[j] = glm::mat4(1.0f);
             }
 
-            VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+            VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
             ai.descriptorPool = boneDescPool_;
             ai.descriptorSetCount = 1;
             ai.pSetLayouts = &boneSetLayout_;
@@ -2465,7 +2465,7 @@ void CharacterRenderer::prepareRender(uint32_t frameIndex) {
                 bufInfo.buffer = instance.boneBuffer[frameIndex];
                 bufInfo.offset = 0;
                 bufInfo.range = bci.size;
-                VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                 write.dstSet = instance.boneSet[frameIndex];
                 write.dstBinding = 0;
                 write.descriptorCount = 1;
@@ -3215,10 +3215,10 @@ bool CharacterRenderer::initializeShadow(VkRenderPass shadowRenderPass) {
     vertBind.stride = static_cast<uint32_t>(sizeof(CharVertexGPU));
     vertBind.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     std::vector<VkVertexInputAttributeDescription> vertAttrs = {
-        {0, 0, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(CharVertexGPU, position))},
-        {1, 0, VK_FORMAT_R8G8B8A8_UNORM,   static_cast<uint32_t>(offsetof(CharVertexGPU, boneWeights))},
-        {2, 0, VK_FORMAT_R8G8B8A8_UINT,    static_cast<uint32_t>(offsetof(CharVertexGPU, boneIndices))},
-        {3, 0, VK_FORMAT_R32G32_SFLOAT,    static_cast<uint32_t>(offsetof(CharVertexGPU, texCoords))},
+        {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = static_cast<uint32_t>(offsetof(CharVertexGPU, position))},
+        {.location = 1, .binding = 0, .format = VK_FORMAT_R8G8B8A8_UNORM,   .offset = static_cast<uint32_t>(offsetof(CharVertexGPU, boneWeights))},
+        {.location = 2, .binding = 0, .format = VK_FORMAT_R8G8B8A8_UINT,    .offset = static_cast<uint32_t>(offsetof(CharVertexGPU, boneIndices))},
+        {.location = 3, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT,    .offset = static_cast<uint32_t>(offsetof(CharVertexGPU, texCoords))},
     };
 
     shadowPipeline_ = buildShadowPipeline(
@@ -3281,7 +3281,7 @@ void CharacterRenderer::renderShadow(VkCommandBuffer cmd, const glm::mat4& light
         int numBones = std::min(static_cast<int>(inst.boneMatrices.size()), MAX_BONES);
         if (numBones > 0) {
             if (!inst.boneBuffer[frameIndex]) {
-                VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+                VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
                 bci.size = MAX_BONES * sizeof(glm::mat4);
                 bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
                 VmaAllocationCreateInfo aci{};
@@ -3304,7 +3304,7 @@ void CharacterRenderer::renderShadow(VkCommandBuffer cmd, const glm::mat4& light
                     for (int j = 0; j < MAX_BONES; j++) dst[j] = glm::mat4(1.0f);
                 }
 
-                VkDescriptorSetAllocateInfo dsAI{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+                VkDescriptorSetAllocateInfo dsAI{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
                 dsAI.descriptorPool = boneDescPool_;
                 dsAI.descriptorSetCount = 1;
                 dsAI.pSetLayouts = &boneSetLayout_;
@@ -3326,7 +3326,7 @@ void CharacterRenderer::renderShadow(VkCommandBuffer cmd, const glm::mat4& light
                     bInfo.buffer = inst.boneBuffer[frameIndex];
                     bInfo.offset = 0;
                     bInfo.range = bci.size;
-                    VkWriteDescriptorSet w{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                    VkWriteDescriptorSet w{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                     w.dstSet = inst.boneSet[frameIndex];
                     w.dstBinding = 0;
                     w.descriptorCount = 1;
@@ -3358,7 +3358,7 @@ void CharacterRenderer::renderShadow(VkCommandBuffer cmd, const glm::mat4& light
             0, 2, sets, 0, nullptr);
         currentTexSet = shadowParams_.set;
 
-        ShadowPush push{lightSpaceMatrix, modelMat};
+        ShadowPush push{.lightSpaceMatrix = lightSpaceMatrix, .model = modelMat};
         vkCmdPushConstants(cmd, shadowPipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, 128, &push);
 
         VkDeviceSize offset = 0;
@@ -3458,9 +3458,9 @@ VkTexture* CharacterRenderer::resolveBatchTexture(const CharacterInstance& inst,
             comboCount = std::min<uint32_t>(comboCount, 8u);
 
             struct Candidate { VkTexture* tex; uint32_t type; };
-            Candidate first{whiteTexture_.get(), 0};
+            Candidate first{.tex = whiteTexture_.get(), .type = 0};
             bool hasFirst = false;
-            Candidate firstNonWhite{whiteTexture_.get(), 0};
+            Candidate firstNonWhite{.tex = whiteTexture_.get(), .type = 0};
             bool hasFirstNonWhite = false;
 
             for (uint32_t i = 0; i < comboCount; i++) {

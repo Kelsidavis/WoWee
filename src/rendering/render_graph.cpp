@@ -20,7 +20,7 @@ RGResource RenderGraph::registerResource(const std::string& name) {
         if (r.name == name) return {r.id};
     }
     uint32_t id = nextResourceId_++;
-    resources_.push_back({name, id});
+    resources_.push_back({.name = name, .id = id});
     return {id};
 }
 
@@ -140,7 +140,7 @@ void RenderGraph::execute(VkCommandBuffer cmd) {
                 ib.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
                 ib.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
                 ib.image = b.image;
-                ib.subresourceRange = {b.aspectMask, 0, 1, 0, 1};
+                ib.subresourceRange = {.aspectMask = b.aspectMask, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
                 barriers.push_back(ib);
                 srcStages |= b.srcStage;
                 dstStages |= b.dstStage;

@@ -579,7 +579,7 @@ std::vector<LightingManager::WeightedVolume> LightingManager::findLightVolumes(c
         }
 
         if (weight > 0.0f) {
-            weighted.push_back({&volume, weight});
+            weighted.push_back({.volume = &volume, .weight = weight});
         }
     }
 

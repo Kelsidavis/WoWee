@@ -156,10 +156,10 @@ void M2Renderer::setInstanceTransform(uint32_t instanceId, const glm::mat4& tran
     // first destroyed it for the other.
     if (!inst.cachedIsGroundDetail) {
         auto keyFor = [&](const glm::vec3& p) {
-            return DedupKey{inst.modelId,
-                            static_cast<int32_t>(std::round(p.x * 10.0f)),
-                            static_cast<int32_t>(std::round(p.y * 10.0f)),
-                            static_cast<int32_t>(std::round(p.z * 10.0f))};
+            return DedupKey{.modelId = inst.modelId,
+                            .qx = static_cast<int32_t>(std::round(p.x * 10.0f)),
+                            .qy = static_cast<int32_t>(std::round(p.y * 10.0f)),
+                            .qz = static_cast<int32_t>(std::round(p.z * 10.0f))};
         };
         const DedupKey oldKey = keyFor(oldPosition);
         const DedupKey newKey = keyFor(inst.position);
@@ -200,10 +200,10 @@ void M2Renderer::removeInstance(uint32_t instanceId) {
 
     // Remove from dedup map
     if (!inst.cachedIsGroundDetail) {
-        DedupKey dk{inst.modelId,
-                    static_cast<int32_t>(std::round(inst.position.x * 10.0f)),
-                    static_cast<int32_t>(std::round(inst.position.y * 10.0f)),
-                    static_cast<int32_t>(std::round(inst.position.z * 10.0f))};
+        DedupKey dk{.modelId = inst.modelId,
+                    .qx = static_cast<int32_t>(std::round(inst.position.x * 10.0f)),
+                    .qy = static_cast<int32_t>(std::round(inst.position.y * 10.0f)),
+                    .qz = static_cast<int32_t>(std::round(inst.position.z * 10.0f))};
         instanceDedupMap_.erase(dk);
     }
 
@@ -440,10 +440,10 @@ void M2Renderer::rebuildSpatialIndex() {
 
         // Rebuild dedup map (skip ground detail)
         if (!inst.cachedIsGroundDetail) {
-            DedupKey dk{inst.modelId,
-                        static_cast<int32_t>(std::round(inst.position.x * 10.0f)),
-                        static_cast<int32_t>(std::round(inst.position.y * 10.0f)),
-                        static_cast<int32_t>(std::round(inst.position.z * 10.0f))};
+            DedupKey dk{.modelId = inst.modelId,
+                        .qx = static_cast<int32_t>(std::round(inst.position.x * 10.0f)),
+                        .qy = static_cast<int32_t>(std::round(inst.position.y * 10.0f)),
+                        .qz = static_cast<int32_t>(std::round(inst.position.z * 10.0f))};
             instanceDedupMap_[dk] = inst.id;
         }
 
@@ -700,7 +700,7 @@ VkTexture* M2Renderer::loadTexture(const std::string& path, uint32_t texFlags) {
     textureCache[key] = std::move(e);
     failedTextureCache_.erase(key);
     failedTextureRetryAt_.erase(key);
-    texturePropsByPtr_[texPtr] = {hasAlpha, colorKeyBlackHint};
+    texturePropsByPtr_[texPtr] = {.hasAlpha = hasAlpha, .colorKeyBlack = colorKeyBlackHint};
     LOG_DEBUG("M2: Loaded texture: ", path, " (", blp.width, "x", blp.height, ")");
 
     return texPtr;

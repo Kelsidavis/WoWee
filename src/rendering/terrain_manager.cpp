@@ -260,7 +260,7 @@ void TerrainManager::update(const Camera& camera, float deltaTime) {
                             " streamTiles=", *stream);
             }
         }
-    } report{tStart, &reconcileMs, &readyMs, &unloadMs, &streamMs};
+    } report{.start = tStart, .reconcile = &reconcileMs, .ready = &readyMs, .unload = &unloadMs, .stream = &streamMs};
 
     // Reconcile the "already uploaded" cache against models the renderer reaped
     // for being instanceless. Without this, a model freed after leaving an area
@@ -387,7 +387,7 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
                     CollisionData cd;
                     cd.triangles.reserve(woc.triangles.size());
                     for (const auto& t : woc.triangles)
-                        cd.triangles.push_back({t.v0, t.v1, t.v2, t.flags});
+                        cd.triangles.push_back({.v0 = t.v0, .v1 = t.v1, .v2 = t.v2, .flags = t.flags});
                     cd.boundsMin = woc.bounds.min;
                     cd.boundsMax = woc.bounds.max;
                     cd.loaded = true;
@@ -412,7 +412,7 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
                         CollisionData cd;
                         cd.triangles.reserve(woc.triangles.size());
                         for (const auto& t : woc.triangles)
-                            cd.triangles.push_back({t.v0, t.v1, t.v2, t.flags});
+                            cd.triangles.push_back({.v0 = t.v0, .v1 = t.v1, .v2 = t.v2, .flags = t.flags});
                         cd.boundsMin = woc.bounds.min;
                         cd.boundsMax = woc.bounds.max;
                         cd.loaded = true;
@@ -442,7 +442,7 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
                         CollisionData cd;
                         cd.triangles.reserve(woc.triangles.size());
                         for (const auto& t : woc.triangles)
-                            cd.triangles.push_back({t.v0, t.v1, t.v2, t.flags});
+                            cd.triangles.push_back({.v0 = t.v0, .v1 = t.v1, .v2 = t.v2, .flags = t.flags});
                         cd.boundsMin = woc.bounds.min;
                         cd.boundsMax = woc.bounds.max;
                         cd.loaded = true;
@@ -603,7 +603,7 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
             if (wom.isValid()) {
                 auto m2Model = pipeline::WoweeModelLoader::toM2(wom);
                 m2Model.name = m2Path;
-                pending->m2Models.push_back({modelId, std::move(m2Model), {}});
+                pending->m2Models.push_back({.modelId = modelId, .model = std::move(m2Model), .path = {}});
                 preparedModelIds.insert(modelId);
                 LOG_INFO("Loaded WOM model: ", m2Path, " (v", wom.version,
                          ", ", wom.batches.size(), " batches)");
@@ -1760,7 +1760,7 @@ void TerrainManager::softReset() {
 
 TileCoord TerrainManager::worldToTile(float glX, float glY) const {
     auto [tileX, tileY] = core::coords::worldToTile(glX, glY);
-    return {tileX, tileY};
+    return {.x = tileX, .y = tileY};
 }
 
 void TerrainManager::getTileBounds(const TileCoord& coord, float& minX, float& minY,
@@ -2467,7 +2467,7 @@ void TerrainManager::streamTiles() {
                 if (failedTiles.find(coord) != failedTiles.end()) continue;
                 if (shouldSkipMissingAdt(coord)) continue;
 
-                newTiles.push_back({coord, dx*dx + dy*dy});
+                newTiles.push_back({.coord = coord, .distSq = dx*dx + dy*dy});
                 pendingTiles[coord] = true;
             }
         }
@@ -2517,7 +2517,7 @@ void TerrainManager::precacheTiles(const std::vector<std::pair<int, int>>& tiles
     for (const auto& [x, y] : tiles) {
         if (x < 0 || x > 63 || y < 0 || y > 63) continue;
 
-        TileCoord coord = {x, y};
+        TileCoord coord = {.x = x, .y = y};
 
         // Skip if already loaded, pending, or failed
         if (loadedTiles.find(coord) != loadedTiles.end()) continue;

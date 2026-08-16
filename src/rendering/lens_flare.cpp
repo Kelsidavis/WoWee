@@ -148,30 +148,30 @@ void LensFlare::generateFlareElements() {
     flareElements.clear();
 
     // Main sun glow (at sun position)
-    flareElements.push_back({0.0f, 0.3f, glm::vec3(1.0f, 0.95f, 0.8f), 0.8f});
+    flareElements.push_back({.position = 0.0f, .size = 0.3f, .color = glm::vec3(1.0f, 0.95f, 0.8f), .brightness = 0.8f});
 
     // Flare ghosts along sun-to-center axis
 
     // Bright white ghost near sun
-    flareElements.push_back({0.2f, 0.08f, glm::vec3(1.0f, 1.0f, 1.0f), 0.5f});
+    flareElements.push_back({.position = 0.2f, .size = 0.08f, .color = glm::vec3(1.0f, 1.0f, 1.0f), .brightness = 0.5f});
 
     // Blue-tinted ghost
-    flareElements.push_back({0.4f, 0.15f, glm::vec3(0.4f, 0.55f, 0.9f), 0.35f});
+    flareElements.push_back({.position = 0.4f, .size = 0.15f, .color = glm::vec3(0.4f, 0.55f, 0.9f), .brightness = 0.35f});
 
     // Small bright spot
-    flareElements.push_back({0.6f, 0.05f, glm::vec3(1.0f, 0.8f, 0.6f), 0.5f});
+    flareElements.push_back({.position = 0.6f, .size = 0.05f, .color = glm::vec3(1.0f, 0.8f, 0.6f), .brightness = 0.5f});
 
     // Warm amber ghost (replaced oversaturated green)
-    flareElements.push_back({0.8f, 0.10f, glm::vec3(0.9f, 0.75f, 0.5f), 0.2f});
+    flareElements.push_back({.position = 0.8f, .size = 0.10f, .color = glm::vec3(0.9f, 0.75f, 0.5f), .brightness = 0.2f});
 
     // Large halo on opposite side
-    flareElements.push_back({-0.5f, 0.22f, glm::vec3(1.0f, 0.8f, 0.5f), 0.15f});
+    flareElements.push_back({.position = -0.5f, .size = 0.22f, .color = glm::vec3(1.0f, 0.8f, 0.5f), .brightness = 0.15f});
 
     // Faint blue ghost far from sun
-    flareElements.push_back({-0.8f, 0.08f, glm::vec3(0.6f, 0.5f, 0.9f), 0.15f});
+    flareElements.push_back({.position = -0.8f, .size = 0.08f, .color = glm::vec3(0.6f, 0.5f, 0.9f), .brightness = 0.15f});
 
     // Small warm ghost
-    flareElements.push_back({-1.2f, 0.05f, glm::vec3(1.0f, 0.6f, 0.4f), 0.2f});
+    flareElements.push_back({.position = -1.2f, .size = 0.05f, .color = glm::vec3(1.0f, 0.6f, 0.4f), .brightness = 0.2f});
 }
 
 glm::vec2 LensFlare::worldToScreen(const Camera& camera, const glm::vec3& worldPos) const {

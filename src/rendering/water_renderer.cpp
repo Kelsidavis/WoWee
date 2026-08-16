@@ -179,8 +179,8 @@ bool WaterRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLay
     // Water vertex shader only takes aPos(vec3) at loc 0 and aTexCoord(vec2) at loc 1
     // (normal is computed in shader from wave derivatives)
     std::vector<VkVertexInputAttributeDescription> vertAttribs = {
-        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },                     // aPos
-        { 1, 0, VK_FORMAT_R32G32_SFLOAT, 6 * sizeof(float) },        // aTexCoord (skip normal)
+        { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },                     // aPos
+        { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 6 * sizeof(float) },        // aTexCoord (skip normal)
     };
 
     VkRenderPass mainPass = vkCtx->getImGuiRenderPass();
@@ -243,8 +243,8 @@ void WaterRenderer::recreatePipelines() {
     vertBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     std::vector<VkVertexInputAttributeDescription> vertAttribs = {
-        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
-        { 1, 0, VK_FORMAT_R32G32_SFLOAT, 6 * sizeof(float) },
+        { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
+        { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 6 * sizeof(float) },
     };
 
     VkRenderPass mainPass = vkCtx->getImGuiRenderPass();
@@ -380,7 +380,7 @@ void WaterRenderer::destroySceneHistoryResources() {
 // screen, so it gets the pixels.
 VkExtent2D WaterRenderer::refractionCaptureExtent() const {
     VkExtent2D full = vkCtx ? vkCtx->getSwapchainExtent() : VkExtent2D{.width = 0, .height = 0};
-    return { std::max(1u, full.width), std::max(1u, full.height) };
+    return { .width = std::max(1u, full.width), .height = std::max(1u, full.height) };
 }
 
 void WaterRenderer::createSceneHistoryResources(VkExtent2D extent, VkFormat colorFormat, VkFormat depthFormat) {
@@ -676,7 +676,7 @@ void WaterRenderer::loadFromTerrain(const pipeline::ADTTerrain& terrain, bool ap
             MergeKey key;
             key.liquidType = layer.liquidType;
             key.roundedHeight = static_cast<int32_t>(std::round(layer.minHeight * 2.0f));
-            mergeGroups[key].push_back({chunkX, chunkY, &layer});
+            mergeGroups[key].push_back({.chunkX = chunkX, .chunkY = chunkY, .layer = &layer});
         }
     }
 
@@ -1184,8 +1184,8 @@ void WaterRenderer::captureSceneHistory(VkCommandBuffer cmd,
     const bool needsScaling = (srcExtent.width != sceneHistoryExtent.width ||
                                srcExtent.height != sceneHistoryExtent.height);
     VkExtent2D copyExtent{
-        std::min(srcExtent.width, sceneHistoryExtent.width),
-        std::min(srcExtent.height, sceneHistoryExtent.height)
+        .width = std::min(srcExtent.width, sceneHistoryExtent.width),
+        .height = std::min(srcExtent.height, sceneHistoryExtent.height)
     };
     if (copyExtent.width == 0 || copyExtent.height == 0) return;
 
@@ -2085,8 +2085,8 @@ bool WaterRenderer::createWater1xPass(VkFormat colorFormat, VkFormat depthFormat
     vertBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     std::vector<VkVertexInputAttributeDescription> vertAttribs = {
-        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
-        { 1, 0, VK_FORMAT_R32G32_SFLOAT, 6 * sizeof(float) },
+        { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
+        { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 6 * sizeof(float) },
     };
 
     water1xPipeline = PipelineBuilder()

@@ -58,7 +58,7 @@ struct TokenMatch {
 inline TokenMatch lastMatch(const std::string& lower, std::string_view token) noexcept {
     const std::size_t i = lower.rfind(token);
     if (i == std::string::npos) return {};
-    return {i + token.size(), token.size(), true};
+    return {.end = i + token.size(), .len = token.size(), .found = true};
 }
 
 template <std::size_t N>

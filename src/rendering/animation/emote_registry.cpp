@@ -285,31 +285,31 @@ void EmoteRegistry::loadFallbackEmotes() {
     animByEmotesId_ = makeFallbackEmotesIdMap();
     stateEmoteIds_ = makeFallbackStateEmoteIds();
     emoteTable_ = {
-        {"wave",    {anim::EMOTE_WAVE,    0, false, "You wave.", "You wave at %s.", "%s waves.", "%s waves at %s.", "wave"}},
-        {"bow",     {anim::EMOTE_BOW,     0, false, "You bow down graciously.", "You bow down before %s.", "%s bows down graciously.", "%s bows down before %s.", "bow"}},
-        {"laugh",   {anim::EMOTE_LAUGH,   0, false, "You laugh.", "You laugh at %s.", "%s laughs.", "%s laughs at %s.", "laugh"}},
-        {"point",   {anim::EMOTE_POINT,   0, false, "You point over yonder.", "You point at %s.", "%s points over yonder.", "%s points at %s.", "point"}},
-        {"cheer",   {anim::EMOTE_CHEER,   0, false, "You cheer!", "You cheer at %s.", "%s cheers!", "%s cheers at %s.", "cheer"}},
-        {"dance",   {anim::EMOTE_DANCE,   0, true,  "You burst into dance.", "You dance with %s.", "%s bursts into dance.", "%s dances with %s.", "dance"}},
-        {"kneel",   {anim::EMOTE_KNEEL,   0, false, "You kneel down.", "You kneel before %s.", "%s kneels down.", "%s kneels before %s.", "kneel"}},
-        {"applaud", {anim::EMOTE_APPLAUD, 0, false, "You applaud. Bravo!", "You applaud at %s. Bravo!", "%s applauds. Bravo!", "%s applauds at %s. Bravo!", "applaud"}},
-        {"shout",   {anim::EMOTE_SHOUT,   0, false, "You shout.", "You shout at %s.", "%s shouts.", "%s shouts at %s.", "shout"}},
-        {"chicken", {anim::EMOTE_CHICKEN, 0, false, "With arms flapping, you strut around. Cluck, Cluck, Chicken!",
-                     "With arms flapping, you strut around %s. Cluck, Cluck, Chicken!",
-                     "%s struts around. Cluck, Cluck, Chicken!", "%s struts around %s. Cluck, Cluck, Chicken!", "chicken"}},
-        {"cry",     {anim::EMOTE_CRY,     0, false, "You cry.", "You cry on %s's shoulder.", "%s cries.", "%s cries on %s's shoulder.", "cry"}},
-        {"kiss",    {anim::EMOTE_KISS,    0, false, "You blow a kiss into the wind.", "You blow a kiss to %s.", "%s blows a kiss into the wind.", "%s blows a kiss to %s.", "kiss"}},
-        {"roar",    {anim::EMOTE_ROAR,    0, false, "You roar with bestial vigor. So fierce!", "You roar with bestial vigor at %s. So fierce!", "%s roars with bestial vigor. So fierce!", "%s roars with bestial vigor at %s. So fierce!", "roar"}},
-        {"salute",  {anim::EMOTE_SALUTE,  0, false, "You salute.", "You salute %s with respect.", "%s salutes.", "%s salutes %s with respect.", "salute"}},
-        {"rude",    {anim::EMOTE_RUDE,    0, false, "You make a rude gesture.", "You make a rude gesture at %s.", "%s makes a rude gesture.", "%s makes a rude gesture at %s.", "rude"}},
-        {"flex",    {anim::EMOTE_FLEX,    0, false, "You flex your muscles. Oooooh so strong!", "You flex at %s. Oooooh so strong!", "%s flexes. Oooooh so strong!", "%s flexes at %s. Oooooh so strong!", "flex"}},
-        {"shy",     {anim::EMOTE_SHY,     0, false, "You smile shyly.", "You smile shyly at %s.", "%s smiles shyly.", "%s smiles shyly at %s.", "shy"}},
-        {"beg",     {anim::EMOTE_BEG,     0, false, "You beg everyone around you. How pathetic.", "You beg %s. How pathetic.", "%s begs everyone around. How pathetic.", "%s begs %s. How pathetic.", "beg"}},
-        {"eat",     {anim::EMOTE_EAT,     0, true,  "You begin to eat.", "You begin to eat in front of %s.", "%s begins to eat.", "%s begins to eat in front of %s.", "eat"}},
-        {"talk",    {anim::EMOTE_TALK,    0, false, "You talk.", "You talk to %s.", "%s talks.", "%s talks to %s.", "talk"}},
-        {"work",    {anim::EMOTE_WORK,    0, true,  "You begin to work.", "You begin to work near %s.", "%s begins to work.", "%s begins to work near %s.", "work"}},
-        {"train",   {anim::EMOTE_TRAIN,   0, true,  "You let off a train whistle. Choo Choo!", "You let off a train whistle at %s. Choo Choo!", "%s lets off a train whistle. Choo Choo!", "%s lets off a train whistle at %s. Choo Choo!", "train"}},
-        {"dead",    {anim::EMOTE_DEAD,    0, true,  "You play dead.", "You play dead in front of %s.", "%s plays dead.", "%s plays dead in front of %s.", "dead"}},
+        {"wave",    {.animId = anim::EMOTE_WAVE,    .dbcId = 0, .loop = false, .textNoTarget = "You wave.", .textTarget = "You wave at %s.", .othersNoTarget = "%s waves.", .othersTarget = "%s waves at %s.", .command = "wave"}},
+        {"bow",     {.animId = anim::EMOTE_BOW,     .dbcId = 0, .loop = false, .textNoTarget = "You bow down graciously.", .textTarget = "You bow down before %s.", .othersNoTarget = "%s bows down graciously.", .othersTarget = "%s bows down before %s.", .command = "bow"}},
+        {"laugh",   {.animId = anim::EMOTE_LAUGH,   .dbcId = 0, .loop = false, .textNoTarget = "You laugh.", .textTarget = "You laugh at %s.", .othersNoTarget = "%s laughs.", .othersTarget = "%s laughs at %s.", .command = "laugh"}},
+        {"point",   {.animId = anim::EMOTE_POINT,   .dbcId = 0, .loop = false, .textNoTarget = "You point over yonder.", .textTarget = "You point at %s.", .othersNoTarget = "%s points over yonder.", .othersTarget = "%s points at %s.", .command = "point"}},
+        {"cheer",   {.animId = anim::EMOTE_CHEER,   .dbcId = 0, .loop = false, .textNoTarget = "You cheer!", .textTarget = "You cheer at %s.", .othersNoTarget = "%s cheers!", .othersTarget = "%s cheers at %s.", .command = "cheer"}},
+        {"dance",   {.animId = anim::EMOTE_DANCE,   .dbcId = 0, .loop = true,  .textNoTarget = "You burst into dance.", .textTarget = "You dance with %s.", .othersNoTarget = "%s bursts into dance.", .othersTarget = "%s dances with %s.", .command = "dance"}},
+        {"kneel",   {.animId = anim::EMOTE_KNEEL,   .dbcId = 0, .loop = false, .textNoTarget = "You kneel down.", .textTarget = "You kneel before %s.", .othersNoTarget = "%s kneels down.", .othersTarget = "%s kneels before %s.", .command = "kneel"}},
+        {"applaud", {.animId = anim::EMOTE_APPLAUD, .dbcId = 0, .loop = false, .textNoTarget = "You applaud. Bravo!", .textTarget = "You applaud at %s. Bravo!", .othersNoTarget = "%s applauds. Bravo!", .othersTarget = "%s applauds at %s. Bravo!", .command = "applaud"}},
+        {"shout",   {.animId = anim::EMOTE_SHOUT,   .dbcId = 0, .loop = false, .textNoTarget = "You shout.", .textTarget = "You shout at %s.", .othersNoTarget = "%s shouts.", .othersTarget = "%s shouts at %s.", .command = "shout"}},
+        {"chicken", {.animId = anim::EMOTE_CHICKEN, .dbcId = 0, .loop = false, .textNoTarget = "With arms flapping, you strut around. Cluck, Cluck, Chicken!",
+                     .textTarget = "With arms flapping, you strut around %s. Cluck, Cluck, Chicken!",
+                     .othersNoTarget = "%s struts around. Cluck, Cluck, Chicken!", .othersTarget = "%s struts around %s. Cluck, Cluck, Chicken!", .command = "chicken"}},
+        {"cry",     {.animId = anim::EMOTE_CRY,     .dbcId = 0, .loop = false, .textNoTarget = "You cry.", .textTarget = "You cry on %s's shoulder.", .othersNoTarget = "%s cries.", .othersTarget = "%s cries on %s's shoulder.", .command = "cry"}},
+        {"kiss",    {.animId = anim::EMOTE_KISS,    .dbcId = 0, .loop = false, .textNoTarget = "You blow a kiss into the wind.", .textTarget = "You blow a kiss to %s.", .othersNoTarget = "%s blows a kiss into the wind.", .othersTarget = "%s blows a kiss to %s.", .command = "kiss"}},
+        {"roar",    {.animId = anim::EMOTE_ROAR,    .dbcId = 0, .loop = false, .textNoTarget = "You roar with bestial vigor. So fierce!", .textTarget = "You roar with bestial vigor at %s. So fierce!", .othersNoTarget = "%s roars with bestial vigor. So fierce!", .othersTarget = "%s roars with bestial vigor at %s. So fierce!", .command = "roar"}},
+        {"salute",  {.animId = anim::EMOTE_SALUTE,  .dbcId = 0, .loop = false, .textNoTarget = "You salute.", .textTarget = "You salute %s with respect.", .othersNoTarget = "%s salutes.", .othersTarget = "%s salutes %s with respect.", .command = "salute"}},
+        {"rude",    {.animId = anim::EMOTE_RUDE,    .dbcId = 0, .loop = false, .textNoTarget = "You make a rude gesture.", .textTarget = "You make a rude gesture at %s.", .othersNoTarget = "%s makes a rude gesture.", .othersTarget = "%s makes a rude gesture at %s.", .command = "rude"}},
+        {"flex",    {.animId = anim::EMOTE_FLEX,    .dbcId = 0, .loop = false, .textNoTarget = "You flex your muscles. Oooooh so strong!", .textTarget = "You flex at %s. Oooooh so strong!", .othersNoTarget = "%s flexes. Oooooh so strong!", .othersTarget = "%s flexes at %s. Oooooh so strong!", .command = "flex"}},
+        {"shy",     {.animId = anim::EMOTE_SHY,     .dbcId = 0, .loop = false, .textNoTarget = "You smile shyly.", .textTarget = "You smile shyly at %s.", .othersNoTarget = "%s smiles shyly.", .othersTarget = "%s smiles shyly at %s.", .command = "shy"}},
+        {"beg",     {.animId = anim::EMOTE_BEG,     .dbcId = 0, .loop = false, .textNoTarget = "You beg everyone around you. How pathetic.", .textTarget = "You beg %s. How pathetic.", .othersNoTarget = "%s begs everyone around. How pathetic.", .othersTarget = "%s begs %s. How pathetic.", .command = "beg"}},
+        {"eat",     {.animId = anim::EMOTE_EAT,     .dbcId = 0, .loop = true,  .textNoTarget = "You begin to eat.", .textTarget = "You begin to eat in front of %s.", .othersNoTarget = "%s begins to eat.", .othersTarget = "%s begins to eat in front of %s.", .command = "eat"}},
+        {"talk",    {.animId = anim::EMOTE_TALK,    .dbcId = 0, .loop = false, .textNoTarget = "You talk.", .textTarget = "You talk to %s.", .othersNoTarget = "%s talks.", .othersTarget = "%s talks to %s.", .command = "talk"}},
+        {"work",    {.animId = anim::EMOTE_WORK,    .dbcId = 0, .loop = true,  .textNoTarget = "You begin to work.", .textTarget = "You begin to work near %s.", .othersNoTarget = "%s begins to work.", .othersTarget = "%s begins to work near %s.", .command = "work"}},
+        {"train",   {.animId = anim::EMOTE_TRAIN,   .dbcId = 0, .loop = true,  .textNoTarget = "You let off a train whistle. Choo Choo!", .textTarget = "You let off a train whistle at %s. Choo Choo!", .othersNoTarget = "%s lets off a train whistle. Choo Choo!", .othersTarget = "%s lets off a train whistle at %s. Choo Choo!", .command = "train"}},
+        {"dead",    {.animId = anim::EMOTE_DEAD,    .dbcId = 0, .loop = true,  .textNoTarget = "You play dead.", .textTarget = "You play dead in front of %s.", .othersNoTarget = "%s plays dead.", .othersTarget = "%s plays dead in front of %s.", .command = "dead"}},
     };
     buildDbcIdIndex();
 }
@@ -328,7 +328,7 @@ std::optional<EmoteRegistry::EmoteResult> EmoteRegistry::findEmote(const std::st
     if (it == emoteTable_.end()) return std::nullopt;
     const auto& info = it->second;
     if (info.animId == 0) return std::nullopt;
-    return EmoteResult{info.animId, info.loop};
+    return EmoteResult{.animId = info.animId, .loop = info.loop};
 }
 uint32_t EmoteRegistry::animByEmotesId(uint32_t emoteId) const {
     auto it = animByEmotesId_.find(emoteId);

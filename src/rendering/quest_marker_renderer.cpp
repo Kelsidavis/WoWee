@@ -284,7 +284,7 @@ void QuestMarkerRenderer::loadTextures(pipeline::AssetManager* assetManager) {
 
 void QuestMarkerRenderer::setMarker(uint64_t guid, const glm::vec3& position, int markerType,
                                     float boundingHeight, float grayscale) {
-    markers_[guid] = {position, markerType, boundingHeight, grayscale};
+    markers_[guid] = {.position = position, .type = markerType, .boundingHeight = boundingHeight, .grayscale = grayscale};
 }
 void QuestMarkerRenderer::clear() {
     markers_.clear();

@@ -1098,8 +1098,8 @@ void CharacterPreview::attachWeapons(const std::vector<game::EquipmentItem>& equ
     };
     // Main hand also covers two-handers and ranged; off hand covers shields and held items.
     const WeaponSlot slots[] = {
-        { {13, 17, 21, 15, 25, 26}, 1 },
-        { {14, 22, 23},             2 },
+        { .invTypes = {13, 17, 21, 15, 25, 26}, .attachmentId = 1 },
+        { .invTypes = {14, 22, 23},             .attachmentId = 2 },
     };
 
     for (const auto& ws : slots) {

@@ -128,9 +128,9 @@ uint32_t M2Renderer::gatherLocalLights(const glm::vec3& cameraPos,
             if (distSq <= 300.0f * 300.0f) {
                 const float radius = std::clamp(instance.cachedVisualRadius * 0.8f,
                                                 10.0f, 35.0f);
-                candidates.push_back({distSq, glm::vec4(worldPos, radius),
-                                      glm::vec4(1.0f, 0.28f, 0.035f, 1.75f),
-                                      /*flame=*/false, instance.position});
+                candidates.push_back({.distSq = distSq, .posRadius = glm::vec4(worldPos, radius),
+                                      .colorIntensity = glm::vec4(1.0f, 0.28f, 0.035f, 1.75f),
+                                      .flame = false, .phaseSeed = instance.position});
             }
         }
 
@@ -165,9 +165,9 @@ uint32_t M2Renderer::gatherLocalLights(const glm::vec3& cameraPos,
             glm::vec3 color(1.0f, 0.58f, 0.22f);
             if (batch.glowTint == 1) color = glm::vec3(0.42f, 0.68f, 1.0f);
             else if (batch.glowTint == 2) color = glm::vec3(1.0f, 0.24f, 0.14f);
-            candidates.push_back({distSq, glm::vec4(worldPos, radius),
-                                  glm::vec4(color, 1.35f), /*flame=*/true,
-                                  instance.position});
+            candidates.push_back({.distSq = distSq, .posRadius = glm::vec4(worldPos, radius),
+                                  .colorIntensity = glm::vec4(color, 1.35f), .flame = true,
+                                  .phaseSeed = instance.position});
             hasBatchLight = true;
         }
 
@@ -215,10 +215,10 @@ uint32_t M2Renderer::gatherLocalLights(const glm::vec3& cameraPos,
                         intensity = model->isTorch ? 0.95f : 1.05f;
                         color     = glm::vec3(1.0f, 0.50f, 0.18f);
                     }
-                    candidates.push_back({distSq,
-                        glm::vec4(worldPos, radius),
-                        glm::vec4(color, intensity),
-                        /*flame=*/true, instance.position});
+                    candidates.push_back({.distSq = distSq,
+                        .posRadius = glm::vec4(worldPos, radius),
+                        .colorIntensity = glm::vec4(color, intensity),
+                        .flame = true, .phaseSeed = instance.position});
                 }
             }
         }
@@ -290,12 +290,12 @@ bool M2Renderer::buildMainPassPipelines(VkDescriptorSetLayout perFrameLayout) {
     m2Binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     std::vector<VkVertexInputAttributeDescription> m2Attrs = {
-        {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0},                     // position
-        {1, 0, VK_FORMAT_R32G32B32_SFLOAT, 3 * sizeof(float)},     // normal
-        {2, 0, VK_FORMAT_R32G32_SFLOAT, 6 * sizeof(float)},        // texCoord0
-        {5, 0, VK_FORMAT_R32G32_SFLOAT, 8 * sizeof(float)},        // texCoord1
-        {3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 10 * sizeof(float)}, // boneWeights
-        {4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 14 * sizeof(float)}, // boneIndices (float)
+        {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0},                     // position
+        {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 3 * sizeof(float)},     // normal
+        {.location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 6 * sizeof(float)},        // texCoord0
+        {.location = 5, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 8 * sizeof(float)},        // texCoord1
+        {.location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = 10 * sizeof(float)}, // boneWeights
+        {.location = 4, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = 14 * sizeof(float)}, // boneIndices (float)
     };
 
     // Pipeline derivatives - opaque is the base, others derive from it for shared state optimization
@@ -342,10 +342,10 @@ bool M2Renderer::buildMainPassPipelines(VkDescriptorSetLayout perFrameLayout) {
         pBind.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
         std::vector<VkVertexInputAttributeDescription> pAttrs = {
-            {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0},                    // position
-            {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 3 * sizeof(float)}, // color
-            {2, 0, VK_FORMAT_R32_SFLOAT, 7 * sizeof(float)},          // size
-            {3, 0, VK_FORMAT_R32_SFLOAT, 8 * sizeof(float)},          // tile
+            {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0},                    // position
+            {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = 3 * sizeof(float)}, // color
+            {.location = 2, .binding = 0, .format = VK_FORMAT_R32_SFLOAT, .offset = 7 * sizeof(float)},          // size
+            {.location = 3, .binding = 0, .format = VK_FORMAT_R32_SFLOAT, .offset = 8 * sizeof(float)},          // tile
         };
 
         auto buildParticlePipeline = [&](VkPipelineColorBlendAttachmentState blend) -> VkPipeline {
@@ -376,10 +376,10 @@ bool M2Renderer::buildMainPassPipelines(VkDescriptorSetLayout perFrameLayout) {
         sBind.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
         std::vector<VkVertexInputAttributeDescription> sAttrs = {
-            {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0},           // position
-            {1, 0, VK_FORMAT_R32_SFLOAT, 3 * sizeof(float)}, // lifeRatio
-            {2, 0, VK_FORMAT_R32_SFLOAT, 4 * sizeof(float)}, // size
-            {3, 0, VK_FORMAT_R32_SFLOAT, 5 * sizeof(float)}, // isSpark
+            {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0},           // position
+            {.location = 1, .binding = 0, .format = VK_FORMAT_R32_SFLOAT, .offset = 3 * sizeof(float)}, // lifeRatio
+            {.location = 2, .binding = 0, .format = VK_FORMAT_R32_SFLOAT, .offset = 4 * sizeof(float)}, // size
+            {.location = 3, .binding = 0, .format = VK_FORMAT_R32_SFLOAT, .offset = 5 * sizeof(float)}, // isSpark
         };
 
         smokePipeline_ = PipelineBuilder()
@@ -424,10 +424,10 @@ bool M2Renderer::buildMainPassPipelines(VkDescriptorSetLayout perFrameLayout) {
             rBind.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
             std::vector<VkVertexInputAttributeDescription> rAttrs = {
-                {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0},                    // pos
-                {1, 0, VK_FORMAT_R32G32B32_SFLOAT, 3 * sizeof(float)},    // color
-                {2, 0, VK_FORMAT_R32_SFLOAT,       6 * sizeof(float)},    // alpha
-                {3, 0, VK_FORMAT_R32G32_SFLOAT,    7 * sizeof(float)},    // uv
+                {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0},                    // pos
+                {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 3 * sizeof(float)},    // color
+                {.location = 2, .binding = 0, .format = VK_FORMAT_R32_SFLOAT,       .offset = 6 * sizeof(float)},    // alpha
+                {.location = 3, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT,    .offset = 7 * sizeof(float)},    // uv
             };
 
             auto buildRibbonPipeline = [&](VkPipelineColorBlendAttachmentState blend) -> VkPipeline {
@@ -1947,7 +1947,7 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
                     bgpu.lightBoneAnchors.reserve(boneAnchorSums.size());
                     for (const auto& [bone, weightedPoint] : boneAnchorSums) {
                         bgpu.lightBoneAnchors.push_back({
-                            bone, weightedPoint / static_cast<float>(counted)});
+                            .bone = bone, .weightedPoint = weightedPoint / static_cast<float>(counted)});
                     }
                     if (!boneAnchorSums.empty() && !model.bones.empty()) {
                         const auto dominant = std::max_element(
@@ -2087,7 +2087,7 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
         // We allocate them as separate buffers for clarity
         VmaAllocationInfo matAllocInfo{};
         {
-            VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+            VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
             bci.size = sizeof(M2MaterialUBO);
             bci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
             VmaAllocationCreateInfo aci{};

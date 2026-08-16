@@ -1085,7 +1085,7 @@ CameraController::FloorSample CameraController::sampleFloorUnderFeet(const glm::
             hasCachedFloor_ = false;
         }
     }
-    return {groundH, centerTerrainH, centerWmoH, centerM2H};
+    return {.floor = groundH, .terrain = centerTerrainH, .wmo = centerWmoH, .m2 = centerM2H};
 }
 
 void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
@@ -1248,7 +1248,7 @@ void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
                     return wmoRenderer->getFloorHeight(x, y, z, nz);
                 },
                 targetPos.x, targetPos.y, feetCross(0.35f), wmoProbeZ, minWalkableWmo,
-                {lastGroundZ - 3.5f, maxZ});
+                {.minZ = lastGroundZ - 3.5f, .maxZ = maxZ});
             if (wh && (!groundH || *wh > *groundH)) groundH = wh;
         }
 
@@ -1262,7 +1262,7 @@ void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
                 },
                 targetPos.x, targetPos.y, feetRing(0.65f), rescueProbeZ,
                 MIN_WALKABLE_NORMAL_WMO,
-                {lastGroundZ - 6.0f, lastGroundZ + stepUpBudget + 0.75f});
+                {.minZ = lastGroundZ - 6.0f, .maxZ = lastGroundZ + stepUpBudget + 0.75f});
             if (rescueFloor) groundH = rescueFloor;
         }
 
@@ -1276,7 +1276,7 @@ void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
                 },
                 targetPos.x, targetPos.y, feetRing(0.75f), rescueProbeZ,
                 MIN_WALKABLE_NORMAL_M2,
-                {lastGroundZ - 6.0f, lastGroundZ + stepUpBudget + 0.90f});
+                {.minZ = lastGroundZ - 6.0f, .maxZ = lastGroundZ + stepUpBudget + 0.90f});
             if (rescueFloor) groundH = rescueFloor;
         }
 
