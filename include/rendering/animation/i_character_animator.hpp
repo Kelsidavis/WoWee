@@ -36,7 +36,7 @@ public:
     virtual void setInCombat(bool combat) = 0;
     virtual void setLowHealth(bool low) = 0;
     virtual void setSprintAuraActive(bool active) = 0;
-    virtual ~ICharacterAnimator() = default;
+    ~ICharacterAnimator() override = default;
 };
 
 } // namespace rendering

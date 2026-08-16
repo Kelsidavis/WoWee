@@ -163,7 +163,7 @@ public:
     using TalentTabEntry = game::TalentTabEntry;
 
     explicit GameHandler(GameServices& services);
-    ~GameHandler();
+    ~GameHandler() override;
 
     const GameServices& services() const { return services_; }
 
@@ -200,13 +200,13 @@ public:
     /**
      * Check if connected to world server
      */
-    bool isConnected() const;
-    bool isInWorld() const { return state == WorldState::IN_WORLD && socket; }
+    bool isConnected() const override;
+    bool isInWorld() const override { return state == WorldState::IN_WORLD && socket; }
 
     /**
      * Get current connection state
      */
-    WorldState getState() const { return state; }
+    WorldState getState() const override { return state; }
 
     /**
      * Request character list from server
@@ -309,8 +309,8 @@ public:
         return entityController_->getPlayerAppearance(guid, race, gender,
                                                       appearanceBytes, facial);
     }
-    EntityManager& getEntityManager() { return entityController_->getEntityManager(); }
-    const EntityManager& getEntityManager() const { return entityController_->getEntityManager(); }
+    EntityManager& getEntityManager() override { return entityController_->getEntityManager(); }
+    const EntityManager& getEntityManager() const override { return entityController_->getEntityManager(); }
 
     /**
      * Send a chat message
@@ -567,23 +567,23 @@ public:
     void unequipToBackpack(EquipSlot equipSlot);
 
     // Targeting
-    void setTarget(uint64_t guid);
-    void clearTarget();
-    uint64_t getTargetGuid() const { return targetGuid; }
-    std::shared_ptr<Entity> getTarget() const;
-    bool hasTarget() const { return targetGuid != 0; }
+    void setTarget(uint64_t guid) override;
+    void clearTarget() override;
+    uint64_t getTargetGuid() const override { return targetGuid; }
+    std::shared_ptr<Entity> getTarget() const override;
+    bool hasTarget() const override { return targetGuid != 0; }
     void tabTarget(float playerX, float playerY, float playerZ);
 
     // Focus targeting
-    void setFocus(uint64_t guid);
-    void clearFocus();
-    uint64_t getFocusGuid() const { return focusGuid; }
+    void setFocus(uint64_t guid) override;
+    void clearFocus() override;
+    uint64_t getFocusGuid() const override { return focusGuid; }
     std::shared_ptr<Entity> getFocus() const;
-    bool hasFocus() const { return focusGuid != 0; }
+    bool hasFocus() const override { return focusGuid != 0; }
 
     // Mouseover targeting - set each frame by the nameplate renderer
-    void setMouseoverGuid(uint64_t guid);
-    uint64_t getMouseoverGuid() const { return mouseoverGuid_; }
+    void setMouseoverGuid(uint64_t guid) override;
+    uint64_t getMouseoverGuid() const override { return mouseoverGuid_; }
 
     // Advanced targeting
     void targetLastTarget();
@@ -629,12 +629,12 @@ public:
     std::string getWhoAreaName(uint32_t zoneId) const { return getAreaName(zoneId); }
 
     // Social commands
-    void addFriend(const std::string& playerName, const std::string& note = "");
-    void removeFriend(const std::string& playerName);
+    void addFriend(const std::string& playerName, const std::string& note = "") override;
+    void removeFriend(const std::string& playerName) override;
     void setFriendNote(const std::string& playerName, const std::string& note);
-    void addIgnore(const std::string& playerName);
-    void removeIgnore(const std::string& playerName);
-    const std::unordered_map<std::string, uint64_t>& getIgnoreCache() const { return ignoreCache; }
+    void addIgnore(const std::string& playerName) override;
+    void removeIgnore(const std::string& playerName) override;
+    const std::unordered_map<std::string, uint64_t>& getIgnoreCache() const override { return ignoreCache; }
 
     // Random roll
     void randomRoll(uint32_t minRoll = 1, uint32_t maxRoll = 100);
@@ -646,23 +646,23 @@ public:
     using AvailableBgInfo = game::AvailableBgInfo;
 
     // Battleground
-    bool hasPendingBgInvite() const;
-    void acceptBattlefield(uint32_t queueSlot = 0xFFFFFFFF);
-    void declineBattlefield(uint32_t queueSlot = 0xFFFFFFFF);
+    bool hasPendingBgInvite() const override;
+    void acceptBattlefield(uint32_t queueSlot = 0xFFFFFFFF) override;
+    void declineBattlefield(uint32_t queueSlot = 0xFFFFFFFF) override;
     void leaveBattlefield();
     void requestBattlefieldList(uint32_t bgTypeId);
     void reportPvpAfk(uint64_t playerGuid);
     void joinBattlefield(uint64_t battlemasterGuid, uint32_t bgTypeId,
                          uint32_t instanceId, bool asGroup);
-    const std::array<BgQueueSlot, 3>& getBgQueues() const;
-    const std::vector<AvailableBgInfo>& getAvailableBgs() const;
+    const std::array<BgQueueSlot, 3>& getBgQueues() const override;
+    const std::vector<AvailableBgInfo>& getAvailableBgs() const override;
 
     // BG scoreboard (aliased from handler_types.hpp)
     using BgPlayerScore = game::BgPlayerScore;
     using ArenaTeamScore = game::ArenaTeamScore;
     using BgScoreboardData = game::BgScoreboardData;
     void requestPvpLog();
-    const BgScoreboardData* getBgScoreboard() const;
+    const BgScoreboardData* getBgScoreboard() const override;
 
     // BG flag carrier positions (aliased from handler_types.hpp)
     using BgPlayerPosition = game::BgPlayerPosition;
@@ -800,9 +800,9 @@ public:
                      uint32_t clientIndex = 1);
 
     // Guild state accessors
-    bool isInGuild() const;
-    const std::string& getGuildName() const;
-    const GuildRosterData& getGuildRoster() const;
+    bool isInGuild() const override;
+    const std::string& getGuildName() const override;
+    const GuildRosterData& getGuildRoster() const override;
 
     /// Where the player sits in the guild, as an index into the roster's rank
     /// list. Rank zero is the guild master, which is what IsGuildLeader asks.
@@ -813,7 +813,7 @@ public:
     /// whether to show officer chat, and a second copy is how two answers to
     /// one question start to disagree.
     uint32_t getPlayerGuildRankIndex() const;
-    bool hasGuildRoster() const;
+    bool hasGuildRoster() const override;
     const std::vector<std::string>& getGuildRankNames() const;
     uint32_t getPlayerGuildRankRights() const;
     /// Which rank the guild control panel is editing. Client-side only - the
@@ -962,12 +962,12 @@ public:
     void resetCastState();       // force-clear all cast/craft/queue state without sending packets
     void clearUnitCaches();      // clear per-unit cast states and aura caches
 
-    void queryPlayerName(uint64_t guid);
+    void queryPlayerName(uint64_t guid) override;
 
     /// Who a piece of mail is from, resolved from its GUID or entry depending on
     /// the mail type. Resolved on demand so a late name query still shows.
     std::string getMailSenderName(const MailMessage& mail) const;
-    void queryCreatureInfo(uint32_t entry, uint64_t guid);
+    void queryCreatureInfo(uint32_t entry, uint64_t guid) override;
     /// A creature template entry turned into something that can be drawn, by
     /// asking the server if it has not already.
     ///
@@ -981,16 +981,16 @@ public:
     /// frame to find.
     uint32_t getCreatureDisplayIdForEntry(uint32_t entry);
     void queryGameObjectInfo(uint32_t entry, uint64_t guid);
-    const GameObjectQueryResponseData* getCachedGameObjectInfo(uint32_t entry) const {
+    const GameObjectQueryResponseData* getCachedGameObjectInfo(uint32_t entry) const override {
         return entityController_->getCachedGameObjectInfo(entry);
     }
-    std::string getCachedPlayerName(uint64_t guid) const;
-    std::string getCachedCreatureName(uint32_t entry) const;
+    std::string getCachedPlayerName(uint64_t guid) const override;
+    std::string getCachedCreatureName(uint32_t entry) const override;
     // Read-only cache access forwarded from EntityController
-    const std::unordered_map<uint64_t, std::string>& getPlayerNameCache() const {
+    const std::unordered_map<uint64_t, std::string>& getPlayerNameCache() const override {
         return entityController_->getPlayerNameCache();
     }
-    const std::unordered_map<uint32_t, CreatureQueryResponseData>& getCreatureInfoCache() const {
+    const std::unordered_map<uint32_t, CreatureQueryResponseData>& getCreatureInfoCache() const override {
         return entityController_->getCreatureInfoCache();
     }
     // Returns the creature subname/title (e.g. "<Warchief of the Horde>"), empty if not cached
@@ -1795,7 +1795,7 @@ public:
     void sendSetLootMethod(uint32_t method, uint32_t threshold, uint64_t masterLooterGuid);
     bool isInGroup() const;
     const GroupListData& getPartyData() const;
-    const std::vector<ContactEntry>& getContacts() const { return contacts_; }
+    const std::vector<ContactEntry>& getContacts() const override { return contacts_; }
     bool hasPendingGroupInvite() const;
     const std::string& getPendingInviterName() const;
 
@@ -1956,7 +1956,7 @@ public:
 
     // Arena team stats (aliased from handler_types.hpp)
     using ArenaTeamStats = game::ArenaTeamStats;
-    const std::vector<ArenaTeamStats>& getArenaTeamStats() const;
+    const std::vector<ArenaTeamStats>& getArenaTeamStats() const override;
     void requestArenaTeamRoster(uint32_t teamId);
 
     // Arena team roster (aliased from handler_types.hpp)
@@ -3385,7 +3385,7 @@ public:
     // ═══════════════════════════════════════════════════════════════════
 
     // ── Handler & Subsystem Accessors (unique_ptr → raw pointer) ─────
-    network::WorldSocket* getSocket() { return socket.get(); }
+    network::WorldSocket* getSocket() override { return socket.get(); }
     const network::WorldSocket* getSocket() const { return socket.get(); }
     ChatHandler* getChatHandler() { return chatHandler_.get(); }
     CombatHandler* getCombatHandler() { return combatHandler_.get(); }
@@ -3403,7 +3403,7 @@ public:
 
     // ── Core / Session ───────────────────────────────────────────────
     uint32_t getBuild() const { return build; }
-    const std::vector<uint8_t>& getSessionKey() const { return sessionKey; }
+    const std::vector<uint8_t>& getSessionKey() const override { return sessionKey; }
     auto& charactersRef() { return characters; }
     auto& updateFieldTableRef() { return updateFieldTable_; }
     auto& lastPlayerFieldsRef() { return lastPlayerFields_; }
