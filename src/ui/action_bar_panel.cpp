@@ -1200,18 +1200,19 @@ void ActionBarPanel::renderActionBar(game::GameHandler& gameHandler,
                 actionBarCarryId_ = 0;
             };
 
-            // Left-release on empty space cancels the carry, returning the action to its
-            // origin. A left-release on a slot is consumed by the per-slot drop logic
-            // above (this block is then skipped since the carry has already ended).
+            // Left-release off the bar removes the action, which is what
+            // dragging something off a bar means and what the real client
+            // does. The origin slot was emptied at pickup, so there is nothing
+            // left to clear. A left-release on a slot is consumed by the
+            // per-slot drop logic above, which moves it there instead.
             if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && !insideBar) {
-                restoreCarried();
                 endCarry();
             }
 
-            // Right-release drops the carried action: off the bar removes it (the origin
-            // slot was already emptied on pickup), over the bar cancels and restores it.
+            // Right-release puts it back where it was lifted from, wherever the
+            // pointer is. The way out of a drag begun by mistake.
             if (ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
-                if (insideBar) restoreCarried();
+                restoreCarried();
                 endCarry();
             }
         }
