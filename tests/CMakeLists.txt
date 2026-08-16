@@ -364,6 +364,19 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/sweep_guard.py)
 endif()
 
+# ── unicorn_stub_compiles ────────────────────────────────────────
+# Unicorn is optional and every build here has it, so the stub branch the
+# Warden emulator falls back to compiles in no configuration anyone runs. It
+# rotted that way: issue #115 was a stub defining a method the header does
+# not declare, found by someone building without Unicorn and invisible to us.
+# Parses the two translation units with the define removed. A second or two.
+if(Python3_Interpreter_FOUND)
+    add_test(NAME unicorn_stub_compiles
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_SOURCE_DIR}/tools/unicorn_stub_check.py
+                     ${CMAKE_BINARY_DIR})
+endif()
+
 # ── test_chat_types ─────────────────────────────────────────────
 # A chat type is a byte off the wire and the event name is built from it, so a
 # value missing from the enum is a line of chat that never appears - no error,
