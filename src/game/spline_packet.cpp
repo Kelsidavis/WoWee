@@ -115,7 +115,7 @@ bool parseMonsterMoveSplineBody(
             float wx = packet.readFloat();
             float wy = packet.readFloat();
             float wz = packet.readFloat();
-            out.waypoints.push_back(glm::vec3(wx, wy, wz));
+            out.waypoints.emplace_back(wx, wy, wz);
         }
         if (!packet.hasRemaining(12)) return true;
         out.destination.x = packet.readFloat();
@@ -255,7 +255,7 @@ bool parseClassicMoveUpdateSpline(
         float px = packet.readFloat();
         float py = packet.readFloat();
         float pz = packet.readFloat();
-        out.waypoints.push_back(glm::vec3(px, py, pz));
+        out.waypoints.emplace_back(px, py, pz);
     }
 
     out.endPoint.x = packet.readFloat();

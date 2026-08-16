@@ -295,7 +295,7 @@ void VkContext::deferAfterAllFrameFences(std::function<void()>&& fn) {
     auto counter  = std::make_shared<uint32_t>(MAX_FRAMES_IN_FLIGHT);
     auto sharedFn = std::make_shared<std::function<void()>>(std::move(fn));
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        deferredCleanup_[i].push_back([counter, sharedFn]() {
+        deferredCleanup_[i].emplace_back([counter, sharedFn]() {
             if (--(*counter) == 0) {
                 (*sharedFn)();
             }

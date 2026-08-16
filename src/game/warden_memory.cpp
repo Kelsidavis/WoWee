@@ -619,7 +619,7 @@ uint32_t WardenMemory::expectedImageSizeForBuild(uint16_t build, bool isTurtle) 
 std::string WardenMemory::findWowExe(uint16_t build) const {
     std::vector<std::string> candidateDirs;
     if (const char* env = std::getenv("WOWEE_INTEGRITY_DIR")) {
-        if (env && *env) candidateDirs.push_back(env);
+        if (env && *env) candidateDirs.emplace_back(env);
     }
     if (const char* home = std::getenv("HOME")) {
         if (home && *home) {
@@ -628,10 +628,10 @@ std::string WardenMemory::findWowExe(uint16_t build) const {
             candidateDirs.push_back(std::string(home) + "/twmoa_1180");
         }
     }
-    candidateDirs.push_back("Data/expansions/turtle/misc");
-    candidateDirs.push_back("Data/expansions/classic/misc");
-    candidateDirs.push_back("Data/misc");
-    candidateDirs.push_back("Data/expansions/turtle/overlay/misc");
+    candidateDirs.emplace_back("Data/expansions/turtle/misc");
+    candidateDirs.emplace_back("Data/expansions/classic/misc");
+    candidateDirs.emplace_back("Data/misc");
+    candidateDirs.emplace_back("Data/expansions/turtle/overlay/misc");
 
     const char* candidateExes[] = { "WoW.exe", "TurtleWoW.exe", "Wow.exe", "wow.exe" };
 

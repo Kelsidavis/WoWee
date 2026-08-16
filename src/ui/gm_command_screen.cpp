@@ -155,12 +155,12 @@ void WindowManager::queueMaxOutCharacter(game::GameHandler& gameHandler) {
     // then skills, then gold, then gear.
     if (gmMaxLevel_)  gmPendingCmds_.push_back(".character level " + std::to_string(maxLevel));
     if (gmMaxSpells_) {
-        gmPendingCmds_.push_back(".learn all my class");
-        gmPendingCmds_.push_back(".learn all my spells");
+        gmPendingCmds_.emplace_back(".learn all my class");
+        gmPendingCmds_.emplace_back(".learn all my spells");
     }
-    if (gmMaxTalents_) gmPendingCmds_.push_back(".learn all my talents");
-    if (gmMaxSkills_)  gmPendingCmds_.push_back(".maxskill");
-    if (gmMaxGold_)    gmPendingCmds_.push_back(".modify money 10000000"); // 1000g
+    if (gmMaxTalents_) gmPendingCmds_.emplace_back(".learn all my talents");
+    if (gmMaxSkills_)  gmPendingCmds_.emplace_back(".maxskill");
+    if (gmMaxGold_)    gmPendingCmds_.emplace_back(".modify money 10000000"); // 1000g
     if (gmMaxGear_) {
         for (uint32_t id : getMaxOutGear(exp, classId))
             gmPendingCmds_.push_back(".additem " + std::to_string(id));

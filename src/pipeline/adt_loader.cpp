@@ -160,7 +160,7 @@ void ADTLoader::parseMTEX(std::span<const uint8_t> data, ADTTerrain& terrain) {
             break;
         }
 
-        terrain.textures.push_back(std::string(textureName, nameLen));
+        terrain.textures.emplace_back(textureName, nameLen);
         offset += nameLen + 1;  // +1 for null terminator
     }
 
@@ -179,7 +179,7 @@ void ADTLoader::parseMMDX(std::span<const uint8_t> data, ADTTerrain& terrain) {
             break;
         }
 
-        terrain.doodadNames.push_back(std::string(modelName, nameLen));
+        terrain.doodadNames.emplace_back(modelName, nameLen);
         offset += nameLen + 1;
     }
 
@@ -198,7 +198,7 @@ void ADTLoader::parseMWMO(std::span<const uint8_t> data, ADTTerrain& terrain) {
             break;
         }
 
-        terrain.wmoNames.push_back(std::string(wmoName, nameLen));
+        terrain.wmoNames.emplace_back(wmoName, nameLen);
         offset += nameLen + 1;
     }
 

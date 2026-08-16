@@ -17,7 +17,7 @@ namespace wowee {
 namespace rendering {
 
 LoadingScreen::LoadingScreen() {
-    imagePaths.push_back("assets/krayonload.png");
+    imagePaths.emplace_back("assets/krayonload.png");
 }
 
 LoadingScreen::~LoadingScreen() {

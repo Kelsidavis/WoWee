@@ -308,21 +308,21 @@ void AuthHandler::sendLogonProof() {
     {
         std::vector<std::string> candidateDirs;
         if (const char* env = std::getenv("WOWEE_INTEGRITY_DIR")) {
-            if (env && *env) candidateDirs.push_back(env);
+            if (env && *env) candidateDirs.emplace_back(env);
         }
         // Expansion-isolated extraction layouts. Select narrowly so a Wrath or
         // stock Classic executable can never be used for a Turtle integrity hash.
         if (clientInfo.majorVersion == 1 && clientInfo.minorVersion == 18) {
-            candidateDirs.push_back("Data/expansions/turtle/misc");
+            candidateDirs.emplace_back("Data/expansions/turtle/misc");
         } else if (clientInfo.build <= 6005) {
-            candidateDirs.push_back("Data/expansions/classic/misc");
+            candidateDirs.emplace_back("Data/expansions/classic/misc");
         } else if (clientInfo.build <= 8606) {
-            candidateDirs.push_back("Data/expansions/tbc/misc");
+            candidateDirs.emplace_back("Data/expansions/tbc/misc");
         } else {
-            candidateDirs.push_back("Data/expansions/wotlk/misc");
+            candidateDirs.emplace_back("Data/expansions/wotlk/misc");
         }
         // Legacy flat extraction layout.
-        candidateDirs.push_back("Data/misc");
+        candidateDirs.emplace_back("Data/misc");
         // Common turtle repack location used in this workspace
         if (const char* home = std::getenv("HOME")) {
             if (home && *home) {

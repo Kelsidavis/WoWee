@@ -380,7 +380,7 @@ std::shared_ptr<DBCFile> AssetManager::loadDBC(const std::string& name) {
             dbDirs.push_back(expansionDataPath_ + "/overlay/db");
         dbDirs.push_back(dataPath + "/db");
         dbDirs.push_back(dataPath + "/../../db");
-        dbDirs.push_back("Data/db");
+        dbDirs.emplace_back("Data/db");
         // Try exact-case first, then case-insensitive scan (Linux is case-sensitive
         // but DBC filenames in Data/db/ are often all-lowercase).
         std::string nameLower = name;

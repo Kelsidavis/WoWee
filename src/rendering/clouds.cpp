@@ -204,7 +204,7 @@ void Clouds::generateMesh() {
             float theta = (seg / static_cast<float>(SEGMENTS)) * (2.0f * static_cast<float>(M_PI));
             float x = ringRadius * std::cos(theta);
             float y = ringRadius * std::sin(theta);
-            vertices_.push_back(glm::vec3(x, y, altZ));
+            vertices_.emplace_back(x, y, altZ);
         }
     }
 
