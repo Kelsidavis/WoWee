@@ -40,8 +40,6 @@ public:
     void toggleBag(int idx);
     void openAllBags();
     void closeAllBags();
-    /// Toggle between independently positioned bag windows and one continuous grid.
-    void toggleCombinedBags();
     void setSeparateBags(bool sep) { separateBags_ = sep; }
     bool isSeparateBags() const { return separateBags_; }
     void toggleCompactBags() { compactBags_ = !compactBags_; }
@@ -263,13 +261,8 @@ public:
     void releaseHeldItem() { holdingItem = false; }
     /// Returns the item being held (only valid when isHoldingItem() is true).
     const game::ItemDef& getHeldItem() const { return heldItem; }
-    /// Begin pickup from an equipment slot (e.g., bag bar slot) into held cursor.
-    bool beginPickupFromEquipSlot(game::Inventory& inv, game::EquipSlot slot);
     /// Cancel the pickup, returning the item to its original slot.
     void returnHeldItem(game::Inventory& inv) { cancelPickup(inv); }
-    /// Drop the currently held item into a specific equipment slot.
-    /// Returns true if the drop was accepted and consumed.
-    bool dropHeldItemToEquipSlot(game::Inventory& inv, game::EquipSlot slot);
     /// Returns a WoW item link string if the user shift-clicked a bag item, then clears it.
     std::string getAndClearPendingChatLink() {
         std::string out = std::move(pendingChatItemLink_);

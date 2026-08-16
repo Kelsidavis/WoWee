@@ -181,7 +181,6 @@ private:
     std::vector<UIErrorEntry> uiErrors_;
     bool uiErrorCallbackSet_ = false;
     static constexpr float kUIErrorLifetime = 2.5f;
-    bool castFailedCallbackSet_ = false;
 
     bool showPlayerInfo = false;
     bool showWorldMap_ = false;  // W key toggles world map

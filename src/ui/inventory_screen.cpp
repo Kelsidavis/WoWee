@@ -736,20 +736,8 @@ void InventoryScreen::renderHeldItem() {
     }
 }
 
-bool InventoryScreen::dropHeldItemToEquipSlot(game::Inventory& inv, game::EquipSlot slot) {
-    if (!holdingItem) return false;
-    placeInEquipment(inv, slot);
-    return !holdingItem;
-}
 
 
-bool InventoryScreen::beginPickupFromEquipSlot(game::Inventory& inv, game::EquipSlot slot) {
-    if (holdingItem) return false;
-    const auto& eq = inv.getEquipSlot(slot);
-    if (eq.empty()) return false;
-    pickupFromEquipment(inv, slot);
-    return holdingItem;
-}
 
 // ============================================================
 // Bags window (B key) - bottom of screen, no equipment panel
@@ -775,19 +763,6 @@ void InventoryScreen::closeAllBags() {
     for (auto& b : bagOpen_) b = false;
 }
 
-void InventoryScreen::toggleCombinedBags() {
-    if (separateBags_) {
-        // Consolidating is an explicit request to see the inventory, even when
-        // all of the individual windows happened to be closed.
-        separateBags_ = false;
-        open = true;
-    } else {
-        // Restore every physical bag as a visible, independently movable window.
-        separateBags_ = true;
-        openAllBags();
-        open = true;
-    }
-}
 void InventoryScreen::render(game::Inventory& inventory, uint64_t moneyCopper) {
     // Bags toggle (B key, edge-triggered)
     bool bagsDown = KeybindingManager::getInstance().isActionPressed(

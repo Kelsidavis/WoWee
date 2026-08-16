@@ -82,6 +82,11 @@ NOTHING_TO_GATE = {
     # logic behind it stays: the style lists, the cost and the apply are Lua
     # services, and the interface's own barber panel is built on them.
     "BarberShop",
+    # src/ui/action_bar_panel.cpp, removed whole: the action bar, stance bar,
+    # bag bar and the two thin bars are one frame in FrameXML and this client
+    # draws none of them. What is left of the class is the page and slot
+    # arithmetic the number keys need.
+    "BagBar",
 }
 
 

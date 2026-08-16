@@ -420,7 +420,15 @@ static int lua_UseAction(lua_State* L) {
             toLowerInPlace(uid);
             if (const uint64_t named = resolveUnitGuid(gh, uid)) target = named;
         }
-        gh->castSpell(action.id, target);
+        // A spell that belongs to an item - a Hearthstone is spell 8690 - has
+        // to go as CMSG_USE_ITEM rather than a cast, or the server drops it.
+        // This client's own action bar did that and was the only place that
+        // did; the bar is FrameXML's now and this is the path its buttons take.
+        if (const uint32_t itemForSpell = gh->getItemIdForSpell(action.id)) {
+            gh->useItemById(itemForSpell, target);
+        } else {
+            gh->castSpell(action.id, target);
+        }
     } else if (action.type == game::ActionBarSlot::ITEM && action.id != 0) {
         gh->useItemById(action.id);
     }

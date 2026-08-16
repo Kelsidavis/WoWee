@@ -223,7 +223,6 @@ void GameScreen::setServices(const UIServices& services) {
     settingsPanel_.setInventoryScreen(&inventoryScreen);
     combatUI_.setServices(services);
     socialPanel_.setServices(services);
-    actionBarPanel_.setServices(services);
     windowManager_.setServices(services);
     applyCameraControlSettings();
     // The settings file is read in the constructor, before there is a renderer
@@ -323,15 +322,9 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         uiErrorCallbackSet_ = true;
     }
 
-    // Flash the action bar button whose spell just failed (0.5 s red overlay).
-    if (!castFailedCallbackSet_) {
-        gameHandler.setSpellCastFailedCallback([this](uint32_t spellId) {
-            if (spellId == 0) return;
-            float now = static_cast<float>(ImGui::GetTime());
-            actionBarPanel_.actionFlashEndTimes_[spellId] = now + actionBarPanel_.kActionFlashDuration;
-        });
-        castFailedCallbackSet_ = true;
-    }
+    // No flash callback here. The red overlay on a failed cast belonged to
+    // this client's own action bar; FrameXML draws the bars and flashes its
+    // own button from UI_ERROR_MESSAGE.
 
     // Apply UI transparency setting
     float prevAlpha = ImGui::GetStyle().Alpha;
@@ -622,23 +615,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     }
 
     // ---- New UI elements ----
-    if (!frameXmlOwns(UiElement::ActionBar)) {
-        actionBarPanel_.renderActionBar(gameHandler, settingsPanel_, chatPanel_,
-            inventoryScreen, spellbookScreen, questLogScreen,
-            [this](uint32_t id, pipeline::AssetManager* am) { return getSpellIcon(id, am); });
-    }
-    if (!frameXmlOwns(UiElement::StanceBar)) {
-        actionBarPanel_.renderStanceBar(gameHandler, settingsPanel_, spellbookScreen,
-            [this](uint32_t id, pipeline::AssetManager* am) { return getSpellIcon(id, am); });
-    }
-    if (!frameXmlOwns(UiElement::BagBar) &&
-        actionBarPanel_.renderBagBar(gameHandler, settingsPanel_, inventoryScreen))
-        saveSettings();
     if (!frameXmlOwns(UiElement::MicroMenu)) renderMicroMenu(gameHandler);
-    if (!frameXmlOwns(UiElement::XpBar))
-        actionBarPanel_.renderXpBar(gameHandler, settingsPanel_);
-    if (!frameXmlOwns(UiElement::RepBar))
-        actionBarPanel_.renderRepBar(gameHandler, settingsPanel_);
     auto spellIconFn = [this](uint32_t id, pipeline::AssetManager* am) { return getSpellIcon(id, am); };
     if (!frameXmlOwns(UiElement::CastBar))
         combatUI_.renderCastBar(gameHandler, spellIconFn);
