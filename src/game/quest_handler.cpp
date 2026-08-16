@@ -1630,9 +1630,12 @@ void QuestHandler::chooseQuestReward(uint32_t rewardIndex) {
     owner_.getSocket()->send(packet);
     pendingTurnInQuestId_ = 0;
     pendingTurnInNpcGuid_ = 0;
-    pendingTurnInRewardRequest_ = false;
-    questOfferRewardOpen_ = false;
-    currentQuestOfferReward_ = QuestOfferRewardData{};
+    // Announced, which is what closes the dialog. Taking the reward put the
+    // three fields back and told nothing: this client's own window reads the
+    // flag and closed, and the interface's quest frame hides on QUEST_FINISHED
+    // and nothing else, so it stayed on screen over the world after the quest
+    // had been handed in.
+    closeQuestOfferReward(true);
 
     // Re-query quest giver status so markers update
     if (npcGuid) {
