@@ -37,7 +37,6 @@ public:
     using SpellIconFn = std::function<VkDescriptorSet(uint32_t, pipeline::AssetManager*)>;
 
     // ---- NPC interaction windows ----
-    void renderBarberShopWindow(game::GameHandler& gameHandler);
 
     // ---- Mail and banking ----
 
@@ -129,11 +128,6 @@ public:
     uint8_t barberOrigSkinColor_ = 0;
     uint8_t barberColorsForHairStyle_ = 0xFF;
     float barberBaseCost_ = 0.0f;
-    int barberPreviewSkin_ = -1;
-    int barberPreviewHairStyle_ = -1;
-    int barberPreviewHairColor_ = -1;
-    int barberPreviewFacialHair_ = -1;
-    std::unique_ptr<rendering::CharacterPreview> barberPreview_;
     bool barberInitialized_ = false;
 
     // Barber state, separated from the window that used to hold it.

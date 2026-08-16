@@ -702,9 +702,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     if (!frameXmlOwns(UiElement::Buffs)) {
         combatUI_.renderBuffBar(gameHandler, spellbookScreen, inventoryScreen, settingsPanel_, spellIconFn);
     }
-    if (!frameXmlOwns(UiElement::BarberShop)) {
-        windowManager_.renderBarberShopWindow(gameHandler);
-    }
     windowManager_.renderGmCommandScreen(gameHandler);
     if (!frameXmlOwns(UiElement::DungeonFinder)) {
         socialPanel_.renderDungeonFinderWindow(gameHandler, chatPanel_);

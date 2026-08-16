@@ -78,6 +78,10 @@ NOTHING_TO_GATE = {
     # renderBankWindow, and with it the "Combine bags" view option it was the
     # only reader of - see settings_file_round_trip for the key that went.
     "Bank",
+    # renderBarberShopWindow and the character preview only it drew. The barber
+    # logic behind it stays: the style lists, the cost and the apply are Lua
+    # services, and the interface's own barber panel is built on them.
+    "BarberShop",
 }
 
 
