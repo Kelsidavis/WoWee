@@ -84,6 +84,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from cpp_number import number  # noqa: E402  (a sibling, not a package)
+
 ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "build" / "bin" / "framexml_run"
 DATA = ROOT / "Data"
@@ -526,10 +529,9 @@ def clientCVarPairs():
     for row in re.finditer(r'\{"([a-z0-9_]+)",\s*"([a-z0-9_]+)"\s*(?:,\s*([^}]+?))?\s*\}', body):
         scale = 1.0
         if row.group(3):
-            try:
-                scale = eval(row.group(3), {"__builtins__": {}}, {})  # a literal like 1.5 / 64.0
-            except Exception:
-                scale = None  # unreadable: reported rather than guessed at
+            # A literal like 1.5 / 64.0. None when it is not one, which the
+            # caller reports rather than guesses at.
+            scale = number(row.group(3))
         out.append((row.group(1), row.group(2), scale))
     return out
 

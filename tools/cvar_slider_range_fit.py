@@ -62,6 +62,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import settings_config_parse  # noqa: E402  (a sibling, not a package)
+from cpp_number import number  # noqa: E402  (same)
 
 ROOT = Path(__file__).resolve().parent.parent
 FRAMEXML = ROOT / "Data/interface/framexml"
@@ -131,10 +132,7 @@ def bindings():
     for m in re.finditer(r'\{"([a-z0-9_]+)",\s*"([a-z0-9_]+)"\s*(?:,\s*([^}]+?))?\s*\}', body):
         scale = 1.0
         if m.group(3):
-            try:
-                scale = float(eval(m.group(3), {"__builtins__": {}}, {}))
-            except Exception:
-                scale = None
+            scale = number(m.group(3))
         out[m.group(1)] = (m.group(2), scale)
     return out
 
