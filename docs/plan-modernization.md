@@ -1,12 +1,11 @@
 # Codebase Modernization — Phased Plan
 
-**Status:** Phases 0–7 complete (2 and 4 cancelled on evidence). Next: Phase 8 (Vulkan 1.2 features).
-**Branch:** `master`. Phase 1 was done on `chore/modernization` and pushed to `master` as
-`7b9d4a93d..2b5628a0f`; later phases continue directly on `master`.
+**Status:** Phases 1, 3, 5, 6, 7 complete. Phases 2 and 4 cancelled. Phase 8 in progress.
 **Scope:** code quality and modernity, codebase-wide. Not a performance effort. Where a phase
 happens to help performance that is a side effect, and no phase here is justified by it.
 
-Read this file at the start of every session. Update §5 at the end of each phase.
+This document records the plan and the decisions behind it. Phase outcomes belong in the
+commit history, not here.
 
 ---
 
@@ -117,7 +116,7 @@ project-specific — a PCH pulling in `game_handler.hpp` would make incremental 
 
 **Exit:** clean-build wall time recorded before/after in §5. Revert if it does not improve.
 
-### Phase 2 — ~~Split the compile-time anchors~~ **CANCELLED — measured, not worth it**
+### Phase 2 — Split the compile-time anchors — CANCELLED
 The original plan was to split `game_handler.hpp` (5013 lines, 57 includers) and
 `world_packets.hpp` (3387) to cut compile time. Measuring preprocessed output killed it:
 
@@ -161,7 +160,7 @@ Note the survey pattern that nearly wasted a session: grepping for
 `wowee_*.cpp` files — lambda parameters, not buffers. Tighten the pattern to require a
 length-shaped name (`len|size|length|count`) before believing a count.
 
-### Phase 4 — ~~`std::format` for the 507 `snprintf` sites~~ **CANCELLED — measured, not worth it**
+### Phase 4 — `std::format` for the 507 `snprintf` sites — CANCELLED
 The case for this phase was that each `char buf[N]` + `snprintf` is a truncation *and* a
 type-safety hazard. Measuring both halves killed it.
 
@@ -198,7 +197,7 @@ closes the last manual-memory hole in the codebase.
 
 **Exit:** zero bare `malloc`/`free`, audio still works, `./test.sh --asan` clean.
 
-### Phase 6 — `std::bit_cast` — **done, but the premise was wrong**
+### Phase 6 — `std::bit_cast` — DONE (reduced scope)
 This phase was written as "replace the *punning* subset of the 303 `reinterpret_cast`... Today
 those are UB-adjacent." **That was false on both counts.**
 
@@ -214,12 +213,11 @@ There is no `reinterpret_cast` punning in this codebase. Of 298 casts:
 A search for `*reinterpret_cast<T*>(&x)` — the actual punning shape — returns **nothing**. The
 codebase already used `memcpy`, which is well defined, not "UB-adjacent".
 
-So the real scope was six `memcpy(&a, &b, sizeof(float))` sites. Converted anyway in
-`(see log)`: `bit_cast` is the same operation as an expression rather than a statement, which let
-`Packet::readFloat`/`writeFloat` collapse to one line each. Zero risk, small gain, honestly
-labelled — not the safety fix the phase claimed.
+So the real scope was six `memcpy(&a, &b, sizeof(float))` sites. Converted regardless: `bit_cast` is the same operation as an expression rather than a
+statement, which lets `Packet::readFloat`/`writeFloat` collapse to one line each. Cosmetic, not
+a correctness fix.
 
-### Phase 7 — `std::jthread` — **done, narrowly**
+### Phase 7 — `std::jthread` — DONE (reduced scope)
 Converted one thread, deliberately. The stall watchdog in `application.cpp` had a hand-rolled
 `std::atomic<bool>` stop flag *and* its teardown written twice — once in a `try/catch` that
 existed for no other reason, once after the loop. A `jthread` destructor does both, so the flag,
@@ -238,19 +236,31 @@ duplicated teardown**. Where the stop mechanism is already integrated with a con
 it is a rewrite, not a modernization.
 
 ### Phase 8 — Vulkan: timeline semaphores + descriptor indexing
-Both **core in 1.2, already required** — no extension, no feature negotiation, no fallback path.
-The cheapest real Vulkan modernization available here.
+Both are core in the Vulkan 1.2 this project already requires, so neither needs an extension or
+raises the hardware floor.
 
-- *Timeline semaphores*: replace fence + binary-semaphore juggling around `MAX_FRAMES_IN_FLIGHT=2`
-  and the per-frame deferred-cleanup queues (`vk_context.hpp:270,316`) with one monotonic counter.
-  "Is frame N-2 done?" becomes a comparison instead of a protocol.
-- *Descriptor indexing*: collapse per-material descriptor sets into bindless arrays, cutting the
-  34 allocate / 44 update sites and the per-draw rebinding around them.
+**Scope correction.** Timeline semaphores cannot replace the swapchain semaphores. WSI does not
+accept them: `vkAcquireNextImageKHR` and `vkQueuePresentKHR` require binary semaphores, so the
+per-image acquire and renderFinished pair is unchanged. What a timeline replaces is
+`FrameData::inFlightFence` and the keying of the deferred-cleanup queues.
 
-Split into two sessions if it runs long; they are independent.
+**Verification is the constraint.** No test in this repository creates a Vulkan device, submits
+work, or links `vk_context.cpp`; all 158 are headless logic tests. A green build and a green
+suite therefore say nothing about whether a frame-synchronisation change works — the failure
+modes are validation errors, GPU hangs, device loss and visual corruption. `resetFrameSyncState`
+exists because a rebuilt swapchain left fences mid-cycle and the driver lost the device; its
+comment names `VUID-vkResetFences-01123` and `VUID-vkBeginCommandBuffer-00049`.
 
-**Exit:** frame sync expressed as timeline waits, deferred cleanup keyed on timeline value,
-descriptor updates per frame down (number in §5), no visual regression, validation clean.
+Acceptance criteria, on the target GPU with `WOWEE_VULKAN_VALIDATION=1`:
+
+1. Zero validation errors during startup, world load and shutdown.
+2. No fence/timeline timeout messages in the log.
+3. Correct behaviour across a swapchain rebuild — window resize, alt-tab, and an MSAA or FSR
+   setting change, which rebuilds without changing the image count.
+4. Both frames-in-flight slots exercised over a sustained run.
+
+Timeline semaphores and descriptor indexing land separately. They are independent, and debugging
+them together means not knowing which one broke the frame.
 
 ### Phase 9 — Vulkan: synchronization2 + dynamic rendering (one change, or neither)
 30 barrier sites / 29 barrier structs (25 image, 2 buffer, 2 memory); 12 render passes, 29
@@ -292,142 +302,3 @@ Written down so they are not re-proposed every time someone reads a blog post.
 | Replacing the 2365 `char*` | Overwhelmingly `const char*` string literals for Vulkan extension names, Lua API and file paths. Correct as-is. |
 
 ---
-
-## 5. Phase log
-
-*(append at the end of each session: what landed, what was measured, what is still open)*
-
-- **Phase 0** — Survey. All numbers in §1 measured directly. Three findings reframed the work:
-  - The standard modernization checklist is **already complete** (C++20, no `new`/`delete`, tuned
-    clang-tidy, warnings-as-errors, 116 `enum class` vs 6 plain, 2812 `constexpr`). The remaining
-    language gap is *depth*: `std::span` at 2 uses against 303 `reinterpret_cast`, 144 `memcpy`
-    and 507 `snprintf`.
-  - The codebase **requires Vulkan 1.2 and uses nothing from 1.1 or 1.2.** Timeline semaphores and
-    descriptor indexing are already paid for and unused, which is why they outrank the more
-    fashionable dynamic-rendering/sync2 migration.
-  - "Zero manual memory management" was **almost** true — `audio_engine.cpp` still does raw
-    `malloc`/`free` for miniaudio interop with hand-written cleanup on error paths (Phase 5).
-
-  Method note: several counts were wrong on the first pass because `\b` is not supported in
-  git grep's POSIX ERE — `printf(` matched `snprintf(`, and `NULL` matched `VK_NULL_HANDLE`,
-  inflating both by two orders of magnitude. `git grep -P` works here; use it for
-  word-boundary counts and re-verify any number before acting on it.
-
-- **Pre-flight** — `origin/master` did not compile with Apple clang. The window-removal commits
-  left `kMonthAbbrev`, `kColorRed`, `kColorGreen`, `kColorYellow` and `kDialogFlags` defined but
-  unused in `src/ui/window_manager.cpp`, and `-Werror,-Wunused-const-variable` makes an orphaned
-  constant a build failure. Fixed in `89969db40`. **Check whether CI runs the macOS build** — this
-  should not have reached master.
-
-  Verified green baseline before any modernization work: build exit 0, **156/156 tests pass**
-  (2 skipped: `framexml_compiles`, `addon_xml_compiles`).
-
-- **Phase 1** — Build hygiene. Done: `cc31a0a29` (test object library), `45ffa4625` (PCH).
-
-  | | before | after |
-  |---|---|---|
-  | clean build, wall | 1:56.61 | **1:33.13** (−20%) |
-  | clean build, user CPU | 1229.51 s | **969.12 s** (−21%) |
-  | `logger.cpp` compilations | 112 | **2** |
-  | tests | 156/156 | 156/156 |
-
-  The plan predicted PCH would be the win. It was not — watching a real build showed
-  `logger.cpp` being compiled **112 times**, once per test target that opted in. Static
-  inspection could not have found that; only the build log showed it. Prefer reading a real
-  build log over reasoning about CMake.
-
-  Two things this surfaced, both worth remembering:
-  - Three tests listed *both* `${TEST_COMMON_SOURCES}` and a direct path to `logger.cpp`. That
-    was latent and harmless while the variable held an identical path string CMake could dedupe,
-    and became a duplicate-symbol link failure the moment the variable held an object file. A
-    redundancy can be invisible until the representation under it changes.
-  - Checking a *running* build's log for `error:` proves nothing — it returned 0 at 29% and at
-    92% of a build that failed at 98%. Gate on the exit code, never on a grep of a live log.
-
-- **Phase 1b / Phase 2** — Done: `d938a41b0` (measured PCH), `23e4048fd` (sanitizer coverage).
-  Phase 2 as written was **cancelled on evidence** — see above.
-
-  Cumulative against the pre-work baseline:
-
-  | | baseline | now |
-  |---|---|---|
-  | clean build, wall | 1:56.61 | **1:31.05** (−22%) |
-  | clean build, user CPU | 1229.51 s | **941.23 s** (−23%) |
-  | tests | 156/156 | 156/156 |
-
-  Findings:
-  - The first PCH list was picked by counting include-list appearances and missed every one of
-    the expensive headers. `<chrono>` alone is 89k preprocessed lines; glm 89k; `<future>` 87k.
-    Adding them took user CPU 969.1 s → 945.2 s.
-  - A PCH on the **test** targets was tried and removed: ~140 executables each generating their
-    own PCH cost slightly more than it saved (950.8 s vs 945.2 s). The main target wins because
-    it is one target over 413 objects; the tests are the opposite shape. Measured, reverted,
-    and recorded in the file so it is not re-attempted.
-  - **Bug found: `./test.sh --asan` was sanitizing only two thirds of the suite.** The ASAN
-    block iterates `ALL_TEST_TARGETS` from mid-file, and 47 tests are declared below it. Those
-    built uninstrumented and reported as passing. Any CMake loop over a list that is still being
-    appended to belongs at the end of the file — the same positional bug could recur with any
-    future `foreach` over that list.
-
-- **Phase 3** — `std::span` across the untrusted-file parsers. Done: `8baa3c457` (ADT),
-  `b6d5206c8` (sanitizer coverage + ADT test), `8fb5f5e58` (BLP), `90f5ba7ca` (WMO widening).
-
-  Three real out-of-bounds reads, all reachable from game data on disk:
-  - **ADT / MCAL.** `sizeAlpha - skip` with `sizeAlpha` known only to be >= 1 and `skip` 8 — a
-    four-byte chunk spelling `MCAL` wrapped it to 4294967292, which became a memcpy length.
-  - **BLP / decompressors.** Source length derived from width and height rather than from the mip
-    actually supplied; 4096x4096 DXT1 with an 8-byte mip read 2 MB from an 8-byte buffer. The
-    call site carried a comment claiming the decompressors bounded themselves — they bounded the
-    destination only.
-  - **BLP / mip offset.** `offset + mipSize > size` with both `uint32_t` from the file:
-    `0xFFFFFF00 + 0x200` is `0x100` and passed.
-
-  The shape is identical every time: **a length that comes from the file, arithmetic on it that
-  can wrap, and the guard placed at the call site rather than where the read happens.** That is
-  what `span` fixes — the bound travels with the pointer, so the callee can enforce it.
-
-  Method, which cost more than the fixes: **a robustness test you have not watched fail is not
-  evidence.** The ADT test passed twice with the bug deliberately reintroduced — first because an
-  out-of-bounds read is invisible without ASAN, then because the test used `0x28`/`0x2C` for
-  offsets the parser reads at decimal 36/40, so it built a well-formed chunk that never entered
-  the branch. Every fix here was verified by reverting it and confirming ASAN reports
-  `heap-buffer-overflow` or `BUS` first.
-
-  Full suite under ASAN with all 156 targets genuinely instrumented: **157/157 clean.** The 77
-  targets the sanitizer had been skipping hide no further bugs.
-
-- **Phase 4** — **Cancelled on evidence.** `-Wformat` under `-Werror` already makes a mismatched
-  specifier a build error, and only 40 of 507 sites format unbounded input (`.c_str()`), all of
-  them chat lines carrying names WoW caps at 12 characters. 507 edits across untested UI string
-  code for a cosmetic gain is the wrong trade. Detail in §3.
-
-- **Phase 5** — Audio RAII. Done: `4b81de7e5`.
-
-  Three sound-construction paths each malloc'd two miniaudio objects and hand-unwound them at
-  five early returns apiece — fifteen unwind sequences, each of which had to be right, and
-  nothing checked them. `MaStorage` puts the uninit-then-free distinction in one destructor.
-
-  It exposed a real leak: of the three failure paths in `playMusic`, two reset `musicData_` — a
-  `shared_ptr` holding the entire encoded music file — and the `ma_sound_start` one did not,
-  pinning the file until the next `playMusic` reassigned the member. That is precisely the
-  failure mode duplicated unwind code produces: not one path being wrong in an obvious way, but
-  one of several drifting out of step with the others.
-
-  Remaining `malloc`/`free` in `audio_engine.cpp` is the teardown in `shutdown`/`stopSound`,
-  which frees what `activeSounds_` owns. Converting those means changing `ActiveSound` in the
-  header from raw pointers, which is a wider change than the leak-prone construction paths
-  warranted.
-
-- **Phase 6** — `std::bit_cast`. Done: `519224ce0`. Premise was wrong — there is no
-  `reinterpret_cast` punning in this codebase (206 of 298 casts are the legal `char*` form) and
-  the six `memcpy` punning sites were already well defined, not "UB-adjacent" as this plan
-  claimed. Converted anyway for the expression form; labelled honestly as cosmetic.
-
-- **Phase 7** — `std::jthread`. Done: `d125da096`. One thread converted, four pools deliberately
-  left. See §3 for why.
-
-  Running tally: of seven executed phases, **two were cancelled outright on measurement (2, 4)
-  and two more turned out far smaller than written (6, 7)**. Every one of those was scoped from a
-  plausible proxy — line counts, call-site counts, cast counts — that did not survive being
-  measured. The phases that held up (1, 3, 5) were the ones where the defect was structural
-  rather than statistical.
