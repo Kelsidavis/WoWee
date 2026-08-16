@@ -484,8 +484,7 @@ void EntitySpawner::processCreatureSpawnQueue(bool unlimited) {
                                 uint32_t trf[8];
                                 pipeline::getItemDisplayInfoTextureFields(*idiDbc, idiL, trf);
                                 const bool isFem = (he.sexId == 1);
-                                for (int eq = 0; eq < 11; eq++) {
-                                    uint32_t did = he.equipDisplayId[eq];
+                                for (uint32_t did : he.equipDisplayId) {
                                     if (did == 0) continue;
                                     int32_t recIdx = idiDbc->findRecordById(did);
                                     if (recIdx < 0) continue;

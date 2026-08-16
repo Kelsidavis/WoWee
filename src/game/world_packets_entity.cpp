@@ -262,8 +262,8 @@ bool parseGameObjectQueryBody(network::Packet& packet,
     // Read 24 type-specific data fields
     size_t remaining = packet.getRemainingSize();
     if (remaining >= 24 * 4) {
-        for (int i = 0; i < 24; i++) {
-            data.data[i] = packet.readUInt32();
+        for (uint32_t& field : data.data) {
+            field = packet.readUInt32();
         }
         data.hasData = true;
         // Whether the string count above was right, asked without knowing what

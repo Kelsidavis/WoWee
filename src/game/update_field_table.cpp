@@ -103,7 +103,6 @@ static const UFNameEntry kUFNames[] = {
     {.name = "CONTAINER_FIELD_SLOT_1", .field = UF::CONTAINER_FIELD_SLOT_1},
 };
 
-static constexpr size_t kUFNameCount = sizeof(kUFNames) / sizeof(kUFNames[0]);
 
 bool UpdateFieldTable::loadFromJson(const std::string& path) {
     std::ifstream f(path);
@@ -125,9 +124,9 @@ bool UpdateFieldTable::loadFromJson(const std::string& path) {
         if (!parseTableNumber(valStr, parsed)) return;
         const uint16_t idx = static_cast<uint16_t>(parsed);
 
-        for (size_t i = 0; i < kUFNameCount; ++i) {
-            if (key == kUFNames[i].name) {
-                fieldMap_[static_cast<uint16_t>(kUFNames[i].field)] = idx;
+        for (auto entry : kUFNames) {
+            if (key == entry.name) {
+                fieldMap_[static_cast<uint16_t>(entry.field)] = idx;
                 ++loaded;
                 break;
             }

@@ -11,6 +11,7 @@
 #include <array>
 #include <fstream>
 #include <filesystem>
+#include <ranges>
 #include <sstream>
 #include <set>
 #include <string_view>
@@ -1902,10 +1903,10 @@ std::vector<game::AuctionSortKey> wireAuctionSort(std::string_view which) {
     const auto& keys = auctionSortState()[std::string(which)];
     std::vector<game::AuctionSortKey> out;
     out.reserve(keys.size());
-    for (auto it = keys.rbegin(); it != keys.rend(); ++it) {
-        auto found = kColumns.find(it->column);
+    for (const auto& key : std::views::reverse(keys)) {
+        auto found = kColumns.find(key.column);
         if (found == kColumns.end()) continue;
-        out.push_back({found->second, it->reverse});
+        out.push_back({found->second, key.reverse});
     }
     return out;
 }

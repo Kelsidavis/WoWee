@@ -1170,8 +1170,7 @@ void InventoryScreen::renderSeparateBags(game::Inventory& inventory, uint64_t mo
 
     // Extra bag windows in right-to-left bag-bar order (closest to backpack first).
     constexpr int kBagOrder[game::Inventory::NUM_BAG_SLOTS] = {3, 2, 1, 0};
-    for (int ord = 0; ord < game::Inventory::NUM_BAG_SLOTS; ++ord) {
-        int bag = kBagOrder[ord];
+    for (int bag : kBagOrder) {
         if (!bagOpen_[bag]) continue;
         int bagSize = inventory.getBagSize(bag);
         if (bagSize <= 0) {

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <climits>
 #include <cmath>
+#include <ranges>
 
 namespace wowee {
 namespace ui {
@@ -242,8 +243,8 @@ Widget* WidgetTree::findByName(std::string_view name) {
     if (name.empty()) return nullptr;
     // Backwards, so the last frame to take the name is the one found - the
     // same rule as the global it was published under.
-    for (auto it = widgets_.rbegin(); it != widgets_.rend(); ++it) {
-        if (it->id != 0 && it->name == name) return &*it;
+    for (auto& widget : std::views::reverse(widgets_)) {
+        if (widget.id != 0 && widget.name == name) return &widget;
     }
     return nullptr;
 }

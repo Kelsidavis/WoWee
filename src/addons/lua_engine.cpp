@@ -3289,13 +3289,13 @@ int lua_FontString_GetTextColor(lua_State* L) {
         lua_pop(L, 1);
     }
     if (w) {
-        for (int i = 0; i < 4; ++i) lua_pushnumber(L, w->color[i]);
+        for (float component : w->color) lua_pushnumber(L, component);
         return 4;
     }
     if (lua_istable(L, 1)) {
         static const char* keys[4] = {"r", "g", "b", "a"};
-        for (int i = 0; i < 4; ++i) {
-            lua_getfield(L, 1, keys[i]);
+        for (auto& key : keys) {
+            lua_getfield(L, 1, key);
             lua_pushnumber(L, lua_isnumber(L, -1) ? lua_tonumber(L, -1) : 1.0);
             lua_remove(L, -2);
         }
@@ -9278,8 +9278,8 @@ bool LuaEngine::dispatchMouseWheel(float x, float y, float delta) {
 }
 
 bool LuaEngine::holdsMousePress() const {
-    for (int i = 0; i < kMouseButtons; ++i) {
-        if (buttonDown_[i]) return true;
+    for (bool down : buttonDown_) {
+        if (down) return true;
     }
     // A drag or a moved frame counts even with nothing held, because that is
     // precisely the state a stranded drag leaves behind and it has to stay

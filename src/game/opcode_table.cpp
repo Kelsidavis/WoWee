@@ -40,21 +40,19 @@ static const OpcodeNameEntry kOpcodeNames[] = {
 };
 // clang-format on
 
-static constexpr size_t kOpcodeNameCount = sizeof(kOpcodeNames) / sizeof(kOpcodeNames[0]);
-static constexpr size_t kOpcodeAliasCount = sizeof(kOpcodeAliases) / sizeof(kOpcodeAliases[0]);
 
 static std::string_view canonicalOpcodeName(std::string_view name) {
-    for (size_t i = 0; i < kOpcodeAliasCount; ++i) {
-        if (name == kOpcodeAliases[i].alias) return kOpcodeAliases[i].canonical;
+    for (auto entry : kOpcodeAliases) {
+        if (name == entry.alias) return entry.canonical;
     }
     return name;
 }
 
 static std::optional<uint16_t> resolveLogicalOpcodeIndex(std::string_view name) {
     const std::string_view canonical = canonicalOpcodeName(name);
-    for (size_t i = 0; i < kOpcodeNameCount; ++i) {
-        if (canonical == kOpcodeNames[i].name) {
-            return static_cast<uint16_t>(kOpcodeNames[i].op);
+    for (auto entry : kOpcodeNames) {
+        if (canonical == entry.name) {
+            return static_cast<uint16_t>(entry.op);
         }
     }
     return std::nullopt;
@@ -173,8 +171,8 @@ static bool loadOpcodeJsonRecursive(const std::filesystem::path& path,
 }
 const char* OpcodeTable::logicalToName(LogicalOpcode op) {
     uint16_t val = static_cast<uint16_t>(op);
-    for (size_t i = 0; i < kOpcodeNameCount; ++i) {
-        if (static_cast<uint16_t>(kOpcodeNames[i].op) == val) return kOpcodeNames[i].name;
+    for (auto entry : kOpcodeNames) {
+        if (static_cast<uint16_t>(entry.op) == val) return entry.name;
     }
     return "UNKNOWN";
 }

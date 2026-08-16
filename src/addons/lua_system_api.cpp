@@ -8,6 +8,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <ranges>
 #include <set>
 #include <utility>
 #include <vector>
@@ -5350,8 +5351,8 @@ void registerSystemLuaAPI(lua_State* L) {
                 {"GetPrevCompleatedTutorial", [](lua_State* L) -> int {
             const int from = static_cast<int>(luaL_optnumber(L, 1, 0));
             const auto ids = tutorialIds();
-            for (auto it = ids.rbegin(); it != ids.rend(); ++it) {
-                if (*it < from) { lua_pushnumber(L, *it); return 1; }
+            for (int id : std::views::reverse(ids)) {
+                if (id < from) { lua_pushnumber(L, id); return 1; }
             }
             return 0;
         }},

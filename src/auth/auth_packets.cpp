@@ -85,8 +85,8 @@ network::Packet LogonChallengePacket::build(const std::string& account, const Cl
         for (size_t i = 0; i < len; ++i) {
             buf[i] = static_cast<uint8_t>(str[len - 1 - i]);
         }
-        for (int i = 0; i < 4; ++i) {
-            packet.writeUInt8(buf[i]);
+        for (uint8_t byte : buf) {
+            packet.writeUInt8(byte);
         }
     };
 
@@ -183,8 +183,8 @@ bool LogonChallengeResponseParser::parse(network::Packet& packet, LogonChallenge
     }
 
     // Integrity salt / CRC salt - 16 bytes
-    for (size_t i = 0; i < response.checksumSalt.size(); ++i) {
-        response.checksumSalt[i] = packet.readUInt8();
+    for (uint8_t& byte : response.checksumSalt) {
+        byte = packet.readUInt8();
     }
 
     // Security flags
@@ -194,8 +194,8 @@ bool LogonChallengeResponseParser::parse(network::Packet& packet, LogonChallenge
     if (response.securityFlags & 0x01) {
         // PIN required: u32 pin_grid_seed + u8[16] pin_salt
         response.pinGridSeed = packet.readUInt32();
-        for (size_t i = 0; i < response.pinSalt.size(); ++i) {
-            response.pinSalt[i] = packet.readUInt8();
+        for (uint8_t& byte : response.pinSalt) {
+            byte = packet.readUInt8();
         }
     }
     if (response.securityFlags & 0x04) {

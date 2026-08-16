@@ -3,6 +3,7 @@
 #include <cstring>
 #include <chrono>
 #include <iterator>
+#include <ranges>
 
 #ifdef HAVE_UNICORN
 // Unicorn Engine headers
@@ -265,9 +266,8 @@ uint32_t WardenEmulator::callFunction(uint32_t address, const std::vector<uint32
     uc_reg_read(uc_, UC_X86_REG_ESP, &esp);
 
     // Push arguments (stdcall: right-to-left)
-    for (auto it = args.rbegin(); it != args.rend(); ++it) {
+    for (uint32_t arg : std::views::reverse(args)) {
         esp -= 4;
-        uint32_t arg = *it;
         uc_mem_write(uc_, esp, &arg, 4);
     }
 

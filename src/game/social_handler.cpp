@@ -2473,7 +2473,7 @@ void SocialHandler::handleGuildQueryResponse(network::Packet& packet) {
         guildName_ = data.guildName;
         guildQueryData_ = data;
         guildRankNames_.clear();
-        for (uint32_t i = 0; i < 10; ++i) guildRankNames_.push_back(data.rankNames[i]);
+        for (const auto& rankName : data.rankNames) guildRankNames_.push_back(rankName);
         if (wasUnknown && !guildName_.empty()) {
             owner_.addSystemChatMessage("Guild: <" + guildName_ + ">");
             if (owner_.addonEventCallbackRef()) owner_.addonEventCallbackRef()("PLAYER_GUILD_UPDATE", {});
@@ -4137,12 +4137,12 @@ void SocialHandler::handlePvpLogData(network::Packet& packet) {
     bgScoreboard_ = BgScoreboardData{};
     bgScoreboard_.isArena = (packet.readUInt8() != 0);
     if (bgScoreboard_.isArena) {
-        for (int t = 0; t < 2; ++t) {
+        for (auto& arenaTeam : bgScoreboard_.arenaTeams) {
             if (remaining() < 20) { packet.skipAll(); return; }
-            bgScoreboard_.arenaTeams[t].ratingChange = packet.readUInt32();
-            bgScoreboard_.arenaTeams[t].newRating = packet.readUInt32();
+            arenaTeam.ratingChange = packet.readUInt32();
+            arenaTeam.newRating = packet.readUInt32();
             packet.readUInt32(); packet.readUInt32(); packet.readUInt32();
-            bgScoreboard_.arenaTeams[t].teamName = remaining() > 0 ? packet.readString() : "";
+            arenaTeam.teamName = remaining() > 0 ? packet.readString() : "";
         }
     }
     // Ended, and the winner, BEFORE the player count. This was read after the

@@ -1125,8 +1125,8 @@ bool ClassicPacketParsers::parseGuildQueryResponse(network::Packet& packet, Guil
     }
     data.guildId = packet.readUInt32();
     data.guildName = packet.readString();
-    for (int i = 0; i < 10; ++i) {
-        data.rankNames[i] = packet.readString();
+    for (auto& rankName : data.rankNames) {
+        rankName = packet.readString();
     }
     data.emblemStyle = packet.readUInt32();
     data.emblemColor = packet.readUInt32();

@@ -942,8 +942,8 @@ network::Packet MovementPacket::build(Opcode opcode, const MovementInfo& info, u
     if (mvLog-- > 0) {
         const auto& raw = packet.getData();
         std::string hex;
-        for (size_t i = 0; i < raw.size(); i++) {
-            char b[4]; snprintf(b, sizeof(b), "%02x ", raw[i]);
+        for (uint8_t byte : raw) {
+            char b[4]; snprintf(b, sizeof(b), "%02x ", byte);
             hex += b;
         }
         LOG_DEBUG("MOVEPKT opcode=0x", std::hex, wireOpcode(opcode), std::dec,

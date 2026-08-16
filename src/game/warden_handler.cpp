@@ -1319,7 +1319,7 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
                                     " xorByte=0x",
                                     [&]{char s[4];snprintf(s,4,"%02x",xorByte);return std::string(s);}(),
                                     " opcodes=[",
-                                    [&]{std::string r;for(int i=0;i<9;i++){char s[6];snprintf(s,6,"0x%02x ",wardenCheckOpcodes_[i]);r+=s;}return r;}(),
+                                    [&]{std::string r;for(uint8_t wardenCheckOpcode : wardenCheckOpcodes_){char s[6];snprintf(s,6,"0x%02x ",wardenCheckOpcode);r+=s;}return r;}(),
                                     "] pos=", pos, "/", checkEnd);
                         pos = checkEnd; // stop parsing
                         break;

@@ -47,6 +47,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <ranges>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -4011,8 +4012,8 @@ const std::vector<GameHandler::ReputationRow>& GameHandler::getReputationRows() 
     // and relying on the flags would file each faction under whichever heading
     // happened to be printed last.
     std::vector<std::pair<uint32_t, int>> stack;
-    for (auto it = children[0].rbegin(); it != children[0].rend(); ++it) {
-        stack.emplace_back(*it, 0);
+    for (uint32_t child : std::views::reverse(children[0])) {
+        stack.emplace_back(child, 0);
     }
     while (!stack.empty()) {
         const auto [factionId, depth] = stack.back();
@@ -4045,8 +4046,8 @@ const std::vector<GameHandler::ReputationRow>& GameHandler::getReputationRows() 
         // panel counts rows and indexes into them, so a hidden row must not be
         // in the list at all.
         if (!isHeader || isFactionCollapsed(factionId)) continue;
-        for (auto it = kidsIt->second.rbegin(); it != kidsIt->second.rend(); ++it) {
-            stack.emplace_back(*it, depth + 1);
+        for (uint32_t child : std::views::reverse(kidsIt->second)) {
+            stack.emplace_back(child, depth + 1);
         }
     }
     return reputationRows_;

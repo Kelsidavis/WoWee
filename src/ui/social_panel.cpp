@@ -85,8 +85,8 @@ void SocialPanel::renderPartyFrames(game::GameHandler& gameHandler,
 
         // Count non-empty subgroups to determine layout
         int activeSgs = 0;
-        for (int sg = 0; sg < MAX_SUBGROUPS; sg++)
-            if (!subgroups[sg].empty()) activeSgs++;
+        for (const auto& subgroup : subgroups)
+            if (!subgroup.empty()) activeSgs++;
 
         // Compact raid cell: name + 2 narrow bars
         constexpr float CELL_W = 90.0f;
@@ -118,13 +118,13 @@ void SocialPanel::renderPartyFrames(game::GameHandler& gameHandler,
             ImVec2 winPos = ImGui::GetWindowPos();
 
             int colIdx = 0;
-            for (int sg = 0; sg < MAX_SUBGROUPS; sg++) {
-                if (subgroups[sg].empty()) continue;
+            for (auto& subgroup : subgroups) {
+                if (subgroup.empty()) continue;
 
                 float colX = winPos.x + CELL_PAD + colIdx * (CELL_W + CELL_PAD);
 
-                for (int row = 0; row < static_cast<int>(subgroups[sg].size()); row++) {
-                    const auto& m = *subgroups[sg][row];
+                for (int row = 0; row < static_cast<int>(subgroup.size()); row++) {
+                    const auto& m = *subgroup[row];
                     float cellY = winPos.y + CELL_PAD + 14.0f + row * (CELL_H + CELL_PAD);
 
                     ImVec2 cellMin(colX, cellY);
@@ -2284,26 +2284,26 @@ void SocialPanel::renderDungeonFinderWindow(game::GameHandler& gameHandler,
         ImGui::SetNextItemWidth(-1);
         if (ImGui::BeginCombo("##dungeon", curLabel)) {
             uint8_t lastCat = 255;
-            for (int i = 0; i < kDungeonCount; ++i) {
-                if (kDungeons[i].cat != lastCat && kCatHeaders[kDungeons[i].cat]) {
+            for (const auto& kDungeon : kDungeons) {
+                if (kDungeon.cat != lastCat && kCatHeaders[kDungeon.cat]) {
                     if (lastCat != 255) ImGui::Separator();
-                    ImGui::TextDisabled("%s", kCatHeaders[kDungeons[i].cat]);
-                    lastCat = kDungeons[i].cat;
-                } else if (kDungeons[i].cat != lastCat) {
-                    lastCat = kDungeons[i].cat;
+                    ImGui::TextDisabled("%s", kCatHeaders[kDungeon.cat]);
+                    lastCat = kDungeon.cat;
+                } else if (kDungeon.cat != lastCat) {
+                    lastCat = kDungeon.cat;
                 }
                 // Grey out dungeons the player is too low to queue for.
-                const bool tooLow = (playerLvl != 0 && playerLvl < kDungeons[i].minLvl);
+                const bool tooLow = (playerLvl != 0 && playerLvl < kDungeon.minLvl);
                 char label[96];
-                dungeonLabel(kDungeons[i], label, sizeof(label));
-                bool selected = (kDungeons[i].id == lfgSelectedDungeon_);
+                dungeonLabel(kDungeon, label, sizeof(label));
+                bool selected = (kDungeon.id == lfgSelectedDungeon_);
                 if (tooLow) {
                     ImGui::TextDisabled("%s", label);
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Requires level %u.", static_cast<unsigned>(kDungeons[i].minLvl));
+                        ImGui::SetTooltip("Requires level %u.", static_cast<unsigned>(kDungeon.minLvl));
                 } else {
                     if (ImGui::Selectable(label, selected))
-                        lfgSelectedDungeon_ = kDungeons[i].id;
+                        lfgSelectedDungeon_ = kDungeon.id;
                     if (selected) ImGui::SetItemDefaultFocus();
                 }
             }

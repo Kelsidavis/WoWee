@@ -50,6 +50,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <ranges>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -2553,8 +2554,8 @@ void GameHandler::registerRemainingOpcodes() {
             subPackets.emplace_back(subOpcode, std::move(subPayload));
             pos += 4 + payloadLen;
         }
-        for (auto it = subPackets.rbegin(); it != subPackets.rend(); ++it) {
-            enqueueIncomingPacketFront(std::move(*it));
+        for (auto& subPacket : std::views::reverse(subPackets)) {
+            enqueueIncomingPacketFront(std::move(subPacket));
         }
         packet.skipAll();
     };
