@@ -1,6 +1,6 @@
 # Codebase Modernization — Phased Plan
 
-**Status:** Phases 0–5 complete (2 and 4 cancelled on evidence). Next: Phase 6 (`std::bit_cast`).
+**Status:** Phases 0–7 complete (2 and 4 cancelled on evidence). Next: Phase 8 (Vulkan 1.2 features).
 **Branch:** `master`. Phase 1 was done on `chore/modernization` and pushed to `master` as
 `7b9d4a93d..2b5628a0f`; later phases continue directly on `master`.
 **Scope:** code quality and modernity, codebase-wide. Not a performance effort. Where a phase
@@ -198,22 +198,44 @@ closes the last manual-memory hole in the codebase.
 
 **Exit:** zero bare `malloc`/`free`, audio still works, `./test.sh --asan` clean.
 
-### Phase 6 — `std::bit_cast` for type punning
-Replace the *punning* subset of the 303 `reinterpret_cast` — the `float`↔`uint32` and
-struct-reinterpret cases — with `std::bit_cast`. Those are UB-adjacent today; `bit_cast` is
-well-defined and `constexpr`. **Leave genuine pointer casts alone**: they are legitimate in
-graphics/network code, which is why `.clang-tidy` disables the aggressive cppcoreguidelines checks
-and says so.
+### Phase 6 — `std::bit_cast` — **done, but the premise was wrong**
+This phase was written as "replace the *punning* subset of the 303 `reinterpret_cast`... Today
+those are UB-adjacent." **That was false on both counts.**
 
-**Exit:** punning cases converted, tests green, no release-build codegen regression.
+There is no `reinterpret_cast` punning in this codebase. Of 298 casts:
 
-### Phase 7 — `std::jthread` and threading cleanup
-16 raw `std::thread`, 5 manual `.join()`, 78 `std::mutex`, 35 `std::atomic`. Move to `jthread` for
-automatic joining and `stop_token` for cooperative cancellation, removing hand-rolled shutdown
-flags.
+| form | count | what it is |
+|---|---|---|
+| `char*` / `const char*` | **206** | byte-level object access — explicitly legal, not punning |
+| `ImTextureID`, `ffx*`, `VkDescriptorSet`, `void*` | ~50 | opaque handles for C APIs |
+| `decltype(fns_->…)` | 14 | function pointers for dynamic loading |
+| `uint64_t` | 4 | pointer-to-integer |
 
-**Exit:** no manual `.join()` on owned threads, shutdown paths simplified, `--asan` clean, no new
-races under a stress run.
+A search for `*reinterpret_cast<T*>(&x)` — the actual punning shape — returns **nothing**. The
+codebase already used `memcpy`, which is well defined, not "UB-adjacent".
+
+So the real scope was six `memcpy(&a, &b, sizeof(float))` sites. Converted anyway in
+`(see log)`: `bit_cast` is the same operation as an expression rather than a statement, which let
+`Packet::readFloat`/`writeFloat` collapse to one line each. Zero risk, small gain, honestly
+labelled — not the safety fix the phase claimed.
+
+### Phase 7 — `std::jthread` — **done, narrowly**
+Converted one thread, deliberately. The stall watchdog in `application.cpp` had a hand-rolled
+`std::atomic<bool>` stop flag *and* its teardown written twice — once in a `try/catch` that
+existed for no other reason, once after the loop. A `jthread` destructor does both, so the flag,
+the catch and the duplicate both went. `git diff -w`: five lines added, sixteen removed.
+
+**Left the worker pools alone**, and that is the finding. `TerrainManager::stopWorkers` pairs its
+flag with a `queueCV.notify_all()` and carries a comment explaining why it joins the way it does
+(plain `join()` rather than `pthread_timedjoin_np`, which leaves the `std::thread` thinking it is
+still joinable and terminates in the destructor). `thread_pool`, `world_loader` and
+`world_socket` are the same shape. Those are considered designs, not omissions — a `stop_token`
+would have to be threaded through the same condition variable to match what they already do, and
+the payoff is nothing.
+
+The rule this phase suggests: `jthread` is worth it where a thread has a **hand-rolled flag and
+duplicated teardown**. Where the stop mechanism is already integrated with a condition variable,
+it is a rewrite, not a modernization.
 
 ### Phase 8 — Vulkan: timeline semaphores + descriptor indexing
 Both **core in 1.2, already required** — no extension, no feature negotiation, no fallback path.
@@ -395,3 +417,17 @@ Written down so they are not re-proposed every time someone reads a blog post.
   which frees what `activeSounds_` owns. Converting those means changing `ActiveSound` in the
   header from raw pointers, which is a wider change than the leak-prone construction paths
   warranted.
+
+- **Phase 6** — `std::bit_cast`. Done: `519224ce0`. Premise was wrong — there is no
+  `reinterpret_cast` punning in this codebase (206 of 298 casts are the legal `char*` form) and
+  the six `memcpy` punning sites were already well defined, not "UB-adjacent" as this plan
+  claimed. Converted anyway for the expression form; labelled honestly as cosmetic.
+
+- **Phase 7** — `std::jthread`. Done: `d125da096`. One thread converted, four pools deliberately
+  left. See §3 for why.
+
+  Running tally: of seven executed phases, **two were cancelled outright on measurement (2, 4)
+  and two more turned out far smaller than written (6, 7)**. Every one of those was scoped from a
+  plausible proxy — line counts, call-site counts, cast counts — that did not survive being
+  measured. The phases that held up (1, 3, 5) were the ones where the defect was structural
+  rather than statistical.
