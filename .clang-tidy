@@ -1,8 +1,14 @@
-# Suppressions below the aggressive-check note were each added after reading
-# every finding the check produced on this codebase. They are systematically
-# intentional here rather than occasionally wrong, so leaving them enabled
-# means a lint gate that can never go green and that nobody reads. Unique
-# finding counts are as of LLVM 22.
+# clang-tidy configuration for WoWee
+# Targets C++20. Checks are tuned for a Vulkan/game-engine codebase:
+#   - reinterpret_cast, pointer arithmetic, and magic numbers are frequent
+#     in low-level graphics/network code, so the most aggressive
+#     cppcoreguidelines and readability-magic-numbers checks are disabled.
+#
+# The suppressions at the end of the Checks list were each added after
+# reading every finding that check produced here. They are systematically
+# intentional in this codebase rather than occasionally wrong, so leaving
+# them on means a gate that can never go green and that nobody reads.
+# Counts are unique findings as of LLVM 22.
 #
 #   bugprone-narrowing-conversions (152)
 #       float/int conversion is what graphics maths is made of:
@@ -15,12 +21,12 @@
 #       smallest type that fits.
 #   bugprone-implicit-widening-of-multiplication-result (31)
 #       every site is a compile-time constant (MAX_DUST * 5 * sizeof(float))
-#       or a byte count over 1024*1024 for a log line. Note it does not catch
-#       the + and - overflows that were the real bugs in the ADT and BLP
-#       parsers.
+#       or a byte count over 1024*1024 for a log line. Worth noting it does
+#       not catch the + and - overflows that were the real bugs in the ADT
+#       and BLP parsers.
 #   bugprone-invalid-enum-default-initialization (33)
-#       fires on VkImageCreateInfo ci{}. Zero-initialising a C API struct and
-#       then setting sType is the required Vulkan idiom.
+#       fires on VkImageCreateInfo ci{}. Zero-initialising a C API struct
+#       and then setting sType is the required Vulkan idiom.
 #   bugprone-empty-catch (39)
 #       all try { std::stoi(s) } catch (...) {} over addon and cvar strings,
 #       where the variable already holds the default that failure keeps.
@@ -30,17 +36,28 @@
 #       size < 2.
 #   bugprone-std-namespace-modification (35)
 #       std::hash specialisations, which is the sanctioned way.
-#   bugprone-derived-method-shadowing-base-method (28), bugprone-parent-virtual-call (2)
-#       the expansion-specific packet parsers deliberately override and call
-#       through to their base.
+#   bugprone-derived-method-shadowing-base-method (28)
+#   bugprone-parent-virtual-call (2)
+#       the expansion-specific packet parsers deliberately override and
+#       call through to their base.
 #   bugprone-integer-division (6)
 #       decomposing a duration into years/months/days wants truncation.
+#   readability-non-const-parameter (10)
+#       every site is an output buffer -- snprintf(buf, ...), RC4 xoring
+#       data[n] in place, a hash or seed being filled.
+#   readability-misplaced-array-index (3)
+#       all container()[key] = value. The check looks for index[array].
+#   bugprone-switch-missing-default-case (4)
+#       the switched-over variable already holds its intended default, eg
+#       float maxDist = 28.0f. A default label would restate it.
+#   bugprone-misplaced-widening-cast (3)
+#       static_cast<size_t>(bookPage() + 1), over values bounded by a page
+#       or id count.
+#   performance-trivially-destructible (9)
+#       the out-of-line destructors are load-bearing: UIManager holds five
+#       unique_ptrs to forward-declared types, so defaulting the destructor
+#       in the header does not compile.
 
-# clang-tidy configuration for WoWee
-# Targets C++20. Checks are tuned for a Vulkan/game-engine codebase:
-#   - reinterpret_cast, pointer arithmetic, and magic numbers are frequent
-#     in low-level graphics/network code, so the most aggressive
-#     cppcoreguidelines and readability-magic-numbers checks are disabled.
 ---
 Checks: >
   bugprone-*, 
@@ -80,17 +97,11 @@ Checks: >
   -bugprone-derived-method-shadowing-base-method, 
   -bugprone-parent-virtual-call, 
   -bugprone-integer-division, 
-  -bugprone-narrowing-conversions, 
-  -bugprone-branch-clone, 
-  -performance-enum-size, 
-  -bugprone-implicit-widening-of-multiplication-result, 
-  -bugprone-invalid-enum-default-initialization, 
-  -bugprone-empty-catch, 
-  -bugprone-infinite-loop, 
-  -bugprone-std-namespace-modification, 
-  -bugprone-derived-method-shadowing-base-method, 
-  -bugprone-parent-virtual-call, 
-  -bugprone-integer-division
+  -readability-non-const-parameter, 
+  -readability-misplaced-array-index, 
+  -bugprone-switch-missing-default-case, 
+  -bugprone-misplaced-widening-cast, 
+  -performance-trivially-destructible
 
 WarningsAsErrors: ''
 
