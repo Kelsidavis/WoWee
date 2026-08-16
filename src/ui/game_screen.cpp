@@ -705,18 +705,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     if (!frameXmlOwns(UiElement::Loot)) {
         windowManager_.renderLootWindow(gameHandler, inventoryScreen, chatPanel_);
     }
-    if (!frameXmlOwns(UiElement::Gossip)) {
-        windowManager_.renderGossipWindow(gameHandler, chatPanel_);
-    }
-    if (!frameXmlOwns(UiElement::QuestGiver)) {
-        windowManager_.renderQuestDetailsWindow(gameHandler, chatPanel_, inventoryScreen);
-    }
-    if (!frameXmlOwns(UiElement::QuestGiver)) {
-        windowManager_.renderQuestRequestItemsWindow(gameHandler, chatPanel_, inventoryScreen);
-    }
-    if (!frameXmlOwns(UiElement::QuestGiver)) {
-        windowManager_.renderQuestOfferRewardWindow(gameHandler, chatPanel_, inventoryScreen);
-    }
     if (!frameXmlOwns(UiElement::Vendor)) {
         windowManager_.renderVendorWindow(gameHandler, inventoryScreen, chatPanel_);
     }

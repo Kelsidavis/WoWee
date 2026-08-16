@@ -55,6 +55,12 @@ NOTHING_TO_GATE = {
     # panel was FrameXML's. Both openers - the escape menu button and the slash
     # command - call ToggleHelpFrame now.
     "Help",
+    # src/ui/window_manager.cpp's three quest windows - details, request items
+    # and offer reward - removed once the quest giver was FrameXML's. Gossip
+    # keeps a gate of its own, but it is a behaviour one: this client sends
+    # CMSG_BINDER_ACTIVATE on the innkeeper option, where FrameXML waits for
+    # the server's confirm.
+    "QuestGiver",
 }
 
 

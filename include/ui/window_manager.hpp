@@ -40,17 +40,6 @@ public:
     void renderLootWindow(game::GameHandler& gameHandler,
                           InventoryScreen& inventoryScreen,
                           ChatPanel& chatPanel);
-    void renderGossipWindow(game::GameHandler& gameHandler,
-                            ChatPanel& chatPanel);
-    void renderQuestDetailsWindow(game::GameHandler& gameHandler,
-                                  ChatPanel& chatPanel,
-                                  InventoryScreen& inventoryScreen);
-    void renderQuestRequestItemsWindow(game::GameHandler& gameHandler,
-                                       ChatPanel& chatPanel,
-                                       InventoryScreen& inventoryScreen);
-    void renderQuestOfferRewardWindow(game::GameHandler& gameHandler,
-                                      ChatPanel& chatPanel,
-                                      InventoryScreen& inventoryScreen);
     void renderVendorWindow(game::GameHandler& gameHandler,
                             InventoryScreen& inventoryScreen,
                             ChatPanel& chatPanel);
