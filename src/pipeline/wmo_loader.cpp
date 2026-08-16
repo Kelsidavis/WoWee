@@ -87,7 +87,10 @@ WMOModel WMOLoader::load(const std::vector<uint8_t>& wmoData) {
         uint32_t chunkId = read<uint32_t>(wmoData, offset);
         uint32_t chunkSize = read<uint32_t>(wmoData, offset);
 
-        if (offset + chunkSize > wmoData.size()) {
+        // 64-bit, for the reason readArray gives above: offset and chunkSize
+        // are both uint32 and both come from the file, so the sum wraps and a
+        // crafted chunkSize walks the loop past the end of the buffer.
+        if (static_cast<uint64_t>(offset) + chunkSize > wmoData.size()) {
             core::Logger::getInstance().warning("Chunk extends beyond file");
             break;
         }
@@ -482,11 +485,18 @@ bool WMOLoader::loadGroup(const std::vector<uint8_t>& groupData,
             while (mogpOffset + 8 < chunkEnd) {
                 uint32_t subChunkId = read<uint32_t>(groupData, mogpOffset);
                 uint32_t subChunkSize = read<uint32_t>(groupData, mogpOffset);
-                uint32_t subChunkEnd = mogpOffset + subChunkSize;
-
-                if (subChunkEnd > chunkEnd) {
+                // Widened for the same reason as the root chunk loop: both
+                // operands are uint32 read from the file, and a wrapped
+                // subChunkEnd is smaller than mogpOffset, which every
+                // "parseOffset + n <= subChunkEnd" test below then reads as
+                // "no room" or, worse, as room that is not there.
+                const uint64_t subChunkEnd64 =
+                    static_cast<uint64_t>(mogpOffset) + subChunkSize;
+                if (subChunkEnd64 > chunkEnd) {
                     break;
                 }
+                // Past the guard it is <= chunkEnd, so this cannot truncate.
+                const uint32_t subChunkEnd = static_cast<uint32_t>(subChunkEnd64);
 
                 // Debug: log chunk magic as string
                 char magic[5] = {0};
