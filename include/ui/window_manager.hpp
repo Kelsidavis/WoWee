@@ -37,28 +37,14 @@ public:
     using SpellIconFn = std::function<VkDescriptorSet(uint32_t, pipeline::AssetManager*)>;
 
     // ---- NPC interaction windows ----
-    void renderLootWindow(game::GameHandler& gameHandler,
-                          InventoryScreen& inventoryScreen,
-                          ChatPanel& chatPanel);
-    void renderVendorWindow(game::GameHandler& gameHandler,
-                            InventoryScreen& inventoryScreen,
-                            ChatPanel& chatPanel);
     void renderBarberShopWindow(game::GameHandler& gameHandler);
 
     // ---- Mail and banking ----
-    void renderMailWindow(game::GameHandler& gameHandler,
-                          InventoryScreen& inventoryScreen,
-                          ChatPanel& chatPanel);
-    void renderMailComposeWindow(game::GameHandler& gameHandler,
-                                 InventoryScreen& inventoryScreen);
     // Returns true when a persisted bank view option (Combine bags) changed,
     // so the caller can save settings.
     bool renderBankWindow(game::GameHandler& gameHandler,
                           InventoryScreen& inventoryScreen,
                           ChatPanel& chatPanel);
-    void renderGuildBankWindow(game::GameHandler& gameHandler,
-                               InventoryScreen& inventoryScreen,
-                               ChatPanel& chatPanel);
 
     // ---- Popup / overlay windows ----
     /// The game handler is only for the Help button, which has to reach
@@ -125,21 +111,6 @@ public:
     // Escape menu
     bool showEscapeMenu = false;
 
-    // Mail compose
-    char mailRecipientBuffer_[256] = "";
-    char mailSubjectBuffer_[256] = "";
-    char mailBodyBuffer_[2048] = "";
-    int mailComposeMoney_[3] = {0, 0, 0};
-
-    // Vendor
-    char vendorSearchFilter_[128] = "";
-    bool vendorConfirmOpen_ = false;
-    uint64_t vendorConfirmGuid_ = 0;
-    uint32_t vendorConfirmItemId_ = 0;
-    uint32_t vendorConfirmSlot_ = 0;
-    uint32_t vendorConfirmQty_ = 1;
-    uint32_t vendorConfirmPrice_ = 0;
-    std::string vendorConfirmItemName_;
     bool vendorBagsOpened_ = false;
     bool guildBankBagsOpened_ = false;
     // Bank "Combine bags" view (one contiguous grid vs per-bag sections).
@@ -205,9 +176,6 @@ public:
     /// FrameXML's reaches it through ApplyBarberShopStyle.
     void barberApplySelection(game::GameHandler& gameHandler);
 
-    // Guild bank money input
-    int guildBankMoneyInput_[3] = {0, 0, 0};
-
     // ItemExtendedCost.dbc cache
     // UIServices injection (Phase B singleton breaking)
     void setServices(const UIServices& services) { services_ = services; }
@@ -215,7 +183,6 @@ public:
 private:
     UIServices services_;
     // Resolve an achievement's SpellIcon.dbc ID to an ImGui texture (lazy BLP load + cache).
-    std::string formatExtendedCost(uint32_t extendedCostId, game::GameHandler& gameHandler);
 };
 
 } // namespace ui

@@ -4564,7 +4564,11 @@ void registerInventoryLuaAPI(lua_State* L) {
             const auto& mail = inbox[index - 1];
             lua_pushstring(L, "Interface\\Icons\\INV_Letter_15"); // packageIcon
             lua_pushstring(L, "Interface\\Icons\\INV_Letter_15"); // stationeryIcon
-            lua_pushstring(L, mail.senderName.c_str());           // sender
+            // Through getMailSenderName, which is what turns a player's guid
+            // into a name once the query comes back, and names the auction
+            // house, a creature or an object for the other message types. The
+            // raw field is empty for player mail until then.
+            lua_pushstring(L, gh->getMailSenderName(mail).c_str());  // sender
             const std::string subject = gh->getMailDisplaySubject(mail);
             lua_pushstring(L, subject.c_str());                   // subject
             lua_pushnumber(L, mail.money);                        // money (copper)

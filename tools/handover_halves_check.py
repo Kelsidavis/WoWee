@@ -67,6 +67,14 @@ NOTHING_TO_GATE = {
     # src/ui/window_manager.cpp's renderAuctionHouseWindow and its browse,
     # filter and sell state.
     "AuctionHouse",
+    # src/ui/window_manager.cpp's renderVendorWindow, with its buy confirmation.
+    # The auto-open of the bags when a vendor opens stays: it routes to the
+    # interface's own bags.
+    "Vendor",
+    # renderMailWindow and renderMailComposeWindow, with the compose buffers.
+    "Mail",
+    # renderGuildBankWindow and its money input.
+    "GuildBank",
 }
 
 

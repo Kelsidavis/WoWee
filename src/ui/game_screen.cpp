@@ -702,27 +702,12 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     if (!frameXmlOwns(UiElement::Buffs)) {
         combatUI_.renderBuffBar(gameHandler, spellbookScreen, inventoryScreen, settingsPanel_, spellIconFn);
     }
-    if (!frameXmlOwns(UiElement::Loot)) {
-        windowManager_.renderLootWindow(gameHandler, inventoryScreen, chatPanel_);
-    }
-    if (!frameXmlOwns(UiElement::Vendor)) {
-        windowManager_.renderVendorWindow(gameHandler, inventoryScreen, chatPanel_);
-    }
     if (!frameXmlOwns(UiElement::BarberShop)) {
         windowManager_.renderBarberShopWindow(gameHandler);
-    }
-    if (!frameXmlOwns(UiElement::Mail)) {
-        windowManager_.renderMailWindow(gameHandler, inventoryScreen, chatPanel_);
-    }
-    if (!frameXmlOwns(UiElement::Mail)) {
-        windowManager_.renderMailComposeWindow(gameHandler, inventoryScreen);
     }
     if (!frameXmlOwns(UiElement::Bank)) {
         if (windowManager_.renderBankWindow(gameHandler, inventoryScreen, chatPanel_))
             saveSettings();
-    }
-    if (!frameXmlOwns(UiElement::GuildBank)) {
-        windowManager_.renderGuildBankWindow(gameHandler, inventoryScreen, chatPanel_);
     }
     windowManager_.renderGmCommandScreen(gameHandler);
     if (!frameXmlOwns(UiElement::DungeonFinder)) {
