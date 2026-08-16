@@ -1,8 +1,8 @@
-// The two chat filters the Social panel offers.
+// The spam filter the Social panel offers.
 //
-// Both are easy to write in a way that looks right and is wrong in one
-// direction only: a spam filter that eats two people greeting each other, and
-// a word filter that stars the middle of a place name.
+// Easy to write in a way that looks right and is wrong in one direction only:
+// a filter that eats two people greeting each other. The mature language
+// filter that used to sit beside it is gone - chat arrives as it was sent.
 #include <catch_amalgamated.hpp>
 #include "game/chat_filters.hpp"
 
@@ -39,29 +39,4 @@ TEST_CASE("the same line long enough later is not spam", "[chatfilter]") {
 TEST_CASE("a line with no sender is never spam", "[chatfilter]") {
     // System lines and anything the server sends unattributed.
     CHECK_FALSE(repeatsRecentLine(history(), 0, "WTS [Thunderfury] pst", 110.0));
-}
-
-TEST_CASE("a covered word is masked and the sentence still reads", "[chatfilter]") {
-    const std::string out = maskProfanity("what the fuck was that");
-    CHECK(out == "what the f*** was that");
-    CHECK(out.size() == std::string("what the fuck was that").size());
-}
-
-TEST_CASE("the filter matches whole words only", "[chatfilter]") {
-    // The case that makes a naive substring filter embarrassing: real names
-    // and words that merely contain a covered one.
-    CHECK(maskProfanity("Shitterton") == "Shitterton");
-    CHECK(maskProfanity("classic") == "classic");
-    CHECK(maskProfanity("assassin") == "assassin");
-    CHECK(maskProfanity("Bastardsword") == "Bastardsword");
-}
-
-TEST_CASE("punctuation around a word does not hide it", "[chatfilter]") {
-    CHECK(maskProfanity("(shit!)") == "(s***!)");
-    CHECK(maskProfanity("SHIT") == "S***");
-}
-
-TEST_CASE("a clean line comes back untouched", "[chatfilter]") {
-    const std::string clean = "Anyone for Deadmines? Need a healer.";
-    CHECK(maskProfanity(clean) == clean);
 }

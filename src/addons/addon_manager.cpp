@@ -509,6 +509,10 @@ void AddonManager::giveCoinAmountsClearance() {
     if (!luaEngine_.executeString(kScript)) {
         LOG_WARNING("Coin amount clearance did not apply: ", luaEngine_.lastError());
     }
+    // Chat lines that do not fade out from under the player.
+    if (!luaEngine_.executeString(kChatNoFadeLua)) {
+        LOG_WARNING("Chat fade removal did not apply: ", luaEngine_.lastError());
+    }
     // What the player last set, applied.
     //
     // The CVar store is filled from disk before any renderer, camera or audio

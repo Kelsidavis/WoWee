@@ -697,9 +697,6 @@ void ChatHandler::handleMessageChat(network::Packet& packet) {
             // again a moment later, not keeping a record of the conversation.
             while (recentChatLines_.size() > 64) recentChatLines_.pop_front();
         }
-        if (addons::storedCVarValue("profanityFilter", "0") != "0") {
-            data.message = maskProfanity(data.message);
-        }
     }
 
     // Trigger chat bubble for SAY/YELL messages from others

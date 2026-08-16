@@ -56,52 +56,6 @@ inline bool repeatsRecentLine(const std::deque<RecentChatLine>& recent,
     return false;
 }
 
-/// The words the mature language filter covers.
-///
-/// Short and English, which is what this client can honestly claim: the real
-/// client takes its list from the locale data, and inventing a large one here
-/// would filter unevenly and surprise people. Matching is whole-word so that
-/// place and class names containing these letters are left alone.
-inline const char* const* profanityWordList(int& count) {
-    static const char* const kWords[] = {
-        "fuck", "fucking", "fucker", "shit", "shitty", "bitch",
-        "cunt", "bastard", "asshole", "dickhead", "wanker",
-    };
-    count = static_cast<int>(sizeof(kWords) / sizeof(kWords[0]));
-    return kWords;
-}
-
-/// The line with covered words masked, keeping their first letter.
-///
-/// Masked rather than dropped: the real client leaves the sentence readable
-/// and takes the word out of it, and a line that vanishes reads as a bug.
-inline std::string maskProfanity(const std::string& text) {
-    int count = 0;
-    const char* const* words = profanityWordList(count);
-
-    std::string out = text;
-    auto isWordChar = [](unsigned char c) { return std::isalnum(c) || c == '\''; };
-
-    for (size_t i = 0; i < out.size();) {
-        if (!isWordChar(static_cast<unsigned char>(out[i]))) { ++i; continue; }
-        size_t end = i;
-        while (end < out.size() && isWordChar(static_cast<unsigned char>(out[end]))) ++end;
-
-        std::string word = out.substr(i, end - i);
-        for (char& c : word) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-
-        for (int w = 0; w < count; ++w) {
-            if (word == words[w]) {
-                // First letter kept, the rest starred - the sentence still
-                // reads and the word does not.
-                for (size_t k = i + 1; k < end; ++k) out[k] = '*';
-                break;
-            }
-        }
-        i = end;
-    }
-    return out;
-}
 
 } // namespace game
 } // namespace wowee

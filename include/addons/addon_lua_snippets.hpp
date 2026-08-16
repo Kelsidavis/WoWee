@@ -985,6 +985,13 @@ local kRemoved = {
 
     -- Whichever language's sound files are installed is what plays.
     "InterfaceOptionsLanguagesPanelUseEnglishAudio",
+
+    -- No mature language filter. The real client takes its word list from the
+    -- locale data; the short English one written here filtered unevenly, and
+    -- what it masked it masked for a player who had not asked. Chat arrives as
+    -- it was sent. The spam filter beside it is a different thing and stays -
+    -- it matches the same line pasted over and over, not the words in it.
+    "InterfaceOptionsSocialPanelProfanityFilter",
 }
 
 -- Whole pages, because every control on them is for a feature that is not
@@ -1294,6 +1301,42 @@ if realInitialize then
 end
 )LUA";
 
+/// Chat that stays on screen.
+///
+/// ChatFrameTemplate declares displayDuration="120.0", so every line a chat
+/// window holds fades two minutes after it arrives and the window empties
+/// itself while the player is reading it. Zero is what this client's message
+/// frames take for "never", and a chat frame is the one kind of window that
+/// wants it - UIErrorsFrame, which declares five seconds, is left alone.
+///
+/// Applied to the windows the interface has now and to any opened later, since
+/// a chat window can be created after this runs.
+inline constexpr const char* kChatNoFadeLua = R"LUA(
+local function hold(frame)
+    if frame and frame.SetTimeVisible then
+        frame:SetTimeVisible(0)
+        -- The real client's own switch for this, in case anything asks it
+        -- rather than the duration.
+        if frame.SetFading then frame:SetFading(false) end
+    end
+end
+
+for i = 1, (NUM_CHAT_WINDOWS or 10) do
+    hold(_G["ChatFrame" .. i])
+end
+
+-- A window opened later gets the same treatment. FCF_OpenNewWindow is what
+-- makes one, and it answers the frame it made.
+local realOpen = FCF_OpenNewWindow
+if type(realOpen) == "function" then
+    FCF_OpenNewWindow = function(...)
+        local frame = realOpen(...)
+        hold(frame)
+        return frame
+    end
+end
+)LUA";
+
 inline constexpr const char* kCoinAmountClearanceLua = R"LUA(
 -- Colourblind mode off, explicitly.
 --
@@ -1315,23 +1358,35 @@ inline constexpr const char* kCoinAmountClearanceLua = R"LUA(
 -- spacing is MoneyFrame_Update's own, and it is right.
 local kClearance = 6
 
+-- The interface's own denomination letters, read once. Fallbacks because a
+-- money frame can be updated before globalstrings has been through, and "12"
+-- with a nil beside it raises where "12g" was wanted.
+local kSymbols = {
+    Gold   = GOLD_AMOUNT_SYMBOL   or "g",
+    Silver = SILVER_AMOUNT_SYMBOL or "s",
+    Copper = COPPER_AMOUNT_SYMBOL or "c",
+}
+
 local function nudge(frameName)
     for _, coin in ipairs({"Gold", "Silver", "Copper"}) do
         local text = _G[frameName .. coin .. "ButtonText"]
         local button = _G[frameName .. coin .. "Button"]
         if text and button then
-            -- The amount alone, whatever wrote it.
+            -- The amount and its denomination, as a letter.
             --
-            -- WoW writes the amount and the coin's picture; the letter belongs
-            -- to the colourblind branch, which is off. It has been reported
-            -- four times running and turning that branch off did not stop it,
-            -- so rather than keep hunting for the writer, the letter comes off
-            -- here where the answer is certain. If the diagnostic in the
-            -- renderer ever names what puts it there, this can go.
+            -- The coin picture comes off below, and an amount with nothing
+            -- beside it says nothing: a training cost read as three numbers in
+            -- a row with no way to tell gold from silver. The letters are the
+            -- interface's own - GOLD_AMOUNT_SYMBOL and its two siblings, what
+            -- the colourblind branch writes - so they are localised and this
+            -- client's own windows already print costs the same way.
+            --
+            -- Written from the digits rather than appended, so running twice
+            -- over the same frame does not leave "12gg".
             local shown = text:GetText()
             if shown then
-                local bare = shown:match("^(%d+)[gsc]$")
-                if bare then text:SetText(bare) end
+                local bare = shown:match("^(%d+)")
+                if bare then text:SetText(bare .. kSymbols[coin]) end
             end
             -- No coin of ours.
             --
