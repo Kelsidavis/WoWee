@@ -206,7 +206,6 @@ void ActivitySoundManager::rebuildHardLandClipsForProfile(const std::string& rac
 void ActivitySoundManager::startSwimLoop() {
     // Swimming sounds now handled by periodic playback in update() method
     // This method kept for API compatibility but does nothing
-    return;
 }
 
 void ActivitySoundManager::stopSwimLoop() {

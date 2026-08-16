@@ -607,7 +607,15 @@ void WidgetRenderer::drawBackdrop(ImDrawList* dl, const Widget& w, float scale,
         float step = (e < 2.0f) ? span : e;
         if (step > 0.0f && span / step > kMaxTiles) step = span / kMaxTiles;
         const float tu0 = index / 8.0f, tu1 = (index + 1) / 8.0f;
-        for (float at = 0.0f; at < span; at += step) {
+        // Counted rather than accumulated: adding step to a float each pass
+        // drifts, and the last tile's length is derived from the position.
+        // step is span when the edge inset is degenerate, so it can be zero
+        // and the count has to tolerate that.
+        const int tileCount = (step > 0.0f)
+            ? static_cast<int>(std::ceil(span / step))
+            : 0;
+        for (int tile = 0; tile < tileCount; ++tile) {
+            const float at = static_cast<float>(tile) * step;
             // The last tile is cut short rather than overhanging, and its UVs
             // are cut with it so the art is cropped rather than squeezed into
             // the remainder.

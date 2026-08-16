@@ -1062,8 +1062,6 @@ static void callScriptOnTable(lua_State* L, int tableIdx, const char* script,
 ///
 /// The tooltip is the first argument at every one of those call sites, which
 /// is what makes one index right for all of them.
-static void callScriptOnTable(lua_State* L, int tableIdx, const char* script,
-                              double arg);
 static void fireTooltipSetItem(lua_State* L) {
     if (lua_istable(L, 1)) callScriptOnTable(L, 1, "OnTooltipSetItem", 0.0);
 }

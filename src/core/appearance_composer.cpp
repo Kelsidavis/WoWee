@@ -224,7 +224,7 @@ void AppearanceComposer::compositePlayerSkin(uint32_t modelSlotId, const PlayerT
         }
         if (layers.size() > 1) {
             rendering::VkTexture* compositeTex = charRenderer->compositeTextures(layers);
-            if (compositeTex != 0) {
+            if (compositeTex != nullptr) {
                 // Find type-1 (skin) texture slot and replace with composite
                 // We need model texture info - walk slots via charRenderer
                 // Use the model slot ID to find the right texture index
