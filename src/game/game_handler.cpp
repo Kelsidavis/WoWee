@@ -172,11 +172,7 @@ bool GameHandler::connect(const std::string& host,
 }
 
 void GameHandler::disconnect() {
-    if (onTaxiFlight_) {
-        taxiRecoverPending_ = true;
-    } else {
-        taxiRecoverPending_ = false;
-    }
+    taxiRecoverPending_ = onTaxiFlight_;
     if (socket) {
         socket->disconnect();
         socket.reset();

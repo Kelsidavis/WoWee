@@ -76,7 +76,7 @@ public:
         return fut;
     }
 
-    size_t threadCount() const { return workers_.size(); }
+    [[nodiscard]] size_t threadCount() const { return workers_.size(); }
 
 private:
     static size_t defaultThreadCount() {

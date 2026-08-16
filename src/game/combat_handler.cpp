@@ -1589,15 +1589,12 @@ void CombatHandler::tabTarget(float playerX, float playerY, float playerZ) {
         if (unit->getHealth() == 0) {
             if (playerInCombat) return false;
             auto lootIt = owner_.localLootStateRef().find(guid);
-            if (lootIt == owner_.localLootStateRef().end() || lootIt->second.data.items.empty()) {
-                return false;
-            }
-            return true;
+            return lootIt != owner_.localLootStateRef().end() &&
+                   !lootIt->second.data.items.empty();
         }
         const bool hostileByFaction = unit->isHostile();
         const bool hostileByCombat = isAggressiveTowardPlayer(guid);
-        if (!hostileByFaction && !hostileByCombat) return false;
-        return true;
+        return hostileByFaction || hostileByCombat;
     };
 
     // Restart the cycle after a pause - the player has moved on; the next tab

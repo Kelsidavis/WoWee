@@ -651,11 +651,11 @@ uint32_t LightingManager::selectLightParamsId(const LightVolume* volume, bool is
     // Select appropriate LightParams based on conditions
     if (isUnderwater && volume->lightParamsIdUnderwater != 0) {
         return volume->lightParamsIdUnderwater;
-    } if (isRaining && volume->lightParamsIdRain != 0) {
-        return volume->lightParamsIdRain;
-    } else {
-        return volume->lightParamsId;
     }
+    if (isRaining && volume->lightParamsIdRain != 0) {
+        return volume->lightParamsIdRain;
+    }
+    return volume->lightParamsId;
 }
 
 LightingParams LightingManager::sampleLightParams(const LightParamsProfile* profile, uint16_t timeHalfMinutes) const {

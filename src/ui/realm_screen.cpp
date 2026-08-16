@@ -236,13 +236,14 @@ const char* RealmScreen::getRealmStatus(uint8_t flags) const {
 ImVec4 RealmScreen::getPopulationColor(float population) const {
     if (population < 0.5f) {
         return ui::colors::kBrightGreen;  // Green - Low
-    } if (population < 1.5f) {
-        return ui::colors::kYellow;  // Yellow - Medium
-    } else if (population < 2.5f) {
-        return ImVec4(1.0f, 0.6f, 0.0f, 1.0f);  // Orange - High
-    } else {
-        return ui::colors::kRed;  // Red - Full
     }
+    if (population < 1.5f) {
+        return ui::colors::kYellow;  // Yellow - Medium
+    }
+    if (population < 2.5f) {
+        return ImVec4(1.0f, 0.6f, 0.0f, 1.0f);  // Orange - High
+    }
+    return ui::colors::kRed;  // Red - Full
 }
 
 }} // namespace wowee::ui
