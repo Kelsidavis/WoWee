@@ -1195,7 +1195,6 @@ void Application::run() {
     }
 
     auto lastTime = std::chrono::high_resolution_clock::now();
-    std::atomic<bool> watchdogRunning{true};
     beatWatchdog();
     std::atomic<int64_t>& watchdogHeartbeatMs = watchdogHeartbeatMs_;
     // Signal flag: watchdog sets this when a stall is detected, main loop
@@ -1203,9 +1202,14 @@ void Application::run() {
     // from the main thread (the one that called SDL_Init); calling them from
     // a background thread is UB on macOS (Cocoa) and unsafe on other platforms.
     std::atomic<bool> watchdogRequestRelease{false};
-    std::thread watchdogThread([&watchdogRunning, &watchdogHeartbeatMs, &watchdogRequestRelease]() {
+    // A jthread, so its destructor requests the stop and joins. The main loop
+    // below used to be wrapped in a try/catch whose only job was to run that
+    // teardown before rethrowing, with the same three lines repeated on the
+    // normal path -- both are gone, and neither can now be forgotten on a path
+    // added later.
+    std::jthread watchdogThread([&watchdogHeartbeatMs, &watchdogRequestRelease](std::stop_token stopToken) {
         bool signalledForCurrentStall = false;
-        while (watchdogRunning.load(std::memory_order_acquire)) {
+        while (!stopToken.stop_requested()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(250));
             const int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -1225,410 +1229,397 @@ void Application::run() {
         }
     });
 
-    try {
-        while (running && !window->shouldClose()) {
-            const auto frameStart = std::chrono::steady_clock::now();
-            beatWatchdog();
+    while (running && !window->shouldClose()) {
+        const auto frameStart = std::chrono::steady_clock::now();
+        beatWatchdog();
 
-            // Handle watchdog mouse-release request on the main thread where
-            // SDL video calls are safe (required by SDL2 threading model).
-            if (watchdogRequestRelease.exchange(false, std::memory_order_acq_rel)) {
-                SDL_SetRelativeMouseMode(SDL_FALSE);
-                SDL_ShowCursor(SDL_ENABLE);
-                if (window && window->getSDLWindow()) {
-                    SDL_SetWindowGrab(window->getSDLWindow(), SDL_FALSE);
-                }
-                if (renderer && renderer->getCameraController()) {
-                    renderer->getCameraController()->releaseMouseCapture();
-                }
-                LOG_WARNING("Watchdog: force-released mouse capture on main thread");
+        // Handle watchdog mouse-release request on the main thread where
+        // SDL video calls are safe (required by SDL2 threading model).
+        if (watchdogRequestRelease.exchange(false, std::memory_order_acq_rel)) {
+            SDL_SetRelativeMouseMode(SDL_FALSE);
+            SDL_ShowCursor(SDL_ENABLE);
+            if (window && window->getSDLWindow()) {
+                SDL_SetWindowGrab(window->getSDLWindow(), SDL_FALSE);
             }
-
-            // Hold the frame to the cap, if one is set.
-            //
-            // Before the delta time is taken, so the wait is part of the frame
-            // it paces rather than a stall the next one has to absorb. Sleep
-            // granularity is a millisecond or so, which is close enough for a
-            // cap and far cheaper than spinning.
-            if (window) {
-                const int capFps = window->frameCap();
-                if (capFps > 0) {
-                    const std::chrono::duration<float> target(1.0f / static_cast<float>(capFps));
-                    const auto elapsed = std::chrono::high_resolution_clock::now() - lastTime;
-                    if (elapsed < target) {
-                        std::this_thread::sleep_for(target - elapsed);
-                    }
-                }
-            }
-
-            // Calculate delta time
-            auto currentTime = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<float> deltaTimeDuration = currentTime - lastTime;
-            float deltaTime = deltaTimeDuration.count();
-            lastTime = currentTime;
-
-            // Cap delta time to prevent large jumps
-            if (deltaTime > 0.1f) {
-                deltaTime = 0.1f;
-            }
-
-            if (renderer && renderer->getCameraController() && ImGui::GetIO().WantCaptureMouse) {
+            if (renderer && renderer->getCameraController()) {
                 renderer->getCameraController()->releaseMouseCapture();
             }
+            LOG_WARNING("Watchdog: force-released mouse capture on main thread");
+        }
 
-            // Poll events
-            //
-            // Cleared here rather than after the draw, because the flag only
-            // ever describes the iteration it was set in: the pump sets it and
-            // the draw, further down this same iteration, is the only reader.
-            ui::clearInterfaceConsumedKeys();
-            SDL_Event event;
-            while (SDL_PollEvent(&event)) {
-                // Pass event to UI manager first
-                if (uiManager) {
-                    uiManager->processEvent(event);
+        // Hold the frame to the cap, if one is set.
+        //
+        // Before the delta time is taken, so the wait is part of the frame
+        // it paces rather than a stall the next one has to absorb. Sleep
+        // granularity is a millisecond or so, which is close enough for a
+        // cap and far cheaper than spinning.
+        if (window) {
+            const int capFps = window->frameCap();
+            if (capFps > 0) {
+                const std::chrono::duration<float> target(1.0f / static_cast<float>(capFps));
+                const auto elapsed = std::chrono::high_resolution_clock::now() - lastTime;
+                if (elapsed < target) {
+                    std::this_thread::sleep_for(target - elapsed);
                 }
+            }
+        }
 
-                // Pass mouse events to camera controller (skip when UI has mouse focus)
-                if (renderer && renderer->getCameraController() && !ImGui::GetIO().WantCaptureMouse) {
-                    if (event.type == SDL_MOUSEMOTION) {
-                        renderer->getCameraController()->processMouseMotion(event.motion);
-                    }
-                    else if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) {
-                        renderer->getCameraController()->processMouseButton(event.button);
-                    }
-                    else if (event.type == SDL_MOUSEWHEEL) {
-                        // The interface gets first refusal, and only where a
-                        // frame under the cursor asked for the wheel. Zooming
-                        // the camera while scrolling a quest log is what
-                        // happens without the check, and a frame that did not
-                        // ask must not swallow it either.
-                        bool takenByUi = false;
-                        if (addonManager_ && addonManager_->getLuaEngine()) {
-                            // ImGui's cursor, not SDL's, because that is what
-                            // the rest of the widget dispatch is fed and the
-                            // two need not agree on a scaled display. Flipped
-                            // to bottom-origin for the same reason the button
-                            // dispatch is: the tree measures upward.
-                            const ImGuiIO& mio = ImGui::GetIO();
-                            takenByUi = addonManager_->getLuaEngine()->dispatchMouseWheel(
-                                mio.MousePos.x, mio.DisplaySize.y - mio.MousePos.y,
-                                static_cast<float>(event.wheel.y));
-                        }
-                        if (!takenByUi) {
-                            renderer->getCameraController()->processMouseWheel(
-                                static_cast<float>(event.wheel.y));
-                        }
-                    }
-                }
+        // Calculate delta time
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> deltaTimeDuration = currentTime - lastTime;
+        float deltaTime = deltaTimeDuration.count();
+        lastTime = currentTime;
 
-                // Handle window events
-                if (event.type == SDL_QUIT) {
-                    window->setShouldClose(true);
-                }
-                else if (event.type == SDL_WINDOWEVENT) {
-                    if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
-                        int newWidth = event.window.data1;
-                        int newHeight = event.window.data2;
-                        window->setSize(newWidth, newHeight);
-                        // Mark swapchain dirty so it gets recreated at the correct size
-                        if (window->getVkContext()) {
-                            window->getVkContext()->markSwapchainDirty();
-                        }
-                        // Vulkan viewport set in command buffer, not globally
-                        if (renderer && renderer->getCamera() && newHeight > 0) {
-                            renderer->getCamera()->setAspectRatio(static_cast<float>(newWidth) / newHeight);
-                        }
-                        // Notify addons so UI layouts can adapt to the new size
-                        if (addonManager_)
-                            addonManager_->fireEvent("DISPLAY_SIZE_CHANGED");
-                    }
-                    // Sound in Background. Off in the real client and off here:
-                    // losing the window silences the client rather than playing
-                    // on behind whatever the player switched to. Read at the
-                    // moment focus changes, so clearing the box takes effect on
-                    // the next alt-tab and not the next restart.
-                    else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST ||
-                             event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-                        const bool focused =
-                            (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED);
-                        const bool playInBackground =
-                            addons::storedCVarValue("Sound_EnableSoundWhenGameIsInBG", "0") != "0";
-                        audio::AudioEngine::instance().setSuspended(!focused && !playInBackground);
-                    }
-                }
-                // Typed text, when an addon's edit box is listening for it.
-                else if (event.type == SDL_TEXTINPUT) {
-                    if (addonManager_ && addonsLoaded_) {
-                        if (auto* engine = addonManager_->getLuaEngine();
-                            engine && engine->editBoxHasFocus()) {
-                            engine->dispatchText(event.text.text);
-                        }
-                    }
-                }
-                // Debug controls
-                else if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
-                    // Shift, control and alt announce themselves. The interface
-                    // watches these to swap what a tooltip shows and what a
-                    // click will do - item comparison appears on shift, and an
-                    // action button's self-cast indicator on alt. Four frames
-                    // listen and none had ever been told.
-                    if (addonManager_ && addonsLoaded_) {
-                        const char* modName = nullptr;
-                        switch (event.key.keysym.sym) {
-                            case SDLK_LSHIFT: modName = "LSHIFT"; break;
-                            case SDLK_RSHIFT: modName = "RSHIFT"; break;
-                            case SDLK_LCTRL:  modName = "LCTRL";  break;
-                            case SDLK_RCTRL:  modName = "RCTRL";  break;
-                            case SDLK_LALT:   modName = "LALT";   break;
-                            case SDLK_RALT:   modName = "RALT";   break;
-                            default: break;
-                        }
-                        // Repeats are not changes: holding shift sends a stream
-                        // of key-downs and the interface would rebuild every
-                        // tooltip in the game for each one.
-                        if (modName && event.key.repeat == 0) {
-                            addonManager_->fireEvent(
-                                "MODIFIER_STATE_CHANGED",
-                                {modName, event.type == SDL_KEYDOWN ? "1" : "0"});
-                        }
-                    }
-                }
-                if (event.type == SDL_KEYDOWN) {
-                    // An addon's edit box takes the keystroke before anything
-                    // else looks at it. Otherwise typing into one would also
-                    // walk the character, and backspace would trip a keybind.
-                    if (addonManager_ && addonsLoaded_) {
-                        if (auto* engine = addonManager_->getLuaEngine();
-                            engine && engine->editBoxHasFocus()) {
-                            const bool ctrl =
-                                (event.key.keysym.mod & KMOD_CTRL) != 0;
-                            // Said before the dispatch, because dispatching is
-                            // what lets go of the focus that the check above
-                            // just used - ask afterwards and the box no longer
-                            // admits to having taken anything.
-                            //
-                            // Only the three that let go. Every other key
-                            // leaves the box focused, so the poll's own typing
-                            // guard still answers for them.
-                            switch (event.key.keysym.sym) {
-                                case SDLK_ESCAPE:
-                                    ui::noteInterfaceConsumedKey(ImGuiKey_Escape);
-                                    // The first of the three ways a press ends
-                                    // early, and the correct one: an edit box
-                                    // had the keyboard, so Escape closed the
-                                    // box and means nothing further. WoW stops
-                                    // here too.
-                                    LOG_WARNING("Escape: taken in the pump by a "
-                                                "focused edit box; it closes the "
-                                                "box and stops");
-                                    break;
-                                case SDLK_RETURN:
-                                case SDLK_KP_ENTER:
-                                    ui::noteInterfaceConsumedKey(ImGuiKey_Enter);
-                                    break;
-                                case SDLK_TAB:
-                                    ui::noteInterfaceConsumedKey(ImGuiKey_Tab);
-                                    break;
-                                default: break;
-                            }
-                            engine->dispatchKey(event.key.keysym.sym, ctrl);
-                            continue;
-                        }
-                        // No edit box, but a dialog may still be listening -
-                        // the colour picker, the stack splitter, the coin
-                        // pickup. The key is only swallowed when one of them
-                        // actually takes it, so with nothing up the movement
-                        // keys and every binding carry on exactly as before.
-                        if (auto* engine = addonManager_->getLuaEngine()) {
-                            if (engine->dispatchFrameKey(event.key.keysym.sym, true)) {
-                                // Escape says so, because "Escape does nothing"
-                                // is a live report and this is one of the three
-                                // ways the press can end before the chain that
-                                // decides what it means ever runs. At warning:
-                                // the default log carries nothing else, so an
-                                // info line here is a line nobody will ever
-                                // see. See the pair in GameScreen.
-                                if (event.key.keysym.sym == SDLK_ESCAPE) {
-                                    LOG_WARNING("Escape: taken in the pump by a "
-                                                "frame listening for keys; the "
-                                                "chain below never runs");
-                                }
-                                continue;
-                            }
-                        }
-                        // Then whatever the interface has bound to the key.
-                        //
-                        // Last of the three, because a focused edit box and an
-                        // open dialog both outrank a binding - which is WoW's
-                        // order too. It declines for anything this client
-                        // performs itself, so the keys that already work are
-                        // untouched; what it adds is every command the client
-                        // has no path for, which until now could be bound in
-                        // the interface's own key-binding panel and then never
-                        // honoured by any press.
-                        if (auto* engine = addonManager_->getLuaEngine()) {
-                            const SDL_Keymod mods = SDL_GetModState();
-                            if (engine->dispatchBindingKey(
-                                    event.key.keysym.sym,
-                                    (mods & KMOD_SHIFT) != 0,
-                                    (mods & KMOD_CTRL) != 0,
-                                    (mods & KMOD_ALT) != 0, true)) {
-                                // The fourth way a press can end in the pump - an
-                                // interface key binding claimed it - which had no
-                                // line. For the DEFAULT Escape this does not fire:
-                                // Escape binds to TOGGLEGAMEMENU, which
-                                // clientActsOnBinding lists, so dispatchBindingKey
-                                // yields (returns false) and the poll chain below
-                                // runs. It fires only if Escape has been rebound to
-                                // a FrameXML command a binding script handles - in
-                                // which case *that* is why the game menu never
-                                // opens, and this line names it. So it is a real
-                                // signal for a rebound Escape, not the default one.
-                                if (event.key.keysym.sym == SDLK_ESCAPE) {
-                                    LOG_WARNING("Escape: taken in the pump by an "
-                                                "interface key binding (rebound off "
-                                                "TOGGLEGAMEMENU); the game-menu chain "
-                                                "never runs");
-                                }
-                                continue;
-                            }
-                        }
-                    }
-                    // The third way, and the ordinary one: nothing in the
-                    // interface wanted it, so the poll further down decides.
-                    // Said as well as the other two, because the whole value of
-                    // these lines is that exactly one of them appears per
-                    // press - silence would mean the key never arrived at all,
-                    // and that is a different fault in a different place.
-                    if (event.key.keysym.sym == SDLK_ESCAPE) {
-                        LOG_WARNING("Escape: through the pump untaken; the chain "
-                                    "below decides");
-                    }
-                    // Skip non-function-key input when UI (chat) has keyboard focus
-                    bool uiHasKeyboard = ImGui::GetIO().WantCaptureKeyboard ||
-                                         ui::interfaceTakingTypedInput();
-                    auto sc = event.key.keysym.scancode;
-                    bool isFKey = (sc >= SDL_SCANCODE_F1 && sc <= SDL_SCANCODE_F12);
-                    if (uiHasKeyboard && !isFKey) {
-                        continue;  // Let ImGui handle the keystroke
-                    }
+        // Cap delta time to prevent large jumps
+        if (deltaTime > 0.1f) {
+            deltaTime = 0.1f;
+        }
 
-                    // The development keys are not built into a release.
-                    //
-                    // They are not bindings the player chose and not anything
-                    // the interface knows about, so a stray F-key silently
-                    // changing how the world is drawn is a bug report about
-                    // rendering rather than about a keystroke. Independent ifs
-                    // rather than a chain, so either can be compiled out on its
-                    // own; the scancodes are mutually exclusive anyway.
-#ifndef NDEBUG
-                    // F1: Toggle performance HUD
-                    if (event.key.keysym.scancode == SDL_SCANCODE_F1) {
-                        if (renderer && renderer->getPerformanceHUD()) {
-                            renderer->getPerformanceHUD()->toggle();
-                            bool enabled = renderer->getPerformanceHUD()->isEnabled();
-                            LOG_INFO("Performance HUD: ", enabled ? "ON" : "OFF");
-                        }
+        if (renderer && renderer->getCameraController() && ImGui::GetIO().WantCaptureMouse) {
+            renderer->getCameraController()->releaseMouseCapture();
+        }
+
+        // Poll events
+        //
+        // Cleared here rather than after the draw, because the flag only
+        // ever describes the iteration it was set in: the pump sets it and
+        // the draw, further down this same iteration, is the only reader.
+        ui::clearInterfaceConsumedKeys();
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            // Pass event to UI manager first
+            if (uiManager) {
+                uiManager->processEvent(event);
+            }
+
+            // Pass mouse events to camera controller (skip when UI has mouse focus)
+            if (renderer && renderer->getCameraController() && !ImGui::GetIO().WantCaptureMouse) {
+                if (event.type == SDL_MOUSEMOTION) {
+                    renderer->getCameraController()->processMouseMotion(event.motion);
+                }
+                else if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) {
+                    renderer->getCameraController()->processMouseButton(event.button);
+                }
+                else if (event.type == SDL_MOUSEWHEEL) {
+                    // The interface gets first refusal, and only where a
+                    // frame under the cursor asked for the wheel. Zooming
+                    // the camera while scrolling a quest log is what
+                    // happens without the check, and a frame that did not
+                    // ask must not swallow it either.
+                    bool takenByUi = false;
+                    if (addonManager_ && addonManager_->getLuaEngine()) {
+                        // ImGui's cursor, not SDL's, because that is what
+                        // the rest of the widget dispatch is fed and the
+                        // two need not agree on a scaled display. Flipped
+                        // to bottom-origin for the same reason the button
+                        // dispatch is: the tree measures upward.
+                        const ImGuiIO& mio = ImGui::GetIO();
+                        takenByUi = addonManager_->getLuaEngine()->dispatchMouseWheel(
+                            mio.MousePos.x, mio.DisplaySize.y - mio.MousePos.y,
+                            static_cast<float>(event.wheel.y));
                     }
-                    // No F4 shadow toggle.
-                    //
-                    // setShadowsEnabled ignores what it is passed and holds
-                    // shadows on, because turning them off loses the device -
-                    // which is why the settings panel has no control for it
-                    // either. So the key did nothing, and said the opposite in
-                    // the log every time: it read the flag back to decide what
-                    // to print, the flag never moved, and every press logged
-                    // "Shadows: OFF" while they stayed on.
-#endif
-                    // F8: Debug WMO floor at current position
-                    if (event.key.keysym.scancode == SDL_SCANCODE_F8 && event.key.repeat == 0) {
-                        if (renderer && renderer->getWMORenderer()) {
-                            glm::vec3 pos = renderer->getCharacterPosition();
-                            LOG_WARNING("F8: WMO floor debug at render pos (", pos.x, ", ", pos.y, ", ", pos.z, ")");
-                            renderer->getWMORenderer()->debugDumpGroupsAtPosition(pos.x, pos.y, pos.z);
-                        }
+                    if (!takenByUi) {
+                        renderer->getCameraController()->processMouseWheel(
+                            static_cast<float>(event.wheel.y));
                     }
                 }
             }
 
-            if (window->shouldClose()) {
-                break;
-            }
-
-            // Update input
-            Input::getInstance().update();
-
-            // Update application state
-            try {
-                FrameMark;
-                update(deltaTime);
-            } catch (const std::bad_alloc& e) {
-                LOG_ERROR("OOM during Application::update (state=", static_cast<int>(state),
-                          ", dt=", deltaTime, "): ", e.what());
-                throw;
-            } catch (const std::exception& e) {
-                LOG_ERROR("Exception during Application::update (state=", static_cast<int>(state),
-                          ", dt=", deltaTime, "): ", e.what());
-                throw;
-            }
-            if (window->shouldClose()) {
-                break;
-            }
-            // Render
-            try {
-                render();
-            } catch (const std::bad_alloc& e) {
-                LOG_ERROR("OOM during Application::render (state=", static_cast<int>(state), "): ", e.what());
-                throw;
-            } catch (const std::exception& e) {
-                LOG_ERROR("Exception during Application::render (state=", static_cast<int>(state), "): ", e.what());
-                throw;
-            }
-            // Swap buffers
-            try {
-                window->swapBuffers();
-            } catch (const std::bad_alloc& e) {
-                LOG_ERROR("OOM during swapBuffers: ", e.what());
-                throw;
-            } catch (const std::exception& e) {
-                LOG_ERROR("Exception during swapBuffers: ", e.what());
-                throw;
-            }
-
-            processDeferredLogoutToLogin();
-
-            // Exit gracefully on GPU device lost (unrecoverable)
-            if (renderer && renderer->getVkContext() && renderer->getVkContext()->isDeviceLost()) {
-                LOG_ERROR("GPU device lost - exiting application");
+            // Handle window events
+            if (event.type == SDL_QUIT) {
                 window->setShouldClose(true);
             }
+            else if (event.type == SDL_WINDOWEVENT) {
+                if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    int newWidth = event.window.data1;
+                    int newHeight = event.window.data2;
+                    window->setSize(newWidth, newHeight);
+                    // Mark swapchain dirty so it gets recreated at the correct size
+                    if (window->getVkContext()) {
+                        window->getVkContext()->markSwapchainDirty();
+                    }
+                    // Vulkan viewport set in command buffer, not globally
+                    if (renderer && renderer->getCamera() && newHeight > 0) {
+                        renderer->getCamera()->setAspectRatio(static_cast<float>(newWidth) / newHeight);
+                    }
+                    // Notify addons so UI layouts can adapt to the new size
+                    if (addonManager_)
+                        addonManager_->fireEvent("DISPLAY_SIZE_CHANGED");
+                }
+                // Sound in Background. Off in the real client and off here:
+                // losing the window silences the client rather than playing
+                // on behind whatever the player switched to. Read at the
+                // moment focus changes, so clearing the box takes effect on
+                // the next alt-tab and not the next restart.
+                else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST ||
+                         event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+                    const bool focused =
+                        (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED);
+                    const bool playInBackground =
+                        addons::storedCVarValue("Sound_EnableSoundWhenGameIsInBG", "0") != "0";
+                    audio::AudioEngine::instance().setSuspended(!focused && !playInBackground);
+                }
+            }
+            // Typed text, when an addon's edit box is listening for it.
+            else if (event.type == SDL_TEXTINPUT) {
+                if (addonManager_ && addonsLoaded_) {
+                    if (auto* engine = addonManager_->getLuaEngine();
+                        engine && engine->editBoxHasFocus()) {
+                        engine->dispatchText(event.text.text);
+                    }
+                }
+            }
+            // Debug controls
+            else if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+                // Shift, control and alt announce themselves. The interface
+                // watches these to swap what a tooltip shows and what a
+                // click will do - item comparison appears on shift, and an
+                // action button's self-cast indicator on alt. Four frames
+                // listen and none had ever been told.
+                if (addonManager_ && addonsLoaded_) {
+                    const char* modName = nullptr;
+                    switch (event.key.keysym.sym) {
+                        case SDLK_LSHIFT: modName = "LSHIFT"; break;
+                        case SDLK_RSHIFT: modName = "RSHIFT"; break;
+                        case SDLK_LCTRL:  modName = "LCTRL";  break;
+                        case SDLK_RCTRL:  modName = "RCTRL";  break;
+                        case SDLK_LALT:   modName = "LALT";   break;
+                        case SDLK_RALT:   modName = "RALT";   break;
+                        default: break;
+                    }
+                    // Repeats are not changes: holding shift sends a stream
+                    // of key-downs and the interface would rebuild every
+                    // tooltip in the game for each one.
+                    if (modName && event.key.repeat == 0) {
+                        addonManager_->fireEvent(
+                            "MODIFIER_STATE_CHANGED",
+                            {modName, event.type == SDL_KEYDOWN ? "1" : "0"});
+                    }
+                }
+            }
+            if (event.type == SDL_KEYDOWN) {
+                // An addon's edit box takes the keystroke before anything
+                // else looks at it. Otherwise typing into one would also
+                // walk the character, and backspace would trip a keybind.
+                if (addonManager_ && addonsLoaded_) {
+                    if (auto* engine = addonManager_->getLuaEngine();
+                        engine && engine->editBoxHasFocus()) {
+                        const bool ctrl =
+                            (event.key.keysym.mod & KMOD_CTRL) != 0;
+                        // Said before the dispatch, because dispatching is
+                        // what lets go of the focus that the check above
+                        // just used - ask afterwards and the box no longer
+                        // admits to having taken anything.
+                        //
+                        // Only the three that let go. Every other key
+                        // leaves the box focused, so the poll's own typing
+                        // guard still answers for them.
+                        switch (event.key.keysym.sym) {
+                            case SDLK_ESCAPE:
+                                ui::noteInterfaceConsumedKey(ImGuiKey_Escape);
+                                // The first of the three ways a press ends
+                                // early, and the correct one: an edit box
+                                // had the keyboard, so Escape closed the
+                                // box and means nothing further. WoW stops
+                                // here too.
+                                LOG_WARNING("Escape: taken in the pump by a "
+                                            "focused edit box; it closes the "
+                                            "box and stops");
+                                break;
+                            case SDLK_RETURN:
+                            case SDLK_KP_ENTER:
+                                ui::noteInterfaceConsumedKey(ImGuiKey_Enter);
+                                break;
+                            case SDLK_TAB:
+                                ui::noteInterfaceConsumedKey(ImGuiKey_Tab);
+                                break;
+                            default: break;
+                        }
+                        engine->dispatchKey(event.key.keysym.sym, ctrl);
+                        continue;
+                    }
+                    // No edit box, but a dialog may still be listening -
+                    // the colour picker, the stack splitter, the coin
+                    // pickup. The key is only swallowed when one of them
+                    // actually takes it, so with nothing up the movement
+                    // keys and every binding carry on exactly as before.
+                    if (auto* engine = addonManager_->getLuaEngine()) {
+                        if (engine->dispatchFrameKey(event.key.keysym.sym, true)) {
+                            // Escape says so, because "Escape does nothing"
+                            // is a live report and this is one of the three
+                            // ways the press can end before the chain that
+                            // decides what it means ever runs. At warning:
+                            // the default log carries nothing else, so an
+                            // info line here is a line nobody will ever
+                            // see. See the pair in GameScreen.
+                            if (event.key.keysym.sym == SDLK_ESCAPE) {
+                                LOG_WARNING("Escape: taken in the pump by a "
+                                            "frame listening for keys; the "
+                                            "chain below never runs");
+                            }
+                            continue;
+                        }
+                    }
+                    // Then whatever the interface has bound to the key.
+                    //
+                    // Last of the three, because a focused edit box and an
+                    // open dialog both outrank a binding - which is WoW's
+                    // order too. It declines for anything this client
+                    // performs itself, so the keys that already work are
+                    // untouched; what it adds is every command the client
+                    // has no path for, which until now could be bound in
+                    // the interface's own key-binding panel and then never
+                    // honoured by any press.
+                    if (auto* engine = addonManager_->getLuaEngine()) {
+                        const SDL_Keymod mods = SDL_GetModState();
+                        if (engine->dispatchBindingKey(
+                                event.key.keysym.sym,
+                                (mods & KMOD_SHIFT) != 0,
+                                (mods & KMOD_CTRL) != 0,
+                                (mods & KMOD_ALT) != 0, true)) {
+                            // The fourth way a press can end in the pump - an
+                            // interface key binding claimed it - which had no
+                            // line. For the DEFAULT Escape this does not fire:
+                            // Escape binds to TOGGLEGAMEMENU, which
+                            // clientActsOnBinding lists, so dispatchBindingKey
+                            // yields (returns false) and the poll chain below
+                            // runs. It fires only if Escape has been rebound to
+                            // a FrameXML command a binding script handles - in
+                            // which case *that* is why the game menu never
+                            // opens, and this line names it. So it is a real
+                            // signal for a rebound Escape, not the default one.
+                            if (event.key.keysym.sym == SDLK_ESCAPE) {
+                                LOG_WARNING("Escape: taken in the pump by an "
+                                            "interface key binding (rebound off "
+                                            "TOGGLEGAMEMENU); the game-menu chain "
+                                            "never runs");
+                            }
+                            continue;
+                        }
+                    }
+                }
+                // The third way, and the ordinary one: nothing in the
+                // interface wanted it, so the poll further down decides.
+                // Said as well as the other two, because the whole value of
+                // these lines is that exactly one of them appears per
+                // press - silence would mean the key never arrived at all,
+                // and that is a different fault in a different place.
+                if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    LOG_WARNING("Escape: through the pump untaken; the chain "
+                                "below decides");
+                }
+                // Skip non-function-key input when UI (chat) has keyboard focus
+                bool uiHasKeyboard = ImGui::GetIO().WantCaptureKeyboard ||
+                                     ui::interfaceTakingTypedInput();
+                auto sc = event.key.keysym.scancode;
+                bool isFKey = (sc >= SDL_SCANCODE_F1 && sc <= SDL_SCANCODE_F12);
+                if (uiHasKeyboard && !isFKey) {
+                    continue;  // Let ImGui handle the keystroke
+                }
 
-            // Pace from the start of the frame we just completed. Using deltaTime
-            // here measured the previous frame, and relying only on FIFO present
-            // still allowed the main thread to saturate a core on high-refresh or
-            // compositor-managed displays. VSync defaults to a conservative 60 Hz;
-            // disabling it retains the existing 240 Hz ceiling.
-            const auto targetFrame = window->isVsyncEnabled()
-                ? std::chrono::microseconds(16667)
-                : std::chrono::microseconds(4167);
-            const auto deadline = frameStart + targetFrame;
-            const auto now = std::chrono::steady_clock::now();
-            if (now < deadline) {
-                std::this_thread::sleep_until(deadline);
+                // The development keys are not built into a release.
+                //
+                // They are not bindings the player chose and not anything
+                // the interface knows about, so a stray F-key silently
+                // changing how the world is drawn is a bug report about
+                // rendering rather than about a keystroke. Independent ifs
+                // rather than a chain, so either can be compiled out on its
+                // own; the scancodes are mutually exclusive anyway.
+#ifndef NDEBUG
+                // F1: Toggle performance HUD
+                if (event.key.keysym.scancode == SDL_SCANCODE_F1) {
+                    if (renderer && renderer->getPerformanceHUD()) {
+                        renderer->getPerformanceHUD()->toggle();
+                        bool enabled = renderer->getPerformanceHUD()->isEnabled();
+                        LOG_INFO("Performance HUD: ", enabled ? "ON" : "OFF");
+                    }
+                }
+                // No F4 shadow toggle.
+                //
+                // setShadowsEnabled ignores what it is passed and holds
+                // shadows on, because turning them off loses the device -
+                // which is why the settings panel has no control for it
+                // either. So the key did nothing, and said the opposite in
+                // the log every time: it read the flag back to decide what
+                // to print, the flag never moved, and every press logged
+                // "Shadows: OFF" while they stayed on.
+#endif
+                // F8: Debug WMO floor at current position
+                if (event.key.keysym.scancode == SDL_SCANCODE_F8 && event.key.repeat == 0) {
+                    if (renderer && renderer->getWMORenderer()) {
+                        glm::vec3 pos = renderer->getCharacterPosition();
+                        LOG_WARNING("F8: WMO floor debug at render pos (", pos.x, ", ", pos.y, ", ", pos.z, ")");
+                        renderer->getWMORenderer()->debugDumpGroupsAtPosition(pos.x, pos.y, pos.z);
+                    }
+                }
             }
         }
-    } catch (...) {
-        watchdogRunning.store(false, std::memory_order_release);
-        if (watchdogThread.joinable()) {
-            watchdogThread.join();
-        }
-        throw;
-    }
 
-    watchdogRunning.store(false, std::memory_order_release);
-    if (watchdogThread.joinable()) {
-        watchdogThread.join();
+        if (window->shouldClose()) {
+            break;
+        }
+
+        // Update input
+        Input::getInstance().update();
+
+        // Update application state
+        try {
+            FrameMark;
+            update(deltaTime);
+        } catch (const std::bad_alloc& e) {
+            LOG_ERROR("OOM during Application::update (state=", static_cast<int>(state),
+                      ", dt=", deltaTime, "): ", e.what());
+            throw;
+        } catch (const std::exception& e) {
+            LOG_ERROR("Exception during Application::update (state=", static_cast<int>(state),
+                      ", dt=", deltaTime, "): ", e.what());
+            throw;
+        }
+        if (window->shouldClose()) {
+            break;
+        }
+        // Render
+        try {
+            render();
+        } catch (const std::bad_alloc& e) {
+            LOG_ERROR("OOM during Application::render (state=", static_cast<int>(state), "): ", e.what());
+            throw;
+        } catch (const std::exception& e) {
+            LOG_ERROR("Exception during Application::render (state=", static_cast<int>(state), "): ", e.what());
+            throw;
+        }
+        // Swap buffers
+        try {
+            window->swapBuffers();
+        } catch (const std::bad_alloc& e) {
+            LOG_ERROR("OOM during swapBuffers: ", e.what());
+            throw;
+        } catch (const std::exception& e) {
+            LOG_ERROR("Exception during swapBuffers: ", e.what());
+            throw;
+        }
+
+        processDeferredLogoutToLogin();
+
+        // Exit gracefully on GPU device lost (unrecoverable)
+        if (renderer && renderer->getVkContext() && renderer->getVkContext()->isDeviceLost()) {
+            LOG_ERROR("GPU device lost - exiting application");
+            window->setShouldClose(true);
+        }
+
+        // Pace from the start of the frame we just completed. Using deltaTime
+        // here measured the previous frame, and relying only on FIFO present
+        // still allowed the main thread to saturate a core on high-refresh or
+        // compositor-managed displays. VSync defaults to a conservative 60 Hz;
+        // disabling it retains the existing 240 Hz ceiling.
+        const auto targetFrame = window->isVsyncEnabled()
+            ? std::chrono::microseconds(16667)
+            : std::chrono::microseconds(4167);
+        const auto deadline = frameStart + targetFrame;
+        const auto now = std::chrono::steady_clock::now();
+        if (now < deadline) {
+            std::this_thread::sleep_until(deadline);
+        }
     }
 
     LOG_INFO("Main loop ended");
