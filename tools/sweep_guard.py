@@ -1055,6 +1055,15 @@ SENTENCES = [
     ("persisted_but_unread_check.py",
      "is read by something that uses it",
      "a setting kept in the config file that nothing acts on"),
+    # The apply-once latches. A saved setting reaches its subsystem on the first
+    # frame that subsystem exists, and a bool remembers that it has. Latching as
+    # soon as the *outer* thing existed is how gamma came to be read from the
+    # file and handed to nothing - the pipeline is built after the renderer, and
+    # the latch only waited for the renderer. Canaried by hoisting one
+    # assignment out of its guard.
+    ("startup_latch_check.py",
+     "is set inside the test for the thing it applies to",
+     "a saved setting marked delivered on a frame where nothing took it"),
     # What this client draws itself, scaled to the screen. Four things pick a
     # default from the height and they have to pick the same, or neighbouring
     # parts of one HUD come up at different sizes - the buff bar was at 2.0 on a
