@@ -3377,7 +3377,17 @@ void registerQuestLuaAPI(lua_State* L) {
             if (!gh) return luaReturnNil(L);
             const auto* rec = tradeSkillRecipeAt(tradeSkillRows(gh), i);
             if (!rec) return luaReturnNil(L);
-            const std::string icon = gh->getSpellIconPath(rec->spellId);
+            // What the recipe makes, which is what this returns in WoW. A
+            // recipe spell carries its profession's icon rather than its
+            // product's - every tailoring spell in the shipped Spell.dbc is
+            // Ability_Ensnare - so the pane showed the same picture beside
+            // every recipe. The spell's icon is the fallback for a recipe
+            // whose item has not been answered for yet.
+            std::string icon;
+            if (const auto* made = craftedItem(gh, rec->spellId)) {
+                if (made->displayInfoId) icon = gh->getItemIconPath(made->displayInfoId);
+            }
+            if (icon.empty()) icon = gh->getSpellIconPath(rec->spellId);
             lua_pushstring(L, icon.empty()
                 ? "Interface\\Icons\\INV_Misc_QuestionMark" : icon.c_str());
             return 1;
