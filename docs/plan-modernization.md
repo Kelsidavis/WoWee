@@ -1,6 +1,6 @@
 # Codebase Modernization — Phased Plan
 
-**Status:** Phases 0–2 complete (Phase 2 cancelled on evidence). Next: Phase 3 (`std::span`).
+**Status:** Phases 0–3 complete. Next: Phase 4 (`std::format` for 507 `snprintf` sites).
 **Branch:** `master`. Phase 1 was done on `chore/modernization` and pushed to `master` as
 `7b9d4a93d..2b5628a0f`; later phases continue directly on `master`.
 **Scope:** code quality and modernity, codebase-wide. Not a performance effort. Where a phase
@@ -149,6 +149,17 @@ corruption, not a crash.
 
 **Exit:** `span` uses up from 2 to real coverage across parsing; `reinterpret_cast` count down; a
 test added that feeds a truncated buffer to a parser and expects clean rejection.
+
+**Done for the parsers that read untrusted files** (`adt_loader`, `blp_loader`). The rest of the
+codebase's `(ptr, len)` pairs are crypto and socket wrappers where the length comes from a buffer
+the caller already owns — converting those is cosmetic, and the plan's own "safety before
+elegance" rule says leave them. `wmo_loader` and `m2_loader` were audited and are already
+defensive at the read primitive; only their chunk-bounds arithmetic needed widening.
+
+Note the survey pattern that nearly wasted a session: grepping for
+`uint8_t\s*\*\s*\w+,\s*size_t` matched `const char* name, uint32_t bit` in a dozen
+`wowee_*.cpp` files — lambda parameters, not buffers. Tighten the pattern to require a
+length-shaped name (`len|size|length|count`) before believing a count.
 
 ### Phase 4 — `std::format` for the 507 `snprintf` sites
 Each `char buf[N]` + `snprintf` is a truncation and type-safety hazard. `std::format` makes both
@@ -316,3 +327,30 @@ Written down so they are not re-proposed every time someone reads a blog post.
     built uninstrumented and reported as passing. Any CMake loop over a list that is still being
     appended to belongs at the end of the file — the same positional bug could recur with any
     future `foreach` over that list.
+
+- **Phase 3** — `std::span` across the untrusted-file parsers. Done: `8baa3c457` (ADT),
+  `b6d5206c8` (sanitizer coverage + ADT test), `8fb5f5e58` (BLP), `90f5ba7ca` (WMO widening).
+
+  Three real out-of-bounds reads, all reachable from game data on disk:
+  - **ADT / MCAL.** `sizeAlpha - skip` with `sizeAlpha` known only to be >= 1 and `skip` 8 — a
+    four-byte chunk spelling `MCAL` wrapped it to 4294967292, which became a memcpy length.
+  - **BLP / decompressors.** Source length derived from width and height rather than from the mip
+    actually supplied; 4096x4096 DXT1 with an 8-byte mip read 2 MB from an 8-byte buffer. The
+    call site carried a comment claiming the decompressors bounded themselves — they bounded the
+    destination only.
+  - **BLP / mip offset.** `offset + mipSize > size` with both `uint32_t` from the file:
+    `0xFFFFFF00 + 0x200` is `0x100` and passed.
+
+  The shape is identical every time: **a length that comes from the file, arithmetic on it that
+  can wrap, and the guard placed at the call site rather than where the read happens.** That is
+  what `span` fixes — the bound travels with the pointer, so the callee can enforce it.
+
+  Method, which cost more than the fixes: **a robustness test you have not watched fail is not
+  evidence.** The ADT test passed twice with the bug deliberately reintroduced — first because an
+  out-of-bounds read is invisible without ASAN, then because the test used `0x28`/`0x2C` for
+  offsets the parser reads at decimal 36/40, so it built a well-formed chunk that never entered
+  the branch. Every fix here was verified by reverting it and confirming ASAN reports
+  `heap-buffer-overflow` or `BUS` first.
+
+  Full suite under ASAN with all 156 targets genuinely instrumented: **157/157 clean.** The 77
+  targets the sanitizer had been skipping hide no further bugs.
