@@ -8,8 +8,8 @@ namespace wowee {
 namespace game {
 
 WardenCrypto::WardenCrypto()
-    : initialized_(false)
-    , decryptRC4_i_(0)
+    : 
+     decryptRC4_i_(0)
     , decryptRC4_j_(0)
     , encryptRC4_i_(0)
     , encryptRC4_j_(0) {

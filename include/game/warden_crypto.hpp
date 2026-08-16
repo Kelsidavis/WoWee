@@ -41,7 +41,7 @@ public:
     bool isInitialized() const { return initialized_; }
 
 private:
-    bool initialized_;
+    bool initialized_ = false;
 
     // RC4 state for decrypting incoming packets (server->client)
     std::vector<uint8_t> decryptRC4State_;

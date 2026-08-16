@@ -24,8 +24,8 @@ constexpr uint32_t HEAP_SIZE  = 0x01000000;  // 16MB heap
 constexpr uint32_t API_STUB_BASE = 0x70000000; // API stub area (high memory)
 
 WardenEmulator::WardenEmulator()
-    : uc_(nullptr)
-    , moduleBase_(0)
+    : 
+     moduleBase_(0)
     , moduleSize_(0)
     , stackBase_(STACK_BASE)
     , stackSize_(STACK_SIZE)
@@ -33,8 +33,8 @@ WardenEmulator::WardenEmulator()
     , heapSize_(HEAP_SIZE)
     , apiStubBase_(API_STUB_BASE)
     , nextApiStubAddr_(API_STUB_BASE)
-    , apiCodeHookRegistered_(false)
-    , nextHeapAddr_(HEAP_BASE)
+    , 
+     nextHeapAddr_(HEAP_BASE)
 {
 }
 

@@ -18,9 +18,9 @@ struct TerrainVertex {
     float normal[3];       // Normal vector
     float texCoord[2];     // Base texture coordinates
     float layerUV[2];      // Layer texture coordinates
-    uint8_t chunkIndex;    // Which chunk this vertex belongs to
+    uint8_t chunkIndex = 0;    // Which chunk this vertex belongs to
 
-    TerrainVertex() : chunkIndex(0) {
+    TerrainVertex()  {
         position[0] = position[1] = position[2] = 0.0f;
         normal[0] = normal[1] = normal[2] = 0.0f;
         texCoord[0] = texCoord[1] = 0.0f;

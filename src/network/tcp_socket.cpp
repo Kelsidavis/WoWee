@@ -230,10 +230,9 @@ size_t TCPSocket::getExpectedPacketSize(uint8_t opcode) {
                         }
                     }
                     return 0;  // Need more data
-                } else {
-                    // Failure - just opcode + unknown + status
+                }                     // Failure - just opcode + unknown + status
                     return 3;
-                }
+               
             }
             return 0;  // Need more data to determine
 
@@ -250,10 +249,9 @@ size_t TCPSocket::getExpectedPacketSize(uint8_t opcode) {
                     if (receiveBuffer.size() >= 28) return 28;
                     if (receiveBuffer.size() >= 26) return 26;
                     return 0;
-                } else {
-                    // Consume up to 4 bytes if available, minimum 2
+                }                     // Consume up to 4 bytes if available, minimum 2
                     return (receiveBuffer.size() >= 4) ? 4 : 2;
-                }
+               
             }
             return 0;  // Need more data
 

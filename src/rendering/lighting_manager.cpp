@@ -651,7 +651,7 @@ uint32_t LightingManager::selectLightParamsId(const LightVolume* volume, bool is
     // Select appropriate LightParams based on conditions
     if (isUnderwater && volume->lightParamsIdUnderwater != 0) {
         return volume->lightParamsIdUnderwater;
-    } else if (isRaining && volume->lightParamsIdRain != 0) {
+    } if (isRaining && volume->lightParamsIdRain != 0) {
         return volume->lightParamsIdRain;
     } else {
         return volume->lightParamsId;

@@ -209,7 +209,7 @@ MountFSM::Output MountFSM::evaluate(const Input& in) {
                 out.mountBob = std::sin(norm * core::coords::TWO_PI) * 0.12f;
             }
             return out;
-        } else if (!in.moving && anims_.rearUp > 0) {
+        } if (!in.moving && anims_.rearUp > 0) {
             action_ = MountAction::RearUp;
             actionPhase_ = 0;
             actionAnimId_ = anims_.rearUp;

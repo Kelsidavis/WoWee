@@ -366,7 +366,7 @@ public:
                 ctx.gameHandler.addLocalChatMessage(msg);
             }
             return {};
-        } else if (sub == "leave") {
+        } if (sub == "leave") {
             if (ctx.gameHandler.isOnTransport()) {
                 ctx.gameHandler.clearPlayerTransport();
                 game::MessageChatData msg;

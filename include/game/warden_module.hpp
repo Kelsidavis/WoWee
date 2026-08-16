@@ -135,7 +135,7 @@ public:
     void setCallbackDependencies(WardenCrypto* crypto, SendPacketFunc sendFunc);
 
 private:
-    bool loaded_;                          // Module successfully loaded
+    bool loaded_ = false;                          // Module successfully loaded
     // False when the module did not unpack into a real code image - typically because
     // the server sent something other than a genuine Blizzard Warden module, which is
     // normal on private servers. Running the emulator over that image just executes
@@ -147,7 +147,7 @@ private:
     std::vector<uint8_t> decompressedData_; // zlib decompressed data
 
     // Module execution context
-    void* moduleMemory_;                   // Allocated executable memory region
+    void* moduleMemory_ = nullptr;                   // Allocated executable memory region
     size_t moduleSize_;                    // Size of loaded code
     uint32_t moduleBase_;                  // Module base address (for emulator)
     size_t relocDataOffset_ = 0;           // Offset into decompressedData_ where relocation data starts

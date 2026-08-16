@@ -169,7 +169,7 @@ void KeybindingManager::loadFromConfigFile(const std::string& filePath) {
         if (line == "[Keybindings]") {
             inKeybindingsSection = true;
             continue;
-        } else if (line[0] == '[') {
+        } if (line[0] == '[') {
             inKeybindingsSection = false;
             continue;
         }
@@ -274,7 +274,7 @@ void KeybindingManager::saveToConfigFile(const std::string& filePath) const {
             if (line == "[Keybindings]") {
                 inKeybindingsSection = true;
                 continue;
-            } else if (line[0] == '[') {
+            } if (line[0] == '[') {
                 inKeybindingsSection = false;
             }
 

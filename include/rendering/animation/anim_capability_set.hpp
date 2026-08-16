@@ -124,23 +124,21 @@ struct AnimCapabilitySet {
     uint32_t resolvedLoot = 0;
 
     // ── Capability flags (bitfield) ─────────────────────────────────────
-    bool hasStand : 1;
-    bool hasWalk : 1;
-    bool hasRun : 1;
-    bool hasSprint : 1;
-    bool hasWalkBackwards : 1;
-    bool hasJump : 1;
-    bool hasSwim : 1;
-    bool hasMelee : 1;
-    bool hasStealth : 1;
-    bool hasDeath : 1;
-    bool hasMount : 1;
+    bool hasStand : 1 = false;
+    bool hasWalk : 1 = false;
+    bool hasRun : 1 = false;
+    bool hasSprint : 1 = false;
+    bool hasWalkBackwards : 1 = false;
+    bool hasJump : 1 = false;
+    bool hasSwim : 1 = false;
+    bool hasMelee : 1 = false;
+    bool hasStealth : 1 = false;
+    bool hasDeath : 1 = false;
+    bool hasMount : 1 = false;
 
     // Default-initialize all flags to false
     AnimCapabilitySet()
-        : hasStand(false), hasWalk(false), hasRun(false), hasSprint(false),
-          hasWalkBackwards(false), hasJump(false), hasSwim(false),
-          hasMelee(false), hasStealth(false), hasDeath(false), hasMount(false) {}
+         {}
 };
 
 } // namespace rendering

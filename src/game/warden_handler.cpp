@@ -523,9 +523,8 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
 
                     wardenState_ = WardenState::WAIT_CHECKS;
                     break;
-                } else {
-                    LOG_DEBUG("Warden: Seed not found in ", wardenCREntries_.size(), " CR entries");
-                }
+                }                     LOG_DEBUG("Warden: Seed not found in ", wardenCREntries_.size(), " CR entries");
+               
             }
 
             // --- No CR match: decide strategy based on server strictness ---

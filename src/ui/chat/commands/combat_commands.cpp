@@ -292,7 +292,7 @@ public:
                 if (bagNum == 0) {
                     ctx.gameHandler.useItemBySlot(slotNum - 1, true);
                     return {};
-                } else if (bagNum >= 1 && bagNum <= game::Inventory::NUM_BAG_SLOTS) {
+                } if (bagNum >= 1 && bagNum <= game::Inventory::NUM_BAG_SLOTS) {
                     ctx.gameHandler.useItemInBag(bagNum - 1, slotNum - 1, true);
                     return {};
                 }

@@ -392,12 +392,11 @@ std::string EmoteRegistry::textByDbcId(uint32_t dbcId,
             return out;
         }
         return senderName + " " + info.command + "s at " + *targetName + ".";
-    } else {
-        if (!info.othersNoTarget.empty()) {
+    }         if (!info.othersNoTarget.empty()) {
             return replacePlaceholders(info.othersNoTarget, &senderName);
         }
         return senderName + " " + info.command + "s.";
-    }
+   
 }
 
 } // namespace rendering

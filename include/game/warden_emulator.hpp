@@ -137,7 +137,7 @@ public:
     uint32_t getAPIAddress(const std::string& dllName, const std::string& funcName) const;
 
 private:
-    uc_engine* uc_;                  // Unicorn engine instance
+    uc_engine* uc_ = nullptr;                  // Unicorn engine instance
     uint32_t moduleBase_;            // Module base address
     uint32_t moduleSize_;            // Module size
     uint32_t stackBase_;             // Stack base address
@@ -156,7 +156,7 @@ private:
     };
     std::unordered_map<uint32_t, ApiHookEntry> apiHandlers_;
     uint32_t nextApiStubAddr_;   // tracks next free stub slot (replaces static local)
-    bool apiCodeHookRegistered_; // true once UC_HOOK_CODE for stub range is added
+    bool apiCodeHookRegistered_ = false; // true once UC_HOOK_CODE for stub range is added
 
     // Memory allocation tracking
     std::unordered_map<uint32_t, size_t> allocations_;

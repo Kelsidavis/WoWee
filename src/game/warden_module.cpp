@@ -45,9 +45,8 @@ void WardenModule::setCallbackDependencies(WardenCrypto* crypto, SendPacketFunc 
 }
 
 WardenModule::WardenModule()
-    : loaded_(false)
-    , moduleMemory_(nullptr)
-    , moduleSize_(0)
+    : 
+     moduleSize_(0)
     // 0x400000 is the default PE image base for 32-bit Windows executables.
     // Warden modules are loaded as if they were PE DLLs at this base address.
     , moduleBase_(0x400000)

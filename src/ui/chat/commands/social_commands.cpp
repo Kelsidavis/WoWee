@@ -44,7 +44,7 @@ public:
                 if (subCmd == "add") {
                     ctx.gameHandler.addFriend(ctx.args.substr(subCmdSpace + 1));
                     return {};
-                } else if (subCmd == "remove" || subCmd == "delete" || subCmd == "rem") {
+                } if (subCmd == "remove" || subCmd == "delete" || subCmd == "rem") {
                     ctx.gameHandler.removeFriend(ctx.args.substr(subCmdSpace + 1));
                     return {};
                 }

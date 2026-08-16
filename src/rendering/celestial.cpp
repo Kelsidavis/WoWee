@@ -301,7 +301,7 @@ glm::vec3 Celestial::getMoonPosition(float timeOfDay) const {
 glm::vec3 Celestial::getSunColor(float timeOfDay) const {
     if (timeOfDay >= 5.0f && timeOfDay < 7.0f) {
         return glm::vec3(1.0f, 0.6f, 0.2f); // Sunrise orange
-    } else if (timeOfDay >= 7.0f && timeOfDay < 9.0f) {
+    } if (timeOfDay >= 7.0f && timeOfDay < 9.0f) {
         float t = (timeOfDay - 7.0f) / 2.0f;
         return glm::mix(glm::vec3(1.0f, 0.6f, 0.2f), glm::vec3(1.0f, 1.0f, 0.9f), t);
     } else if (timeOfDay >= 9.0f && timeOfDay < 16.0f) {
@@ -317,7 +317,7 @@ glm::vec3 Celestial::getSunColor(float timeOfDay) const {
 float Celestial::getSunIntensity(float timeOfDay) const {
     if (timeOfDay >= 5.0f && timeOfDay < 6.0f) {
         return timeOfDay - 5.0f;          // Fade in
-    } else if (timeOfDay >= 6.0f && timeOfDay < 18.0f) {
+    } if (timeOfDay >= 6.0f && timeOfDay < 18.0f) {
         return 1.0f;                       // Full day
     } else if (timeOfDay >= 18.0f && timeOfDay < 19.0f) {
         return 1.0f - (timeOfDay - 18.0f); // Fade out

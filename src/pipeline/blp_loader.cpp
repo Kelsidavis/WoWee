@@ -21,7 +21,7 @@ BLPImage BLPLoader::load(const std::vector<uint8_t>& blpData) {
     // Check magic number
     if (std::memcmp(magic, "BLP1", 4) == 0) {
         return loadBLP1(blpData);
-    } else if (std::memcmp(magic, "BLP2", 4) == 0) {
+    } if (std::memcmp(magic, "BLP2", 4) == 0) {
         return loadBLP2(blpData);
     } else if (std::memcmp(magic, "BLP0", 4) == 0) {
         LOG_WARNING("BLP0 format not fully supported");

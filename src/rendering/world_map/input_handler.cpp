@@ -27,7 +27,7 @@ InputResult InputHandler::process(ViewLevel currentLevel,
     if (wheelDelta > 0.0f) {
         result.action = InputAction::ZOOM_IN;
         return result;
-    } else if (wheelDelta < 0.0f) {
+    } if (wheelDelta < 0.0f) {
         result.action = InputAction::ZOOM_OUT;
         return result;
     }
