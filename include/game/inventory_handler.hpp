@@ -512,6 +512,8 @@ public:
     ItemDef buildItemDef(uint32_t entry, uint32_t stackCount, uint32_t curDur, uint32_t maxDur, uint64_t guid,
                          uint32_t flags = 0, int32_t randomPropertyId = 0, uint32_t suffixFactor = 0);
     void rebuildOnlineInventory();
+    /// Announce the bank slots that moved, once their items are current.
+    void fireBankSlotEvents();
     void maybeDetectVisibleItemLayout();
     void updateOtherPlayerVisibleItems(uint64_t guid, const FlatFieldMap& fields);
     void cacheInspectedPlayerEquipment(uint64_t guid, const std::array<uint32_t, 19>& itemEntries);
@@ -696,6 +698,13 @@ private:
     uint64_t bankerGuid_ = 0;
     std::array<uint64_t, 28> bankSlotGuids_{};
     std::array<uint64_t, 7> bankBagSlotGuids_{};
+    /// Bank slots whose guid changed, waiting for the rebuild to catch up.
+    ///
+    /// The fields say what moved; rebuildOnlineInventory is what turns them
+    /// into the items the bank frame draws, and it runs after this. Announcing
+    /// a slot before then redraws it from what it held a moment ago, and
+    /// nothing announces it again - see fireBankSlotEvents.
+    std::vector<int> pendingBankSlotEvents_;
     int effectiveBankSlots_ = 28;
     int effectiveBankBagSlots_ = 7;
 

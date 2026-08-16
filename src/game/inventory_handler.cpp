@@ -4471,10 +4471,13 @@ bool InventoryHandler::applyInventoryFields(const FlatFieldMap& fields) {
     }
 
     if (buybackSlotsChanged) reconcileBuybackSlots();
-    for (int slot : changedBankSlots) {
-        if (owner_.addonEventCallbackRef())
-            owner_.addonEventCallbackRef()("PLAYERBANKSLOTS_CHANGED", {std::to_string(slot)});
-    }
+    // Held rather than announced. The bank frame redraws a slot by asking what
+    // that slot holds, and what it holds is written by rebuildOnlineInventory,
+    // which runs after this returns - so announcing here redrew the slot from
+    // the item that had just left it, and nothing said so again. The item
+    // stayed on screen until the bank was closed and opened.
+    pendingBankSlotEvents_.insert(pendingBankSlotEvents_.end(),
+                                  changedBankSlots.begin(), changedBankSlots.end());
 
 
     return slotsChanged;
@@ -4885,6 +4888,22 @@ void InventoryHandler::rebuildOnlineInventory() {
         }
     }
     owner_.reconcileQuestItemObjectives(carriedCounts);
+    // Last, with the slots holding what they now hold.
+    fireBankSlotEvents();
+}
+
+void InventoryHandler::fireBankSlotEvents() {
+    if (pendingBankSlotEvents_.empty()) return;
+    // Moved out first: the frame redraws from inside this, and a slot that
+    // changes again while it does must queue rather than be dropped.
+    std::vector<int> slots;
+    slots.swap(pendingBankSlotEvents_);
+    std::sort(slots.begin(), slots.end());
+    slots.erase(std::unique(slots.begin(), slots.end()), slots.end());
+    if (!owner_.addonEventCallbackRef()) return;
+    for (int slot : slots) {
+        owner_.addonEventCallbackRef()("PLAYERBANKSLOTS_CHANGED", {std::to_string(slot)});
+    }
 }
 
 void InventoryHandler::maybeDetectVisibleItemLayout() {
