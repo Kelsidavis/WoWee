@@ -821,6 +821,23 @@ target_link_libraries(test_blp_loader PRIVATE catch2_main)
 add_test(NAME blp_loader COMMAND test_blp_loader)
 register_test_target(test_blp_loader)
 
+# ── test_blp_alpha_scan ──────────────────────────────────────
+# M2 textures were decoded to RGBA8 so something could walk every fourth byte
+# and learn whether the texture had any transparency. The block scan that
+# replaced it has to answer the same, on real files rather than on the cases
+# someone thought to write down.
+add_executable(test_blp_alpha_scan
+    test_blp_alpha_scan.cpp
+    ${TEST_COMMON_SOURCES}
+    ${CMAKE_SOURCE_DIR}/src/pipeline/blp_loader.cpp
+)
+target_include_directories(test_blp_alpha_scan PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_blp_alpha_scan SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
+target_compile_definitions(test_blp_alpha_scan PRIVATE WOWEE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(test_blp_alpha_scan PRIVATE catch2_main)
+add_test(NAME blp_alpha_scan COMMAND test_blp_alpha_scan)
+register_test_target(test_blp_alpha_scan)
+
 # ── test_frustum ─────────────────────────────────────────────
 wowee_add_test(test_frustum
     SOURCES test_frustum.cpp

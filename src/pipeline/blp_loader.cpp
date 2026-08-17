@@ -9,6 +9,85 @@
 namespace wowee {
 namespace pipeline {
 
+bool BLPImage::hasTransparency() const {
+    if (!isBlockCompressed()) {
+        for (size_t i = 3; i < data.size(); i += 4) {
+            if (data[i] != 255) return true;
+        }
+        return false;
+    }
+    if (mipmaps.empty()) return false;
+
+    // Level 0 only: a mip chain is a filtered copy of it, so a level cannot
+    // introduce transparency the base does not have.
+    const std::vector<uint8_t>& blocks = mipmaps[0];
+
+    if (compression == BLPCompression::DXT1) {
+        // Eight bytes per block. Transparency exists only in the punch-through
+        // mode, and only where a pixel actually selects index 3.
+        for (size_t at = 0; at + 8 <= blocks.size(); at += 8) {
+            const DxtColorBlock block = decodeDxtColorBlock(&blocks[at], true);
+            if (!block.index3IsTransparent) continue;
+            for (int py = 0; py < 4; ++py) {
+                for (int px = 0; px < 4; ++px) {
+                    if (block.indexAt(px, py) == 3) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    if (compression == BLPCompression::DXT3) {
+        // Sixteen bytes per block, the first eight being one 4-bit alpha per
+        // texel. Anything but 0xF is not fully opaque.
+        for (size_t at = 0; at + 16 <= blocks.size(); at += 16) {
+            for (int b = 0; b < 8; ++b) {
+                if ((blocks[at + b] & 0x0Fu) != 0x0Fu) return true;
+                if ((blocks[at + b] >> 4) != 0x0Fu) return true;
+            }
+        }
+        return false;
+    }
+
+    if (compression == BLPCompression::DXT5) {
+        // Sixteen bytes per block: two alpha endpoints, then three bits per
+        // texel selecting one of eight. Every interpolant lies between the
+        // endpoints, so two opaque endpoints make the whole block opaque and
+        // the indices need not be read.
+        for (size_t at = 0; at + 16 <= blocks.size(); at += 16) {
+            const uint8_t a0 = blocks[at];
+            const uint8_t a1 = blocks[at + 1];
+            if (a0 == 255 && a1 == 255) continue;
+
+            uint8_t palette[8] = {a0, a1};
+            if (a0 > a1) {
+                for (int i = 0; i < 6; ++i) {
+                    palette[2 + i] = static_cast<uint8_t>(((6 - i) * a0 + (1 + i) * a1) / 7);
+                }
+            } else {
+                for (int i = 0; i < 4; ++i) {
+                    palette[2 + i] = static_cast<uint8_t>(((4 - i) * a0 + (1 + i) * a1) / 5);
+                }
+                palette[6] = 0;
+                palette[7] = 255;
+            }
+
+            // Six bytes of 3-bit indices, little-endian across two 24-bit runs.
+            for (int half = 0; half < 2; ++half) {
+                uint32_t bits = static_cast<uint32_t>(blocks[at + 2 + half * 3]) |
+                                (static_cast<uint32_t>(blocks[at + 3 + half * 3]) << 8) |
+                                (static_cast<uint32_t>(blocks[at + 4 + half * 3]) << 16);
+                for (int i = 0; i < 8; ++i) {
+                    if (palette[(bits >> (i * 3)) & 0x7u] != 255) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    return false;
+}
+
 BLPImage BLPLoader::load(const std::vector<uint8_t>& blpData, bool keepCompressed) {
     if (blpData.size() < 8) {  // Minimum: magic + first field
         LOG_ERROR("BLP data too small");

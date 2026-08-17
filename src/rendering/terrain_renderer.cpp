@@ -22,23 +22,6 @@
 namespace wowee {
 namespace rendering {
 
-namespace {
-
-/// What a loaded texture will actually occupy once uploaded, which the cache
-/// budget is spent against. A block-compressed one is its own levels; a
-/// decoded one is the base plus the third that a generated mip chain adds.
-size_t approxTextureBytes(const pipeline::BLPImage& blp) {
-    if (blp.isBlockCompressed()) {
-        size_t total = 0;
-        for (const auto& level : blp.mipmaps) total += level.size();
-        return total;
-    }
-    const size_t base = static_cast<size_t>(blp.width) * static_cast<size_t>(blp.height) * 4ull;
-    return base + (base / 3);
-}
-
-} // namespace
-
 // Matches set 1 binding 7 in terrain.frag.glsl
 struct TerrainParamsUBO {
     int32_t layerCount;
@@ -619,7 +602,7 @@ VkTexture* TerrainRenderer::loadTexture(const std::string& path) {
         return whiteTexture.get();
     }
 
-    const size_t approxBytes = approxTextureBytes(blp);
+    const size_t approxBytes = blp.approxUploadBytes();
     if (textureCacheBytes_ + approxBytes > textureCacheBudgetBytes_) {
         if (textureBudgetRejectWarnings_ < 3) {
             LOG_WARNING("Terrain texture cache full (", textureCacheBytes_ / (1024 * 1024),
@@ -672,7 +655,7 @@ void TerrainRenderer::uploadPreloadedTextures(
 
         TextureCacheEntry e;
         e.texture = std::move(tex);
-        e.approxBytes = approxTextureBytes(blp);
+        e.approxBytes = blp.approxUploadBytes();
         e.lastUse = ++textureCacheCounter_;
         textureCacheBytes_ += e.approxBytes;
         textureCache[key] = std::move(e);

@@ -643,7 +643,7 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
             std::transform(texKey.begin(), texKey.end(), texKey.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
             if (pending->preloadedM2Textures.find(texKey) != pending->preloadedM2Textures.end()) continue;
-            auto blp = assetManager->loadTexture(texKey);
+            auto blp = assetManager->loadTexture(texKey, true);
             if (blp.isValid()) {
                 pending->preloadedM2Textures[texKey] = std::move(blp);
             }
@@ -845,7 +845,7 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
                                 std::transform(texKey.begin(), texKey.end(), texKey.begin(),
                                                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
                                 if (pending->preloadedM2Textures.find(texKey) != pending->preloadedM2Textures.end()) continue;
-                                auto blp = assetManager->loadTexture(texKey);
+                                auto blp = assetManager->loadTexture(texKey, true);
                                 if (blp.isValid()) {
                                     pending->preloadedM2Textures[texKey] = std::move(blp);
                                 }
@@ -960,9 +960,9 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
     // doesn't block the main thread with file I/O.
     for (const auto& texPath : pending->terrain.textures) {
         if (pending->preloadedTextures.find(texPath) != pending->preloadedTextures.end()) continue;
-        // Terrain tilesets only ever get sampled, so they stay in their
-        // blocks. The M2 preloads above and the normal-map source below do
-        // not: their consumers read the pixels.
+        // Terrain tilesets and M2 skins stay in their blocks - both are only
+        // sampled, and M2's transparency now comes from the blocks too. The
+        // normal-map source below still decodes: it reads the pixels.
         pending->preloadedTextures[texPath] = assetManager->loadTexture(texPath, true);
     }
 

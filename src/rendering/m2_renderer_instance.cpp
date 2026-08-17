@@ -621,7 +621,9 @@ VkTexture* M2Renderer::loadTexture(const std::string& path, uint32_t texFlags) {
         }
     }
     if (!blp.isValid()) {
-        blp = assetManager->loadTexture(key);
+        // M2 skins are sampled and their transparency is read from the
+        // blocks, so they need no decode.
+        blp = assetManager->loadTexture(key, true);
     }
     if (!blp.isValid()) {
         // Cache misses briefly to avoid repeated expensive MPQ/disk probes.
@@ -633,8 +635,7 @@ VkTexture* M2Renderer::loadTexture(const std::string& path, uint32_t texFlags) {
         return whiteTexture_.get();
     }
 
-    size_t base = static_cast<size_t>(blp.width) * static_cast<size_t>(blp.height) * 4ull;
-    size_t approxBytes = base + (base / 3);
+    const size_t approxBytes = blp.approxUploadBytes();
     if (textureCacheBytes_ + approxBytes > textureCacheBudgetBytes_) {
         static constexpr size_t kMaxFailedTextureCache = 200000;
         if (failedTextureCache_.size() < kMaxFailedTextureCache) {
@@ -652,18 +653,15 @@ VkTexture* M2Renderer::loadTexture(const std::string& path, uint32_t texFlags) {
         return whiteTexture_.get();
     }
 
-    // Track whether the texture actually uses alpha (any pixel with alpha < 255).
-    bool hasAlpha = false;
-    for (size_t i = 3; i < blp.data.size(); i += 4) {
-        if (blp.data[i] != 255) {
-            hasAlpha = true;
-            break;
-        }
-    }
+    // Whether the texture actually uses alpha. Reads the DXT blocks when the
+    // loader kept them, and every fourth decoded byte when it did not; the two
+    // agree, which tests/test_blp_alpha_scan.cpp checks against the assets.
+    // This was the only thing forcing M2 textures to be decoded.
+    const bool hasAlpha = blp.hasTransparency();
 
     // Create Vulkan texture
     auto tex = std::make_unique<VkTexture>();
-    tex->upload(*vkCtx_, blp.data.data(), blp.width, blp.height, VK_FORMAT_R8G8B8A8_UNORM);
+    tex->uploadBLP(*vkCtx_, blp);
 
     // M2Texture flags: bit 0 = WrapS (1=repeat, 0=clamp), bit 1 = WrapT
     VkSamplerAddressMode wrapS = (texFlags & 0x1) ? VK_SAMPLER_ADDRESS_MODE_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;

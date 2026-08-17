@@ -48,6 +48,30 @@ struct BLPImage {
     }
     /// True when mipmaps holds DXT blocks rather than data holding RGBA8.
     [[nodiscard]] bool isBlockCompressed() const { return !mipmaps.empty(); }
+
+    /// Whether any texel is less than fully opaque.
+    ///
+    /// The same question a caller used to answer by walking every fourth byte
+    /// of the decoded RGBA8, and the reason M2 textures had to be decoded at
+    /// all. Answered from the blocks instead, exactly rather than by format:
+    /// a DXT3 or DXT5 texture carries an alpha channel that may still be
+    /// opaque everywhere, and DXT1's punch-through is per block, so the format
+    /// alone would report alpha that is not there and silence an alpha test
+    /// that is currently running.
+    [[nodiscard]] bool hasTransparency() const;
+
+    /// What this will occupy once uploaded, which the texture caches spend
+    /// their budget against. Block-compressed is its own levels; decoded is
+    /// the base plus the third a generated mip chain adds.
+    [[nodiscard]] size_t approxUploadBytes() const {
+        if (isBlockCompressed()) {
+            size_t total = 0;
+            for (const auto& level : mipmaps) total += level.size();
+            return total;
+        }
+        const size_t base = static_cast<size_t>(width) * static_cast<size_t>(height) * 4ull;
+        return base + (base / 3);
+    }
 };
 
 /**
