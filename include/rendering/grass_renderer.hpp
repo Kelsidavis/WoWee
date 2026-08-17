@@ -47,7 +47,10 @@ public:
     /// Record the cull dispatch. Must run outside a render pass, before
     /// `render()` for the same frame.
     ///
-    void dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const Camera& camera);
+    /// `rangeCenter` is the point the draw distance is measured from - the
+    /// player, matching the generation window. Never the camera: it orbits.
+    void dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const Camera& camera,
+                      const glm::vec3& rangeCenter);
 
     /// Record the indirect draw. Must run inside the render pass.
     void render(VkCommandBuffer cmd, uint32_t frameIndex, VkDescriptorSet perFrameSet);

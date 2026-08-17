@@ -430,7 +430,8 @@ bool GrassRenderer::buildDrawPipeline() {
     return pipeline_ != VK_NULL_HANDLE;
 }
 
-void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const Camera& camera) {
+void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const Camera& camera,
+                                 const glm::vec3& rangeCenter) {
     if (!isReady() || frameIndex >= kFrames || bladeCount_ == 0) return;
 
     // Cull parameters for this frame.
@@ -448,7 +449,9 @@ void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const
             const auto& plane = frustum.getPlane(static_cast<Frustum::Side>(i));
             uniforms.frustumPlanes[i] = glm::vec4(plane.normal, plane.distance);
         }
-        uniforms.cameraPos = glm::vec4(camera.getPosition(), kCullDistance * kCullDistance);
+        // Frustum from the camera; range from the player the window is built
+        // around. Two different centres on purpose - see the shader comment.
+        uniforms.cameraPos = glm::vec4(rangeCenter, kCullDistance * kCullDistance);
         uniforms.bladeCount = bladeCount_;
         std::memcpy(cullUniformMapped_[frameIndex], &uniforms, sizeof(uniforms));
     }

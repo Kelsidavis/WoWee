@@ -21,7 +21,7 @@ struct GrassBlade {
 
 layout(std140, set = 0, binding = 0) uniform GrassCullUniforms {
     vec4 frustumPlanes[6];  // xyz = normal, w = distance
-    vec4 cameraPos;         // xyz = camera position, w = maxDistSq
+    vec4 rangeCenter;       // xyz = player position, w = maxDistSq
     uint bladeCount;
     uint _pad0;
     uint _pad1;
@@ -54,12 +54,14 @@ void main() {
     vec3 root = blade.positionHeight.xyz;
     float height = blade.positionHeight.w;
 
-    // Distance cull against the same squared bound the M2 path uses, so a
-    // blade and the doodads around it disappear at one distance rather than
-    // two.
-    vec3 toCam = root - cameraPos.xyz;
-    float distSq = dot(toCam, toCam);
-    if (distSq > cameraPos.w) return;
+    // Distance is measured from the player, not the camera. The population
+    // window is generated around the player, and this game's camera orbits:
+    // measured from the camera, a swing of the view put the far edge of the
+    // draw range outside the generated window, and which side of the field
+    // was missing followed the camera around.
+    vec3 toCenter = root - rangeCenter.xyz;
+    float distSq = dot(toCenter, toCenter);
+    if (distSq > rangeCenter.w) return;
 
     // Frustum cull. The bounding sphere is centred at half height and sized to
     // cover the blade at full bend, so a blade leaning out of its upright

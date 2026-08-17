@@ -1050,7 +1050,8 @@ void Renderer::beginFrame() {
     if (grassRenderer_ && camera && vkCtx) {
         updateGrassPopulation();
         grassRenderer_->reportCullResult();
-        grassRenderer_->dispatchCull(currentCmd, vkCtx->getCurrentFrame(), *camera);
+        grassRenderer_->dispatchCull(currentCmd, vkCtx->getCurrentFrame(), *camera,
+                                     characterPosition);
     }
 
     // --- Off-screen pre-passes ---
