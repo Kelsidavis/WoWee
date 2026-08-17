@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstring>
+#include <fstream>
 #include <vector>
 
 #include "core/logger.hpp"
@@ -463,6 +464,18 @@ void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const
                     LOG_INFO("Grass debug: ", command.instanceCount, " of ", bladeCount_,
                              " kept, player=(", rangeCenter.x, ",", rangeCenter.y,
                              ") camera=(", camPos.x, ",", camPos.y, ",", camPos.z, ")");
+                    // The main log is bounded and has rotated these lines away
+                    // before they could be read, three runs in a row. A debug
+                    // flag's whole output has to survive to the end of the
+                    // session, so it also goes to its own file.
+                    static std::ofstream debugFile("grass_debug.log", std::ios::app);
+                    if (debugFile) {
+                        debugFile << command.instanceCount << " of " << bladeCount_
+                                  << " kept, player=(" << rangeCenter.x << ","
+                                  << rangeCenter.y << ") camera=(" << camPos.x << ","
+                                  << camPos.y << "," << camPos.z << ")\n";
+                        debugFile.flush();
+                    }
                 }
                 destroyBuffer(vkCtx_->getAllocator(), readback);
             }
