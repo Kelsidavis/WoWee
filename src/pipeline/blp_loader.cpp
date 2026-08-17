@@ -88,6 +88,29 @@ bool BLPImage::hasTransparency() const {
     return false;
 }
 
+std::vector<uint8_t> BLPLoader::decodeBaseLevel(const BLPImage& image) {
+    if (!image.isBlockCompressed() || image.mipmaps.empty()) return {};
+    if (image.width <= 0 || image.height <= 0) return {};
+
+    const std::span<const uint8_t> blocks(image.mipmaps[0].data(), image.mipmaps[0].size());
+    std::vector<uint8_t> rgba(static_cast<size_t>(image.width) *
+                              static_cast<size_t>(image.height) * 4ull);
+    switch (image.compression) {
+        case BLPCompression::DXT1:
+            decompressDXT1(blocks, rgba.data(), image.width, image.height);
+            break;
+        case BLPCompression::DXT3:
+            decompressDXT3(blocks, rgba.data(), image.width, image.height);
+            break;
+        case BLPCompression::DXT5:
+            decompressDXT5(blocks, rgba.data(), image.width, image.height);
+            break;
+        default:
+            return {};
+    }
+    return rgba;
+}
+
 BLPImage BLPLoader::load(const std::vector<uint8_t>& blpData, bool keepCompressed) {
     if (blpData.size() < 8) {  // Minimum: magic + first field
         LOG_ERROR("BLP data too small");

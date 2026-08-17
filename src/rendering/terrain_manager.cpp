@@ -925,12 +925,21 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
                             blpKey = blpKey.substr(0, blpKey.size() - 4) + ".blp";
                         }
                     }
-                    auto blp = assetManager->loadTexture(blpKey);
+                    // Blocks for the upload; the normal map decodes a copy
+                    // here on the worker thread and lets it go, which is where
+                    // that cost already was.
+                    auto blp = assetManager->loadTexture(blpKey, true);
                     if (blp.isValid()) {
                         float variance = 0.0f;
-                        auto normalPixels = WMORenderer::generateNormalHeightMapPixels(
-                            blp.data.data(), static_cast<uint32_t>(blp.width),
-                            static_cast<uint32_t>(blp.height), variance);
+                        const std::vector<uint8_t> decoded =
+                            blp.isBlockCompressed()
+                                ? pipeline::BLPLoader::decodeBaseLevel(blp)
+                                : blp.data;
+                        auto normalPixels = decoded.empty()
+                            ? pipeline::BLPImage{}
+                            : WMORenderer::generateNormalHeightMapPixels(
+                                  decoded.data(), static_cast<uint32_t>(blp.width),
+                                  static_cast<uint32_t>(blp.height), variance);
                         if (normalPixels.isValid()) {
                             pending->preloadedWMONormalMaps[blpKey] = std::move(normalPixels);
                             pending->preloadedWMONormalMapVariances[blpKey] = variance;

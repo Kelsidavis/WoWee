@@ -98,6 +98,14 @@ public:
     /// Palette and ARGB8888 always decode; there is nothing to pass through.
     static BLPImage load(const std::vector<uint8_t>& blpData, bool keepCompressed = false);
 
+    /// Decode a block-compressed image's base level to RGBA8.
+    ///
+    /// For callers that need the pixels for something other than sampling -
+    /// building a normal map, scanning for a colour key - while the texture
+    /// itself still uploads as blocks. Returns empty for an image that is not
+    /// block-compressed, whose pixels are already in data.
+    static std::vector<uint8_t> decodeBaseLevel(const BLPImage& image);
+
     /**
      * Get format name for debugging
      */

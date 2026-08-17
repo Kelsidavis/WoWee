@@ -2551,7 +2551,9 @@ VkTexture* WMORenderer::loadTexture(const std::string& path) {
     }
     if (!blp.isValid()) {
         for (const auto& c : attemptedCandidates) {
-            blp = assetManager->loadTexture(c);
+            // Blocks. The diffuse is only ever sampled; the normal map
+            // below needs pixels and decodes them from these when it runs.
+            blp = assetManager->loadTexture(c, true);
             if (blp.isValid()) {
                 resolvedKey = c;
                 break;
@@ -2574,8 +2576,7 @@ VkTexture* WMORenderer::loadTexture(const std::string& path) {
 
     core::Logger::getInstance().debug("WMO texture: ", path, " size=", blp.width, "x", blp.height);
 
-    size_t base = static_cast<size_t>(blp.width) * static_cast<size_t>(blp.height) * 4ull;
-    size_t approxBytes = base + (base / 3);
+    size_t approxBytes = blp.approxUploadBytes();
     if (textureCacheBytes_ + approxBytes > textureCacheBudgetBytes_) {
         for (const auto& c : attemptedCandidates) {
             failedTextureCache_.insert(c);
@@ -2593,8 +2594,7 @@ VkTexture* WMORenderer::loadTexture(const std::string& path) {
 
     // Create Vulkan texture
     auto texture = std::make_unique<VkTexture>();
-    if (!texture->upload(*vkCtx_, blp.data.data(), blp.width, blp.height,
-                          VK_FORMAT_R8G8B8A8_UNORM, true)) {
+    if (!texture->uploadBLP(*vkCtx_, blp)) {
         core::Logger::getInstance().warning("WMO: Failed to upload texture to GPU: ", path);
         return whiteTexture_.get();
     }
@@ -2632,7 +2632,16 @@ VkTexture* WMORenderer::loadTexture(const std::string& path) {
             }
         }
         if (!nhMap && !deferNormalMaps_) {
-            nhMap = generateNormalHeightMap(blp.data.data(), blp.width, blp.height, nhVariance);
+            // Decoded here and thrown away, rather than kept and uploaded.
+            // The Sobel pass has always needed pixels; what changes is that
+            // the texture itself no longer has to be RGBA8 to provide them.
+            const std::vector<uint8_t> decoded =
+                blp.isBlockCompressed() ? pipeline::BLPLoader::decodeBaseLevel(blp)
+                                        : blp.data;
+            if (!decoded.empty()) {
+                nhMap = generateNormalHeightMap(decoded.data(), blp.width, blp.height,
+                                                nhVariance);
+            }
         }
         if (nhMap) {
             approxBytes *= 2;  // account for normal map in budget
