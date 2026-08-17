@@ -1697,7 +1697,14 @@ void Application::shutdown() {
     // What the block upload actually saved this session, rather than what the
     // asset survey predicted it would. Reported here because it is a whole
     // session's total and the walk decides which textures that covers.
-    if (const auto tally = rendering::VkTexture::blockUploadTally(); tally.textures > 0) {
+    //
+    // Latched because shutdown() runs twice on the way out - once from main and
+    // again from ~Application - and the counters are static, so unlike every
+    // member below they survive the first pass and would report themselves a
+    // second time.
+    static bool tallyReported = false;
+    if (const auto tally = rendering::VkTexture::blockUploadTally();
+        tally.textures > 0 && !std::exchange(tallyReported, true)) {
         const double savedPct =
             100.0 * (1.0 - static_cast<double>(tally.blockBytes) /
                                static_cast<double>(tally.decodedBytes));
