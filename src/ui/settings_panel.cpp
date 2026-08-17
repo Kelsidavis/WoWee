@@ -541,12 +541,12 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                     saveCallback();
                 }
 
-                // Grass has its own two, rather than riding the clutter
-                // slider: clutter is M2 doodads with a per-instance cost and
-                // grass is one indirect draw, so turning one down is not a
-                // wish to turn the other down. Both take effect on the next
-                // rebuild, which is a short walk away.
-                if (ImGui::Checkbox("Grass", &pendingGrassEnabled)) {
+                // Under its own heading rather than loose among the graphics
+                // rows: "Grass" beside "Grass Density" reads as a label for the
+                // slider rather than a control of its own, and was missed.
+                ImGui::Spacing();
+                ImGui::SeparatorText("Grass");
+                if (ImGui::Checkbox("Enable grass", &pendingGrassEnabled)) {
                     applySettingSideEffects("grassenabled");
                     saveCallback();
                 }
@@ -1240,9 +1240,6 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
         // and it did nothing but store the answer, because the only copy of
         // this lived beside the checkbox in the settings window.
         if (renderer) {
-            renderer->setGrassEnabled(pendingGrassEnabled);
-            renderer->setGrassScales(static_cast<float>(pendingGrassDensity) / 100.0f,
-                                     static_cast<float>(pendingGrassHeight) / 100.0f);
             if (auto* zm = renderer->getZoneManager()) {
                 zm->setUseOriginalSoundtrack(pendingUseOriginalSoundtrack);
                 if (!pendingUseOriginalSoundtrack) {
@@ -1251,6 +1248,16 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
                     }
                 }
             }
+        }
+    } else if (key == "grassenabled" || key == "grassdensity" || key == "grassheight") {
+        // Grass belonged in its own branch all along. These calls were sitting
+        // inside the soundtrack's, so changing the soundtrack applied the grass
+        // settings and changing a grass setting did nothing at all - the key
+        // matched no branch and fell out of the bottom.
+        if (renderer) {
+            renderer->setGrassEnabled(pendingGrassEnabled);
+            renderer->setGrassScales(static_cast<float>(pendingGrassDensity) / 100.0f,
+                                     static_cast<float>(pendingGrassHeight) / 100.0f);
         }
     } else if (isVolumeKey(key)) {
         // Every volume goes through one call, because each of them is a balance

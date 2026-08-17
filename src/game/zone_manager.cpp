@@ -485,10 +485,14 @@ std::string ZoneManager::getRandomMusic(uint32_t zoneId) {
         if (!useOriginalSoundtrack_ && p.rfind("file:", 0) == 0) continue;
         pool.push_back(&p);
     }
-    // Fall back to full list if filtering left nothing
-    if (pool.empty()) {
-        for (const auto& p : all) pool.push_back(&p);
-    }
+    // No fallback to the full list. The only thing filtered out here is the
+    // client's own soundtrack, and only when the player has turned it off - so
+    // a pool that came back empty means every track this zone has is one they
+    // asked not to hear, and the answer is silence rather than all of them.
+    // Putting them back was the whole of "the setting does not stay off": it
+    // held in any zone with a mixed pool and did nothing in the zones that are
+    // entirely ours, which are the ones a player notices.
+    if (pool.empty()) return "";
 
     if (pool.size() == 1) {
         lastPlayedMusic_ = *pool[0];
