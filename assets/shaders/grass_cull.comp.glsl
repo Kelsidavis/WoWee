@@ -23,7 +23,7 @@ layout(std140, set = 0, binding = 0) uniform GrassCullUniforms {
     vec4 frustumPlanes[6];  // xyz = normal, w = distance
     vec4 rangeCenter;       // xyz = player position, w = maxDistSq
     uint bladeCount;
-    uint _pad0;
+    uint debugFlags;   // bit 1 = skip frustum test, bit 2 = skip distance test
     uint _pad1;
     uint _pad2;
 };
@@ -61,7 +61,7 @@ void main() {
     // was missing followed the camera around.
     vec3 toCenter = root - rangeCenter.xyz;
     float distSq = dot(toCenter, toCenter);
-    if (distSq > rangeCenter.w) return;
+    if ((debugFlags & 2u) == 0u && distSq > rangeCenter.w) return;
 
     // Frustum cull. The bounding sphere is centred at half height and sized to
     // cover the blade at full bend, so a blade leaning out of its upright

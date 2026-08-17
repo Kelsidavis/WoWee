@@ -57,7 +57,11 @@ struct GrassCullUniformsGPU {
     glm::vec4 frustumPlanes[6]{};
     glm::vec4 cameraPos{};
     uint32_t bladeCount = 0;
-    uint32_t _pad0 = 0;
+    /// Bit 1 skips the frustum test, bit 2 the distance test. Driven by
+    /// WOWEE_GRASS_NOCULL / WOWEE_GRASS_NODIST, the same bisecting flags the
+    /// other renderers use: turn one off and see whether the artifact
+    /// survives.
+    uint32_t debugFlags = 0;
     uint32_t _pad1 = 0;
     uint32_t _pad2 = 0;
 };

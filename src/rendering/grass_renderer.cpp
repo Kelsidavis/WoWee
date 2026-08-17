@@ -452,6 +452,10 @@ void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const
         // Frustum from the camera; range from the player the window is built
         // around. Two different centres on purpose - see the shader comment.
         uniforms.cameraPos = glm::vec4(rangeCenter, kCullDistance * kCullDistance);
+        // Read once, the way every rendering diagnostic flag is.
+        static const bool noFrustum = envFlagEnabled("WOWEE_GRASS_NOCULL");
+        static const bool noDistance = envFlagEnabled("WOWEE_GRASS_NODIST");
+        uniforms.debugFlags = (noFrustum ? 1u : 0u) | (noDistance ? 2u : 0u);
         uniforms.bladeCount = bladeCount_;
         std::memcpy(cullUniformMapped_[frameIndex], &uniforms, sizeof(uniforms));
     }
