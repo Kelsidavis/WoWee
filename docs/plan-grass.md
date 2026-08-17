@@ -1,6 +1,6 @@
 # GPU-Driven Grass — Phased Implementation Plan
 
-**Status:** Phases 1, 2, 3, 4 and 5 complete. Next: Phase 6.
+**Status:** Phases 1 through 6 complete. Next: Phase 7.
 **Branch:** `grass`
 **Spec:** [`docs/grass-spec.md`](grass-spec.md) — every `spec §N` below refers to a numbered
 section there. The spec is **not** authoritative; this plan and the repository are. See §2.
@@ -424,13 +424,27 @@ zero means its four doodads are equally likely, not that none of them apply;
 and an effect whose doodad ids resolve to no model still grows ordinary grass
 rather than becoming bare ground.
 
-### Still open
+### Phase 6 — done
 
-- **Blades are all at one Z**, the field origin's. On sloped ground they float
-  or sink. Phase 3 generates per-tile positions from real terrain and fixes it;
-  until then the field is only honest on flat ground.
-- Lighting is a wrapped diffuse with a root-to-tip gradient, enough to read the
-  shape. Terrain colour influence and the upright-normal blend are still Phase 6.
+The two-sided lighting, wrapped diffuse and root-to-tip gradient landed with
+Phase 5. The rest:
+
+- **Terrain colour influence (spec §8).** Each blade carries the mean colour
+  of the ground under its root - the chunk's layer texture colours blended by
+  the same alpha weights the terrain shader composites with, so the grass
+  tints toward exactly the ground drawn beneath it. Mixed, not replaced:
+  45% at the root falling to 20% at the tip. Mean colours are computed once
+  per texture from the decoded base level and cached
+  (`TerrainManager::getTerrainTextureMeanColor`); a failure yields neutral
+  grey, which is a non-tint rather than a hole. The blade grew to 48 bytes
+  for it - struct, both shaders and the layout test updated in one commit,
+  which is the discipline the test exists to enforce.
+- **Upright-normal blend (spec §31).** The per-blade normal is blended
+  halfway toward +Z before shading. A field shades like a field; unblended
+  per-blade normals make every blade a separate glint.
+
+The fragment shader is still one gradient mix, one ground mix, one wrapped
+diffuse - no texture fetches.
 
 ### Phase 2 — done
 

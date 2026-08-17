@@ -300,3 +300,33 @@ TEST_CASE("the sample range is 0..8 grid units, not 0..1", "[grass][terrain]") {
     REQUIRE(atEight == Catch::Approx(8.0f).margin(0.01));
     REQUIRE(atEight > atOne);
 }
+
+TEST_CASE("ground colour is the layers' blend, and absent when not provided",
+          "[grass][terrain]") {
+    // The same alpha weights that blend the layers' suitability blend their
+    // colours, so the grass tints toward exactly the ground drawn under it.
+    MapChunk chunk = makeFlatChunk();
+    chunk.layers.push_back(makeLayer(kGrassEffect));
+    const uint32_t offset = appendAlpha(chunk, rampAlpha());
+    chunk.layers.push_back(makeLayer(kRoadEffect, 0x100, offset));
+
+    wowee::pipeline::ChunkGrassContext context;
+    context.build(chunk, densityFor);
+
+    SECTION("without colours the flag stays down") {
+        const auto fit = evaluateGrass(context, chunk, 4.0f, 4.0f);
+        REQUIRE_FALSE(fit.hasGroundColor);
+    }
+
+    SECTION("with colours the blend follows the alpha ramp") {
+        context.layerColor[0] = {0.0f, 1.0f, 0.0f};  // base: green
+        context.layerColor[1] = {1.0f, 0.0f, 0.0f};  // overlay: red, ramping in
+        context.hasLayerColors = true;
+
+        const auto west = evaluateGrass(context, chunk, 0.2f, 4.0f);
+        const auto east = evaluateGrass(context, chunk, 7.8f, 4.0f);
+        REQUIRE(west.hasGroundColor);
+        REQUIRE(west.groundColor.g > west.groundColor.r);   // mostly base
+        REQUIRE(east.groundColor.r > east.groundColor.g);   // mostly overlay
+    }
+}

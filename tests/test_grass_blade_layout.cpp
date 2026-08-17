@@ -21,16 +21,17 @@ using wowee::rendering::GrassCullUniformsGPU;
 
 TEST_CASE("GrassBladeGPU matches the std430 GrassBlade", "[grass]") {
     SECTION("size is the std430 array stride") {
-        // Two vec4s. std430 rounds a struct's stride up to its largest member's
-        // alignment, which is 16 for a vec4, so 32 is both the packed size and
-        // the stride the shader indexes with.
-        REQUIRE(sizeof(GrassBladeGPU) == 32);
+        // Three vec4s. std430 rounds a struct's stride up to its largest
+        // member's alignment, which is 16 for a vec4, so 48 is both the packed
+        // size and the stride the shader indexes with.
+        REQUIRE(sizeof(GrassBladeGPU) == 48);
         REQUIRE(sizeof(GrassBladeGPU) % 16 == 0);
     }
 
     SECTION("every member sits where the shader reads it") {
         REQUIRE(offsetof(GrassBladeGPU, positionHeight) == 0);
         REQUIRE(offsetof(GrassBladeGPU, facingWidthPhase) == 16);
+        REQUIRE(offsetof(GrassBladeGPU, groundColor) == 32);
     }
 
     SECTION("an array is tightly packed") {
@@ -39,8 +40,8 @@ TEST_CASE("GrassBladeGPU matches the std430 GrassBlade", "[grass]") {
         GrassBladeGPU blades[4]{};
         const auto* base = reinterpret_cast<const std::byte*>(&blades[0]);
         const auto* second = reinterpret_cast<const std::byte*>(&blades[1]);
-        REQUIRE(static_cast<std::size_t>(second - base) == 32);
-        REQUIRE(sizeof(blades) == 128);
+        REQUIRE(static_cast<std::size_t>(second - base) == 48);
+        REQUIRE(sizeof(blades) == 192);
     }
 }
 

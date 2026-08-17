@@ -31,21 +31,21 @@ namespace rendering {
 /// | 20     | facingWidthPhase.y | width in yards                          |
 /// | 24     | facingWidthPhase.z | profile index, as a whole number        |
 /// | 28     | facingWidthPhase.w | wind phase seed                         |
-///
-/// Both trailing fields were carried unused from the first version so the
-/// stride would not have to change once there was real data for them. There
-/// now is, and it did not.
+/// | 32     | groundColor.xyz    | terrain colour under the root           |
+/// | 44     | groundColor.w      | 1 when that colour is real, else 0      |
 struct GrassBladeGPU {
     glm::vec4 positionHeight{};
     glm::vec4 facingWidthPhase{};
+    glm::vec4 groundColor{};
 };
 
-static_assert(sizeof(GrassBladeGPU) == 32,
-              "GrassBladeGPU must be 32 bytes to match the std430 GrassBlade");
+static_assert(sizeof(GrassBladeGPU) == 48,
+              "GrassBladeGPU must be 48 bytes to match the std430 GrassBlade");
 static_assert(sizeof(GrassBladeGPU) % 16 == 0,
               "std430 rounds the array stride of a vec4-bearing struct up to 16");
 static_assert(offsetof(GrassBladeGPU, positionHeight) == 0);
 static_assert(offsetof(GrassBladeGPU, facingWidthPhase) == 16);
+static_assert(offsetof(GrassBladeGPU, groundColor) == 32);
 
 /// Cull parameters, one per frame in flight.
 ///

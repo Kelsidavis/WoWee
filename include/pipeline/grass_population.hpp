@@ -30,6 +30,10 @@ struct GrassBladeSample {
     float phase = 0.0f;
     /// Index into the profile table the shaders read colour and stiffness from.
     uint32_t profileIndex = 0;
+    /// The terrain's colour under the root; w of the upload carries whether it
+    /// is real, so a population without colours renders unmixed.
+    glm::vec3 groundColor{0.0f};
+    bool hasGroundColor = false;
 };
 
 /// What a ground effect's profile means for generating a blade: the scales

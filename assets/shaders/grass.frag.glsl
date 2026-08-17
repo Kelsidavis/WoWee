@@ -26,6 +26,7 @@ layout(location = 0) in float vHeightT;
 layout(location = 1) in vec3 vNormal;
 layout(location = 2) in vec3 vRootColor;
 layout(location = 3) in vec3 vTipColor;
+layout(location = 4) in vec4 vGroundColor;
 
 layout(location = 0) out vec4 outColor;
 
@@ -33,6 +34,14 @@ void main() {
     // Colours come from the ground's own vegetation profile, so scree, dry
     // scrub and meadow differ without anything here knowing which zone it is.
     vec3 albedo = mix(vRootColor, vTipColor, vHeightT * vHeightT);
+
+    // Pulled toward the terrain's own colour, mixed rather than replaced
+    // (spec 8), and more strongly at the root than the tip - the root is what
+    // sits against the ground, and an unmixed field reads as green paint over
+    // brown earth. w is zero when no colour was available, which disables the
+    // mix instead of pulling toward black.
+    float groundMix = vGroundColor.w * mix(0.45, 0.20, vHeightT);
+    albedo = mix(albedo, vGroundColor.rgb, groundMix);
 
     // Two-sided: a blade is one strip and is lit from whichever face is turned
     // to the camera.

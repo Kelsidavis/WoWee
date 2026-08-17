@@ -28,6 +28,7 @@ layout(set = 0, binding = 0) uniform PerFrame {
 struct GrassBlade {
     vec4 positionHeight;
     vec4 facingWidthPhase;
+    vec4 groundColor;      // xyz = terrain colour under the root, w = 1 if real
 };
 
 layout(std430, set = 1, binding = 0) readonly buffer GrassSource {
@@ -57,6 +58,7 @@ layout(location = 0) out float vHeightT;
 layout(location = 1) out vec3 vNormal;
 layout(location = 2) out vec3 vRootColor;
 layout(location = 3) out vec3 vTipColor;
+layout(location = 4) out vec4 vGroundColor;
 
 // Five segments, six rows of two vertices.
 const float kSegments = 5.0;
@@ -175,11 +177,15 @@ void main() {
     float tint = 1.0 + (seed - 0.5) * 2.0 * profile.params.x;
     vRootColor = profile.rootColor.rgb * tint;
     vTipColor  = profile.tipColor.rgb * tint;
+    vGroundColor = blade.groundColor;
 
     vHeightT = t;
-    // Face out of the blade, and let it curl a little across its width so it
-    // catches light along the edge instead of reading as a flat cutout.
-    vNormal = normalize(cross(across, tangent) + across * (side * 0.35));
+    // Face out of the blade, curled a little across its width - then blended
+    // toward straight up (spec 31). Grass is lit mostly as the ground it
+    // stands on: a field shades like a field, and unblended per-blade normals
+    // make every blade a separate glint that flickers as it moves.
+    vec3 bladeNormal = normalize(cross(across, tangent) + across * (side * 0.35));
+    vNormal = normalize(mix(bladeNormal, vec3(0.0, 0.0, 1.0), 0.5));
 
     gl_Position = projection * view * vec4(world, 1.0);
 }

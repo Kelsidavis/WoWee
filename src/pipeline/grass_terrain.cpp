@@ -153,6 +153,18 @@ GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk&
     }
     weight[0] = std::max(remaining, 0.0f);
 
+    // The ground's colour is the same blend the terrain shader draws, so the
+    // grass sits on the colour it is tinted by. All layers count here - the
+    // ground under a blade is what it is whether or not that layer grows.
+    if (context.hasLayerColors) {
+        glm::vec3 ground(0.0f);
+        for (size_t i = 0; i < context.layerCount; ++i) {
+            ground += context.layerColor[i] * weight[i];
+        }
+        out.groundColor = ground;
+        out.hasGroundColor = true;
+    }
+
     // Each layer contributes its own weight if its ground effect grows
     // anything. Weighted rather than thresholded, so a texel that is half
     // grass and half road is half suitable instead of one or the other.

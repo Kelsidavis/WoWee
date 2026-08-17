@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <functional>
 
+#include <glm/glm.hpp>
+
 #include "pipeline/adt_loader.hpp"
 
 // Whether grass grows at a point on the terrain, and what kind.
@@ -38,6 +40,11 @@ struct GrassSuitability {
     /// World Z at the sample point, on the surface the terrain mesh draws.
     /// Only meaningful when suitability is above zero, as above.
     float rootHeight = 0.0f;
+    /// The ground's own colour under this point: the chunk's layer colours
+    /// blended by the same alpha weights the terrain shader composites with.
+    /// Valid only when hasGroundColor - the caller may not have colours.
+    glm::vec3 groundColor{0.0f};
+    bool hasGroundColor = false;
 };
 
 /// Density for a ground-effect id; 0 (or an unknown id) means no vegetation.
@@ -60,6 +67,12 @@ struct ChunkGrassContext {
     /// sample in the chunk zero without looking at alpha, slope or height.
     /// Roads, rock and water are whole chunks of this.
     bool growsAnything = false;
+
+    /// Mean colour of each layer's ground texture, filled by the caller after
+    /// build() - the texture names live on the tile, which pipeline code never
+    /// sees. Left unset, blades keep their profile colours unmixed.
+    glm::vec3 layerColor[4]{};
+    bool hasLayerColors = false;
 
     /// Returns false when nothing in this chunk grows anything, so a caller
     /// can skip it whole.

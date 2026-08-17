@@ -1956,6 +1956,7 @@ void Renderer::updateGrassPopulation() {
     // hits - without it every candidate would decode the chunk's alpha maps
     // again, which is four kilobytes a layer for each of tens of thousands.
     const pipeline::MapChunk* cached = nullptr;
+    const TerrainTile* cachedTile = nullptr;
     pipeline::ChunkGrassContext context;
     auto densityFor = [this](uint32_t effectId) {
         return terrainManager->getGroundEffectDensity(effectId);
@@ -1984,12 +1985,26 @@ void Renderer::updateGrassPopulation() {
                           cached->position, wx, wy, kUnitSize, fracX, fracY)) {
             chunk = cached;
         } else {
-            chunk = terrainManager->findChunkAt(wx, wy, fracX, fracY);
+            chunk = terrainManager->findChunkAt(wx, wy, fracX, fracY, &cachedTile);
         }
         if (!chunk) { ++noChunk; return {}; }
         if (chunk != cached) {
             context = pipeline::ChunkGrassContext{};
             context.build(*chunk, densityFor);
+            // The layers' mean texture colours, which the context cannot fetch
+            // itself: the texture names live on the tile, and the tile is a
+            // rendering-side object pipeline code never sees.
+            if (cachedTile) {
+                const auto& names = cachedTile->terrain.textures;
+                const size_t n = std::min<size_t>(chunk->layers.size(), 4);
+                for (size_t i = 0; i < n; ++i) {
+                    const uint32_t texId = chunk->layers[i].textureId;
+                    if (texId >= names.size()) continue;
+                    context.layerColor[i] =
+                        terrainManager->getTerrainTextureMeanColor(names[texId]);
+                    context.hasLayerColors = true;
+                }
+            }
             cached = chunk;
             if (!reportedChain) {
                 reportedChain = true;

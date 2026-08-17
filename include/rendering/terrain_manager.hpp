@@ -302,7 +302,16 @@ public:
      * index guess missed.
      */
     const pipeline::MapChunk* findChunkAt(float glX, float glY,
-                                          float& fracX, float& fracY) const;
+                                          float& fracX, float& fracY,
+                                          const TerrainTile** outTile = nullptr) const;
+
+    /** Mean colour of a terrain texture, cached by path.
+     *
+     * What grass mixes toward so a field sits on the colour it grows from.
+     * Computed once per texture from the decoded base level; wrong answers
+     * here are a tint, not a hole, so failures return a neutral grey.
+     */
+    [[nodiscard]] glm::vec3 getTerrainTextureMeanColor(const std::string& texturePath);
 
     /** Get the precise MCNK AreaTable ID at a world position. */
     [[nodiscard]] std::optional<uint32_t> getAreaIdAt(float glX, float glY) const;
@@ -509,6 +518,7 @@ private:
     std::unordered_map<uint32_t, GroundEffectEntry> groundEffectById_; // effectId -> config
     std::unordered_map<uint32_t, std::string> groundDoodadModelById_;  // doodadId -> model path
     float groundClutterDensityScale_ = 1.0f;
+    std::unordered_map<std::string, glm::vec3> terrainTextureMeanColor_;
 };
 
 } // namespace rendering

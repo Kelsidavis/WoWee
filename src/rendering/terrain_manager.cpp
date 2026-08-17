@@ -2132,6 +2132,39 @@ void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile
     }
 }
 
+glm::vec3 TerrainManager::getTerrainTextureMeanColor(const std::string& texturePath) {
+    const auto it = terrainTextureMeanColor_.find(texturePath);
+    if (it != terrainTextureMeanColor_.end()) return it->second;
+
+    // Neutral grey on any failure: a wrong mean is a tint, not a hole, and a
+    // grey mix leaves the profile colour effectively alone.
+    glm::vec3 mean(0.5f);
+    if (assetManager) {
+        const pipeline::BLPImage blp = assetManager->loadTexture(texturePath, false);
+        if (blp.isValid() && !blp.data.empty()) {
+            // Every 16th pixel is plenty for a mean; the point is the hue of
+            // the ground, not a faithful downsample.
+            uint64_t r = 0;
+            uint64_t g = 0;
+            uint64_t b = 0;
+            uint64_t n = 0;
+            for (size_t i = 0; i + 3 < blp.data.size(); i += 64) {
+                r += blp.data[i];
+                g += blp.data[i + 1];
+                b += blp.data[i + 2];
+                ++n;
+            }
+            if (n > 0) {
+                mean = glm::vec3(static_cast<float>(r) / static_cast<float>(n),
+                                 static_cast<float>(g) / static_cast<float>(n),
+                                 static_cast<float>(b) / static_cast<float>(n)) / 255.0f;
+            }
+        }
+    }
+    terrainTextureMeanColor_[texturePath] = mean;
+    return mean;
+}
+
 void TerrainManager::getGroundEffectDoodads(uint32_t effectId,
                                             std::vector<std::string>& outModels,
                                             std::vector<uint32_t>& outWeights) const {
@@ -2157,7 +2190,8 @@ uint32_t TerrainManager::getGroundEffectDensity(uint32_t effectId) const {
 }
 
 const pipeline::MapChunk* TerrainManager::findChunkAt(float glX, float glY,
-                                                      float& fracX, float& fracY) const {
+                                                      float& fracX, float& fracY,
+                                                      const TerrainTile** outTile) const {
     // Terrain mesh vertices use chunk.position directly (WoW coordinates) and
     // the terrain is rendered without a model transform, so the camera's own
     // coordinates index it unchanged. A chunk spans
@@ -2189,6 +2223,9 @@ const pipeline::MapChunk* TerrainManager::findChunkAt(float glX, float glY,
 
     auto inTile = [&](const TerrainTile* tile) -> const pipeline::MapChunk* {
         if (!tile || !tile->loaded) return nullptr;
+        // Recorded per attempt rather than per hit: whichever tile the found
+        // chunk came from was necessarily the last one tried.
+        if (outTile) *outTile = tile;
 
         // Fast path: infer the likely chunk index and probe a 3x3 neighbourhood.
         const int guessCy = glm::clamp(
@@ -2222,6 +2259,7 @@ const pipeline::MapChunk* TerrainManager::findChunkAt(float glX, float glY,
         if (coord == tc) continue;
         if (auto* c = inTile(tile.get())) return c;
     }
+    if (outTile) *outTile = nullptr;
     return nullptr;
 }
 
