@@ -550,8 +550,17 @@ bool VkContext::createLogicalDevice() {
     // memory, so a texture upload needs no staging buffer, no transfer
     // submission and no layout barriers around it. Worth most where the two
     // copies were never separate memory to begin with.
-    const bool hostImageCopyAvailable = vkbPhysicalDevice_.enable_extension_if_present(
-        VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME);
+    //
+    // It depends on two others, and every dependency has to be in the same
+    // enabled list: without them vkCreateDevice is out of spec. MoltenVK
+    // creates the device anyway and only the validation layer says so, so the
+    // three are taken together or not at all.
+    const bool hostCopyDeps =
+        vkbPhysicalDevice_.enable_extension_if_present(VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME) &&
+        vkbPhysicalDevice_.enable_extension_if_present(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
+    const bool hostImageCopyAvailable =
+        hostCopyDeps &&
+        vkbPhysicalDevice_.enable_extension_if_present(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME);
 
     vkb::DeviceBuilder deviceBuilder{vkbPhysicalDevice_};
 
