@@ -72,6 +72,17 @@ struct BLPImage {
         const size_t base = static_cast<size_t>(width) * static_cast<size_t>(height) * 4ull;
         return base + (base / 3);
     }
+
+    /// What this would have occupied decoded, whether or not it is.
+    ///
+    /// The counterfactual the block upload is measured against: RGBA8 plus the
+    /// third a generated mip chain adds, which is what every one of these
+    /// textures cost before they went up as blocks. Reported next to the real
+    /// figure so the saving is a measurement rather than an estimate.
+    [[nodiscard]] size_t approxDecodedUploadBytes() const {
+        const size_t base = static_cast<size_t>(width) * static_cast<size_t>(height) * 4ull;
+        return base + (base / 3);
+    }
 };
 
 /**

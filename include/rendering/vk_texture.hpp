@@ -47,6 +47,21 @@ public:
     /// block format, so a caller can fall back to loading it decoded.
     bool uploadBLP(VkContext& ctx, const pipeline::BLPImage& image);
 
+    /// What every uploadBLP so far actually cost, and what the same textures
+    /// would have cost decoded.
+    ///
+    /// The block upload was justified by an estimate taken from the files on
+    /// disk - 99.8% DXT, all carrying mips - which says what the assets are,
+    /// not what a session loads. These two counters answer the second
+    /// question, and they are gathered on the one path every block upload
+    /// goes through, so neither can drift from the other.
+    struct BlockUploadTally {
+        uint64_t textures;
+        uint64_t blockBytes;
+        uint64_t decodedBytes;
+    };
+    static BlockUploadTally blockUploadTally();
+
     // Create a depth/stencil texture (no upload)
     bool createDepth(VkContext& ctx, uint32_t width, uint32_t height,
         VkFormat format = VK_FORMAT_D32_SFLOAT);

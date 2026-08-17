@@ -1,6 +1,7 @@
 #include "rendering/vk_texture.hpp"
 #include "rendering/vk_context.hpp"
 #include "core/logger.hpp"
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -248,6 +249,20 @@ bool VkTexture::uploadMips(VkContext& ctx, const uint8_t* const* mipData,
     return true;
 }
 
+namespace {
+// Relaxed because nothing orders on these; they are only ever read back once,
+// after the uploads that write them have finished.
+std::atomic<uint64_t> g_blockUploadTextures{0};
+std::atomic<uint64_t> g_blockUploadBytes{0};
+std::atomic<uint64_t> g_blockUploadDecodedBytes{0};
+} // namespace
+
+VkTexture::BlockUploadTally VkTexture::blockUploadTally() {
+    return {.textures = g_blockUploadTextures.load(std::memory_order_relaxed),
+            .blockBytes = g_blockUploadBytes.load(std::memory_order_relaxed),
+            .decodedBytes = g_blockUploadDecodedBytes.load(std::memory_order_relaxed)};
+}
+
 bool VkTexture::uploadBLP(VkContext& ctx, const pipeline::BLPImage& image) {
     if (!image.isValid()) return false;
 
@@ -283,10 +298,20 @@ bool VkTexture::uploadBLP(VkContext& ctx, const pipeline::BLPImage& image) {
         sizes.push_back(static_cast<uint32_t>(level.size()));
     }
 
-    return uploadMips(ctx, levels.data(), sizes.data(),
-                      static_cast<uint32_t>(levels.size()),
-                      static_cast<uint32_t>(image.width),
-                      static_cast<uint32_t>(image.height), format);
+    if (!uploadMips(ctx, levels.data(), sizes.data(),
+                    static_cast<uint32_t>(levels.size()),
+                    static_cast<uint32_t>(image.width),
+                    static_cast<uint32_t>(image.height), format)) {
+        return false;
+    }
+
+    // Counted after the upload succeeds, so a texture the device refused above
+    // is not credited with a saving it never made.
+    g_blockUploadTextures.fetch_add(1, std::memory_order_relaxed);
+    g_blockUploadBytes.fetch_add(image.approxUploadBytes(), std::memory_order_relaxed);
+    g_blockUploadDecodedBytes.fetch_add(image.approxDecodedUploadBytes(),
+                                        std::memory_order_relaxed);
+    return true;
 }
 
 bool VkTexture::createDepth(VkContext& ctx, uint32_t width, uint32_t height, VkFormat format) {

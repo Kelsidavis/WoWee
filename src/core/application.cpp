@@ -1694,6 +1694,19 @@ void Application::shutdown() {
         uiManager->shutdown();
     }
 
+    // What the block upload actually saved this session, rather than what the
+    // asset survey predicted it would. Reported here because it is a whole
+    // session's total and the walk decides which textures that covers.
+    if (const auto tally = rendering::VkTexture::blockUploadTally(); tally.textures > 0) {
+        const double savedPct =
+            100.0 * (1.0 - static_cast<double>(tally.blockBytes) /
+                               static_cast<double>(tally.decodedBytes));
+        LOG_INFO("Block texture upload: ", tally.textures, " textures, ",
+                 tally.blockBytes / (1024 * 1024), " MB uploaded vs ",
+                 tally.decodedBytes / (1024 * 1024), " MB decoded (",
+                 std::lround(savedPct), "% saved)");
+    }
+
     // Explicitly shut down the renderer before destroying it - this ensures
     // all sub-renderers free their VMA allocations in the correct order,
     // before VkContext::shutdown() calls vmaDestroyAllocator().
