@@ -1982,6 +1982,13 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
                 VkCommandBuffer cmd = beginSecondary(SEC_TERRAIN);
                 setSecondaryViewportScissor(cmd);
                 terrainRenderer->render(cmd, perFrameSet, *camera);
+                // Grass rides in the terrain secondary: it sits on the ground,
+                // and this buffer is executed after the sky and before WMO,
+                // which is exactly the order grass wants. Recording it here
+                // touches only this worker's command buffer.
+                if (grassRenderer_) {
+                    grassRenderer_->render(cmd, frameIdx, perFrameSet);
+                }
                 vkEndCommandBuffer(cmd);
                 return std::chrono::duration<double, std::milli>(
                     std::chrono::steady_clock::now() - t0).count();

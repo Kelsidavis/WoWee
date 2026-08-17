@@ -7,6 +7,7 @@
 
 #include "core/logger.hpp"
 #include "rendering/camera.hpp"
+#include "rendering/frustum.hpp"
 #include "rendering/vk_pipeline.hpp"
 #include "rendering/vk_shader.hpp"
 #include "rendering/vk_utils.hpp"
@@ -388,16 +389,17 @@ void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const
     // Cull parameters for this frame.
     if (cullUniformMapped_[frameIndex]) {
         GrassCullUniformsGPU uniforms{};
+        // The same extractor the M2 cull uploads from, rather than a second
+        // derivation. Deriving the planes by hand here got the near plane wrong
+        // - the textbook form assumes OpenGL's [-1,1] depth and Vulkan clips to
+        // [0,1] - which culled the whole field while looking like a draw that
+        // never ran.
         const glm::mat4 viewProj = camera.getProjectionMatrix() * camera.getViewMatrix();
-        // Gribb-Hartmann: the six planes fall out of the rows of the combined
-        // matrix. Normalised, because the shader compares against a radius in
-        // yards rather than against zero.
-        const glm::mat4 m = glm::transpose(viewProj);
-        glm::vec4 planes[6] = {m[3] + m[0], m[3] - m[0], m[3] + m[1],
-                               m[3] - m[1], m[3] + m[2], m[3] - m[2]};
+        Frustum frustum;
+        frustum.extractFromMatrix(viewProj);
         for (int i = 0; i < 6; ++i) {
-            const float len = glm::length(glm::vec3(planes[i]));
-            uniforms.frustumPlanes[i] = (len > 0.0f) ? planes[i] / len : planes[i];
+            const auto& plane = frustum.getPlane(static_cast<Frustum::Side>(i));
+            uniforms.frustumPlanes[i] = glm::vec4(plane.normal, plane.distance);
         }
         uniforms.cameraPos = glm::vec4(camera.getPosition(), kMaxDistance * kMaxDistance);
         uniforms.fieldOrigin = glm::vec4(fieldOrigin_, 0.0f);
