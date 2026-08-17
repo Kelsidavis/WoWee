@@ -192,6 +192,13 @@ public:
     [[nodiscard]] bool isSynchronization2Supported() const { return synchronization2Supported_; }
     [[nodiscard]] PFN_vkCmdPipelineBarrier2KHR cmdPipelineBarrier2Fn() const { return cmdPipelineBarrier2_; }
 
+    /// Whether a texture can be uploaded without a staging buffer.
+    [[nodiscard]] bool isHostImageCopySupported() const { return hostImageCopySupported_; }
+    [[nodiscard]] PFN_vkCopyMemoryToImageEXT copyMemoryToImageFn() const { return copyMemoryToImage_; }
+    [[nodiscard]] PFN_vkTransitionImageLayoutEXT transitionImageLayoutHostFn() const {
+        return transitionImageLayoutHost_;
+    }
+
     /// A ceiling on every sampler's anisotropy - the game's Texture Filtering.
     ///
     /// Applied where samplers are made rather than by rebuilding the ones that
@@ -303,6 +310,14 @@ private:
     /// entry point name resolves - the promoted one is not loadable on 1.2.
     bool sync2IsCore_ = false;
     PFN_vkCmdPipelineBarrier2KHR cmdPipelineBarrier2_ = nullptr;
+
+    /// VK_EXT_host_image_copy. When present, pixels go from host memory into
+    /// the image directly - no staging buffer, no transfer submission, no
+    /// barriers around the copy. Detected, so the staging path stays for
+    /// devices without it.
+    bool hostImageCopySupported_ = false;
+    PFN_vkCopyMemoryToImageEXT copyMemoryToImage_ = nullptr;
+    PFN_vkTransitionImageLayoutEXT transitionImageLayoutHost_ = nullptr;
 
     VkSemaphore frameTimeline_ = VK_NULL_HANDLE;
     /// Last value signalled on frameTimeline_. Monotonic for the life of the

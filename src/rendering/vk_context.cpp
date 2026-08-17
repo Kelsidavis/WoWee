@@ -546,6 +546,12 @@ bool VkContext::createLogicalDevice() {
                             VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     const bool amdCoherentAvailable = vkbPhysicalDevice_.enable_extension_if_present(
         VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME);
+    // VK_EXT_host_image_copy. Lets pixels go straight into an image from host
+    // memory, so a texture upload needs no staging buffer, no transfer
+    // submission and no layout barriers around it. Worth most where the two
+    // copies were never separate memory to begin with.
+    const bool hostImageCopyAvailable = vkbPhysicalDevice_.enable_extension_if_present(
+        VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME);
 
     vkb::DeviceBuilder deviceBuilder{vkbPhysicalDevice_};
 
@@ -624,6 +630,24 @@ bool VkContext::createLogicalDevice() {
         LOG_INFO("synchronization2 not available - barriers use the legacy entry point");
     }
 
+    VkPhysicalDeviceHostImageCopyFeaturesEXT hostCopyFeatures{};
+    hostCopyFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_FEATURES_EXT;
+    if (hostImageCopyAvailable) {
+        // Advertising the extension is not the same as having the feature.
+        VkPhysicalDeviceHostImageCopyFeaturesEXT supported{};
+        supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_FEATURES_EXT;
+        VkPhysicalDeviceFeatures2 probe{};
+        probe.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        probe.pNext = &supported;
+        vkGetPhysicalDeviceFeatures2(physicalDevice, &probe);
+        if (supported.hostImageCopy) {
+            hostCopyFeatures.hostImageCopy = VK_TRUE;
+            deviceBuilder.add_pNext(&hostCopyFeatures);
+            hostImageCopySupported_ = true;
+            LOG_INFO("Enabling VK_EXT_host_image_copy - textures upload without a staging buffer");
+        }
+    }
+
     // Enable AMD device coherent memory feature if the extension was enabled
     // (prevents validation errors when VMA selects memory types with DEVICE_COHERENT_BIT_AMD)
     VkPhysicalDeviceCoherentMemoryFeaturesAMD coherentFeatures{};
@@ -688,6 +712,18 @@ bool VkContext::createLogicalDevice() {
         }
     }
     setPipelineBarrier2Fn(cmdPipelineBarrier2_);
+
+    if (hostImageCopySupported_) {
+        copyMemoryToImage_ = reinterpret_cast<PFN_vkCopyMemoryToImageEXT>(
+            vkGetDeviceProcAddr(device, "vkCopyMemoryToImageEXT"));
+        transitionImageLayoutHost_ = reinterpret_cast<PFN_vkTransitionImageLayoutEXT>(
+            vkGetDeviceProcAddr(device, "vkTransitionImageLayoutEXT"));
+        if (copyMemoryToImage_ == nullptr || transitionImageLayoutHost_ == nullptr) {
+            hostImageCopySupported_ = false;
+            LOG_WARNING("VK_EXT_host_image_copy enabled but its entry points did not "
+                        "resolve - textures keep the staging buffer path");
+        }
+    }
 
     if (requestTransferQueue) {
         // With custom_queue_setup, we must retrieve queues manually.

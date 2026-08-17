@@ -60,19 +60,31 @@ bool VkTexture::upload(VkContext& ctx, const uint8_t* pixels, uint32_t width, ui
 
     VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * bpp;
 
-    // Create staging buffer
-    AllocatedBuffer staging = createBuffer(ctx.getAllocator(), imageSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+    // A texture with one level and host image copy needs no staging buffer,
+    // no queue submission and no barriers: the pixels go into the image and
+    // the layout moves on the host. Mipped textures still take the staging
+    // path, because their levels are built by a GPU blit chain that has to
+    // read back from the image anyway.
+    const bool useHostCopy = ctx.isHostImageCopySupported() && !generateMips;
 
-    void* mapped;
-    vmaMapMemory(ctx.getAllocator(), staging.allocation, &mapped);
-    std::memcpy(mapped, pixels, imageSize);
-    vmaUnmapMemory(ctx.getAllocator(), staging.allocation);
+    AllocatedBuffer staging{};
+    if (!useHostCopy) {
+        staging = createBuffer(ctx.getAllocator(), imageSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+
+        void* mapped;
+        vmaMapMemory(ctx.getAllocator(), staging.allocation, &mapped);
+        std::memcpy(mapped, pixels, imageSize);
+        vmaUnmapMemory(ctx.getAllocator(), staging.allocation);
+    }
 
     // Create image with transfer dst + src (src for mipmap generation) + sampled
     VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     if (generateMips) {
         usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    }
+    if (useHostCopy) {
+        usage |= VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT;
     }
     // Release anything this object already held: a second upload over the
     // same texture used to abandon the first, which is how three quest
@@ -84,8 +96,43 @@ bool VkTexture::upload(VkContext& ctx, const uint8_t* pixels, uint32_t width, ui
         format, usage, VK_SAMPLE_COUNT_1_BIT, mipLevels_, where);
 
     if (!image_.image) {
-        destroyBuffer(ctx.getAllocator(), staging);
+        if (!useHostCopy) destroyBuffer(ctx.getAllocator(), staging);
         return false;
+    }
+
+    if (useHostCopy) {
+        VkHostImageLayoutTransitionInfoEXT toDst{};
+        toDst.sType = VK_STRUCTURE_TYPE_HOST_IMAGE_LAYOUT_TRANSITION_INFO_EXT;
+        toDst.image = image_.image;
+        toDst.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        toDst.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        toDst.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0,
+                                  .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
+        ctx.transitionImageLayoutHostFn()(ctx.getDevice(), 1, &toDst);
+
+        VkMemoryToImageCopyEXT region{};
+        region.sType = VK_STRUCTURE_TYPE_MEMORY_TO_IMAGE_COPY_EXT;
+        region.pHostPointer = pixels;
+        region.imageSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0,
+                                   .baseArrayLayer = 0, .layerCount = 1};
+        region.imageExtent = {.width = width, .height = height, .depth = 1};
+
+        VkCopyMemoryToImageInfoEXT copy{};
+        copy.sType = VK_STRUCTURE_TYPE_COPY_MEMORY_TO_IMAGE_INFO_EXT;
+        copy.dstImage = image_.image;
+        copy.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        copy.regionCount = 1;
+        copy.pRegions = &region;
+        if (ctx.copyMemoryToImageFn()(ctx.getDevice(), &copy) != VK_SUCCESS) {
+            LOG_ERROR("host image copy failed for a ", width, "x", height, " texture");
+            return false;
+        }
+
+        VkHostImageLayoutTransitionInfoEXT toRead = toDst;
+        toRead.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        toRead.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        ctx.transitionImageLayoutHostFn()(ctx.getDevice(), 1, &toRead);
+        return true;
     }
 
     ctx.immediateSubmit([&](VkCommandBuffer cmd) {
