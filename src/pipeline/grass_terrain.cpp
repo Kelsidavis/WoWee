@@ -113,6 +113,14 @@ bool ChunkGrassContext::build(const MapChunk& chunk, const GroundEffectDensityFn
     return any;
 }
 
+void ChunkGrassContext::suppressLayer(size_t layerIdx) {
+    if (layerIdx >= layerCount) return;
+    grows[layerIdx] = false;
+    effectId[layerIdx] = 0;
+    growsAnything = false;
+    for (size_t i = 0; i < layerCount; ++i) growsAnything = growsAnything || grows[i];
+}
+
 GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk& chunk,
                                float fracX, float fracY) {
     GrassSuitability out;

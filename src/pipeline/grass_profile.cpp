@@ -24,6 +24,14 @@ bool has(const std::string& name, const char* needle) {
 
 } // namespace
 
+bool isRoadLikeTexture(const std::string& texturePath) {
+    std::string t = texturePath;
+    std::transform(t.begin(), t.end(), t.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return has(t, "road") || has(t, "cobble") || has(t, "path") ||
+           has(t, "street") || has(t, "pavement") || has(t, "brick");
+}
+
 GrassCategory categoriseDoodad(const std::string& modelPath) {
     const std::string name = basenameLower(modelPath);
 

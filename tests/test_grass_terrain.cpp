@@ -323,3 +323,38 @@ TEST_CASE("ground colour is the layers' blend, and absent when not provided",
         REQUIRE(east.groundColor.r > east.groundColor.g);   // mostly overlay
     }
 }
+
+TEST_CASE("a suppressed layer grows nothing whatever its effect says",
+          "[grass][terrain]") {
+    // What the renderer does to a road layer once it has seen the texture
+    // name. The effect is real and has density; the surface is still a road.
+    MapChunk chunk = makeFlatChunk();
+    chunk.layers.push_back(makeLayer(kGrassEffect));
+
+    wowee::pipeline::ChunkGrassContext context;
+    REQUIRE(context.build(chunk, densityFor));
+    REQUIRE(evaluateGrass(context, chunk, 4.0f, 4.0f).suitability == Catch::Approx(1.0f));
+
+    context.suppressLayer(0);
+    REQUIRE_FALSE(context.growsAnything);
+    REQUIRE(evaluateGrass(context, chunk, 4.0f, 4.0f).suitability == Catch::Approx(0.0f));
+}
+
+TEST_CASE("suppressing a road layer leaves the grass under it growing",
+          "[grass][terrain]") {
+    // A road blended over grass: the grass keeps its own weight and thins as
+    // the road takes over, which is the verge.
+    MapChunk chunk = makeFlatChunk();
+    chunk.layers.push_back(makeLayer(kGrassEffect));      // base: grass
+    const uint32_t offset = appendAlpha(chunk, rampAlpha());
+    chunk.layers.push_back(makeLayer(kGrassEffect, 0x100, offset));  // road, ramping in
+
+    wowee::pipeline::ChunkGrassContext context;
+    context.build(chunk, densityFor);
+    context.suppressLayer(1);
+    REQUIRE(context.growsAnything);
+
+    // West: almost all base grass. East: almost all road, so almost nothing.
+    REQUIRE(evaluateGrass(context, chunk, 0.2f, 4.0f).suitability > 0.9f);
+    REQUIRE(evaluateGrass(context, chunk, 7.8f, 4.0f).suitability < 0.1f);
+}

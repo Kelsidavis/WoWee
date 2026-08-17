@@ -1,6 +1,7 @@
 #include "rendering/terrain_manager.hpp"
 
 #include "pipeline/adt_alpha.hpp"
+#include "pipeline/grass_profile.hpp"
 #include "rendering/terrain_renderer.hpp"
 #include "rendering/vk_context.hpp"
 #include "rendering/water_renderer.hpp"
@@ -1872,14 +1873,10 @@ void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile
     size_t noDoodadModel = 0;
     std::array<uint16_t, 256> perChunkAdded{};
 
+    // pipeline::isRoadLikeTexture - shared with grass, which needs the same
+    // test for the same reason and used to lack it.
     auto isRoadLikeTexture = [](const std::string& texPath) -> bool {
-        std::string t = toLowerCopy(texPath);
-        return (t.find("road") != std::string::npos) ||
-               (t.find("cobble") != std::string::npos) ||
-               (t.find("path") != std::string::npos) ||
-               (t.find("street") != std::string::npos) ||
-               (t.find("pavement") != std::string::npos) ||
-               (t.find("brick") != std::string::npos);
+        return pipeline::isRoadLikeTexture(texPath);
     };
 
     auto layerWeightAt = [&](const pipeline::MapChunk& chunk, size_t layerIdx, int alphaIndex) -> int {

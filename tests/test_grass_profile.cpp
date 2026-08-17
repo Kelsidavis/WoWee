@@ -18,6 +18,7 @@ using wowee::pipeline::categoriseDoodad;
 using wowee::pipeline::deriveProfile;
 using wowee::pipeline::GrassCategory;
 using wowee::pipeline::GrassProfile;
+using wowee::pipeline::isRoadLikeTexture;
 using wowee::pipeline::profileFor;
 
 TEST_CASE("detail doodads are read by their type code", "[grass][profile]") {
@@ -134,4 +135,18 @@ TEST_CASE("weights shorter than the model list are treated as zero",
     const GrassProfile p = deriveProfile(models, {100});
     // Only the grass carried weight, so this is meadow.
     REQUIRE(p.densityScale == Catch::Approx(profileFor(GrassCategory::Meadow).densityScale));
+}
+
+TEST_CASE("made surfaces are recognised by name", "[grass][profile]") {
+    // Road textures carry real ground effects with real densities, so nothing
+    // in the effect data marks them as bare. The name is the only signal, and
+    // the shipped clutter placer has always relied on it alone.
+    REQUIRE(isRoadLikeTexture("Tileset\\Elwynn\\ElwynnCobbleStone01.blp"));
+    REQUIRE(isRoadLikeTexture("tileset/elwynn/ElwynnRoad01.blp"));
+    REQUIRE(isRoadLikeTexture("Tileset\\Human\\HumanPath.blp"));
+    REQUIRE(isRoadLikeTexture("StreetBrick.blp"));
+
+    REQUIRE_FALSE(isRoadLikeTexture("Tileset\\Elwynn\\ElwynnGrass01.blp"));
+    REQUIRE_FALSE(isRoadLikeTexture("Tileset\\Elwynn\\ElwynnDirt.blp"));
+    REQUIRE_FALSE(isRoadLikeTexture(""));
 }

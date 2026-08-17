@@ -2019,6 +2019,13 @@ void Renderer::updateGrassPopulation() {
                     context.layerColor[i] =
                         terrainManager->getTerrainTextureMeanColor(names[texId]);
                     context.hasLayerColors = true;
+                    // Nothing grows out of a road. Road textures carry real
+                    // ground effects with real densities - the effect data
+                    // never says otherwise - so only the name says so, which
+                    // is how the clutter placer has always known.
+                    if (pipeline::isRoadLikeTexture(names[texId])) {
+                        context.suppressLayer(i);
+                    }
                 }
             }
             cached = chunk;

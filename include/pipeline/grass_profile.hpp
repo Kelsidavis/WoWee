@@ -64,6 +64,14 @@ enum class GrassCategory {
 /// The profile for a single category.
 [[nodiscard]] GrassProfile profileFor(GrassCategory category);
 
+/// Whether a terrain texture is a made surface - road, path, cobble, brick.
+///
+/// These carry perfectly real ground effects with real densities, so nothing
+/// in the effect data says "do not grow here"; the shipped ground-clutter
+/// placer keeps detail doodads off roads with exactly this name test and
+/// nothing else. Grass needs the same test for the same reason.
+[[nodiscard]] bool isRoadLikeTexture(const std::string& texturePath);
+
 /// Blend the profiles of an effect's doodads, weighted as the effect weights
 /// them. Equal weights when every weight is zero, which some effects have.
 ///

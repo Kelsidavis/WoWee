@@ -77,6 +77,13 @@ struct ChunkGrassContext {
     /// Returns false when nothing in this chunk grows anything, so a caller
     /// can skip it whole.
     bool build(const MapChunk& chunk, const GroundEffectDensityFn& densityFor);
+
+    /// Stop a layer growing anything, whatever its ground effect says.
+    ///
+    /// For made surfaces. The caller applies it because the test is on the
+    /// texture's name and the names live on the tile, which pipeline code
+    /// never sees. Recomputes whether the chunk grows anything at all.
+    void suppressLayer(size_t layerIdx);
 };
 
 /// Sample using a context already built for this chunk.
