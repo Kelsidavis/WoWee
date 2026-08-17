@@ -86,7 +86,7 @@ TEST_CASE("moving the window slides over a fixed population", "[grass][populatio
         // Only blades the second window actually reaches: the window is round,
         // so a blade inside the first can sit outside the second.
         const float dx = a.x - 4.0f;
-        if (dx * dx + a.y * a.y > 9.0f * 9.0f) continue;
+        if (dx * dx + a.y * a.y > 8.0f * 8.0f) continue;
         const bool found = std::any_of(shifted.begin(), shifted.end(),
                                        [&](const GrassBladeSample& b) { return sameBlade(a, b); });
         REQUIRE(found);
@@ -169,11 +169,12 @@ TEST_CASE("generated blades are within the requested area", "[grass][population]
                          blades, 100000));
     REQUIRE(!blades.empty());
     for (const auto& b : blades) {
-        // Round window, with one lattice cell of slack: a cell whose centre is
-        // inside can jitter its blade just outside.
+        // Round window, with a couple of cells of slack: jitter deliberately
+        // reaches past a cell's own bounds, so a cell whose centre is inside
+        // can put its blade a little outside.
         const float dx = b.x - 50.0f;
         const float dy = b.y + 30.0f;
-        REQUIRE(std::sqrt(dx * dx + dy * dy) < radius + 1.0f);
+        REQUIRE(std::sqrt(dx * dx + dy * dy) < radius + 2.0f);
     }
 }
 

@@ -53,6 +53,10 @@ struct GrassSuitability {
 /// Density for a ground-effect id; 0 (or an unknown id) means no vegetation.
 using GroundEffectDensityFn = std::function<uint32_t(uint32_t effectId)>;
 
+/// A layer's texture path from its MTEX index, or empty if unavailable. The
+/// names live on the tile, which pipeline code never sees.
+using LayerTextureNameFn = std::function<std::string(uint32_t textureId)>;
+
 /// Everything about a chunk that does not change between samples.
 ///
 /// Built once per chunk and reused for every point in it. Without this,
@@ -80,7 +84,13 @@ struct ChunkGrassContext {
 
     /// Returns false when nothing in this chunk grows anything, so a caller
     /// can skip it whole.
-    bool build(const MapChunk& chunk, const GroundEffectDensityFn& densityFor);
+    /// `textureNameFor` is what keeps grass off made surfaces. Road textures
+    /// carry ordinary ground effects with ordinary densities, so the effect
+    /// data never marks them; only the name does. Omitting it grows grass on
+    /// roads, which is why it lives here rather than in the caller where it
+    /// could quietly not run.
+    bool build(const MapChunk& chunk, const GroundEffectDensityFn& densityFor,
+               const LayerTextureNameFn& textureNameFor = {});
 
     /// Stop a layer growing anything, whatever its ground effect says.
     ///

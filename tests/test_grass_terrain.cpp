@@ -363,3 +363,29 @@ TEST_CASE("suppressing a road layer leaves the grass under it growing",
     REQUIRE(evaluateGrass(context, chunk, 0.2f, 4.0f).suitability > 0.9f);
     REQUIRE(evaluateGrass(context, chunk, 7.8f, 4.0f).suitability < 0.1f);
 }
+
+TEST_CASE("a road texture keeps grass off, whatever its effect says",
+          "[grass][terrain]") {
+    // The road's ground effect is as real as a meadow's - this is the only
+    // thing in the whole chain that knows a road is a road. It lives inside
+    // build() rather than in the caller because a caller can quietly not run
+    // it, and then grass grows down the middle of every street.
+    MapChunk chunk = makeFlatChunk();
+    TextureLayer road = makeLayer(kGrassEffect);
+    road.textureId = 3;
+    chunk.layers.push_back(road);
+
+    auto nameFor = [](uint32_t texId) -> std::string {
+        return texId == 3 ? "Tileset\\Elwynn\\ElwynnCobbleStoneBase.blp" : "";
+    };
+
+    wowee::pipeline::ChunkGrassContext paved;
+    REQUIRE_FALSE(paved.build(chunk, densityFor, nameFor));
+    REQUIRE(evaluateGrass(paved, chunk, 4.0f, 4.0f).suitability == Catch::Approx(0.0f));
+
+    // Without the names it cannot know, and grows - which is the failure this
+    // guards, stated the way it actually happened.
+    wowee::pipeline::ChunkGrassContext blind;
+    REQUIRE(blind.build(chunk, densityFor));
+    REQUIRE(evaluateGrass(blind, chunk, 4.0f, 4.0f).suitability == Catch::Approx(1.0f));
+}

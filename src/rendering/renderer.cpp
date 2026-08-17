@@ -2005,29 +2005,27 @@ void Renderer::updateGrassPopulation() {
         }
         if (!chunk) { ++noChunk; return {}; }
         if (chunk != cached) {
+            // The texture names live on the tile, which pipeline code never
+            // sees, so they arrive as a lookup. build() uses them to keep
+            // grass off made surfaces; nothing else can, because a road's
+            // ground effect is as real as a meadow's.
+            const TerrainTile* tile = cachedTile;
+            auto textureNameFor = [tile](uint32_t texId) -> std::string {
+                if (!tile || texId >= tile->terrain.textures.size()) return {};
+                return tile->terrain.textures[texId];
+            };
             context = pipeline::ChunkGrassContext{};
-            context.build(*chunk, densityFor);
-            // The layers' mean texture colours, which the context cannot fetch
-            // itself: the texture names live on the tile, and the tile is a
-            // rendering-side object pipeline code never sees.
-            if (cachedTile) {
-                const auto& names = cachedTile->terrain.textures;
-                const size_t n = std::min<size_t>(chunk->layers.size(), 4);
-                for (size_t i = 0; i < n; ++i) {
-                    const uint32_t texId = chunk->layers[i].textureId;
-                    if (texId >= names.size()) continue;
-                    const auto tones = terrainManager->getTerrainTextureTones(names[texId]);
-                    context.layerShadow[i] = tones.shadow;
-                    context.layerHighlight[i] = tones.highlight;
-                    context.hasLayerColors = true;
-                    // Nothing grows out of a road. Road textures carry real
-                    // ground effects with real densities - the effect data
-                    // never says otherwise - so only the name says so, which
-                    // is how the clutter placer has always known.
-                    if (pipeline::isRoadLikeTexture(names[texId])) {
-                        context.suppressLayer(i);
-                    }
-                }
+            context.build(*chunk, densityFor, textureNameFor);
+
+            // The tones the ground is painted in, for colouring the blades.
+            const size_t n = std::min<size_t>(chunk->layers.size(), 4);
+            for (size_t i = 0; i < n; ++i) {
+                const std::string name = textureNameFor(chunk->layers[i].textureId);
+                if (name.empty()) continue;
+                const auto tones = terrainManager->getTerrainTextureTones(name);
+                context.layerShadow[i] = tones.shadow;
+                context.layerHighlight[i] = tones.highlight;
+                context.hasLayerColors = true;
             }
             cached = chunk;
             if (!reportedChain) {
@@ -2079,16 +2077,18 @@ void Renderer::updateGrassPopulation() {
         const TerrainTile* tile = nullptr;
         if (const pipeline::MapChunk* here =
                 terrainManager->findChunkAt(center.x, center.y, fx, fy, &tile)) {
+            auto nameFor = [tile](uint32_t texId) -> std::string {
+                if (!tile || texId >= tile->terrain.textures.size()) return {};
+                return tile->terrain.textures[texId];
+            };
             pipeline::ChunkGrassContext ctx;
-            ctx.build(*here, densityFor);
+            ctx.build(*here, densityFor, nameFor);
             std::string report;
             for (size_t i = 0; i < std::min<size_t>(here->layers.size(), 4); ++i) {
                 const uint32_t texId = here->layers[i].textureId;
-                const std::string name =
-                    (tile && texId < tile->terrain.textures.size())
-                        ? tile->terrain.textures[texId] : std::string("<none>");
+                const std::string name = nameFor(texId).empty() ? std::string("<none>")
+                                                                : nameFor(texId);
                 const bool road = pipeline::isRoadLikeTexture(name);
-                if (road) ctx.suppressLayer(i);
                 report += "\n    [" + std::to_string(i) + "] effect=" +
                           std::to_string(here->layers[i].effectId) + " density=" +
                           std::to_string(terrainManager->getGroundEffectDensity(

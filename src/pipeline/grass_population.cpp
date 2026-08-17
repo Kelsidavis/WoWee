@@ -93,10 +93,19 @@ bool populateArea(float centerX, float centerY, float radius,
 
     for (int32_t cy = minCellY; cy <= maxCellY; ++cy) {
         for (int32_t cx = minCellX; cx <= maxCellX; ++cx) {
-            // Jitter off the lattice, or the field reads as a checkerboard.
-            const float jx = hashUnit(cx, cy, params.seed ^ 0x01u) - 0.5f;
-            const float jy = hashUnit(cx, cy, params.seed ^ 0x02u) - 0.5f;
-            const float wx = (static_cast<float>(cx) + 0.5f + jx) * spacing;
+            // Off the lattice, hard enough that no lattice shows through.
+            //
+            // A jitter of half a cell keeps every blade inside its own cell,
+            // which is stratified sampling: it enforces a minimum spacing
+            // between neighbours and the field comes out in rows, like a
+            // planted crop. Jittering past the cell lets blades cluster and
+            // leave gaps, which is what a meadow does. Alternate rows are also
+            // offset half a cell, so the columns that ran north to south have
+            // no straight line left to run along.
+            const float rowShift = (cy & 1) ? 0.5f : 0.0f;
+            const float jx = (hashUnit(cx, cy, params.seed ^ 0x01u) - 0.5f) * 1.9f;
+            const float jy = (hashUnit(cx, cy, params.seed ^ 0x02u) - 0.5f) * 1.9f;
+            const float wx = (static_cast<float>(cx) + 0.5f + rowShift + jx) * spacing;
             const float wy = (static_cast<float>(cy) + 0.5f + jy) * spacing;
 
             // Round, not square. Grass draws within a radius of the player, so

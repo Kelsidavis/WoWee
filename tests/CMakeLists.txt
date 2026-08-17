@@ -1912,6 +1912,7 @@ wowee_add_test(test_grass_terrain
     SOURCES test_grass_terrain.cpp
             ${TEST_COMMON_SOURCES}
             ${CMAKE_SOURCE_DIR}/src/pipeline/grass_terrain.cpp
+            ${CMAKE_SOURCE_DIR}/src/pipeline/grass_profile.cpp
             ${CMAKE_SOURCE_DIR}/src/pipeline/terrain_mesh.cpp
             ${CMAKE_SOURCE_DIR}/src/pipeline/adt_alpha.cpp
             ${CMAKE_SOURCE_DIR}/src/pipeline/adt_loader.cpp)

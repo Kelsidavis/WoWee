@@ -7,6 +7,7 @@
 
 #include "core/coordinates.hpp"
 #include "pipeline/adt_alpha.hpp"
+#include "pipeline/grass_profile.hpp"
 #include "pipeline/terrain_mesh.hpp"
 
 namespace wowee {
@@ -83,7 +84,8 @@ float sampleHeight(const MapChunk& chunk, float fracX, float fracY) {
 
 } // namespace
 
-bool ChunkGrassContext::build(const MapChunk& chunk, const GroundEffectDensityFn& densityFor) {
+bool ChunkGrassContext::build(const MapChunk& chunk, const GroundEffectDensityFn& densityFor,
+                              const LayerTextureNameFn& textureNameFor) {
     layerCount = std::min<size_t>(chunk.layers.size(), 4);
     bool any = false;
     for (size_t i = 0; i < layerCount; ++i) {
@@ -103,6 +105,11 @@ bool ChunkGrassContext::build(const MapChunk& chunk, const GroundEffectDensityFn
         effectId[i] = layer.effectId;
         const uint32_t density = (effectId[i] != 0 && densityFor) ? densityFor(effectId[i]) : 0;
         grows[i] = density != 0;
+        // Nothing grows out of a road, and only the name says so.
+        if (grows[i] && textureNameFor && isRoadLikeTexture(textureNameFor(layer.textureId))) {
+            grows[i] = false;
+            effectId[i] = 0;
+        }
         any = any || grows[i];
         if (i == 0) continue;  // layer 0 is the base and carries no alpha map
         // Unset texels read as zero coverage: a layer whose data runs out is
