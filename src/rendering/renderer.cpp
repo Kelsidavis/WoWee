@@ -881,6 +881,7 @@ void Renderer::applyMsaaChange() {
 
     // Recreate all sub-renderer pipelines (they embed sample count from render pass)
     if (terrainRenderer) terrainRenderer->recreatePipelines();
+    if (grassRenderer_) grassRenderer_->recreatePipelines();
     if (waterRenderer) {
         waterRenderer->recreatePipelines();
         // Under MSAA the water draws single-sampled in its own pass, after the

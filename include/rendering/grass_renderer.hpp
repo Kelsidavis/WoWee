@@ -39,6 +39,10 @@ public:
     bool initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout);
     void shutdown();
 
+    /// Rebuild the graphics pipeline against the current render pass. Called
+    /// when MSAA or the swapchain changes, like every other renderer.
+    void recreatePipelines();
+
     /// Record the cull dispatch. Must run outside a render pass, before
     /// `render()` for the same frame.
     ///
@@ -71,8 +75,10 @@ private:
     bool createPerFrameBuffers();
     bool createCullPipeline();
     bool createDrawPipeline(VkDescriptorSetLayout perFrameLayout);
+    bool buildDrawPipeline();
 
     VkContext* vkCtx_ = nullptr;
+    VkDescriptorSetLayout perFrameLayout_ = VK_NULL_HANDLE;
     uint32_t bladeCount_ = 0;
     bool cullReported_ = false;
     uint32_t framesSincePopulated_ = 0;

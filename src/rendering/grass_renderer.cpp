@@ -366,11 +366,19 @@ bool GrassRenderer::createDrawPipeline(VkDescriptorSetLayout perFrameLayout) {
         vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
     }
 
+    perFrameLayout_ = perFrameLayout;
+    return buildDrawPipeline();
+}
+
+bool GrassRenderer::buildDrawPipeline() {
+    VkDevice device = vkCtx_->getDevice();
+    destroyPipeline(device, pipeline_, pipelineLayout_);
+
     auto shaders = loadShaderPair(device, "assets/shaders/grass.vert.spv",
                                   "assets/shaders/grass.frag.spv", "grass");
     if (!shaders) return false;
 
-    pipelineLayout_ = createPipelineLayout(device, {perFrameLayout, drawSetLayout_}, {});
+    pipelineLayout_ = createPipelineLayout(device, {perFrameLayout_, drawSetLayout_}, {});
     if (pipelineLayout_ == VK_NULL_HANDLE) return false;
 
     // No vertex input: the shader builds the quad from gl_VertexIndex and reads
@@ -459,6 +467,20 @@ void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const
         dep.memoryBarrierCount = 1;
         dep.pMemoryBarriers = &barrier;
         cmdPipelineBarrier2(cmd, dep);
+    }
+}
+
+void GrassRenderer::recreatePipelines() {
+    // The graphics pipeline embeds the render pass's sample count, and the
+    // scene's pass is rebuilt whenever MSAA changes. Without this the pipeline
+    // keeps the count it was built with and every draw is a render-pass
+    // incompatibility - which the driver here executed anyway, so it showed up
+    // only as validation errors rather than as anything visible.
+    //
+    // The compute pipeline has no render pass and is left alone.
+    if (!vkCtx_ || pipelineLayout_ == VK_NULL_HANDLE) return;
+    if (!buildDrawPipeline()) {
+        LOG_ERROR("GrassRenderer: failed to rebuild the draw pipeline");
     }
 }
 
