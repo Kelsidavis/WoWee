@@ -57,6 +57,9 @@ public:
     /// Blades beyond kMaxBlades are dropped, and the caller is told.
     bool setPopulation(const pipeline::GrassBladeSample* blades, size_t count);
 
+    /// Log how many blades the cull kept, once. Diagnostic only.
+    void reportCullResult();
+
     [[nodiscard]] bool isReady() const { return pipeline_ != VK_NULL_HANDLE; }
     [[nodiscard]] uint32_t bladeCount() const { return bladeCount_; }
 
@@ -71,6 +74,7 @@ private:
 
     VkContext* vkCtx_ = nullptr;
     uint32_t bladeCount_ = 0;
+    bool cullReported_ = false;
 
 
     // Shared, written once at load.

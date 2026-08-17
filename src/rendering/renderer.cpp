@@ -1039,6 +1039,7 @@ void Renderer::beginFrame() {
     // the count it produces is consumed by the indirect draw on the GPU.
     if (grassRenderer_ && camera && vkCtx) {
         updateGrassPopulation();
+        grassRenderer_->reportCullResult();
         grassRenderer_->dispatchCull(currentCmd, vkCtx->getCurrentFrame(), *camera);
     }
 
@@ -2007,6 +2008,17 @@ void Renderer::updateGrassPopulation() {
 
     const double totalMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+    if (!blades.empty()) {
+        float minZ = blades[0].z, maxZ = blades[0].z;
+        float minH = blades[0].height, maxH = blades[0].height;
+        for (const auto& b : blades) {
+            minZ = std::min(minZ, b.z); maxZ = std::max(maxZ, b.z);
+            minH = std::min(minH, b.height); maxH = std::max(maxH, b.height);
+        }
+        LOG_INFO("Grass extent: player=(", center.x, ",", center.y, ",", center.z,
+                 ") bladeZ=[", minZ, ",", maxZ, "] height=[", minH, ",", maxH,
+                 "] first=(", blades[0].x, ",", blades[0].y, ",", blades[0].z, ")");
+    }
     if (blades.empty()) {
         LOG_INFO("Grass population empty: ", sampled, " samples, ", noChunk,
                  " with no chunk under them");

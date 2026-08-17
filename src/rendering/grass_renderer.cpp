@@ -212,7 +212,8 @@ bool GrassRenderer::createPerFrameBuffers() {
         command.firstInstance = 0;
         AllocatedBuffer indirect = uploadBuffer(*vkCtx_, &command, sizeof(command),
                                                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                                                    VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+                                                    VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT |
+                                                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
         if (indirect.buffer == VK_NULL_HANDLE) return false;
         indirectBuffer_[i] = indirect.buffer;
         indirectAlloc_[i] = indirect.allocation;
@@ -458,6 +459,38 @@ void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const
         dep.pMemoryBarriers = &barrier;
         cmdPipelineBarrier2(cmd, dep);
     }
+}
+
+void GrassRenderer::reportCullResult() {
+    // One-shot, and the only host read of the counter anywhere. A draw that
+    // records nothing and a cull that keeps nothing are the same silence from
+    // outside, and telling them apart by reasoning has already cost several
+    // runs. Reads the slot the previous frame wrote, so no waiting is needed
+    // beyond the submit this makes.
+    if (cullReported_ || bladeCount_ == 0) return;
+    cullReported_ = true;
+
+    AllocatedBuffer readback = createBuffer(vkCtx_->getAllocator(),
+                                            sizeof(VkDrawIndexedIndirectCommand),
+                                            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                            VMA_MEMORY_USAGE_GPU_TO_CPU);
+    if (readback.buffer == VK_NULL_HANDLE) return;
+
+    vkCtx_->immediateSubmit([&](VkCommandBuffer copyCmd) {
+        VkBufferCopy region{};
+        region.size = sizeof(VkDrawIndexedIndirectCommand);
+        vkCmdCopyBuffer(copyCmd, indirectBuffer_[0], readback.buffer, 1, &region);
+    });
+
+    void* mapped = nullptr;
+    if (vmaMapMemory(vkCtx_->getAllocator(), readback.allocation, &mapped) == VK_SUCCESS) {
+        VkDrawIndexedIndirectCommand command{};
+        std::memcpy(&command, mapped, sizeof(command));
+        vmaUnmapMemory(vkCtx_->getAllocator(), readback.allocation);
+        LOG_INFO("Grass cull result: ", command.instanceCount, " of ", bladeCount_,
+                 " blades survived, indexCount=", command.indexCount);
+    }
+    destroyBuffer(vkCtx_->getAllocator(), readback);
 }
 
 void GrassRenderer::render(VkCommandBuffer cmd, uint32_t frameIndex,
