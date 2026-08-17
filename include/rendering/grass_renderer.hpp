@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
@@ -61,6 +62,14 @@ public:
     /// Blades beyond kMaxBlades are dropped, and the caller is told.
     bool setPopulation(const pipeline::GrassBladeSample* blades, size_t count);
 
+    /// Replace the vegetation profile table the shaders index by blade.
+    /// Uploaded whole; there are a few dozen at most.
+    bool setProfiles(const std::vector<pipeline::GrassProfile>& profiles);
+
+    /// Profiles the table can hold. Ground effects number in the hundreds but
+    /// distinct profiles do not, because they are a blend of five categories.
+    static constexpr uint32_t kMaxProfiles = 64;
+
     /// Log how many blades the cull kept, once. Diagnostic only.
     void reportCullResult();
 
@@ -88,6 +97,8 @@ private:
     // Shared, written once at load.
     VkBuffer sourceBuffer_ = VK_NULL_HANDLE;
     VmaAllocation sourceAlloc_ = VK_NULL_HANDLE;
+    VkBuffer profileBuffer_ = VK_NULL_HANDLE;
+    VmaAllocation profileAlloc_ = VK_NULL_HANDLE;
     VkBuffer indexBuffer_ = VK_NULL_HANDLE;
     VmaAllocation indexAlloc_ = VK_NULL_HANDLE;
 

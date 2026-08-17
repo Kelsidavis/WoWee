@@ -24,13 +24,15 @@ layout(set = 0, binding = 0) uniform PerFrame {
 
 layout(location = 0) in float vHeightT;
 layout(location = 1) in vec3 vNormal;
+layout(location = 2) in vec3 vRootColor;
+layout(location = 3) in vec3 vTipColor;
 
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    const vec3 rootColor = vec3(0.09, 0.17, 0.05);
-    const vec3 tipColor  = vec3(0.34, 0.50, 0.16);
-    vec3 albedo = mix(rootColor, tipColor, vHeightT * vHeightT);
+    // Colours come from the ground's own vegetation profile, so scree, dry
+    // scrub and meadow differ without anything here knowing which zone it is.
+    vec3 albedo = mix(vRootColor, vTipColor, vHeightT * vHeightT);
 
     // Two-sided: a blade is one strip and is lit from whichever face is turned
     // to the camera.

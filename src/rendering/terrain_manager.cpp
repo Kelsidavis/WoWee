@@ -2132,6 +2132,24 @@ void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile
     }
 }
 
+void TerrainManager::getGroundEffectDoodads(uint32_t effectId,
+                                            std::vector<std::string>& outModels,
+                                            std::vector<uint32_t>& outWeights) const {
+    outModels.clear();
+    outWeights.clear();
+    const auto it = groundEffectById_.find(effectId);
+    if (it == groundEffectById_.end()) return;
+
+    for (size_t i = 0; i < it->second.doodadIds.size(); ++i) {
+        const uint32_t doodadId = it->second.doodadIds[i];
+        if (doodadId == 0) continue;
+        const auto model = groundDoodadModelById_.find(doodadId);
+        if (model == groundDoodadModelById_.end()) continue;
+        outModels.push_back(model->second);
+        outWeights.push_back(it->second.weights[i]);
+    }
+}
+
 uint32_t TerrainManager::getGroundEffectDensity(uint32_t effectId) const {
     if (effectId == 0) return 0;
     const auto it = groundEffectById_.find(effectId);

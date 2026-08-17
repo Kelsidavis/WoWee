@@ -40,8 +40,23 @@ layout(std430, set = 1, binding = 1) readonly buffer VisibleIndices {
     uint visibleIndices[];
 };
 
+// Matches GrassProfileGPU in include/rendering/grass_blade.hpp (std430).
+// What grows on this patch of ground, derived from the detail doodads the map
+// plants there.
+struct GrassProfile {
+    vec4 rootColor;
+    vec4 tipColor;
+    vec4 params;   // x = colour variation, y = stiffness
+};
+
+layout(std430, set = 1, binding = 2) readonly buffer GrassProfiles {
+    GrassProfile profiles[];
+};
+
 layout(location = 0) out float vHeightT;
 layout(location = 1) out vec3 vNormal;
+layout(location = 2) out vec3 vRootColor;
+layout(location = 3) out vec3 vTipColor;
 
 // Five segments, six rows of two vertices.
 const float kSegments = 5.0;
@@ -57,6 +72,11 @@ void main() {
     float facing = blade.facingWidthPhase.x;
     float width  = blade.facingWidthPhase.y;
     float seed   = blade.facingWidthPhase.w;
+
+    GrassProfile profile = profiles[uint(blade.facingWidthPhase.z + 0.5)];
+    // Stiff growth resists both the wind and being trodden on, so it divides
+    // every bend rather than being subtracted from one of them.
+    float give = 1.0 / max(profile.params.y, 0.01);
 
     // Row up the blade and which side of it this vertex is.
     float row  = floor(float(gl_VertexIndex) * 0.5);
@@ -82,7 +102,7 @@ void main() {
 
     // A single world direction, so the whole field leans together.
     vec2 windDir = normalize(vec2(0.80, 0.60));
-    vec2 bendVec = windDir * (windAmount * height * kWindBend);
+    vec2 bendVec = windDir * (windAmount * height * kWindBend * give);
 
     // ---- The player brushing past -----------------------------------------
     // Ported from m2.vert.glsl:139-199. The size gate is dropped - every blade
@@ -116,7 +136,7 @@ void main() {
 
         // Trodden grass lies most of the way over, unlike the clutter this is
         // ported from, which only leans.
-        bendVec += dir * (influence * height * 0.85);
+        bendVec += dir * (influence * height * 0.85 * give);
 
         // A quiver riding on the bend, only while the player is moving, phased
         // per blade so the patch shivers rather than pulsing in unison.
@@ -149,6 +169,12 @@ void main() {
     // Z is up in render space (renderX = wowY, renderY = wowX, renderZ = wowZ).
     vec3 across = vec3(cos(facing), sin(facing), 0.0);
     vec3 world  = root + curve + across * (halfWidth * side);
+
+    // Blade-to-blade colour, varied by as much as the profile allows. Seeded
+    // from the blade, so a blade keeps its own shade rather than shimmering.
+    float tint = 1.0 + (seed - 0.5) * 2.0 * profile.params.x;
+    vRootColor = profile.rootColor.rgb * tint;
+    vTipColor  = profile.tipColor.rgb * tint;
 
     vHeightT = t;
     // Face out of the blade, and let it curl a little across its width so it

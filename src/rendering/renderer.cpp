@@ -29,6 +29,7 @@
 #include "rendering/character_preview.hpp"
 #include "rendering/wmo_renderer.hpp"
 #include "rendering/m2_renderer.hpp"
+#include "pipeline/grass_profile.hpp"
 #include "pipeline/grass_population.hpp"
 #include "pipeline/grass_terrain.hpp"
 #include "rendering/grass_renderer.hpp"
@@ -1913,6 +1914,26 @@ void Renderer::setFSR2Enabled(bool enabled) {
         pendingMsaaSamples_ = VK_SAMPLE_COUNT_1_BIT;
     }
 }
+uint32_t Renderer::grassProfileFor(uint32_t effectId) {
+    const auto known = grassProfileIndex_.find(effectId);
+    if (known != grassProfileIndex_.end()) return known->second;
+
+    // Derived once per effect and kept. The table is uploaded whole whenever
+    // it grows, which happens a handful of times as the player crosses into
+    // ground they have not stood on before and then stops.
+    std::vector<std::string> models;
+    std::vector<uint32_t> weights;
+    if (terrainManager) terrainManager->getGroundEffectDoodads(effectId, models, weights);
+
+    uint32_t index = 0;
+    if (grassProfiles_.size() < GrassRenderer::kMaxProfiles) {
+        index = static_cast<uint32_t>(grassProfiles_.size());
+        grassProfiles_.push_back(pipeline::deriveProfile(models, weights));
+    }
+    grassProfileIndex_[effectId] = index;
+    return index;
+}
+
 void Renderer::updateGrassPopulation() {
     if (!grassRenderer_ || !grassRenderer_->isReady() || !terrainManager) return;
 
@@ -2009,10 +2030,28 @@ void Renderer::updateGrassPopulation() {
         return;
     }
 
+    const size_t profilesBefore = grassProfiles_.size();
+    auto profileFor = [this](uint32_t effectId) {
+        pipeline::GrassProfileRef ref;
+        ref.index = grassProfileFor(effectId);
+        const auto& p = grassProfiles_[ref.index];
+        ref.heightScale = p.heightScale;
+        ref.widthScale = p.widthScale;
+        ref.densityScale = p.densityScale;
+        return ref;
+    };
+
     const auto started = std::chrono::steady_clock::now();
     std::vector<pipeline::GrassBladeSample> blades;
     const bool complete = populateArea(center.x, center.y, kWindowRadius, params,
-                                       sampler, blades, GrassRenderer::kMaxBlades);
+                                       sampler, blades, GrassRenderer::kMaxBlades,
+                                       profileFor);
+
+    // Only when it grew. The shaders index this by blade, so it has to reach
+    // the device before the population that refers to it does.
+    if (grassProfiles_.size() != profilesBefore) {
+        grassRenderer_->setProfiles(grassProfiles_);
+    }
     const double generateMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
 

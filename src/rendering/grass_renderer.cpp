@@ -9,6 +9,7 @@
 #include "rendering/frustum.hpp"
 #include "rendering/vk_pipeline.hpp"
 #include "rendering/vk_shader.hpp"
+#include "pipeline/grass_profile.hpp"
 #include "rendering/vk_utils.hpp"
 
 namespace wowee {
@@ -125,6 +126,22 @@ bool GrassRenderer::createSourceBuffer() {
     setObjectName(vkCtx_->getDevice(), VK_OBJECT_TYPE_BUFFER,
                   reinterpret_cast<uint64_t>(sourceBuffer_), "grass source blades");
 
+    // One profile per distinct vegetation mix. Uploaded with a meadow default
+    // so a draw before the table is built is green rather than black.
+    std::vector<GrassProfileGPU> defaults(kMaxProfiles);
+    const pipeline::GrassProfile meadow;
+    for (auto& g : defaults) {
+        g.rootColor = glm::vec4(meadow.rootColor, 0.0f);
+        g.tipColor = glm::vec4(meadow.tipColor, 0.0f);
+        g.params = glm::vec4(meadow.colorVariation, meadow.stiffness, 0.0f, 0.0f);
+    }
+    AllocatedBuffer profiles = uploadBuffer(*vkCtx_, defaults.data(),
+                                            sizeof(GrassProfileGPU) * kMaxProfiles,
+                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    if (profiles.buffer == VK_NULL_HANDLE) return false;
+    profileBuffer_ = profiles.buffer;
+    profileAlloc_ = profiles.allocation;
+
     // One index list, shared by every blade.
     const auto indexData = bladeIndices();
     AllocatedBuffer indices = uploadBuffer(*vkCtx_, indexData.data(),
@@ -151,7 +168,8 @@ bool GrassRenderer::setPopulation(const pipeline::GrassBladeSample* blades, size
     for (size_t i = 0; i < count; ++i) {
         const auto& b = blades[i];
         packed[i].positionHeight = glm::vec4(b.x, b.y, b.z, b.height);
-        packed[i].facingWidthPhase = glm::vec4(b.facing, b.width, 0.0f, b.phase);
+        packed[i].facingWidthPhase =
+            glm::vec4(b.facing, b.width, static_cast<float>(b.profileIndex), b.phase);
     }
 
     const VkDeviceSize bytes = sizeof(GrassBladeGPU) * count;
@@ -231,7 +249,7 @@ bool GrassRenderer::createCullPipeline() {
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = kFrames;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[1].descriptorCount = kFrames * 5;
+    poolSizes[1].descriptorCount = kFrames * 6;
 
     VkDescriptorPoolCreateInfo poolCi{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     poolCi.maxSets = kFrames * 2;
@@ -322,8 +340,8 @@ bool GrassRenderer::createDrawPipeline(VkDescriptorSetLayout perFrameLayout) {
 
     // Set 1: the source blades and this frame's visible list. Set 0 stays the
     // per-frame UBO, as everywhere else.
-    VkDescriptorSetLayoutBinding bindings[2]{};
-    for (uint32_t b = 0; b < 2; ++b) {
+    VkDescriptorSetLayoutBinding bindings[3]{};
+    for (uint32_t b = 0; b < 3; ++b) {
         bindings[b].binding = b;
         bindings[b].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         bindings[b].descriptorCount = 1;
@@ -331,7 +349,7 @@ bool GrassRenderer::createDrawPipeline(VkDescriptorSetLayout perFrameLayout) {
     }
     VkDescriptorSetLayoutCreateInfo layoutCi{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    layoutCi.bindingCount = 2;
+    layoutCi.bindingCount = 3;
     layoutCi.pBindings = bindings;
     if (vkCreateDescriptorSetLayout(device, &layoutCi, nullptr, &drawSetLayout_) != VK_SUCCESS) {
         return false;
@@ -350,7 +368,9 @@ bool GrassRenderer::createDrawPipeline(VkDescriptorSetLayout perFrameLayout) {
             .buffer = sourceBuffer_, .offset = 0, .range = VK_WHOLE_SIZE};
         VkDescriptorBufferInfo visibleInfo{
             .buffer = visibleBuffer_[i], .offset = 0, .range = VK_WHOLE_SIZE};
-        VkWriteDescriptorSet writes[2]{};
+        VkDescriptorBufferInfo profileInfo{
+            .buffer = profileBuffer_, .offset = 0, .range = VK_WHOLE_SIZE};
+        VkWriteDescriptorSet writes[3]{};
         writes[0] = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
         writes[0].dstSet = drawSet_[i];
         writes[0].dstBinding = 0;
@@ -363,7 +383,13 @@ bool GrassRenderer::createDrawPipeline(VkDescriptorSetLayout perFrameLayout) {
         writes[1].descriptorCount = 1;
         writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         writes[1].pBufferInfo = &visibleInfo;
-        vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
+        writes[2] = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+        writes[2].dstSet = drawSet_[i];
+        writes[2].dstBinding = 2;
+        writes[2].descriptorCount = 1;
+        writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        writes[2].pBufferInfo = &profileInfo;
+        vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
     }
 
     perFrameLayout_ = perFrameLayout;
@@ -470,6 +496,39 @@ void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const
     }
 }
 
+bool GrassRenderer::setProfiles(const std::vector<pipeline::GrassProfile>& profiles) {
+    if (!vkCtx_ || profileBuffer_ == VK_NULL_HANDLE || profiles.empty()) return false;
+    const size_t count = std::min<size_t>(profiles.size(), kMaxProfiles);
+
+    std::vector<GrassProfileGPU> packed(count);
+    for (size_t i = 0; i < count; ++i) {
+        packed[i].rootColor = glm::vec4(profiles[i].rootColor, 0.0f);
+        packed[i].tipColor = glm::vec4(profiles[i].tipColor, 0.0f);
+        packed[i].params = glm::vec4(profiles[i].colorVariation, profiles[i].stiffness,
+                                     0.0f, 0.0f);
+    }
+
+    const VkDeviceSize bytes = sizeof(GrassProfileGPU) * count;
+    AllocatedBuffer staging = createBuffer(vkCtx_->getAllocator(), bytes,
+                                           VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                           VMA_MEMORY_USAGE_CPU_ONLY);
+    if (staging.buffer == VK_NULL_HANDLE) return false;
+    void* mapped = nullptr;
+    if (vmaMapMemory(vkCtx_->getAllocator(), staging.allocation, &mapped) != VK_SUCCESS) {
+        destroyBuffer(vkCtx_->getAllocator(), staging);
+        return false;
+    }
+    std::memcpy(mapped, packed.data(), bytes);
+    vmaUnmapMemory(vkCtx_->getAllocator(), staging.allocation);
+    vkCtx_->immediateSubmit([&](VkCommandBuffer cmd) {
+        VkBufferCopy region{};
+        region.size = bytes;
+        vkCmdCopyBuffer(cmd, staging.buffer, profileBuffer_, 1, &region);
+    });
+    destroyBuffer(vkCtx_->getAllocator(), staging);
+    return true;
+}
+
 void GrassRenderer::recreatePipelines() {
     // The graphics pipeline embeds the render pass's sample count, and the
     // scene's pass is rebuilt whenever MSAA changes. Without this the pipeline
@@ -566,6 +625,7 @@ void GrassRenderer::shutdown() {
     }
     destroy(allocator, sourceBuffer_, sourceAlloc_);
     destroy(allocator, indexBuffer_, indexAlloc_);
+    destroy(allocator, profileBuffer_, profileAlloc_);
 
     bladeCount_ = 0;
     vkCtx_ = nullptr;

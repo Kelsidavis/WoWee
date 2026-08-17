@@ -1,6 +1,6 @@
 # GPU-Driven Grass — Phased Implementation Plan
 
-**Status:** Phases 1, 2, 3 and 5 complete. Next: Phase 4.
+**Status:** Phases 1, 2, 3, 4 and 5 complete. Next: Phase 6.
 **Branch:** `grass`
 **Spec:** [`docs/grass-spec.md`](grass-spec.md) — every `spec §N` below refers to a numbered
 section there. The spec is **not** authoritative; this plan and the repository are. See §2.
@@ -396,6 +396,33 @@ this visible.
 
 The Bezier does the height weighting the M2 path applies separately: the root
 is a fixed control point, so motion collects at the tip on its own.
+
+### Phase 4 — done
+
+`pipeline::deriveProfile` in `include/pipeline/grass_profile.hpp`. Six cases,
+ctest `grass_profile`.
+
+**The doodad names are the classification.** The shipped detail set is named
+`<zone><type><n>`, and the type is one of about a dozen three-letter codes:
+`gra` 156 of them, `bus` 119, `roc` 71, `flo` 67, then bones, branches,
+thorns, coral, mushrooms. An effect that plants mostly `gra` is meadow; one
+that plants mostly `roc` is scree with a little growth between the stones. A
+profile is the weighted blend of the five categories those fall into, so
+nothing in it knows what a zone is - and a profile needing a per-zone
+correction would be the wrong shape entirely.
+
+The scales that change geometry and count (height, width, density) are applied
+when the population is generated and never reach the device. Colour, colour
+variation and stiffness go up as a small table the blade indexes, in the field
+carried unused since Phase 1 for exactly this - the blade is still 32 bytes.
+
+Stiffness divides both the wind bend and the player bend rather than being
+subtracted from one, so stiff growth resists everything that moves it.
+
+Two details that would otherwise be silent: an effect whose weights are all
+zero means its four doodads are equally likely, not that none of them apply;
+and an effect whose doodad ids resolve to no model still grows ordinary grass
+rather than becoming bare ground.
 
 ### Still open
 

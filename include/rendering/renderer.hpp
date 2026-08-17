@@ -16,6 +16,8 @@
 #include "rendering/sky_system.hpp"
 #include "pipeline/custom_zone_discovery.hpp"
 
+#include "pipeline/grass_profile.hpp"
+
 namespace wowee {
 namespace core { class Window; }
 namespace rendering { class VkContext; }
@@ -458,6 +460,12 @@ private:
     glm::vec3 grassWindowCenter_{0.0f};
     bool grassWindowValid_ = false;
     void updateGrassPopulation();
+    // effectId -> index into the profile table, built as effects are met.
+    // Grass profiles are a blend of five categories, so distinct ones are far
+    // fewer than the hundreds of ground effects that map onto them.
+    std::unordered_map<uint32_t, uint32_t> grassProfileIndex_;
+    std::vector<pipeline::GrassProfile> grassProfiles_;
+    uint32_t grassProfileFor(uint32_t effectId);
 
     // CPU timing stats (last frame/update).
     double lastUpdateMs = 0.0;

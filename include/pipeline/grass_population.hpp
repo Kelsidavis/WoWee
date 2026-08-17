@@ -5,6 +5,7 @@
 #include <functional>
 #include <vector>
 
+#include "pipeline/grass_profile.hpp"
 #include "pipeline/grass_terrain.hpp"
 
 // Turning "grass grows here" into actual blades.
@@ -27,7 +28,23 @@ struct GrassBladeSample {
     float facing = 0.0f;
     float width = 0.0f;
     float phase = 0.0f;
+    /// Index into the profile table the shaders read colour and stiffness from.
+    uint32_t profileIndex = 0;
 };
+
+/// What a ground effect's profile means for generating a blade: the scales
+/// that change geometry and count, and the index the shaders look the rest up
+/// by. Resolved by the caller, which owns the table.
+struct GrassProfileRef {
+    uint32_t index = 0;
+    float heightScale = 1.0f;
+    float widthScale = 1.0f;
+    float densityScale = 1.0f;
+};
+
+/// Profile for a ground effect. An empty function means one profile for
+/// everything, which is what the phase before this had.
+using ProfileLookupFn = std::function<GrassProfileRef(uint32_t effectId)>;
 
 struct GrassPopulationParams {
     /// Lattice pitch in yards. One candidate blade per cell.
@@ -57,7 +74,8 @@ bool populateArea(float centerX, float centerY, float radius,
                   const GrassPopulationParams& params,
                   const SuitabilitySampler& sample,
                   std::vector<GrassBladeSample>& out,
-                  size_t maxBlades);
+                  size_t maxBlades,
+                  const ProfileLookupFn& profileFor = {});
 
 } // namespace pipeline
 } // namespace wowee

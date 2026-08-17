@@ -29,11 +29,12 @@ namespace rendering {
 /// | 12     | positionHeight.w   | height in yards                         |
 /// | 16     | facingWidthPhase.x | facing, radians about +Z                |
 /// | 20     | facingWidthPhase.y | width in yards                          |
-/// | 24     | facingWidthPhase.z | tilt (unused until Phase 5)             |
-/// | 28     | facingWidthPhase.w | wind phase seed (unused until Phase 5)  |
+/// | 24     | facingWidthPhase.z | profile index, as a whole number        |
+/// | 28     | facingWidthPhase.w | wind phase seed                         |
 ///
-/// The last two are carried now rather than added later so the stride does not
-/// change once real population data exists.
+/// Both trailing fields were carried unused from the first version so the
+/// stride would not have to change once there was real data for them. There
+/// now is, and it did not.
 struct GrassBladeGPU {
     glm::vec4 positionHeight{};
     glm::vec4 facingWidthPhase{};
@@ -65,6 +66,23 @@ static_assert(sizeof(GrassCullUniformsGPU) == 128,
               "GrassCullUniformsGPU must be 128 bytes to match the std140 block");
 static_assert(offsetof(GrassCullUniformsGPU, cameraPos) == 96);
 static_assert(offsetof(GrassCullUniformsGPU, bladeCount) == 112);
+
+/// One vegetation profile, as the vertex and fragment shaders read it.
+///
+/// Matches `GrassProfile` in `grass.vert.glsl` and `grass.frag.glsl` (std430).
+/// Only what the GPU needs: the scales that change a blade's geometry and how
+/// many of them there are were already applied when the population was
+/// generated, so they never reach the device.
+struct GrassProfileGPU {
+    glm::vec4 rootColor{};   ///< xyz colour, w unused
+    glm::vec4 tipColor{};    ///< xyz colour, w unused
+    glm::vec4 params{};      ///< x colourVariation, y stiffness, zw unused
+};
+
+static_assert(sizeof(GrassProfileGPU) == 48,
+              "GrassProfileGPU must be 48 bytes to match the std430 GrassProfile");
+static_assert(offsetof(GrassProfileGPU, tipColor) == 16);
+static_assert(offsetof(GrassProfileGPU, params) == 32);
 
 } // namespace rendering
 } // namespace wowee

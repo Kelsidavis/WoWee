@@ -251,6 +251,16 @@ public:
      * a TerrainManager at all.
      */
     [[nodiscard]] uint32_t getGroundEffectDensity(uint32_t effectId) const;
+
+    /** The detail doodads a ground effect plants, and their weights.
+     *
+     * Their model names are what says whether a patch of ground is meadow,
+     * scrub or scree, so grass derives its whole appearance from them rather
+     * than from a table of zones. Doodad ids that resolved to no model are
+     * left out, along with their weights.
+     */
+    void getGroundEffectDoodads(uint32_t effectId, std::vector<std::string>& outModels,
+                                std::vector<uint32_t>& outWeights) const;
     void setWaterRenderer(WaterRenderer* renderer) { waterRenderer = renderer; }
     void setM2Renderer(M2Renderer* renderer) { m2Renderer = renderer; }
     void setWMORenderer(WMORenderer* renderer) { wmoRenderer = renderer; }

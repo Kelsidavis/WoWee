@@ -36,7 +36,8 @@ bool populateArea(float centerX, float centerY, float radius,
                   const GrassPopulationParams& params,
                   const SuitabilitySampler& sample,
                   std::vector<GrassBladeSample>& out,
-                  size_t maxBlades) {
+                  size_t maxBlades,
+                  const ProfileLookupFn& profileFor) {
     out.clear();
     if (!sample || params.spacing <= 0.0f || radius <= 0.0f) return true;
 
@@ -63,10 +64,15 @@ bool populateArea(float centerX, float centerY, float radius,
             const GrassSuitability fit = sample(wx, wy);
             if (fit.suitability <= 0.0f) continue;
 
+            // What grows here, from what the map plants here. Scree thins
+            // further than meadow does on ground both call suitable.
+            const GrassProfileRef profile =
+                profileFor ? profileFor(fit.effectId) : GrassProfileRef{};
+
             // Thin by suitability rather than cutting at a threshold: this is
             // what makes a blend boundary fade out instead of ending on a line.
             const float keep = hashUnit(cx, cy, params.seed ^ 0x03u);
-            if (keep >= fit.suitability * densityScale) continue;
+            if (keep >= fit.suitability * densityScale * profile.densityScale) continue;
 
             if (out.size() >= maxBlades) return false;
 
@@ -74,12 +80,13 @@ bool populateArea(float centerX, float centerY, float radius,
             blade.x = wx;
             blade.y = wy;
             blade.z = fit.rootHeight;
-            blade.height = params.baseHeight *
+            blade.height = params.baseHeight * profile.heightScale *
                            (1.0f - params.heightVariation +
                             2.0f * params.heightVariation * hashUnit(cx, cy, params.seed ^ 0x04u));
             blade.facing = hashUnit(cx, cy, params.seed ^ 0x05u) * core::coords::TWO_PI;
-            blade.width = params.baseWidth;
+            blade.width = params.baseWidth * profile.widthScale;
             blade.phase = hashUnit(cx, cy, params.seed ^ 0x06u);
+            blade.profileIndex = profile.index;
             out.push_back(blade);
         }
     }

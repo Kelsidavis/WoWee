@@ -1926,6 +1926,15 @@ wowee_add_test(test_grass_population
             ${TEST_COMMON_SOURCES}
             ${CMAKE_SOURCE_DIR}/src/pipeline/grass_population.cpp)
 
+# ── test_grass_profile ─────────────────────────────────
+# What grass looks like on a patch of ground, from the detail doodads the map
+# places there. The asset names carry the classification, so nothing here knows
+# what a zone is - a profile needing a per-zone correction would be the wrong
+# shape entirely.
+wowee_add_test(test_grass_profile
+    SOURCES test_grass_profile.cpp
+            ${CMAKE_SOURCE_DIR}/src/pipeline/grass_profile.cpp)
+
 # ── Sanitizers, once every test target exists ────────────────
 # This must be the last thing in this file. The loop walks ALL_TEST_TARGETS,
 # which register_test_target appends to as each test is declared, so the
