@@ -440,9 +440,12 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                 minimap->setRotateWithCamera(minimapRotate_);
                 minimap->setSquareShape(minimapSquare_);
             }
-            if (auto* zm = renderer->getZoneManager()) {
-                pendingUseOriginalSoundtrack = zm->getUseOriginalSoundtrack();
-            }
+            // Deliberately NOT read back from the zone manager here. This
+            // block runs when the panel first opens, which can be before the
+            // saved settings have been applied to the runtime - reading the
+            // runtime's default into pending overwrote the player's saved
+            // choice, and the next save wrote the default back to disk. The
+            // file is authoritative; the runtime catches up, not the reverse.
         }
         settingsInit = true;
     }

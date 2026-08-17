@@ -361,6 +361,15 @@ void GameScreen::render(game::GameHandler& gameHandler) {
             }
             if (auto* zm = renderer->getZoneManager()) {
                 zm->setUseOriginalSoundtrack(settingsPanel_.pendingUseOriginalSoundtrack);
+                // Setting the flag alone is not the whole apply: music that
+                // already started during the loading screen keeps playing
+                // through a disabled setting. The panel's own apply does this
+                // second step, and restart has to do the same.
+                if (!settingsPanel_.pendingUseOriginalSoundtrack) {
+                    if (auto* ac = renderer->getAudioCoordinator()) {
+                        ac->onOriginalSoundtrackDisabled(zm);
+                    }
+                }
             }
             if (auto* tm = renderer->getTerrainManager()) {
                 tm->setGroundClutterDensityScale(static_cast<float>(settingsPanel_.pendingGroundClutterDensity) / 100.0f);
