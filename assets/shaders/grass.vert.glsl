@@ -126,6 +126,11 @@ void main() {
         height *= 0.92;
     }
 
+    // Sink into the ground over the last stretch before the cull distance
+    // (GrassRenderer::kCullDistance / kFadeStart - change together), so the
+    // field thins away instead of ending on a cut line.
+    height *= 1.0 - smoothstep(40.0, 55.0, distance(root.xy, viewPos.xy));
+
     // Row up the blade and which side of it this vertex is.
     float row  = floor(float(gl_VertexIndex) * 0.5);
     float side = (gl_VertexIndex - row * 2.0) * 2.0 - 1.0;  // -1 or +1

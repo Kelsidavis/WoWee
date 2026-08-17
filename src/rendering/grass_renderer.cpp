@@ -17,9 +17,10 @@ namespace rendering {
 
 namespace {
 
-/// Distance beyond which a blade is not drawn, squared. A single fixed bound
-/// in this phase; Phase 7 makes it a density falloff.
-constexpr float kMaxDistance = 120.0f;
+// Cull bound and fade band live on the class - the generation window is
+// sized against them, and 120 here against a 55 yard window was exactly the
+// bug: a hard field edge closer than the eye could see, popping forward on
+// every rebuild.
 
 /// Five segments, six rows of two vertices, so a blade can curve instead of
 /// hinging. The top row's width tapers to nothing, which makes its quad a
@@ -447,7 +448,7 @@ void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const
             const auto& plane = frustum.getPlane(static_cast<Frustum::Side>(i));
             uniforms.frustumPlanes[i] = glm::vec4(plane.normal, plane.distance);
         }
-        uniforms.cameraPos = glm::vec4(camera.getPosition(), kMaxDistance * kMaxDistance);
+        uniforms.cameraPos = glm::vec4(camera.getPosition(), kCullDistance * kCullDistance);
         uniforms.bladeCount = bladeCount_;
         std::memcpy(cullUniformMapped_[frameIndex], &uniforms, sizeof(uniforms));
     }

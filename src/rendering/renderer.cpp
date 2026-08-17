@@ -1946,11 +1946,16 @@ void Renderer::updateGrassPopulation() {
     if (!grassRenderer_ || !grassRenderer_->isReady() || !terrainManager) return;
 
     // How far out blades are generated, and how far the player may walk before
-    // the window is rebuilt. The radius has to exceed the cull distance or
-    // grass would end at a visible circle; the step is what keeps rebuilds
-    // rare, and costs the difference in blades generated but never seen.
-    constexpr float kWindowRadius = 55.0f;
-    constexpr float kRebuildStep = 20.0f;
+    // the window is rebuilt. The margin between them is the invariant: at its
+    // stalest the window centre lags the player by a full step, so the grass
+    // ahead reaches (radius - step) - and that must clear the cull distance,
+    // or the field ends at a visible edge on one side of the player and pops
+    // forward on every rebuild. The first set of numbers here had the window
+    // *inside* the cull distance, which is exactly how it looked.
+    constexpr float kWindowRadius = 75.0f;
+    constexpr float kRebuildStep = 18.0f;
+    static_assert(kWindowRadius - kRebuildStep >= GrassRenderer::kCullDistance,
+                  "the stalest window must still reach past the draw distance");
 
     const glm::vec3 center = characterPosition;
     if (grassWindowValid_) {
