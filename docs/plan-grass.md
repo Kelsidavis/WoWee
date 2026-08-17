@@ -394,8 +394,10 @@ this visible.
   `playerWake`, stronger influence wins, `reach` falloff, level gate. The size
   gate is dropped (every blade here is grass) and the bend is larger: trodden
   grass lies most of the way over where clutter only leans.
-- **Sizes.** 0.28 yards nominal, 0.6-1.4 variation, 0.024 wide. The first
-  version was 0.6 and 0.08 and stood chest-high on a character.
+- **Sizes.** 0.42 yards nominal (raised from 0.28 - travelling waves are read
+  from blade tips, and short grass has no tip to read them from), 0.6-1.4
+  variation, 0.024 wide; bolted stems 1.6x on top. The first version was 0.6
+  and 0.08 wide and stood chest-high on a character.
 
 The Bezier does the height weighting the M2 path applies separately: the root
 is a fixed control point, so motion collects at the tip on its own.

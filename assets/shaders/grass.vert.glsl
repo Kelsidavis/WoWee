@@ -83,8 +83,10 @@ const vec3 kBloomColors[4] = vec3[4](
     vec3(0.92, 0.92, 0.85),   // white
     vec3(0.55, 0.45, 0.85));  // violet
 
-// Pale straw for a seed head.
-const vec3 kSeedHeadColor = vec3(0.72, 0.64, 0.42);
+// A seed head runs from pale straw to the dark plum-brown of a fescue
+// panicle; where a blade sits between the two is its own seed's business.
+const vec3 kSeedStraw = vec3(0.72, 0.64, 0.42);
+const vec3 kSeedPlum  = vec3(0.32, 0.22, 0.24);
 
 // A slow world-space blob field, 0..1, blobs a couple of dozen yards across.
 // What turns "20% of blades" into "most blades over there, few here".
@@ -119,7 +121,7 @@ void main() {
 
     if (seeded) {
         // Bolted: the tall wispy stems that stand above the sward.
-        height *= 1.35;
+        height *= 1.6;
     } else if (bloom) {
         height *= 0.92;
     }
@@ -135,10 +137,15 @@ void main() {
     // stays blunt at the top, which is what makes it read as petals rather
     // than as a fat blade.
     float halfWidth;
+    float panicle = 0.0;
     if (seeded) {
-        float stalk = (1.0 - 0.55 * smoothstep(0.3, 0.7, t)) * (1.0 - smoothstep(0.9, 1.0, t));
-        float head  = 1.7 * smoothstep(0.6, 0.8, t) * (1.0 - smoothstep(0.8, 1.0, t));
-        halfWidth = 0.5 * width * max(stalk, head);
+        // A panicle, not a bulge: a thin stalk to halfway, then the top rows
+        // thrown alternately off the centreline so the silhouette is an open
+        // zigzag spray of spikelets - the way a fescue head actually branches.
+        panicle = smoothstep(0.5, 0.7, t);
+        float stalk = 0.55 * (1.0 - smoothstep(0.3, 0.5, t) * 0.4);
+        float spikelet = 1.1 * panicle * (1.0 - 0.55 * smoothstep(0.8, 1.0, t));
+        halfWidth = 0.5 * width * max(stalk, spikelet);
     } else if (bloom) {
         float stalk = (1.0 - 0.45 * smoothstep(0.3, 0.7, t));
         float head  = 2.4 * smoothstep(0.55, 0.8, t) * (1.0 - 0.6 * smoothstep(0.8, 1.0, t));
@@ -241,6 +248,20 @@ void main() {
     vec3 across = vec3(cos(facing), sin(facing), 0.0);
     vec3 world  = root + curve + across * (halfWidth * side);
 
+    // The spray itself: head rows swing off the stem line, alternating sides
+    // row by row, further out for some blades than others. Rows are at
+    // t = 0.6, 0.8, 1.0 up there, so the alternation is what the silhouette
+    // is made of.
+    if (panicle > 0.0) {
+        float alt = (fract(row * 0.5) < 0.25) ? 1.0 : -1.0;
+        float sprayReach = width * (2.0 + 4.0 * fract(seed * 41.77));
+        world += across * (alt * panicle * sprayReach);
+        // And the head nods: the top leans a little further leeward and down,
+        // which is what a heavy seed head does that a blade tip does not.
+        world.xy += dirNow * (panicle * height * 0.06);
+        world.z  -= panicle * panicle * height * 0.05;
+    }
+
     // Blade-to-blade colour, varied by as much as the profile allows. Seeded
     // from the blade, so a blade keeps its own shade rather than shimmering.
     float tint = 1.0 + (seed - 0.5) * 2.0 * profile.params.x;
@@ -252,8 +273,11 @@ void main() {
     // blade. Seed heads also dry the blade below them a little, which is what
     // sells "gone to seed" rather than "green grass wearing a hat".
     if (seeded) {
-        vHeadColor = vec4(kSeedHeadColor * tint, 1.0);
-        vTipColor = mix(vTipColor, kSeedHeadColor, 0.45);
+        vec3 headCol = mix(kSeedStraw, kSeedPlum, fract(seed * 53.71));
+        vHeadColor = vec4(headCol * tint, 1.0);
+        // The stem below a seed head has dried toward straw, whatever colour
+        // the head above it ripened to.
+        vTipColor = mix(vTipColor, kSeedStraw, 0.45);
     } else if (bloom) {
         vHeadColor = vec4(kBloomColors[int(fract(seed * 71.13) * 4.0) & 3], 1.0);
     } else {

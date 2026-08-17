@@ -48,7 +48,7 @@ void main() {
     // mix on purpose: a bloom should be the one thing in the field that does
     // not take the earth's colour.
     albedo = mix(albedo, vHeadColor.rgb,
-                 vHeadColor.a * smoothstep(0.62, 0.85, vHeightT));
+                 vHeadColor.a * smoothstep(0.50, 0.72, vHeightT));
 
     // Two-sided: a blade is one strip and is lit from whichever face is turned
     // to the camera.

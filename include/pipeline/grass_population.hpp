@@ -56,7 +56,10 @@ struct GrassPopulationParams {
     /// Scales how many candidates survive, on top of terrain suitability.
     /// TerrainManager::getGroundClutterDensityScale() feeds this.
     float densityScale = 1.0f;
-    float baseHeight = 0.28f;
+    /// Knee-high rather than shin-high: travelling wind waves are read from
+    /// blade tips changing angle, and there is not enough tip on short grass
+    /// for a wave to be visible crossing it.
+    float baseHeight = 0.42f;
     float heightVariation = 0.45f;
     float baseWidth = 0.024f;
     /// Mixed into every hash. Changing it reshuffles the whole world's grass.
