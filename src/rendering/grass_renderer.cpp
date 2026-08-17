@@ -434,6 +434,41 @@ void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const
                                  const glm::vec3& rangeCenter) {
     if (!isReady() || frameIndex >= kFrames || bladeCount_ == 0) return;
 
+    // WOWEE_GRASS_DEBUG=1: every couple of seconds, read back how many blades
+    // the previous cull kept and where the two centres are. Rotating the
+    // camera while watching this line splits the remaining suspects: a count
+    // that swings with orientation convicts the compute cull; a steady count
+    // while grass visibly vanishes convicts the draw side.
+    static const bool debug = envFlagEnabled("WOWEE_GRASS_DEBUG");
+    if (debug) {
+        static uint32_t tick = 0;
+        if (++tick % 120 == 0) {
+            AllocatedBuffer readback = createBuffer(vkCtx_->getAllocator(),
+                                                    sizeof(VkDrawIndexedIndirectCommand),
+                                                    VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                                    VMA_MEMORY_USAGE_GPU_TO_CPU);
+            if (readback.buffer != VK_NULL_HANDLE) {
+                const uint32_t slot = (frameIndex + kFrames - 1) % kFrames;
+                vkCtx_->immediateSubmit([&](VkCommandBuffer copyCmd) {
+                    VkBufferCopy region{};
+                    region.size = sizeof(VkDrawIndexedIndirectCommand);
+                    vkCmdCopyBuffer(copyCmd, indirectBuffer_[slot], readback.buffer, 1, &region);
+                });
+                void* mapped = nullptr;
+                if (vmaMapMemory(vkCtx_->getAllocator(), readback.allocation, &mapped) == VK_SUCCESS) {
+                    VkDrawIndexedIndirectCommand command{};
+                    std::memcpy(&command, mapped, sizeof(command));
+                    vmaUnmapMemory(vkCtx_->getAllocator(), readback.allocation);
+                    const glm::vec3 camPos = camera.getPosition();
+                    LOG_INFO("Grass debug: ", command.instanceCount, " of ", bladeCount_,
+                             " kept, player=(", rangeCenter.x, ",", rangeCenter.y,
+                             ") camera=(", camPos.x, ",", camPos.y, ",", camPos.z, ")");
+                }
+                destroyBuffer(vkCtx_->getAllocator(), readback);
+            }
+        }
+    }
+
     // Cull parameters for this frame.
     if (cullUniformMapped_[frameIndex]) {
         GrassCullUniformsGPU uniforms{};
