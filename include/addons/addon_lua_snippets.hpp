@@ -42,6 +42,7 @@ for _, s in ipairs(list) do byKey[s.key] = s end
 
 local kCategoryHost = {
     ["Graphics"]     = "video",
+    ["Grass"]        = "video",
     ["Upscaling"]    = "video",
     ["Display"]      = "video",
     ["Sound"]        = "audio",
