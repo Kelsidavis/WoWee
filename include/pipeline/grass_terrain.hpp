@@ -40,10 +40,13 @@ struct GrassSuitability {
     /// World Z at the sample point, on the surface the terrain mesh draws.
     /// Only meaningful when suitability is above zero, as above.
     float rootHeight = 0.0f;
-    /// The ground's own colour under this point: the chunk's layer colours
-    /// blended by the same alpha weights the terrain shader composites with.
-    /// Valid only when hasGroundColor - the caller may not have colours.
-    glm::vec3 groundColor{0.0f};
+    /// The tones the ground under this point is painted in, blended by the
+    /// same alpha weights the terrain shader composites with. The terrain
+    /// textures depict each region's own foliage, so grass grown from these
+    /// wears the region's colours without anything naming a region.
+    /// Valid only when hasGroundColor.
+    glm::vec3 groundShadow{0.0f};
+    glm::vec3 groundHighlight{0.0f};
     bool hasGroundColor = false;
 };
 
@@ -68,10 +71,11 @@ struct ChunkGrassContext {
     /// Roads, rock and water are whole chunks of this.
     bool growsAnything = false;
 
-    /// Mean colour of each layer's ground texture, filled by the caller after
-    /// build() - the texture names live on the tile, which pipeline code never
-    /// sees. Left unset, blades keep their profile colours unmixed.
-    glm::vec3 layerColor[4]{};
+    /// Each layer's ground texture tones, filled by the caller after build() -
+    /// the texture names live on the tile, which pipeline code never sees.
+    /// Left unset, blades keep their profile colours unmixed.
+    glm::vec3 layerShadow[4]{};
+    glm::vec3 layerHighlight[4]{};
     bool hasLayerColors = false;
 
     /// Returns false when nothing in this chunk grows anything, so a caller

@@ -2016,8 +2016,9 @@ void Renderer::updateGrassPopulation() {
                 for (size_t i = 0; i < n; ++i) {
                     const uint32_t texId = chunk->layers[i].textureId;
                     if (texId >= names.size()) continue;
-                    context.layerColor[i] =
-                        terrainManager->getTerrainTextureMeanColor(names[texId]);
+                    const auto tones = terrainManager->getTerrainTextureTones(names[texId]);
+                    context.layerShadow[i] = tones.shadow;
+                    context.layerHighlight[i] = tones.highlight;
                     context.hasLayerColors = true;
                     // Nothing grows out of a road. Road textures carry real
                     // ground effects with real densities - the effect data

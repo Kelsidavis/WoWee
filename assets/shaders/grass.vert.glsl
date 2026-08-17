@@ -34,7 +34,8 @@ layout(set = 0, binding = 0) uniform PerFrame {
 struct GrassBlade {
     vec4 positionHeight;
     vec4 facingWidthPhase;
-    vec4 groundColor;      // xyz = terrain colour under the root, w = 1 if real
+    vec4 groundShadow;      // xyz = terrain's shadow tone, w = 1 if tones real
+    vec4 groundHighlight;   // xyz = terrain's highlight tone
 };
 
 layout(std430, set = 1, binding = 0) readonly buffer GrassSource {
@@ -64,7 +65,7 @@ layout(location = 0) out float vHeightT;
 layout(location = 1) out vec3 vNormal;
 layout(location = 2) out vec3 vRootColor;
 layout(location = 3) out vec3 vTipColor;
-layout(location = 4) out vec4 vGroundColor;
+layout(location = 4) out vec4 vGroundColor;   // kept for the tint strength in w
 layout(location = 5) out vec4 vHeadColor;   // rgb head colour, a = strength
 
 // Five segments, six rows of two vertices. Row 4 sits at t = 0.8, which is
@@ -294,9 +295,33 @@ void main() {
     // Blade-to-blade colour, varied by as much as the profile allows. Seeded
     // from the blade, so a blade keeps its own shade rather than shimmering.
     float tint = 1.0 + (seed - 0.5) * 2.0 * profile.params.x;
-    vRootColor = profile.rootColor.rgb * tint;
-    vTipColor  = profile.tipColor.rgb * tint;
-    vGroundColor = blade.groundColor;
+
+    // The terrain texture already depicts this region's own grass, so the
+    // blade is coloured from the ground it grew out of and the profile only
+    // shifts it: dry ground still skews its grass browner, scree still duller,
+    // but Elwynn's greens and Westfall's golds arrive without either being
+    // named anywhere. Shadow tone at the root, highlight at the tip, pushed a
+    // little further apart than the texture is so a blade reads against the
+    // ground rather than dissolving into it.
+    vec3 profileRoot = profile.rootColor.rgb;
+    vec3 profileTip  = profile.tipColor.rgb;
+    if (blade.groundShadow.w > 0.5) {
+        vec3 groundRoot = blade.groundShadow.rgb * 0.85;
+        vec3 groundTip  = blade.groundHighlight.rgb * 1.15;
+        // Keep the profile's character as a hue shift rather than a colour:
+        // its own brightness would flatten every region back to one palette.
+        vec3 shift = profileTip / max(dot(profileTip, vec3(0.333)), 0.001);
+        groundTip *= mix(vec3(1.0), shift, 0.45);
+        profileRoot = mix(profileRoot, groundRoot, 0.75);
+        profileTip  = mix(profileTip,  groundTip,  0.75);
+    }
+    vRootColor = profileRoot * tint;
+    vTipColor  = profileTip * tint;
+
+    // The fragment shader's ground mix now only needs to seat the very base
+    // of the blade against the earth; the rest of the colour already came
+    // from there.
+    vGroundColor = vec4(blade.groundShadow.rgb, blade.groundShadow.w);
 
     // The head's colour, applied by the fragment shader over the top of the
     // blade. Seed heads also dry the blade below them a little, which is what

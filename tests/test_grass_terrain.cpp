@@ -311,16 +311,21 @@ TEST_CASE("ground colour is the layers' blend, and absent when not provided",
         REQUIRE_FALSE(fit.hasGroundColor);
     }
 
-    SECTION("with colours the blend follows the alpha ramp") {
-        context.layerColor[0] = {0.0f, 1.0f, 0.0f};  // base: green
-        context.layerColor[1] = {1.0f, 0.0f, 0.0f};  // overlay: red, ramping in
+    SECTION("with tones the blend follows the alpha ramp") {
+        context.layerShadow[0] = {0.0f, 0.4f, 0.0f};     // base: dark green
+        context.layerHighlight[0] = {0.0f, 1.0f, 0.0f};  //       bright green
+        context.layerShadow[1] = {0.4f, 0.0f, 0.0f};     // overlay: dark red
+        context.layerHighlight[1] = {1.0f, 0.0f, 0.0f};  //          bright red
         context.hasLayerColors = true;
 
         const auto west = evaluateGrass(context, chunk, 0.2f, 4.0f);
         const auto east = evaluateGrass(context, chunk, 7.8f, 4.0f);
         REQUIRE(west.hasGroundColor);
-        REQUIRE(west.groundColor.g > west.groundColor.r);   // mostly base
-        REQUIRE(east.groundColor.r > east.groundColor.g);   // mostly overlay
+        REQUIRE(west.groundHighlight.g > west.groundHighlight.r);  // mostly base
+        REQUIRE(east.groundHighlight.r > east.groundHighlight.g);  // mostly overlay
+        // Shadow and highlight stay distinct through the blend, which is the
+        // whole point of carrying two.
+        REQUIRE(west.groundHighlight.g > west.groundShadow.g);
     }
 }
 

@@ -41,7 +41,9 @@ void main() {
     // sits against the ground, and an unmixed field reads as green paint over
     // brown earth. w is zero when no colour was available, which disables the
     // mix instead of pulling toward black.
-    float groundMix = vGroundColor.w * mix(0.45, 0.20, vHeightT);
+    // Only the base needs seating against the earth now - the blade's whole
+    // colour already came from the ground's own tones.
+    float groundMix = vGroundColor.w * mix(0.35, 0.0, smoothstep(0.0, 0.45, vHeightT));
     albedo = mix(albedo, vGroundColor.rgb, groundMix);
 
     // Seed heads and blooms take over the top of the blade. After the ground

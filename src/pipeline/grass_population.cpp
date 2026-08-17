@@ -125,7 +125,8 @@ bool populateArea(float centerX, float centerY, float radius,
                           (0.7f + 0.8f * hashUnit(cx, cy, params.seed ^ 0x08u));
             blade.phase = hashUnit(cx, cy, params.seed ^ 0x06u);
             blade.profileIndex = profile.index;
-            blade.groundColor = fit.groundColor;
+            blade.groundShadow = fit.groundShadow;
+            blade.groundHighlight = fit.groundHighlight;
             blade.hasGroundColor = fit.hasGroundColor;
             out.push_back(blade);
         }

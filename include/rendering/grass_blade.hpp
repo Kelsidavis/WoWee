@@ -31,21 +31,25 @@ namespace rendering {
 /// | 20     | facingWidthPhase.y | width in yards                          |
 /// | 24     | facingWidthPhase.z | profile index, as a whole number        |
 /// | 28     | facingWidthPhase.w | wind phase seed                         |
-/// | 32     | groundColor.xyz    | terrain colour under the root           |
-/// | 44     | groundColor.w      | 1 when that colour is real, else 0      |
+/// | 32     | groundShadow.xyz   | terrain's shadow tone under the root     |
+/// | 44     | groundShadow.w     | 1 when the tones are real, else 0        |
+/// | 48     | groundHighlight.xyz| terrain's highlight tone                 |
+/// | 60     | groundHighlight.w  | unused                                   |
 struct GrassBladeGPU {
     glm::vec4 positionHeight{};
     glm::vec4 facingWidthPhase{};
-    glm::vec4 groundColor{};
+    glm::vec4 groundShadow{};
+    glm::vec4 groundHighlight{};
 };
 
-static_assert(sizeof(GrassBladeGPU) == 48,
-              "GrassBladeGPU must be 48 bytes to match the std430 GrassBlade");
+static_assert(sizeof(GrassBladeGPU) == 64,
+              "GrassBladeGPU must be 64 bytes to match the std430 GrassBlade");
 static_assert(sizeof(GrassBladeGPU) % 16 == 0,
               "std430 rounds the array stride of a vec4-bearing struct up to 16");
 static_assert(offsetof(GrassBladeGPU, positionHeight) == 0);
 static_assert(offsetof(GrassBladeGPU, facingWidthPhase) == 16);
-static_assert(offsetof(GrassBladeGPU, groundColor) == 32);
+static_assert(offsetof(GrassBladeGPU, groundShadow) == 32);
+static_assert(offsetof(GrassBladeGPU, groundHighlight) == 48);
 
 /// Cull parameters, one per frame in flight.
 ///

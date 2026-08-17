@@ -1,5 +1,7 @@
 #include "rendering/terrain_manager.hpp"
 
+#include <vector>
+
 #include "pipeline/adt_alpha.hpp"
 #include "pipeline/grass_profile.hpp"
 #include "rendering/terrain_renderer.hpp"
@@ -2129,37 +2131,47 @@ void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile
     }
 }
 
-glm::vec3 TerrainManager::getTerrainTextureMeanColor(const std::string& texturePath) {
-    const auto it = terrainTextureMeanColor_.find(texturePath);
-    if (it != terrainTextureMeanColor_.end()) return it->second;
+TerrainManager::TerrainTextureTones
+TerrainManager::getTerrainTextureTones(const std::string& texturePath) {
+    const auto it = terrainTextureTones_.find(texturePath);
+    if (it != terrainTextureTones_.end()) return it->second;
 
-    // Neutral grey on any failure: a wrong mean is a tint, not a hole, and a
-    // grey mix leaves the profile colour effectively alone.
-    glm::vec3 mean(0.5f);
+    TerrainTextureTones tones;  // greys, which tint nothing much either way
     if (assetManager) {
         const pipeline::BLPImage blp = assetManager->loadTexture(texturePath, false);
         if (blp.isValid() && !blp.data.empty()) {
-            // Every 16th pixel is plenty for a mean; the point is the hue of
-            // the ground, not a faithful downsample.
-            uint64_t r = 0;
-            uint64_t g = 0;
-            uint64_t b = 0;
-            uint64_t n = 0;
+            // Every sixteenth pixel, sorted by luminance. Percentiles rather
+            // than a mean because a grass texture is blades over earth, and
+            // the mean is the two averaged into neither.
+            struct Sample { float luma; uint8_t r, g, b; };
+            std::vector<Sample> samples;
+            samples.reserve(blp.data.size() / 64 + 1);
             for (size_t i = 0; i + 3 < blp.data.size(); i += 64) {
-                r += blp.data[i];
-                g += blp.data[i + 1];
-                b += blp.data[i + 2];
-                ++n;
+                const uint8_t r = blp.data[i];
+                const uint8_t g = blp.data[i + 1];
+                const uint8_t b = blp.data[i + 2];
+                samples.push_back({0.299f * static_cast<float>(r) +
+                                       0.587f * static_cast<float>(g) +
+                                       0.114f * static_cast<float>(b),
+                                   r, g, b});
             }
-            if (n > 0) {
-                mean = glm::vec3(static_cast<float>(r) / static_cast<float>(n),
-                                 static_cast<float>(g) / static_cast<float>(n),
-                                 static_cast<float>(b) / static_cast<float>(n)) / 255.0f;
+            if (samples.size() >= 8) {
+                std::sort(samples.begin(), samples.end(),
+                          [](const Sample& a, const Sample& b) { return a.luma < b.luma; });
+                auto at = [&](float pct) {
+                    const auto idx = static_cast<size_t>(
+                        static_cast<float>(samples.size() - 1) * pct);
+                    const Sample& sm = samples[idx];
+                    return glm::vec3(static_cast<float>(sm.r), static_cast<float>(sm.g),
+                                     static_cast<float>(sm.b)) / 255.0f;
+                };
+                tones.shadow = at(0.25f);
+                tones.highlight = at(0.85f);
             }
         }
     }
-    terrainTextureMeanColor_[texturePath] = mean;
-    return mean;
+    terrainTextureTones_[texturePath] = tones;
+    return tones;
 }
 
 void TerrainManager::getGroundEffectDoodads(uint32_t effectId,

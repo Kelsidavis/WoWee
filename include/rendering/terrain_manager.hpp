@@ -305,13 +305,22 @@ public:
                                           float& fracX, float& fracY,
                                           const TerrainTile** outTile = nullptr) const;
 
-    /** Mean colour of a terrain texture, cached by path.
+    /** The tones a terrain texture is painted in, cached by path.
      *
-     * What grass mixes toward so a field sits on the colour it grows from.
-     * Computed once per texture from the decoded base level; wrong answers
-     * here are a tint, not a hole, so failures return a neutral grey.
+     * These textures already depict their region's own grass and foliage -
+     * Elwynn's greens, Westfall's dry golds - so the grass growing out of one
+     * takes its colours from it rather than from a palette of ours. Shadow
+     * and highlight are luminance percentiles of the decoded base level, not
+     * a mean: a mean of a grass texture is the average of its blades and the
+     * earth between them, and grass wants the blades.
+     *
+     * Wrong answers here are a tint, not a hole, so failures return greys.
      */
-    [[nodiscard]] glm::vec3 getTerrainTextureMeanColor(const std::string& texturePath);
+    struct TerrainTextureTones {
+        glm::vec3 shadow{0.35f};
+        glm::vec3 highlight{0.65f};
+    };
+    [[nodiscard]] TerrainTextureTones getTerrainTextureTones(const std::string& texturePath);
 
     /** Get the precise MCNK AreaTable ID at a world position. */
     [[nodiscard]] std::optional<uint32_t> getAreaIdAt(float glX, float glY) const;
@@ -518,7 +527,7 @@ private:
     std::unordered_map<uint32_t, GroundEffectEntry> groundEffectById_; // effectId -> config
     std::unordered_map<uint32_t, std::string> groundDoodadModelById_;  // doodadId -> model path
     float groundClutterDensityScale_ = 1.0f;
-    std::unordered_map<std::string, glm::vec3> terrainTextureMeanColor_;
+    std::unordered_map<std::string, TerrainTextureTones> terrainTextureTones_;
 };
 
 } // namespace rendering

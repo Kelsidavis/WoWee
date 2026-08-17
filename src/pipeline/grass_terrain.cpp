@@ -164,11 +164,14 @@ GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk&
     // grass sits on the colour it is tinted by. All layers count here - the
     // ground under a blade is what it is whether or not that layer grows.
     if (context.hasLayerColors) {
-        glm::vec3 ground(0.0f);
+        glm::vec3 shadow(0.0f);
+        glm::vec3 highlight(0.0f);
         for (size_t i = 0; i < context.layerCount; ++i) {
-            ground += context.layerColor[i] * weight[i];
+            shadow += context.layerShadow[i] * weight[i];
+            highlight += context.layerHighlight[i] * weight[i];
         }
-        out.groundColor = ground;
+        out.groundShadow = shadow;
+        out.groundHighlight = highlight;
         out.hasGroundColor = true;
     }
 
