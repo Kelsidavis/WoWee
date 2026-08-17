@@ -196,10 +196,19 @@ bool GrassRenderer::setPopulation(const pipeline::GrassBladeSample* blades, size
         region.size = bytes;
         vkCmdCopyBuffer(cmd, staging.buffer, sourceBuffer_, 1, &region);
     });
-    destroyBuffer(vkCtx_->getAllocator(), staging);
 
-    // Only after the copy: the cull dispatches over this count, so raising it
-    // before the data landed would cull against whatever was there before.
+    // The staging buffer outlives the call. immediateSubmit does not submit
+    // while an upload batch is open - and one is open for the whole frame -
+    // so it records the copy and returns, and destroying the source here freed
+    // memory the GPU had not read yet. Blades came out of that copy holding
+    // whatever the allocator handed back, which is a field that pops in and
+    // out in patches as it is rebuilt.
+    const VmaAllocator allocator = vkCtx_->getAllocator();
+    AllocatedBuffer pending = staging;
+    vkCtx_->deferAfterFrameFence([allocator, pending]() mutable {
+        destroyBuffer(allocator, pending);
+    });
+
     bladeCount_ = static_cast<uint32_t>(count);
     framesSincePopulated_ = 0;
     return complete;
@@ -584,7 +593,12 @@ bool GrassRenderer::setProfiles(const std::vector<pipeline::GrassProfile>& profi
         region.size = bytes;
         vkCmdCopyBuffer(cmd, staging.buffer, profileBuffer_, 1, &region);
     });
-    destroyBuffer(vkCtx_->getAllocator(), staging);
+    // Outlives the call, for the same reason setPopulation's does.
+    const VmaAllocator allocator = vkCtx_->getAllocator();
+    AllocatedBuffer pending = staging;
+    vkCtx_->deferAfterFrameFence([allocator, pending]() mutable {
+        destroyBuffer(allocator, pending);
+    });
     return true;
 }
 
