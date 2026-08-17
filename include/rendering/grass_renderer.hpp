@@ -40,7 +40,13 @@ public:
 
     /// Record the cull dispatch. Must run outside a render pass, before
     /// `render()` for the same frame.
-    void dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const Camera& camera);
+    ///
+    /// `playerPos` plants the test field the first time it is non-zero, and is
+    /// ignored afterwards. Latched rather than followed: a field that tracked
+    /// the player would slide under them, and blade positions have to depend on
+    /// the world rather than on the frame (spec §36).
+    void dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const Camera& camera,
+                      const glm::vec3& playerPos);
 
     /// Record the indirect draw. Must run inside the render pass.
     void render(VkCommandBuffer cmd, uint32_t frameIndex, VkDescriptorSet perFrameSet);
@@ -60,6 +66,11 @@ private:
 
     VkContext* vkCtx_ = nullptr;
     uint32_t bladeCount_ = 0;
+
+    // Where the test field was planted, and whether it has been. Phase 3
+    // generates real world positions per tile and both of these go.
+    glm::vec3 fieldOrigin_{0.0f};
+    bool fieldPlanted_ = false;
 
     // Shared, written once at load.
     VkBuffer sourceBuffer_ = VK_NULL_HANDLE;

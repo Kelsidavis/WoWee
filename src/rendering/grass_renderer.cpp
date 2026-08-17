@@ -341,7 +341,12 @@ bool GrassRenderer::createDrawPipeline(VkDescriptorSetLayout perFrameLayout) {
                                   "assets/shaders/grass.frag.spv", "grass");
     if (!shaders) return false;
 
-    pipelineLayout_ = createPipelineLayout(device, {perFrameLayout, drawSetLayout_}, {});
+    VkPushConstantRange pushRange{};
+    pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushRange.offset = 0;
+    pushRange.size = sizeof(GrassPushConstants);
+
+    pipelineLayout_ = createPipelineLayout(device, {perFrameLayout, drawSetLayout_}, {pushRange});
     if (pipelineLayout_ == VK_NULL_HANDLE) return false;
 
     // No vertex input: the shader builds the quad from gl_VertexIndex and reads
@@ -364,8 +369,21 @@ bool GrassRenderer::createDrawPipeline(VkDescriptorSetLayout perFrameLayout) {
     return pipeline_ != VK_NULL_HANDLE;
 }
 
-void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const Camera& camera) {
+void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const Camera& camera,
+                                 const glm::vec3& playerPos) {
     if (!isReady() || frameIndex >= kFrames || bladeCount_ == 0) return;
+
+    // Plant the field under whoever is looking at it, once. Zero means the
+    // character has not loaded yet - the renderer starts before the world does,
+    // so the first frames have no position to use. Latched rather than
+    // followed, or the field would slide along under the player and no blade
+    // would keep a fixed place in the world.
+    if (!fieldPlanted_ && glm::dot(playerPos, playerPos) > 0.0f) {
+        fieldOrigin_ = playerPos;
+        fieldPlanted_ = true;
+        LOG_INFO("GrassRenderer: test field planted at (", fieldOrigin_.x, ", ",
+                 fieldOrigin_.y, ", ", fieldOrigin_.z, ")");
+    }
 
     // Cull parameters for this frame.
     if (cullUniformMapped_[frameIndex]) {
@@ -382,6 +400,7 @@ void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const
             uniforms.frustumPlanes[i] = (len > 0.0f) ? planes[i] / len : planes[i];
         }
         uniforms.cameraPos = glm::vec4(camera.getPosition(), kMaxDistance * kMaxDistance);
+        uniforms.fieldOrigin = glm::vec4(fieldOrigin_, 0.0f);
         uniforms.bladeCount = bladeCount_;
         std::memcpy(cullUniformMapped_[frameIndex], &uniforms, sizeof(uniforms));
     }
@@ -441,6 +460,12 @@ void GrassRenderer::render(VkCommandBuffer cmd, uint32_t frameIndex,
                             &perFrameSet, 0, nullptr);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 1, 1,
                             &drawSet_[frameIndex], 0, nullptr);
+    // The same origin the cull used. Read from the member rather than passed
+    // in, so the two stages cannot be given different ones.
+    GrassPushConstants push{};
+    push.fieldOrigin = glm::vec4(fieldOrigin_, 0.0f);
+    vkCmdPushConstants(cmd, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                       sizeof(push), &push);
     vkCmdBindIndexBuffer(cmd, indexBuffer_, 0, VK_INDEX_TYPE_UINT16);
     // One command, and its instance count came from the GPU.
     vkCmdDrawIndexedIndirect(cmd, indirectBuffer_[frameIndex], 0, 1,
@@ -473,6 +498,8 @@ void GrassRenderer::shutdown() {
     destroy(allocator, indexBuffer_, indexAlloc_);
 
     bladeCount_ = 0;
+    fieldOrigin_ = glm::vec3(0.0f);
+    fieldPlanted_ = false;
     vkCtx_ = nullptr;
 }
 

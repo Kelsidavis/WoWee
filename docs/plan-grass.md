@@ -308,7 +308,17 @@ sections are in `docs/grass-spec.md` with navigable `## N.` headings.
 ### Phase 1 — done
 
 The GPU-driven path runs end to end on the fixed test population: 99856 blades
-(a 316x316 field, jittered off the lattice) at the render-space origin.
+(a 316x316 field, about 79 yards across, jittered off the lattice), planted
+under the player the first frame a character position exists.
+
+The field origin is latched, not followed: a field that tracked the player
+would slide along under them and no blade would hold a fixed place in the
+world, which is the property spec §36 asks for and which Phase 3's generator
+must also have. Blades are generated around a local origin and placed by that
+offset - added in the cull shader from its uniform block and in the vertex
+shader from a push constant - so moving the field costs a uniform write rather
+than regenerating and re-uploading the source buffer. Phase 3 generates real
+world positions per tile and all of this goes.
 
 | Piece | Where |
 |---|---|
@@ -359,9 +369,7 @@ Decisions worth not relitigating:
 
 **Not verified.** `./test.sh` is green at 161/161 and the lint gate reports
 nothing in any grass file, but no run on hardware has happened yet, so "flat
-green blades render at the test origin" and "validation layers clean" are
-claims about the code rather than observations. The test population sits at the
-render-space origin, which is a corner of the map rather than anywhere a
-character starts, so seeing it may need flying there.
+green blades render" and "validation layers clean" are claims about the code
+rather than observations.
 
 Phase 2 has not started.

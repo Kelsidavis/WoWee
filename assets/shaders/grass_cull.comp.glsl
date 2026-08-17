@@ -22,6 +22,7 @@ struct GrassBlade {
 layout(std140, set = 0, binding = 0) uniform GrassCullUniforms {
     vec4 frustumPlanes[6];  // xyz = normal, w = distance
     vec4 cameraPos;         // xyz = camera position, w = maxDistSq
+    vec4 fieldOrigin;       // xyz = where the test field is planted
     uint bladeCount;
     uint _pad0;
     uint _pad1;
@@ -51,7 +52,9 @@ void main() {
     if (id >= bladeCount) return;
 
     GrassBlade blade = blades[id];
-    vec3 root = blade.positionHeight.xyz;
+    // Blades are generated around a local origin; the field is placed here, so
+    // the vertex shader must add the same offset (it gets it as a push constant).
+    vec3 root = blade.positionHeight.xyz + fieldOrigin.xyz;
     float height = blade.positionHeight.w;
 
     // Distance cull against the same squared bound the M2 path uses, so a

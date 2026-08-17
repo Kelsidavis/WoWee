@@ -1036,7 +1036,8 @@ void Renderer::beginFrame() {
     // outside a render pass. Unlike the M2 path nothing reads the result back -
     // the count it produces is consumed by the indirect draw on the GPU.
     if (grassRenderer_ && camera && vkCtx) {
-        grassRenderer_->dispatchCull(currentCmd, vkCtx->getCurrentFrame(), *camera);
+        grassRenderer_->dispatchCull(currentCmd, vkCtx->getCurrentFrame(), *camera,
+                                     characterPosition);
     }
 
     // --- Off-screen pre-passes ---

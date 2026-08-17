@@ -18,6 +18,7 @@
 
 using wowee::rendering::GrassBladeGPU;
 using wowee::rendering::GrassCullUniformsGPU;
+using wowee::rendering::GrassPushConstants;
 
 TEST_CASE("GrassBladeGPU matches the std430 GrassBlade", "[grass]") {
     SECTION("size is the std430 array stride") {
@@ -46,16 +47,17 @@ TEST_CASE("GrassBladeGPU matches the std430 GrassBlade", "[grass]") {
 
 TEST_CASE("GrassCullUniformsGPU matches the std140 uniform block", "[grass]") {
     SECTION("size and trailing padding") {
-        // std140: six vec4 planes (96) + one vec4 camera (16) + a uint and the
-        // three pads that round the block to a 16-byte multiple.
-        REQUIRE(sizeof(GrassCullUniformsGPU) == 128);
+        // std140: six vec4 planes (96) + camera (16) + field origin (16) + a
+        // uint and the three pads that round the block to a 16-byte multiple.
+        REQUIRE(sizeof(GrassCullUniformsGPU) == 144);
         REQUIRE(sizeof(GrassCullUniformsGPU) % 16 == 0);
     }
 
     SECTION("every member sits where the shader reads it") {
         REQUIRE(offsetof(GrassCullUniformsGPU, frustumPlanes) == 0);
         REQUIRE(offsetof(GrassCullUniformsGPU, cameraPos) == 96);
-        REQUIRE(offsetof(GrassCullUniformsGPU, bladeCount) == 112);
+        REQUIRE(offsetof(GrassCullUniformsGPU, fieldOrigin) == 112);
+        REQUIRE(offsetof(GrassCullUniformsGPU, bladeCount) == 128);
     }
 
     SECTION("the plane array is tightly packed") {
@@ -65,4 +67,12 @@ TEST_CASE("GrassCullUniformsGPU matches the std140 uniform block", "[grass]") {
         REQUIRE(static_cast<std::size_t>(p1 - p0) == 16);
         REQUIRE(sizeof(u.frustumPlanes) == 96);
     }
+}
+
+TEST_CASE("GrassPushConstants matches the vertex shader's push block", "[grass]") {
+    // The vertex shader adds the same field origin the cull shader reads from
+    // its uniform block. Disagree on the size and the origin the two stages use
+    // differs, which puts the drawn blades somewhere the cull did not test.
+    REQUIRE(sizeof(GrassPushConstants) == 16);
+    REQUIRE(offsetof(GrassPushConstants, fieldOrigin) == 0);
 }
