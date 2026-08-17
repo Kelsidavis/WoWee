@@ -282,6 +282,7 @@ void UIManager::shutdown() {
         if (vkCtx) {
             vkDeviceWaitIdle(vkCtx->getDevice());
         }
+
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplSDL2_Shutdown();
         ImGui::DestroyContext();

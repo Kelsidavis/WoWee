@@ -1,5 +1,6 @@
 #include "rendering/imgui_texture.hpp"
 
+#include <imgui.h>
 #include <backends/imgui_impl_vulkan.h>
 
 #include "rendering/vk_context.hpp"
@@ -7,11 +8,20 @@
 namespace wowee {
 namespace rendering {
 
-void ImGuiTexture::destroy(VkDevice device, VmaAllocator allocator) {
-    if (descriptorSet != VK_NULL_HANDLE) {
+void removeImGuiTexture(VkDescriptorSet& descriptorSet) {
+    if (descriptorSet == VK_NULL_HANDLE) return;
+    // BackendRendererUserData is what ImGui_ImplVulkan_Init sets and
+    // ImGui_ImplVulkan_Shutdown clears, so it answers whether there is still a
+    // backend to give this back to.
+    if (ImGui::GetCurrentContext() != nullptr &&
+        ImGui::GetIO().BackendRendererUserData != nullptr) {
         ImGui_ImplVulkan_RemoveTexture(descriptorSet);
-        descriptorSet = VK_NULL_HANDLE;
     }
+    descriptorSet = VK_NULL_HANDLE;
+}
+
+void ImGuiTexture::destroy(VkDevice device, VmaAllocator allocator) {
+    removeImGuiTexture(descriptorSet);
     if (texture) {
         texture->destroy(device, allocator);
         texture.reset();

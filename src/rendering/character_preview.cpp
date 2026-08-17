@@ -1,4 +1,5 @@
 #include "rendering/character_preview.hpp"
+#include "rendering/imgui_texture.hpp"
 #include "rendering/character_renderer.hpp"
 #include "rendering/animation/animation_ids.hpp"
 #include "rendering/vk_render_target.hpp"
@@ -448,7 +449,7 @@ void CharacterPreview::destroyFBO() {
     VmaAllocator allocator = vkCtx_->getAllocator();
 
     if (imguiTextureId_) {
-        ImGui_ImplVulkan_RemoveTexture(imguiTextureId_);
+        removeImGuiTexture(imguiTextureId_);
         imguiTextureId_ = VK_NULL_HANDLE;
     }
 

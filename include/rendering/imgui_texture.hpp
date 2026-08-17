@@ -19,6 +19,15 @@ class VkContext;
 /// view and sampler, so it stops being valid the moment the texture goes.
 /// Holding them apart is what made three copies of the loading code all have
 /// to remember to destroy the texture on each of their failure paths.
+/// Hand a descriptor set back to ImGui's Vulkan backend, if it is still there.
+///
+/// ImGui_ImplVulkan_RemoveTexture reads the backend's data unconditionally, so
+/// calling it after ImGui_ImplVulkan_Shutdown dereferences what that just
+/// freed. Several things hold these sets until their own destructors run, and
+/// those run in an order no single call site controls, so the check belongs
+/// here rather than in an ordering that has to be got right everywhere.
+void removeImGuiTexture(VkDescriptorSet& descriptorSet);
+
 struct ImGuiTexture {
     std::unique_ptr<VkTexture> texture;
     VkDescriptorSet descriptorSet = VK_NULL_HANDLE;

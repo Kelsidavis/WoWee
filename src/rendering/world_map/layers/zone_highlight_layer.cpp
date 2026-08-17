@@ -23,7 +23,7 @@ ZoneHighlightLayer::~ZoneHighlightLayer() {
         VkDevice device = vkCtx_->getDevice();
         VmaAllocator alloc = vkCtx_->getAllocator();
         for (auto& [name, entry] : highlights_) {
-            if (entry.imguiDS) ImGui_ImplVulkan_RemoveTexture(entry.imguiDS);
+            removeImGuiTexture(entry.imguiDS);
             if (entry.texture) entry.texture->destroy(device, alloc);
         }
     }
@@ -57,7 +57,7 @@ void ZoneHighlightLayer::clearTextures() {
         }
         vkCtx_->deferAfterAllFrameFences([device, alloc, captured]() {
             for (auto& dh : *captured) {
-                if (dh.imguiDS) ImGui_ImplVulkan_RemoveTexture(dh.imguiDS);
+                removeImGuiTexture(dh.imguiDS);
                 if (dh.texture) dh.texture->destroy(device, alloc);
             }
         });
