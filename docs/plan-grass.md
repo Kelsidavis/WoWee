@@ -19,13 +19,21 @@ Every statement below was checked against the file named. Cite these instead of 
 | Fact | Where |
 |---|---|
 | `MAX_FRAMES_IN_FLIGHT = 2` | `include/rendering/vk_context.hpp:19` |
-| Per-frame state array `FrameData frames[MAX_FRAMES_IN_FLIGHT]` | `include/rendering/vk_context.hpp:270` |
-| Deferred destruction queue, one per frame slot | `include/rendering/vk_context.hpp:316` |
+| Per-frame state array `FrameData frames[MAX_FRAMES_IN_FLIGHT]` | `include/rendering/vk_context.hpp:288` |
+| Deferred destruction queue, one per frame slot (`deferredCleanup_`) | `include/rendering/vk_context.hpp:370` |
 | Buffers via `VkBuffer::uploadToGPU(ctx, data, size, usage)` (GPU-local + staging) and `VkBuffer::createMapped(allocator, size, usage)` (host-visible) | `include/rendering/vk_buffer.hpp:16-50` |
 | `VkBuffer::descriptorInfo(offset, range)` builds `VkDescriptorBufferInfo` | `include/rendering/vk_buffer.hpp` |
 | Allocator is VMA (`VmaAllocation`, `AllocatedBuffer`) | `include/rendering/vk_buffer.hpp` |
 
-**`synchronization2` is NOT used anywhere in this codebase.** `rg -c "vkCmdPipelineBarrier2|VK_KHR_SYNCHRONIZATION_2"` returns zero hits across `src/` and `include/`. The grass spec asks for `vkCmdPipelineBarrier2`; **ignore that** and use legacy `vkCmdPipelineBarrier`. The repository is authoritative. Do not enable a new device feature for this.
+**`synchronization2` is used throughout, through a wrapper.** Barriers are written in the newer form and lowered where the extension is absent:
+
+```cpp
+void cmdPipelineBarrier2(VkCommandBuffer cmd, const VkDependencyInfo& dep);  // vk_utils.hpp:151
+```
+
+With `VK_KHR_synchronization2` present this is `vkCmdPipelineBarrier2KHR`; without it the same dependency is lowered to `vkCmdPipelineBarrier`, ORing the per-barrier stage masks into the single pair the legacy call takes. Eleven files under `src/` use it.
+
+**So write grass barriers as `VkDependencyInfo` + `cmdPipelineBarrier2`, following the spec.** The earlier instruction here was the opposite, and its reason — that enabling sync2 for one feature would add a device requirement — no longer holds: the wrapper adds no requirement, because the legacy path is what runs when the extension is missing.
 
 ### Shaders
 
@@ -60,8 +68,9 @@ pattern (and its comment convention) for the blade struct in Phase 1.
 
 ### Coordinate system — **+Z is UP**
 
-`include/core/spawn_presets.hpp:11` — *"Canonical WoW coords: +X=North, +Y=West, +Z=Up"*.
-Confirmed by `src/core/world_loader.cpp:891` and `include/math/spline.hpp:39` ("Z-up convention").
+`include/core/coordinates.hpp:16` — *"+X = North, +Y = West, +Z = Up (height)"*, above the
+canonical/server/ADT/render conversions themselves. Confirmed by `include/math/spline.hpp:39`
+("Z-up convention").
 
 **The spec is written Y-up and is wrong here.** §10 computes slope as
 `1.0 - dot(terrainNormal, vec3(0,1,0))` and §31 blends toward `vec3(0,1,0)`. Both must be
@@ -128,7 +137,7 @@ Consequences — **do not add a new UBO for any of these**:
 
 WoW's ADT format already encodes where grass grows. **Do not build a parallel classifier.**
 
-`struct TextureLayer` (`include/pipeline/adt_loader.hpp:33-42`):
+`struct TextureLayer` (`include/pipeline/adt_loader.hpp:34-43`):
 ```cpp
 uint32_t textureId;   // index into MTEX
 uint32_t flags;
@@ -138,7 +147,7 @@ bool useAlpha() const;        // flags & 0x100
 bool compressedAlpha() const; // flags & 0x200
 ```
 
-`struct MapChunk` (`include/pipeline/adt_loader.hpp:46+`):
+`struct MapChunk` (`include/pipeline/adt_loader.hpp:47+`):
 ```cpp
 uint32_t flags, indexX, indexY, areaId;
 uint16_t holes;                      // 4x4 hole bitmask
@@ -201,7 +210,7 @@ Streaming: `TerrainManager::unloadTile(int x, int y)` (`include/rendering/terrai
 
 - `./test.sh` — unit tests + clang-tidy. `--asan`, `--lint`, `FIX=1 ./test.sh --lint`.
 - `WOWEE_WARNINGS_AS_ERRORS` is **ON** by default. A warning fails the build.
-- 89 Catch2 v3 suites via CTest, in `tests/`.
+- 160 tests via CTest, from 156 Catch2 v3 suites in `tests/`.
 - Debug HUD: `PerformanceHUD` (`include/rendering/performance_hud.hpp`), F1 to toggle, `setShowTerrain(bool)` etc. — add grass counters here, do not build a new overlay.
 
 ---
@@ -210,7 +219,7 @@ Streaming: `TerrainManager::unloadTile(int x, int y)` (`include/rendering/terrai
 
 | Spec asks | We do | Why |
 |---|---|---|
-| §22 `vkCmdPipelineBarrier2` | legacy `vkCmdPipelineBarrier` | synchronization2 is not used anywhere; enabling it for one feature adds a device requirement |
+| §22 `vkCmdPipelineBarrier2` | **follow the spec**, via `cmdPipelineBarrier2` | the wrapper lowers to the legacy call where the extension is absent, so the newer form costs no device requirement |
 | §13 32-byte blade struct | measure and document the real packed layout | spec itself says do not force 32 bytes |
 | §6 new `GrassType` enum | derive profiles from `GroundEffectEntry.doodadIds` | spec §6: "do not duplicate an existing WoWee enum/system" |
 | §28 entity buffer | reuse `playerPos`/`playerWake` in `GPUPerFrameData` | already exists, purpose-built for foliage |
@@ -237,7 +246,7 @@ from the terrain logic, which is where correctness actually lives.
 - Source SSBO (`VK_BUFFER_USAGE_STORAGE_BUFFER_BIT`), shared/immutable.
 - Per-frame ×2: visible-index SSBO, indirect buffer (`VkDrawIndexedIndirectCommand`, `INDIRECT | STORAGE`), counter.
 - `assets/shaders/grass_cull.comp.glsl` — modeled on `m2_cull.comp.glsl`. Frustum + distance cull, `atomicAdd` compaction, writes `instanceCount`. Reset the counter each frame (`vkCmdFillBuffer` before dispatch).
-- Barrier: `COMPUTE_SHADER → DRAW_INDIRECT | VERTEX_SHADER`, `SHADER_WRITE → INDIRECT_COMMAND_READ | SHADER_READ`. **No host readback.**
+- Barrier: `COMPUTE_SHADER → DRAW_INDIRECT | VERTEX_SHADER`, `SHADER_WRITE → INDIRECT_COMMAND_READ | SHADER_READ`, written as a `VkDependencyInfo` through `cmdPipelineBarrier2`. **No host readback.**
 - Minimal `grass.vert.glsl` / `grass.frag.glsl`: flat quads, solid colour. No Bézier, no wind.
 - `vkCmdDrawIndexedIndirect`.
 
