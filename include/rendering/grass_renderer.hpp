@@ -80,15 +80,15 @@ public:
     [[nodiscard]] uint32_t bladeCount() const { return bladeCount_; }
 
     /// Capacity of the source buffer, in blades.
-    static constexpr uint32_t kMaxBlades = 400000;
+    static constexpr uint32_t kMaxBlades = 450000;
 
     /// How far out a blade can draw, and where it starts shrinking away.
     /// The generation window must stay ahead of kCullDistance even at its
     /// stalest - renderer.cpp asserts that - and the vertex shader fades
     /// height over the last stretch so the field never shows a cut edge.
     /// grass.vert.glsl carries these two numbers; change them together.
-    static constexpr float kCullDistance = 55.0f;
-    static constexpr float kFadeStart = 40.0f;
+    static constexpr float kCullDistance = 45.0f;
+    static constexpr float kFadeStart = 32.0f;
 
 private:
     bool createSourceBuffer();

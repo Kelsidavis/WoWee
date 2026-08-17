@@ -61,7 +61,7 @@ struct GrassPopulationParams {
     /// along it you see through many blades and it reads as a field, looking
     /// down at it you see 86% bare earth. That is the whole of "the grass
     /// disappears depending on which way I look".
-    float spacing = 0.28f;
+    float spacing = 0.20f;
     /// Scales how many candidates survive, on top of terrain suitability.
     /// TerrainManager::getGroundClutterDensityScale() feeds this.
     float densityScale = 1.0f;
@@ -76,7 +76,7 @@ struct GrassPopulationParams {
     /// upscaling simply ate. A blade here stands for a tuft rather than a
     /// single leaf - with pitch above, the field now covers about a third of
     /// the ground it stands on.
-    float baseWidth = 0.08f;
+    float baseWidth = 0.09f;
     /// Mixed into every hash. Changing it reshuffles the whole world's grass.
     uint32_t seed = 0x9e3779b9u;
 };
@@ -84,8 +84,7 @@ struct GrassPopulationParams {
 /// What the terrain says at a world position.
 using SuitabilitySampler = std::function<GrassSuitability(float worldX, float worldY)>;
 
-/// Fill `out` with blades over the square of side 2*radius centred on
-/// (centerX, centerY).
+/// Fill `out` with blades within `radius` of (centerX, centerY).
 ///
 /// The lattice is anchored to the world, not to the centre, so moving the
 /// centre slides a window over a fixed population rather than regenerating a

@@ -1955,7 +1955,7 @@ void Renderer::updateGrassPopulation() {
     // or the field ends at a visible edge on one side of the player and pops
     // forward on every rebuild. The first set of numbers here had the window
     // *inside* the cull distance, which is exactly how it looked.
-    constexpr float kWindowRadius = 75.0f;
+    constexpr float kWindowRadius = 64.0f;
     constexpr float kRebuildStep = 18.0f;
     static_assert(kWindowRadius - kRebuildStep >= GrassRenderer::kCullDistance,
                   "the stalest window must still reach past the draw distance");

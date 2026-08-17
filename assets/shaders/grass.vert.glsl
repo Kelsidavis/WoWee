@@ -132,7 +132,7 @@ void main() {
     // field thins away instead of ending on a cut line. Distance from the
     // player, like the cull: the camera orbits, and a fade measured from it
     // slid around the field as the view turned.
-    height *= 1.0 - smoothstep(40.0, 55.0, distance(root.xy, playerPos.xy));
+    height *= 1.0 - smoothstep(32.0, 45.0, distance(root.xy, playerPos.xy));
 
     // Row up the blade and which side of it this vertex is.
     float row  = floor(float(gl_VertexIndex) * 0.5);

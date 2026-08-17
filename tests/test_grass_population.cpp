@@ -11,6 +11,7 @@
 #include <catch_amalgamated.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 #include "pipeline/grass_population.hpp"
@@ -82,7 +83,10 @@ TEST_CASE("moving the window slides over a fixed population", "[grass][populatio
     // present there, identical.
     size_t overlapping = 0;
     for (const auto& a : here) {
-        if (a.x < -6.0f || a.x > 14.0f) continue;
+        // Only blades the second window actually reaches: the window is round,
+        // so a blade inside the first can sit outside the second.
+        const float dx = a.x - 4.0f;
+        if (dx * dx + a.y * a.y > 9.0f * 9.0f) continue;
         const bool found = std::any_of(shifted.begin(), shifted.end(),
                                        [&](const GrassBladeSample& b) { return sameBlade(a, b); });
         REQUIRE(found);
@@ -148,12 +152,14 @@ TEST_CASE("blades sit at the height the terrain reported", "[grass][population]"
     }
 }
 
-TEST_CASE("the blade cap is honoured and reported", "[grass][population]") {
+TEST_CASE("the blade cap is honoured", "[grass][population]") {
+    // Landing exactly on the cap is what filling-until-full does, and that is
+    // the behaviour with the directional failure. Under the cap by some margin
+    // is what thinning to fit looks like.
     std::vector<GrassBladeSample> blades;
-    const bool complete =
-        populateArea(0.0f, 0.0f, 40.0f, GrassPopulationParams{}, everywhere, blades, 64);
-    REQUIRE_FALSE(complete);
-    REQUIRE(blades.size() == 64);
+    populateArea(0.0f, 0.0f, 40.0f, GrassPopulationParams{}, everywhere, blades, 64);
+    REQUIRE(blades.size() <= 64);
+    REQUIRE(!blades.empty());
 }
 
 TEST_CASE("generated blades are within the requested area", "[grass][population]") {
@@ -163,12 +169,11 @@ TEST_CASE("generated blades are within the requested area", "[grass][population]
                          blades, 100000));
     REQUIRE(!blades.empty());
     for (const auto& b : blades) {
-        // One lattice cell of slack: a cell whose centre is inside can jitter
-        // its blade just outside.
-        REQUIRE(b.x > 50.0f - radius - 1.0f);
-        REQUIRE(b.x < 50.0f + radius + 1.0f);
-        REQUIRE(b.y > -30.0f - radius - 1.0f);
-        REQUIRE(b.y < -30.0f + radius + 1.0f);
+        // Round window, with one lattice cell of slack: a cell whose centre is
+        // inside can jitter its blade just outside.
+        const float dx = b.x - 50.0f;
+        const float dy = b.y + 30.0f;
+        REQUIRE(std::sqrt(dx * dx + dy * dy) < radius + 1.0f);
     }
 }
 
@@ -218,4 +223,29 @@ TEST_CASE("grass shortens toward a road and stands deep in the open",
     const float open = meanHeightBetween(-30.0f, -15.0f);
     const float verge = meanHeightBetween(4.0f, 7.0f);
     REQUIRE(verge < open * 0.85f);
+}
+
+TEST_CASE("hitting the blade cap thins the whole window, not its far side",
+          "[grass][population]") {
+    // The loop walks south to north. Filling until full and stopping deletes
+    // the northern rows outright, so the field ends on a line: grass behind
+    // the player and none ahead, depending only on which way north is. The
+    // cap has to thin everywhere instead.
+    GrassPopulationParams params;
+    std::vector<GrassBladeSample> blades;
+    const size_t cap = 400;
+    REQUIRE(populateArea(0.0f, 0.0f, 20.0f, params, everywhere, blades, cap));
+    REQUIRE(blades.size() <= cap);
+    REQUIRE(blades.size() > cap / 4);
+
+    // Both halves populated, north as well as south.
+    const auto north = std::count_if(blades.begin(), blades.end(),
+                                     [](const GrassBladeSample& b) { return b.y > 5.0f; });
+    const auto south = std::count_if(blades.begin(), blades.end(),
+                                     [](const GrassBladeSample& b) { return b.y < -5.0f; });
+    REQUIRE(north > 0);
+    REQUIRE(south > 0);
+    // Comparable, rather than one side carrying the entire population.
+    REQUIRE(north * 4 > south);
+    REQUIRE(south * 4 > north);
 }

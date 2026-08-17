@@ -76,6 +76,20 @@ bool populateArea(float centerX, float centerY, float radius,
     const auto maxCellY = static_cast<int32_t>(std::floor((centerY + radius) / spacing));
 
     const float densityScale = std::max(params.densityScale, 0.0f);
+    const float radiusSq = radius * radius;
+
+    // If the window holds more candidates than the cap allows, thin every one
+    // of them by the same factor rather than filling until full and stopping.
+    // The loop walks south to north, so stopping deletes the northern rows
+    // outright - the field simply ends on a line, and which line depends on
+    // nothing the player can see. Thinning uniformly degrades the whole window
+    // instead, and being hash-driven it stays stable frame to frame.
+    const auto totalCells = static_cast<size_t>(maxCellX - minCellX + 1) *
+                            static_cast<size_t>(maxCellY - minCellY + 1);
+    const float capFactor =
+        (totalCells > maxBlades)
+            ? 0.95f * static_cast<float>(maxBlades) / static_cast<float>(totalCells)
+            : 1.0f;
 
     for (int32_t cy = minCellY; cy <= maxCellY; ++cy) {
         for (int32_t cx = minCellX; cx <= maxCellX; ++cx) {
@@ -84,6 +98,13 @@ bool populateArea(float centerX, float centerY, float radius,
             const float jy = hashUnit(cx, cy, params.seed ^ 0x02u) - 0.5f;
             const float wx = (static_cast<float>(cx) + 0.5f + jx) * spacing;
             const float wy = (static_cast<float>(cy) + 0.5f + jy) * spacing;
+
+            // Round, not square. Grass draws within a radius of the player, so
+            // the corners of a square window were a quarter of the generation
+            // cost spent where nothing is ever drawn.
+            const float ddx = wx - centerX;
+            const float ddy = wy - centerY;
+            if (ddx * ddx + ddy * ddy > radiusSq) continue;
 
             const GrassSuitability fit = sample(wx, wy);
             if (fit.suitability <= 0.0f) continue;
@@ -96,7 +117,9 @@ bool populateArea(float centerX, float centerY, float radius,
             // Thin by suitability rather than cutting at a threshold: this is
             // what makes a blend boundary fade out instead of ending on a line.
             const float keep = hashUnit(cx, cy, params.seed ^ 0x03u);
-            if (keep >= fit.suitability * densityScale * profile.densityScale) continue;
+            if (keep >= fit.suitability * densityScale * profile.densityScale * capFactor) {
+                continue;
+            }
 
             if (out.size() >= maxBlades) return false;
 
