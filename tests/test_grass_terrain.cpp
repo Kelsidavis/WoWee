@@ -111,30 +111,23 @@ TEST_CASE("an effect id absent from the table grows nothing", "[grass][terrain]"
     REQUIRE(evaluateGrass(chunk, 4.0f, 4.0f, densityFor).suitability == Catch::Approx(0.0f));
 }
 
-TEST_CASE("a layer resolves by texture id when its effect id does not",
+TEST_CASE("a road never grows grass through a texture-id collision",
           "[grass][terrain]") {
-    // 3.3.5 chunks routinely carry an MCLY effect id that is not in the
-    // ground-effect table while the texture id is. The ground-clutter placer
-    // has always fallen back this way; without the same fallback here, nothing
-    // grows anywhere in the world and the failure looks like a plumbing bug.
+    // A layer with effect id zero is the map saying no vegetation - that is
+    // how roads are marked. textureId is an index into the tile's own texture
+    // list, a small integer that can numerically equal a real ground-effect
+    // id; a fallback that looked it up in the effect table made roads sprout
+    // grass chunk by chunk, depending on where the road texture sat in each
+    // tile's list. Which is also why the bug looked camera-directional: the
+    // chunk ahead collided and the chunk behind did not.
     MapChunk chunk = makeFlatChunk();
-    TextureLayer layer = makeLayer(kUnknownEffect);
-    layer.textureId = kGrassEffect;
-    chunk.layers.push_back(layer);
+    TextureLayer road = makeLayer(0);
+    road.textureId = kGrassEffect;  // collides with a real effect id
+    chunk.layers.push_back(road);
 
     const auto result = evaluateGrass(chunk, 4.0f, 4.0f, densityFor);
-    REQUIRE(result.suitability == Catch::Approx(1.0f));
-    REQUIRE(result.effectId == kGrassEffect);
-}
-
-TEST_CASE("the effect id is preferred over the texture id", "[grass][terrain]") {
-    // The fallback must not override a working effect id.
-    MapChunk chunk = makeFlatChunk();
-    TextureLayer layer = makeLayer(kGrassEffect);
-    layer.textureId = kRoadEffect;
-    chunk.layers.push_back(layer);
-
-    REQUIRE(evaluateGrass(chunk, 4.0f, 4.0f, densityFor).effectId == kGrassEffect);
+    REQUIRE(result.suitability == Catch::Approx(0.0f));
+    REQUIRE(result.effectId == 0);
 }
 
 TEST_CASE("a layer with no effect at all grows nothing", "[grass][terrain]") {

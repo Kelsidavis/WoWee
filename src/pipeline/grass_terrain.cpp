@@ -89,20 +89,19 @@ bool ChunkGrassContext::build(const MapChunk& chunk, const GroundEffectDensityFn
     for (size_t i = 0; i < layerCount; ++i) {
         const auto& layer = chunk.layers[i];
 
-        // The layer's own effect id first, then its texture id. In 3.3.5 data
-        // the MCLY effect id frequently does not resolve and the texture id
-        // does, which is why the ground-clutter placer carries the same
-        // fallback (terrain_manager.cpp, textureIdFallbackMatch). Without it
-        // this answers "nothing grows anywhere" across all of Elwynn.
+        // The layer's effect id, and nothing else. An effect id of zero is
+        // the map saying no vegetation here - roads and bare dirt carry
+        // exactly that. There used to be a fallback through layer.textureId,
+        // copied from the clutter placer; but textureId is an index into the
+        // tile's own texture list, a small integer, and looking it up in a
+        // table keyed by DBC ground-effect ids collides with whatever row
+        // happens to share the number. Roads sprouted grass chunk by chunk
+        // depending on where their texture sat in each tile's list, and the
+        // clutter placer only survives the same fallback because it also
+        // filters road textures by name. Elwynn's real grass resolves through
+        // its effect id directly.
         effectId[i] = layer.effectId;
-        uint32_t density = (effectId[i] != 0 && densityFor) ? densityFor(effectId[i]) : 0;
-        if (density == 0 && layer.textureId != 0 && densityFor) {
-            const uint32_t byTexture = densityFor(layer.textureId);
-            if (byTexture != 0) {
-                effectId[i] = layer.textureId;
-                density = byTexture;
-            }
-        }
+        const uint32_t density = (effectId[i] != 0 && densityFor) ? densityFor(effectId[i]) : 0;
         grows[i] = density != 0;
         any = any || grows[i];
         if (i == 0) continue;  // layer 0 is the base and carries no alpha map
