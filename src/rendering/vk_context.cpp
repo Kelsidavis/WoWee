@@ -534,6 +534,19 @@ bool VkContext::selectPhysicalDevice() {
 }
 
 bool VkContext::createLogicalDevice() {
+    // Every enable_extension_if_present has to happen before this line.
+    // vkb::DeviceBuilder takes the physical device by value, so a call made
+    // after it is constructed changes vkbPhysicalDevice_ and not the copy the
+    // builder creates the device from. That is how synchronization2 came to
+    // log as enabled while vkCmdPipelineBarrier2KHR would not resolve.
+    sync2IsCore_ = (deviceApiVersion_ >= VK_API_VERSION_1_3 &&
+                    instanceApiVersion_ >= VK_API_VERSION_1_3);
+    const bool sync2Available =
+        sync2IsCore_ || vkbPhysicalDevice_.enable_extension_if_present(
+                            VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    const bool amdCoherentAvailable = vkbPhysicalDevice_.enable_extension_if_present(
+        VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME);
+
     vkb::DeviceBuilder deviceBuilder{vkbPhysicalDevice_};
 
     // Enable optional Vulkan 1.1/1.2 features for FSR2/FSR3 compute shaders.
@@ -602,10 +615,7 @@ bool VkContext::createLogicalDevice() {
     // that supports it natively.
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2Features{};
     sync2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
-    sync2IsCore_ = (deviceApiVersion_ >= VK_API_VERSION_1_3 &&
-                    instanceApiVersion_ >= VK_API_VERSION_1_3);
-    if (sync2IsCore_ || vkbPhysicalDevice_.enable_extension_if_present(
-                            VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)) {
+    if (sync2Available) {
         sync2Features.synchronization2 = VK_TRUE;
         deviceBuilder.add_pNext(&sync2Features);
         synchronization2Supported_ = true;
@@ -618,7 +628,7 @@ bool VkContext::createLogicalDevice() {
     // (prevents validation errors when VMA selects memory types with DEVICE_COHERENT_BIT_AMD)
     VkPhysicalDeviceCoherentMemoryFeaturesAMD coherentFeatures{};
     coherentFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COHERENT_MEMORY_FEATURES_AMD;
-    if (vkbPhysicalDevice_.enable_extension_if_present(VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME)) {
+    if (amdCoherentAvailable) {
         coherentFeatures.deviceCoherentMemory = VK_TRUE;
         deviceBuilder.add_pNext(&coherentFeatures);
         LOG_INFO("Enabling AMD device coherent memory");
