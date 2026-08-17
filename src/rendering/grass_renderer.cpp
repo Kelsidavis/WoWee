@@ -25,16 +25,42 @@ namespace {
 constexpr float kTestOriginX = 0.0f;
 constexpr float kTestOriginY = 0.0f;
 constexpr float kTestOriginZ = 0.0f;
-constexpr float kTestSpacing = 0.25f;   // yards between blades
-constexpr float kTestHeight = 0.6f;
-constexpr float kTestWidth = 0.08f;
+constexpr float kTestSpacing = 0.22f;   // yards between blades
+/// Yards. Short grass, roughly shin height on a character - the first version
+/// was more than twice this and stood chest-high on the player.
+constexpr float kTestHeight = 0.28f;
+constexpr float kTestWidth = 0.024f;
 
 /// Distance beyond which a blade is not drawn, squared. A single fixed bound
 /// in this phase; Phase 7 makes it a density falloff.
 constexpr float kMaxDistance = 120.0f;
 
-/// Two triangles over the four corners the vertex shader builds.
-constexpr std::array<uint16_t, 6> kQuadIndices{0, 1, 2, 2, 3, 0};
+/// Five segments, six rows of two vertices, so a blade can curve instead of
+/// hinging. The top row's width tapers to nothing, which makes its quad a
+/// triangle and gives the blade a point rather than a cut-off end.
+constexpr uint32_t kBladeSegments = 5;
+constexpr uint32_t kBladeVertices = (kBladeSegments + 1) * 2;
+constexpr uint32_t kBladeIndexCount = kBladeSegments * 6;
+
+// The highest index the list below generates is the last vertex of the top
+// row. If the two ever disagree the draw reads past the rows the vertex shader
+// builds, which the shader cannot detect - it just returns garbage positions.
+static_assert(kBladeSegments * 2 + 1 == kBladeVertices - 1,
+              "the index list must reference exactly the rows that exist");
+
+std::array<uint16_t, kBladeIndexCount> bladeIndices() {
+    std::array<uint16_t, kBladeIndexCount> indices{};
+    for (uint32_t seg = 0; seg < kBladeSegments; ++seg) {
+        const auto a = static_cast<uint16_t>(seg * 2);
+        const auto b = static_cast<uint16_t>(seg * 2 + 1);
+        const auto c = static_cast<uint16_t>(seg * 2 + 2);
+        const auto d = static_cast<uint16_t>(seg * 2 + 3);
+        const uint32_t o = seg * 6;
+        indices[o + 0] = a; indices[o + 1] = b; indices[o + 2] = d;
+        indices[o + 3] = a; indices[o + 4] = d; indices[o + 5] = c;
+    }
+    return indices;
+}
 
 /// A cheap deterministic hash, so the test field has some variation without
 /// pulling in a generator. Value depends only on the blade index, never on the
@@ -123,7 +149,7 @@ bool GrassRenderer::createSourceBuffer() {
         // than as grass and hides a per-blade indexing error in the regularity.
         const float jx = (hashUnit(i * 2u + 1u) - 0.5f) * kTestSpacing;
         const float jy = (hashUnit(i * 2u + 2u) - 0.5f) * kTestSpacing;
-        const float heightScale = 0.7f + 0.6f * hashUnit(i + 0x9e3779b9u);
+        const float heightScale = 0.6f + 0.8f * hashUnit(i + 0x9e3779b9u);
 
         blades[i].positionHeight = glm::vec4(
             kTestOriginX - half + static_cast<float>(gx) * kTestSpacing + jx,
@@ -148,9 +174,10 @@ bool GrassRenderer::createSourceBuffer() {
     setObjectName(vkCtx_->getDevice(), VK_OBJECT_TYPE_BUFFER,
                   reinterpret_cast<uint64_t>(sourceBuffer_), "grass source blades");
 
-    // Six indices, shared by every blade.
-    AllocatedBuffer indices = uploadBuffer(*vkCtx_, kQuadIndices.data(),
-                                           sizeof(uint16_t) * kQuadIndices.size(),
+    // One index list, shared by every blade.
+    const auto indexData = bladeIndices();
+    AllocatedBuffer indices = uploadBuffer(*vkCtx_, indexData.data(),
+                                           sizeof(uint16_t) * indexData.size(),
                                            VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
     if (indices.buffer == VK_NULL_HANDLE) return false;
     indexBuffer_ = indices.buffer;
@@ -179,7 +206,7 @@ bool GrassRenderer::createPerFrameBuffers() {
         // instanceCount changes afterwards, and only the GPU changes it -
         // TRANSFER_DST is for the per-frame vkCmdFillBuffer that resets it.
         VkDrawIndexedIndirectCommand command{};
-        command.indexCount = static_cast<uint32_t>(kQuadIndices.size());
+        command.indexCount = kBladeIndexCount;
         command.instanceCount = 0;
         command.firstIndex = 0;
         command.vertexOffset = 0;

@@ -1,6 +1,6 @@
 # GPU-Driven Grass — Phased Implementation Plan
 
-**Status:** Phase 1 complete. Next: Phase 2.
+**Status:** Phase 1 complete; Phase 5 brought forward. Next: Phase 2.
 **Branch:** `grass`
 **Spec:** [`docs/grass-spec.md`](grass-spec.md) — every `spec §N` below refers to a numbered
 section there. The spec is **not** authoritative; this plan and the repository are. See §2.
@@ -371,5 +371,38 @@ Decisions worth not relitigating:
 nothing in any grass file, but no run on hardware has happened yet, so "flat
 green blades render" and "validation layers clean" are claims about the code
 rather than observations.
+
+### Phase 5 — brought forward, done
+
+Out of order, because the Phase 1 blades were legible enough to be judged and
+were wrong: too tall, too thick, cut square at the tip, and motionless. Shape
+is not something to leave until after two phases of terrain work when it is
+this visible.
+
+- **Geometry.** Five segments, six rows of two vertices, bent along a quadratic
+  Bezier. Width is near constant over the lower half and tapers to nothing at
+  the top row, whose quad collapses to a triangle - that is the point. A
+  `static_assert` ties the index list to the row count, because a mismatch
+  reads rows the vertex shader never builds and cannot be detected at runtime.
+- **Wind.** Two layers multiplied rather than three summed (spec §27), reusing
+  m2.vert.glsl's phase constants and its `dot(worldPos.xy, ...)` seeding, so
+  grass and the foliage beside it move as one field. Time from `fogParams.z`.
+- **Player.** Ported from `m2.vert.glsl:139-199` - `playerPos` against
+  `playerWake`, stronger influence wins, `reach` falloff, level gate. The size
+  gate is dropped (every blade here is grass) and the bend is larger: trodden
+  grass lies most of the way over where clutter only leans.
+- **Sizes.** 0.28 yards nominal, 0.6-1.4 variation, 0.024 wide. The first
+  version was 0.6 and 0.08 and stood chest-high on a character.
+
+The Bezier does the height weighting the M2 path applies separately: the root
+is a fixed control point, so motion collects at the tip on its own.
+
+### Still open
+
+- **Blades are all at one Z**, the field origin's. On sloped ground they float
+  or sink. Phase 3 generates per-tile positions from real terrain and fixes it;
+  until then the field is only honest on flat ground.
+- Lighting is a wrapped diffuse with a root-to-tip gradient, enough to read the
+  shape. Terrain colour influence and the upright-normal blend are still Phase 6.
 
 Phase 2 has not started.
