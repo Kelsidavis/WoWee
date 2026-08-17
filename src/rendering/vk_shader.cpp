@@ -57,6 +57,13 @@ bool VkShaderModule::loadFromFile(VkDevice device, const std::string& path) {
         }
         setObjectName(device, VK_OBJECT_TYPE_SHADER_MODULE,
                       reinterpret_cast<uint64_t>(module_), leaf.c_str());
+        // And said in our own log, because the validation layer's leak report
+        // prints bare handles whether or not the object carries a name - which
+        // is what two rounds of naming just established. Matching a handle from
+        // that report against these lines is what actually identifies it.
+        if (isObjectNamingActive()) {
+            LOG_INFO("shader module ", reinterpret_cast<const void*>(module_), " = ", leaf);
+        }
     }
     return true;
 }

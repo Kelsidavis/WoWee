@@ -136,6 +136,10 @@ void setObjectName(VkDevice device, VkObjectType type, uint64_t handle, const ch
 /// Set by VkContext once the device exists; nullptr disables naming.
 void setObjectNameFn(PFN_vkSetDebugUtilsObjectNameEXT fn);
 
+/// Whether naming resolved, which is true exactly when validation is on.
+/// Used to gate logging that only matters while chasing a leak report.
+bool isObjectNamingActive();
+
 /// Record a dependency described the synchronization2 way.
 ///
 /// With VK_KHR_synchronization2 present this is vkCmdPipelineBarrier2KHR.

@@ -159,6 +159,8 @@ void setObjectNameFn(PFN_vkSetDebugUtilsObjectNameEXT fn) {
     gSetObjectName = fn;
 }
 
+bool isObjectNamingActive() { return gSetObjectName != nullptr; }
+
 void setObjectName(VkDevice device, VkObjectType type, uint64_t handle, const char* name) {
     if (gSetObjectName == nullptr || handle == 0) return;
     VkDebugUtilsObjectNameInfoEXT info{};
