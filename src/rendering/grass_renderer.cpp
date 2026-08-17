@@ -104,7 +104,8 @@ bool GrassRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLay
         return false;
     }
 
-    LOG_INFO("GrassRenderer initialized (", bladeCount_, " test blades, GPU-driven)");
+    LOG_INFO("GrassRenderer initialized (GPU-driven, capacity ", kMaxBlades,
+             " blades) - population arrives once terrain has loaded");
     return true;
 }
 
@@ -182,7 +183,11 @@ bool GrassRenderer::setPopulation(const pipeline::GrassBladeSample* blades, size
 
 bool GrassRenderer::createPerFrameBuffers() {
     VmaAllocator allocator = vkCtx_->getAllocator();
-    const VkDeviceSize visibleSize = sizeof(uint32_t) * bladeCount_;
+    // Sized to the source buffer's capacity, not to the live blade count. The
+    // count is zero here - the population arrives later, once terrain has
+    // loaded - and it changes on every rebuild, while this buffer is written
+    // once and must hold the worst case: every blade surviving the cull.
+    const VkDeviceSize visibleSize = sizeof(uint32_t) * kMaxBlades;
 
     for (uint32_t i = 0; i < kFrames; ++i) {
         if (!createMappedBuffer(allocator, sizeof(GrassCullUniformsGPU),
