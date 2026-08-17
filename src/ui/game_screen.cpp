@@ -1628,17 +1628,31 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                     static bool namedTheOpenFrame = false;
                     if (!namedTheOpenFrame) {
                         namedTheOpenFrame = true;
+                        // Wrapped in a call, because askInterface puts the
+                        // text inside `return (...)` - a bare block is a
+                        // syntax error there, which is what the first attempt
+                        // logged instead of an answer.
                         gameHandler.askInterface(
-                            "local n = {} "
-                            "for _, v in pairs(UISpecialFrames or {}) do "
-                            "  local f = _G[v] "
-                            "  if f and f.IsShown and f:IsShown() then n[#n+1] = v end "
-                            "end "
-                            "if #n > 0 then "
-                            "  print('Escape: UISpecialFrames already shown: ' "
-                            "        .. table.concat(n, ', ')) "
-                            "else print('Escape: no UISpecialFrame is shown') end "
-                            "return false");
+                            "(function() "
+                            "  local n = {} "
+                            "  for _, v in pairs(UISpecialFrames or {}) do "
+                            "    local f = _G[v] "
+                            "    if f and f.IsShown and f:IsShown() then n[#n+1] = v end "
+                            "  end "
+                            "  if #n > 0 then "
+                            "    print('Escape: UISpecialFrames already shown: ' "
+                            "          .. table.concat(n, ', ')) "
+                            "  else print('Escape: no UISpecialFrame is shown') end "
+                            "  local m = {} "
+                            "  for _, v in pairs(UIMenus or {}) do "
+                            "    local f = _G[v] "
+                            "    if f and f.IsShown and f:IsShown() then m[#m+1] = v end "
+                            "  end "
+                            "  if #m > 0 then "
+                            "    print('Escape: UIMenus already shown: ' "
+                            "          .. table.concat(m, ', ')) end "
+                            "  return false "
+                            "end)()");
                     }
 
                     const bool closed = gameHandler.askInterface(
