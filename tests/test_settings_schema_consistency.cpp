@@ -338,8 +338,8 @@ TEST_CASE("every panel the client offers still has settings on it", "[settings][
     std::set<std::string> present;
     for (const auto& d : schema()) present.insert(d.category);
 
-    for (const char* category : {"Graphics", "Upscaling", "Display", "Camera",
-                                 "Interface", "Minimap", "Action Bars",
+    for (const char* category : {"Graphics", "Grass", "Upscaling", "Display",
+                                 "Camera", "Interface", "Minimap", "Action Bars",
                                  "Combat & HUD", "Sound", "Chat", "Gameplay"}) {
         INFO("no setting names the category " << category
              << " any more, so that panel is empty or gone");
@@ -348,6 +348,9 @@ TEST_CASE("every panel the client offers still has settings on it", "[settings][
 
     // And nothing has appeared that this list does not know about, which would
     // mean a panel nobody named here is being drawn.
-    INFO("the schema names " << present.size() << " categories where eleven are expected");
-    CHECK(present.size() == 11);
+    // Grass is its own page rather than three more rows under Graphics: that
+    // page is full, and test_settings_panel_layout fails the moment anything
+    // is added to it.
+    INFO("the schema names " << present.size() << " categories where twelve are expected");
+    CHECK(present.size() == 12);
 }

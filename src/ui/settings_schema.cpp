@@ -128,6 +128,19 @@ constexpr SettingDesc kSchema[] = {
     // this client's own compute shaders and runs either way, but frame
     // generation is the SDK's alone. With the backend off the control would
     // tick, save, and change nothing.
+    // Their own category, which the interface's options panel turns into its
+    // own page. They belong beside ground clutter under Graphics, but that
+    // page is full - two rows pushed lens flare and sharp stars off the bottom
+    // of its second column, which test_settings_panel_layout catches - and a
+    // setting a player cannot find is not a setting.
+    {"grassenabled", "Enable grass", SettingKind::Bool, 0, 0, 0, "Grass", "Ground cover",
+     "Grass grown from the terrain's own ground-effect data. Off by default:\n"
+     "it is new, and it costs time on the main thread as you move.", "", 0},
+    {"grassdensity", "Density", SettingKind::Float, 0, 300, 5, "Grass", "",
+     "How much grass grows, against the amount the terrain asks for.", "", 100},
+    {"grassheight", "Height", SettingKind::Float, 50, 300, 5, "Grass", "",
+     "How tall it grows. Taller grass shows the wind crossing it more.", "", 100},
+
 #if WOWEE_HAS_AMD_FSR3_FRAMEGEN
     {"framegen", "Frame generation", SettingKind::Bool, 0, 0, 0, "Upscaling", "",
      "Experimental. FSR 3 only, and known broken on RADV/Mesa.",

@@ -30,12 +30,6 @@ KNOWN = {
                        "(settings_schema.cpp)",
     "brightness": "driven by the video panel's brightness slider through SetGamma "
                   "(lua_system_api.cpp)",
-    # Schema rows for these overflowed the Graphics panel's two columns, which
-    # test_settings_panel_layout catches: it is full. They have their own
-    # sliders on our Graphics panel instead, next to ground clutter.
-    "grassenabled": "driven by the Grass checkbox (settings_panel.cpp)",
-    "grassdensity": "driven by the Grass Density slider (settings_panel.cpp)",
-    "grassheight": "driven by the Grass Height slider (settings_panel.cpp)",
 }
 
 # Floors, so a regex that stops matching reports an empty world rather than a
