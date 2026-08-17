@@ -3,6 +3,7 @@
 #include <source_location>
 
 #include "rendering/vk_utils.hpp"
+#include "pipeline/blp_loader.hpp"
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <string>
@@ -34,6 +35,17 @@ public:
     bool uploadMips(VkContext& ctx, const uint8_t* const* mipData, const uint32_t* mipSizes,
         uint32_t mipCount, uint32_t width, uint32_t height,
         VkFormat format = VK_FORMAT_R8G8B8A8_UNORM);
+
+    /// Upload a loaded BLP, whichever form it came back in.
+    ///
+    /// A texture the loader kept compressed goes up as BC1/BC2/BC3 with the
+    /// file's own mip levels: no decode, a quarter to an eighth of the bytes,
+    /// and no blit chain to rebuild what the file already had. Anything else
+    /// takes the RGBA8 path exactly as before.
+    ///
+    /// Returns false if the image is invalid or the device cannot sample the
+    /// block format, so a caller can fall back to loading it decoded.
+    bool uploadBLP(VkContext& ctx, const pipeline::BLPImage& image);
 
     // Create a depth/stencil texture (no upload)
     bool createDepth(VkContext& ctx, uint32_t width, uint32_t height,

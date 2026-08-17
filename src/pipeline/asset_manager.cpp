@@ -202,7 +202,7 @@ void AssetManager::setBaseFallbackPath(const std::string& basePath) {
     }
 }
 
-BLPImage AssetManager::loadTexture(const std::string& path) {
+BLPImage AssetManager::loadTexture(const std::string& path, bool keepCompressed) {
     ZoneScopedN("AssetManager::loadTexture");
     if (!initialized) {
         LOG_ERROR("AssetManager not initialized");
@@ -238,7 +238,7 @@ BLPImage AssetManager::loadTexture(const std::string& path) {
         return BLPImage();
     }
 
-    BLPImage image = BLPLoader::load(blpData);
+    BLPImage image = BLPLoader::load(blpData, keepCompressed);
     if (!image.isValid()) {
         static std::mutex logMtx;
         static std::unordered_set<std::string> loggedDecodeFails;

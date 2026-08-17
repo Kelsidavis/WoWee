@@ -43,7 +43,11 @@ struct BLPImage {
     std::vector<uint8_t> data;      // RGBA8 pixel data (decompressed)
     std::vector<std::vector<uint8_t>> mipmaps;  // Mipmap levels
 
-    [[nodiscard]] bool isValid() const { return width > 0 && height > 0 && !data.empty(); }
+    [[nodiscard]] bool isValid() const {
+        return width > 0 && height > 0 && (!data.empty() || !mipmaps.empty());
+    }
+    /// True when mipmaps holds DXT blocks rather than data holding RGBA8.
+    [[nodiscard]] bool isBlockCompressed() const { return !mipmaps.empty(); }
 };
 
 /**
@@ -60,7 +64,15 @@ public:
      * @param blpData Raw BLP file data
      * @return Loaded image (check isValid())
      */
-    static BLPImage load(const std::vector<uint8_t>& blpData);
+    /// keepCompressed leaves a DXT texture in its DXT blocks: mipmaps holds
+    /// every level as stored and data stays empty. The GPU samples BC1/BC2/BC3
+    /// natively, so decoding to RGBA8 costs CPU time to produce four to eight
+    /// times the bytes, and the file's own mip levels get thrown away and
+    /// rebuilt. Only for callers that do not read the pixels - anything that
+    /// composites or scans them needs the decoded form.
+    ///
+    /// Palette and ARGB8888 always decode; there is nothing to pass through.
+    static BLPImage load(const std::vector<uint8_t>& blpData, bool keepCompressed = false);
 
     /**
      * Get format name for debugging
@@ -105,7 +117,7 @@ private:
                   "BLP2Header is memcpy'd from the file: 1172 bytes, no padding");
 
     static BLPImage loadBLP1(std::span<const uint8_t> data);
-    static BLPImage loadBLP2(std::span<const uint8_t> data);
+    static BLPImage loadBLP2(std::span<const uint8_t> data, bool keepCompressed);
     static void decompressDXT1(std::span<const uint8_t> src, uint8_t* dst, int width, int height);
     static void decompressDXT3(std::span<const uint8_t> src, uint8_t* dst, int width, int height);
     static void decompressDXT5(std::span<const uint8_t> src, uint8_t* dst, int width, int height);

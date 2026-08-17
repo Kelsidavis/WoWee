@@ -9,7 +9,7 @@
 namespace wowee {
 namespace pipeline {
 
-BLPImage BLPLoader::load(const std::vector<uint8_t>& blpData) {
+BLPImage BLPLoader::load(const std::vector<uint8_t>& blpData, bool keepCompressed) {
     if (blpData.size() < 8) {  // Minimum: magic + first field
         LOG_ERROR("BLP data too small");
         return BLPImage();
@@ -23,7 +23,7 @@ BLPImage BLPLoader::load(const std::vector<uint8_t>& blpData) {
         return loadBLP1(blpData);
     }
     if (std::memcmp(magic, "BLP2", 4) == 0) {
-        return loadBLP2(blpData);
+        return loadBLP2(blpData, keepCompressed);
     }
     if (std::memcmp(magic, "BLP0", 4) == 0) {
         LOG_WARNING("BLP0 format not fully supported");
@@ -91,7 +91,7 @@ BLPImage BLPLoader::loadBLP1(std::span<const uint8_t> data) {
     return image;
 }
 
-BLPImage BLPLoader::loadBLP2(std::span<const uint8_t> data) {
+BLPImage BLPLoader::loadBLP2(std::span<const uint8_t> data, bool keepCompressed) {
     const size_t size = data.size();
     // Copy header to stack to avoid unaligned reinterpret_cast (UB on strict platforms)
     if (size < sizeof(BLP2Header)) {
@@ -165,6 +165,37 @@ BLPImage BLPLoader::loadBLP2(std::span<const uint8_t> data) {
         LOG_ERROR("BLP2 ARGB8888 mipSize (", mipSize, ") < required (", requiredArgb, ")");
         return BLPImage();
     }
+    const bool isDxt = image.compression == BLPCompression::DXT1 ||
+                       image.compression == BLPCompression::DXT3 ||
+                       image.compression == BLPCompression::DXT5;
+    if (keepCompressed && isDxt) {
+        // Every level as stored. mipSizes is zero past the last real one, and
+        // a level whose extent has collapsed to 1x1 is the end regardless.
+        uint32_t levelW = static_cast<uint32_t>(image.width);
+        uint32_t levelH = static_cast<uint32_t>(image.height);
+        for (int level = 0; level < 16; ++level) {
+            const uint32_t levelOffset = header.mipOffsets[level];
+            const uint32_t levelSize = header.mipSizes[level];
+            if (levelSize == 0) break;
+            if (static_cast<uint64_t>(levelOffset) + levelSize > size) {
+                LOG_WARNING("BLP2 mip ", level, " runs past the file - keeping ",
+                            image.mipmaps.size(), " level(s)");
+                break;
+            }
+            const auto* first = data.data() + levelOffset;
+            image.mipmaps.emplace_back(first, first + levelSize);
+            if (levelW == 1 && levelH == 1) break;
+            levelW = std::max(1u, levelW / 2);
+            levelH = std::max(1u, levelH / 2);
+        }
+        if (image.mipmaps.empty()) {
+            LOG_ERROR("BLP2 has no readable mip levels");
+            return BLPImage();
+        }
+        image.mipLevels = static_cast<int>(image.mipmaps.size());
+        return image;
+    }
+
     image.data.resize(requiredArgb);  // RGBA8
 
     switch (image.compression) {

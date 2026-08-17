@@ -22,6 +22,23 @@
 namespace wowee {
 namespace rendering {
 
+namespace {
+
+/// What a loaded texture will actually occupy once uploaded, which the cache
+/// budget is spent against. A block-compressed one is its own levels; a
+/// decoded one is the base plus the third that a generated mip chain adds.
+size_t approxTextureBytes(const pipeline::BLPImage& blp) {
+    if (blp.isBlockCompressed()) {
+        size_t total = 0;
+        for (const auto& level : blp.mipmaps) total += level.size();
+        return total;
+    }
+    const size_t base = static_cast<size_t>(blp.width) * static_cast<size_t>(blp.height) * 4ull;
+    return base + (base / 3);
+}
+
+} // namespace
+
 // Matches set 1 binding 7 in terrain.frag.glsl
 struct TerrainParamsUBO {
     int32_t layerCount;
@@ -590,7 +607,9 @@ VkTexture* TerrainRenderer::loadTexture(const std::string& path) {
         it->second.lastUse = ++textureCacheCounter_;
         return it->second.texture.get();
     }
-    pipeline::BLPImage blp = assetManager->loadTexture(key);
+    // Terrain tileset textures are sampled and never read back, so they go
+    // up as blocks with the file's own mip levels.
+    pipeline::BLPImage blp = assetManager->loadTexture(key, true);
     if (!blp.isValid()) {
         // Return white fallback but don't cache the failure - allow retry
         // on next tile load in case the asset becomes available.
@@ -600,8 +619,7 @@ VkTexture* TerrainRenderer::loadTexture(const std::string& path) {
         return whiteTexture.get();
     }
 
-    size_t base = static_cast<size_t>(blp.width) * static_cast<size_t>(blp.height) * 4ull;
-    size_t approxBytes = base + (base / 3);
+    const size_t approxBytes = approxTextureBytes(blp);
     if (textureCacheBytes_ + approxBytes > textureCacheBudgetBytes_) {
         if (textureBudgetRejectWarnings_ < 3) {
             LOG_WARNING("Terrain texture cache full (", textureCacheBytes_ / (1024 * 1024),
@@ -613,8 +631,7 @@ VkTexture* TerrainRenderer::loadTexture(const std::string& path) {
     }
 
     auto tex = std::make_unique<VkTexture>();
-    if (!tex->upload(*vkCtx, blp.data.data(), blp.width, blp.height,
-                      VK_FORMAT_R8G8B8A8_UNORM, true)) {
+    if (!tex->uploadBLP(*vkCtx, blp)) {
         LOG_WARNING("Failed to upload texture to GPU: ", path);
         return whiteTexture.get();
     }
@@ -649,15 +666,13 @@ void TerrainRenderer::uploadPreloadedTextures(
         if (!blp.isValid()) continue;
 
         auto tex = std::make_unique<VkTexture>();
-        if (!tex->upload(*vkCtx, blp.data.data(), blp.width, blp.height,
-                          VK_FORMAT_R8G8B8A8_UNORM, true)) continue;
+        if (!tex->uploadBLP(*vkCtx, blp)) continue;
         tex->createSampler(vkCtx->getDevice(), VK_FILTER_LINEAR, VK_FILTER_LINEAR,
                             VK_SAMPLER_ADDRESS_MODE_REPEAT);
 
         TextureCacheEntry e;
         e.texture = std::move(tex);
-        size_t base = static_cast<size_t>(blp.width) * static_cast<size_t>(blp.height) * 4ull;
-        e.approxBytes = base + (base / 3);
+        e.approxBytes = approxTextureBytes(blp);
         e.lastUse = ++textureCacheCounter_;
         textureCacheBytes_ += e.approxBytes;
         textureCache[key] = std::move(e);

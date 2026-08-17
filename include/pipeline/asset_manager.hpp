@@ -61,7 +61,9 @@ public:
      * @param path Virtual path to BLP file (e.g., "Textures\\Minimap\\Background.blp")
      * @return BLP image (check isValid())
      */
-    BLPImage loadTexture(const std::string& path);
+    /// keepCompressed asks the loader to leave a DXT texture in its blocks.
+    /// A PNG override is decoded regardless - it has no blocks to keep.
+    BLPImage loadTexture(const std::string& path, bool keepCompressed = false);
 
     /**
      * Set expansion-specific data path for CSV DBC lookup.

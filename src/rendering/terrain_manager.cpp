@@ -960,7 +960,10 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
     // doesn't block the main thread with file I/O.
     for (const auto& texPath : pending->terrain.textures) {
         if (pending->preloadedTextures.find(texPath) != pending->preloadedTextures.end()) continue;
-        pending->preloadedTextures[texPath] = assetManager->loadTexture(texPath);
+        // Terrain tilesets only ever get sampled, so they stay in their
+        // blocks. The M2 preloads above and the normal-map source below do
+        // not: their consumers read the pixels.
+        pending->preloadedTextures[texPath] = assetManager->loadTexture(texPath, true);
     }
 
     LOG_DEBUG("Prepared tile [", x, ",", y, "]: ",

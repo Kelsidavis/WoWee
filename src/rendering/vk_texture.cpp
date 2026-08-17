@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <vector>
 
 namespace wowee {
 namespace rendering {
@@ -245,6 +246,47 @@ bool VkTexture::uploadMips(VkContext& ctx, const uint8_t* const* mipData,
         destroyBuffer(ctx.getAllocator(), staging);
     }
     return true;
+}
+
+bool VkTexture::uploadBLP(VkContext& ctx, const pipeline::BLPImage& image) {
+    if (!image.isValid()) return false;
+
+    if (!image.isBlockCompressed()) {
+        return upload(ctx, image.data.data(),
+                      static_cast<uint32_t>(image.width),
+                      static_cast<uint32_t>(image.height),
+                      VK_FORMAT_R8G8B8A8_UNORM, true);
+    }
+
+    VkFormat format = VK_FORMAT_UNDEFINED;
+    switch (image.compression) {
+        case pipeline::BLPCompression::DXT1: format = VK_FORMAT_BC1_RGBA_UNORM_BLOCK; break;
+        case pipeline::BLPCompression::DXT3: format = VK_FORMAT_BC2_UNORM_BLOCK; break;
+        case pipeline::BLPCompression::DXT5: format = VK_FORMAT_BC3_UNORM_BLOCK; break;
+        default: return false;
+    }
+
+    // A device that cannot sample the block format has to be told before the
+    // image is created, not after: the caller reloads the file decoded.
+    VkFormatProperties props{};
+    vkGetPhysicalDeviceFormatProperties(ctx.getPhysicalDevice(), format, &props);
+    if ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) == 0) {
+        return false;
+    }
+
+    std::vector<const uint8_t*> levels;
+    std::vector<uint32_t> sizes;
+    levels.reserve(image.mipmaps.size());
+    sizes.reserve(image.mipmaps.size());
+    for (const auto& level : image.mipmaps) {
+        levels.push_back(level.data());
+        sizes.push_back(static_cast<uint32_t>(level.size()));
+    }
+
+    return uploadMips(ctx, levels.data(), sizes.data(),
+                      static_cast<uint32_t>(levels.size()),
+                      static_cast<uint32_t>(image.width),
+                      static_cast<uint32_t>(image.height), format);
 }
 
 bool VkTexture::createDepth(VkContext& ctx, uint32_t width, uint32_t height, VkFormat format) {
