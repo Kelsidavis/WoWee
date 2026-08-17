@@ -1,4 +1,5 @@
 #include "rendering/render_graph.hpp"
+#include "rendering/vk_utils.hpp"
 #include "core/logger.hpp"
 #include <algorithm>
 #include <unordered_map>
@@ -124,15 +125,18 @@ void RenderGraph::execute(VkCommandBuffer cmd) {
 
         // Insert image barriers declared for this pass
         if (!pass.imageBarriers.empty()) {
-            std::vector<VkImageMemoryBarrier> barriers;
+            // Each barrier carries its own stages. The legacy call took one
+            // pair for the whole batch, so every barrier in it waited on the
+            // union of all of them; here a depth transition no longer waits on
+            // whatever a colour one needed.
+            std::vector<VkImageMemoryBarrier2> barriers;
             barriers.reserve(pass.imageBarriers.size());
 
-            VkPipelineStageFlags srcStages = 0;
-            VkPipelineStageFlags dstStages = 0;
-
             for (const auto& b : pass.imageBarriers) {
-                VkImageMemoryBarrier ib{};
-                ib.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                VkImageMemoryBarrier2 ib{};
+                ib.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                ib.srcStageMask = b.srcStage;
+                ib.dstStageMask = b.dstStage;
                 ib.oldLayout = b.oldLayout;
                 ib.newLayout = b.newLayout;
                 ib.srcAccessMask = b.srcAccess;
@@ -142,29 +146,24 @@ void RenderGraph::execute(VkCommandBuffer cmd) {
                 ib.image = b.image;
                 ib.subresourceRange = {.aspectMask = b.aspectMask, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
                 barriers.push_back(ib);
-                srcStages |= b.srcStage;
-                dstStages |= b.dstStage;
             }
 
-            vkCmdPipelineBarrier(cmd,
-                srcStages, dstStages,
-                0,
-                0, nullptr,
-                0, nullptr,
-                static_cast<uint32_t>(barriers.size()), barriers.data());
+            VkDependencyInfo dep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+            dep.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+            dep.pImageMemoryBarriers = barriers.data();
+            cmdPipelineBarrier2(cmd, dep);
         }
 
         // Insert buffer barriers declared for this pass
         if (!pass.bufferBarriers.empty()) {
-            std::vector<VkBufferMemoryBarrier> barriers;
+            std::vector<VkBufferMemoryBarrier2> barriers;
             barriers.reserve(pass.bufferBarriers.size());
 
-            VkPipelineStageFlags srcStages = 0;
-            VkPipelineStageFlags dstStages = 0;
-
             for (const auto& b : pass.bufferBarriers) {
-                VkBufferMemoryBarrier bb{};
-                bb.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+                VkBufferMemoryBarrier2 bb{};
+                bb.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+                bb.srcStageMask = b.srcStage;
+                bb.dstStageMask = b.dstStage;
                 bb.srcAccessMask = b.srcAccess;
                 bb.dstAccessMask = b.dstAccess;
                 bb.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -173,16 +172,12 @@ void RenderGraph::execute(VkCommandBuffer cmd) {
                 bb.offset = b.offset;
                 bb.size = b.size;
                 barriers.push_back(bb);
-                srcStages |= b.srcStage;
-                dstStages |= b.dstStage;
             }
 
-            vkCmdPipelineBarrier(cmd,
-                srcStages, dstStages,
-                0,
-                0, nullptr,
-                static_cast<uint32_t>(barriers.size()), barriers.data(),
-                0, nullptr);
+            VkDependencyInfo dep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+            dep.bufferMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+            dep.pBufferMemoryBarriers = barriers.data();
+            cmdPipelineBarrier2(cmd, dep);
         }
 
         // Execute the pass

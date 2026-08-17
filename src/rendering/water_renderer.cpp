@@ -282,8 +282,10 @@ void WaterRenderer::setRefractionEnabled(bool enabled) {
             for (auto& sh : sceneHistory) {
                 if (!sh.colorImage) continue;
 
-                VkImageMemoryBarrier toTransfer{};
-                toTransfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                VkImageMemoryBarrier2 toTransfer{};
+                toTransfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                toTransfer.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+                toTransfer.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
                 toTransfer.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 toTransfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
                 toTransfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -292,20 +294,26 @@ void WaterRenderer::setRefractionEnabled(bool enabled) {
                 toTransfer.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
                 toTransfer.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
                 toTransfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                     0, 0, nullptr, 0, nullptr, 1, &toTransfer);
+                VkDependencyInfo toTransferDep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+                toTransferDep.imageMemoryBarrierCount = 1;
+                toTransferDep.pImageMemoryBarriers = &toTransfer;
+                cmdPipelineBarrier2(cmd, toTransferDep);
 
                 VkClearColorValue clearColor = {{0.0f, 0.0f, 0.0f, 0.0f}};
                 VkImageSubresourceRange range = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
                 vkCmdClearColorImage(cmd, sh.colorImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColor, 1, &range);
 
-                VkImageMemoryBarrier toRead = toTransfer;
+                VkImageMemoryBarrier2 toRead = toTransfer;
+                toRead.srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+                toRead.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
                 toRead.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
                 toRead.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 toRead.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
                 toRead.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                                     0, 0, nullptr, 0, nullptr, 1, &toRead);
+                VkDependencyInfo toReadDep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+                toReadDep.imageMemoryBarrierCount = 1;
+                toReadDep.pImageMemoryBarriers = &toRead;
+                cmdPipelineBarrier2(cmd, toReadDep);
             }
         });
     }
@@ -542,10 +550,12 @@ void WaterRenderer::createSceneHistoryResources(VkExtent2D extent, VkFormat colo
 
     // Initialize all per-frame history images to shader-read layout
     vkCtx->immediateSubmit([&](VkCommandBuffer cmd) {
-        std::vector<VkImageMemoryBarrier> barriers;
+        std::vector<VkImageMemoryBarrier2> barriers;
         for (auto& sh : sceneHistory) {
-            VkImageMemoryBarrier b{};
-            b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            VkImageMemoryBarrier2 b{};
+            b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            b.srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            b.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
             b.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             b.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -559,8 +569,10 @@ void WaterRenderer::createSceneHistoryResources(VkExtent2D extent, VkFormat colo
             b.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
             barriers.push_back(b);
         }
-        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(barriers.size()), barriers.data());
+        VkDependencyInfo dep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dep.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+        dep.pImageMemoryBarriers = barriers.data();
+        cmdPipelineBarrier2(cmd, dep);
     });
 }
 
@@ -1197,8 +1209,10 @@ void WaterRenderer::captureSceneHistory(VkCommandBuffer cmd,
                         VkAccessFlags dstAccess,
                         VkPipelineStageFlags srcStage,
                         VkPipelineStageFlags dstStage) {
-        VkImageMemoryBarrier b{};
-        b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        VkImageMemoryBarrier2 b{};
+        b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        b.srcStageMask = srcStage;
+        b.dstStageMask = dstStage;
         b.oldLayout = oldLayout;
         b.newLayout = newLayout;
         b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -1211,7 +1225,10 @@ void WaterRenderer::captureSceneHistory(VkCommandBuffer cmd,
         b.subresourceRange.layerCount = 1;
         b.srcAccessMask = srcAccess;
         b.dstAccessMask = dstAccess;
-        vkCmdPipelineBarrier(cmd, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &b);
+        VkDependencyInfo dep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dep.imageMemoryBarrierCount = 1;
+        dep.pImageMemoryBarriers = &b;
+        cmdPipelineBarrier2(cmd, dep);
     };
 
     // Color source: final render pass layout is PRESENT_SRC.
@@ -1732,8 +1749,10 @@ void WaterRenderer::createReflectionResources() {
 
     // Transition reflection color image to shader-read so first frame doesn't read undefined
     vkCtx->immediateSubmit([&](VkCommandBuffer cmd) {
-        VkImageMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        VkImageMemoryBarrier2 barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        barrier.srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -1741,9 +1760,10 @@ void WaterRenderer::createReflectionResources() {
         barrier.image = reflectionColorImage;
         barrier.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+        VkDependencyInfo dep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dep.imageMemoryBarrierCount = 1;
+        dep.pImageMemoryBarriers = &barrier;
+        cmdPipelineBarrier2(cmd, dep);
     });
     reflectionColorLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 

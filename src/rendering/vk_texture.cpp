@@ -348,8 +348,10 @@ void VkTexture::generateMipmaps(VkContext& ctx, VkFormat format,
 
         for (uint32_t i = 1; i < mipLevels_; i++) {
             // Transition previous mip to transfer src
-            VkImageMemoryBarrier barrier{};
-            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            VkImageMemoryBarrier2 barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            barrier.srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
             barrier.image = image_.image;
             barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -363,9 +365,11 @@ void VkTexture::generateMipmaps(VkContext& ctx, VkFormat format,
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
-            vkCmdPipelineBarrier(cmd,
-                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                0, 0, nullptr, 0, nullptr, 1, &barrier);
+            VkDependencyInfo barrierDep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+            barrierDep.dependencyFlags = 0;
+            barrierDep.imageMemoryBarrierCount = 1;
+            barrierDep.pImageMemoryBarriers = &barrier;
+            cmdPipelineBarrier2(cmd, barrierDep);
 
             // Blit from previous mip to current
             VkImageBlit blit{};
@@ -390,22 +394,27 @@ void VkTexture::generateMipmaps(VkContext& ctx, VkFormat format,
                 1, &blit, VK_FILTER_LINEAR);
 
             // Transition previous mip to shader read
+            barrier.srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
             barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-            vkCmdPipelineBarrier(cmd,
-                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                0, 0, nullptr, 0, nullptr, 1, &barrier);
+            VkDependencyInfo toReadDep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+            toReadDep.imageMemoryBarrierCount = 1;
+            toReadDep.pImageMemoryBarriers = &barrier;
+            cmdPipelineBarrier2(cmd, toReadDep);
 
             mipW = mipW > 1 ? mipW / 2 : 1;
             mipH = mipH > 1 ? mipH / 2 : 1;
         }
 
         // Transition last mip to shader read
-        VkImageMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        VkImageMemoryBarrier2 barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        barrier.srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         barrier.image = image_.image;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -419,9 +428,11 @@ void VkTexture::generateMipmaps(VkContext& ctx, VkFormat format,
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        vkCmdPipelineBarrier(cmd,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-            0, 0, nullptr, 0, nullptr, 1, &barrier);
+        VkDependencyInfo barrierDep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        barrierDep.dependencyFlags = 0;
+        barrierDep.imageMemoryBarrierCount = 1;
+        barrierDep.pImageMemoryBarriers = &barrier;
+        cmdPipelineBarrier2(cmd, barrierDep);
     });
 }
 

@@ -1203,16 +1203,20 @@ bool Renderer::captureScreenshot(const std::string& outputPath) {
     VkCommandBuffer cmd = vkCtx->beginSingleTimeCommands();
 
     // Transition swapchain image: PRESENT_SRC → TRANSFER_SRC
-    VkImageMemoryBarrier toTransfer{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+    VkImageMemoryBarrier2 toTransfer{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+    toTransfer.srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    toTransfer.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
     toTransfer.srcAccessMask       = VK_ACCESS_MEMORY_READ_BIT;
     toTransfer.dstAccessMask       = VK_ACCESS_TRANSFER_READ_BIT;
     toTransfer.oldLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     toTransfer.newLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     toTransfer.image               = srcImage;
     toTransfer.subresourceRange    = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
-    vkCmdPipelineBarrier(cmd,
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-        0, 0, nullptr, 0, nullptr, 1, &toTransfer);
+    VkDependencyInfo toTransferDep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    toTransferDep.dependencyFlags = 0;
+    toTransferDep.imageMemoryBarrierCount = 1;
+    toTransferDep.pImageMemoryBarriers = &toTransfer;
+    cmdPipelineBarrier2(cmd, toTransferDep);
 
     // Copy image to buffer
     VkBufferImageCopy region{};
@@ -1222,14 +1226,17 @@ bool Renderer::captureScreenshot(const std::string& outputPath) {
                            stagingBuf, 1, &region);
 
     // Transition back: TRANSFER_SRC → PRESENT_SRC
-    VkImageMemoryBarrier toPresent = toTransfer;
+    VkImageMemoryBarrier2 toPresent = toTransfer;
+    toPresent.srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    toPresent.dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
     toPresent.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     toPresent.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
     toPresent.oldLayout     = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     toPresent.newLayout     = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    vkCmdPipelineBarrier(cmd,
-        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-        0, 0, nullptr, 0, nullptr, 1, &toPresent);
+    VkDependencyInfo toPresentDep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    toPresentDep.imageMemoryBarrierCount = 1;
+    toPresentDep.pImageMemoryBarriers = &toPresent;
+    cmdPipelineBarrier2(cmd, toPresentDep);
 
     vkCtx->endSingleTimeCommands(cmd);
 
@@ -3226,8 +3233,9 @@ void Renderer::renderShadowPass() {
     uint32_t frame = vkCtx->getCurrentFrame();
 
     // Barrier 1: transition this frame's shadow map into writable depth layout.
-    VkImageMemoryBarrier b1{};
-    b1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    VkImageMemoryBarrier2 b1{};
+    b1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    b1.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     b1.oldLayout = shadowDepthLayout_[frame];
     b1.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     b1.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -3242,9 +3250,12 @@ void Renderer::renderShadowPass() {
     VkPipelineStageFlags srcStage = (shadowDepthLayout_[frame] == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
         ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
         : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    vkCmdPipelineBarrier(currentCmd,
-        srcStage, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-        0, 0, nullptr, 0, nullptr, 1, &b1);
+    b1.srcStageMask = srcStage;
+    VkDependencyInfo b1Dep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    b1Dep.dependencyFlags = 0;
+    b1Dep.imageMemoryBarrierCount = 1;
+    b1Dep.pImageMemoryBarriers = &b1;
+    cmdPipelineBarrier2(currentCmd, b1Dep);
 
     // Begin shadow render pass
     VkRenderPassBeginInfo rpInfo{};
@@ -3285,8 +3296,10 @@ void Renderer::renderShadowPass() {
     vkCmdEndRenderPass(currentCmd);
 
     // Barrier 2: DEPTH_STENCIL_ATTACHMENT_OPTIMAL → SHADER_READ_ONLY_OPTIMAL
-    VkImageMemoryBarrier b2{};
-    b2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    VkImageMemoryBarrier2 b2{};
+    b2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    b2.srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    b2.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     b2.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     b2.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     b2.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -3295,9 +3308,11 @@ void Renderer::renderShadowPass() {
     b2.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     b2.image = shadowDepthImage[frame];
     b2.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
-    vkCmdPipelineBarrier(currentCmd,
-        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        0, 0, nullptr, 0, nullptr, 1, &b2);
+    VkDependencyInfo b2Dep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    b2Dep.dependencyFlags = 0;
+    b2Dep.imageMemoryBarrierCount = 1;
+    b2Dep.pImageMemoryBarriers = &b2;
+    cmdPipelineBarrier2(currentCmd, b2Dep);
     shadowDepthLayout_[frame] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 

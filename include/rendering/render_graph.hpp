@@ -12,7 +12,7 @@ namespace rendering {
 // Lightweight Render Graph / Frame Graph
 // Converts hardcoded pass sequence (shadow → reflection → compute cull →
 // main → post-process → ImGui → present) into declarative graph nodes.
-// Graph auto-inserts VkImageMemoryBarrier between passes.
+// Graph auto-inserts VkImageMemoryBarrier2 between passes.
 
 // Resource handle - identifies a virtual resource (image or buffer) within the graph.
 struct RGResource {

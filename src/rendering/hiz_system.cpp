@@ -402,7 +402,9 @@ void HiZSystem::buildPyramid(VkCommandBuffer cmd, uint32_t frameIndex, VkImage d
 
     // Transition depth image from DEPTH_STENCIL_ATTACHMENT to SHADER_READ_ONLY for sampling
     {
-        VkImageMemoryBarrier barrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        VkImageMemoryBarrier2 barrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        barrier.srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
         barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
         barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -414,15 +416,18 @@ void HiZSystem::buildPyramid(VkCommandBuffer cmd, uint32_t frameIndex, VkImage d
         barrier.subresourceRange.levelCount = 1;
         barrier.subresourceRange.layerCount = 1;
 
-        vkCmdPipelineBarrier(cmd,
-            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            0, 0, nullptr, 0, nullptr, 1, &barrier);
+        VkDependencyInfo barrierDep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        barrierDep.dependencyFlags = 0;
+        barrierDep.imageMemoryBarrierCount = 1;
+        barrierDep.pImageMemoryBarriers = &barrier;
+        cmdPipelineBarrier2(cmd, barrierDep);
     }
 
     // Transition entire pyramid to GENERAL layout for storage writes
     {
-        VkImageMemoryBarrier barrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        VkImageMemoryBarrier2 barrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        barrier.srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -435,10 +440,11 @@ void HiZSystem::buildPyramid(VkCommandBuffer cmd, uint32_t frameIndex, VkImage d
         barrier.subresourceRange.levelCount = mipLevels_;
         barrier.subresourceRange.layerCount = 1;
 
-        vkCmdPipelineBarrier(cmd,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            0, 0, nullptr, 0, nullptr, 1, &barrier);
+        VkDependencyInfo barrierDep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        barrierDep.dependencyFlags = 0;
+        barrierDep.imageMemoryBarrierCount = 1;
+        barrierDep.pImageMemoryBarriers = &barrier;
+        cmdPipelineBarrier2(cmd, barrierDep);
     }
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, buildPipeline_);
@@ -467,7 +473,9 @@ void HiZSystem::buildPyramid(VkCommandBuffer cmd, uint32_t frameIndex, VkImage d
 
         // Barrier between mip levels: ensure writes to mip N are visible before reads for mip N+1
         if (mip + 1 < mipLevels_) {
-            VkImageMemoryBarrier mipBarrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            VkImageMemoryBarrier2 mipBarrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+            mipBarrier.srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+            mipBarrier.dstStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
             mipBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
             mipBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             mipBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -480,10 +488,11 @@ void HiZSystem::buildPyramid(VkCommandBuffer cmd, uint32_t frameIndex, VkImage d
             mipBarrier.subresourceRange.levelCount = 1;
             mipBarrier.subresourceRange.layerCount = 1;
 
-            vkCmdPipelineBarrier(cmd,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                0, 0, nullptr, 0, nullptr, 1, &mipBarrier);
+            VkDependencyInfo mipBarrierDep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+            mipBarrierDep.dependencyFlags = 0;
+            mipBarrierDep.imageMemoryBarrierCount = 1;
+            mipBarrierDep.pImageMemoryBarriers = &mipBarrier;
+            cmdPipelineBarrier2(cmd, mipBarrierDep);
         }
 
         // Next mip level dimensions
@@ -493,7 +502,9 @@ void HiZSystem::buildPyramid(VkCommandBuffer cmd, uint32_t frameIndex, VkImage d
 
     // Transition depth back to DEPTH_STENCIL_ATTACHMENT for next frame
     {
-        VkImageMemoryBarrier barrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        VkImageMemoryBarrier2 barrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        barrier.srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
         barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
         barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
                                 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
@@ -506,10 +517,11 @@ void HiZSystem::buildPyramid(VkCommandBuffer cmd, uint32_t frameIndex, VkImage d
         barrier.subresourceRange.levelCount = 1;
         barrier.subresourceRange.layerCount = 1;
 
-        vkCmdPipelineBarrier(cmd,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-            0, 0, nullptr, 0, nullptr, 1, &barrier);
+        VkDependencyInfo barrierDep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        barrierDep.dependencyFlags = 0;
+        barrierDep.imageMemoryBarrierCount = 1;
+        barrierDep.pImageMemoryBarriers = &barrier;
+        cmdPipelineBarrier2(cmd, barrierDep);
     }
 }
 
