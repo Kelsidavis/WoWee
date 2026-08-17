@@ -2068,6 +2068,39 @@ void Renderer::updateGrassPopulation() {
         return;
     }
 
+    // WOWEE_GRASS_DEBUG=1: everything about the ground the player is standing
+    // on. Screenshots cannot say whether a stretch of cobble resolved to a
+    // road layer that was suppressed, a dirt layer that was not, or a grass
+    // layer underneath showing through - and those want three different fixes.
+    if (rendering::envFlagEnabled("WOWEE_GRASS_DEBUG")) {
+        float fx = 0.0f;
+        float fy = 0.0f;
+        const TerrainTile* tile = nullptr;
+        if (const pipeline::MapChunk* here =
+                terrainManager->findChunkAt(center.x, center.y, fx, fy, &tile)) {
+            pipeline::ChunkGrassContext ctx;
+            ctx.build(*here, densityFor);
+            std::string report;
+            for (size_t i = 0; i < std::min<size_t>(here->layers.size(), 4); ++i) {
+                const uint32_t texId = here->layers[i].textureId;
+                const std::string name =
+                    (tile && texId < tile->terrain.textures.size())
+                        ? tile->terrain.textures[texId] : std::string("<none>");
+                const bool road = pipeline::isRoadLikeTexture(name);
+                if (road) ctx.suppressLayer(i);
+                report += "\n    [" + std::to_string(i) + "] effect=" +
+                          std::to_string(here->layers[i].effectId) + " density=" +
+                          std::to_string(terrainManager->getGroundEffectDensity(
+                              here->layers[i].effectId)) +
+                          (road ? " ROAD-SUPPRESSED " : " ") + name;
+            }
+            const auto fit = pipeline::evaluateGrass(ctx, *here, fx, fy);
+            LOG_INFO("Grass under player: frac=(", fx, ",", fy, ") suitability=",
+                     fit.suitability, " growsAnything=", ctx.growsAnything ? 1 : 0,
+                     report);
+        }
+    }
+
     const size_t profilesBefore = grassProfiles_.size();
     auto profileFor = [this](uint32_t effectId) {
         pipeline::GrassProfileRef ref;

@@ -352,13 +352,27 @@ void GameScreen::render(game::GameHandler& gameHandler) {
             // the stale value - the setting appeared to do nothing at all, and
             // only took effect a run later.
             loadSettings();
+
+            // The latch has to wait for every subsystem this block feeds, not
+            // just the first one. It used to be set inside the minimap branch,
+            // so a frame where the minimap existed and the zone manager did
+            // not yet marked the whole apply done - and the saved soundtrack
+            // and clutter settings were then never applied at all that run.
+            // They are separate subsystems built at different moments; whether
+            // a setting survived depended on which won the race.
+            bool allApplied = true;
             if (auto* minimap = renderer->getMinimap()) {
                 settingsPanel_.minimapRotate_ = false;
                 settingsPanel_.pendingMinimapRotate = false;
                 minimap->setRotateWithCamera(false);
                 minimap->setSquareShape(settingsPanel_.minimapSquare_);
-                settingsPanel_.minimapSettingsApplied_ = true;
+            } else {
+                allApplied = false;
             }
+            if (!renderer->getZoneManager() || !renderer->getTerrainManager()) {
+                allApplied = false;
+            }
+            settingsPanel_.minimapSettingsApplied_ = allApplied;
             if (auto* zm = renderer->getZoneManager()) {
                 zm->setUseOriginalSoundtrack(settingsPanel_.pendingUseOriginalSoundtrack);
                 // Setting the flag alone is not the whole apply: music that

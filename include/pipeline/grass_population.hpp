@@ -52,7 +52,14 @@ using ProfileLookupFn = std::function<GrassProfileRef(uint32_t effectId)>;
 
 struct GrassPopulationParams {
     /// Lattice pitch in yards. One candidate blade per cell.
-    float spacing = 0.32f;
+    ///
+    /// Pitch and width together decide how much of the ground the field
+    /// actually covers, and coverage is what makes grass read as grass. At
+    /// 0.32 pitch and 0.046 wide the field covered 14% of the ground: looking
+    /// along it you see through many blades and it reads as a field, looking
+    /// down at it you see 86% bare earth. That is the whole of "the grass
+    /// disappears depending on which way I look".
+    float spacing = 0.28f;
     /// Scales how many candidates survive, on top of terrain suitability.
     /// TerrainManager::getGroundClutterDensityScale() feeds this.
     float densityScale = 1.0f;
@@ -61,11 +68,13 @@ struct GrassPopulationParams {
     /// for a wave to be visible crossing it.
     float baseHeight = 0.42f;
     float heightVariation = 0.45f;
-    /// Wide enough to hold pixels at gameplay camera distances. 0.024 was a
-    /// realistic blade and an invisible one: one to two pixels at twenty
-    /// yards, which sampling and upscaling simply ate - the field was dense
-    /// and knee-high in the buffer and absent on screen.
-    float baseWidth = 0.042f;
+    /// Wide enough to hold pixels at gameplay camera distances, and wide
+    /// enough that the field covers ground. 0.024 was a realistic blade and an
+    /// invisible one: one to two pixels at twenty yards, which sampling and
+    /// upscaling simply ate. A blade here stands for a tuft rather than a
+    /// single leaf - with pitch above, the field now covers about a third of
+    /// the ground it stands on.
+    float baseWidth = 0.08f;
     /// Mixed into every hash. Changing it reshuffles the whole world's grass.
     uint32_t seed = 0x9e3779b9u;
 };
