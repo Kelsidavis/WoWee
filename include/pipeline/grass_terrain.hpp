@@ -48,6 +48,10 @@ struct GrassSuitability {
     glm::vec3 groundShadow{0.0f};
     glm::vec3 groundHighlight{0.0f};
     bool hasGroundColor = false;
+    /// Standing in water. Submerged growth is drab - brown and dark green,
+    /// with no bloom - because light does not reach it and nothing flowers
+    /// under a pond.
+    bool submerged = false;
 };
 
 /// Density for a ground-effect id; 0 (or an unknown id) means no vegetation.
@@ -81,6 +85,11 @@ struct ChunkGrassContext {
     glm::vec3 layerShadow[4]{};
     glm::vec3 layerHighlight[4]{};
     bool hasLayerColors = false;
+
+    /// Surface height of any water over this chunk, filled by the caller for
+    /// the same reason the colours are: the water lives on a renderer.
+    float waterHeight = 0.0f;
+    bool hasWater = false;
 
     /// Returns false when nothing in this chunk grows anything, so a caller
     /// can skip it whole.

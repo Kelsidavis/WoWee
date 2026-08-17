@@ -34,7 +34,7 @@ namespace rendering {
 /// | 32     | groundShadow.xyz   | terrain's shadow tone under the root     |
 /// | 44     | groundShadow.w     | 1 when the tones are real, else 0        |
 /// | 48     | groundHighlight.xyz| terrain's highlight tone                 |
-/// | 60     | groundHighlight.w  | unused                                   |
+/// | 60     | groundHighlight.w  | 1 when the blade stands in water         |
 struct GrassBladeGPU {
     glm::vec4 positionHeight{};
     glm::vec4 facingWidthPhase{};

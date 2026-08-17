@@ -35,7 +35,7 @@ struct GrassBlade {
     vec4 positionHeight;
     vec4 facingWidthPhase;
     vec4 groundShadow;      // xyz = terrain's shadow tone, w = 1 if tones real
-    vec4 groundHighlight;   // xyz = terrain's highlight tone
+    vec4 groundHighlight;   // xyz = highlight tone, w = 1 if under water
 };
 
 layout(std430, set = 1, binding = 0) readonly buffer GrassSource {
@@ -118,7 +118,11 @@ void main() {
     float seedGate  = smoothstep(0.35, 0.75, patchField(root.xy, 0.31, 0.0));
     float bloomGate = smoothstep(0.40, 0.80, patchField(root.xy, 0.47, 2.9));
     bool seeded = rSeeded < profile.params.w * (0.15 + 1.85 * seedGate);
-    bool bloom  = !seeded && rBloom < profile.params.z * (0.20 + 1.80 * bloomGate);
+    // Nothing flowers under a pond, and drowned growth does not go to seed.
+    bool submerged = blade.groundHighlight.w > 0.5;
+    bool bloom  = !seeded && !submerged
+                  && rBloom < profile.params.z * (0.20 + 1.80 * bloomGate);
+    seeded = seeded && !submerged;
 
     if (seeded) {
         // Bolted: the tall wispy stems that stand above the sward.
@@ -319,6 +323,15 @@ void main() {
         profileRoot = mix(profileRoot, groundRoot, 0.75);
         profileTip  = mix(profileTip,  groundTip,  0.75);
     }
+    // Under water the colour drops toward drab brown-green: light does not
+    // reach it, and a bright meadow palette read as painted-on where it was
+    // clearly submerged.
+    if (submerged) {
+        const vec3 kDrowned = vec3(0.16, 0.20, 0.11);
+        profileRoot = mix(profileRoot, kDrowned * 0.7, 0.75);
+        profileTip  = mix(profileTip, kDrowned, 0.7);
+    }
+
     vRootColor = profileRoot * tint;
     vTipColor  = profileTip * tint;
 

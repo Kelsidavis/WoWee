@@ -547,12 +547,12 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                 // wish to turn the other down. Both take effect on the next
                 // rebuild, which is a short walk away.
                 if (ImGui::SliderInt("Grass Density", &pendingGrassDensity,
-                                     0, 200, "%d%%")) {
+                                     0, 300, "%d%%")) {
                     applySettingSideEffects("grassdensity");
                     saveCallback();
                 }
                 if (ImGui::SliderInt("Grass Height", &pendingGrassHeight,
-                                     50, 200, "%d%%")) {
+                                     50, 300, "%d%%")) {
                     applySettingSideEffects("grassheight");
                     saveCallback();
                 }

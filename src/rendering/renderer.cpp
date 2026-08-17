@@ -1926,8 +1926,11 @@ void Renderer::setFSR2Enabled(bool enabled) {
     }
 }
 void Renderer::setGrassScales(float density, float height) {
-    const float d = glm::clamp(density, 0.0f, 2.0f);
-    const float h = glm::clamp(height, 0.5f, 2.0f);
+    // Up to triple. Density past 1 costs generation time and can meet the
+    // blade cap, which thins the whole window rather than cutting a side off
+    // it; height past 1 costs nothing.
+    const float d = glm::clamp(density, 0.0f, 3.0f);
+    const float h = glm::clamp(height, 0.5f, 3.0f);
     if (d == grassDensityScale_ && h == grassHeightScale_) return;
     grassDensityScale_ = d;
     grassHeightScale_ = h;
@@ -2027,6 +2030,38 @@ void Renderer::updateGrassPopulation() {
             };
             context = pipeline::ChunkGrassContext{};
             context.build(*chunk, densityFor, textureNameFor);
+
+            // Reported once, at a level the default log actually keeps.
+            // Grass on cobblestone has now survived two fixes that each
+            // looked right, so the next report is the code saying what it
+            // sees rather than me saying what it should.
+            static bool reportedLayers = false;
+            if (!reportedLayers) {
+                reportedLayers = true;
+                std::string detail;
+                for (size_t i = 0; i < std::min<size_t>(chunk->layers.size(), 4); ++i) {
+                    const std::string name = textureNameFor(chunk->layers[i].textureId);
+                    detail += "\n    [" + std::to_string(i) + "] tex=" +
+                              std::to_string(chunk->layers[i].textureId) + " '" +
+                              (name.empty() ? std::string("<no name>") : name) + "' effect=" +
+                              std::to_string(chunk->layers[i].effectId) +
+                              (pipeline::isRoadLikeTexture(name) ? " ROAD" : "") +
+                              (context.grows[i] ? " grows" : " bare");
+                }
+                LOG_WARNING("Grass first chunk: ", chunk->layers.size(), " layers", detail);
+            }
+
+            // Any water over this chunk. Sampled once here rather than per
+            // blade: a pond's surface is flat, and three hundred thousand
+            // height queries a rebuild is not.
+            if (waterRenderer) {
+                const float cx = chunk->position[0] - 4.0f * kUnitSize;
+                const float cy = chunk->position[1] - 4.0f * kUnitSize;
+                if (const auto level = waterRenderer->getWaterHeightAt(cx, cy)) {
+                    context.waterHeight = *level;
+                    context.hasWater = true;
+                }
+            }
 
             // The tones the ground is painted in, for colouring the blades.
             const size_t n = std::min<size_t>(chunk->layers.size(), 4);

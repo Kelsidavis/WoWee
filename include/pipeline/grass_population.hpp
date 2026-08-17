@@ -36,6 +36,8 @@ struct GrassBladeSample {
     glm::vec3 groundShadow{0.0f};
     glm::vec3 groundHighlight{0.0f};
     bool hasGroundColor = false;
+    /// Under water: drab, and never in bloom.
+    bool submerged = false;
 };
 
 /// What a ground effect's profile means for generating a blade: the scales

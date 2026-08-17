@@ -141,6 +141,7 @@ GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk&
 
     out.slope = sampleSlope(chunk, fracX, fracY);
     out.rootHeight = sampleHeight(chunk, fracX, fracY);
+    out.submerged = context.hasWater && out.rootHeight < context.waterHeight;
 
     if (context.layerCount == 0) return out;
 

@@ -160,6 +160,7 @@ bool populateArea(float centerX, float centerY, float radius,
             blade.groundShadow = fit.groundShadow;
             blade.groundHighlight = fit.groundHighlight;
             blade.hasGroundColor = fit.hasGroundColor;
+            blade.submerged = fit.submerged;
             out.push_back(blade);
         }
     }

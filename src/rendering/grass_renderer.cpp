@@ -174,7 +174,7 @@ bool GrassRenderer::setPopulation(const pipeline::GrassBladeSample* blades, size
         packed[i].facingWidthPhase =
             glm::vec4(b.facing, b.width, static_cast<float>(b.profileIndex), b.phase);
         packed[i].groundShadow = glm::vec4(b.groundShadow, b.hasGroundColor ? 1.0f : 0.0f);
-        packed[i].groundHighlight = glm::vec4(b.groundHighlight, 0.0f);
+        packed[i].groundHighlight = glm::vec4(b.groundHighlight, b.submerged ? 1.0f : 0.0f);
     }
 
     const VkDeviceSize bytes = sizeof(GrassBladeGPU) * count;
