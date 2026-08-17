@@ -1,4 +1,5 @@
 #include "rendering/vk_shader.hpp"
+#include "rendering/vk_utils.hpp"
 #include "core/logger.hpp"
 #include <fstream>
 
@@ -43,7 +44,21 @@ bool VkShaderModule::loadFromFile(VkDevice device, const std::string& path) {
     file.read(reinterpret_cast<char*>(code.data()), fileSize);
     file.close();
 
-    return loadFromMemory(device, code.data(), fileSize);
+    if (!loadFromMemory(device, code.data(), fileSize)) return false;
+
+    // Named with the file it came from, so a shader module in the
+    // vkDestroyDevice leak report identifies its subsystem rather than being
+    // a bare handle. Nothing without validation: the naming call is a no-op
+    // when VK_EXT_debug_utils is absent.
+    {
+        std::string leaf = path;
+        if (const size_t slash = leaf.find_last_of("/\\"); slash != std::string::npos) {
+            leaf = leaf.substr(slash + 1);
+        }
+        setObjectName(device, VK_OBJECT_TYPE_SHADER_MODULE,
+                      reinterpret_cast<uint64_t>(module_), leaf.c_str());
+    }
+    return true;
 }
 
 bool VkShaderModule::loadFromMemory(VkDevice device, const uint32_t* code, size_t sizeBytes) {
