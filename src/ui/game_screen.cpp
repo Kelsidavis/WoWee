@@ -1619,6 +1619,28 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                     // the panel does, or Escape closes the window out from
                     // under the menu; the special windows are the list addons
                     // add themselves to, and nothing has ever walked it.
+                    // Which frame answered, before asking anything to close.
+                    // Escape reported closing a panel on every press with
+                    // nothing open, so the menu never opened - and the chain
+                    // can only say that something was shown, not what. Named
+                    // once, because a frame that is always shown is the bug
+                    // rather than the closing.
+                    static bool namedTheOpenFrame = false;
+                    if (!namedTheOpenFrame) {
+                        namedTheOpenFrame = true;
+                        gameHandler.askInterface(
+                            "local n = {} "
+                            "for _, v in pairs(UISpecialFrames or {}) do "
+                            "  local f = _G[v] "
+                            "  if f and f.IsShown and f:IsShown() then n[#n+1] = v end "
+                            "end "
+                            "if #n > 0 then "
+                            "  print('Escape: UISpecialFrames already shown: ' "
+                            "        .. table.concat(n, ', ')) "
+                            "else print('Escape: no UISpecialFrame is shown') end "
+                            "return false");
+                    }
+
                     const bool closed = gameHandler.askInterface(
                         "(CloseMenus and CloseMenus()) or "
                         "(CloseSpecialWindows and CloseSpecialWindows()) or "
