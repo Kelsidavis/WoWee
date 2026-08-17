@@ -121,6 +121,21 @@ AllocatedImage createImage(VkDevice device, VmaAllocator allocator,
 
 void destroyImage(VkDevice device, VmaAllocator allocator, AllocatedImage& image);
 
+/// Give a Vulkan object a name the validation layer will print.
+///
+/// The leak report at vkDestroyDevice lists what was never destroyed as bare
+/// handles - "VkImage 0x2f7ce000002f7ce" - which says nothing about where it
+/// came from. Named, the same line carries the file and line that created it,
+/// which is how the VMA allocation names turned the last leak hunt from
+/// guesswork into a lookup.
+///
+/// Does nothing when VK_EXT_debug_utils is absent, so it costs nothing in a
+/// build without validation.
+void setObjectName(VkDevice device, VkObjectType type, uint64_t handle, const char* name);
+
+/// Set by VkContext once the device exists; nullptr disables naming.
+void setObjectNameFn(PFN_vkSetDebugUtilsObjectNameEXT fn);
+
 /// Record a dependency described the synchronization2 way.
 ///
 /// With VK_KHR_synchronization2 present this is vkCmdPipelineBarrier2KHR.

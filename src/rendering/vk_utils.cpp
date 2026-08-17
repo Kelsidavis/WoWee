@@ -78,6 +78,8 @@ AllocatedImage createImage(VkDevice device, VmaAllocator allocator,
                       width, height, mipLevels, static_cast<int>(format),
                       file, where.line());
         vmaSetAllocationName(allocator, result.allocation, name);
+        setObjectName(device, VK_OBJECT_TYPE_IMAGE,
+                      reinterpret_cast<uint64_t>(result.image), name);
     }
 
     // Create image view
@@ -123,6 +125,9 @@ namespace {
 /// The device's vkCmdPipelineBarrier2KHR, or nullptr for the legacy path.
 PFN_vkCmdPipelineBarrier2KHR gPipelineBarrier2 = nullptr;
 
+/// vkSetDebugUtilsObjectNameEXT, or nullptr when validation is off.
+PFN_vkSetDebugUtilsObjectNameEXT gSetObjectName = nullptr;
+
 /// synchronization2 stage and access masks are 64 bits and the legacy ones
 /// are 32. The bits above 32 are the stages synchronization2 added and have
 /// no legacy spelling, so a mask that uses one is widened to the coarsest
@@ -148,6 +153,20 @@ VkAccessFlags lowerAccess(VkAccessFlags2 access) {
 
 void setPipelineBarrier2Fn(PFN_vkCmdPipelineBarrier2KHR fn) {
     gPipelineBarrier2 = fn;
+}
+
+void setObjectNameFn(PFN_vkSetDebugUtilsObjectNameEXT fn) {
+    gSetObjectName = fn;
+}
+
+void setObjectName(VkDevice device, VkObjectType type, uint64_t handle, const char* name) {
+    if (gSetObjectName == nullptr || handle == 0) return;
+    VkDebugUtilsObjectNameInfoEXT info{};
+    info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+    info.objectType = type;
+    info.objectHandle = handle;
+    info.pObjectName = name;
+    gSetObjectName(device, &info);
 }
 
 void cmdPipelineBarrier2(VkCommandBuffer cmd, const VkDependencyInfo& dep) {

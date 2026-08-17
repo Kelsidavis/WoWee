@@ -722,6 +722,11 @@ bool VkContext::createLogicalDevice() {
     }
     setPipelineBarrier2Fn(cmdPipelineBarrier2_);
 
+    // Only present with VK_EXT_debug_utils, which comes with validation. When
+    // it is absent naming is a no-op, which is what a release build wants.
+    setObjectNameFn(reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(
+        vkGetDeviceProcAddr(device, "vkSetDebugUtilsObjectNameEXT")));
+
     if (hostImageCopySupported_) {
         copyMemoryToImage_ = reinterpret_cast<PFN_vkCopyMemoryToImageEXT>(
             vkGetDeviceProcAddr(device, "vkCopyMemoryToImageEXT"));
