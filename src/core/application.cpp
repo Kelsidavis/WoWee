@@ -1679,6 +1679,20 @@ void Application::shutdown() {
     for (auto& p : partyPortraits_) p.shutdown(renderer.get());
     paperdollModel_.shutdown(renderer.get());
 
+    // For the same reason, and it was never being done: ImGui's Vulkan backend
+    // holds a pipeline, its layout and descriptor set layout, two shader
+    // modules, a sampler, a command pool, the font atlas image with its view
+    // and memory, and the per-frame vertex and index buffers. Nineteen objects,
+    // which is exactly what vkDestroyDevice reported as leaked on every run.
+    //
+    // UIManager::shutdown() calls ImGui_ImplVulkan_Shutdown and was reached
+    // from nowhere; its destructor is defaulted, so nothing released them. It
+    // has to run here rather than at member destruction, because the backend
+    // waits on the device and frees against it.
+    if (uiManager) {
+        uiManager->shutdown();
+    }
+
     // Explicitly shut down the renderer before destroying it - this ensures
     // all sub-renderers free their VMA allocations in the correct order,
     // before VkContext::shutdown() calls vmaDestroyAllocator().
