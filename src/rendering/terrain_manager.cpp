@@ -2132,6 +2132,12 @@ void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile
     }
 }
 
+uint32_t TerrainManager::getGroundEffectDensity(uint32_t effectId) const {
+    if (effectId == 0) return 0;
+    const auto it = groundEffectById_.find(effectId);
+    return (it == groundEffectById_.end()) ? 0 : it->second.density;
+}
+
 const pipeline::MapChunk* TerrainManager::findChunkAt(float glX, float glY,
                                                       float& fracX, float& fracY) const {
     // Terrain mesh vertices use chunk.position directly (WoW coordinates) and

@@ -29,6 +29,8 @@
 #include "rendering/character_preview.hpp"
 #include "rendering/wmo_renderer.hpp"
 #include "rendering/m2_renderer.hpp"
+#include "pipeline/grass_population.hpp"
+#include "pipeline/grass_terrain.hpp"
 #include "rendering/grass_renderer.hpp"
 #include "rendering/hiz_system.hpp"
 #include "rendering/minimap.hpp"
@@ -1036,8 +1038,8 @@ void Renderer::beginFrame() {
     // outside a render pass. Unlike the M2 path nothing reads the result back -
     // the count it produces is consumed by the indirect draw on the GPU.
     if (grassRenderer_ && camera && vkCtx) {
-        grassRenderer_->dispatchCull(currentCmd, vkCtx->getCurrentFrame(), *camera,
-                                     characterPosition);
+        updateGrassPopulation();
+        grassRenderer_->dispatchCull(currentCmd, vkCtx->getCurrentFrame(), *camera);
     }
 
     // --- Off-screen pre-passes ---
@@ -1909,6 +1911,66 @@ void Renderer::setFSR2Enabled(bool enabled) {
         pendingMsaaSamples_ = VK_SAMPLE_COUNT_1_BIT;
     }
 }
+void Renderer::updateGrassPopulation() {
+    if (!grassRenderer_ || !grassRenderer_->isReady() || !terrainManager) return;
+
+    // How far out blades are generated, and how far the player may walk before
+    // the window is rebuilt. The radius has to exceed the cull distance or
+    // grass would end at a visible circle; the step is what keeps rebuilds
+    // rare, and costs the difference in blades generated but never seen.
+    constexpr float kWindowRadius = 55.0f;
+    constexpr float kRebuildStep = 20.0f;
+
+    const glm::vec3 center = characterPosition;
+    if (grassWindowValid_) {
+        const glm::vec2 moved(center.x - grassWindowCenter_.x, center.y - grassWindowCenter_.y);
+        if (glm::dot(moved, moved) < kRebuildStep * kRebuildStep) return;
+    }
+    if (glm::dot(center, center) <= 0.0f) return;  // no character yet
+
+    // One chunk decoded at a time. populateArea walks cells in world order, so
+    // consecutive samples land in the same chunk and this memo almost always
+    // hits - without it every candidate would decode the chunk's alpha maps
+    // again, which is four kilobytes a layer for each of tens of thousands.
+    const pipeline::MapChunk* cached = nullptr;
+    pipeline::ChunkGrassContext context;
+    auto densityFor = [this](uint32_t effectId) {
+        return terrainManager->getGroundEffectDensity(effectId);
+    };
+    auto sampler = [&](float wx, float wy) -> pipeline::GrassSuitability {
+        float fracX = 0.0f;
+        float fracY = 0.0f;
+        const pipeline::MapChunk* chunk = terrainManager->findChunkAt(wx, wy, fracX, fracY);
+        if (!chunk) return {};
+        if (chunk != cached) {
+            context = pipeline::ChunkGrassContext{};
+            context.build(*chunk, densityFor);
+            cached = chunk;
+        }
+        return pipeline::evaluateGrass(context, *chunk, fracX, fracY);
+    };
+
+    pipeline::GrassPopulationParams params;
+    params.densityScale = terrainManager->getGroundClutterDensityScale();
+
+    const auto started = std::chrono::steady_clock::now();
+    std::vector<pipeline::GrassBladeSample> blades;
+    const bool complete = populateArea(center.x, center.y, kWindowRadius, params,
+                                       sampler, blades, GrassRenderer::kMaxBlades);
+    const double generateMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+
+    grassRenderer_->setPopulation(blades.data(), blades.size());
+    grassWindowCenter_ = center;
+    grassWindowValid_ = true;
+
+    const double totalMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+    LOG_INFO("Grass population rebuilt: ", blades.size(), " blades in ",
+             static_cast<int>(totalMs), "ms (generate ", static_cast<int>(generateMs),
+             "ms)", complete ? "" : " - hit the blade cap");
+}
+
 void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
     ZoneScopedN("Renderer::renderWorld");
     (void)world;

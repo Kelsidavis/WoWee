@@ -449,9 +449,15 @@ private:
     // HiZ occlusion culling - builds depth pyramid each frame
     std::unique_ptr<HiZSystem> hizSystem_;
 
-    // GPU-driven grass. Phase 1 of docs/plan-grass.md: compute cull with
-    // atomic compaction feeding an indirect draw, on a fixed test population.
+    // GPU-driven grass: compute cull with atomic compaction feeding an
+    // indirect draw, over a population generated from terrain suitability.
     std::unique_ptr<GrassRenderer> grassRenderer_;
+    // Where the live population was generated for. Rebuilt when the player
+    // leaves it; the generator's lattice is world-anchored, so a rebuild
+    // reproduces every blade that is still in range rather than reshuffling.
+    glm::vec3 grassWindowCenter_{0.0f};
+    bool grassWindowValid_ = false;
+    void updateGrassPopulation();
 
     // CPU timing stats (last frame/update).
     double lastUpdateMs = 0.0;

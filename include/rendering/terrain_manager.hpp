@@ -242,6 +242,15 @@ public:
     void setTaxiStreamingMode(bool enabled) { taxiStreamingMode_ = enabled; }
     void setGroundClutterDensityScale(float scale) { groundClutterDensityScale_ = glm::clamp(scale, 0.0f, 1.5f); }
     [[nodiscard]] float getGroundClutterDensityScale() const { return groundClutterDensityScale_; }
+
+    /** Density for a ground-effect id, or 0 if it grows nothing or is unknown.
+     *
+     * The one question grass asks of this table. Exposed rather than handing
+     * out the table, so callers cannot start depending on its shape - and so
+     * the grass generator can take a plain callback and stay testable without
+     * a TerrainManager at all.
+     */
+    [[nodiscard]] uint32_t getGroundEffectDensity(uint32_t effectId) const;
     void setWaterRenderer(WaterRenderer* renderer) { waterRenderer = renderer; }
     void setM2Renderer(M2Renderer* renderer) { m2Renderer = renderer; }
     void setWMORenderer(WMORenderer* renderer) { wmoRenderer = renderer; }

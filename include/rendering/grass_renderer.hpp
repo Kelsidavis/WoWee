@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 
+#include "pipeline/grass_population.hpp"
 #include "rendering/grass_blade.hpp"
 #include "rendering/vk_context.hpp"
 
@@ -41,22 +42,26 @@ public:
     /// Record the cull dispatch. Must run outside a render pass, before
     /// `render()` for the same frame.
     ///
-    /// `playerPos` plants the test field the first time it is non-zero, and is
-    /// ignored afterwards. Latched rather than followed: a field that tracked
-    /// the player would slide under them, and blade positions have to depend on
-    /// the world rather than on the frame (spec §36).
-    void dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const Camera& camera,
-                      const glm::vec3& playerPos);
+    void dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const Camera& camera);
 
     /// Record the indirect draw. Must run inside the render pass.
     void render(VkCommandBuffer cmd, uint32_t frameIndex, VkDescriptorSet perFrameSet);
 
+    /// Replace the live population. Blades carry world positions, so this is
+    /// the whole of what the renderer knows about where grass is.
+    ///
+    /// Stages into a buffer allocated once at its full capacity: the set of
+    /// blades changes every time the player leaves the generated window, and
+    /// reallocating a device-local buffer on that cadence would mean either
+    /// stalling the queue or deferring destruction on every rebuild.
+    /// Blades beyond kMaxBlades are dropped, and the caller is told.
+    bool setPopulation(const pipeline::GrassBladeSample* blades, size_t count);
+
     [[nodiscard]] bool isReady() const { return pipeline_ != VK_NULL_HANDLE; }
     [[nodiscard]] uint32_t bladeCount() const { return bladeCount_; }
 
-    /// Blades the test population is built with. Phase 3 replaces this with a
-    /// per-tile generator driven by terrain suitability.
-    static constexpr uint32_t kTestBladeCount = 100000;
+    /// Capacity of the source buffer, in blades. 12 MB at 32 bytes each.
+    static constexpr uint32_t kMaxBlades = 400000;
 
 private:
     bool createSourceBuffer();
@@ -67,10 +72,6 @@ private:
     VkContext* vkCtx_ = nullptr;
     uint32_t bladeCount_ = 0;
 
-    // Where the test field was planted, and whether it has been. Phase 3
-    // generates real world positions per tile and both of these go.
-    glm::vec3 fieldOrigin_{0.0f};
-    bool fieldPlanted_ = false;
 
     // Shared, written once at load.
     VkBuffer sourceBuffer_ = VK_NULL_HANDLE;

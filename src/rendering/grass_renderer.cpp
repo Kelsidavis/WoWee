@@ -1,11 +1,9 @@
 #include "rendering/grass_renderer.hpp"
 
 #include <array>
-#include <cmath>
 #include <cstring>
 #include <vector>
 
-#include "core/coordinates.hpp"
 #include "core/logger.hpp"
 #include "rendering/camera.hpp"
 #include "rendering/frustum.hpp"
@@ -17,20 +15,6 @@ namespace wowee {
 namespace rendering {
 
 namespace {
-
-/// Where the Phase 1 test population sits, in render space.
-///
-/// Hardcoded on purpose: this phase deliberately has no terrain input, so that
-/// a blank screen means the Vulkan path is wrong rather than that the terrain
-/// said no grass here. Phase 3 replaces the whole generator.
-constexpr float kTestOriginX = 0.0f;
-constexpr float kTestOriginY = 0.0f;
-constexpr float kTestOriginZ = 0.0f;
-constexpr float kTestSpacing = 0.22f;   // yards between blades
-/// Yards. Short grass, roughly shin height on a character - the first version
-/// was more than twice this and stood chest-high on the player.
-constexpr float kTestHeight = 0.28f;
-constexpr float kTestWidth = 0.024f;
 
 /// Distance beyond which a blade is not drawn, squared. A single fixed bound
 /// in this phase; Phase 7 makes it a density falloff.
@@ -61,18 +45,6 @@ std::array<uint16_t, kBladeIndexCount> bladeIndices() {
         indices[o + 3] = a; indices[o + 4] = d; indices[o + 5] = c;
     }
     return indices;
-}
-
-/// A cheap deterministic hash, so the test field has some variation without
-/// pulling in a generator. Value depends only on the blade index, never on the
-/// frame - spec §36, and the property Phase 3's real generator must also have.
-float hashUnit(uint32_t x) {
-    x ^= x >> 16;
-    x *= 0x7feb352du;
-    x ^= x >> 15;
-    x *= 0x846ca68bu;
-    x ^= x >> 16;
-    return static_cast<float>(x & 0xffffffu) / static_cast<float>(0xffffff);
 }
 
 bool createGpuBuffer(VmaAllocator allocator, VkDeviceSize size, VkBufferUsageFlags usage,
@@ -137,41 +109,18 @@ bool GrassRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLay
 }
 
 bool GrassRenderer::createSourceBuffer() {
-    // A square field, laid out so the count is exactly kTestBladeCount.
-    const auto side = static_cast<uint32_t>(std::sqrt(static_cast<double>(kTestBladeCount)));
-    bladeCount_ = side * side;
-
-    std::vector<GrassBladeGPU> blades(bladeCount_);
-    const float half = 0.5f * static_cast<float>(side) * kTestSpacing;
-    for (uint32_t i = 0; i < bladeCount_; ++i) {
-        const uint32_t gx = i % side;
-        const uint32_t gy = i / side;
-        // Jitter off the lattice, or the field reads as a checkerboard rather
-        // than as grass and hides a per-blade indexing error in the regularity.
-        const float jx = (hashUnit(i * 2u + 1u) - 0.5f) * kTestSpacing;
-        const float jy = (hashUnit(i * 2u + 2u) - 0.5f) * kTestSpacing;
-        const float heightScale = 0.6f + 0.8f * hashUnit(i + 0x9e3779b9u);
-
-        blades[i].positionHeight = glm::vec4(
-            kTestOriginX - half + static_cast<float>(gx) * kTestSpacing + jx,
-            kTestOriginY - half + static_cast<float>(gy) * kTestSpacing + jy,
-            kTestOriginZ,
-            kTestHeight * heightScale);
-        blades[i].facingWidthPhase = glm::vec4(
-            hashUnit(i + 0x85ebca6bu) * core::coords::TWO_PI,
-            kTestWidth,
-            0.0f,
-            hashUnit(i + 0xc2b2ae35u));
-    }
-
-    // uploadBuffer stages and copies in one call, and returns the GPU-local
-    // buffer. Both of these are written once at load and never again.
-    const VkDeviceSize sourceSize = sizeof(GrassBladeGPU) * bladeCount_;
-    AllocatedBuffer source = uploadBuffer(*vkCtx_, blades.data(), sourceSize,
+    // Allocated once at full capacity and never resized. The population is
+    // replaced whenever the player leaves the window it was generated for, and
+    // reallocating a device-local buffer on that cadence would mean stalling
+    // the queue or deferring a destroy on every rebuild.
+    const std::vector<GrassBladeGPU> empty(kMaxBlades);
+    AllocatedBuffer source = uploadBuffer(*vkCtx_, empty.data(),
+                                          sizeof(GrassBladeGPU) * kMaxBlades,
                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     if (source.buffer == VK_NULL_HANDLE) return false;
     sourceBuffer_ = source.buffer;
     sourceAlloc_ = source.allocation;
+    bladeCount_ = 0;
     setObjectName(vkCtx_->getDevice(), VK_OBJECT_TYPE_BUFFER,
                   reinterpret_cast<uint64_t>(sourceBuffer_), "grass source blades");
 
@@ -185,6 +134,50 @@ bool GrassRenderer::createSourceBuffer() {
     indexAlloc_ = indices.allocation;
 
     return true;
+}
+
+bool GrassRenderer::setPopulation(const pipeline::GrassBladeSample* blades, size_t count) {
+    if (!vkCtx_ || sourceBuffer_ == VK_NULL_HANDLE) return false;
+
+    const bool complete = count <= kMaxBlades;
+    count = std::min<size_t>(count, kMaxBlades);
+    if (count == 0) {
+        bladeCount_ = 0;
+        return complete;
+    }
+
+    std::vector<GrassBladeGPU> packed(count);
+    for (size_t i = 0; i < count; ++i) {
+        const auto& b = blades[i];
+        packed[i].positionHeight = glm::vec4(b.x, b.y, b.z, b.height);
+        packed[i].facingWidthPhase = glm::vec4(b.facing, b.width, 0.0f, b.phase);
+    }
+
+    const VkDeviceSize bytes = sizeof(GrassBladeGPU) * count;
+    AllocatedBuffer staging = createBuffer(vkCtx_->getAllocator(), bytes,
+                                           VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                           VMA_MEMORY_USAGE_CPU_ONLY);
+    if (staging.buffer == VK_NULL_HANDLE) return false;
+
+    void* mapped = nullptr;
+    if (vmaMapMemory(vkCtx_->getAllocator(), staging.allocation, &mapped) != VK_SUCCESS) {
+        destroyBuffer(vkCtx_->getAllocator(), staging);
+        return false;
+    }
+    std::memcpy(mapped, packed.data(), bytes);
+    vmaUnmapMemory(vkCtx_->getAllocator(), staging.allocation);
+
+    vkCtx_->immediateSubmit([&](VkCommandBuffer cmd) {
+        VkBufferCopy region{};
+        region.size = bytes;
+        vkCmdCopyBuffer(cmd, staging.buffer, sourceBuffer_, 1, &region);
+    });
+    destroyBuffer(vkCtx_->getAllocator(), staging);
+
+    // Only after the copy: the cull dispatches over this count, so raising it
+    // before the data landed would cull against whatever was there before.
+    bladeCount_ = static_cast<uint32_t>(count);
+    return complete;
 }
 
 bool GrassRenderer::createPerFrameBuffers() {
@@ -370,12 +363,7 @@ bool GrassRenderer::createDrawPipeline(VkDescriptorSetLayout perFrameLayout) {
                                   "assets/shaders/grass.frag.spv", "grass");
     if (!shaders) return false;
 
-    VkPushConstantRange pushRange{};
-    pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    pushRange.offset = 0;
-    pushRange.size = sizeof(GrassPushConstants);
-
-    pipelineLayout_ = createPipelineLayout(device, {perFrameLayout, drawSetLayout_}, {pushRange});
+    pipelineLayout_ = createPipelineLayout(device, {perFrameLayout, drawSetLayout_}, {});
     if (pipelineLayout_ == VK_NULL_HANDLE) return false;
 
     // No vertex input: the shader builds the quad from gl_VertexIndex and reads
@@ -398,21 +386,8 @@ bool GrassRenderer::createDrawPipeline(VkDescriptorSetLayout perFrameLayout) {
     return pipeline_ != VK_NULL_HANDLE;
 }
 
-void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const Camera& camera,
-                                 const glm::vec3& playerPos) {
+void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const Camera& camera) {
     if (!isReady() || frameIndex >= kFrames || bladeCount_ == 0) return;
-
-    // Plant the field under whoever is looking at it, once. Zero means the
-    // character has not loaded yet - the renderer starts before the world does,
-    // so the first frames have no position to use. Latched rather than
-    // followed, or the field would slide along under the player and no blade
-    // would keep a fixed place in the world.
-    if (!fieldPlanted_ && glm::dot(playerPos, playerPos) > 0.0f) {
-        fieldOrigin_ = playerPos;
-        fieldPlanted_ = true;
-        LOG_INFO("GrassRenderer: test field planted at (", fieldOrigin_.x, ", ",
-                 fieldOrigin_.y, ", ", fieldOrigin_.z, ")");
-    }
 
     // Cull parameters for this frame.
     if (cullUniformMapped_[frameIndex]) {
@@ -430,7 +405,6 @@ void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const
             uniforms.frustumPlanes[i] = glm::vec4(plane.normal, plane.distance);
         }
         uniforms.cameraPos = glm::vec4(camera.getPosition(), kMaxDistance * kMaxDistance);
-        uniforms.fieldOrigin = glm::vec4(fieldOrigin_, 0.0f);
         uniforms.bladeCount = bladeCount_;
         std::memcpy(cullUniformMapped_[frameIndex], &uniforms, sizeof(uniforms));
     }
@@ -490,12 +464,6 @@ void GrassRenderer::render(VkCommandBuffer cmd, uint32_t frameIndex,
                             &perFrameSet, 0, nullptr);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 1, 1,
                             &drawSet_[frameIndex], 0, nullptr);
-    // The same origin the cull used. Read from the member rather than passed
-    // in, so the two stages cannot be given different ones.
-    GrassPushConstants push{};
-    push.fieldOrigin = glm::vec4(fieldOrigin_, 0.0f);
-    vkCmdPushConstants(cmd, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                       sizeof(push), &push);
     vkCmdBindIndexBuffer(cmd, indexBuffer_, 0, VK_INDEX_TYPE_UINT16);
     // One command, and its instance count came from the GPU.
     vkCmdDrawIndexedIndirect(cmd, indirectBuffer_[frameIndex], 0, 1,
@@ -528,8 +496,6 @@ void GrassRenderer::shutdown() {
     destroy(allocator, indexBuffer_, indexAlloc_);
 
     bladeCount_ = 0;
-    fieldOrigin_ = glm::vec3(0.0f);
-    fieldPlanted_ = false;
     vkCtx_ = nullptr;
 }
 

@@ -55,29 +55,16 @@ static_assert(offsetof(GrassBladeGPU, facingWidthPhase) == 16);
 struct GrassCullUniformsGPU {
     glm::vec4 frustumPlanes[6]{};
     glm::vec4 cameraPos{};
-    /// xyz = where the test field is planted; w unused. Blades are generated
-    /// around a local origin and placed by this, so moving the field costs a
-    /// uniform write rather than regenerating and re-uploading the buffer.
-    /// Phase 3 generates real world positions per tile and drops it.
-    glm::vec4 fieldOrigin{};
     uint32_t bladeCount = 0;
     uint32_t _pad0 = 0;
     uint32_t _pad1 = 0;
     uint32_t _pad2 = 0;
 };
 
-static_assert(sizeof(GrassCullUniformsGPU) == 144,
-              "GrassCullUniformsGPU must be 144 bytes to match the std140 block");
+static_assert(sizeof(GrassCullUniformsGPU) == 128,
+              "GrassCullUniformsGPU must be 128 bytes to match the std140 block");
 static_assert(offsetof(GrassCullUniformsGPU, cameraPos) == 96);
-static_assert(offsetof(GrassCullUniformsGPU, fieldOrigin) == 112);
-static_assert(offsetof(GrassCullUniformsGPU, bladeCount) == 128);
-
-/// Pushed to the vertex shader, which needs the same origin the cull used but
-/// does not see the cull's uniform block.
-struct GrassPushConstants {
-    glm::vec4 fieldOrigin{};
-};
-static_assert(sizeof(GrassPushConstants) == 16);
+static_assert(offsetof(GrassCullUniformsGPU, bladeCount) == 112);
 
 } // namespace rendering
 } // namespace wowee

@@ -40,12 +40,6 @@ layout(std430, set = 1, binding = 1) readonly buffer VisibleIndices {
     uint visibleIndices[];
 };
 
-// The same origin grass_cull.comp.glsl adds, which the cull carries in its own
-// uniform block. This stage does not see that block, so it is pushed instead.
-layout(push_constant) uniform Push {
-    vec4 fieldOrigin;
-} push;
-
 layout(location = 0) out float vHeightT;
 layout(location = 1) out vec3 vNormal;
 
@@ -58,7 +52,7 @@ const float kWindBend = 0.22;
 void main() {
     GrassBlade blade = blades[visibleIndices[gl_InstanceIndex]];
 
-    vec3  root   = blade.positionHeight.xyz + push.fieldOrigin.xyz;
+    vec3  root   = blade.positionHeight.xyz;
     float height = blade.positionHeight.w;
     float facing = blade.facingWidthPhase.x;
     float width  = blade.facingWidthPhase.y;

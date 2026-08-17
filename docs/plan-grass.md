@@ -1,6 +1,6 @@
 # GPU-Driven Grass — Phased Implementation Plan
 
-**Status:** Phases 1, 5, 2 complete; Phase 3 generator done, GPU side outstanding.
+**Status:** Phases 1, 2, 3 and 5 complete. Next: Phase 4.
 **Branch:** `grass`
 **Spec:** [`docs/grass-spec.md`](grass-spec.md) — every `spec §N` below refers to a numbered
 section there. The spec is **not** authoritative; this plan and the repository are. See §2.
@@ -471,8 +471,22 @@ tile, and most of it is never in view. Generation is therefore windowed on the
 player, at a radius, rebuilt when they leave it - which the world-anchored
 lattice makes free of visual consequence.
 
-**Outstanding:** nothing generated is on the GPU yet. `GrassRenderer` still
-uploads the Phase 1 test population once at init. It needs a fixed-capacity
-source buffer, a `setPopulation` that stages into it, and a trigger that
-regenerates when the player leaves the window. The field-origin push constant
-goes at the same time, since generated blades carry world positions.
+**On the GPU.** `GrassRenderer::setPopulation` stages blades into a source
+buffer allocated once at its full capacity (400k blades, 12 MB). The
+population is replaced whenever the player leaves the window, and reallocating
+a device-local buffer on that cadence would mean stalling the queue or
+deferring a destroy every time. `bladeCount_` is raised only after the copy,
+since the cull dispatches over it.
+
+`Renderer::updateGrassPopulation` rebuilds when the player has moved 20 yards
+from the window centre; the window is 55 yards, comfortably past the cull
+distance so grass never ends at a visible circle. The sampler memoises one
+decoded chunk, which is nearly always a hit because the generator walks cells
+in world order.
+
+The field-origin push constant is gone - generated blades carry world
+positions - and with it the last of the Phase 1 test population.
+
+**Still open:** the rebuild runs on the main thread. It logs how long it took;
+if that shows as a stall it needs to move to a worker, which needs
+`findChunkAt` to be safe against terrain streaming.
