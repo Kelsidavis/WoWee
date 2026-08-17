@@ -61,7 +61,11 @@ struct GrassPopulationParams {
     /// for a wave to be visible crossing it.
     float baseHeight = 0.42f;
     float heightVariation = 0.45f;
-    float baseWidth = 0.024f;
+    /// Wide enough to hold pixels at gameplay camera distances. 0.024 was a
+    /// realistic blade and an invisible one: one to two pixels at twenty
+    /// yards, which sampling and upscaling simply ate - the field was dense
+    /// and knee-high in the buffer and absent on screen.
+    float baseWidth = 0.042f;
     /// Mixed into every hash. Changing it reshuffles the whole world's grass.
     uint32_t seed = 0x9e3779b9u;
 };

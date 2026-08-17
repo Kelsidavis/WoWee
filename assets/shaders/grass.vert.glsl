@@ -262,6 +262,17 @@ void main() {
     // Derivative of the same curve: the blade's own up direction at this row.
     vec3 tangent = normalize(2.0 * u * (p1 - p0) + 2.0 * t * (p2 - p1));
 
+    // A blade never renders thinner than about two pixels. Real blade widths
+    // go sub-pixel a few yards out, and sub-pixel geometry does not survive
+    // sampling - it shimmers with view angle and vanishes under temporal
+    // upscaling, which read as the whole field disappearing when the camera
+    // turned. The floor is skipped where the envelope is genuinely zero so
+    // pointed tips stay pointed.
+    if (halfWidth > 0.0005) {
+        float camDist = distance(root, viewPos.xyz);
+        halfWidth = max(halfWidth, camDist * 0.0011);
+    }
+
     // Z is up in render space (renderX = wowY, renderY = wowX, renderZ = wowZ).
     vec3 across = vec3(cos(facing), sin(facing), 0.0);
     vec3 world  = root + curve + across * (halfWidth * side);
