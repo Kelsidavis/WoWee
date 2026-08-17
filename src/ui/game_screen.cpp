@@ -344,6 +344,14 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     if (!settingsPanel_.minimapSettingsApplied_) {
         auto* renderer = services_.renderer;
         if (renderer) {
+            // Re-read from disk first. This screen is constructed by
+            // UIManager's constructor, which runs before the login screen
+            // exists, so loadSettings() in the constructor saw the file as it
+            // was at startup. The login screen's graphics page writes the same
+            // file, and every change made there was then overwritten here by
+            // the stale value - the setting appeared to do nothing at all, and
+            // only took effect a run later.
+            loadSettings();
             if (auto* minimap = renderer->getMinimap()) {
                 settingsPanel_.minimapRotate_ = false;
                 settingsPanel_.pendingMinimapRotate = false;
