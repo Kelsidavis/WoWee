@@ -1977,6 +1977,23 @@ void Renderer::updateGrassPopulation() {
     pipeline::GrassPopulationParams params;
     params.densityScale = terrainManager->getGroundClutterDensityScale();
 
+    // Grass is ground clutter and honours the same setting, so zero means the
+    // player turned it off. Said out loud once: a density of zero produces an
+    // empty population through a chain that is otherwise working perfectly,
+    // and nothing else about it looks like a setting rather than a fault.
+    if (params.densityScale <= 0.0f) {
+        static bool warnedDisabled = false;
+        if (!warnedDisabled) {
+            warnedDisabled = true;
+            LOG_WARNING("Grass: ground clutter density is 0, so no grass will grow. "
+                        "Raise it in Settings > Graphics to see any.");
+        }
+        grassRenderer_->setPopulation(nullptr, 0);
+        grassWindowCenter_ = center;
+        grassWindowValid_ = true;
+        return;
+    }
+
     const auto started = std::chrono::steady_clock::now();
     std::vector<pipeline::GrassBladeSample> blades;
     const bool complete = populateArea(center.x, center.y, kWindowRadius, params,
@@ -1996,7 +2013,8 @@ void Renderer::updateGrassPopulation() {
     }
     LOG_INFO("Grass population rebuilt: ", blades.size(), " blades in ",
              static_cast<int>(totalMs), "ms (generate ", static_cast<int>(generateMs),
-             "ms)", complete ? "" : " - hit the blade cap");
+             "ms, density ", params.densityScale, ")",
+             complete ? "" : " - hit the blade cap");
 }
 
 void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
