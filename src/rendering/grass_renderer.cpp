@@ -178,6 +178,7 @@ bool GrassRenderer::setPopulation(const pipeline::GrassBladeSample* blades, size
     // Only after the copy: the cull dispatches over this count, so raising it
     // before the data landed would cull against whatever was there before.
     bladeCount_ = static_cast<uint32_t>(count);
+    framesSincePopulated_ = 0;
     return complete;
 }
 
@@ -468,6 +469,11 @@ void GrassRenderer::reportCullResult() {
     // runs. Reads the slot the previous frame wrote, so no waiting is needed
     // beyond the submit this makes.
     if (cullReported_ || bladeCount_ == 0) return;
+    // Not on the first frame the population exists. Until then every dispatch
+    // early-returned on a zero blade count, so this slot's counter still holds
+    // the value it was created with - which is zero, and indistinguishable
+    // from a cull that kept nothing. Wait for both slots to have run.
+    if (++framesSincePopulated_ < 4) return;
     cullReported_ = true;
 
     AllocatedBuffer readback = createBuffer(vkCtx_->getAllocator(),

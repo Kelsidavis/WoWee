@@ -58,19 +58,24 @@ struct ChunkGrassContext {
 
 /// Sample using a context already built for this chunk.
 GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk& chunk,
-                               float u, float v);
+                               float fracX, float fracY);
 
-/// Sample a chunk at (u, v), each in [0,1] across it.
+/// Sample a chunk at (fracX, fracY), each in **0..8 grid units** across it.
 ///
-/// u runs along the chunk's local X and v along its local Y, matching the
-/// order the alpha maps and the height grid are stored in. Phase 3 maps world
-/// positions onto chunk and uv; keeping this in chunk-local terms is what lets
-/// it be tested without a world, a tile, or a device.
+/// These are the fractions `TerrainManager::findChunkAt` hands back, and the
+/// same ones `chunkSurfacePoint` and `isHoleAt` take. Normalised 0..1 would be
+/// tidier and is what this took first; every caller then had to remember to
+/// divide, one did not, and every sample landed clamped at a chunk corner -
+/// which reads as "the whole chunk is uniformly suitable" rather than as a
+/// units mistake.
 ///
 /// Builds a context for every call, so it is for single samples and tests. Use
 /// the overload above when walking many points across one chunk.
-GrassSuitability evaluateGrass(const MapChunk& chunk, float u, float v,
+GrassSuitability evaluateGrass(const MapChunk& chunk, float fracX, float fracY,
                                const GroundEffectDensityFn& densityFor);
+
+/// One chunk is 8 grid quads across.
+inline constexpr float GRASS_CHUNK_QUADS = 8.0f;
 
 /// Above this the ground is too steep to hold grass, and below it nothing is
 /// taken away. Between the two, suitability falls off smoothly rather than

@@ -5,7 +5,9 @@
 #include <cmath>
 #include <vector>
 
+#include "core/coordinates.hpp"
 #include "pipeline/adt_alpha.hpp"
+#include "pipeline/terrain_mesh.hpp"
 
 namespace wowee {
 namespace pipeline {
@@ -49,11 +51,12 @@ float sampleAlpha(const std::vector<uint8_t>& alpha, float u, float v) {
 /// The normals are the terrain's own, so this agrees with what the ground
 /// looks like rather than with a height difference measured over some chosen
 /// distance. Z is up.
-float sampleSlope(const MapChunk& chunk, float u, float v) {
-    // The 9x9 outer grid, in the interleaved 145-vertex layout.
+float sampleSlope(const MapChunk& chunk, float fracX, float fracY) {
+    // The 9x9 outer grid, in the interleaved 145-vertex layout. fracX indexes
+    // the grid's x and fracY its y, the same pairing chunkSurfacePoint uses.
     constexpr int kRowStride = 17;
-    const int x = std::clamp(static_cast<int>(std::lround(clamp01(u) * 8.0f)), 0, 8);
-    const int y = std::clamp(static_cast<int>(std::lround(clamp01(v) * 8.0f)), 0, 8);
+    const int x = std::clamp(static_cast<int>(std::lround(fracX)), 0, 8);
+    const int y = std::clamp(static_cast<int>(std::lround(fracY)), 0, 8);
     const size_t idx = static_cast<size_t>(y * kRowStride + x);
     if (idx * 3 + 2 >= chunk.normals.size()) return 0.0f;
 
@@ -62,27 +65,20 @@ float sampleSlope(const MapChunk& chunk, float u, float v) {
     return clamp01(1.0f - std::fabs(nz));
 }
 
-/// Height at (u, v), bilinear over the 9x9 outer grid.
-float sampleHeight(const MapChunk& chunk, float u, float v) {
+/// Height at (fracX, fracY), from the sampler the terrain mesh is built with.
+///
+/// Not a bilinear interpolation of the four outer corners. The mesh fans four
+/// triangles from each quad's centre vertex, and MCVT puts that centre
+/// wherever the artist needed it - commonly a yard or two off the plane of its
+/// corners on a hillside. Interpolating the corners answers below the ground
+/// that is drawn, and a blade is a third of a yard tall, so the entire field
+/// ends up buried. terrain_manager.cpp carries the same warning, from the time
+/// the player sank through slopes for the same reason.
+float sampleHeight(const MapChunk& chunk, float fracX, float fracY) {
     if (!chunk.heightMap.isLoaded()) return chunk.position[2];
-
-    const float fx = clamp01(u) * 8.0f;
-    const float fy = clamp01(v) * 8.0f;
-    const int x0 = std::clamp(static_cast<int>(fx), 0, 8);
-    const int y0 = std::clamp(static_cast<int>(fy), 0, 8);
-    const int x1 = std::min(x0 + 1, 8);
-    const int y1 = std::min(y0 + 1, 8);
-    const float tx = fx - static_cast<float>(x0);
-    const float ty = fy - static_cast<float>(y0);
-
-    const float h00 = chunk.heightMap.getHeight(x0, y0);
-    const float h10 = chunk.heightMap.getHeight(x1, y0);
-    const float h01 = chunk.heightMap.getHeight(x0, y1);
-    const float h11 = chunk.heightMap.getHeight(x1, y1);
-
-    const float top = h00 + (h10 - h00) * tx;
-    const float bottom = h01 + (h11 - h01) * tx;
-    return chunk.position[2] + top + (bottom - top) * ty;
+    constexpr float kUnitSize = core::coords::TILE_SIZE / 16.0f / GRASS_CHUNK_QUADS;
+    return TerrainMeshGenerator::chunkSurfacePoint(chunk.position, chunk.heightMap,
+                                                   fracX, fracY, kUnitSize).z;
 }
 
 } // namespace
@@ -118,21 +114,28 @@ bool ChunkGrassContext::build(const MapChunk& chunk, const GroundEffectDensityFn
 }
 
 GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk& chunk,
-                               float u, float v) {
+                               float fracX, float fracY) {
     GrassSuitability out;
-    u = clamp01(u);
-    v = clamp01(v);
+    fracX = std::clamp(fracX, 0.0f, GRASS_CHUNK_QUADS);
+    fracY = std::clamp(fracY, 0.0f, GRASS_CHUNK_QUADS);
 
-    out.slope = sampleSlope(chunk, u, v);
-    out.rootHeight = sampleHeight(chunk, u, v);
+    out.slope = sampleSlope(chunk, fracX, fracY);
+    out.rootHeight = sampleHeight(chunk, fracX, fracY);
 
     if (context.layerCount == 0) return out;
 
     // A hole is a cave mouth or a doorway cut through the terrain. There is no
     // ground there at all, so nothing grows regardless of what the layers say.
-    const int quadX = std::clamp(static_cast<int>(u * 8.0f), 0, 7);
-    const int quadY = std::clamp(static_cast<int>(v * 8.0f), 0, 7);
-    if (chunk.isHole(quadY, quadX)) return out;
+    // Read the quad the way isHoleAt does, so the two agree about which quads
+    // are there.
+    const int quadX = std::clamp(static_cast<int>(std::floor(fracX)), 0, 7);
+    const int quadY = std::clamp(static_cast<int>(std::floor(fracY)), 0, 7);
+    if (chunk.isHole(quadY, quadX) ) return out;
+
+    // The alpha maps are 64x64 across the chunk, indexed the way the clutter
+    // scatterer indexes them.
+    const float u = fracX / GRASS_CHUNK_QUADS;
+    const float v = fracY / GRASS_CHUNK_QUADS;
 
     // Layer 0 is the base and covers whatever the layers above it do not.
     // Layers 1..3 carry alpha maps, and their weights are taken off the base
@@ -172,11 +175,11 @@ GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk&
     return out;
 }
 
-GrassSuitability evaluateGrass(const MapChunk& chunk, float u, float v,
+GrassSuitability evaluateGrass(const MapChunk& chunk, float fracX, float fracY,
                                const GroundEffectDensityFn& densityFor) {
     ChunkGrassContext context;
     context.build(chunk, densityFor);
-    return evaluateGrass(context, chunk, u, v);
+    return evaluateGrass(context, chunk, fracX, fracY);
 }
 
 } // namespace pipeline
