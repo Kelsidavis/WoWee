@@ -546,6 +546,10 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                 // grass is one indirect draw, so turning one down is not a
                 // wish to turn the other down. Both take effect on the next
                 // rebuild, which is a short walk away.
+                if (ImGui::Checkbox("Grass", &pendingGrassEnabled)) {
+                    applySettingSideEffects("grassenabled");
+                    saveCallback();
+                }
                 if (ImGui::SliderInt("Grass Density", &pendingGrassDensity,
                                      0, 300, "%d%%")) {
                     applySettingSideEffects("grassdensity");
@@ -925,6 +929,7 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "mousespeed",     .asFloat = &SettingsPanel::pendingMouseSensitivity},
     {.key = "minimapclock",   .asBool  = &SettingsPanel::pendingShowMinimapClock},
     {.key = "friendlyplates", .asBool  = &SettingsPanel::showFriendlyNameplates_},
+    {.key = "grassenabled",   .asBool  = &SettingsPanel::pendingGrassEnabled},
     {.key = "grassdensity",   .asInt   = &SettingsPanel::pendingGrassDensity},
     {.key = "grassheight",    .asInt   = &SettingsPanel::pendingGrassHeight},
     {.key = "groundclutter",  .asInt   = &SettingsPanel::pendingGroundClutterDensity,
@@ -1235,6 +1240,7 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
         // and it did nothing but store the answer, because the only copy of
         // this lived beside the checkbox in the settings window.
         if (renderer) {
+            renderer->setGrassEnabled(pendingGrassEnabled);
             renderer->setGrassScales(static_cast<float>(pendingGrassDensity) / 100.0f,
                                      static_cast<float>(pendingGrassHeight) / 100.0f);
             if (auto* zm = renderer->getZoneManager()) {

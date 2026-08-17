@@ -1773,6 +1773,7 @@ void GameScreen::saveSettings() {
     out << "auto_repair=" << (settingsPanel_.pendingAutoRepair ? 1 : 0) << "\n";
     out << "graphics_preset=" << static_cast<int>(settingsPanel_.currentGraphicsPreset) << "\n";
     out << "ground_clutter_density=" << settingsPanel_.pendingGroundClutterDensity << "\n";
+    out << "grass_enabled=" << (settingsPanel_.pendingGrassEnabled ? 1 : 0) << "\n";
     out << "grass_density=" << settingsPanel_.pendingGrassDensity << "\n";
     out << "grass_height=" << settingsPanel_.pendingGrassHeight << "\n";
     out << "shadows=" << (settingsPanel_.pendingShadows ? 1 : 0) << "\n";
@@ -2014,6 +2015,7 @@ void GameScreen::loadSettings() {
                 settingsPanel_.pendingGraphicsPreset = settingsPanel_.currentGraphicsPreset;
             }
             else if (key == "ground_clutter_density") settingsPanel_.pendingGroundClutterDensity = std::clamp(std::stoi(val), 0, 150);
+            else if (key == "grass_enabled") settingsPanel_.pendingGrassEnabled = (std::stoi(val) != 0);
             else if (key == "grass_density") settingsPanel_.pendingGrassDensity = std::clamp(std::stoi(val), 0, 300);
             else if (key == "grass_height") settingsPanel_.pendingGrassHeight = std::clamp(std::stoi(val), 50, 300);
             else if (key == "shadows") settingsPanel_.pendingShadows = (std::stoi(val) != 0);

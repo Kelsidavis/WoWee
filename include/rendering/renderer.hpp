@@ -464,7 +464,12 @@ public:
     /** Grass density and height, as fractions of the generator's defaults.
      * Set from the settings panel; either changing rebuilds the field. */
     void setGrassScales(float density, float height);
+    /** Turn grass on or off. Off is the default: it is new, it costs
+     * generation time on the main thread, and turning it off has to release
+     * what it was holding rather than merely stop drawing. */
+    void setGrassEnabled(bool enabled);
 private:
+    bool grassEnabled_ = false;
     float grassDensityScale_ = 1.0f;
     float grassHeightScale_ = 1.0f;
     // effectId -> index into the profile table, built as effects are met.

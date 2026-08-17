@@ -33,6 +33,7 @@ KNOWN = {
     # Schema rows for these overflowed the Graphics panel's two columns, which
     # test_settings_panel_layout catches: it is full. They have their own
     # sliders on our Graphics panel instead, next to ground clutter.
+    "grassenabled": "driven by the Grass checkbox (settings_panel.cpp)",
     "grassdensity": "driven by the Grass Density slider (settings_panel.cpp)",
     "grassheight": "driven by the Grass Height slider (settings_panel.cpp)",
 }

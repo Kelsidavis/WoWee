@@ -170,6 +170,9 @@ public:
     // ground clutter: clutter is M2 doodads with per-instance cost, grass is
     // one indirect draw, and a player who turns one down does not necessarily
     // mean the other.
+    /// Off unless asked for: it is new, it costs generation time on the main
+    /// thread, and a player who has not gone looking for it should not pay.
+    bool pendingGrassEnabled = false;
     int pendingGrassDensity = 100;   // 0-300
     int pendingGrassHeight = 100;    // 50-300
     int pendingAntiAliasing = 1;  // 0=Off, 1=2x, 2=4x, 3=8x

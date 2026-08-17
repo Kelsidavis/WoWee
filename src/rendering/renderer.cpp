@@ -1925,6 +1925,18 @@ void Renderer::setFSR2Enabled(bool enabled) {
         pendingMsaaSamples_ = VK_SAMPLE_COUNT_1_BIT;
     }
 }
+void Renderer::setGrassEnabled(bool enabled) {
+    if (enabled == grassEnabled_) return;
+    grassEnabled_ = enabled;
+    if (!enabled && grassRenderer_) {
+        // Empty the population rather than just skipping the draw: a blade
+        // count of zero is what stops the cull dispatching too, and the buffer
+        // it was holding is the point of turning it off.
+        grassRenderer_->setPopulation(nullptr, 0);
+    }
+    grassWindowValid_ = false;
+}
+
 void Renderer::setGrassScales(float density, float height) {
     // Up to triple. Density past 1 costs generation time and can meet the
     // blade cap, which thins the whole window rather than cutting a side off
@@ -1960,6 +1972,7 @@ uint32_t Renderer::grassProfileFor(uint32_t effectId) {
 }
 
 void Renderer::updateGrassPopulation() {
+    if (!grassEnabled_) return;
     if (!grassRenderer_ || !grassRenderer_->isReady() || !terrainManager) return;
 
     // How far out blades are generated, and how far the player may walk before
