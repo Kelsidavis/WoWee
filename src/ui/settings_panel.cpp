@@ -545,8 +545,8 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                 // rows: "Grass" beside "Grass Density" reads as a label for the
                 // slider rather than a control of its own, and was missed.
                 ImGui::Spacing();
-                ImGui::SeparatorText("Grass");
-                if (ImGui::Checkbox("Enable grass", &pendingGrassEnabled)) {
+                ImGui::SeparatorText("Grass (experimental)");
+                if (ImGui::Checkbox("Enable grass (experimental)", &pendingGrassEnabled)) {
                     applySettingSideEffects("grassenabled");
                     saveCallback();
                 }

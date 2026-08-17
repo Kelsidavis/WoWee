@@ -133,9 +133,11 @@ constexpr SettingDesc kSchema[] = {
     // page is full - two rows pushed lens flare and sharp stars off the bottom
     // of its second column, which test_settings_panel_layout catches - and a
     // setting a player cannot find is not a setting.
-    {"grassenabled", "Enable grass", SettingKind::Bool, 0, 0, 0, "Grass", "Ground cover",
-     "Grass grown from the terrain's own ground-effect data. Off by default:\n"
-     "it is new, and it costs time on the main thread as you move.", "", 0},
+    {"grassenabled", "Enable grass (experimental)", SettingKind::Bool, 0, 0, 0,
+     "Grass", "Ground cover (experimental)",
+     "Experimental. Grass grown from the terrain's own ground-effect data.\n"
+     "Off by default: it is new, it costs time on the main thread as you\n"
+     "move, and it still has known faults.", "", 0},
     {"grassdensity", "Density", SettingKind::Float, 0, 300, 5, "Grass", "",
      "How much grass grows, against the amount the terrain asks for.", "", 100},
     {"grassheight", "Height", SettingKind::Float, 50, 300, 5, "Grass", "",

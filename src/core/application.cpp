@@ -4411,6 +4411,32 @@ void Application::render() {
 }
 
 void Application::setupUICallbacks() {
+    // Everything below binds references by dereferencing these, and four of
+    // them are only created inside `if (assetManager->initialize(...))`. When
+    // that fails they stay null, `*entitySpawner_` binds a reference to
+    // address zero, and the first callback to touch a member writes through
+    // it - the mount callback, which fires from handleLoginVerifyWorld, so the
+    // client came up, listed the characters, and died the instant the world
+    // was entered. Reported as issue #117 with the fault address 0x9f8, which
+    // is a member offset from nothing.
+    //
+    // A reference bound to null is undefined the moment it is bound, so the
+    // check has to be here rather than inside the callbacks.
+    if (!entitySpawner_ || !renderer || !gameHandler || !assetManager ||
+        !uiManager || !authHandler || !appearanceComposer_) {
+        LOG_ERROR("Cannot wire the interface callbacks: ",
+                  !assetManager ? "asset manager" :
+                  !entitySpawner_ ? "entity spawner" :
+                  !appearanceComposer_ ? "appearance composer" :
+                  !renderer ? "renderer" :
+                  !gameHandler ? "game handler" :
+                  !uiManager ? "UI manager" : "auth handler",
+                  " was never created - the game data path is the usual reason. "
+                  "The client will run without them rather than crash on the "
+                  "first packet that needs one.");
+        return;
+    }
+
     // ── UI screen callbacks (auth, realm, character selection/creation) ──
     uiScreenCallbacks_ = std::make_unique<UIScreenCallbackHandler>(
         *uiManager, *gameHandler, *authHandler, expansionRegistry_.get(),
