@@ -1937,15 +1937,39 @@ void Renderer::updateGrassPopulation() {
     auto densityFor = [this](uint32_t effectId) {
         return terrainManager->getGroundEffectDensity(effectId);
     };
+    // One-shot diagnostic: which link in the chain is empty. A population of
+    // zero can mean no chunk under the sample, no effect id on its layers, or
+    // an effect the table grows nothing for, and the three are indistinguish-
+    // able from the outside.
+    static bool reportedChain = false;
+    size_t noChunk = 0;
+    size_t sampled = 0;
+
     auto sampler = [&](float wx, float wy) -> pipeline::GrassSuitability {
         float fracX = 0.0f;
         float fracY = 0.0f;
+        ++sampled;
         const pipeline::MapChunk* chunk = terrainManager->findChunkAt(wx, wy, fracX, fracY);
-        if (!chunk) return {};
+        if (!chunk) { ++noChunk; return {}; }
         if (chunk != cached) {
             context = pipeline::ChunkGrassContext{};
             context.build(*chunk, densityFor);
             cached = chunk;
+            if (!reportedChain) {
+                reportedChain = true;
+                std::string layers;
+                for (size_t i = 0; i < chunk->layers.size(); ++i) {
+                    layers += " [" + std::to_string(i) +
+                              "] effect=" + std::to_string(chunk->layers[i].effectId) +
+                              " density=" +
+                              std::to_string(terrainManager->getGroundEffectDensity(
+                                  chunk->layers[i].effectId));
+                }
+                const auto fit = pipeline::evaluateGrass(context, *chunk, fracX, fracY);
+                LOG_INFO("Grass chain: chunk at (", wx, ",", wy, ") frac=(", fracX, ",", fracY,
+                         ") layers=", chunk->layers.size(), layers,
+                         " -> suitability=", fit.suitability, " slope=", fit.slope);
+            }
         }
         return pipeline::evaluateGrass(context, *chunk, fracX, fracY);
     };
@@ -1966,6 +1990,10 @@ void Renderer::updateGrassPopulation() {
 
     const double totalMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+    if (blades.empty()) {
+        LOG_INFO("Grass population empty: ", sampled, " samples, ", noChunk,
+                 " with no chunk under them");
+    }
     LOG_INFO("Grass population rebuilt: ", blades.size(), " blades in ",
              static_cast<int>(totalMs), "ms (generate ", static_cast<int>(generateMs),
              "ms)", complete ? "" : " - hit the blade cap");

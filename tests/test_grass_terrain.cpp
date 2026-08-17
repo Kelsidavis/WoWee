@@ -111,9 +111,35 @@ TEST_CASE("an effect id absent from the table grows nothing", "[grass][terrain]"
     REQUIRE(evaluateGrass(chunk, 0.5f, 0.5f, densityFor).suitability == Catch::Approx(0.0f));
 }
 
+TEST_CASE("a layer resolves by texture id when its effect id does not",
+          "[grass][terrain]") {
+    // 3.3.5 chunks routinely carry an MCLY effect id that is not in the
+    // ground-effect table while the texture id is. The ground-clutter placer
+    // has always fallen back this way; without the same fallback here, nothing
+    // grows anywhere in the world and the failure looks like a plumbing bug.
+    MapChunk chunk = makeFlatChunk();
+    TextureLayer layer = makeLayer(kUnknownEffect);
+    layer.textureId = kGrassEffect;
+    chunk.layers.push_back(layer);
+
+    const auto result = evaluateGrass(chunk, 0.5f, 0.5f, densityFor);
+    REQUIRE(result.suitability == Catch::Approx(1.0f));
+    REQUIRE(result.effectId == kGrassEffect);
+}
+
+TEST_CASE("the effect id is preferred over the texture id", "[grass][terrain]") {
+    // The fallback must not override a working effect id.
+    MapChunk chunk = makeFlatChunk();
+    TextureLayer layer = makeLayer(kGrassEffect);
+    layer.textureId = kRoadEffect;
+    chunk.layers.push_back(layer);
+
+    REQUIRE(evaluateGrass(chunk, 0.5f, 0.5f, densityFor).effectId == kGrassEffect);
+}
+
 TEST_CASE("a layer with no effect at all grows nothing", "[grass][terrain]") {
     MapChunk chunk = makeFlatChunk();
-    chunk.layers.push_back(makeLayer(0));
+    chunk.layers.push_back(makeLayer(0));  // textureId 0 too, so no fallback
 
     REQUIRE(evaluateGrass(chunk, 0.5f, 0.5f, densityFor).suitability == Catch::Approx(0.0f));
 }
