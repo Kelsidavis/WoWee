@@ -68,6 +68,18 @@
 #   bugprone-throwing-static-initialization (18)
 #       namespace-scope random_device/mt19937 pairs, one mutex, and three
 #       const tables. Every report is bad_alloc during static init.
+#   readability-braces-around-statements (12717)
+#       the single largest thing the lint reports, and the only one whose
+#       fixer has been seen to produce code that is wrong rather than ugly.
+#       Run twice, in --fix and in the safer -export-fixes plus
+#       clang-apply-replacements form, it wrote a brace into the middle of an
+#       identifier both times - "} else { k" / "}eyElementSize = ..." - on
+#       chained single-statement else if. Neither run was committed.
+#
+#       Applying it by hand is 12717 edits of pure style with no defect to
+#       find at the end of them, and a brace put in the wrong place compiles
+#       and says nothing. The 462 findings the other checks still report are
+#       worth reading; leaving this one on buries them.
 #   performance-inefficient-string-concatenation (40)
 #       none is the s = s + x accumulation this check exists to catch.
 #       All forty build one string from pieces in a single expression -- an
@@ -99,7 +111,6 @@ Checks: >
   modernize-make-shared, 
   modernize-use-nodiscard, 
   modernize-use-designated-initializers, 
-  readability-braces-around-statements, 
   readability-container-size-empty, 
   readability-delete-null-pointer, 
   readability-else-after-return, 
