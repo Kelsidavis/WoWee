@@ -1904,6 +1904,17 @@ wowee_add_test(test_blp_truncation
 wowee_add_test(test_grass_blade_layout
     SOURCES test_grass_blade_layout.cpp)
 
+# ── test_grass_terrain ─────────────────────────────────
+# Whether grass grows at a point, answered from the ADT's own ground-effect
+# ids rather than from a classifier of ours. Headless: the chunks are built by
+# hand, so this needs no device, no tile and no world.
+wowee_add_test(test_grass_terrain
+    SOURCES test_grass_terrain.cpp
+            ${TEST_COMMON_SOURCES}
+            ${CMAKE_SOURCE_DIR}/src/pipeline/grass_terrain.cpp
+            ${CMAKE_SOURCE_DIR}/src/pipeline/adt_alpha.cpp
+            ${CMAKE_SOURCE_DIR}/src/pipeline/adt_loader.cpp)
+
 # ── Sanitizers, once every test target exists ────────────────
 # This must be the last thing in this file. The loop walks ALL_TEST_TARGETS,
 # which register_test_target appends to as each test is declared, so the

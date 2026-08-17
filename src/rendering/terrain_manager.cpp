@@ -1,4 +1,6 @@
 #include "rendering/terrain_manager.hpp"
+
+#include "pipeline/adt_alpha.hpp"
 #include "rendering/terrain_renderer.hpp"
 #include "rendering/vk_context.hpp"
 #include "rendering/water_renderer.hpp"
@@ -85,12 +87,10 @@ glm::vec3 placementEuler(const float rotation[3]) {
 }
 
 
-// Alpha map format constants
-constexpr size_t  ALPHA_MAP_SIZE    = 4096;  // 64×64 uncompressed alpha bytes
-constexpr size_t  ALPHA_MAP_PACKED  = 2048;  // 64×64 packed 4-bit alpha (half size)
-static_assert(ALPHA_MAP_PACKED * 2 == ALPHA_MAP_SIZE, "packed alpha must unpack to full size");
-constexpr uint8_t ALPHA_FILL_FLAG   = 0x80;  // RLE command: fill vs. copy
-constexpr uint8_t ALPHA_COUNT_MASK  = 0x7F;  // RLE command: count bits
+// Alpha map format constants live with the loader now - see
+// pipeline/adt_alpha.hpp - because two copies of the decoder had grown and the
+// grass terrain adapter would have made a third.
+using pipeline::ALPHA_MAP_SIZE;
 
 // Random float normalization: mask to 16-bit then divide by max value to get [0..1]
 constexpr float kRand16Max = 65535.0f;
@@ -120,61 +120,7 @@ int computeTerrainWorkerCount() {
     return 4;  // Fallback
 }
 
-bool decodeLayerAlpha(const pipeline::MapChunk& chunk, size_t layerIdx, std::vector<uint8_t>& outAlpha) {
-    if (layerIdx >= chunk.layers.size()) return false;
-    const auto& layer = chunk.layers[layerIdx];
-    if (!layer.useAlpha() || layer.offsetMCAL >= chunk.alphaMap.size()) return false;
-
-    size_t offset = layer.offsetMCAL;
-    size_t layerSize = chunk.alphaMap.size() - offset;
-    for (size_t j = layerIdx + 1; j < chunk.layers.size(); j++) {
-        if (chunk.layers[j].useAlpha()) {
-            layerSize = chunk.layers[j].offsetMCAL - offset;
-            break;
-        }
-    }
-
-    outAlpha.assign(ALPHA_MAP_SIZE, 255);
-
-    if (layer.compressedAlpha()) {
-        size_t readPos = offset;
-        size_t writePos = 0;
-        while (writePos < ALPHA_MAP_SIZE && readPos < chunk.alphaMap.size()) {
-            uint8_t cmd = chunk.alphaMap[readPos++];
-            bool fill = (cmd & ALPHA_FILL_FLAG) != 0;
-            int count = (cmd & ALPHA_COUNT_MASK) + 1;
-
-            if (fill) {
-                if (readPos >= chunk.alphaMap.size()) break;
-                uint8_t val = chunk.alphaMap[readPos++];
-                for (int i = 0; i < count && writePos < ALPHA_MAP_SIZE; i++) {
-                    outAlpha[writePos++] = val;
-                }
-            } else {
-                for (int i = 0; i < count && writePos < ALPHA_MAP_SIZE && readPos < chunk.alphaMap.size(); i++) {
-                    outAlpha[writePos++] = chunk.alphaMap[readPos++];
-                }
-            }
-        }
-        return true;
-    }
-
-    if (layerSize >= ALPHA_MAP_SIZE) {
-        std::copy(chunk.alphaMap.begin() + offset, chunk.alphaMap.begin() + offset + ALPHA_MAP_SIZE, outAlpha.begin());
-        return true;
-    }
-
-    if (layerSize >= ALPHA_MAP_PACKED) {
-        for (size_t i = 0; i < ALPHA_MAP_PACKED; i++) {
-            uint8_t v = chunk.alphaMap[offset + i];
-            outAlpha[i * 2] = (v & 0x0F) * 17;
-            outAlpha[i * 2 + 1] = (v >> 4) * 17;
-        }
-        return true;
-    }
-
-    return false;
-}
+using pipeline::decodeLayerAlpha;
 
 std::string toLowerCopy(std::string v) {
     std::transform(v.begin(), v.end(), v.begin(),

@@ -5,6 +5,7 @@
 #include <cstring>
 #include <vector>
 
+#include "core/coordinates.hpp"
 #include "core/logger.hpp"
 #include "rendering/camera.hpp"
 #include "rendering/frustum.hpp"
@@ -157,7 +158,7 @@ bool GrassRenderer::createSourceBuffer() {
             kTestOriginZ,
             kTestHeight * heightScale);
         blades[i].facingWidthPhase = glm::vec4(
-            hashUnit(i + 0x85ebca6bu) * 6.2831853f,
+            hashUnit(i + 0x85ebca6bu) * core::coords::TWO_PI,
             kTestWidth,
             0.0f,
             hashUnit(i + 0xc2b2ae35u));

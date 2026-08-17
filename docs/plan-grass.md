@@ -1,6 +1,6 @@
 # GPU-Driven Grass — Phased Implementation Plan
 
-**Status:** Phase 1 complete; Phase 5 brought forward. Next: Phase 2.
+**Status:** Phases 1, 5 and 2 complete. Next: Phase 3.
 **Branch:** `grass`
 **Spec:** [`docs/grass-spec.md`](grass-spec.md) — every `spec §N` below refers to a numbered
 section there. The spec is **not** authoritative; this plan and the repository are. See §2.
@@ -405,4 +405,40 @@ is a fixed control point, so motion collects at the tip on its own.
 - Lighting is a wrapped diffuse with a root-to-tip gradient, enough to read the
   shape. Terrain colour influence and the upright-normal blend are still Phase 6.
 
-Phase 2 has not started.
+### Phase 2 — done
+
+`pipeline::evaluateGrass(chunk, u, v, densityFor)` in
+`include/pipeline/grass_terrain.hpp` answers what the terrain says about one
+point: `{suitability, effectId, slope, rootHeight}`.
+
+The density lookup arrives as a callback rather than a `TerrainManager`
+reference. The table lives in the rendering layer, and this has no business
+depending on it or on a device - which is what lets the whole suite run
+headless with chunks built by hand.
+
+- **Layers.** Layer 0 is the base; 1..3 take their weight off it in order, the
+  way the terrain shader composites them. Each layer contributes its own weight
+  if its ground effect has density, so a texel half grass and half road is half
+  suitable rather than one or the other (spec §4).
+- **Continuity.** Alpha is sampled bilinearly. Point-sampling would step in
+  64ths of a chunk - about half a yard - and grass would end along a straight
+  line wherever two textures meet. A test walks a blend boundary and asserts no
+  step over 0.05.
+- **Holes** are cave mouths and doorways cut through the terrain, so nothing
+  grows there whatever the layers say.
+- **Slope** comes from the chunk's own normals, tapering between 0.30 and 0.55
+  (about 25 to 56 degrees) rather than stopping along a contour.
+
+Ten cases, headless, ctest `grass_terrain`: pure grass, road, an id absent from
+the table, no effect at all, a blend boundary, dominant-layer selection, holes,
+three slopes, interpolated root height, and an empty chunk.
+
+**MCAL decoding moved to `pipeline/adt_alpha.hpp`.** Two copies had already
+grown - `terrain_mesh.cpp` and `terrain_manager.cpp` - and this would have been
+a third. `terrain_manager` now uses the shared one; `terrain_mesh` still has
+its own, because its version differs in what it leaves unreached texels as and
+switching it is a separate change with its own risk. The fill value is a
+parameter for that reason. The shared version also bounds the packed-alpha read
+against the blob, which neither copy did.
+
+Phase 3 has not started.
