@@ -1,6 +1,6 @@
 # GPU-Driven Grass — Phased Implementation Plan
 
-**Status:** Phases 1, 5 and 2 complete. Next: Phase 3.
+**Status:** Phases 1, 5, 2 complete; Phase 3 generator done, GPU side outstanding.
 **Branch:** `grass`
 **Spec:** [`docs/grass-spec.md`](grass-spec.md) — every `spec §N` below refers to a numbered
 section there. The spec is **not** authoritative; this plan and the repository are. See §2.
@@ -441,4 +441,38 @@ switching it is a separate change with its own risk. The fill value is a
 parameter for that reason. The shared version also bounds the packed-alpha read
 against the blob, which neither copy did.
 
-Phase 3 has not started.
+### Phase 3 — generator done, GPU side outstanding
+
+`pipeline::populateArea` in `include/pipeline/grass_population.hpp` turns
+suitability into blades. Nine cases, ctest `grass_population`.
+
+Everything about a blade - jitter, whether it survives thinning, height,
+facing, phase - comes from an integer hash of the world lattice cell it sits
+in. No floating point in a blade's identity, and no dependence on the window it
+was generated in. **The lattice is anchored to the world, not to the centre**,
+so moving the centre slides a window over a fixed population rather than
+producing a different one. A test walks the window four yards east and requires
+every overlapping blade to come back identical; without that, each rebuild
+would visibly reshuffle the field.
+
+Thinning is by suitability rather than a threshold, which is what carries
+Phase 2's continuous boundary through into where blades actually appear.
+
+**Deviation: sampling takes a per-chunk context.** `evaluateGrass` decoded the
+chunk's alpha maps on every call - four kilobytes per layer per sample, which
+at fifty thousand candidates is hundreds of megabytes of the same work.
+`ChunkGrassContext::build` does it once per chunk. The old signature remains
+for single samples and tests.
+
+**Deviation from per-tile allocation.** The plan called for a source SSBO per
+tile, allocated on tile load. A tile is 533 yards square; at a density that
+looks like grass that is over a million blades and tens of megabytes for one
+tile, and most of it is never in view. Generation is therefore windowed on the
+player, at a radius, rebuilt when they leave it - which the world-anchored
+lattice makes free of visual consequence.
+
+**Outstanding:** nothing generated is on the GPU yet. `GrassRenderer` still
+uploads the Phase 1 test population once at init. It needs a fixed-capacity
+source buffer, a `setPopulation` that stages into it, and a trigger that
+regenerates when the player leaves the window. The field-origin push constant
+goes at the same time, since generated blades carry world positions.

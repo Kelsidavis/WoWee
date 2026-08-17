@@ -1915,6 +1915,16 @@ wowee_add_test(test_grass_terrain
             ${CMAKE_SOURCE_DIR}/src/pipeline/adt_alpha.cpp
             ${CMAKE_SOURCE_DIR}/src/pipeline/adt_loader.cpp)
 
+# ── test_grass_population ──────────────────────────────
+# Blades generated from terrain suitability. Most of these cases are one
+# property from different angles: a blade's identity comes from its world
+# lattice cell and nothing else, so rebuilding the population as the player
+# moves cannot shuffle the field.
+wowee_add_test(test_grass_population
+    SOURCES test_grass_population.cpp
+            ${TEST_COMMON_SOURCES}
+            ${CMAKE_SOURCE_DIR}/src/pipeline/grass_population.cpp)
+
 # ── Sanitizers, once every test target exists ────────────────
 # This must be the last thing in this file. The loop walks ALL_TEST_TARGETS,
 # which register_test_target appends to as each test is declared, so the

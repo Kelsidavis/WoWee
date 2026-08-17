@@ -37,12 +37,38 @@ struct GrassSuitability {
 /// Density for a ground-effect id; 0 (or an unknown id) means no vegetation.
 using GroundEffectDensityFn = std::function<uint32_t(uint32_t effectId)>;
 
+/// Everything about a chunk that does not change between samples.
+///
+/// Built once per chunk and reused for every point in it. Without this,
+/// sampling decoded the chunk's alpha maps again for every blade considered -
+/// four kilobytes per layer per sample, which at fifty thousand candidates is
+/// hundreds of megabytes of the same work.
+struct ChunkGrassContext {
+    /// Decoded alpha per layer; empty for layers that carry none.
+    std::vector<uint8_t> alpha[4];
+    /// Whether each layer's ground effect grows anything.
+    bool grows[4] = {};
+    uint32_t effectId[4] = {};
+    size_t layerCount = 0;
+
+    /// Returns false when nothing in this chunk grows anything, so a caller
+    /// can skip it whole.
+    bool build(const MapChunk& chunk, const GroundEffectDensityFn& densityFor);
+};
+
+/// Sample using a context already built for this chunk.
+GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk& chunk,
+                               float u, float v);
+
 /// Sample a chunk at (u, v), each in [0,1] across it.
 ///
 /// u runs along the chunk's local X and v along its local Y, matching the
 /// order the alpha maps and the height grid are stored in. Phase 3 maps world
 /// positions onto chunk and uv; keeping this in chunk-local terms is what lets
 /// it be tested without a world, a tile, or a device.
+///
+/// Builds a context for every call, so it is for single samples and tests. Use
+/// the overload above when walking many points across one chunk.
 GrassSuitability evaluateGrass(const MapChunk& chunk, float u, float v,
                                const GroundEffectDensityFn& densityFor);
 

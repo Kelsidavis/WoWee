@@ -87,8 +87,23 @@ float sampleHeight(const MapChunk& chunk, float u, float v) {
 
 } // namespace
 
-GrassSuitability evaluateGrass(const MapChunk& chunk, float u, float v,
-                               const GroundEffectDensityFn& densityFor) {
+bool ChunkGrassContext::build(const MapChunk& chunk, const GroundEffectDensityFn& densityFor) {
+    layerCount = std::min<size_t>(chunk.layers.size(), 4);
+    bool any = false;
+    for (size_t i = 0; i < layerCount; ++i) {
+        effectId[i] = chunk.layers[i].effectId;
+        grows[i] = effectId[i] != 0 && densityFor && densityFor(effectId[i]) != 0;
+        any = any || grows[i];
+        if (i == 0) continue;  // layer 0 is the base and carries no alpha map
+        // Unset texels read as zero coverage: a layer whose data runs out is
+        // not covering the rest of the chunk, it simply stopped.
+        if (!decodeLayerAlpha(chunk, i, alpha[i], 0)) alpha[i].clear();
+    }
+    return any;
+}
+
+GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk& chunk,
+                               float u, float v) {
     GrassSuitability out;
     u = clamp01(u);
     v = clamp01(v);
@@ -96,7 +111,7 @@ GrassSuitability evaluateGrass(const MapChunk& chunk, float u, float v,
     out.slope = sampleSlope(chunk, u, v);
     out.rootHeight = sampleHeight(chunk, u, v);
 
-    if (chunk.layers.empty() || !densityFor) return out;
+    if (context.layerCount == 0) return out;
 
     // A hole is a cave mouth or a doorway cut through the terrain. There is no
     // ground there at all, so nothing grows regardless of what the layers say.
@@ -109,13 +124,9 @@ GrassSuitability evaluateGrass(const MapChunk& chunk, float u, float v,
     // in order, which is how the terrain shader composites them.
     std::array<float, 4> weight{};
     float remaining = 1.0f;
-    std::vector<uint8_t> alpha;
-
-    for (size_t i = 1; i < chunk.layers.size() && i < 4; ++i) {
-        // Unset texels read as zero coverage here: a layer whose data runs out
-        // is not covering the rest of the chunk, it simply stopped.
-        if (!decodeLayerAlpha(chunk, i, alpha, 0)) continue;
-        const float a = clamp01(sampleAlpha(alpha, u, v));
+    for (size_t i = 1; i < context.layerCount; ++i) {
+        if (context.alpha[i].empty()) continue;
+        const float a = clamp01(sampleAlpha(context.alpha[i], u, v));
         weight[i] = remaining * a;
         remaining -= weight[i];
     }
@@ -125,14 +136,12 @@ GrassSuitability evaluateGrass(const MapChunk& chunk, float u, float v,
     // anything. Weighted rather than thresholded, so a texel that is half
     // grass and half road is half suitable instead of one or the other.
     float best = 0.0f;
-    for (size_t i = 0; i < chunk.layers.size() && i < 4; ++i) {
-        if (weight[i] <= 0.0f) continue;
-        const uint32_t effectId = chunk.layers[i].effectId;
-        if (effectId == 0 || densityFor(effectId) == 0) continue;
+    for (size_t i = 0; i < context.layerCount; ++i) {
+        if (weight[i] <= 0.0f || !context.grows[i]) continue;
         out.suitability += weight[i];
         if (weight[i] > best) {
             best = weight[i];
-            out.effectId = effectId;
+            out.effectId = context.effectId[i];
         }
     }
     out.suitability = clamp01(out.suitability);
@@ -146,6 +155,13 @@ GrassSuitability evaluateGrass(const MapChunk& chunk, float u, float v,
     if (out.suitability <= 0.0f) out.effectId = 0;
 
     return out;
+}
+
+GrassSuitability evaluateGrass(const MapChunk& chunk, float u, float v,
+                               const GroundEffectDensityFn& densityFor) {
+    ChunkGrassContext context;
+    context.build(chunk, densityFor);
+    return evaluateGrass(context, chunk, u, v);
 }
 
 } // namespace pipeline

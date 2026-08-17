@@ -840,6 +840,7 @@ set(WOWEE_SOURCES
     src/rendering/grass_renderer.cpp
     src/pipeline/adt_alpha.cpp
     src/pipeline/grass_terrain.cpp
+    src/pipeline/grass_population.cpp
     src/rendering/quest_marker_renderer.cpp
     src/rendering/footprint_renderer.cpp
     src/rendering/minimap.cpp
