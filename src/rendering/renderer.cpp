@@ -2031,13 +2031,20 @@ void Renderer::updateGrassPopulation() {
             context = pipeline::ChunkGrassContext{};
             context.build(*chunk, densityFor, textureNameFor);
 
-            // Reported once, at a level the default log actually keeps.
-            // Grass on cobblestone has now survived two fixes that each
-            // looked right, so the next report is the code saying what it
-            // sees rather than me saying what it should.
-            static bool reportedLayers = false;
-            if (!reportedLayers) {
-                reportedLayers = true;
+            // Reported for the first few chunks that carry a made surface, at
+            // a level the default log actually keeps. Grass on cobblestone has
+            // survived two fixes that each looked right, so this is the code
+            // saying what it sees rather than me saying what it should - and
+            // aimed at the chunks in question rather than at whichever chunk
+            // happened to be sampled first.
+            static int reportedRoadChunks = 0;
+            bool anyRoad = false;
+            for (size_t i = 0; i < std::min<size_t>(chunk->layers.size(), 4); ++i) {
+                anyRoad = anyRoad ||
+                          pipeline::isRoadLikeTexture(textureNameFor(chunk->layers[i].textureId));
+            }
+            if (anyRoad && reportedRoadChunks < 4) {
+                ++reportedRoadChunks;
                 std::string detail;
                 for (size_t i = 0; i < std::min<size_t>(chunk->layers.size(), 4); ++i) {
                     const std::string name = textureNameFor(chunk->layers[i].textureId);
@@ -2048,7 +2055,7 @@ void Renderer::updateGrassPopulation() {
                               (pipeline::isRoadLikeTexture(name) ? " ROAD" : "") +
                               (context.grows[i] ? " grows" : " bare");
                 }
-                LOG_WARNING("Grass first chunk: ", chunk->layers.size(), " layers", detail);
+                LOG_WARNING("Grass road chunk: ", chunk->layers.size(), " layers", detail);
             }
 
             // Any water over this chunk. Sampled once here rather than per

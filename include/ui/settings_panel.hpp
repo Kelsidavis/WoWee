@@ -211,6 +211,15 @@ public:
     bool showMinimapCoordinates_ = false;
     bool showLatencyMeter_ = true;           // Show server latency indicator
     bool minimapSettingsApplied_ = false;
+    // Separate from the apply latches. The file is re-read once, when the
+    // renderer first exists; the subsystems it feeds are built at different
+    // moments and each latches when it has been given its own settings.
+    // Sharing one latch meant either re-reading the file every frame until the
+    // slowest subsystem arrived - clobbering anything the player changed in
+    // that window - or latching on the first and never feeding the rest.
+    bool settingsRereadFromDisk_ = false;
+    bool zoneSettingsApplied_ = false;
+    bool terrainSettingsApplied_ = false;
     bool volumeSettingsApplied_ = false;  // True once saved volume settings applied to audio managers
     bool msaaSettingsApplied_ = false;   // True once saved MSAA setting applied to renderer
     bool fxaaSettingsApplied_ = false;   // True once saved FXAA setting applied to renderer

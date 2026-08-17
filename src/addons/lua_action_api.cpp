@@ -1084,7 +1084,16 @@ static int lua_PickupBagFromSlot(lua_State* L) {
         ? gh->getInventory().getBankBagItem(bankIndex)
         : gh->getInventory().getEquipSlot(static_cast<game::EquipSlot>(
               static_cast<int>(game::EquipSlot::BAG1) + wornIndex));
-    if (held.empty()) return 0;
+    if (held.empty()) {
+        // Dragging a bag that is plainly in the slot has been reported doing
+        // nothing, and every step of the arithmetic checks out on paper: the
+        // button's id, the worn index, the equipment slot. So say what the
+        // slot actually held when the drag arrived, rather than returning in
+        // silence as this has always done for an empty slot.
+        LOG_WARNING("PickupBagFromSlot: slot ", slot, " (worn index ", wornIndex,
+                    ", bank index ", bankIndex, ") reads as empty - nothing to pick up");
+        return 0;
+    }
     setCursorType(L, CursorType::ITEM);
     s_cursorId = held.item.itemId;
     s_cursorSlot = slot;

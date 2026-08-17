@@ -341,56 +341,53 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     }
 
     // Apply initial settings when renderer becomes available
-    if (!settingsPanel_.minimapSettingsApplied_) {
+    if (!settingsPanel_.minimapSettingsApplied_ || !settingsPanel_.zoneSettingsApplied_ ||
+        !settingsPanel_.terrainSettingsApplied_) {
         auto* renderer = services_.renderer;
         if (renderer) {
-            // Re-read from disk first. This screen is constructed by
-            // UIManager's constructor, which runs before the login screen
-            // exists, so loadSettings() in the constructor saw the file as it
-            // was at startup. The login screen's graphics page writes the same
-            // file, and every change made there was then overwritten here by
-            // the stale value - the setting appeared to do nothing at all, and
-            // only took effect a run later.
-            loadSettings();
+            // Re-read from disk once. This screen is constructed by UIManager's
+            // constructor, which runs before the login screen exists, so
+            // loadSettings() in the constructor saw the file as it was at
+            // startup; the login screen's graphics page writes the same file.
+            // Once, not every frame: the subsystems below arrive at different
+            // moments, and re-reading until the slowest one turned up threw
+            // away anything the player changed while waiting.
+            if (!settingsPanel_.settingsRereadFromDisk_) {
+                settingsPanel_.settingsRereadFromDisk_ = true;
+                loadSettings();
+            }
 
-            // The latch has to wait for every subsystem this block feeds, not
-            // just the first one. It used to be set inside the minimap branch,
-            // so a frame where the minimap existed and the zone manager did
-            // not yet marked the whole apply done - and the saved soundtrack
-            // and clutter settings were then never applied at all that run.
-            // They are separate subsystems built at different moments; whether
-            // a setting survived depended on which won the race.
-            bool allApplied = true;
+            // Each subsystem latches when it has been given its settings. One
+            // latch for all three meant the first to exist marked the whole
+            // apply done and the others never got theirs, which is how a saved
+            // soundtrack setting could be ignored for a whole run.
             if (auto* minimap = renderer->getMinimap()) {
                 settingsPanel_.minimapRotate_ = false;
                 settingsPanel_.pendingMinimapRotate = false;
                 minimap->setRotateWithCamera(false);
                 minimap->setSquareShape(settingsPanel_.minimapSquare_);
-            } else {
-                allApplied = false;
+                settingsPanel_.minimapSettingsApplied_ = true;
             }
-            if (!renderer->getZoneManager() || !renderer->getTerrainManager()) {
-                allApplied = false;
-            }
-            settingsPanel_.minimapSettingsApplied_ = allApplied;
             if (auto* zm = renderer->getZoneManager()) {
                 zm->setUseOriginalSoundtrack(settingsPanel_.pendingUseOriginalSoundtrack);
                 // Setting the flag alone is not the whole apply: music that
                 // already started during the loading screen keeps playing
-                // through a disabled setting. The panel's own apply does this
-                // second step, and restart has to do the same.
+                // through a disabled setting.
                 if (!settingsPanel_.pendingUseOriginalSoundtrack) {
                     if (auto* ac = renderer->getAudioCoordinator()) {
                         ac->onOriginalSoundtrackDisabled(zm);
                     }
                 }
+                settingsPanel_.zoneSettingsApplied_ = true;
             }
             if (auto* tm = renderer->getTerrainManager()) {
-                tm->setGroundClutterDensityScale(static_cast<float>(settingsPanel_.pendingGroundClutterDensity) / 100.0f);
+                tm->setGroundClutterDensityScale(
+                    static_cast<float>(settingsPanel_.pendingGroundClutterDensity) / 100.0f);
+                renderer->setGrassScales(
+                    static_cast<float>(settingsPanel_.pendingGrassDensity) / 100.0f,
+                    static_cast<float>(settingsPanel_.pendingGrassHeight) / 100.0f);
+                settingsPanel_.terrainSettingsApplied_ = true;
             }
-            renderer->setGrassScales(
-                static_cast<float>(settingsPanel_.pendingGrassDensity) / 100.0f,
-                static_cast<float>(settingsPanel_.pendingGrassHeight) / 100.0f);
             // Restore mute state: save actual master volume first, then apply mute
             if (settingsPanel_.soundMuted_) {
                 float actual = audio::AudioEngine::instance().getMasterVolume();
