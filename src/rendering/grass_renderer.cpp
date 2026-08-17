@@ -497,6 +497,12 @@ void GrassRenderer::render(VkCommandBuffer cmd, uint32_t frameIndex,
                            VkDescriptorSet perFrameSet) {
     if (!isReady() || frameIndex >= kFrames || bladeCount_ == 0) return;
 
+    if (!drawReported_) {
+        drawReported_ = true;
+        LOG_INFO("Grass draw recorded: frame ", frameIndex, ", ", bladeCount_,
+                 " blades in the source buffer");
+    }
+
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1,
                             &perFrameSet, 0, nullptr);

@@ -75,6 +75,7 @@ private:
     VkContext* vkCtx_ = nullptr;
     uint32_t bladeCount_ = 0;
     bool cullReported_ = false;
+    bool drawReported_ = false;
 
 
     // Shared, written once at load.
