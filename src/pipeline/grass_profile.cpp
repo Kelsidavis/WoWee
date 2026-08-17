@@ -54,7 +54,7 @@ GrassProfile profileFor(GrassCategory category) {
     GrassProfile p;
     switch (category) {
         case GrassCategory::Meadow:
-            return p;  // the defaults are meadow
+            return p;  // the defaults are meadow, bloom 0.05 / seed 0.20
         case GrassCategory::Scrub:
             p.heightScale = 1.35f;
             p.widthScale = 1.5f;
@@ -63,6 +63,8 @@ GrassProfile profileFor(GrassCategory category) {
             p.tipColor = {0.22f, 0.36f, 0.12f};
             p.colorVariation = 0.12f;
             p.stiffness = 1.6f;
+            p.bloomChance = 0.03f;
+            p.seedChance = 0.08f;
             return p;
         case GrassCategory::Flowers:
             p.heightScale = 0.85f;
@@ -72,6 +74,8 @@ GrassProfile profileFor(GrassCategory category) {
             p.tipColor = {0.55f, 0.52f, 0.24f};
             p.colorVariation = 0.30f;
             p.stiffness = 0.9f;
+            p.bloomChance = 0.40f;
+            p.seedChance = 0.06f;
             return p;
         case GrassCategory::Dry:
             p.heightScale = 0.75f;
@@ -81,6 +85,8 @@ GrassProfile profileFor(GrassCategory category) {
             p.tipColor = {0.55f, 0.47f, 0.22f};
             p.colorVariation = 0.20f;
             p.stiffness = 1.4f;
+            p.bloomChance = 0.02f;
+            p.seedChance = 0.50f;
             return p;
         case GrassCategory::Barren:
             p.heightScale = 0.6f;
@@ -90,6 +96,8 @@ GrassProfile profileFor(GrassCategory category) {
             p.tipColor = {0.38f, 0.35f, 0.20f};
             p.colorVariation = 0.18f;
             p.stiffness = 1.5f;
+            p.bloomChance = 0.0f;
+            p.seedChance = 0.12f;
             return p;
     }
     return p;
@@ -116,6 +124,8 @@ GrassProfile deriveProfile(const std::vector<std::string>& modelPaths,
     out.tipColor = glm::vec3(0.0f);
     out.colorVariation = 0.0f;
     out.stiffness = 0.0f;
+    out.bloomChance = 0.0f;
+    out.seedChance = 0.0f;
 
     for (size_t i = 0; i < modelPaths.size(); ++i) {
         const float w = equalWeights
@@ -131,6 +141,8 @@ GrassProfile deriveProfile(const std::vector<std::string>& modelPaths,
         out.tipColor += p.tipColor * k;
         out.colorVariation += p.colorVariation * k;
         out.stiffness += p.stiffness * k;
+        out.bloomChance += p.bloomChance * k;
+        out.seedChance += p.seedChance * k;
     }
     return out;
 }

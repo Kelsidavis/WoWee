@@ -71,6 +71,13 @@ TEST_CASE("scree grows less and drier than meadow", "[grass][profile]") {
     // Scrub is the tall stiff one.
     REQUIRE(scrub.heightScale > meadow.heightScale);
     REQUIRE(scrub.stiffness > meadow.stiffness);
+
+    // Going to seed is what drying grass does, so dry ground seeds the most;
+    // blooms belong where the map plants flowers.
+    const GrassProfile flowers = profileFor(GrassCategory::Flowers);
+    REQUIRE(dry.seedChance > meadow.seedChance);
+    REQUIRE(flowers.bloomChance > meadow.bloomChance);
+    REQUIRE(barren.bloomChance == Catch::Approx(0.0f));
 }
 
 TEST_CASE("an effect's profile is its doodads mixed by weight", "[grass][profile]") {
@@ -94,6 +101,8 @@ TEST_CASE("an effect's profile is its doodads mixed by weight", "[grass][profile
         const GrassProfile barren = profileFor(GrassCategory::Barren);
         REQUIRE(even.densityScale < meadow.densityScale);
         REQUIRE(even.densityScale > barren.densityScale);
+        REQUIRE(even.bloomChance < meadow.bloomChance);
+        REQUIRE(even.seedChance > barren.seedChance);
     }
 }
 

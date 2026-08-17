@@ -36,6 +36,12 @@ struct GrassProfile {
     float colorVariation = 0.15f;
     /// Resistance to wind and to being walked through. Higher is stiffer.
     float stiffness = 1.0f;
+    /// Chance a blade carries a coloured bloom at its tip. Highest where the
+    /// map plants flower doodads; the bloom colour itself is per blade.
+    float bloomChance = 0.05f;
+    /// Chance a blade has bolted to seed: taller, wispier, a pale seed head.
+    /// Highest for dry growth - going to seed is what drying grass does.
+    float seedChance = 0.20f;
 };
 
 /// The categories the three-letter type codes fall into.

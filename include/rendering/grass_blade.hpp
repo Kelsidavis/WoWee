@@ -76,7 +76,7 @@ static_assert(offsetof(GrassCullUniformsGPU, bladeCount) == 112);
 struct GrassProfileGPU {
     glm::vec4 rootColor{};   ///< xyz colour, w unused
     glm::vec4 tipColor{};    ///< xyz colour, w unused
-    glm::vec4 params{};      ///< x colourVariation, y stiffness, zw unused
+    glm::vec4 params{};      ///< x colourVariation, y stiffness, z bloomChance, w seedChance
 };
 
 static_assert(sizeof(GrassProfileGPU) == 48,

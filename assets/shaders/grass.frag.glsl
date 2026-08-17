@@ -27,6 +27,7 @@ layout(location = 1) in vec3 vNormal;
 layout(location = 2) in vec3 vRootColor;
 layout(location = 3) in vec3 vTipColor;
 layout(location = 4) in vec4 vGroundColor;
+layout(location = 5) in vec4 vHeadColor;
 
 layout(location = 0) out vec4 outColor;
 
@@ -42,6 +43,12 @@ void main() {
     // mix instead of pulling toward black.
     float groundMix = vGroundColor.w * mix(0.45, 0.20, vHeightT);
     albedo = mix(albedo, vGroundColor.rgb, groundMix);
+
+    // Seed heads and blooms take over the top of the blade. After the ground
+    // mix on purpose: a bloom should be the one thing in the field that does
+    // not take the earth's colour.
+    albedo = mix(albedo, vHeadColor.rgb,
+                 vHeadColor.a * smoothstep(0.62, 0.85, vHeightT));
 
     // Two-sided: a blade is one strip and is lit from whichever face is turned
     // to the camera.

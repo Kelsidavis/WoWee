@@ -3,11 +3,17 @@
 // A grass blade: a tapered strip of five segments bent along a quadratic
 // Bezier, moved by wind and by whoever walks through it.
 //
-// Wind and player interaction are ported from m2.vert.glsl rather than
-// invented. That system is already tuned and already world-stable, and grass
-// that used its own constants would move at a different rate from the foliage
-// standing next to it - two systems rather than one field. The differences are
-// deliberate and marked below.
+// The player interaction is ported from m2.vert.glsl. The wind is not, any
+// more: it began as that system's constants, and was reworked into travelling
+// waves - fronts that sweep across the field and gusts that roll through in
+// bands - because grass in place-to-place unison reads as a texture, and a
+// field the wind visibly crosses reads as weather. Phase still comes from
+// world position and never from the frame (spec §36).
+//
+// Some blades have gone to seed and some carry blooms. Which ones is decided
+// here, from the blade's own seed and a slow world-space patch function, so
+// seeding drifts across a meadow in swathes rather than speckling it evenly -
+// and the same blade is the same blade on every frame and every rebuild.
 
 layout(set = 0, binding = 0) uniform PerFrame {
     mat4 view;
@@ -47,7 +53,7 @@ layout(std430, set = 1, binding = 1) readonly buffer VisibleIndices {
 struct GrassProfile {
     vec4 rootColor;
     vec4 tipColor;
-    vec4 params;   // x = colour variation, y = stiffness
+    vec4 params;   // x = colour variation, y = stiffness, z = bloom, w = seed
 };
 
 layout(std430, set = 1, binding = 2) readonly buffer GrassProfiles {
@@ -59,12 +65,32 @@ layout(location = 1) out vec3 vNormal;
 layout(location = 2) out vec3 vRootColor;
 layout(location = 3) out vec3 vTipColor;
 layout(location = 4) out vec4 vGroundColor;
+layout(location = 5) out vec4 vHeadColor;   // rgb head colour, a = strength
 
-// Five segments, six rows of two vertices.
+// Five segments, six rows of two vertices. Row 4 sits at t = 0.8, which is
+// where the head envelopes below put their bulge - a peak between rows would
+// never be sampled.
 const float kSegments = 5.0;
 
 // How far the wind can lay a blade over, as a fraction of its height.
-const float kWindBend = 0.22;
+const float kWindBend = 0.32;
+
+// The bloom palette. Four is enough for a meadow to read as mixed wildflowers;
+// which one a blade gets is its own seed's business.
+const vec3 kBloomColors[4] = vec3[4](
+    vec3(0.95, 0.80, 0.25),   // yellow
+    vec3(0.90, 0.45, 0.65),   // pink
+    vec3(0.92, 0.92, 0.85),   // white
+    vec3(0.55, 0.45, 0.85));  // violet
+
+// Pale straw for a seed head.
+const vec3 kSeedHeadColor = vec3(0.72, 0.64, 0.42);
+
+// A slow world-space blob field, 0..1, blobs a couple of dozen yards across.
+// What turns "20% of blades" into "most blades over there, few here".
+float patchField(vec2 p, float scale, float shift) {
+    return 0.5 + 0.5 * sin(p.x * scale + shift) * sin(p.y * scale * 1.27 + shift * 1.7);
+}
 
 void main() {
     GrassBlade blade = blades[visibleIndices[gl_InstanceIndex]];
@@ -80,33 +106,76 @@ void main() {
     // every bend rather than being subtracted from one of them.
     float give = 1.0 / max(profile.params.y, 0.01);
 
+    // ---- What kind of blade this is ----------------------------------------
+    // Two more uniform randoms unpacked from the one seed; the patch fields
+    // gate them so seeding and blooming come in drifts. Seeded wins ties -
+    // a blade cannot be both.
+    float rSeeded = fract(seed * 127.31);
+    float rBloom  = fract(seed * 311.73);
+    float seedGate  = smoothstep(0.35, 0.75, patchField(root.xy, 0.31, 0.0));
+    float bloomGate = smoothstep(0.40, 0.80, patchField(root.xy, 0.47, 2.9));
+    bool seeded = rSeeded < profile.params.w * (0.15 + 1.85 * seedGate);
+    bool bloom  = !seeded && rBloom < profile.params.z * (0.20 + 1.80 * bloomGate);
+
+    if (seeded) {
+        // Bolted: the tall wispy stems that stand above the sward.
+        height *= 1.35;
+    } else if (bloom) {
+        height *= 0.92;
+    }
+
     // Row up the blade and which side of it this vertex is.
     float row  = floor(float(gl_VertexIndex) * 0.5);
     float side = (gl_VertexIndex - row * 2.0) * 2.0 - 1.0;  // -1 or +1
     float t    = row / kSegments;
 
-    // Width: near constant over the lower half, then to a point. A blade cut
-    // square at the top reads as a strip of card, which is what the first
-    // version looked like.
-    float halfWidth = 0.5 * width * (1.0 - 0.25 * t) * (1.0 - smoothstep(0.45, 1.0, t));
+    // ---- Width envelope -----------------------------------------------------
+    // A plain blade tapers to a point. A seeded one thins to a stalk and
+    // swells at the head row before its point; a bloom swells wider still and
+    // stays blunt at the top, which is what makes it read as petals rather
+    // than as a fat blade.
+    float halfWidth;
+    if (seeded) {
+        float stalk = (1.0 - 0.55 * smoothstep(0.3, 0.7, t)) * (1.0 - smoothstep(0.9, 1.0, t));
+        float head  = 1.7 * smoothstep(0.6, 0.8, t) * (1.0 - smoothstep(0.8, 1.0, t));
+        halfWidth = 0.5 * width * max(stalk, head);
+    } else if (bloom) {
+        float stalk = (1.0 - 0.45 * smoothstep(0.3, 0.7, t));
+        float head  = 2.4 * smoothstep(0.55, 0.8, t) * (1.0 - 0.6 * smoothstep(0.8, 1.0, t));
+        halfWidth = 0.5 * width * max(stalk * (1.0 - smoothstep(0.55, 0.8, t)), head);
+    } else {
+        halfWidth = 0.5 * width * (1.0 - 0.25 * t) * (1.0 - smoothstep(0.45, 1.0, t));
+    }
 
-    // ---- Wind -------------------------------------------------------------
-    // Two layers rather than m2.vert's three, multiplied rather than summed
-    // (spec §27): a gust that crosses the field and a faster rustle riding on
-    // it, so the field breathes instead of every blade beating in time. Phase
-    // comes from the blade's world position, never from the frame, so a blade
-    // does not jump when the camera moves (spec §36).
+    // ---- Wind ---------------------------------------------------------------
+    // Travelling waves. `wave` is a front about thirteen yards wide sweeping
+    // along the wind at a few yards a second; `gustBand` is a far larger
+    // swell rolling through on top, so the field surges and rests instead of
+    // pulsing; `rustle` is the per-blade flutter riding on both. The bend
+    // direction also wobbles perpendicular to the wind as a front passes,
+    // which is what makes a wave look like it pushes through the grass rather
+    // than dimming and brightening it.
     float windTime = fogParams.z;
-    float gust   = sin(windTime * 0.8 + dot(root.xy, vec2(0.10, 0.13)));
-    float rustle = sin(windTime * 1.7 + dot(root.xy, vec2(0.37, 0.71))
-                       + seed * 6.2831853);
-    float windAmount = (0.5 + 0.5 * gust) * (0.75 + 0.25 * rustle);
-
-    // A single world direction, so the whole field leans together.
     vec2 windDir = normalize(vec2(0.80, 0.60));
-    vec2 bendVec = windDir * (windAmount * height * kWindBend * give);
+    float alongWind = dot(root.xy, windDir);
 
-    // ---- The player brushing past -----------------------------------------
+    float wave     = sin(alongWind * 0.48 - windTime * 2.1);
+    float gustBand = 0.55 + 0.45 * sin(alongWind * 0.11 - windTime * 0.7);
+    float rustle   = sin(windTime * 1.9 + dot(root.xy, vec2(0.37, 0.71))
+                         + seed * 6.2831853);
+
+    float windAmount = (0.30 + 0.50 * (0.5 + 0.5 * wave) * gustBand)
+                     * (0.82 + 0.18 * rustle);
+    // A bolted stem catches more wind than the sward it stands above.
+    if (seeded) windAmount *= 1.25;
+
+    vec2 perp = vec2(-windDir.y, windDir.x);
+    vec2 dirNow = normalize(windDir
+                            + perp * (0.30 * sin(alongWind * 0.48 - windTime * 2.1 + 1.3)
+                                      + (seed - 0.5) * 0.35));
+    vec2 bendVec = dirNow * (windAmount * height * kWindBend * give);
+
+    // ---- The player brushing past -------------------------------------------
     // Ported from m2.vert.glsl:139-199. The size gate is dropped - every blade
     // here is grass, so there is no tree to exempt - and the reach is smaller,
     // because a tuft gives way closer in than a waist-high fern does.
@@ -178,6 +247,18 @@ void main() {
     vRootColor = profile.rootColor.rgb * tint;
     vTipColor  = profile.tipColor.rgb * tint;
     vGroundColor = blade.groundColor;
+
+    // The head's colour, applied by the fragment shader over the top of the
+    // blade. Seed heads also dry the blade below them a little, which is what
+    // sells "gone to seed" rather than "green grass wearing a hat".
+    if (seeded) {
+        vHeadColor = vec4(kSeedHeadColor * tint, 1.0);
+        vTipColor = mix(vTipColor, kSeedHeadColor, 0.45);
+    } else if (bloom) {
+        vHeadColor = vec4(kBloomColors[int(fract(seed * 71.13) * 4.0) & 3], 1.0);
+    } else {
+        vHeadColor = vec4(0.0);
+    }
 
     vHeightT = t;
     // Face out of the blade, curled a little across its width - then blended

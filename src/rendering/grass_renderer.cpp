@@ -133,7 +133,8 @@ bool GrassRenderer::createSourceBuffer() {
     for (auto& g : defaults) {
         g.rootColor = glm::vec4(meadow.rootColor, 0.0f);
         g.tipColor = glm::vec4(meadow.tipColor, 0.0f);
-        g.params = glm::vec4(meadow.colorVariation, meadow.stiffness, 0.0f, 0.0f);
+        g.params = glm::vec4(meadow.colorVariation, meadow.stiffness,
+                             meadow.bloomChance, meadow.seedChance);
     }
     AllocatedBuffer profiles = uploadBuffer(*vkCtx_, defaults.data(),
                                             sizeof(GrassProfileGPU) * kMaxProfiles,
@@ -506,7 +507,7 @@ bool GrassRenderer::setProfiles(const std::vector<pipeline::GrassProfile>& profi
         packed[i].rootColor = glm::vec4(profiles[i].rootColor, 0.0f);
         packed[i].tipColor = glm::vec4(profiles[i].tipColor, 0.0f);
         packed[i].params = glm::vec4(profiles[i].colorVariation, profiles[i].stiffness,
-                                     0.0f, 0.0f);
+                                     profiles[i].bloomChance, profiles[i].seedChance);
     }
 
     const VkDeviceSize bytes = sizeof(GrassProfileGPU) * count;
