@@ -156,7 +156,11 @@ void main() {
         float head  = 2.4 * smoothstep(0.55, 0.8, t) * (1.0 - 0.6 * smoothstep(0.8, 1.0, t));
         halfWidth = 0.5 * width * max(stalk * (1.0 - smoothstep(0.55, 0.8, t)), head);
     } else {
-        halfWidth = 0.5 * width * (1.0 - 0.25 * t) * (1.0 - smoothstep(0.45, 1.0, t));
+        // Where the taper begins varies per blade: some run slim from a third
+        // of the way up, some hold their width to well past half. One taper
+        // for every blade reads as a field of the same die-cut leaf.
+        float tipStart = mix(0.30, 0.60, fract(seed * 97.13));
+        halfWidth = 0.5 * width * (1.0 - 0.25 * t) * (1.0 - smoothstep(tipStart, 1.0, t));
     }
 
     // ---- Wind ---------------------------------------------------------------
@@ -186,6 +190,13 @@ void main() {
                             + perp * (0.30 * sin(alongWind * 0.48 - windTime * 2.1 + 1.3)
                                       + (seed - 0.5) * 0.35));
     vec2 bendVec = dirNow * (windAmount * height * kWindBend * give);
+
+    // A standing lean each blade was born with, in its own direction. A sward
+    // of perfectly upright blades all bending the same way is a parade; real
+    // grass is tousled before the wind ever touches it.
+    float leanAmt = 0.05 + 0.22 * fract(seed * 17.91);
+    float leanAng = 6.2831853 * fract(seed * 29.37);
+    bendVec += vec2(cos(leanAng), sin(leanAng)) * (height * leanAmt * give);
 
     // ---- The player brushing past -------------------------------------------
     // Ported from m2.vert.glsl:139-199. The size gate is dropped - every blade

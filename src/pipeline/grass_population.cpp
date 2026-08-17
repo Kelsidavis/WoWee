@@ -30,6 +30,30 @@ float hashUnit(int32_t cx, int32_t cy, uint32_t salt) {
            static_cast<float>(0xffffff);
 }
 
+float smoothstep01(float t) {
+    return t * t * (3.0f - 2.0f * t);
+}
+
+/// Smooth value noise over a coarse world lattice, 0..1. Built on the same
+/// integer hash as everything else, so it is world-anchored and identical on
+/// every rebuild - a drift of deep meadow stays where it is.
+float smoothNoise(float x, float y, float scale, uint32_t salt) {
+    const float fx = x / scale;
+    const float fy = y / scale;
+    const auto cx = static_cast<int32_t>(std::floor(fx));
+    const auto cy = static_cast<int32_t>(std::floor(fy));
+    const float tx = smoothstep01(fx - static_cast<float>(cx));
+    const float ty = smoothstep01(fy - static_cast<float>(cy));
+
+    const float a = hashUnit(cx, cy, salt);
+    const float b = hashUnit(cx + 1, cy, salt);
+    const float c = hashUnit(cx, cy + 1, salt);
+    const float d = hashUnit(cx + 1, cy + 1, salt);
+    const float top = a + (b - a) * tx;
+    const float bottom = c + (d - c) * tx;
+    return top + (bottom - top) * ty;
+}
+
 } // namespace
 
 bool populateArea(float centerX, float centerY, float radius,
@@ -80,11 +104,25 @@ bool populateArea(float centerX, float centerY, float radius,
             blade.x = wx;
             blade.y = wy;
             blade.z = fit.rootHeight;
-            blade.height = params.baseHeight * profile.heightScale *
+            // Verges are short and the open field is deep. Suitability is
+            // already the distance-to-road signal - it blends down toward
+            // every road and dirt texture - so grass shortens approaching one
+            // instead of standing knee-high to the wheel ruts. On top of
+            // that, drifts of deep meadow twenty-odd yards across, from
+            // world-anchored noise, so open ground is not one uniform pile.
+            const float verge = 0.55f + 0.45f * std::min(fit.suitability * 1.6f, 1.0f);
+            const float depthNoise = smoothNoise(wx, wy, 23.0f, params.seed ^ 0x07u);
+            const float meadowDepth =
+                0.8f + 0.85f * smoothstep01(std::clamp((depthNoise - 0.4f) / 0.35f, 0.0f, 1.0f));
+
+            blade.height = params.baseHeight * profile.heightScale * verge * meadowDepth *
                            (1.0f - params.heightVariation +
                             2.0f * params.heightVariation * hashUnit(cx, cy, params.seed ^ 0x04u));
             blade.facing = hashUnit(cx, cy, params.seed ^ 0x05u) * core::coords::TWO_PI;
-            blade.width = params.baseWidth * profile.widthScale;
+            // Width varies per blade too; a sward of one width reads as
+            // extruded, whatever the heights do.
+            blade.width = params.baseWidth * profile.widthScale *
+                          (0.7f + 0.8f * hashUnit(cx, cy, params.seed ^ 0x08u));
             blade.phase = hashUnit(cx, cy, params.seed ^ 0x06u);
             blade.profileIndex = profile.index;
             blade.groundColor = fit.groundColor;

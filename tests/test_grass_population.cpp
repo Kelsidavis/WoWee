@@ -182,12 +182,40 @@ TEST_CASE("heights and facings vary between blades", "[grass][population]") {
         [&](const GrassBladeSample& b) { return b.height != blades[0].height; });
     const bool facingsDiffer = std::any_of(blades.begin(), blades.end(),
         [&](const GrassBladeSample& b) { return b.facing != blades[0].facing; });
+    const bool widthsDiffer = std::any_of(blades.begin(), blades.end(),
+        [&](const GrassBladeSample& b) { return b.width != blades[0].width; });
     REQUIRE(heightsDiffer);
     REQUIRE(facingsDiffer);
+    REQUIRE(widthsDiffer);
 
     for (const auto& b : blades) {
         REQUIRE(b.height > 0.0f);
         REQUIRE(b.facing >= 0.0f);
         REQUIRE(b.facing <= Catch::Approx(6.2831853f).margin(0.001));
     }
+}
+
+TEST_CASE("grass shortens toward a road and stands deep in the open",
+          "[grass][population]") {
+    // Suitability is the distance-to-road signal, so height follows it: verge
+    // grass at a blend boundary is shorter on average than the open field,
+    // instead of standing knee-high to the wheel ruts.
+    const GrassPopulationParams params;
+    std::vector<GrassBladeSample> blades;
+    REQUIRE(populateArea(0.0f, 0.0f, 30.0f, params, boundary, blades, 200000));
+
+    auto meanHeightBetween = [&](float lo, float hi) {
+        float sum = 0.0f;
+        int n = 0;
+        for (const auto& b : blades) {
+            if (b.x >= lo && b.x < hi) { sum += b.height; ++n; }
+        }
+        REQUIRE(n > 20);
+        return sum / static_cast<float>(n);
+    };
+
+    // Deep field (suitability 1.0) vs the thin end of the verge (~0.15).
+    const float open = meanHeightBetween(-30.0f, -15.0f);
+    const float verge = meanHeightBetween(4.0f, 7.0f);
+    REQUIRE(verge < open * 0.85f);
 }
