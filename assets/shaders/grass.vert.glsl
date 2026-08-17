@@ -152,11 +152,11 @@ void main() {
         // zigzag spray of spikelets - the way a fescue head actually branches.
         panicle = smoothstep(0.5, 0.7, t);
         float stalk = 0.55 * (1.0 - smoothstep(0.3, 0.5, t) * 0.4);
-        float spikelet = 1.1 * panicle * (1.0 - 0.55 * smoothstep(0.8, 1.0, t));
+        float spikelet = 0.75 * panicle * (1.0 - 0.55 * smoothstep(0.8, 1.0, t));
         halfWidth = 0.5 * width * max(stalk, spikelet);
     } else if (bloom) {
         float stalk = (1.0 - 0.45 * smoothstep(0.3, 0.7, t));
-        float head  = 2.4 * smoothstep(0.55, 0.8, t) * (1.0 - 0.6 * smoothstep(0.8, 1.0, t));
+        float head  = 1.5 * smoothstep(0.55, 0.8, t) * (1.0 - 0.6 * smoothstep(0.8, 1.0, t));
         halfWidth = 0.5 * width * max(stalk * (1.0 - smoothstep(0.55, 0.8, t)), head);
     } else {
         // A grass blade holds most of its width and then points; tapering
@@ -285,7 +285,10 @@ void main() {
     // is made of.
     if (panicle > 0.0) {
         float alt = (fract(row * 0.5) < 0.25) ? 1.0 : -1.0;
-        float sprayReach = width * (2.0 + 4.0 * fract(seed * 41.77));
+        // In blade widths. This was up to six, which throws a spikelet the
+        // better part of a yard off its own stem - the seeded blades came out
+        // as great splayed wedges rather than as heads of seed.
+        float sprayReach = width * (0.5 + 1.1 * fract(seed * 41.77));
         world += across * (alt * panicle * sprayReach);
         // And the head nods: the top leans a little further leeward and down,
         // which is what a heavy seed head does that a blade tip does not.

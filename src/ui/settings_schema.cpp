@@ -65,6 +65,17 @@ constexpr SettingDesc kSchema[] = {
     // reading against a surface that does not behave the way they assume. The
     // shader keeps its own guard for a frame whose scene copy is not there yet,
     // which is a different thing from a player turning the feature off.
+    // Grass has two rows rather than riding the ground-clutter slider. They
+    // are different workloads and a player turning one down is not asking for
+    // the other: clutter is M2 doodads costing per instance, grass is one
+    // indirect draw whose cost is generation. Both take effect on the next
+    // rebuild, which is a short walk.
+    {"grassdensity", "Grass density", SettingKind::Float, 0, 200, 5, "Graphics", "Ground cover",
+     "How much grass grows, against the amount the terrain itself asks for.\n"
+     "0 turns it off.", "", 100},
+    {"grassheight", "Grass height", SettingKind::Float, 50, 200, 5, "Graphics", "Ground cover",
+     "How tall grass grows. Shorter grass hides less of the ground; taller\n"
+     "grass shows the wind crossing it more.", "", 100},
     {"fogstrength", "Fog strength", SettingKind::Float, 0, 2, 0.05f, "Graphics", "Atmosphere",
      "How much distance fog, against what the zone asks for. 1 is the zone's\n"
      "own amount, higher brings it closer, 0 turns it off.", "", 0.4f},

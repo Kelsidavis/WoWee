@@ -388,6 +388,9 @@ void GameScreen::render(game::GameHandler& gameHandler) {
             if (auto* tm = renderer->getTerrainManager()) {
                 tm->setGroundClutterDensityScale(static_cast<float>(settingsPanel_.pendingGroundClutterDensity) / 100.0f);
             }
+            renderer->setGrassScales(
+                static_cast<float>(settingsPanel_.pendingGrassDensity) / 100.0f,
+                static_cast<float>(settingsPanel_.pendingGrassHeight) / 100.0f);
             // Restore mute state: save actual master volume first, then apply mute
             if (settingsPanel_.soundMuted_) {
                 float actual = audio::AudioEngine::instance().getMasterVolume();

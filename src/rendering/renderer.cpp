@@ -1925,6 +1925,17 @@ void Renderer::setFSR2Enabled(bool enabled) {
         pendingMsaaSamples_ = VK_SAMPLE_COUNT_1_BIT;
     }
 }
+void Renderer::setGrassScales(float density, float height) {
+    const float d = glm::clamp(density, 0.0f, 2.0f);
+    const float h = glm::clamp(height, 0.5f, 2.0f);
+    if (d == grassDensityScale_ && h == grassHeightScale_) return;
+    grassDensityScale_ = d;
+    grassHeightScale_ = h;
+    // The live population was generated with the old numbers, so it has to go
+    // rather than wait for the player to walk far enough to be rebuilt.
+    grassWindowValid_ = false;
+}
+
 uint32_t Renderer::grassProfileFor(uint32_t effectId) {
     const auto known = grassProfileIndex_.find(effectId);
     if (known != grassProfileIndex_.end()) return known->second;
@@ -2048,18 +2059,19 @@ void Renderer::updateGrassPopulation() {
     };
 
     pipeline::GrassPopulationParams params;
-    params.densityScale = terrainManager->getGroundClutterDensityScale();
+    params.densityScale = grassDensityScale_;
+    params.baseHeight *= grassHeightScale_;
 
-    // Grass is ground clutter and honours the same setting, so zero means the
-    // player turned it off. Said out loud once: a density of zero produces an
-    // empty population through a chain that is otherwise working perfectly,
-    // and nothing else about it looks like a setting rather than a fault.
+    // Zero means the player turned grass off. Said out loud once: a density of
+    // zero produces an empty population through a chain that is otherwise
+    // working perfectly, and nothing about that looks like a setting rather
+    // than a fault.
     if (params.densityScale <= 0.0f) {
         static bool warnedDisabled = false;
         if (!warnedDisabled) {
             warnedDisabled = true;
-            LOG_WARNING("Grass: ground clutter density is 0, so no grass will grow. "
-                        "Raise it in Settings > Graphics to see any.");
+            LOG_WARNING("Grass: density is 0, so no grass will grow. "
+                        "Raise Grass Density in Settings > Graphics to see any.");
         }
         grassRenderer_->setPopulation(nullptr, 0);
         grassWindowCenter_ = center;

@@ -1936,6 +1936,14 @@ wowee_add_test(test_grass_profile
     SOURCES test_grass_profile.cpp
             ${CMAKE_SOURCE_DIR}/src/pipeline/grass_profile.cpp)
 
+# ── test_grass_cull_math ───────────────────────────────
+# The frustum arithmetic the grass cull performs, run for a camera turned all
+# the way round. Grass vanishing in one world direction is a claim about this
+# and nothing else, and it is cheaper to measure than to reason about.
+wowee_add_test(test_grass_cull_math
+    SOURCES test_grass_cull_math.cpp
+            ${CMAKE_SOURCE_DIR}/src/rendering/frustum.cpp)
+
 # ── Sanitizers, once every test target exists ────────────────
 # This must be the last thing in this file. The loop walks ALL_TEST_TARGETS,
 # which register_test_target appends to as each test is declared, so the

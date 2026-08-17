@@ -166,6 +166,12 @@ public:
 
     // ---- Pending graphics quality ----
     int pendingGroundClutterDensity = kDefaultGroundClutter;
+    // Grass, as percentages of the generator's own defaults. Separate from
+    // ground clutter: clutter is M2 doodads with per-instance cost, grass is
+    // one indirect draw, and a player who turns one down does not necessarily
+    // mean the other.
+    int pendingGrassDensity = 100;   // 0-200
+    int pendingGrassHeight = 100;    // 50-200
     int pendingAntiAliasing = 1;  // 0=Off, 1=2x, 2=4x, 3=8x
     bool pendingFXAA = false;     // FXAA post-process (combinable with MSAA)
     bool pendingNormalMapping = true;   // on by default

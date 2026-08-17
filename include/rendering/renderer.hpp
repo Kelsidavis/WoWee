@@ -460,6 +460,13 @@ private:
     glm::vec3 grassWindowCenter_{0.0f};
     bool grassWindowValid_ = false;
     void updateGrassPopulation();
+public:
+    /** Grass density and height, as fractions of the generator's defaults.
+     * Set from the settings panel; either changing rebuilds the field. */
+    void setGrassScales(float density, float height);
+private:
+    float grassDensityScale_ = 1.0f;
+    float grassHeightScale_ = 1.0f;
     // effectId -> index into the profile table, built as effects are met.
     // Grass profiles are a blend of five categories, so distinct ones are far
     // fewer than the hundreds of ground effects that map onto them.
