@@ -361,13 +361,16 @@ void GameScreen::render(game::GameHandler& gameHandler) {
             // latch for all three meant the first to exist marked the whole
             // apply done and the others never got theirs, which is how a saved
             // soundtrack setting could be ignored for a whole run.
-            if (auto* minimap = renderer->getMinimap()) {
-                settingsPanel_.minimapRotate_ = false;
-                settingsPanel_.pendingMinimapRotate = false;
-                minimap->setRotateWithCamera(false);
-                minimap->setSquareShape(settingsPanel_.minimapSquare_);
-                settingsPanel_.minimapSettingsApplied_ = true;
+            if (!settingsPanel_.minimapSettingsApplied_) {
+                if (auto* minimap = renderer->getMinimap()) {
+                    settingsPanel_.minimapRotate_ = false;
+                    settingsPanel_.pendingMinimapRotate = false;
+                    minimap->setRotateWithCamera(false);
+                    minimap->setSquareShape(settingsPanel_.minimapSquare_);
+                    settingsPanel_.minimapSettingsApplied_ = true;
+                }
             }
+            if (!settingsPanel_.zoneSettingsApplied_) {
             if (auto* zm = renderer->getZoneManager()) {
                 zm->setUseOriginalSoundtrack(settingsPanel_.pendingUseOriginalSoundtrack);
                 // Setting the flag alone is not the whole apply: music that
@@ -380,6 +383,8 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                 }
                 settingsPanel_.zoneSettingsApplied_ = true;
             }
+            }
+            if (!settingsPanel_.terrainSettingsApplied_) {
             if (auto* tm = renderer->getTerrainManager()) {
                 tm->setGroundClutterDensityScale(
                     static_cast<float>(settingsPanel_.pendingGroundClutterDensity) / 100.0f);
@@ -387,6 +392,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                     static_cast<float>(settingsPanel_.pendingGrassDensity) / 100.0f,
                     static_cast<float>(settingsPanel_.pendingGrassHeight) / 100.0f);
                 settingsPanel_.terrainSettingsApplied_ = true;
+            }
             }
             // Restore mute state: save actual master volume first, then apply mute
             if (settingsPanel_.soundMuted_) {
