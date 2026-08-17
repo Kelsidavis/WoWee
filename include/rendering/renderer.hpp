@@ -466,6 +466,12 @@ private:
     std::unordered_map<uint32_t, uint32_t> grassProfileIndex_;
     std::vector<pipeline::GrassProfile> grassProfiles_;
     uint32_t grassProfileFor(uint32_t effectId);
+    // Session totals, reported once at shutdown. The log is bounded and the
+    // per-rebuild lines rotate out of it whenever the player stands still for
+    // a minute, so the tail is the only place a "check the log" can rely on.
+    uint32_t grassRebuilds_ = 0;
+    size_t grassLastCount_ = 0;
+    double grassWorstGenerateMs_ = 0.0;
 
     // CPU timing stats (last frame/update).
     double lastUpdateMs = 0.0;

@@ -768,6 +768,14 @@ void Renderer::shutdown() {
     }
 
     if (grassRenderer_) {
+        // The whole session in one line, at the end where the bounded log
+        // cannot rotate it away before anyone reads it.
+        if (grassRebuilds_ > 0) {
+            LOG_INFO("Grass session: ", grassRebuilds_, " rebuilds, last population ",
+                     grassLastCount_, " blades, ", grassProfiles_.size(),
+                     " profiles derived, worst generate ",
+                     static_cast<int>(grassWorstGenerateMs_), "ms");
+        }
         grassRenderer_->shutdown();
         grassRenderer_.reset();
     }
@@ -2073,6 +2081,9 @@ void Renderer::updateGrassPopulation() {
     grassRenderer_->setPopulation(blades.data(), blades.size());
     grassWindowCenter_ = center;
     grassWindowValid_ = true;
+    ++grassRebuilds_;
+    grassLastCount_ = blades.size();
+    grassWorstGenerateMs_ = std::max(grassWorstGenerateMs_, generateMs);
 
     const double totalMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
