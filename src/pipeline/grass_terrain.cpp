@@ -158,12 +158,19 @@ GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk&
     const float u = fracX / GRASS_CHUNK_QUADS;
     const float v = fracY / GRASS_CHUNK_QUADS;
 
-    // Layer 0 is the base and covers whatever the layers above it do not.
-    // Layers 1..3 carry alpha maps, and their weights are taken off the base
-    // in order, which is how the terrain shader composites them.
+    // Layers paint over one another, so the topmost takes its alpha and the
+    // ones beneath share what it leaves - which means walking them from the
+    // top down, not the bottom up.
+    //
+    // Bottom up gives the lowest layer the most weight, and on a road that is
+    // the dirt underneath the cobblestone: the dirt grows, so grass came up
+    // through the paving no matter how correctly the cobblestone layer was
+    // marked bare. Three fixes went past this because each asked whether the
+    // road layer was suppressed - it was - rather than whether it was getting
+    // its weight.
     std::array<float, 4> weight{};
     float remaining = 1.0f;
-    for (size_t i = 1; i < context.layerCount; ++i) {
+    for (size_t i = context.layerCount; i-- > 1;) {
         if (context.alpha[i].empty()) continue;
         const float a = clamp01(sampleAlpha(context.alpha[i], u, v));
         weight[i] = remaining * a;

@@ -1098,6 +1098,13 @@ static int lua_PickupBagFromSlot(lua_State* L) {
     s_cursorId = held.item.itemId;
     s_cursorSlot = slot;
     s_cursorBag = -1;
+    // The shared cursor as well as this file's own. Everything that receives a
+    // drop reads cursorItemSlot(), and a worn bag is an equipped item like any
+    // other - PickupInventoryItem below sets exactly this. Without it the bag
+    // lifted onto the pointer and then every drop target reported nothing
+    // held: PutItemInBag returned false, so BagSlotButton_OnClick fell through
+    // to ToggleBag and the bag opened instead of moving.
+    cursorItemSlot() = {-1, slot, true};
     // Same omission as the spell above: a bag dragged off its slot was held
     // invisibly. The display id falls back to the item's own, which is where
     // the equipped-item pickup below reads it from when the slot has none.

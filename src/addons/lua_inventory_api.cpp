@@ -2701,6 +2701,25 @@ static int lua_PutItemInBag(lua_State* L) {
     }
     const int bagIndex = inventoryId - 20;          // 0-3
     const auto& inv = gh->getInventory();
+
+    // A bag dropped on a bag slot changes places with what is worn there, it
+    // does not go inside it. Without this the loop below found a free slot in
+    // the target bag and posted the held bag into it, so replacing one bag
+    // with another was not expressible: the only outcomes were equipping into
+    // an empty slot or being swallowed by a full one.
+    const auto& cursor = cursorItemSlot();
+    const bool holdingWornBag = cursor.equipped && cursor.slot >= 20 && cursor.slot <= 23;
+    if (holdingWornBag) {
+        const int fromIndex = cursor.slot - 20;
+        if (fromIndex != bagIndex) {
+            gh->swapBagSlots(fromIndex, bagIndex);
+        }
+        cursorItemSlot() = {};
+        wowee::ui::frameXmlSetCursorItem(std::string());
+        lua_pushboolean(L, 1);
+        return 1;
+    }
+
     const int size = inv.getBagSize(bagIndex);
     // An empty bag slot equips the held bag rather than swallowing it.
     //

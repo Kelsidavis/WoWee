@@ -412,3 +412,34 @@ TEST_CASE("an overlay whose alpha runs out still covers the ground",
     // Well past the four texels the stream actually wrote.
     REQUIRE(evaluateGrass(context, chunk, 4.0f, 4.0f).suitability == Catch::Approx(0.0f));
 }
+
+TEST_CASE("a road over dirt grows nothing, though the dirt would",
+          "[grass][terrain]") {
+    // The shape of a real Elwynn road chunk: grass base, dirt over it, then
+    // cobblestone over that. Layers paint over one another, so where the
+    // cobblestone is solid it is the only thing there - the dirt beneath it is
+    // covered, and covered ground grows nothing whatever it would grow bare.
+    //
+    // Weighted the other way round the dirt takes the road's weight, and grass
+    // comes up through the paving however correctly the cobblestone layer is
+    // marked bare. That is what it did.
+    MapChunk chunk = makeFlatChunk();
+    chunk.layers.push_back(makeLayer(kGrassEffect));           // [0] base grass
+
+    std::vector<uint8_t> solid(wowee::pipeline::ALPHA_MAP_SIZE, 255);
+    const uint32_t dirtOffset = appendAlpha(chunk, solid);
+    chunk.layers.push_back(makeLayer(kGrassEffect, 0x100, dirtOffset));   // [1] dirt, grows
+
+    const uint32_t roadOffset = appendAlpha(chunk, solid);
+    TextureLayer road = makeLayer(kGrassEffect, 0x100, roadOffset);       // [2] cobblestone
+    road.textureId = 5;
+    chunk.layers.push_back(road);
+
+    auto nameFor = [](uint32_t texId) -> std::string {
+        return texId == 5 ? "Tileset\\Elwynn\\ElwynnCobbleStoneBase.blp" : "";
+    };
+
+    wowee::pipeline::ChunkGrassContext context;
+    context.build(chunk, densityFor, nameFor);
+    REQUIRE(evaluateGrass(context, chunk, 4.0f, 4.0f).suitability == Catch::Approx(0.0f));
+}
