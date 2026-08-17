@@ -864,7 +864,7 @@ void EntitySpawner::finishWmoSpawn(const PreparedGameObjectWMO& result, uint32_t
         modelId, renderPos, glm::vec3(0.0f, 0.0f, result.orientation), result.scale);
     if (instanceId == 0) return;
 
-    gameObjectInstances_[result.guid] = {modelId, instanceId, true};
+    gameObjectInstances_[result.guid] = {.modelId = modelId, .instanceId = instanceId, .isWmo = true};
 
     // The synchronous WMO path notifies TransportManager after creating the
     // render instance. Do the same here: unique/uncached transport WMOs (notably
@@ -1895,7 +1895,8 @@ void EntitySpawner::processPendingRemotePlayerMounts() {
             }
             cr->playAnimation(mountInstance, mountAnim, true);
             cr->playAnimation(playerIt->second, rendering::anim::MOUNT, true);
-            remotePlayerMounts_[guid] = {displayId, modelId, mountInstance, riderHeight};
+            remotePlayerMounts_[guid] = {.displayId = displayId, .modelId = modelId,
+                                         .instanceId = mountInstance, .riderHeight = riderHeight};
             LOG_INFO("Remote player mounted: guid=0x", std::hex, guid, std::dec,
                      " displayId=", displayId, " riderHeight=", riderHeight,
                      " model=", modelPath);

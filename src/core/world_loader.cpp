@@ -94,9 +94,11 @@ void spawnInstancePortalVisuals(uint32_t mapId,
 
     static const InstancePortalVisual kPortals[] = {
         // Ironforge station -> Deeprun Tram
-        {0,   glm::vec3(-1330.46f, -4840.26f, 503.85f), 3.10f, 4.25f},
+        {.mapId = 0,   .canonicalPos = glm::vec3(-1330.46f, -4840.26f, 503.85f),
+         .canonicalYaw = 3.10f, .scale = 4.25f},
         // Deeprun Tram -> Ironforge station
-        {369, glm::vec3(10.50f, 76.03f, -2.30f),       3.12f, 4.25f},
+        {.mapId = 369, .canonicalPos = glm::vec3(10.50f, 76.03f, -2.30f),
+         .canonicalYaw = 3.12f, .scale = 4.25f},
         // Stormwind station -> Deeprun Tram. Coordinates from a live playthrough's
         // actual AreaTrigger 2173 fire: entrance trigger position on map 0, and the
         // canonical position the player actually landed at on map 369 after transfer
@@ -104,14 +106,17 @@ void spawnInstancePortalVisuals(uint32_t mapId,
         // to its own arrival point, since both tunnel ends have similar floor height).
         // Yaw reuses the Ironforge value as a starting point - Stormwind's entrance
         // faces a different direction, so this likely needs live tuning.
-        {0,   glm::vec3(514.03f, -8346.46f, 97.60f),   3.12f, 4.25f},
+        {.mapId = 0,   .canonicalPos = glm::vec3(514.03f, -8346.46f, 97.60f),
+         .canonicalYaw = 3.12f, .scale = 4.25f},
         // Deeprun Tram -> Stormwind station
-        {369, glm::vec3(2490.91f, 68.30f, -2.30f),     3.12f, 4.25f},
+        {.mapId = 369, .canonicalPos = glm::vec3(2490.91f, 68.30f, -2.30f),
+         .canonicalYaw = 3.12f, .scale = 4.25f},
         // The Stockade exit. The WMO contains this InstancePortal doodad, but
         // WMO-child matrix instances bypass the standalone portal presentation.
         // Position and scale come from StormwindJail.wmo's authored doodad after
         // applying the instance's 180-degree placement rotation.
-        {34,  glm::vec3(0.6882f, 45.7492f, -16.1133f), 0.0f, 1.36f},
+        {.mapId = 34,  .canonicalPos = glm::vec3(0.6882f, 45.7492f, -16.1133f),
+         .canonicalYaw = 0.0f, .scale = 1.36f},
     };
 
     for (const auto& portal : kPortals) {

@@ -1127,7 +1127,7 @@ void EntitySpawner::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_
                 return;
             }
 
-            gameObjectInstances_[guid] = {modelId, instanceId, true};
+            gameObjectInstances_[guid] = {.modelId = modelId, .instanceId = instanceId, .isWmo = true};
             LOG_DEBUG("Spawned gameobject WMO: guid=0x", std::hex, guid, std::dec,
                      " displayId=", displayId, " at (", x, ", ", y, ", ", z, ")");
 
@@ -1293,7 +1293,7 @@ void EntitySpawner::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_
             if (!isTotem) applyGameObjectAnimationPolicy(guid, entry, instanceId);
         }
 
-        gameObjectInstances_[guid] = {modelId, instanceId, false};
+        gameObjectInstances_[guid] = {.modelId = modelId, .instanceId = instanceId, .isWmo = false};
 
         // Notify transport system for M2 transports (e.g. Deeprun Tram cars)
         if (gameHandler_ && gameHandler_->isTransportGuid(guid)) {

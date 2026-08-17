@@ -22,7 +22,6 @@
 #include <chrono>
 #include <limits>
 #include <utility>
-#include "core/spawn_presets.hpp"
 #include "core/logger.hpp"
 #include "core/memory_monitor.hpp"
 #include "rendering/renderer.hpp"
@@ -953,7 +952,7 @@ bool Application::initialize() {
                                 // Extract power cost
                                 uint32_t mc = (mcF < fc) ? sDbc->getUInt32(i, mcF) : 0;
                                 uint8_t  pt = (ptF < fc) ? static_cast<uint8_t>(sDbc->getUInt32(i, ptF)) : 0;
-                                if (mc > 0) (*spellCostMap)[id] = {mc, pt};
+                                if (mc > 0) (*spellCostMap)[id] = {.manaCost = mc, .powerType = pt};
                             }
                         }
                         LOG_INFO("SpellDataResolver: loaded ", spellCastIdx->size(), " cast indices, ",
@@ -1058,7 +1057,9 @@ bool Application::initialize() {
                                     for (uint32_t s = 0; s < 3; ++s) {
                                         uint32_t type = dbc->getUInt32(r, effBase + s);
                                         if (type == 0) continue;
-                                        effs.push_back({type, dbc->getUInt32(r, argBase + s), dbc->getInt32(r, minBase + s)});
+                                        effs.push_back({.type = type,
+                                                        .arg = dbc->getUInt32(r, argBase + s),
+                                                        .minAmount = dbc->getInt32(r, minBase + s)});
                                     }
                                     if (!effs.empty()) (*enchMap)[enchId] = std::move(effs);
                                 }
@@ -3821,8 +3822,9 @@ void Application::render() {
                                     break;
                                 }
                                 if (!replaced) {
-                                    worn.push_back({tried.displayInfoId,
-                                                    tried.inventoryType, 0u});
+                                    worn.push_back({.displayModel = tried.displayInfoId,
+                                                    .inventoryType = tried.inventoryType,
+                                                    .enchantment = 0u});
                                 }
                             }
                             const uint8_t gender =
@@ -3950,7 +3952,9 @@ void Application::render() {
                                                                      invTypes)) {
                                 for (size_t slot = 0; slot < displayIds.size(); ++slot) {
                                     if (displayIds[slot] == 0) continue;
-                                    worn.push_back({displayIds[slot], invTypes[slot], 0u});
+                                    worn.push_back({.displayModel = displayIds[slot],
+                                                    .inventoryType = invTypes[slot],
+                                                    .enchantment = 0u});
                                 }
                             }
                             sizeFor(inspectModel_, inspectModel);
@@ -4080,7 +4084,9 @@ void Application::render() {
                                                                  invTypes)) {
                             for (size_t slot = 0; slot < displayIds.size(); ++slot) {
                                 if (displayIds[slot] == 0) continue;
-                                worn.push_back({displayIds[slot], invTypes[slot], 0u});
+                                worn.push_back({.displayModel = displayIds[slot],
+                                                .inventoryType = invTypes[slot],
+                                                .enchantment = 0u});
                             }
                         }
                         // Whether a model actually loaded, not whether one was
@@ -4117,7 +4123,8 @@ void Application::render() {
                             std::vector<game::EquipmentItem> npcWorn;
                             for (const auto& [did, invType] :
                                      entitySpawner_->getHumanoidEquipment(displayId)) {
-                                npcWorn.push_back({did, invType, 0u});
+                                npcWorn.push_back({.displayModel = did, .inventoryType = invType,
+                                                   .enchantment = 0u});
                             }
                             // The bake, where there is one - nearly always.
                             // It is the whole appearance already composited,

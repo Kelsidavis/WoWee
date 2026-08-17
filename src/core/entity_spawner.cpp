@@ -1011,7 +1011,7 @@ EntitySpawner::getOrLoadAttachmentModel(const std::vector<std::string>& candidat
     if (idIt == attachmentModelIds_.end()) {
         idIt = attachmentModelIds_.emplace(key, nextCreatureModelId_++).first;
     }
-    return CachedAttachmentModel{idIt->second, std::move(model)};
+    return CachedAttachmentModel{.modelId = idIt->second, .model = std::move(model)};
 }
 
 std::string EntitySpawner::getHumanoidBakePath(uint32_t displayId) const {
