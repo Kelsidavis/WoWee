@@ -1947,11 +1947,24 @@ void Renderer::updateGrassPopulation() {
     size_t noChunk = 0;
     size_t sampled = 0;
 
+    // A chunk is 33 yards across and candidates are a third of a yard apart, so
+    // a hundred consecutive samples land in the chunk the last one did. Testing
+    // that chunk before searching for another is what takes this off the frame:
+    // findChunkAt is a tile lookup and a 3x3 probe, and running it per sample
+    // was most of the cost.
+    constexpr float kUnitSize = core::coords::TILE_SIZE / 16.0f / 8.0f;
+
     auto sampler = [&](float wx, float wy) -> pipeline::GrassSuitability {
         float fracX = 0.0f;
         float fracY = 0.0f;
         ++sampled;
-        const pipeline::MapChunk* chunk = terrainManager->findChunkAt(wx, wy, fracX, fracY);
+        const pipeline::MapChunk* chunk = nullptr;
+        if (cached && pipeline::TerrainMeshGenerator::chunkFractionsAt(
+                          cached->position, wx, wy, kUnitSize, fracX, fracY)) {
+            chunk = cached;
+        } else {
+            chunk = terrainManager->findChunkAt(wx, wy, fracX, fracY);
+        }
         if (!chunk) { ++noChunk; return {}; }
         if (chunk != cached) {
             context = pipeline::ChunkGrassContext{};

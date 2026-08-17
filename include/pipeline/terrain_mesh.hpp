@@ -112,6 +112,21 @@ public:
                                        const HeightMap& heightMap,
                                        float fracX, float fracY, float unitSize);
 
+    /**
+     * Where a world position falls inside a chunk, in the 0..8 grid fractions
+     * chunkSurfacePoint and isHole take. False if the position is outside it.
+     *
+     * The axes cross here too: world X gives fracY and world Y gives fracX.
+     *
+     * Separated so a caller walking many points can test the chunk it already
+     * has before searching for another. The search is a tile lookup and a 3x3
+     * probe, and running it per sample dominated grass generation - a hundred
+     * thousand candidates in a row nearly all land in the chunk the last one
+     * did.
+     */
+    static bool chunkFractionsAt(const float chunkPosition[3], float glX, float glY,
+                                 float unitSize, float& fracX, float& fracY);
+
 private:
     /**
      * Generate mesh for a single map chunk

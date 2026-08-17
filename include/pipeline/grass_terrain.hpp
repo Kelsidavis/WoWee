@@ -29,8 +29,14 @@ struct GrassSuitability {
     /// Phase 4 turns into a vegetation profile.
     uint32_t effectId = 0;
     /// 0 flat, 1 vertical. From the chunk's own normals.
+    ///
+    /// Only meaningful when suitability is above zero. A chunk where nothing
+    /// grows answers before sampling anything, because that is most of a road
+    /// or a cliff and paying for height and alpha there was most of the cost
+    /// of a rebuild.
     float slope = 0.0f;
-    /// World Z at the sample point, interpolated across the height grid.
+    /// World Z at the sample point, on the surface the terrain mesh draws.
+    /// Only meaningful when suitability is above zero, as above.
     float rootHeight = 0.0f;
 };
 
@@ -50,6 +56,10 @@ struct ChunkGrassContext {
     bool grows[4] = {};
     uint32_t effectId[4] = {};
     size_t layerCount = 0;
+    /// False when no layer's ground effect grows anything, which makes every
+    /// sample in the chunk zero without looking at alpha, slope or height.
+    /// Roads, rock and water are whole chunks of this.
+    bool growsAnything = false;
 
     /// Returns false when nothing in this chunk grows anything, so a caller
     /// can skip it whole.

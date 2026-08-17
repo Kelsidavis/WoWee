@@ -110,12 +110,15 @@ bool ChunkGrassContext::build(const MapChunk& chunk, const GroundEffectDensityFn
         // not covering the rest of the chunk, it simply stopped.
         if (!decodeLayerAlpha(chunk, i, alpha[i], 0)) alpha[i].clear();
     }
+    growsAnything = any;
     return any;
 }
 
 GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk& chunk,
                                float fracX, float fracY) {
     GrassSuitability out;
+    if (!context.growsAnything) return out;  // whole chunk, before any sampling
+
     fracX = std::clamp(fracX, 0.0f, GRASS_CHUNK_QUADS);
     fracY = std::clamp(fracY, 0.0f, GRASS_CHUNK_QUADS);
 

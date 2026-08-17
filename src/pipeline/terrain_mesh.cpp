@@ -348,6 +348,20 @@ void TerrainMeshGenerator::decompressNormal(const int8_t* compressedNormal, floa
     }
 }
 
+bool TerrainMeshGenerator::chunkFractionsAt(const float chunkPosition[3],
+                                            float glX, float glY, float unitSize,
+                                            float& fracX, float& fracY) {
+    const float maxX = chunkPosition[0];
+    const float minX = chunkPosition[0] - 8.0f * unitSize;
+    const float maxY = chunkPosition[1];
+    const float minY = chunkPosition[1] - 8.0f * unitSize;
+    if (glX < minX || glX > maxX || glY < minY || glY > maxY) return false;
+
+    fracY = std::clamp((chunkPosition[0] - glX) / unitSize, 0.0f, 8.0f);
+    fracX = std::clamp((chunkPosition[1] - glY) / unitSize, 0.0f, 8.0f);
+    return true;
+}
+
 glm::vec3 TerrainMeshGenerator::chunkSurfacePoint(const float chunkPosition[3],
                                                   const HeightMap& heightMap,
                                                   float fracX, float fracY,

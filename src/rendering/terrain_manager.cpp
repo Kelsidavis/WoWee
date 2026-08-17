@@ -2162,17 +2162,10 @@ const pipeline::MapChunk* TerrainManager::findChunkAt(float glX, float glY,
         const auto& chunk = tile->terrain.getChunk(cx, cy);
         if (!chunk.hasHeightMap()) return nullptr;
 
-        const float chunkMaxX = chunk.position[0];
-        const float chunkMinX = chunk.position[0] - 8.0f * unitSize;
-        const float chunkMaxY = chunk.position[1];
-        const float chunkMinY = chunk.position[1] - 8.0f * unitSize;
-        if (glX < chunkMinX || glX > chunkMaxX ||
-            glY < chunkMinY || glY > chunkMaxY) {
+        if (!pipeline::TerrainMeshGenerator::chunkFractionsAt(chunk.position, glX, glY,
+                                                              unitSize, fracX, fracY)) {
             return nullptr;
         }
-
-        fracY = glm::clamp((chunk.position[0] - glX) / unitSize, 0.0f, 8.0f);
-        fracX = glm::clamp((chunk.position[1] - glY) / unitSize, 0.0f, 8.0f);
         return &chunk;
     };
 
