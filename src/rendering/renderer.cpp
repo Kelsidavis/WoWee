@@ -1,4 +1,6 @@
 #include "rendering/renderer.hpp"
+
+#include <fstream>
 #include "addons/lua_api_registrations.hpp"
 #include "core/env_flag.hpp"
 #include "rendering/sky_params_from_lighting.hpp"
@@ -2083,6 +2085,24 @@ void Renderer::updateGrassPopulation() {
     }
     const double generateMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+
+    // WOWEE_GRASS_DUMP=1: write the first generated population to a CSV so
+    // the field's actual shape around the player can be analysed offline. The
+    // cull reports a stable 2-3x more grass kept looking one way than the
+    // other, which is a claim about where blades are, and this answers it.
+    static const bool dumpPopulation = rendering::envFlagEnabled("WOWEE_GRASS_DUMP");
+    if (dumpPopulation) {
+        static bool dumped = false;
+        if (!dumped && !blades.empty()) {
+            dumped = true;
+            std::ofstream out("grass_population.csv");
+            out << "# player," << center.x << "," << center.y << "," << center.z << "\n";
+            for (const auto& b : blades) {
+                out << b.x << "," << b.y << "," << b.z << "," << b.height << "\n";
+            }
+            LOG_INFO("Grass population dumped: ", blades.size(), " blades");
+        }
+    }
 
     grassRenderer_->setPopulation(blades.data(), blades.size());
     grassWindowCenter_ = center;
