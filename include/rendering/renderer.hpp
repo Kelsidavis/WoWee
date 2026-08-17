@@ -62,6 +62,7 @@ class SwimEffects;
 class RenderGraph;
 class OverlaySystem;
 class HiZSystem;
+class GrassRenderer;
 
 class Renderer {
 public:
@@ -447,6 +448,10 @@ private:
 
     // HiZ occlusion culling - builds depth pyramid each frame
     std::unique_ptr<HiZSystem> hizSystem_;
+
+    // GPU-driven grass. Phase 1 of docs/plan-grass.md: compute cull with
+    // atomic compaction feeding an indirect draw, on a fixed test population.
+    std::unique_ptr<GrassRenderer> grassRenderer_;
 
     // CPU timing stats (last frame/update).
     double lastUpdateMs = 0.0;

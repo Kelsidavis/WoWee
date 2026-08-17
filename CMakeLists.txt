@@ -837,6 +837,7 @@ set(WOWEE_SOURCES
     src/rendering/m2_model_classifier.cpp
     src/rendering/render_graph.cpp
     src/rendering/hiz_system.cpp
+    src/rendering/grass_renderer.cpp
     src/rendering/quest_marker_renderer.cpp
     src/rendering/footprint_renderer.cpp
     src/rendering/minimap.cpp

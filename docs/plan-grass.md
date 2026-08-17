@@ -1,6 +1,6 @@
 # GPU-Driven Grass — Phased Implementation Plan
 
-**Status:** Phase 0 complete (this document). Next: Phase 1.
+**Status:** Phase 1 complete. Next: Phase 2.
 **Branch:** `grass`
 **Spec:** [`docs/grass-spec.md`](grass-spec.md) — every `spec §N` below refers to a numbered
 section there. The spec is **not** authoritative; this plan and the repository are. See §2.
@@ -305,4 +305,63 @@ Phase 0 (reconnaissance) and Phase 0a (spec recovery) are done: the facts in §1
 verified against the files cited, the deviations in §2 are decided, and all 50 spec
 sections are in `docs/grass-spec.md` with navigable `## N.` headings.
 
-Phase 1 has not started.
+### Phase 1 — done
+
+The GPU-driven path runs end to end on the fixed test population: 99856 blades
+(a 316x316 field, jittered off the lattice) at the render-space origin.
+
+| Piece | Where |
+|---|---|
+| Blade struct, C++ side | `include/rendering/grass_blade.hpp` |
+| Cull + compaction | `assets/shaders/grass_cull.comp.glsl` |
+| Draw | `assets/shaders/grass.vert.glsl`, `grass.frag.glsl` |
+| Renderer | `include/rendering/grass_renderer.hpp`, `src/rendering/grass_renderer.cpp` |
+| Layout test | `tests/test_grass_blade_layout.cpp` (ctest `grass_blade_layout`) |
+
+**Blade layout** — 32 bytes, std430, asserted at compile time and in the test:
+
+| offset | field | meaning |
+|---|---|---|
+| 0 | `positionHeight.xyz` | root world position (render space) |
+| 12 | `positionHeight.w` | height, yards |
+| 16 | `facingWidthPhase.x` | facing, radians about +Z |
+| 20 | `facingWidthPhase.y` | width, yards |
+| 24 | `facingWidthPhase.z` | tilt — carried, unused until Phase 5 |
+| 28 | `facingWidthPhase.w` | wind phase seed — carried, unused until Phase 5 |
+
+The two unused fields are carried now so the stride does not change when Phase 3
+puts real data behind it. `GrassCullUniformsGPU` is 128 bytes, std140, laid out
+like `CullUniformsGPU`.
+
+**The counter is the draw command.** `instanceCount` in the
+`VkDrawIndexedIndirectCommand` is both the cursor `atomicAdd` advances and the
+field `vkCmdDrawIndexedIndirect` consumes, so compaction needs no second buffer
+and no readback. The host zeroes that one field with `vkCmdFillBuffer` before
+each dispatch and never reads it.
+
+Two barriers, both `VkDependencyInfo` through `cmdPipelineBarrier2` per §2: the
+fill before the dispatch that adds to it, and compute-write before
+`DRAW_INDIRECT | VERTEX_SHADER`. Output buffers are per frame in flight, so
+frame N cannot overwrite what N-1 is still drawing.
+
+Decisions worth not relitigating:
+
+- The source blades, the visible-index list and the indirect command are all
+  device-local. Only the cull uniform block is host-visible.
+- No vertex buffer. The quad comes from `gl_VertexIndex`; a six-index buffer
+  shared by every blade satisfies `vkCmdDrawIndexedIndirect`'s requirement for
+  a bound index buffer.
+- `VK_CULL_MODE_NONE`: a blade is one quad and is seen from both faces.
+- Grass draws after terrain and before WMO, so anything standing on the ground
+  occludes it.
+- Initialization is non-fatal, like the other effect renderers; `isReady()`
+  gates both call sites.
+
+**Not verified.** `./test.sh` is green at 161/161 and the lint gate reports
+nothing in any grass file, but no run on hardware has happened yet, so "flat
+green blades render at the test origin" and "validation layers clean" are
+claims about the code rather than observations. The test population sits at the
+render-space origin, which is a corner of the map rather than anywhere a
+character starts, so seeing it may need flying there.
+
+Phase 2 has not started.

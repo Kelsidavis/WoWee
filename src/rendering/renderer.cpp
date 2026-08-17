@@ -29,6 +29,7 @@
 #include "rendering/character_preview.hpp"
 #include "rendering/wmo_renderer.hpp"
 #include "rendering/m2_renderer.hpp"
+#include "rendering/grass_renderer.hpp"
 #include "rendering/hiz_system.hpp"
 #include "rendering/minimap.hpp"
 #include "rendering/world_map.hpp"
@@ -627,6 +628,12 @@ bool Renderer::initialize(core::Window* win) {
 
     levelUpEffect = std::make_unique<LevelUpEffect>();
 
+    // Non-fatal like the effects above: a device that cannot build the compute
+    // pipeline still gets everything else, and isReady() gates both call sites.
+    grassRenderer_ = std::make_unique<GrassRenderer>();
+    if (!grassRenderer_->initialize(vkCtx, perFrameSetLayout))
+        LOG_WARNING("Grass renderer initialization failed (non-fatal)");
+
     questMarkerRenderer = std::make_unique<QuestMarkerRenderer>();
     footprintRenderer = std::make_unique<FootprintRenderer>();
 
@@ -755,6 +762,11 @@ void Renderer::shutdown() {
     if (spellVisualSystem_) {
         spellVisualSystem_->shutdown();
         spellVisualSystem_.reset();
+    }
+
+    if (grassRenderer_) {
+        grassRenderer_->shutdown();
+        grassRenderer_.reset();
     }
 
     LOG_DEBUG("Renderer::shutdown - m2Renderer...");
@@ -1018,6 +1030,13 @@ void Renderer::beginFrame() {
         uint32_t frame = vkCtx->getCurrentFrame();
         m2Renderer->invalidateCullOutput(frame);
         m2Renderer->dispatchCullCompute(currentCmd, frame, *camera);
+    }
+
+    // Grass culls here too, for the same reason: a dispatch has to be recorded
+    // outside a render pass. Unlike the M2 path nothing reads the result back -
+    // the count it produces is consumed by the indirect draw on the GPU.
+    if (grassRenderer_ && camera && vkCtx) {
+        grassRenderer_->dispatchCull(currentCmd, vkCtx->getCurrentFrame(), *camera);
     }
 
     // --- Off-screen pre-passes ---
@@ -2144,6 +2163,12 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
             terrainRenderer->render(currentCmd, perFrameSet, *camera);
             lastTerrainRenderMs = std::chrono::duration<double, std::milli>(
                 std::chrono::steady_clock::now() - terrainStart).count();
+        }
+
+        // After terrain, before the world's models: grass sits on the ground and
+        // is occluded by everything standing on it.
+        if (grassRenderer_ && vkCtx) {
+            grassRenderer_->render(currentCmd, vkCtx->getCurrentFrame(), perFrameSet);
         }
 
         if (wmoRenderer && camera && !skipWMO) {

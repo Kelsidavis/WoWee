@@ -1896,6 +1896,14 @@ wowee_add_test(test_blp_truncation
             ${TEST_COMMON_SOURCES}
             ${CMAKE_SOURCE_DIR}/src/pipeline/blp_loader.cpp)
 
+# ── test_grass_blade_layout ────────────────────────────
+# The C++ and GLSL views of a grass blade have to agree byte for byte, and a
+# disagreement is silent: it compiles, passes validation, and renders the wrong
+# thing. Header-only on purpose -- grass_blade.hpp needs nothing but glm, so
+# this stays a fast test rather than one that drags in a Vulkan context.
+wowee_add_test(test_grass_blade_layout
+    SOURCES test_grass_blade_layout.cpp)
+
 # ── Sanitizers, once every test target exists ────────────────
 # This must be the last thing in this file. The loop walks ALL_TEST_TARGETS,
 # which register_test_target appends to as each test is declared, so the
