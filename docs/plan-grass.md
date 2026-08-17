@@ -225,7 +225,7 @@ Streaming: `TerrainManager::unloadTile(int x, int y)` (`include/rendering/terrai
 | §28 entity buffer | reuse `playerPos`/`playerWake` in `GPUPerFrameData` | already exists, purpose-built for foliage |
 | §21 hierarchical compaction | plain `atomicAdd` first | spec §21: "do not implement the more complicated system prematurely" |
 | §10/§31 up axis `vec3(0,1,0)` | `vec3(0,0,1)` | WoWee is **Z-up**; the spec is written Y-up. Silent garbage otherwise |
-| §26/§27 new wind system | port the 3-layer model from `m2.vert.glsl:104-126` | already tuned, world-stable, and keeps grass coherent with existing foliage |
+| §26/§27 wind | **superseded**: travelling waves, not the M2 port | the port shipped first, then was reworked at the owner's direction into wave fronts that sweep the field - the M2 model moves plants in place, and in-place motion across a whole field reads as a texture. Phase is still world-position seeded (spec §36) |
 | §28 new interaction code | reuse the bend/springback in `m2.vert.glsl:130-185` | already handles wake, reach falloff and player level |
 
 ---
@@ -384,9 +384,12 @@ this visible.
   the top row, whose quad collapses to a triangle - that is the point. A
   `static_assert` ties the index list to the row count, because a mismatch
   reads rows the vertex shader never builds and cannot be detected at runtime.
-- **Wind.** Two layers multiplied rather than three summed (spec §27), reusing
-  m2.vert.glsl's phase constants and its `dot(worldPos.xy, ...)` seeding, so
-  grass and the foliage beside it move as one field. Time from `fogParams.z`.
+- **Wind.** Shipped first as the M2 port (two layers multiplied, spec §27),
+  later reworked into travelling waves at the owner's direction - a ~13 yard
+  front sweeping along the wind, a larger gust band rolling over it, and a
+  perpendicular wobble as fronts pass. Still world-position seeded, time from
+  `fogParams.z`. Seed heads and blooms (profile-gated, drifting in world-space
+  patches) landed with the same rework.
 - **Player.** Ported from `m2.vert.glsl:139-199` - `playerPos` against
   `playerWake`, stronger influence wins, `reach` falloff, level gate. The size
   gate is dropped (every blade here is grass) and the bend is larger: trodden
