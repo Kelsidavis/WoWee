@@ -121,6 +121,20 @@ AllocatedImage createImage(VkDevice device, VmaAllocator allocator,
 
 void destroyImage(VkDevice device, VmaAllocator allocator, AllocatedImage& image);
 
+/// Record a dependency described the synchronization2 way.
+///
+/// With VK_KHR_synchronization2 present this is vkCmdPipelineBarrier2KHR.
+/// Without it the same dependency is lowered to vkCmdPipelineBarrier: the
+/// per-barrier stage masks are ORed into the single pair the legacy call
+/// takes, which is the only thing a legacy barrier could express anyway.
+///
+/// Barriers are written once, in the newer form, on both paths.
+void cmdPipelineBarrier2(VkCommandBuffer cmd, const VkDependencyInfo& dep);
+
+/// Set by VkContext once the device exists; nullptr selects the legacy path.
+/// One device per process, which VkContext already assumes.
+void setPipelineBarrier2Fn(PFN_vkCmdPipelineBarrier2KHR fn);
+
 // Image layout transitions
 void transitionImageLayout(VkCommandBuffer cmd, VkImage image,
     VkImageLayout oldLayout, VkImageLayout newLayout,

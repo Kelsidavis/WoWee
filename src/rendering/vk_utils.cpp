@@ -4,6 +4,7 @@
 #include "rendering/vk_context.hpp"
 #include "core/logger.hpp"
 #include <cstring>
+#include <vector>
 
 namespace wowee {
 namespace rendering {
@@ -117,12 +118,115 @@ void destroyImage(VkDevice device, VmaAllocator allocator, AllocatedImage& image
     }
 }
 
+namespace {
+
+/// The device's vkCmdPipelineBarrier2KHR, or nullptr for the legacy path.
+PFN_vkCmdPipelineBarrier2KHR gPipelineBarrier2 = nullptr;
+
+/// synchronization2 stage and access masks are 64 bits and the legacy ones
+/// are 32. The bits above 32 are the stages synchronization2 added and have
+/// no legacy spelling, so a mask that uses one is widened to the coarsest
+/// legacy equivalent instead. That waits for more than it needs, never less.
+VkPipelineStageFlags lowerStages(VkPipelineStageFlags2 stages, bool isSource) {
+    if ((stages >> 32) != 0) return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    if (stages == 0) {
+        // VK_PIPELINE_STAGE_2_NONE is legal; a legacy mask of zero is not.
+        return isSource ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                        : VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    }
+    return static_cast<VkPipelineStageFlags>(stages);
+}
+
+VkAccessFlags lowerAccess(VkAccessFlags2 access) {
+    if ((access >> 32) != 0) {
+        return VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    }
+    return static_cast<VkAccessFlags>(access);
+}
+
+} // namespace
+
+void setPipelineBarrier2Fn(PFN_vkCmdPipelineBarrier2KHR fn) {
+    gPipelineBarrier2 = fn;
+}
+
+void cmdPipelineBarrier2(VkCommandBuffer cmd, const VkDependencyInfo& dep) {
+    if (gPipelineBarrier2 != nullptr) {
+        gPipelineBarrier2(cmd, &dep);
+        return;
+    }
+
+    VkPipelineStageFlags2 srcStages = 0;
+    VkPipelineStageFlags2 dstStages = 0;
+
+    std::vector<VkMemoryBarrier> mems;
+    mems.reserve(dep.memoryBarrierCount);
+    for (uint32_t i = 0; i < dep.memoryBarrierCount; ++i) {
+        const VkMemoryBarrier2& b = dep.pMemoryBarriers[i];
+        srcStages |= b.srcStageMask;
+        dstStages |= b.dstStageMask;
+        mems.push_back({.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+                        .pNext = nullptr,
+                        .srcAccessMask = lowerAccess(b.srcAccessMask),
+                        .dstAccessMask = lowerAccess(b.dstAccessMask)});
+    }
+
+    std::vector<VkBufferMemoryBarrier> bufs;
+    bufs.reserve(dep.bufferMemoryBarrierCount);
+    for (uint32_t i = 0; i < dep.bufferMemoryBarrierCount; ++i) {
+        const VkBufferMemoryBarrier2& b = dep.pBufferMemoryBarriers[i];
+        srcStages |= b.srcStageMask;
+        dstStages |= b.dstStageMask;
+        bufs.push_back({.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                        .pNext = nullptr,
+                        .srcAccessMask = lowerAccess(b.srcAccessMask),
+                        .dstAccessMask = lowerAccess(b.dstAccessMask),
+                        .srcQueueFamilyIndex = b.srcQueueFamilyIndex,
+                        .dstQueueFamilyIndex = b.dstQueueFamilyIndex,
+                        .buffer = b.buffer,
+                        .offset = b.offset,
+                        .size = b.size});
+    }
+
+    std::vector<VkImageMemoryBarrier> imgs;
+    imgs.reserve(dep.imageMemoryBarrierCount);
+    for (uint32_t i = 0; i < dep.imageMemoryBarrierCount; ++i) {
+        const VkImageMemoryBarrier2& b = dep.pImageMemoryBarriers[i];
+        srcStages |= b.srcStageMask;
+        dstStages |= b.dstStageMask;
+        imgs.push_back({.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                        .pNext = nullptr,
+                        .srcAccessMask = lowerAccess(b.srcAccessMask),
+                        .dstAccessMask = lowerAccess(b.dstAccessMask),
+                        .oldLayout = b.oldLayout,
+                        .newLayout = b.newLayout,
+                        .srcQueueFamilyIndex = b.srcQueueFamilyIndex,
+                        .dstQueueFamilyIndex = b.dstQueueFamilyIndex,
+                        .image = b.image,
+                        .subresourceRange = b.subresourceRange});
+    }
+
+    vkCmdPipelineBarrier(cmd,
+                         lowerStages(srcStages, true),
+                         lowerStages(dstStages, false),
+                         dep.dependencyFlags,
+                         static_cast<uint32_t>(mems.size()), mems.empty() ? nullptr : mems.data(),
+                         static_cast<uint32_t>(bufs.size()), bufs.empty() ? nullptr : bufs.data(),
+                         static_cast<uint32_t>(imgs.size()), imgs.empty() ? nullptr : imgs.data());
+}
+
 void transitionImageLayout(VkCommandBuffer cmd, VkImage image,
     VkImageLayout oldLayout, VkImageLayout newLayout,
     VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage)
 {
-    VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    // The stage masks are the caller's legacy flags widened. synchronization2
+    // defines its first 32 stage and access bits to the same values, so a
+    // VK_PIPELINE_STAGE_* constant is already a valid VK_PIPELINE_STAGE_2_*
+    // one and no call site has to change.
+    VkImageMemoryBarrier2 barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    barrier.srcStageMask = srcStage;
+    barrier.dstStageMask = dstStage;
     barrier.oldLayout = oldLayout;
     barrier.newLayout = newLayout;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -180,8 +284,11 @@ void transitionImageLayout(VkCommandBuffer cmd, VkImage image,
             break;
     }
 
-    vkCmdPipelineBarrier(cmd, srcStage, dstStage, 0,
-        0, nullptr, 0, nullptr, 1, &barrier);
+    VkDependencyInfo dep{};
+    dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dep.imageMemoryBarrierCount = 1;
+    dep.pImageMemoryBarriers = &barrier;
+    cmdPipelineBarrier2(cmd, dep);
 }
 
 AllocatedBuffer uploadBuffer(VkContext& ctx, const void* data, VkDeviceSize size,

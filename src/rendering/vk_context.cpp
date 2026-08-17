@@ -5,6 +5,7 @@
 #include "rendering/vk_context.hpp"
 
 #include <fstream>
+#include "rendering/vk_utils.hpp"
 #include "core/logger.hpp"
 #include <VkBootstrap.h>
 #include <SDL2/SDL_vulkan.h>
@@ -474,7 +475,7 @@ bool VkContext::selectPhysicalDevice() {
 
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(physicalDevice, &props);
-    (void)props.apiVersion; // Available if needed for version checks
+    deviceApiVersion_ = props.apiVersion;
     gpuVendorId_ = props.vendorID;
     // snprintf rather than strncpy: deviceName is the same size as gpuName_,
     // so strncpy copies exactly the buffer length and GCC reports it may not
@@ -591,6 +592,28 @@ bool VkContext::createLogicalDevice() {
         deviceBuilder.add_pNext(&enabled12);
     }
 
+    // VK_KHR_synchronization2, taken when the device offers it and skipped
+    // when it does not. Core in Vulkan 1.3, but MoltenVK advertises 1.2 with
+    // the extension present, so requiring 1.3 would drop the platform this is
+    // developed on for a feature it actually has.
+    // Two ways in, because a 1.3 device has it in core and need not advertise
+    // the extension string at all, while a 1.2 device only has the extension.
+    // Checking one and not the other would take the legacy path on hardware
+    // that supports it natively.
+    VkPhysicalDeviceSynchronization2FeaturesKHR sync2Features{};
+    sync2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
+    sync2IsCore_ = (deviceApiVersion_ >= VK_API_VERSION_1_3 &&
+                    instanceApiVersion_ >= VK_API_VERSION_1_3);
+    if (sync2IsCore_ || vkbPhysicalDevice_.enable_extension_if_present(
+                            VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)) {
+        sync2Features.synchronization2 = VK_TRUE;
+        deviceBuilder.add_pNext(&sync2Features);
+        synchronization2Supported_ = true;
+        LOG_INFO("Enabling synchronization2 (", sync2IsCore_ ? "core 1.3" : "KHR extension", ")");
+    } else {
+        LOG_INFO("synchronization2 not available - barriers use the legacy entry point");
+    }
+
     // Enable AMD device coherent memory feature if the extension was enabled
     // (prevents validation errors when VMA selects memory types with DEVICE_COHERENT_BIT_AMD)
     VkPhysicalDeviceCoherentMemoryFeaturesAMD coherentFeatures{};
@@ -638,6 +661,23 @@ bool VkContext::createLogicalDevice() {
 
     auto vkbDevice = devRet.value();
     device = vkbDevice.device;
+
+    // Resolved once here rather than per barrier. The KHR entry point is the
+    // one to ask for: on a 1.2 instance the promoted vkCmdPipelineBarrier2
+    // name is not loadable even when the extension is present.
+    if (synchronization2Supported_) {
+        cmdPipelineBarrier2_ = reinterpret_cast<PFN_vkCmdPipelineBarrier2KHR>(
+            vkGetDeviceProcAddr(device,
+                sync2IsCore_ ? "vkCmdPipelineBarrier2" : "vkCmdPipelineBarrier2KHR"));
+        if (cmdPipelineBarrier2_ == nullptr) {
+            // Advertised but not loadable. Nothing to do but take the legacy
+            // path, which every barrier already falls back to.
+            synchronization2Supported_ = false;
+            LOG_WARNING("VK_KHR_synchronization2 enabled but vkCmdPipelineBarrier2KHR "
+                        "did not resolve - using the legacy entry point");
+        }
+    }
+    setPipelineBarrier2Fn(cmdPipelineBarrier2_);
 
     if (requestTransferQueue) {
         // With custom_queue_setup, we must retrieve queues manually.

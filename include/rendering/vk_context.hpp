@@ -187,6 +187,11 @@ public:
     // Whether the physical device supports sampler anisotropy.
     [[nodiscard]] bool isSamplerAnisotropySupported() const { return samplerAnisotropySupported_; }
 
+    /// Whether barriers can be recorded as VkDependencyInfo. False means the
+    /// same barriers still record, through the legacy entry point.
+    [[nodiscard]] bool isSynchronization2Supported() const { return synchronization2Supported_; }
+    [[nodiscard]] PFN_vkCmdPipelineBarrier2KHR cmdPipelineBarrier2Fn() const { return cmdPipelineBarrier2_; }
+
     /// A ceiling on every sampler's anisotropy - the game's Texture Filtering.
     ///
     /// Applied where samplers are made rather than by rebuilding the ones that
@@ -286,6 +291,19 @@ private:
     /// only, so the acquire/renderFinished pair stays exactly as it is. The
     /// timeline replaces the CPU-side "is this slot free yet" question.
     bool timelineSemaphoreSupported_ = false;
+
+    /// VK_KHR_synchronization2, detected rather than required. It is core in
+    /// Vulkan 1.3, but MoltenVK advertises 1.2 and offers it as an extension,
+    /// so asking for 1.3 would lose the platform this is developed on while
+    /// the feature itself is right there. Every barrier goes through
+    /// cmdPipelineBarrier2() in vk_utils, which lowers the dependency info
+    /// back to a legacy vkCmdPipelineBarrier when this is false.
+    bool synchronization2Supported_ = false;
+    /// Whether it came from core 1.3 rather than the extension. Decides which
+    /// entry point name resolves - the promoted one is not loadable on 1.2.
+    bool sync2IsCore_ = false;
+    PFN_vkCmdPipelineBarrier2KHR cmdPipelineBarrier2_ = nullptr;
+
     VkSemaphore frameTimeline_ = VK_NULL_HANDLE;
     /// Last value signalled on frameTimeline_. Monotonic for the life of the
     /// device, so it survives a swapchain rebuild without being reset.
@@ -358,6 +376,11 @@ private:
 
     // Actual Vulkan API version the instance was created with (gates core 1.2 calls)
     uint32_t instanceApiVersion_ = VK_API_VERSION_1_1;
+    /// What the physical device reports, which is not what the instance was
+    /// created with. Used to tell a 1.3 device - where synchronization2 is
+    /// core and the extension string may not be advertised at all - from a
+    /// 1.2 one that offers it as an extension.
+    uint32_t deviceApiVersion_ = VK_API_VERSION_1_0;
 
     // MSAA depth resolve support (for sampling/copying resolved depth)
     bool depthResolveSupported_ = false;
