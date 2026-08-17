@@ -112,9 +112,12 @@ bool ChunkGrassContext::build(const MapChunk& chunk, const GroundEffectDensityFn
         }
         any = any || grows[i];
         if (i == 0) continue;  // layer 0 is the base and carries no alpha map
-        // Unset texels read as zero coverage: a layer whose data runs out is
-        // not covering the rest of the chunk, it simply stopped.
-        if (!decodeLayerAlpha(chunk, i, alpha[i], 0)) alpha[i].clear();
+        // Unset texels read as fully covered, which is what the terrain
+        // renderer reads them as. Grass has to agree with the ground that is
+        // actually painted, not with a defensible reading of its own: where an
+        // RLE run ended early this decoded the road as absent and grew a full
+        // field of grass down ground the renderer had already paved.
+        if (!decodeLayerAlpha(chunk, i, alpha[i], 255)) alpha[i].clear();
     }
     growsAnything = any;
     return any;

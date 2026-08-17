@@ -159,10 +159,11 @@ void main() {
         float head  = 2.4 * smoothstep(0.55, 0.8, t) * (1.0 - 0.6 * smoothstep(0.8, 1.0, t));
         halfWidth = 0.5 * width * max(stalk * (1.0 - smoothstep(0.55, 0.8, t)), head);
     } else {
-        // Where the taper begins varies per blade: some run slim from a third
-        // of the way up, some hold their width to well past half. One taper
-        // for every blade reads as a field of the same die-cut leaf.
-        float tipStart = mix(0.30, 0.60, fract(seed * 97.13));
+        // A grass blade holds most of its width and then points; tapering
+        // from near the root makes a cone, and a field of identical cones is
+        // what reads as planted rather than grown. Where the point begins
+        // varies per blade.
+        float tipStart = mix(0.55, 0.88, fract(seed * 97.13));
         halfWidth = 0.5 * width * (1.0 - 0.25 * t) * (1.0 - smoothstep(tipStart, 1.0, t));
     }
 
@@ -197,7 +198,7 @@ void main() {
     // A standing lean each blade was born with, in its own direction. A sward
     // of perfectly upright blades all bending the same way is a parade; real
     // grass is tousled before the wind ever touches it.
-    float leanAmt = 0.05 + 0.22 * fract(seed * 17.91);
+    float leanAmt = 0.08 + 0.42 * fract(seed * 17.91);
     float leanAng = 6.2831853 * fract(seed * 29.37);
     bendVec += vec2(cos(leanAng), sin(leanAng)) * (height * leanAmt * give);
 

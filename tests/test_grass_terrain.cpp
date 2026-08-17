@@ -389,3 +389,26 @@ TEST_CASE("a road texture keeps grass off, whatever its effect says",
     REQUIRE(blind.build(chunk, densityFor));
     REQUIRE(evaluateGrass(blind, chunk, 4.0f, 4.0f).suitability == Catch::Approx(1.0f));
 }
+
+TEST_CASE("an overlay whose alpha runs out still covers the ground",
+          "[grass][terrain]") {
+    // The terrain renderer leaves texels an RLE run never reached as fully
+    // covered, so that is what the ground looks like. Grass read them as
+    // uncovered and grew a full field down every road the renderer had
+    // already paved: it has to agree with what is painted, not with its own
+    // reading of the data.
+    MapChunk chunk = makeFlatChunk();
+    chunk.layers.push_back(makeLayer(kGrassEffect));   // base: grass
+
+    // A compressed overlay whose stream stops after a handful of texels.
+    const auto offset = static_cast<uint32_t>(chunk.alphaMap.size());
+    chunk.alphaMap.push_back(0x80 | 3);   // fill, 4 texels
+    chunk.alphaMap.push_back(255);
+    TextureLayer overlay = makeLayer(kRoadEffect, 0x100 | 0x200, offset);
+    chunk.layers.push_back(overlay);
+
+    wowee::pipeline::ChunkGrassContext context;
+    context.build(chunk, densityFor);
+    // Well past the four texels the stream actually wrote.
+    REQUIRE(evaluateGrass(context, chunk, 4.0f, 4.0f).suitability == Catch::Approx(0.0f));
+}

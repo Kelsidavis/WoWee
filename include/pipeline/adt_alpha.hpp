@@ -31,10 +31,11 @@ inline constexpr uint8_t ALPHA_COUNT_MASK = 0x7F;
 /// Decode one layer's alpha map into `outAlpha`, which is resized to
 /// ALPHA_MAP_SIZE.
 ///
-/// `unsetFill` is what texels the layer's data does not reach are left as. It
-/// is a parameter because the two existing callers disagree and both are right
-/// for their own use: a truncated RLE run means "no more coverage recorded",
-/// which reads as fully covered to one caller and not at all to the other.
+/// `unsetFill` is what texels the layer's data does not reach are left as.
+/// 255 - fully covered - is what the terrain renderer uses and therefore what
+/// the ground actually looks like, so anything deciding what grows where wants
+/// the same. It stays a parameter for the mesh builder, which fills with 0 and
+/// has always done.
 ///
 /// Returns false when the layer has no alpha map of its own, in which case
 /// `outAlpha` is left filled with `unsetFill`. Layer 0 is always the base and
