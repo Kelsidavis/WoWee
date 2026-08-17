@@ -1652,6 +1652,18 @@ void Application::shutdown() {
         worldLoader_->cancelWorldPreload();
     };
 
+    // End the session while the renderer is still alive. disconnect() fires a
+    // despawn callback per entity, and those release creature and player
+    // models through EntitySpawner's renderer pointer. Left to ~GameHandler,
+    // which runs after renderer.reset(), that pointer is eleven lines of
+    // freed memory - the "Exit Game during a logout" path arrived here still
+    // holding a world full of entities and crashed on the first one. Calling
+    // it now empties the entity list, so the destructor's own disconnect()
+    // has nothing left to fire.
+    if (gameHandler) {
+        gameHandler->disconnect();
+    }
+
     // Save floor cache before renderer is destroyed
     if (renderer && renderer->getWMORenderer()) {
         size_t cacheSize = renderer->getWMORenderer()->getFloorCacheSize();
