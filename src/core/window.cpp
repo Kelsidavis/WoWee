@@ -64,6 +64,16 @@ bool Window::initialize() {
     disablePressAndHoldAccents();
 #endif
 
+#ifdef __ANDROID__
+    // Without this the manifest's screenOrientation does not survive: SDL calls
+    // setOrientation itself when it creates the window, and with no hint and a
+    // resizable window it asks for FULL_USER, which follows the phone's own
+    // rotation lock. That is portrait, and the interface is laid out for a
+    // landscape screen. Naming both landscape orientations leaves the phone
+    // free to flip between them.
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+#endif
+
     // Initialize SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
         LOG_ERROR("Failed to initialize SDL: ", SDL_GetError());

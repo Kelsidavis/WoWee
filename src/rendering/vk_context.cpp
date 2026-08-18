@@ -978,6 +978,34 @@ void VkContext::savePipelineCache() {
     LOG_INFO("Pipeline cache saved to disk (", dataSize, " bytes)");
 }
 
+/// Asks for an unrotated swapchain where the surface allows it.
+///
+/// Android hands a portrait-native panel to a landscape activity by reporting
+/// currentTransform as a 90 degree rotation, and vk-bootstrap adopts that when
+/// nothing else is asked for. Adopting it is a promise to rotate the rendering
+/// to match, which this renderer does not do, so the whole interface came out
+/// turned on its side. Asking for identity moves the rotation to the display
+/// controller, which costs a composition pass and is what an engine without
+/// pre-rotation should do.
+///
+/// A surface that cannot present unrotated keeps its own transform, and the
+/// caller is no worse off than before.
+static void requestIdentityTransform(vkb::SwapchainBuilder& builder,
+                                     VkPhysicalDevice physicalDevice,
+                                     VkSurfaceKHR surface) {
+    VkSurfaceCapabilitiesKHR caps{};
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &caps) != VK_SUCCESS) {
+        return;
+    }
+    if (caps.currentTransform == VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) return;
+    if (!(caps.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)) {
+        LOG_WARNING("Surface reports transform 0x", std::hex, caps.currentTransform, std::dec,
+                    " and cannot present unrotated; the image will be rotated");
+        return;
+    }
+    builder.set_pre_transform_flags(VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
+}
+
 bool VkContext::createSwapchain(int width, int height) {
     vkb::SwapchainBuilder swapchainBuilder{physicalDevice, device, surface};
 
@@ -987,6 +1015,8 @@ bool VkContext::createSwapchain(int width, int height) {
         .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
         .set_desired_min_image_count(2)
         .set_old_swapchain(swapchain);
+
+    requestIdentityTransform(builder, physicalDevice, surface);
 
     if (vsync_) {
         builder.set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR);
@@ -2136,6 +2166,8 @@ bool VkContext::recreateSwapchain(int width, int height) {
         .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
         .set_desired_min_image_count(2)
         .set_old_swapchain(oldSwapchain);
+
+    requestIdentityTransform(builder, physicalDevice, surface);
 
     if (vsync_) {
         builder.set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR);

@@ -35,10 +35,11 @@ def gitVersionCode = {
     }
 }()
 def stagedAssets = layout.buildDirectory.dir("staged-assets")
+def stagedMusic = layout.buildDirectory.dir("staged-music")
 
 // The same payload the desktop and macOS releases ship: assets/ without the
-// proprietary music, and the git-tracked Data JSONs. Game data is not here -
-// the player extracts that from their own install and copies it in.
+// original music, and the git-tracked Data JSONs. Game data is not here - the
+// player extracts that from their own install and copies it in.
 tasks.register('stageAssets', Copy) {
     into stagedAssets
     from("${repoRoot}/assets") {
@@ -56,6 +57,14 @@ tasks.register('stageAssets', Copy) {
         include 'expansions/*/update_fields.json'
         include 'opcodes/aliases.json'
         include 'opcodes/canonical.json'
+    }
+}
+
+tasks.register('stageMusic', Copy) {
+    into stagedMusic
+    from("${repoRoot}/assets") {
+        into 'assets'
+        include 'Original Music/**'
     }
 }
 
@@ -94,6 +103,10 @@ android {
     }
 
     sourceSets.main.assets.srcDirs = [stagedAssets]
+    // The music is the project's own and is git-tracked, but the release
+    // archives leave it out, so the release APK does too. A debug build is what
+    // a desktop build directory is: everything, music included.
+    sourceSets.debug.assets.srcDirs = [stagedMusic]
 
     buildTypes {
         release {
@@ -107,7 +120,12 @@ android {
     }
 }
 
-tasks.configureEach { if (name.startsWith('merge') && name.endsWith('Assets')) dependsOn 'stageAssets' }
+tasks.configureEach {
+    if (name.startsWith('merge') && name.endsWith('Assets')) {
+        dependsOn 'stageAssets'
+        if (name.contains('Debug')) dependsOn 'stageMusic'
+    }
+}
 
 // SDLActivity and its eight siblings are Java, so they cannot come out of the
 // native build; they are committed here. They must still match the SDL that
