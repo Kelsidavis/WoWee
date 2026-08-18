@@ -13,10 +13,16 @@
 
 layout(local_size_x = 64) in;
 
-// Matches GrassBladeGPU in include/rendering/grass_renderer.hpp (std430).
+// Matches GrassBladeGPU in include/rendering/grass_blade.hpp (std430). All
+// four vec4s must be declared even though the cull only reads the first two:
+// this struct sets the array stride the shader indexes the shared buffer
+// with, and a two-vec4 version read every blade at half its real offset -
+// testing one blade's position and drawing another's.
 struct GrassBlade {
     vec4 positionHeight;    // xyz = root world position, w = height (yards)
-    vec4 facingWidthPhase;  // x = facing (radians), y = width, z = tilt, w = phase seed
+    vec4 facingWidthPhase;  // x = facing (radians), y = width, z = profile index, w = phase seed
+    vec4 groundShadow;      // unread here; part of the stride
+    vec4 groundHighlight;   // unread here; part of the stride
 };
 
 layout(std140, set = 0, binding = 0) uniform GrassCullUniforms {
@@ -69,9 +75,11 @@ void main() {
     // Z is up: WoWee is Z-up in both canonical and render space.
     float radius = max(height, blade.facingWidthPhase.y) * 0.75;
     vec3 center = root + vec3(0.0, 0.0, height * 0.5);
-    for (int i = 0; i < 6; i++) {
-        float d = dot(frustumPlanes[i].xyz, center) + frustumPlanes[i].w;
-        if (d < -radius) return;
+    if ((debugFlags & 1u) == 0u) {
+        for (int i = 0; i < 6; i++) {
+            float d = dot(frustumPlanes[i].xyz, center) + frustumPlanes[i].w;
+            if (d < -radius) return;
+        }
     }
 
     // Survived: claim a slot and record which blade owns it.
