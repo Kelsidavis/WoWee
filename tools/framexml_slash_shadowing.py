@@ -54,10 +54,10 @@ bound, noop = globals_provided(), set()
 for f in (ROOT / "src/addons").glob("*.cpp"):
     s = f.read_text(errors="ignore")
     # Does nothing: a named stub, or a lambda whose whole body discards L.
-    for m in re.finditer(r'\{"([A-Za-z0-9_]+)",\s*(?:&)?\s*(lua_[A-Za-z0-9_]+)\}', s):
+    for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?(?:&)?\s*(lua_[A-Za-z0-9_]+)\}', s):
         if m.group(2) in STUBS:
             noop.add(m.group(1))
-    for m in re.finditer(r'\{"([A-Za-z0-9_]+)",\s*\[\]\(lua_State\*\s*L\)\s*->\s*int\s*\{\s*\(void\)L;\s*return 0;\s*\}\}', s):
+    for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?\[\]\(lua_State\*\s*L\)\s*->\s*int\s*\{\s*\(void\)L;\s*return 0;\s*\}\}', s):
         noop.add(m.group(1))
 
 # Defined in FrameXML itself - ChatFrame_DisplayUsageError and ShowUIPanel are

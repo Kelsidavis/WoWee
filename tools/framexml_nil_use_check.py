@@ -24,7 +24,7 @@ texts = {f: f.read_text(errors="ignore") for f in files}
 
 csrc = "\n".join(p.read_text(errors="ignore")
                  for p in (REPO / "src" / "addons").glob("*.cpp"))
-c_bindings = set(re.findall(r'\{"(\w+)",', csrc)) | \
+c_bindings = set(re.findall(r'\{(?:\.\w+\s*=\s*)?"(\w+)",', csrc)) | \
              set(re.findall(r'static int lua_(\w+)', csrc))
 lua_defined = set()
 for t in texts.values():

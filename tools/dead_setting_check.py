@@ -65,7 +65,7 @@ CVAR_DECL = re.compile(r'self\.cvar\s*=\s*"([A-Za-z0-9_]+)"')
 FRAME_DECL = re.compile(r'<Frame\s+name="([A-Za-z0-9_]+)"')
 CONTROL_DECL = re.compile(r'<(?:CheckButton|Slider|Button|Frame)\s+name="(\$parent[A-Za-z0-9_]*|[A-Za-z0-9_]+)"')
 #: A name in kRemovedControlsLua - one plain string per line.
-REMOVED = re.compile(r'^\s*"([A-Za-z0-9_]+)",\s*$', re.M)
+REMOVED = re.compile(r'^\s*"([A-Za-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?$', re.M)
 #: `function SomeFrameName_OnLoad (self)` - the frame is the part before _On.
 LUA_HANDLER = re.compile(r'function\s+([A-Za-z0-9_]+?)_On[A-Za-z]+\s*\(')
 UVAR_DECL = re.compile(r'self\.uvar\s*=\s*"([A-Za-z0-9_]+)"')

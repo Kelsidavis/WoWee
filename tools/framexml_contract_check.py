@@ -44,8 +44,8 @@ BINDINGS = ROOT / "src" / "addons"
 GAME = ROOT / "src" / "game"
 
 CHECKS_ARG1 = re.compile(r"luaL_check(?:number|string|integer)\s*\(\s*L\s*,\s*1\s*\)")
-NAMED_FN = re.compile(r"static int lua_(\w+)\s*\(lua_State\* L\)\s*\{")
-LAMBDA_FN = re.compile(r'\{"(\w+)",\s*\[\]\(lua_State\* L\)\s*->\s*int\s*\{')
+NAMED_FN = re.compile(r"static int lua_(\w+)\s*\(lua_State\* L\)\s*\{(?:\.\w+\s*=\s*)?")
+LAMBDA_FN = re.compile(r'\{(?:\.\w+\s*=\s*)?"(\w+)",\s*(?:\.\w+\s*=\s*)?\[\]\(lua_State\* L\)\s*->\s*int\s*\{')
 
 
 def luaSources():

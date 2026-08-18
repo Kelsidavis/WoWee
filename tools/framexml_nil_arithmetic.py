@@ -151,12 +151,12 @@ pushes_nil = {}
 for path in sorted(ADDONS.glob("*.cpp")):
     src = path.read_text(errors="ignore")
     # An inline lambda: its body is the block after the arrow.
-    for m in re.finditer(r'\{"([A-Za-z_]\w*)",\s*\[\]\(lua_State\*\s*L?\s*\)\s*->\s*int\s*\{', src):
+    for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)",\s*(?:\.\w+\s*=\s*)?\[\]\(lua_State\*\s*L?\s*\)\s*->\s*int\s*\{', src):
         body = _balanced(src, src.index("{", m.end() - 1))
         if _answers_nil(body):
             pushes_nil[m.group(1)] = _nil_positions(body)
     # A named implementation: find the function and read its own body.
-    for m in re.finditer(r'\{"([A-Za-z_]\w*)",\s*&?\s*(lua_[A-Za-z0-9_]+)\s*\}', src):
+    for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)",\s*(?:\.\w+\s*=\s*)?&?\s*(lua_[A-Za-z0-9_]+)\s*\}', src):
         fn = re.search(r"int %s\s*\(lua_State\*[^)]*\)\s*\{" % re.escape(m.group(2)), src)
         if not fn:
             continue

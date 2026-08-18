@@ -138,7 +138,7 @@ def server_reads(server_root, handlers):
     out = {}
     for path in Path(server_root).rglob("*.cpp"):
         src = path.read_text(errors="ignore")
-        for m in re.finditer(r"void WorldSession::(\w+)\s*\(\s*WorldPacket\s*&\s*(\w+)\s*\)\s*\{", src):
+        for m in re.finditer(r"void WorldSession::(\w+)\s*\(\s*WorldPacket\s*&\s*(\w+)\s*\)\s*\{(?:\.\w+\s*=\s*)?", src):
             method, arg = m.group(1), m.group(2)
             if method not in wanted:
                 continue

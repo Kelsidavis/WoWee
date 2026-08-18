@@ -47,7 +47,7 @@ eng = ""
 for f in os.listdir(addons):
     if f.endswith(".cpp"): eng += open(addons+"/"+f).read()
 have  = set(re.findall(r'lua_setglobal\(L_?,\s*"(\w+)"', eng))
-have |= set(re.findall(r'\{"(\w+)"\s*,', eng))
+have |= set(re.findall(r'\{(?:\.\w+\s*=\s*)?"(\w+)"\s*,', eng))
 have |= set(re.findall(r'"(\w+)\s*=', eng))
 have |= set(re.findall(r'"function (\w+)\(', eng))
 

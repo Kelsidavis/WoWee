@@ -117,7 +117,7 @@ def main():
     forwarded_getters = set(re.findall(
         r"\bGameHandler::(\w+)\([^)]*\)[^{]*\{\s*(?:if \()?\w+Handler_\s*\)?\s*(?:\?|return)\s*\w+Handler_->", source))
     stale_writers = []
-    for m in re.finditer(r"\bGameHandler::(\w+)\([^)]*\)[^{;]*\{", source):
+    for m in re.finditer(r"\bGameHandler::(\w+)\([^)]*\)[^{;]*\{(?:\.\w+\s*=\s*)?", source):
         depth, j, started = 0, m.end() - 1, False
         while j < len(source):
             if source[j] == "{":

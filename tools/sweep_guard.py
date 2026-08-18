@@ -1292,8 +1292,8 @@ def check_removed_controls_are_gone():
     body = header[start:end]
     # The control list only: the category list below it is checked separately.
     listing_src = body[:body.find("kRemovedCategories")] if "kRemovedCategories" in body else body
-    names = re.findall(r'^\s*"([A-Za-z0-9_]+)",\s*$', listing_src, re.M)
-    cats = re.findall(r'^\s*"([A-Za-z0-9_]+Panel)",\s*$',
+    names = re.findall(r'^\s*"([A-Za-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?$', listing_src, re.M)
+    cats = re.findall(r'^\s*"([A-Za-z0-9_]+Panel)",\s*(?:\.\w+\s*=\s*)?$',
                       body[body.find("kRemovedCategories"):], re.M) if "kRemovedCategories" in body else []
     if not names:
         return False, what + " - no removed control names parsed"

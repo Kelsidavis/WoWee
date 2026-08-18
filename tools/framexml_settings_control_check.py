@@ -526,7 +526,7 @@ def clientCVarPairs():
     # setting's, for the pair that do not count the same thing: Blizzard's
     # Ground Density counts doodads and this client's setting is a proportion.
     out = []
-    for row in re.finditer(r'\{"([a-z0-9_]+)",\s*"([a-z0-9_]+)"\s*(?:,\s*([^}]+?))?\s*\}', body):
+    for row in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([a-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?"([a-z0-9_]+)"\s*(?:,\s*([^}]+?))?\s*\}', body):
         scale = 1.0
         if row.group(3):
             # A literal like 1.5 / 64.0. None when it is not one, which the

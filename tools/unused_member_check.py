@@ -143,7 +143,7 @@ def main():
     # class-or-struct keyword before it read that struct's public default
     # instead of the enclosing class's private section. It was reported as
     # debt and not as a build failure, and Windows found it.
-    OPENER = re.compile(r"\b(class|struct|union)\b[^;{}]*\{")
+    OPENER = re.compile(r"\b(class|struct|union)\b[^;{}]*\{(?:\.\w+\s*=\s*)?")
     ACCESS_LABEL = re.compile(r"\b(public|protected|private)\s*:")
 
     def is_private_at(text, at):

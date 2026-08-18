@@ -50,7 +50,7 @@ EXPECTED = {
 
 
 def schema_keys(text):
-    return re.findall(r'\{"([a-z0-9]+)",\s*"[^"]*",\s*SettingKind::', text)
+    return re.findall(r'\{(?:\.\w+\s*=\s*)?"([a-z0-9]+)",\s*(?:\.\w+\s*=\s*)?"[^"]*",\s*(?:\.\w+\s*=\s*)?SettingKind::', text)
 
 
 def bindings(text):
@@ -59,7 +59,7 @@ def bindings(text):
     for m in re.finditer(
             r'\.key\s*=\s*"([a-z0-9]+)"\s*,\s*\.as\w+\s*=\s*&SettingsPanel::(\w+)', text, re.S):
         out[m.group(1)] = m.group(2)
-    for m in re.finditer(r'\{"([a-z0-9]+)",\s*&ChatSettings::(\w+)\}', text):
+    for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([a-z0-9]+)",\s*(?:\.\w+\s*=\s*)?&ChatSettings::(\w+)\}', text):
         # The chat panel exposes these under chatAutoJoin* aliases.
         out[m.group(1)] = m.group(2)
     return out

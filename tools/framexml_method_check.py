@@ -47,7 +47,7 @@ known = set(re.findall(r'(\w+)=1', block.group(1))) if block else set()
 
 # Methods actually implemented, however they are registered.
 impl = set(re.findall(r'set\("(\w+)"', src))
-impl |= set(re.findall(r'\{"(\w+)",\s*lua_\w+\}', src))
+impl |= set(re.findall(r'\{(?:\.\w+\s*=\s*)?"(\w+)",\s*(?:\.\w+\s*=\s*)?lua_\w+\}', src))
 impl |= set(re.findall(r"mt[:.]\s*(\w+)\s*=|function mt:(\w+)", src))
 impl |= {m for pair in re.findall(r"\"function mt:(\w+)", src) for m in (pair,)}
 impl |= set(re.findall(r"\"mt\.(\w+) =", src))

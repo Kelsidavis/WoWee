@@ -113,7 +113,7 @@ def sliderRanges():
     at = text.find("kCVarRanges[] = {")
     if at != -1:
         body = text[at:text.find("};", at)]
-        for m in re.finditer(r'\{"([a-z0-9_]+)",\s*([-\d.]+)f?\s*,\s*([-\d.]+)f?\s*\}', body):
+        for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([a-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?([-\d.]+)f?\s*,\s*([-\d.]+)f?\s*\}', body):
             try:
                 out[m.group(1).lower()] = (float(m.group(2)), float(m.group(3)))
             except ValueError:
@@ -129,7 +129,7 @@ def bindings():
         return {}
     body = text[at:text.find("};", at)]
     out = {}
-    for m in re.finditer(r'\{"([a-z0-9_]+)",\s*"([a-z0-9_]+)"\s*(?:,\s*([^}]+?))?\s*\}', body):
+    for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([a-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?"([a-z0-9_]+)"\s*(?:,\s*([^}]+?))?\s*\}', body):
         scale = 1.0
         if m.group(3):
             scale = number(m.group(3))
@@ -166,7 +166,7 @@ def sharedSettings():
     at = text.find("kClientCVars[] = {")
     if at != -1:
         body = text[at:text.find("};", at)]
-        for m in re.finditer(r'\{"([a-z0-9_]+)",\s*"([a-z0-9_]+)"', body):
+        for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([a-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?"([a-z0-9_]+)"', body):
             out.setdefault(m.group(2), []).append(m.group(1))
     for m in re.finditer(r'key == "([a-z0-9_]+)"[\s\S]{0,400}?setClientSetting\(\s*"([a-z0-9_]+)"',
                          text):

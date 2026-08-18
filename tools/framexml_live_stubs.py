@@ -182,7 +182,7 @@ bound = {}
 inline_stub = {}
 for f in (ROOT / "src/addons").glob("*.cpp"):
     s = f.read_text(errors="ignore")
-    for m in re.finditer(r'\{"([A-Za-z0-9_]+)",\s*(?:&)?\s*(lua_[A-Za-z0-9_]+)\}', s):
+    for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?(?:&)?\s*(lua_[A-Za-z0-9_]+)\}', s):
         bound[m.group(1)] = m.group(2)
     # The inline form. A binding registered as a lambda in the table is the
     # same binding to Lua, but only the named shared stubs - lua_ReturnNil and
@@ -190,7 +190,7 @@ for f in (ROOT / "src/addons").glob("*.cpp"):
     # counted as an implementation. It is a stub by the same test: it never
     # reaches the game and never reads what it was passed, so it answers the
     # same thing every time it is called.
-    for m in re.finditer(r'\{"([A-Za-z0-9_]+)",\s*\[\]\(lua_State\*\s*L?\s*\)\s*->\s*int\s*\{', s):
+    for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?\[\]\(lua_State\*\s*L?\s*\)\s*->\s*int\s*\{', s):
         depth, i = 1, m.end()
         while i < len(s) and depth:
             if s[i] == "{":

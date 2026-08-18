@@ -146,7 +146,7 @@ def helper_reach():
     out = {}
     # Braces, for the reason given where the bodies are read: a one-line helper
     # has no closing brace at the start of a line.
-    for m in re.finditer(r"(?:inline|static)\s+[\w:*&<> ]+?\s(\w+)\(lua_State\* L[^)]*\)\s*\{", src):
+    for m in re.finditer(r"(?:inline|static)\s+[\w:*&<> ]+?\s(\w+)\(lua_State\* L[^)]*\)\s*\{(?:\.\w+\s*=\s*)?", src):
         depth, i = 1, m.end()
         while i < len(src) and depth:
             if src[i] == "{":
@@ -169,7 +169,7 @@ def main():
     # functions beside a one-liner moved GetContainerItemPurchaseInfo in and out
     # of the list without touching it. Same fault the inline form had below.
     bodies = {}
-    for m in re.finditer(r"static int (lua_\w+)\(lua_State\* L\)\s*\{", src):
+    for m in re.finditer(r"static int (lua_\w+)\(lua_State\* L\)\s*\{(?:\.\w+\s*=\s*)?", src):
         depth, i = 1, m.end()
         while i < len(src) and depth:
             if src[i] == "{":
@@ -179,7 +179,7 @@ def main():
             i += 1
         bodies[m.group(1)] = src[m.end():i - 1]
     registered = {m.group(1): m.group(2) for m in
-                  re.finditer(r'\{"([A-Za-z_]\w*)",\s*(lua_\w+)\}', src)}
+                  re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)",\s*(?:\.\w+\s*=\s*)?(lua_\w+)\}', src)}
     # ...and the inline form, which is more than half of them. Registering a
     # binding as a lambda in the table rather than as a named function above it
     # is the same binding to Lua, but it was invisible here: `registered` only
@@ -187,7 +187,7 @@ def main():
     # so 738 of the 1420 bindings were never asked whether they read what they
     # were passed. The body is taken by matching braces, because the closing
     # "}}" sits at whatever indent the file happens to use.
-    for m in re.finditer(r'\{"([A-Za-z_]\w*)",\s*\[\]\(lua_State\* L\) -> int \{', src):
+    for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)",\s*(?:\.\w+\s*=\s*)?\[\]\(lua_State\* L\) -> int \{', src):
         depth, i = 1, m.end()
         while i < len(src) and depth:
             if src[i] == "{":

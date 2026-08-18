@@ -57,7 +57,7 @@ SETTLED = {
 
 def shared_methods(src: str) -> set:
     """Methods answered by the metatable every frame shares."""
-    found = set(re.findall(r'\{"(\w+)",\s*lua_\w+\}', src))
+    found = set(re.findall(r'\{(?:\.\w+\s*=\s*)?"(\w+)",\s*(?:\.\w+\s*=\s*)?lua_\w+\}', src))
     found |= set(re.findall(r'set\("(\w+)"', src))
     found |= set(re.findall(r"function\s+[\w.]*[Mm][Tt]\w*\s*:\s*(\w+)", src))
     return found

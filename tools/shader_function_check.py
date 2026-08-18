@@ -58,7 +58,7 @@ SETTLED = {
 def functions(path):
     text = re.sub(r"//[^\n]*", "", path.read_text(errors="ignore"))
     out = []
-    for m in re.finditer(r"^\s*(?:\w[\w\s]*?)\s+(\w+)\s*\([^;{]*\)\s*\{", text, re.M):
+    for m in re.finditer(r"^\s*(?:\w[\w\s]*?)\s+(\w+)\s*\([^;{]*\)\s*\{(?:\.\w+\s*=\s*)?", text, re.M):
         depth, j, started = 0, m.start(), False
         while j < len(text):
             if text[j] == "{":

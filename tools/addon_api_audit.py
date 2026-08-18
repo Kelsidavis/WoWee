@@ -117,9 +117,9 @@ def known_names():
     names = set()
     for cpp in SRC.glob("*.cpp"):
         s = read(cpp)
-        names |= set(re.findall(r'\{"(\w+)"\s*,', s))          # luaL_Reg tables
+        names |= set(re.findall(r'\{(?:\.\w+\s*=\s*)?"(\w+)"\s*,', s))          # luaL_Reg tables
         names |= set(re.findall(r'set\("(\w+)"', s))           # region methods
-        names |= set(re.findall(r'lua_setglobal\(\s*\w+\s*,\s*"(\w+)"', s))
+        names |= set(re.findall(r'lua_setglobal\(\s*\w+\s*,\s*(?:\.\w+\s*=\s*)?"(\w+)"', s))
         names |= set(re.findall(r'"function (\w+)\(', s))      # bootstrap Lua
         names |= set(re.findall(r'"(\w+)\s*=\s*function', s))
         # The counting stubs, which are defined by looping over a Lua list of

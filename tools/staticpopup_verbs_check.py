@@ -49,8 +49,8 @@ def bound_names():
     out = set()
     for path in ADDONS.rglob("*.cpp"):
         text = path.read_text(errors="ignore")
-        out |= set(re.findall(r'\{\s*"(\w+)"', text))
-        out |= set(re.findall(r'lua_setglobal\(L_?\s*,\s*"(\w+)"', text))
+        out |= set(re.findall(r'\{\s*(?:\.\w+\s*=\s*)?"(\w+)"', text))
+        out |= set(re.findall(r'lua_setglobal\(L_?\s*,\s*(?:\.\w+\s*=\s*)?"(\w+)"', text))
         # The bootstrap's name lists, which are Lua source inside C strings.
         out |= set(re.findall(r"'(\w+)'", text))
         out |= set(re.findall(r'^\s*"?\s*(\w+)\s*=\s*function', text, re.M))

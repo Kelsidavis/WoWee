@@ -125,13 +125,13 @@ def constant_falsey_bindings():
         return src[start:i - 1]
 
     bodies = {}
-    for m in re.finditer(r"static int (lua_\w+)\(lua_State\* L\)\s*\{", src):
+    for m in re.finditer(r"static int (lua_\w+)\(lua_State\* L\)\s*\{(?:\.\w+\s*=\s*)?", src):
         bodies[m.group(1)] = body_at(m.end())
-    named = dict(re.findall(r'\{"([A-Za-z_]\w*)",\s*(?:&)?\s*(lua_\w+)\}', src))
+    named = dict(re.findall(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)",\s*(?:\.\w+\s*=\s*)?(?:&)?\s*(lua_\w+)\}', src))
     for name, impl in named.items():
         if impl in bodies:
             out.setdefault(name, bodies[impl])
-    for m in re.finditer(r'\{"([A-Za-z_]\w*)",\s*\[\]\(lua_State\* L\) -> int \{', src):
+    for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)",\s*(?:\.\w+\s*=\s*)?\[\]\(lua_State\* L\) -> int \{', src):
         out.setdefault(m.group(1), body_at(m.end()))
 
     hits = {}

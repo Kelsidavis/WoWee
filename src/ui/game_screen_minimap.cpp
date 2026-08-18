@@ -1776,6 +1776,7 @@ void GameScreen::saveSettings() {
     out << "grass_enabled=" << (settingsPanel_.pendingGrassEnabled ? 1 : 0) << "\n";
     out << "grass_density=" << settingsPanel_.pendingGrassDensity << "\n";
     out << "grass_height=" << settingsPanel_.pendingGrassHeight << "\n";
+    out << "grass_distance=" << settingsPanel_.pendingGrassDistance << "\n";
     out << "shadows=" << (settingsPanel_.pendingShadows ? 1 : 0) << "\n";
     out << "shadow_distance=" << settingsPanel_.pendingShadowDistance << "\n";
     out << "view_distance=" << settingsPanel_.pendingViewDistance << "\n";
@@ -2018,6 +2019,7 @@ void GameScreen::loadSettings() {
             else if (key == "grass_enabled") settingsPanel_.pendingGrassEnabled = (std::stoi(val) != 0);
             else if (key == "grass_density") settingsPanel_.pendingGrassDensity = std::clamp(std::stoi(val), 0, 300);
             else if (key == "grass_height") settingsPanel_.pendingGrassHeight = std::clamp(std::stoi(val), 50, 300);
+            else if (key == "grass_distance") settingsPanel_.pendingGrassDistance = std::clamp(std::stoi(val), 30, 800);
             else if (key == "shadows") settingsPanel_.pendingShadows = (std::stoi(val) != 0);
             else if (key == "shadow_distance") settingsPanel_.pendingShadowDistance = std::clamp(std::stof(val), 40.0f, 500.0f);
             else if (key == "view_distance") settingsPanel_.pendingViewDistance = std::clamp(std::stof(val), 400.0f, 2400.0f);

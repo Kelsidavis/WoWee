@@ -125,7 +125,7 @@ _ADDON_SRC = "\n".join(p.read_text(errors="ignore")
                        for p in sorted((ROOT / "src/addons").glob("*.cpp")))
 
 bound = {}
-for m in re.finditer(r'\{"([A-Za-z0-9_]+)",\s*(?:lua_)?([A-Za-z0-9_]+)\}', _ADDON_SRC):
+for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?(?:lua_)?([A-Za-z0-9_]+)\}', _ADDON_SRC):
     bound[m.group(1)] = m.group(2)
 
 # The inline form, whose body is right there rather than in a named function
@@ -134,7 +134,7 @@ for m in re.finditer(r'\{"([A-Za-z0-9_]+)",\s*(?:lua_)?([A-Za-z0-9_]+)\}', _ADDO
 # them - the same blind spot four other sweeps had, and a zero from half a
 # search is not a zero.
 inline_bodies = {}
-for m in re.finditer(r'\{"([A-Za-z0-9_]+)",\s*\[\]\(lua_State\*\s*L?\s*\)\s*->\s*int\s*\{',
+for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?\[\]\(lua_State\*\s*L?\s*\)\s*->\s*int\s*\{',
                      _ADDON_SRC):
     depth, i = 1, m.end()
     while i < len(_ADDON_SRC) and depth:

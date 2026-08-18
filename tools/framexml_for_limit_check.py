@@ -72,12 +72,12 @@ for f in allsrc:
 # aliases, which are why `getn` is not a hit.
 src = "\n".join(p.read_text(errors="ignore")
                 for p in (REPO / "src" / "addons").glob("*.cpp"))
-provided = set(re.findall(r'\{"(\w+)"', src))
+provided = set(re.findall(r'\{(?:\.\w+\s*=\s*)?"(\w+)"', src))
 provided |= set(re.findall(r'"(\w+)"\s*,\s*lua_', src))
 provided |= set(re.findall(r'"function\s+(\w+)\s*\(', src))
 provided |= set(re.findall(r'^\s*([A-Za-z_]\w*)\s*=', src, re.M))
-provided |= set(re.findall(r'\{"\w+",\s*"(\w+)",\s*"\w+"\}', src))
-provided |= set(re.findall(r'\{"\w+",\s*"\w+",\s*"(\w+)"\}', src))
+provided |= set(re.findall(r'\{(?:\.\w+\s*=\s*)?"\w+",\s*(?:\.\w+\s*=\s*)?"(\w+)",\s*(?:\.\w+\s*=\s*)?"\w+"\}', src))
+provided |= set(re.findall(r'\{(?:\.\w+\s*=\s*)?"\w+",\s*(?:\.\w+\s*=\s*)?"\w+",\s*(?:\.\w+\s*=\s*)?"(\w+)"\}', src))
 # The counting table in lua_engine.cpp bootstraps a zero for every name in it,
 # precisely so a nil never reaches a `for` limit. Missing it here reported
 # GetLFDLockPlayerCount, GetNumRandomDungeons and GetNumQuestLogRewardFactions

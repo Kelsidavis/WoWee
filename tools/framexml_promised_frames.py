@@ -73,7 +73,7 @@ DECLARED = re.compile(r'\bname="([A-Za-z][A-Za-z0-9_]*)"')
 #: mostly bar and portrait children of frames that plainly exist.
 RELATIVE = re.compile(r'\bname="\$parent([A-Za-z][A-Za-z0-9_]*)"')
 #: ...and names it builds at runtime, where the literal is written out.
-CREATED = re.compile(r'CreateFrame\s*\(\s*"[^"]*"\s*,\s*"([A-Za-z][A-Za-z0-9_]*)"')
+CREATED = re.compile(r'CreateFrame\s*\(\s*"[^"]*"\s*,\s*(?:\.\w+\s*=\s*)?"([A-Za-z][A-Za-z0-9_]*)"')
 
 #: Elements whose rows carry an element name rather than frame names - the
 #: first table in the file maps UiElement to the lowercase name a run asks for.

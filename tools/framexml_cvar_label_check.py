@@ -61,7 +61,7 @@ def mapping():
     """This client's name-to-label rule, read out of the binding that applies it."""
     src = API.read_text(errors="ignore")
     block = re.search(r"kNamed\[\]\s*=\s*\{(.*?)\};", src, re.S)
-    named = dict(re.findall(r'\{"(\w+)",\s*"(\w+)"\}', block.group(1))) if block else {}
+    named = dict(re.findall(r'\{(?:\.\w+\s*=\s*)?"(\w+)",\s*(?:\.\w+\s*=\s*)?"(\w+)"\}', block.group(1))) if block else {}
 
     def label(name):
         if name.lower() in named:

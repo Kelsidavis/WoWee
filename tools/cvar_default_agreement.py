@@ -45,7 +45,7 @@ FALLBACK = re.compile(
     r'((?:n == "[a-z0-9_]+"\s*(?:\|\|\s*)?)+)\)?\s*(?:\{\s*)?lua_pushstring\(L,\s*"([^"]*)"\)',
     re.IGNORECASE | re.DOTALL)
 NAME = re.compile(r'n == "([a-z0-9_]+)"', re.IGNORECASE)
-DIRECT = re.compile(r'storedCVarValue\(\s*"([A-Za-z0-9_]+)"\s*,\s*"([^"]*)"')
+DIRECT = re.compile(r'storedCVarValue\(\s*"([A-Za-z0-9_]+)"\s*,\s*(?:\.\w+\s*=\s*)?"([^"]*)"')
 
 
 def main():

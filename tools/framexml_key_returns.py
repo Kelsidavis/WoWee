@@ -71,11 +71,11 @@ _ADDON_SRC = "\n".join(p.read_text(errors="ignore")
 
 # name -> implementation symbol, for both registration styles.
 bound = {}
-for m in re.finditer(r'\{"([A-Za-z0-9_]+)",\s*(?:lua_)?([A-Za-z0-9_]+)\}', _ADDON_SRC):
+for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?(?:lua_)?([A-Za-z0-9_]+)\}', _ADDON_SRC):
     bound[m.group(1)] = m.group(2)
 
 inline_bodies = {}
-for m in re.finditer(r'\{"([A-Za-z0-9_]+)",\s*\[\]\(lua_State\*\s*L?\s*\)\s*->\s*int\s*\{',
+for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z0-9_]+)",\s*(?:\.\w+\s*=\s*)?\[\]\(lua_State\*\s*L?\s*\)\s*->\s*int\s*\{',
                      _ADDON_SRC):
     depth, i = 1, m.end()
     while i < len(_ADDON_SRC) and depth:
@@ -134,7 +134,7 @@ FILES = [(p.name, p.read_text(errors="ignore")) for p in sorted(loaded_files(XML
 def _table_key_kinds():
     kinds = {}
     for _name, text in FILES:
-        for m in re.finditer(r"^([A-Z][A-Z0-9_]{3,})\s*=\s*\{", text, re.M):
+        for m in re.finditer(r"^([A-Z][A-Z0-9_]{3,})\s*=\s*\{(?:\.\w+\s*=\s*)?", text, re.M):
             name = m.group(1)
             # Only what is between the braces. Reading a fixed span after the
             # opening one instead meant an empty table - `LOCAL_MAP_QUESTS = {}`

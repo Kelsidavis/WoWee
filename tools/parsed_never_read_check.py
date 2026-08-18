@@ -121,7 +121,7 @@ def structs_and_accessors():
     """{struct: [fields]}, {field: {inline accessor names}}"""
     text = HDR.read_text(errors="ignore")
     fields, accessors = {}, collections.defaultdict(set)
-    for m in re.finditer(r"\bstruct\s+(\w+)\s*\{", text):
+    for m in re.finditer(r"\bstruct\s+(\w+)\s*\{(?:\.\w+\s*=\s*)?", text):
         name, i, depth = m.group(1), m.end(), 1
         while i < len(text) and depth:
             if text[i] == "{":

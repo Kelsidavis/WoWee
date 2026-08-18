@@ -131,8 +131,8 @@ def main():
     bindings = set()
     for path in (SRC / "addons").rglob("*.cpp"):
         text = path.read_text(errors="ignore")
-        bindings |= set(re.findall(r'\{\s*"([A-Za-z_]\w*)"\s*,', text))
-        bindings |= set(re.findall(r'lua_setglobal\s*\(\s*\w+\s*,\s*"([A-Za-z_]\w*)"', text))
+        bindings |= set(re.findall(r'\{\s*(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)"\s*,', text))
+        bindings |= set(re.findall(r'lua_setglobal\s*\(\s*\w+\s*,\s*(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)"', text))
 
     dead, polls, commands = [], {}, 0
     for path, text in cpp_sources():

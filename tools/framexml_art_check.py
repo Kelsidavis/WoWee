@@ -77,7 +77,7 @@ def folder_swaps():
     """The runtime retries, read out of the renderer rather than copied."""
     src = RENDERER.read_text(errors="ignore")
     return [(a.lower().replace("\\\\", "/"), b.lower().replace("\\\\", "/"))
-            for a, b in re.findall(r'\{\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\}', src)
+            for a, b in re.findall(r'\{\s*(?:\.\w+\s*=\s*)?"([^"]+)"\s*,\s*(?:\.\w+\s*=\s*)?"([^"]+)"\s*\}', src)
             if "\\\\" in a and "\\\\" in b]
 
 

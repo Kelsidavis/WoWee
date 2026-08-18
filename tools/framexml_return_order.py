@@ -54,7 +54,7 @@ bodies = {}
 for p in ADDONS.rglob("*.cpp"):
     src = p.read_text(errors="ignore")
     # map registered name -> function name
-    reg = dict(re.findall(r'\{\s*"(\w+)"\s*,\s*(lua_\w+)\}', src))
+    reg = dict(re.findall(r'\{\s*(?:\.\w+\s*=\s*)?"(\w+)"\s*,\s*(lua_\w+)\}', src))
     for fn_name, fn in reg.items():
         mm = re.search(r"^(?:static\s+)?int\s+" + re.escape(fn) + r"\(lua_State\*\s*L\)\s*\{", src, re.M)
         if not mm: continue
@@ -65,7 +65,7 @@ for p in ADDONS.rglob("*.cpp"):
             i += 1
         bodies[fn_name] = src[mm.end():i]
     # inline lambdas: {"Name", [](lua_State* L) -> int { ... }}
-    for m in re.finditer(r'\{\s*"(\w+)"\s*,\s*\[\]\s*\(lua_State\*\s*L\)\s*->\s*int\s*\{', src):
+    for m in re.finditer(r'\{\s*(?:\.\w+\s*=\s*)?"(\w+)"\s*,\s*\[\]\s*\(lua_State\*\s*L\)\s*->\s*int\s*\{', src):
         depth, i = 1, m.end()
         while i < len(src) and depth:
             if src[i] == '{': depth += 1

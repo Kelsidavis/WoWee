@@ -47,8 +47,8 @@ def globals_provided():
     """
     names = set()
     for src in _sources():
-        names |= set(re.findall(r'\{\s*"([A-Za-z_]\w*)"\s*,', src))
-        names |= set(re.findall(r'lua_setglobal\(\s*\w+\s*,\s*"([A-Za-z_]\w*)"', src))
+        names |= set(re.findall(r'\{\s*(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)"\s*,', src))
+        names |= set(re.findall(r'lua_setglobal\(\s*\w+\s*,\s*(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)"', src))
         names |= set(re.findall(r"function\s+([A-Za-z_]\w*)\s*[:(]", src))
         names |= set(re.findall(r"'([A-Za-z_]\w*)'", src))
     return names
@@ -61,7 +61,7 @@ def widget_methods_provided():
     rather than _G, and a name can be one without being the other.
     """
     src = ENGINE.read_text(encoding="utf-8", errors="ignore")
-    table = set(re.findall(r'\{"([A-Za-z_]\w*)",\s*lua_', src))
+    table = set(re.findall(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)",\s*(?:\.\w+\s*=\s*)?lua_', src))
     # Every method the bootstrap defines on anything, not only on the frame
     # metatable. Matching `mt:` alone missed animMeta and groupMeta, so
     # IsPlaying, SetDuration and SetOffset were reported as answering nil when
@@ -105,7 +105,7 @@ def noop_widget_methods():
     guild event log came out blank.
     """
     src = ENGINE.read_text(encoding="utf-8", errors="ignore")
-    real = set(re.findall(r'\{"([A-Za-z_]\w*)",\s*lua_', src))
+    real = set(re.findall(r'\{(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)",\s*(?:\.\w+\s*=\s*)?lua_', src))
     real |= set(re.findall(r'set\("([A-Za-z_]\w*)"', src))
     real |= set(re.findall(r'function\s+\w+\s*:\s*(\w+)\s*\(', src))
     real |= _loop_built(src)

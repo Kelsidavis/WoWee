@@ -48,7 +48,7 @@ def bodies(src):
     A regex to the first `}` stops inside the first `if` in most of these.
     """
     out = {}
-    for m in re.finditer(r"^(?:static\s+)?int\s+(lua_\w+)\(lua_State\*\s*L\)\s*\{",
+    for m in re.finditer(r"^(?:static\s+)?int\s+(lua_\w+)\(lua_State\*\s*L\)\s*\{(?:\.\w+\s*=\s*)?",
                          src, re.M):
         depth, i = 1, m.end()
         while i < len(src) and depth:
@@ -95,7 +95,7 @@ EXPECTED_FIELD_ONLY = {
 
 def main():
     src = ENGINE.read_text(errors="ignore")
-    registered = dict(re.findall(r'\{"(\w+)",\s*(lua_\w+)\}', src))
+    registered = dict(re.findall(r'\{(?:\.\w+\s*=\s*)?"(\w+)",\s*(?:\.\w+\s*=\s*)?(lua_\w+)\}', src))
     fns = bodies(src)
 
     rows = []

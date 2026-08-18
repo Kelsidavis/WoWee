@@ -102,7 +102,7 @@ def bindings(text):
     # Braces matched here too. A named function written on one line has no
     # closing brace at the start of a line, so the non-greedy form ran on and
     # inherited the next function's body - the same fault the inline half had.
-    for m in re.finditer(r"static int (lua_\w+)\(lua_State\* L\)\s*\{", text):
+    for m in re.finditer(r"static int (lua_\w+)\(lua_State\* L\)\s*\{(?:\.\w+\s*=\s*)?", text):
         depth, i = 1, m.end()
         while i < len(text) and depth:
             if text[i] == "{":
@@ -111,7 +111,7 @@ def bindings(text):
                 depth -= 1
             i += 1
         yield m.group(1), text[m.end():i - 1]
-    for m in re.finditer(r'\{"(\w+)",\s*\[\]\(lua_State\* L\) -> int \{', text):
+    for m in re.finditer(r'\{(?:\.\w+\s*=\s*)?"(\w+)",\s*(?:\.\w+\s*=\s*)?\[\]\(lua_State\* L\) -> int \{', text):
         depth, i = 1, m.end()
         while i < len(text) and depth:
             if text[i] == "{":

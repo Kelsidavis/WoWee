@@ -44,12 +44,12 @@ def main():
             return 1
 
     bound = set(re.findall(r'\{\.key = "([a-z0-9_]+)"', PANEL.read_text()))
-    rows = set(re.findall(r'\{"([a-z0-9_]+)", "[^"]*", SettingKind::', SCHEMA.read_text()))
+    rows = set(re.findall(r'\{(?:\.\w+\s*=\s*)?"([a-z0-9_]+)", "[^"]*", SettingKind::', SCHEMA.read_text()))
 
     text = CVARS.read_text()
     at = text.find("kClientCVars")
     block = text[at:at + 6000] if at != -1 else ""
-    driven = set(re.findall(r'\{"[a-z0-9_]+",\s*"([a-z0-9_]+)"', block))
+    driven = set(re.findall(r'\{(?:\.\w+\s*=\s*)?"[a-z0-9_]+",\s*(?:\.\w+\s*=\s*)?"([a-z0-9_]+)"', block))
 
     if len(bound) < MIN_BOUND or len(rows) < MIN_ROWS or len(driven) < MIN_CVARS:
         print(f"parsed {len(bound)} bound settings, {len(rows)} schema rows and "

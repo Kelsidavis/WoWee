@@ -93,7 +93,7 @@ def strip_comments(text):
 def functions(text, path):
     """Every Class::method body in a translation unit, by brace matching."""
     out = {}
-    for m in re.finditer(r"^[\w:<>,&*\s]*?(\w+)::(\w+)\s*\([^;{]*?\)\s*(?:const\s*)?\{",
+    for m in re.finditer(r"^[\w:<>,&*\s]*?(\w+)::(\w+)\s*\([^;{]*?\)\s*(?:const\s*)?\{(?:\.\w+\s*=\s*)?",
                          text, re.M):
         name, start = f"{m.group(1)}::{m.group(2)}", m.end() - 1
         depth, i = 0, start

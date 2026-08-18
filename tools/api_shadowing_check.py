@@ -50,14 +50,14 @@ def scan():
     for path in sources():
         text = path.read_text(errors="replace")
 
-        for name in re.findall(r'\{\s*"([A-Za-z_]\w*)"\s*,\s*(?:lua_|\[)', text):
+        for name in re.findall(r'\{\s*(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)"\s*,\s*(?:lua_|\[)', text):
             binding_names.setdefault(name, []).append(path.name)
         # A binding that is itself a plain stub answers the same as the
         # counting list, so one shadowing the other changes nothing.
         for name in re.findall(
                 r'\{\s*"([A-Za-z_]\w*)"\s*,\s*lua_Return(?:Zero|Nil|Nothing|False)\b', text):
             zero_bindings.add(name)
-        for name in re.findall(r'\{\s*"([A-Za-z_]\w*)"\s*,\s*lua_', text):
+        for name in re.findall(r'\{\s*(?:\.\w+\s*=\s*)?"([A-Za-z_]\w*)"\s*,\s*lua_', text):
             metatable_methods.add(name)
         for name in re.findall(r'"function\s+[\w.]*[Mm][Tt]\w*\s*:\s*([A-Za-z_]\w*)', text):
             metatable_methods.add(name)
@@ -153,7 +153,7 @@ def main():
     m = re.search(r"static const struct luaL_Reg frameMethods\[\] = \{(.*?)\n    \};",
                   eng, re.S)
     if m:
-        c_bound = set(re.findall(r'\{"(\w+)"', m.group(1)))
+        c_bound = set(re.findall(r'\{(?:\.\w+\s*=\s*)?"(\w+)"', m.group(1)))
         after = eng[eng.index('"local mt = __WoweeFrameMT'):] \
             if '"local mt = __WoweeFrameMT' in eng else ""
         lua_defined = set(re.findall(r'"function\s+[\w.]*[Mm][Tt]\w*\s*:\s*(\w+)', after))
