@@ -1,5 +1,19 @@
 # Changelog
 
+## [v3.1.6] - 2026-08-18
+
+### Added
+- **The client runs on Android.** One arm64 APK built from the same tree, and it reaches the login screen, character selection and the world on a Pixel 9a. The release workflow builds and publishes it alongside the desktop archives. Game data is still the player's own: `tools/android/make_minimal_data.py` cuts an 18 GB extraction down to a profile a phone will hold, from 787 MB for the login screen and character creation to 12 GB with every map
+- **On-screen controls.** Left thumb moves, right thumb steers, two fingers zoom. The stick drives the movement keys through a virtual key layer, so the movement state machine, the animations and the packets that announce them run exactly as they do from a keyboard. It is sized in density independent pixels, asks for more deflection sideways than forward, and while a finger is steering the character faces where the camera does
+- **The interface scales itself to the display.** Density decides how much bigger than a desktop layout the client's own panels are drawn, held back so the tallest dialog's buttons stay on screen. The window scale setting reaches 3x for the same reason, and its range now comes from the schema row rather than from copies of the numbers in the loader and the applier
+
+### Fixed
+- **A DXT texture was invisible on hardware that cannot sample it.** The blocks go to the GPU as BC1/BC2/BC3; mobile parts carry ASTC and ETC2 instead and sample a BC image as nothing rather than failing. Walls came up untextured and doodads solid black, while character and interface art was fine because the appearance composer builds those as RGBA. textureCompressionBC is probed with the other device features and the loader unpacks to RGBA8 without it
+- **Device selection refused hardware the renderer already coped with.** samplerAnisotropy, fillModeNonSolid and the two FSR2 compute features were required of the device, and every one of them already had a fallback further in - the sampler clamps anisotropy off, the terrain wireframe is a debug view, FSR2 is a setting. Four soft degradations were being turned into one refusal to start. Selection now names every device it saw and what each one lacked when it fails
+- **VMA was handed a Vulkan version newer than the headers it was built against**, which it asserts on. The two do not have to agree
+- **The zone was named twice**, once above the minimap by the interface and once inside the circle by this client
+- **asset_extract did not link outside Windows where StormLib is static.** StormLib compresses with bzip2 as well as zlib and leaves both to whoever links it, but only Windows was given bz2. Reported by JonasAlv against Arch in #118
+
 ## [v3.1.5] - 2026-08-17
 
 ### Added
