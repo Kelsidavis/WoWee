@@ -2947,7 +2947,13 @@ static void loadInterfaceState() {
         else if (field == "locked")   w.locked = (value == "1");
         else if (field == "docked")   w.docked = std::atoi(value.c_str());
         else if (field == "uninteractable") w.uninteractable = (value == "1");
-        else if (field == "fontSize") w.fontSize = num();
+        else if (field == "fontSize") {
+            // Only a height text can be read at. num() answers 0 for anything
+            // it cannot parse, and a zero here reaches SetFont as the size of
+            // every line in the window. The interface offers 12 through 18.
+            const float size = num();
+            if (std::isfinite(size) && size >= 6.0f && size <= 32.0f) w.fontSize = size;
+        }
         else if (field == "colour") {
             // Read into locals and only kept if all four are numbers, for the
             // same reason position and size below do it: this file is written
