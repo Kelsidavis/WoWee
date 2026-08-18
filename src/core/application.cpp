@@ -1300,6 +1300,28 @@ void Application::run() {
         ui::clearInterfaceConsumedKeys();
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+#ifdef __ANDROID__
+            // The activity going to the background takes the native window with
+            // it, and the Vulkan surface and swapchain built on it die at the
+            // same moment. Drawing to them afterwards is what left the client on
+            // a black screen it never came back from. SDL sends these on the
+            // same thread as the loop, so the teardown happens before the
+            // window is gone rather than after.
+            if (event.type == SDL_APP_WILLENTERBACKGROUND) {
+                if (window && window->getVkContext()) {
+                    window->getVkContext()->releaseSurface();
+                }
+            } else if (event.type == SDL_APP_DIDENTERFOREGROUND) {
+                if (window && window->getVkContext()) {
+                    int w = 0, h = 0;
+                    SDL_GetWindowSize(window->getSDLWindow(), &w, &h);
+                    if (!window->getVkContext()->restoreSurface(
+                            window->getSDLWindow(), w, h)) {
+                        LOG_ERROR("Resuming without a surface; the client cannot draw");
+                    }
+                }
+            }
+#endif
             // Pass event to UI manager first
             if (uiManager) {
                 uiManager->processEvent(event);
@@ -3589,6 +3611,23 @@ void Application::beatWatchdog() {
 }
 
 void Application::render() {
+#ifdef __ANDROID__
+    // Nothing to draw to between the activity leaving the foreground and coming
+    // back. Acquiring an image from a destroyed swapchain is undefined, and the
+    // frame would be thrown away regardless.
+    //
+    // update() has already opened an ImGui frame by this point, and ImGui wants
+    // every frame closed before the next is opened - returning without doing so
+    // aborted on the following NewFrame rather than on anything to do with the
+    // surface. EndFrame closes it without drawing it.
+    if (window && window->getVkContext() && window->getVkContext()->isSurfaceLost()) {
+        if (ImGui::GetCurrentContext() && ImGui::GetFrameCount() > 0) {
+            ImGui::EndFrame();
+        }
+        return;
+    }
+#endif
+
     if (!renderer) {
         return;
     }

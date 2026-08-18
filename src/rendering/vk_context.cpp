@@ -2155,6 +2155,52 @@ VkDescriptorSet VkContext::uploadImGuiTexture(const uint8_t* rgba, int width, in
     return ds;
 }
 
+void VkContext::releaseSurface() {
+    if (device) vkDeviceWaitIdle(device);
+
+    for (auto fb : swapchainFramebuffers) {
+        if (fb) vkDestroyFramebuffer(device, fb, nullptr);
+    }
+    swapchainFramebuffers.clear();
+    for (auto iv : swapchainImageViews) {
+        if (iv) vkDestroyImageView(device, iv, nullptr);
+    }
+    swapchainImageViews.clear();
+    swapchainImages.clear();
+    if (swapchain) {
+        vkDestroySwapchainKHR(device, swapchain, nullptr);
+        swapchain = VK_NULL_HANDLE;
+    }
+    if (surface) {
+        vkDestroySurfaceKHR(instance, surface, nullptr);
+        surface = VK_NULL_HANDLE;
+    }
+    surfaceLost_ = true;
+    LOG_INFO("Vulkan surface and swapchain released for the background");
+}
+
+bool VkContext::restoreSurface(SDL_Window* window, int width, int height) {
+    if (!surfaceLost_) {
+        LOG_INFO("Resume with a surface that was never released; nothing to rebuild");
+        return true;
+    }
+    if (!createSurface(window)) {
+        LOG_ERROR("Could not recreate the Vulkan surface on resume");
+        return false;
+    }
+    surfaceLost_ = false;
+
+    // Only the surface is rebuilt here. The swapchain is left to the renderer's
+    // own dirty path, which rebuilds the water passes, the post-process chain
+    // and the HiZ pyramid along with it - all of them holding views into the
+    // swapchain. Building it here instead left those pointing at images that no
+    // longer existed, and beginFrame read through one of them.
+    swapchainDirty = true;
+    LOG_INFO("Vulkan surface rebuilt after resume; swapchain to follow (",
+             width, "x", height, ")");
+    return true;
+}
+
 bool VkContext::recreateSwapchain(int width, int height) {
     vkDeviceWaitIdle(device);
 

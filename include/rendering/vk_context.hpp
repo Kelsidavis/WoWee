@@ -72,6 +72,19 @@ public:
     // Swapchain management
     [[nodiscard]] bool recreateSwapchain(int width, int height);
 
+    /// Gives up the swapchain and the surface.
+    ///
+    /// Android destroys the native window under a backgrounded activity, and
+    /// every handle derived from it dies with it. Rendering to them afterwards
+    /// is what left the client on a black screen that never came back.
+    void releaseSurface();
+
+    /// Builds both again against the window's new native surface.
+    [[nodiscard]] bool restoreSurface(SDL_Window* window, int width, int height);
+
+    /// True between the two, when there is nothing to draw to.
+    [[nodiscard]] bool isSurfaceLost() const { return surfaceLost_; }
+
     // Frame operations
     VkCommandBuffer beginFrame(uint32_t& imageIndex);
     void endFrame(VkCommandBuffer cmd, uint32_t imageIndex);
@@ -295,6 +308,7 @@ private:
     std::vector<VkImageView> swapchainImageViews;
     std::vector<VkFramebuffer> swapchainFramebuffers;
     bool swapchainDirty = false;
+    bool surfaceLost_ = false;
     bool deviceLost_ = false;
     bool vsync_ = true;
 
