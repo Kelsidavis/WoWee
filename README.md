@@ -46,6 +46,8 @@ AzerothCore/ChromieCraft, TrinityCore, MaNGOS, and Turtle WoW 1.18.
   talents, inventory, banks, vendors, trainers, quests, loot, mail, auction
   house, gossip, chat, parties, pets, maps, and taxi travel
 - Optional Warden module execution through Unicorn Engine x86 emulation
+- Linux, macOS and Windows on x86-64 and ARM64, and **Android on arm64** with
+  on-screen controls
 
 This is an active work in progress, not a drop-in replacement for the official
 client. See [Known limitations](#known-limitations) before reporting a bug.
@@ -201,6 +203,69 @@ use:
 export WOWEE_TURTLE_AUTH_BUILD=7234
 ```
 
+## Android
+
+The Android client is the same tree built for arm64. It reaches the login
+screen, character selection and the world, and is tested on a Pixel 9a.
+
+Install `wowee-<version>-android-arm64.apk` from
+[the latest release](https://github.com/Kelsidavis/WoWee/releases/latest). It
+needs **Android 13 or newer** on **arm64**: Android's `libvulkan.so` only
+exports the Vulkan 1.2/1.3 entry points the renderer uses from API 33. The APK
+is signed with the debug key, so Android asks you to allow installation from an
+unknown source.
+
+### Game data on a phone
+
+Extract on a desktop exactly as above. There is no need to extract on the
+device. A full extraction is around 18 GB, so cut it down to a profile that
+fits, then copy the result across:
+
+```bash
+tools/android/make_minimal_data.py --source ~/Data --out ~/Data-phone \
+    --profile world --maps all
+adb push ~/Data-phone/. /sdcard/Android/data/com.wowee.client/files/Data/
+```
+
+The trailing `/.` matters: push the **contents**, not the directory. Nesting it
+one level deeper leaves the client unable to find its `manifest.json`, and it
+starts with no game data at all.
+
+| Profile | Size | Reaches |
+|---|---|---|
+| `login` | 787 MB | Login, character selection and creation. No world |
+| `world --maps azeroth` | 7.5 GB | One continent |
+| `world --maps all` | 12 GB | Every map |
+| `full` | 18 GB | Everything, sound included |
+
+A subset carries its own rewritten `manifest.json`, because that file is how the
+client locates its data root. See [tools/android/README.md](tools/android/README.md)
+for the profiles and how to check one.
+
+### Touch controls
+
+| Input | Action |
+|---|---|
+| Left thumb, lower left | Move and strafe |
+| Right thumb, drag | Turn the view; the character faces where it looks |
+| Two fingers | Zoom the camera |
+| Tap | Target, interact, and everything in the interface |
+
+A keyboard and mouse should work when attached, since SDL delivers them the same
+way, but that is untested.
+
+### Building it yourself
+
+```bash
+tools/build-android-deps.sh arm64-v8a          # OpenSSL, once
+cd android && ./gradlew :app:assembleDebug     # needs ANDROID_HOME and NDK 28
+```
+
+Debug builds carry this project's own music; release builds leave it out, the
+same split the desktop archives use. `adb logcat -s wowee` shows the client's
+log, and `adb shell setprop debug.wowee.loglevel info` opens it up beyond
+warnings.
+
 ## Container builds
 
 Docker or Podman can build all supported targets without installing a host
@@ -253,6 +318,9 @@ custom binary and catalog formats.
 | `Escape` | Close windows or deselect |
 | `F1` / `F4` | Performance HUD / shadows |
 
+On Android the same actions are driven by
+[touch controls](#touch-controls).
+
 Graphics presets and individual controls are available under **Video
 Settings**. Shadows and MSAA have the largest performance cost; FSR2 can improve
 frame rate on supported hardware.
@@ -297,6 +365,12 @@ before making broad changes.
   glitches.
 - World-map zone hover has edge cases near continent boundaries.
 - Pet-bar protocol behavior may require adjustment for non-AzerothCore forks.
+- On Android the session drops a few seconds after the app goes to the
+  background, because the system closes the socket without a foreground service.
+  The client returns to the login screen as it does on any disconnect.
+- On Android the FrameXML interface is drawn at native size and reads small. The
+  client's own panels scale with display density, and **Window scale** under
+  Interface settings reaches 3x.
 
 When reporting a bug, include the relevant client log lines, expansion, server
 core, and reproduction steps.
