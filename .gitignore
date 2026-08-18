@@ -2,6 +2,8 @@
 build/
 build_asan/
 build-asan/
+build-android/
+build-android-deps/
 build-debug/
 build-sanitize/
 bin/

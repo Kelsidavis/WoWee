@@ -1,7 +1,7 @@
 # Android Port Plan
 
-**Status:** nothing built. This is the survey that decides whether the port is worth starting and,
-if so, in what order. Branch `android`.
+**Status:** phase 1 done. `libwowee.so` builds for `arm64-v8a` and the desktop build is unchanged.
+Next: phase 2, the Activity and a first run. Branch `android`.
 **Target:** a real phone or tablet, touch-driven, installed as an APK.
 **Constraint set by the project:** it must fit the existing asset-extraction release style - the
 player extracts from their own WoW install and the release ships the client, not the data.
@@ -130,7 +130,7 @@ Each phase ends somewhere a person can see the result. No phase depends on the o
 
 | Phase | Ends when | Needs |
 |---|---|---|
-| **1. Toolchain** | `libwowee.so` configures and compiles for `arm64-v8a` against the NDK, desktop builds unchanged | NDK install (~2 GB), SDK CMake |
+| ~~**1. Toolchain**~~ | **done** - see below | |
 | **2. It starts** | The Activity loads the library, SDL opens a Vulkan surface, the client reaches the login screen against a `Data/` copied to `getExternalFilesDir()` | Phase 1 |
 | **3. It draws the world** | A character logs in and the world renders at a watchable frame rate on one real device, with GPU budgets re-measured rather than inherited | Phase 2, a device |
 | **4. It plays** | Touch scheme for camera, movement, interaction and the cursor; soft keyboard for chat | Phase 3, and the design decisions in blocker 2 |
@@ -150,3 +150,54 @@ Phase 1 is a day's work. Phase 4 is the port.
 - **No GL fallback.** Vulkan 1.1 is the floor; a device without it is not a target.
 - **The extraction tooling stays desktop-only.** It is Python and tkinter, and the player has a
   desktop already - they need one to own the game files.
+
+---
+
+## 5. Phase 1, as built
+
+```
+sdkmanager 'ndk;28.2.13676358'
+tools/build-android-deps.sh                    # OpenSSL for arm64, once
+
+cmake -B build-android -S . \
+  -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake \
+  -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-33 \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DOPENSSL_ROOT_DIR=$PWD/build-android-deps/arm64-v8a \
+  -DCMAKE_FIND_ROOT_PATH=$PWD/build-android-deps/arm64-v8a
+cmake --build build-android --target wowee
+```
+
+The result links against `liblog`, `libandroid`, `libvulkan`, `libz`, `libdl`, `libSDL2`, `libm`
+and `libc`, and exports `SDL_main`, which is what SDLActivity calls in phase 2.
+
+### What the phase actually cost
+
+| Problem | Fix |
+|---|---|
+| No system SDL2 | FetchContent, pinned to `release-2.32.10`. **Not** the 2.30 the desktop carries: 2.30 calls `ALooper_pollAll`, which NDK 28 marks unavailable |
+| No system glm | FetchContent, pinned to 1.0.1 |
+| OpenSSL does not build with CMake | `tools/build-android-deps.sh` builds it once and the client is pointed at it with `OPENSSL_ROOT_DIR`, the way the macOS build points at Homebrew's |
+| `find_package` ignored that prefix | The NDK toolchain confines finds to its sysroot. `CMAKE_FIND_ROOT_PATH` has to name the prefix as well |
+| Host glibc headers in the cross build | `pkg_check_modules(FFMPEG ...)` runs the **host** pkg-config and returns the host include path. Skipped on Android, where the no-FFmpeg path was already supported. The same trap the Windows cross build hit with Vulkan |
+| `<SDL2/SDL.h>` not found | SDL's build tree puts headers at the top of `include/`. A directory holding one link named `SDL2` fixes the spelling without touching 30-odd files |
+| miniaudio unused parameters | Its OpenSL and AAudio backends only compile on Android. `-Wno-unused-parameter` on the one unit that compiles it, rather than patching a vendored header |
+| X11 | `__linux__` is defined on Android. Three sites in `main.cpp` and one `target_link_libraries` needed `AND NOT ANDROID`. The other Linux branches - `/proc/self/exe`, `sched.h`, `pthread.h` - are correct there and were left alone |
+| `backtrace()` | Bionic declares it only from API 33. The crash log keeps everything but its stack section |
+| `undefined symbol: main` | On Android the client is a shared library, not a program. `add_library(wowee SHARED ...)` under `if(ANDROID)` |
+
+### The decision phase 1 forced: minSdk 33
+
+Four Vulkan entry points the renderer calls - `vkCreateRenderPass2`, `vkWaitSemaphores`,
+`vkGetDeviceBufferMemoryRequirements`, `vkGetDeviceImageMemoryRequirements` - are Vulkan 1.2 and
+1.3 core. Android's `libvulkan.so` stub exports them by API level, measured against this NDK:
+
+| API level | Of the four, exported |
+|---|---|
+| 29 | 0 |
+| 31 | 2 |
+| 33 and up | 4 |
+
+So the floor is **Android 13**, not the Vulkan 1.1 this document assumed in section 1. The
+alternative is loading those four through `vkGetDeviceProcAddr` and keeping a lower minSdk, which
+is worth doing only if a device that matters is stuck below 13.
