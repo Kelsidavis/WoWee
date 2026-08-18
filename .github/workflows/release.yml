@@ -105,8 +105,22 @@ jobs:
         if-no-files-found: error
 
   build-macos:
-    name: Build (macOS arm64)
-    runs-on: macos-15
+    name: Build (macOS ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      # Each architecture builds natively on its own runner, the way Linux and
+      # Windows do here. Not a universal binary: every dependency would have to
+      # be universal too, and Homebrew's are per-arch.
+      fail-fast: false
+      matrix:
+        include:
+        - arch: arm64
+          runner: macos-15
+          verify_arch: arm64
+        - arch: x86-64
+          runner: macos-13
+          # What lipo calls it, which is not what the archive is named.
+          verify_arch: x86_64
 
     steps:
     - name: Checkout
@@ -277,7 +291,7 @@ jobs:
 
     - name: Verify bundled dylibs
       run: |
-        bash tools/macos/verify_bundle.sh Wowee.app arm64
+        bash tools/macos/verify_bundle.sh Wowee.app ${{ matrix.verify_arch }}
         codesign --verify --deep --strict --verbose=2 "Wowee Asset Extractor.app"
 
     - name: Create DMG
@@ -291,11 +305,11 @@ jobs:
           "dmg-root/README - Asset Extraction.txt"
         ln -s /Applications dmg-root/Applications
         hdiutil create -volname Wowee -srcfolder dmg-root -ov -format UDZO \
-          "wowee-${TAG}-macos-arm64.dmg"
+          "wowee-${TAG}-macos-${{ matrix.arch }}.dmg"
         codesign --force --sign "${APPLE_SIGNING_IDENTITY}" \
-          --timestamp "wowee-${TAG}-macos-arm64.dmg"
+          --timestamp "wowee-${TAG}-macos-${{ matrix.arch }}.dmg"
         codesign --verify --strict --verbose=2 \
-          "wowee-${TAG}-macos-arm64.dmg"
+          "wowee-${TAG}-macos-${{ matrix.arch }}.dmg"
 
     - name: Notarize and staple DMG
       env:
@@ -310,7 +324,7 @@ jobs:
           exit 1
         fi
 
-        DMG="wowee-${GITHUB_REF_NAME}-macos-arm64.dmg"
+        DMG="wowee-${GITHUB_REF_NAME}-macos-${{ matrix.arch }}.dmg"
         printf '%s' "${APPLE_NOTARY_KEY}" | base64 -D \
           > "${RUNNER_TEMP}/AuthKey.p8"
         xcrun notarytool submit "${DMG}" \
@@ -326,7 +340,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v5
       with:
-        name: wowee-macos-arm64
+        name: wowee-macos-${{ matrix.arch }}
         path: wowee-*.dmg
         if-no-files-found: error
 

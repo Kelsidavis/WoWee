@@ -119,6 +119,11 @@ jobs:
         include:
         - arch: arm64
           runner: macos-15
+          verify_arch: arm64
+        - arch: x86-64
+          runner: macos-13
+          # What lipo calls it, which is not what the job is named.
+          verify_arch: x86_64
 
     steps:
     - name: Checkout
@@ -308,7 +313,7 @@ jobs:
 
     - name: Verify bundled dylibs
       run: |
-        bash tools/macos/verify_bundle.sh Wowee.app arm64
+        bash tools/macos/verify_bundle.sh Wowee.app ${{ matrix.verify_arch }}
         codesign --verify --deep --strict --verbose=2 "Wowee Asset Extractor.app"
 
     - name: Create DMG
