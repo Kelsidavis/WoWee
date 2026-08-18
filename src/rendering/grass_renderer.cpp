@@ -178,7 +178,11 @@ bool GrassRenderer::setPopulation(const pipeline::GrassBladeSample* blades, size
         packed[i].facingWidthPhase =
             glm::vec4(b.facing, b.width, static_cast<float>(b.profileIndex), b.phase);
         packed[i].groundShadow = glm::vec4(b.groundShadow, b.hasGroundColor ? 1.0f : 0.0f);
-        packed[i].groundHighlight = glm::vec4(b.groundHighlight, b.submerged ? 1.0f : 0.0f);
+        // w carries the blade's own fade distance, its sign the submerged
+        // flag. A fade of zero means "range cap only" and is sent as a value
+        // past any range, so the shaders need no special case.
+        float fade = b.fadeDistance > 0.0f ? b.fadeDistance : 1.0e6f;
+        packed[i].groundHighlight = glm::vec4(b.groundHighlight, b.submerged ? -fade : fade);
     }
 
     const VkDeviceSize bytes = sizeof(GrassBladeGPU) * count;

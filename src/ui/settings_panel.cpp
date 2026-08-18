@@ -561,15 +561,15 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                     saveCallback();
                 }
                 if (ImGui::SliderInt("Grass Distance", &pendingGrassDistance,
-                                     30, 800, "%d yd")) {
+                                     30, 2000, "%d yd")) {
                     applySettingSideEffects("grassdistance");
                     saveCallback();
                 }
                 if (ImGui::IsItemHovered()) {
                     ImGui::SetTooltip("How far out grass draws. Past 45 yards the field\n"
                                       "thins with distance, so long ranges cost blades\n"
-                                      "slowly; very long ranges rebuild over a few seconds\n"
-                                      "as you move.");
+                                      "slowly, and each blade grows in gently as you\n"
+                                      "approach it.");
                 }
 
                 ImGui::Spacing();

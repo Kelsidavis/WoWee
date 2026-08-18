@@ -280,9 +280,10 @@ TEST_CASE("a build in slices is the build in one call", "[grass][population]") {
 
 TEST_CASE("distance falloff thins the far field and leaves the near alone",
           "[grass][population]") {
-    // Past fullDensityRadius the keep probability falls as 1/d^2, so a ring
-    // at any distance costs the same number of blades. The near field must
-    // not notice: the same roll decides a blade with or without the falloff,
+    // Past fullDensityRadius the lattice coarsens by octaves - each distance
+    // doubling keeps one cell in four, chosen by nested descent - so a ring
+    // at any distance costs about the same number of blades. The near field
+    // must not notice: ring zero is the same cells under the same hashes,
     // so inside the radius the very same blades come out.
     GrassPopulationParams params;
     std::vector<GrassBladeSample> baseline;
@@ -326,4 +327,48 @@ TEST_CASE("distance falloff thins the far field and leaves the near alone",
         }
     }
     REQUIRE(matched == farThin.size());
+}
+
+TEST_CASE("a blade's fade distance is its own and survives the window moving",
+          "[grass][population]") {
+    // The property the smooth ride-in rests on: which octave a cell survives
+    // to is a fact about the cell, not about the window it was generated
+    // from. Two windows six yards apart must agree about every blade they
+    // share - position, height, and the fade distance the shader will sink
+    // it by.
+    GrassPopulationParams params;
+    params.fullDensityRadius = 8.0f;
+
+    std::vector<GrassBladeSample> here;
+    std::vector<GrassBladeSample> there;
+    REQUIRE(populateArea(0.0f, 0.0f, 24.0f, params, everywhere, here, 200000));
+    REQUIRE(populateArea(6.0f, 0.0f, 24.0f, params, everywhere, there, 200000));
+
+    // Near blades carry the innermost level's fade; far rings carry doubled
+    // fades or the uncapped sentinel of the top ring.
+    size_t nearWithBaseFade = 0;
+    for (const auto& b : here) {
+        const float d = std::sqrt(b.x * b.x + b.y * b.y);
+        if (d < 8.0f && b.fadeDistance == 8.0f) ++nearWithBaseFade;
+        if (d >= 8.0f) {
+            // Nothing inside a band may carry a fade the band has already
+            // passed - such a blade would be born invisible.
+            REQUIRE((b.fadeDistance == 0.0f || b.fadeDistance >= 16.0f));
+        }
+    }
+    REQUIRE(nearWithBaseFade > 0);
+
+    // Shared blades agree in full.
+    size_t shared = 0;
+    for (const auto& a : here) {
+        for (const auto& b : there) {
+            if (a.x == b.x && a.y == b.y) {
+                ++shared;
+                REQUIRE(sameBlade(a, b));
+                REQUIRE(a.fadeDistance == b.fadeDistance);
+                break;
+            }
+        }
+    }
+    REQUIRE(shared > 100);
 }

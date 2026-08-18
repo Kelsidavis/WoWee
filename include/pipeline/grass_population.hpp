@@ -28,6 +28,12 @@ struct GrassBladeSample {
     float facing = 0.0f;
     float width = 0.0f;
     float phase = 0.0f;
+    /// How far from the viewer this blade may draw before it has sunk away,
+    /// in yards; 0 means only the global range cap applies. Persistent per
+    /// blade - it comes from the blade's own lattice level - so a ride
+    /// toward it raises it smoothly out of the ground, and no rebuild can
+    /// pop it.
+    float fadeDistance = 0.0f;
     /// Index into the profile table the shaders read colour and stiffness from.
     uint32_t profileIndex = 0;
     /// The tones of the terrain under the root, which the blade is coloured
@@ -83,13 +89,19 @@ struct GrassPopulationParams {
     float baseWidth = 0.09f;
     /// Mixed into every hash. Changing it reshuffles the whole world's grass.
     uint32_t seed = 0x9e3779b9u;
-    /// Radius inside which density is untouched by distance. Beyond it the
-    /// keep probability falls as (fullDensityRadius / d)^2, so a ring at any
-    /// distance costs the same number of blades and a large window's total
-    /// grows with the log of its radius rather than its area. Zero disables
-    /// the falloff, which is what a window no bigger than the near field
-    /// wants.
+    /// Radius of the innermost, full-density octave. Past it the lattice
+    /// coarsens by powers of two - each distance doubling keeps one cell in
+    /// four, chosen by a nested descent so every coarser ring's blades are a
+    /// subset of the finer ring's. Density still follows (r0/d)^2, but a
+    /// blade's survival is a property of its cell rather than a per-rebuild
+    /// roll: it fades by its own level's distance, never pops. Zero disables
+    /// the octaves; the whole window runs at full density.
     float fullDensityRadius = 0.0f;
+    /// Extra reach past each octave's boundary, matched to how far the
+    /// window centre can go stale (the rebuild step). Without it a blade
+    /// approaches the player faster than rebuilds can admit it, and fades in
+    /// late instead of gently.
+    float ringSlack = 0.0f;
 };
 
 /// What the terrain says at a world position.
@@ -145,16 +157,27 @@ public:
     [[nodiscard]] std::vector<GrassBladeSample>& blades() { return out_; }
 
 private:
+    /// Set up the block bounds for the octave ring the cursor is entering.
+    void enterRing();
+
     GrassPopulationParams params_{};
     std::vector<GrassBladeSample> out_;
     size_t maxBlades_ = 0;
     float centerX_ = 0.0f;
     float centerY_ = 0.0f;
-    float radiusSq_ = 0.0f;
+    float radius_ = 0.0f;
     float capFactor_ = 1.0f;
-    int32_t minCellX_ = 0;
-    int32_t maxCellX_ = 0;
-    int32_t maxCellY_ = 0;
+    // The octave rings. Ring k walks blocks of 2^k lattice cells and keeps
+    // one survivor per block; ring_ and the block cursor make a build
+    // resumable mid-ring.
+    int ring_ = 0;
+    int maxRing_ = 0;
+    float ringInner_ = 0.0f;   // annulus bounds for the current ring, yards
+    float ringOuter_ = 0.0f;   // including slack (or the window edge on top)
+    float ringEdge_ = 0.0f;    // the ring's own boundary, before slack
+    int32_t minBlockX_ = 0;
+    int32_t maxBlockX_ = 0;
+    int32_t maxBlockY_ = 0;
     int32_t cursorX_ = 0;
     int32_t cursorY_ = 0;
     bool active_ = false;

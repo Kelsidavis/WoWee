@@ -123,7 +123,8 @@ void main() {
     float bloomGate = smoothstep(0.40, 0.80, patchField(root.xy, 0.47, 2.9));
     bool seeded = rSeeded < profile.params.w * (0.15 + 1.85 * seedGate);
     // Nothing flowers under a pond, and drowned growth does not go to seed.
-    bool submerged = blade.groundHighlight.w > 0.5;
+    // The flag rides as the sign of the blade's fade distance.
+    bool submerged = blade.groundHighlight.w < 0.0;
     bool bloom  = !seeded && !submerged
                   && rBloom < profile.params.z * (0.20 + 1.80 * bloomGate);
     seeded = seeded && !submerged;
@@ -135,11 +136,20 @@ void main() {
         height *= 0.92;
     }
 
-    // Sink into the ground over the last stretch before the cull distance,
-    // so the field thins away instead of ending on a cut line. Distance from
-    // the player, like the cull: the camera orbits, and a fade measured from
-    // it slid around the field as the view turned.
-    height *= 1.0 - smoothstep(fadeStart, fadeEnd, distance(root.xy, playerPos.xy));
+    // Sink into the ground toward this blade's own fade distance - its
+    // octave level's range, carried per blade - capped by the global range.
+    // Purely a function of live distance from the player, so riding toward a
+    // stand raises it smoothly out of the ground and no rebuild can pop it;
+    // and because each level's blades finish sinking exactly where the next
+    // sparser level begins, the field thins continuously with distance
+    // instead of stepping at the octave boundaries. The fade starts at 0.65
+    // of the blade's range, a band wide enough to read as growth rather than
+    // appearance. Distance from the player, like the cull: the camera
+    // orbits, and a fade measured from it slid around the field as the view
+    // turned.
+    float fadeMax = min(abs(blade.groundHighlight.w), fadeEnd);
+    float fadeFrom = min(fadeStart, 0.65 * fadeMax);
+    height *= 1.0 - smoothstep(fadeFrom, fadeMax, distance(root.xy, playerPos.xy));
 
     // Row up the blade and which side of it this vertex is.
     float row  = floor(float(gl_VertexIndex) * 0.5);
