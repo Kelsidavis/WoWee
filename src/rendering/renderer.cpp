@@ -1917,6 +1917,17 @@ void Renderer::setFSREnabled(bool enabled) {
 }
 void Renderer::setFSR2Enabled(bool enabled) {
     if (!postProcessPipeline_) return;
+    // The FSR2 compute shaders need shaderStorageImageWriteWithoutFormat and
+    // shaderInt16. A device without them used to be refused at startup; now it
+    // starts, so the setting has to refuse instead.
+    if (enabled) {
+        VkContext* ctx = VkContext::globalInstance();
+        if (ctx && !ctx->areFsr2ComputeFeaturesSupported()) {
+            LOG_WARNING("FSR2 needs shaderStorageImageWriteWithoutFormat and shaderInt16, "
+                        "which this device does not support - leaving it off");
+            return;
+        }
+    }
     auto req = postProcessPipeline_->setFSR2Enabled(enabled, camera.get());
     if (req.requested) {
         pendingMsaaSamples_ = req.samples;

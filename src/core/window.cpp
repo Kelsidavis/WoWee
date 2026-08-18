@@ -3,6 +3,7 @@
 #include <cmath>
 #include "core/env.hpp"
 #include "core/logger.hpp"
+#include "core/config_paths.hpp"
 #include "stb_image.h"
 #include "rendering/vk_context.hpp"
 #include <SDL2/SDL_vulkan.h>
@@ -169,6 +170,11 @@ bool Window::initialize() {
         LOG_ERROR("Failed to initialize Vulkan context");
         return false;
     }
+
+    // SDL and the Vulkan driver leave the working directory at /system/bin on
+    // Android, and everything after this opens its files relative to it: the
+    // skybox shader was the first to fail, one call after this returned.
+    core::enterResourceRoot();
 
     LOG_INFO("Window initialized successfully (Vulkan)");
     return true;

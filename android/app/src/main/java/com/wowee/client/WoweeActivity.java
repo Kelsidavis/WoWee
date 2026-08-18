@@ -68,12 +68,30 @@ public class WoweeActivity extends SDLActivity {
                     + " - extract it from a WoW install and copy it here.");
         }
 
+        // Warnings only by default, as on desktop. `adb shell setprop
+        // log.tag.wowee INFO` is not enough: the level is the client's own, so
+        // it is read from a property the same way here.
+        String level = systemProperty("debug.wowee.loglevel");
+        if (level != null && !level.isEmpty()) {
+            setEnv("WOWEE_LOG_LEVEL", level);
+        }
+
         setEnv("WOWEE_RESOURCE_ROOT", root.getAbsolutePath());
         setEnv("WOW_DATA_PATH", data.getAbsolutePath());
         setEnv("WOWEE_CONFIG_ROOT", new File(root, "config").getAbsolutePath());
         new File(root, "config").mkdirs();
 
         super.onCreate(savedInstanceState);
+    }
+
+    /** Reads a system property, so a log level can be set without a rebuild. */
+    private String systemProperty(String name) {
+        try {
+            return (String) Class.forName("android.os.SystemProperties")
+                    .getMethod("get", String.class).invoke(null, name);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void setEnv(String name, String value) {

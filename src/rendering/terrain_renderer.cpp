@@ -76,6 +76,15 @@ bool TerrainRenderer::buildMainPassPipelines(VkDevice device,
     }
 
     // --- Build wireframe pipeline (derivative of fill) ---
+    // VK_POLYGON_MODE_LINE needs fillModeNonSolid, which plenty of mobile GPUs
+    // do not have. Asking anyway is a validation error and a null pipeline;
+    // drawing falls back to the filled one either way.
+    if (!vkCtx->isWireframeSupported()) {
+        LOG_WARNING("TerrainRenderer: wireframe views need fillModeNonSolid, "
+                    "which this device does not support");
+        return true;
+    }
+
     wireframePipeline = PipelineBuilder()
         .setShaders(vertShader.stageInfo(VK_SHADER_STAGE_VERTEX_BIT),
                     fragShader.stageInfo(VK_SHADER_STAGE_FRAGMENT_BIT))

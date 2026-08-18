@@ -131,14 +131,9 @@ static void selectMacUserDataPath() {
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 #ifdef __ANDROID__
-    // Shaders and the interface art are loaded through paths relative to the
-    // working directory, which on Android is / and holds neither. The activity
-    // unpacks them into the app's files directory and names it here.
-    if (const char* root = std::getenv("WOWEE_RESOURCE_ROOT"); root && *root) {
-        if (chdir(root) != 0) {
-            std::fprintf(stderr, "could not enter resource root %s\n", root);
-        }
-    }
+    // Everything after this opens its files relative to the working directory,
+    // which on Android is not a directory that holds any of them.
+    wowee::core::enterResourceRoot();
 #endif
 #ifndef _WIN32
     // Writing to a socket the server has already closed raises SIGPIPE, whose
