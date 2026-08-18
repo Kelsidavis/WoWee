@@ -1656,6 +1656,16 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR)
         ZLIB::ZLIB
         Threads::Threads
     )
+    # StormLib compresses with bzip2 as well as zlib, and a static libstorm
+    # leaves both to whoever links it. Only Windows was given bz2, so a static
+    # StormLib on Linux failed to link and the answer looked like a missing
+    # LDFLAGS on the cmake line. Reported against Arch in issue #118.
+    if(NOT WIN32)
+        find_library(BZ2_LIB NAMES bz2 bzip2)
+        if(BZ2_LIB)
+            target_link_libraries(asset_extract PRIVATE ${BZ2_LIB})
+        endif()
+    endif()
     if(WIN32)
         find_library(WININET_LIB wininet)
         find_library(BZ2_LIB bz2)
