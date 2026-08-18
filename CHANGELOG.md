@@ -1,5 +1,35 @@
 # Changelog
 
+## [v3.1.5] - 2026-08-17
+
+### Added
+- **Grass, drawn by the GPU.** Off by default and marked experimental where a player reads it, since it is new. What grows where is read out of the map itself: a chunk's layers are composited the way the terrain renderer paints them, the ground-effect id of whichever layer wins names the doodads that zone plants, and the blades take their shape and colour from those - so a field carries the foliage its terrain texture is painted with rather than one plant everywhere. The population is a world-anchored lattice, so a blade keeps its place while the camera moves instead of the field resetting under it, and the cull compacts survivors into a single indirect draw. Density, height and draw distance have their own page in the interface's options panel
+- **Textures upload as compressed blocks.** Terrain, M2 and WMO all send DXT to the device as it comes, rather than decoding to RGBA8 and generating a mip chain on the way. Measured over a session rather than estimated from the files on disk: 2,328 textures, 72 MB uploaded against 495 MB decoded, 85% saved
+- **A texture with one level skips the staging buffer** where VK_EXT_host_image_copy is present. The pixels go into the image and the layout moves on the host - no staging allocation, no memcpy into it, no queue submission and neither layout barrier. Mipped textures keep the old path, because their levels are built by a blit chain that needs the submission regardless
+- **Barriers are recorded as synchronization2 dependencies** where the device has the extension, through a wrapper that lowers to the legacy call where it does not
+
+### Fixed
+- **Escape closed the game menu but could never open it.** Before asking the interface, this client closed menus, special windows and all windows itself and then skipped ToggleGameMenu whenever one of those answered - which is a fragment of the very cascade ToggleGameMenu runs, in the same order, ending differently. The press was consumed before it could reach the step that shows the menu. Where the interface owns the menu it is now asked and nothing else
+- **The client listed the characters and died the instant the world was entered.** setupUICallbacks binds references by dereferencing seven owned pointers, four of which are only created if the asset manager initialises; when it does not they stay null and the first callback to touch one writes through address zero. The wiring is checked before any of it happens and names which piece is missing, the game data path being the usual reason
+- **The chat opened behind an opaque white panel with the text lost in it.** The panel is a white image the interface tints, so the colour this client stores is the whole of what it looks like - and it stored white at full alpha until v3.1.4. Fixing that default left every install that had already written the white to disk unfixed, so the fault outlived its fix. A saved pure white is now read as unset rather than as a preference
+- **The music kept playing with the soundtrack turned off.** The track picker filters this client's own files out of the pool when the setting is off and then falls back to the unfiltered list if that left nothing - which in a zone whose tracks are all ours is every time, so the fallback could only ever be reached when the setting was off and defeating it was its entire effect
+- **A grass or minimap setting changed nothing, and changing the soundtrack applied them.** Every subsystem's apply hung off the branch of whichever setting had been touched last. Each latches its own now, and the file is read once per change rather than once per frame
+- **A bag could not be dragged out of its slot.** Picking one up set this file's own cursor and not the one every drop target reads, so the drop saw nothing held and the click fell through to opening the bag instead of moving it. A bag dropped onto an occupied bag slot now changes places with what is worn there
+- **The number keys cast page one's actions for the whole session.** The page they read was moved only by the pager buttons on this client's own action bar, which the interface replaced - so the bar on screen paged normally and the keys did not follow
+- **Player mail showed an empty sender.** Mail from a player carries a guid rather than a name, and the resolver that turns one into the other had been reachable only from this client's own inbox
+- **Any .blp on disk could read two megabytes out of an eight-byte buffer.** A BLP header states its dimensions and its mip sizes separately and nothing makes them agree, but the decompressors sized their reads from the dimensions; the bounds check meant to catch it added two uint32s from the file and wrapped. Game data is untrusted input. The decompressors take spans and skip a block that would run past the end, and the comparison is done in 64 bits
+- **Two WMO chunk loops added file-supplied sizes in 32 bits**, so a large one wrapped past its own bounds check and the parse walked on. Mis-parsing rather than an overrun, since the readers below cap themselves, but widened to match what the array reader eight lines up already did
+- **Textures, shader modules, descriptor sets and audio allocations outlived the device they came from.** Shutdown now releases them in an order that holds, and reports what is still allocated when it is done
+
+### Changed
+- **The frame fence is a timeline semaphore**
+- **The Warden emulator's two builds agreed on nothing.** Five constants sat inside the `#ifdef`, so the stub branch could not name them and zeroed its stack base, heap base and both API stub addresses instead. Never observable, since the stub reads none of them, but a field added to one branch alone would have made it a real one
+- **This client's own tooltip and item-icon cache are their own units**, rather than parts of a bag window that no longer exists
+- **A large sweep for clang-tidy's findings**: designated initialisers, range-based `for` over index loops, `emplace_back`, default member initialisers, `bit_cast`, and `std::function` parameters no longer copied. Precompiled headers for the headers measured to cost, and every one of the 166 tests is sanitized rather than the first two thirds
+
+### Removed
+- **This client's own trainer, auction house, vendor, loot, mail, guild bank, bank and barber windows, and its action, stance, bag, experience and reputation bars.** All of them are the interface's by default, so around 4,700 lines behind their gates had not drawn in a long time. What those windows were carrying for the rest of the client stays: the barber's style lists, costs and apply are exposed as Lua services the interface's own panel is built on, an action slot holding an item's spell still goes out as a use rather than a cast, and the bags still open when a vendor does
+
 ## [v3.1.4] - 2026-08-15
 
 ### Fixed
