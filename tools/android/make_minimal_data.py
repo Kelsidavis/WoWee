@@ -89,7 +89,7 @@ def build_filter(profile, maps):
     include = profile.get("include", [])
     exclude = profile.get("exclude", [])
     wanted_maps = None
-    if maps:
+    if maps and not any(m.strip().lower() == "all" for m in maps):
         wanted_maps = ["terrain/maps/%s/**" % m.strip().lower() for m in maps if m.strip()]
 
     def keep(path):
@@ -125,6 +125,21 @@ def place(src, dst, copy):
     shutil.copy2(src, dst)
 
 
+# Exactly what `git ls-files Data/` lists, by name. A recursive glob for *.json
+# also matches the overlay manifests a local extraction generates, and copying
+# one of those describes thousands of files to the client that the subset does
+# not contain: it indexes them, finds nothing, and the world renders with holes
+# in it. Same list as the staging task in android/app/build.gradle.
+REPO_JSON = [
+    "expansions/*/dbc_layouts.json",
+    "expansions/*/expansion.json",
+    "expansions/*/opcodes.json",
+    "expansions/*/update_fields.json",
+    "opcodes/aliases.json",
+    "opcodes/canonical.json",
+]
+
+
 def copy_repo_json(source, out, dry_run):
     """The expansion profiles and opcode tables are not in the manifest.
 
@@ -132,11 +147,10 @@ def copy_repo_json(source, out, dry_run):
     reads them by path. A subset without them loads no expansion at all.
     """
     count = 0
-    for rel in ("expansions", "opcodes"):
-        root = source / rel
-        if not root.is_dir():
-            continue
-        for path in root.rglob("*.json"):
+    for pattern in REPO_JSON:
+        for path in sorted(source.glob(pattern)):
+            if not path.is_file():
+                continue
             count += 1
             if not dry_run:
                 place(path, out / path.relative_to(source), copy=False)
@@ -150,7 +164,9 @@ def main():
                         help="an extracted Data directory, the one holding manifest.json")
     parser.add_argument("--out", help="where to write the subset (not needed with --dry-run)")
     parser.add_argument("--profile", default="login", help="a profile from data_profiles.json")
-    parser.add_argument("--maps", help="comma separated map names to keep under terrain/maps")
+    parser.add_argument("--maps",
+                        help="comma separated map names to keep under terrain/maps, "
+                             "or 'all' for every map the extraction has")
     parser.add_argument("--copy", action="store_true",
                         help="copy instead of hard linking, for a different filesystem")
     parser.add_argument("--dry-run", action="store_true", help="report the size and stop")

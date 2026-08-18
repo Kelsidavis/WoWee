@@ -153,6 +153,13 @@ bool Window::initialize() {
     if (config.fullscreen) {
         flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
     }
+#ifdef __ANDROID__
+    // A phone has no windows to be one of. Fullscreen is also what makes SDL
+    // put the activity in immersive mode, which is what hides the navigation
+    // bar; without it the client draws into 2272x954 of a 2424x1080 panel and
+    // the rest is system chrome.
+    flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+#endif
     if (config.resizable) {
         flags |= SDL_WINDOW_RESIZABLE;
     }

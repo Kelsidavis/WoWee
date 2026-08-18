@@ -3,6 +3,7 @@
 #include "pipeline/asset_manager.hpp"
 #include "ui/interface_fonts.hpp"
 
+#include <SDL2/SDL.h>
 #include <algorithm>
 #include <filesystem>
 #include <chrono>
@@ -29,6 +30,54 @@ UIManager::UIManager() {
 }
 
 UIManager::~UIManager() = default;
+
+namespace {
+
+/// How much bigger the interface has to be drawn than on a desktop monitor.
+///
+/// Android reports its own density as dots per inch over a 160 baseline, which
+/// is the same factor the platform scales its own interface by, so a phone
+/// reporting 420 dpi wants 2.625. The client's panels were laid out in pixels
+/// against a desktop monitor, and at 1:1 on a 420 dpi phone the login dialog is
+/// too small to read and far too small to hit.
+///
+/// 1.0 everywhere else, where the layouts are already the right size.
+#ifdef __ANDROID__
+/// The shortest the interface can be, in the units its layouts are written in.
+///
+/// The client's dialogs are sized in pixels against a desktop monitor, and the
+/// tallest of them - character selection, with its list and its row of buttons
+/// underneath - needs about this much. Scaling past the point where the screen
+/// holds that many units pushes the bottom row off the display, where it cannot
+/// be pressed at all.
+constexpr float kMinLogicalHeight = 620.0f;
+#endif
+
+float interfaceScale([[maybe_unused]] SDL_Window* window) {
+#ifdef __ANDROID__
+    float diagonalDpi = 0.0f;
+    float density = 2.0f;  // No answer from SDL; a phone is still not a monitor.
+    if (SDL_GetDisplayDPI(0, &diagonalDpi, nullptr, nullptr) == 0 && diagonalDpi > 0.0f) {
+        density = diagonalDpi / 160.0f;  // Android's own baseline for 1x.
+    }
+
+    // Density is what makes the text legible and the controls big enough to
+    // hit. It is not free: every unit of it takes a unit of layout room away,
+    // and a phone in landscape has very little height to give.
+    int height = 0;
+    if (window) {
+        SDL_GetWindowSize(window, nullptr, &height);
+    }
+    if (height > 0) {
+        density = std::min(density, static_cast<float>(height) / kMinLogicalHeight);
+    }
+    return std::max(1.0f, density);
+#else
+    return 1.0f;
+#endif
+}
+
+}  // namespace
 
 bool UIManager::initialize(core::Window* win) {
     window = win;
@@ -72,6 +121,15 @@ bool UIManager::initialize(core::Window* win) {
     colors[ImGuiCol_Header] = ImVec4(0.20f, 0.25f, 0.40f, 0.55f);
     colors[ImGuiCol_HeaderHovered] = ImVec4(0.25f, 0.30f, 0.50f, 0.80f);
     colors[ImGuiCol_HeaderActive] = ImVec4(0.20f, 0.25f, 0.45f, 1.00f);
+
+    // Padding, rounding, scrollbars and the rest, before the backend starts.
+    // Fonts are scaled where the atlas is built, so they stay crisp rather than
+    // being magnified from a desktop-sized atlas.
+    interfaceScale_ = interfaceScale(window->getSDLWindow());
+    if (const float scale = interfaceScale_; scale > 1.0f) {
+        style.ScaleAllSizes(scale);
+        LOG_INFO("Interface scaled by ", scale, " for this display");
+    }
 
     // Initialize ImGui for SDL2 + Vulkan
     ImGui_ImplSDL2_InitForVulkan(window->getSDLWindow());
@@ -170,14 +228,17 @@ void UIManager::loadInterfaceFont(const std::string& dataRoot,
     // Built at a size above what the interface mostly asks for. A font string
     // carries its own height and is drawn scaled from its face, and scaling
     // down from a larger atlas reads better than up from a smaller.
-    constexpr float kAtlasSize = 18.0f;
+    // The same figure the style was scaled by. Building the atlas at a
+    // different one puts text of one size into controls sized for another.
+    const float atlasScale = interfaceScale_;
+    const float kAtlasSize = 18.0f * atlasScale;
 
     // What the client's own panels are drawn at. They were laid out against
     // ImGui's built-in face, which is 13 pixels tall, and FRIZQT at the atlas
     // size above would push text out of buttons sized for it. Close enough to
     // the old metrics to keep those layouts intact, in the game's typeface,
     // which is the point.
-    constexpr float kClientSize = 15.0f;
+    const float kClientSize = 15.0f * atlasScale;
 
     ImGuiIO& io = ImGui::GetIO();
 
@@ -384,6 +445,24 @@ void UIManager::finishImGuiFrame() {
     // so the panels have to go in after this stage has drawn the world's
     // overlays - and before the draw data is closed, which is here.
     if (!imguiInitialized) return;
+#ifdef __ANDROID__
+    // The SDL backend stopped calling these deliberately (imgui #6306), because
+    // on a desktop they only pertain to IME. On Android they are what raises
+    // and lowers the on-screen keyboard, so without them a text box takes
+    // focus, shows a caret, and there is no way to type into it.
+    //
+    // Read after the frame is built, so it reflects the box the player just
+    // touched rather than the one they touched last frame.
+    if (const bool wantsText = ImGui::GetIO().WantTextInput; wantsText != softKeyboardUp_) {
+        if (wantsText) {
+            SDL_StartTextInput();
+        } else {
+            SDL_StopTextInput();
+        }
+        softKeyboardUp_ = wantsText;
+    }
+#endif
+
     ImGui::Render();
 }
 

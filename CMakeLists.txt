@@ -1192,6 +1192,17 @@ target_include_directories(lua51 SYSTEM PUBLIC ${LUA_DIR})
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(lua51 PRIVATE -w)
 endif()
+if(ANDROID)
+    # Lua stores a string's bytes immediately after the TString union that
+    # describes them, and reaches them with (ts + 1). That pointer is one past
+    # the declared object, so __builtin_object_size answers 0, and bionic's
+    # fortified strchr aborts on a read that is in bounds of the allocation and
+    # NUL terminated. lgc.c does exactly that on every garbage collection that
+    # walks a table with a __mode field, so the client died during startup as
+    # soon as one existed. glibc does not check, which is why only Android saw
+    # it. The bound is wrong, not the read.
+    target_compile_options(lua51 PRIVATE -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0)
+endif()
 
 # Create executable
 # On Android the client is a shared library, not a program: SDLActivity loads

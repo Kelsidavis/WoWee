@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The artwork's own field colour, so the mask cuts dark and not white. -->
+    <color name="ic_launcher_background">#262626</color>
+</resources>

@@ -159,5 +159,14 @@ inline bool settingIsOn(const std::string& v) { return !v.empty() && v != "0"; }
 /// each one was checked against the bug it describes before being trusted.
 const SettingDesc* clientSettingsSchema(std::size_t& count);
 
+/// The range a setting's own row declares.
+///
+/// A slider's limits were written again wherever the value was clamped on the
+/// way in from settings.cfg, so widening a row moved the control without moving
+/// the clamp behind it, and the setting silently snapped back on the next
+/// start. Ask the row instead. Returns false for a key with no row, leaving the
+/// arguments untouched.
+bool settingRange(const std::string& key, float& lo, float& hi);
+
 }  // namespace ui
 }  // namespace wowee

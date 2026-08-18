@@ -111,6 +111,14 @@ public:
     [[nodiscard]] const UIServices& getServices() const { return services_; }
 
 private:
+    /// Whether the on-screen keyboard is up, so it is raised and lowered once
+    /// per change rather than every frame. Android only; unused elsewhere.
+    bool softKeyboardUp_ = false;
+
+    /// How much bigger than a desktop layout this display needs the interface
+    /// drawn. Decided once at start-up; the style and the font atlas both use
+    /// it, and they have to agree. 1.0 off Android.
+    float interfaceScale_ = 1.0f;
     core::Window* window = nullptr;
     UIServices services_;  // Injected services
 

@@ -165,6 +165,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     }
     std::signal(SIGTERM, [](int) { std::_Exit(1); });
     std::signal(SIGINT,  [](int) { std::_Exit(1); });
+#elif defined(__ANDROID__)
+    // Android already has a crash reporter, and it is a far better one than
+    // this: debuggerd writes a symbolised tombstone and the abort message to
+    // logcat. Ours writes a backtrace to stderr, which on Android goes nowhere,
+    // and installing it costs the tombstone. So only the two exit signals here.
+    std::signal(SIGTERM, crashHandler);
+    std::signal(SIGINT,  crashHandler);
 #else
     std::signal(SIGSEGV, crashHandler);
     std::signal(SIGABRT, crashHandler);

@@ -990,20 +990,23 @@ void VkContext::savePipelineCache() {
 ///
 /// A surface that cannot present unrotated keeps its own transform, and the
 /// caller is no worse off than before.
-static void requestIdentityTransform(vkb::SwapchainBuilder& builder,
+/// Returns true when it asked for a transform the surface is not already using,
+/// which makes VK_SUBOPTIMAL_KHR the permanent answer from then on.
+static bool requestIdentityTransform(vkb::SwapchainBuilder& builder,
                                      VkPhysicalDevice physicalDevice,
                                      VkSurfaceKHR surface) {
     VkSurfaceCapabilitiesKHR caps{};
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &caps) != VK_SUCCESS) {
-        return;
+        return false;
     }
-    if (caps.currentTransform == VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) return;
+    if (caps.currentTransform == VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) return false;
     if (!(caps.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)) {
         LOG_WARNING("Surface reports transform 0x", std::hex, caps.currentTransform, std::dec,
                     " and cannot present unrotated; the image will be rotated");
-        return;
+        return false;
     }
     builder.set_pre_transform_flags(VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
+    return true;
 }
 
 bool VkContext::createSwapchain(int width, int height) {
@@ -1016,7 +1019,7 @@ bool VkContext::createSwapchain(int width, int height) {
         .set_desired_min_image_count(2)
         .set_old_swapchain(swapchain);
 
-    requestIdentityTransform(builder, physicalDevice, surface);
+    presentsOffNativeTransform_ = requestIdentityTransform(builder, physicalDevice, surface);
 
     if (vsync_) {
         builder.set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR);
@@ -2167,7 +2170,7 @@ bool VkContext::recreateSwapchain(int width, int height) {
         .set_desired_min_image_count(2)
         .set_old_swapchain(oldSwapchain);
 
-    requestIdentityTransform(builder, physicalDevice, surface);
+    presentsOffNativeTransform_ = requestIdentityTransform(builder, physicalDevice, surface);
 
     if (vsync_) {
         builder.set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR);
@@ -2515,7 +2518,13 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
     presentInfo.pImageIndices = &imageIndex;
 
     VkResult result = vkQueuePresentKHR(presentQueue, &presentInfo);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    // Presenting unrotated onto a rotated surface is suboptimal by definition,
+    // and says so on every frame for as long as the swapchain lives. Rebuilding
+    // on that answer rebuilds every frame, which is what stopped the client
+    // dead on the login screen rather than merely making it slow.
+    const bool suboptimalIsExpected = presentsOffNativeTransform_;
+    if (result == VK_ERROR_OUT_OF_DATE_KHR ||
+        (result == VK_SUBOPTIMAL_KHR && !suboptimalIsExpected)) {
         swapchainDirty = true;
     }
 

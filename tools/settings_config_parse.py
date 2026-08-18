@@ -16,6 +16,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LOADER = ROOT / "src/ui/game_screen_minimap.cpp"
+PANEL = ROOT / "src/ui/settings_panel.cpp"
+SCHEMA = ROOT / "src/ui/settings_schema.cpp"
 
 # The gap must not cross another `key ==`, or a key with no clamp of its own
 # takes the next one's - which put a quest tracker's height on a scale's range
@@ -31,6 +33,35 @@ LOOSE = re.compile(
     r'std::clamp\([^,]+,\s*([-\d.]+)f?\s*,\s*([-\d.]+)f?\s*\)')
 
 
+# A clamp whose bounds are not written out. The loader asks the setting's own
+# schema row instead, which is a better source than a second copy of the
+# numbers, and leaves nothing here to read. Resolved through the schema below.
+SCHEMA_CLAMP = re.compile(
+    r'key == "([a-z0-9_]+)"(?:(?!key ==)[\s\S]){0,300}?'
+    r'settingsPanel_\.(\w+)\s*=\s*std::clamp\((?:(?!std::clamp)[\s\S]){0,200}?\)\s*;')
+
+# `.key = "windowuiscale", .asFloat = &SettingsPanel::pendingWindowUiScale`
+PANEL_BINDING = re.compile(
+    r'\{\s*\.key\s*=\s*"([a-z0-9_]+)"\s*,\s*\.as\w+\s*=\s*&SettingsPanel::(\w+)')
+
+# A schema row: key, label, kind, min, max, ...
+SCHEMA_ROW = re.compile(
+    r'\{\s*(?:\.\w+\s*=\s*)?"([a-z0-9_]+)"\s*,\s*"[^"]*"\s*,\s*SettingKind::\w+\s*,\s*'
+    r'([-\d.]+)f?\s*,\s*([-\d.]+)f?')
+
+
+def schemaRangesByMember():
+    """member -> (lo, hi), taken from the schema row bound to that member."""
+    rows = {m.group(1): (float(m.group(2)), float(m.group(3)))
+            for m in SCHEMA_ROW.finditer(SCHEMA.read_text())}
+    out = {}
+    for m in PANEL_BINDING.finditer(PANEL.read_text()):
+        span = rows.get(m.group(1))
+        if span:
+            out[m.group(2)] = span
+    return out
+
+
 def clampedRanges():
     """config key -> (member or None, lo, hi) for every value the loader bounds."""
     text = LOADER.read_text()
@@ -39,6 +70,17 @@ def clampedRanges():
         out.setdefault(m.group(1), (None, float(m.group(2)), float(m.group(3))))
     for m in CLAMP.finditer(text):
         out[m.group(1)] = (m.group(2), float(m.group(3)), float(m.group(4)))
+
+    # Then the ones whose bounds live in the schema rather than in the clamp.
+    # Last, so a written-out clamp always wins over the row behind it.
+    bySchema = schemaRangesByMember()
+    for m in SCHEMA_CLAMP.finditer(text):
+        key, member = m.group(1), m.group(2)
+        if key in out:
+            continue
+        span = bySchema.get(member)
+        if span:
+            out[key] = (member, span[0], span[1])
     return out
 
 

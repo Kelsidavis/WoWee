@@ -465,6 +465,9 @@ private:
     bool samplerAnisotropySupported_ = false;
     bool fillModeNonSolidSupported_ = false;
     bool fsr2ComputeFeaturesSupported_ = false;
+    /// True when the swapchain was built with a transform the surface is not
+    /// using, which makes VK_SUBOPTIMAL_KHR permanent rather than a signal.
+    bool presentsOffNativeTransform_ = false;
     float anisotropyLimit_ = 16.0f;
 
     static VkContext* sInstance_;

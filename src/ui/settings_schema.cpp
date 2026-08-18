@@ -216,7 +216,10 @@ constexpr SettingDesc kSchema[] = {
     // --------------------------------------------------------------- Interface
     {"uiopacity", "Window opacity", SettingKind::Int, 20, 100, 5, "Interface", "Windows",
      "How solid this client's own windows are drawn.", "", 65},
-    {"windowuiscale", "Window scale", SettingKind::Float, 0.75f, 1.5f, 0.05f, "Interface", "",
+    // Up to 3x because a phone needs it: the same 1080 lines that are an
+    // ordinary monitor are a 420 dpi panel held at arm's length, and 1.5 does
+    // not reach. Harmless on a desktop, where nobody drags it that far.
+    {"windowuiscale", "Window scale", SettingKind::Float, 0.75f, 3.0f, 0.05f, "Interface", "",
      "Fonts, controls and spacing in this client's own windows. Not the\n"
      "interface's scale, which is in the game's own Video panel.", "", 1},
     {"latencymeter", "Latency meter", SettingKind::Bool, 0, 0, 0, "Interface", "",
@@ -350,6 +353,17 @@ constexpr SettingDesc kSchema[] = {
 const SettingDesc* clientSettingsSchema(std::size_t& count) {
     count = sizeof(kSchema) / sizeof(kSchema[0]);
     return kSchema;
+}
+
+bool settingRange(const std::string& key, float& lo, float& hi) {
+    for (const auto& row : kSchema) {
+        if (key == row.key) {
+            lo = row.minValue;
+            hi = row.maxValue;
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace ui
