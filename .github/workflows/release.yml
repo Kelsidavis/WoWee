@@ -118,7 +118,10 @@ jobs:
           runner: macos-15
           verify_arch: arm64
         - arch: x86-64
-          runner: macos-13
+          # macos-13 was the old Intel image and has been retired; a job asking
+          # for it queues for ever rather than failing. macos-15-intel is the
+          # current x64 label.
+          runner: macos-15-intel
           # What lipo calls it, which is not what the archive is named.
           verify_arch: x86_64
 
