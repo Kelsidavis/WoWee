@@ -259,10 +259,20 @@ shaders.
 
 ### What is not verified
 
-The half of this phase that reads "reaches the login screen". There is no device attached and no
-emulator system image installed, and an arm64 image on an x86 host would emulate the whole
-instruction set to reach a Vulkan renderer. Everything above is static evidence that it will
-load; none of it is evidence that it runs.
+The half of this phase that reads "reaches the login screen". There is no device attached, and the
+emulator is not a way around it on this machine: `/dev/kvm` does not exist because VirtualBox's
+`vboxdrv` holds the virtualization extensions and neither `kvm_amd` nor `kvm_intel` is loaded.
+Without that, an image emulates every instruction on the way to a Vulkan renderer. An arm64 image
+would do so even on a machine with KVM.
+
+Everything above is static evidence that the library will load. None of it is evidence that it
+runs. What that needs is one arm64 device on Android 13 or later:
+
+```
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb push <extracted Data>/. /sdcard/Android/data/com.wowee.client/files/Data/
+adb logcat -s Wowee SDL wowee
+```
 
 ### A hole to close in phase 5
 
