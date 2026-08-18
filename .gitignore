@@ -45,7 +45,7 @@ Makefile
 *.exe
 *.out
 *.app
-wowee
+/wowee
 
 # Claude Code internal state
 .claude/
@@ -144,3 +144,10 @@ logs/*_config/
 # Canary builds: deliberately broken binaries for watching a check fail.
 # Kept out of build/ because that is what the player runs.
 build-canary/
+
+# Android Gradle build outputs
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/local.properties

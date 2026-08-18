@@ -1,0 +1,143 @@
+plugins { id 'com.android.application' }
+
+// OpenSSL is built once per ABI by tools/build-android-deps.sh and handed to
+// CMake the way the desktop and macOS builds hand it theirs.
+def opensslFor = { abi -> file("${rootDir}/${opensslRoot}/${abi}").absolutePath }
+
+def repoRoot = file("${rootDir}/..")
+
+// The version comes from the git tag, the way cmake/GitVersion.cmake derives it
+// for the client itself. A source tarball has no tags, hence the fallback.
+def gitVersion = {
+    try {
+        def out = new ByteArrayOutputStream()
+        exec {
+            commandLine 'git', 'describe', '--tags', '--abbrev=0'
+            workingDir repoRoot
+            standardOutput = out
+            errorOutput = new ByteArrayOutputStream()
+        }
+        return out.toString().trim().replaceFirst(/^v/, '')
+    } catch (Exception ignored) {
+        return '0.0.0'
+    }
+}()
+
+// Android wants a monotonic integer. major*10000 + minor*100 + patch keeps the
+// ordering of the tags it comes from.
+def gitVersionCode = {
+    def parts = gitVersion.tokenize('.')
+    if (parts.size() < 3) return 1
+    try {
+        return parts[0].toInteger() * 10000 + parts[1].toInteger() * 100 + parts[2].toInteger()
+    } catch (Exception ignored) {
+        return 1
+    }
+}()
+def stagedAssets = layout.buildDirectory.dir("staged-assets")
+
+// The same payload the desktop and macOS releases ship: assets/ without the
+// proprietary music, and the git-tracked Data JSONs. Game data is not here -
+// the player extracts that from their own install and copies it in.
+tasks.register('stageAssets', Copy) {
+    into stagedAssets
+    from("${repoRoot}/assets") {
+        into 'assets'
+        exclude 'Original Music/**'
+    }
+    // Exactly the files `git ls-files Data/` lists. A recursive glob here also
+    // catches the overlay manifests a local extraction generates, which are
+    // large, untracked, and not ours to ship.
+    from("${repoRoot}/Data") {
+        into 'Data'
+        include 'expansions/*/dbc_layouts.json'
+        include 'expansions/*/expansion.json'
+        include 'expansions/*/opcodes.json'
+        include 'expansions/*/update_fields.json'
+        include 'opcodes/aliases.json'
+        include 'opcodes/canonical.json'
+    }
+}
+
+android {
+    namespace 'com.wowee.client'
+    compileSdk 34
+    ndkVersion '28.2.13676358'
+
+    defaultConfig {
+        applicationId 'com.wowee.client'
+        // 33 is the floor: Android's libvulkan exports vkWaitSemaphores,
+        // vkCreateRenderPass2 and the two vkGetDevice*MemoryRequirements only
+        // from 33. See docs/plan-android.md.
+        minSdk 33
+        targetSdk 34
+        versionCode gitVersionCode
+        versionName gitVersion
+
+        externalNativeBuild {
+            cmake {
+                targets 'wowee'
+                arguments '-DANDROID_STL=c++_shared',
+                          "-DOPENSSL_ROOT_DIR=${opensslFor('arm64-v8a')}",
+                          "-DCMAKE_FIND_ROOT_PATH=${opensslFor('arm64-v8a')}"
+                cppFlags '-std=c++20'
+            }
+        }
+        ndk { abiFilters 'arm64-v8a' }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path '../../CMakeLists.txt'
+            version '3.22.1+'
+        }
+    }
+
+    sourceSets.main.assets.srcDirs = [stagedAssets]
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+tasks.configureEach { if (name.startsWith('merge') && name.endsWith('Assets')) dependsOn 'stageAssets' }
+
+// SDLActivity and its eight siblings are Java, so they cannot come out of the
+// native build; they are committed here. They must still match the SDL that
+// CMakeLists.txt fetches, because a mismatched pair fails at runtime with a
+// missing native method and nothing at build time. This compares the two once
+// the fetch has happened.
+tasks.register('checkSdlJava') {
+    doLast {
+        def fetched = fileTree(file('.cxx')) { include '**/sdl2-src/android-project/app/src/main/java/org/libsdl/app/*.java' }
+                        .files.collectEntries { [(it.name): it] }
+        if (fetched.isEmpty()) {
+            logger.lifecycle('checkSdlJava: SDL not fetched yet, nothing compared.')
+            return
+        }
+        def committed = file('src/main/java/org/libsdl/app')
+        def drifted = []
+        fetched.each { name, src ->
+            def mine = new File(committed, name)
+            if (!mine.isFile() || mine.text != src.text) drifted << name
+        }
+        def extra = (committed.list() ?: []).findAll { it.endsWith('.java') && !fetched.containsKey(it) }
+        if (drifted || extra) {
+            throw new GradleException(
+                "android/app/src/main/java/org/libsdl/app is out of step with the SDL " +
+                "that CMakeLists.txt fetches.\n" +
+                (drifted ? "  differ or missing: ${drifted.sort().join(', ')}\n" : '') +
+                (extra   ? "  no longer in SDL:  ${extra.sort().join(', ')}\n" : '') +
+                "Re-copy them from the fetched android-project tree under app/.cxx.")
+        }
+        logger.lifecycle("checkSdlJava: ${fetched.size()} files match the fetched SDL.")
+    }
+}
+tasks.configureEach { if (name == 'compileDebugJavaWithJavac' || name == 'compileReleaseJavaWithJavac') finalizedBy 'checkSdlJava' }

@@ -131,7 +131,7 @@ Each phase ends somewhere a person can see the result. No phase depends on the o
 | Phase | Ends when | Needs |
 |---|---|---|
 | ~~**1. Toolchain**~~ | **done** - see below | |
-| **2. It starts** | The Activity loads the library, SDL opens a Vulkan surface, the client reaches the login screen against a `Data/` copied to `getExternalFilesDir()` | Phase 1 |
+| ~~**2. It starts**~~ | **APK built and statically verified - see below. The half that needs a device is unfinished.** | |
 | **3. It draws the world** | A character logs in and the world renders at a watchable frame rate on one real device, with GPU budgets re-measured rather than inherited | Phase 2, a device |
 | **4. It plays** | Touch scheme for camera, movement, interaction and the cursor; soft keyboard for chat | Phase 3, and the design decisions in blocker 2 |
 | **5. It ships** | APK, storage-permission flow, and a written path for the player to get 19 GB onto the device | Phase 4 |
@@ -201,3 +201,72 @@ Four Vulkan entry points the renderer calls - `vkCreateRenderPass2`, `vkWaitSema
 So the floor is **Android 13**, not the Vulkan 1.1 this document assumed in section 1. The
 alternative is loading those four through `vkGetDeviceProcAddr` and keeping a lower minSdk, which
 is worth doing only if a device that matters is stuck below 13.
+
+
+---
+
+## 6. Phase 2, as built
+
+`android/` is a Gradle project that produces an installable APK. `./gradlew :app:assembleDebug`
+from that directory, with `ANDROID_HOME` and the NDK set, gives 45 MB at
+`android/app/build/outputs/apk/debug/app-debug.apk`. OpenSSL has to exist first:
+`tools/build-android-deps.sh arm64-v8a` builds it, and `gradle.properties` points at where it lands.
+
+### Where the client's files go
+
+The client finds its shaders, its interface and its expansion profiles through paths relative to
+the working directory, which Android does not give a process. The renderer alone opens
+`assets/shaders/*.spv` from about thirty call sites. So there is one root, and it holds the layout
+of a desktop install:
+
+```
+<getExternalFilesDir>/
+    assets/     unpacked from the APK
+    Data/       the four expansion profiles from the APK, plus what the player copies in
+    config/     settings.cfg and the logs
+```
+
+`WoweeActivity` sets `WOWEE_RESOURCE_ROOT`, `WOW_DATA_PATH` and `WOWEE_CONFIG_ROOT` to point into
+it before `super.onCreate` loads the library, and `main()` enters that root first thing. The two
+config variables were already read by `config_paths.cpp` and `logger.cpp`; only the root is new.
+
+It is the external files directory rather than the internal one for one reason: the player has to
+be able to reach it. Game data is extracted on a PC and copied to `Data/` under this root, which
+`adb push` and a USB cable can both write.
+
+### What the APK carries
+
+The same payload the desktop and macOS releases ship, assembled by the same rules: `assets/`
+without the proprietary music, and the eighteen git-tracked `Data/` JSONs. No game data, and
+nothing that downloads any. A recursive glob for those JSONs is wrong and was caught doing it -
+it also matches the overlay manifests a local extraction generates, which added 15 MB of
+someone else's files to the APK. The include list names them.
+
+Assets are unpacked when the APK is newer than the last unpack, not when the destination is
+missing. Skipping files that already exist means a new client keeps running the old client's
+shaders.
+
+### What was verified without a device
+
+- Every one of the 639 symbols `libwowee.so` leaves undefined resolves against the API 33 platform
+  stubs plus the two libraries in the APK. Nothing is waiting to fail at `dlopen`.
+- `SDL_main` is exported, which is the symbol `SDLActivity` looks up by name.
+- The APK declares `com.wowee.client.WoweeActivity` as its launcher, ships `arm64-v8a` only, and
+  both that class and `SDLActivity` are in the dex.
+- `checkSdlJava` compares the nine committed `org/libsdl/app` Java files against the SDL that
+  CMakeLists.txt fetches, and fails the build on drift. A mismatched pair fails at runtime with a
+  missing native method and says nothing at build time. Canaried.
+
+### What is not verified
+
+The half of this phase that reads "reaches the login screen". There is no device attached and no
+emulator system image installed, and an arm64 image on an x86 host would emulate the whole
+instruction set to reach a Vulkan renderer. Everything above is static evidence that it will
+load; none of it is evidence that it runs.
+
+### A hole to close in phase 5
+
+`Android/data/<package>/files` is awkward to reach from a phone's own file manager on Android 11
+and up. `adb push` and most USB connections still write it, but the player-facing answer is a
+first-run importer that asks for the extracted `Data/` folder through the storage access
+framework, which sidesteps the question entirely.
