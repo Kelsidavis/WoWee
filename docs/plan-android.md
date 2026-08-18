@@ -274,6 +274,27 @@ adb push <extracted Data>/. /sdcard/Android/data/com.wowee.client/files/Data/
 adb logcat -s Wowee SDL wowee
 ```
 
+### Getting data onto a device
+
+A full extraction is 18 GB and no phone is going to hold it, so `tools/android/`
+cuts one down. `make_minimal_data.py --source ~/Data --out ~/Data-login --profile login`
+gives 787 MB, 23,072 of 199,468 files, which is the login screen, character select and
+character creation with no world in it. A `world` profile with one continent is 7.5 GB.
+`tools/android/README.md` has the detail.
+
+The subset gets its own `manifest.json`. The client finds its data root by looking for one
+and resolves every path through it, so a copied subtree without a rewritten manifest is not
+a smaller install, it is a broken one.
+
+`check_profile_coverage.py` reads every asset path the client names, in `src/` and in the
+interface's Lua and XML, and reports what a profile would drop. All three profiles come back
+clean. The `login` subset also loads the interface identically to the full extraction under
+`framexml_run`: 139 files, 0 failed, same missing-API counts.
+
+That is as far as this can be taken without hardware. `world` is 7.5 GB because
+`world/wmo`, `creature` and `item` are shared across zones; narrowing them by map means
+walking each ADT for the models it references, which is phase 3 work and is not written.
+
 ### A hole to close in phase 5
 
 `Android/data/<package>/files` is awkward to reach from a phone's own file manager on Android 11

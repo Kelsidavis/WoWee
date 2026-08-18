@@ -377,6 +377,18 @@ if(Python3_Interpreter_FOUND)
                      ${CMAKE_BINARY_DIR})
 endif()
 
+# ── android_data_profiles ───────────────────────────────────────
+# The profiles in tools/android decide what an 18 GB extraction is cut down to
+# for a phone. A pattern that stops matching drops files silently and only says
+# so on a device. It has happened once already: * crossed a separator and a
+# trailing /** was compared literally, so one exclusion matched nothing at all.
+# Needs no extraction, so it runs here rather than by hand. Instant.
+if(Python3_Interpreter_FOUND)
+    add_test(NAME android_data_profiles
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_SOURCE_DIR}/tools/android/test_data_profiles.py)
+endif()
+
 # ── test_chat_types ─────────────────────────────────────────────
 # A chat type is a byte off the wire and the event name is built from it, so a
 # value missing from the enum is a line of chat that never appears - no error,

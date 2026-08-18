@@ -1,0 +1,78 @@
+{
+  "_comment": [
+    "Subsets of an extracted Data directory, for devices that cannot hold 18 GB.",
+    "Paths are matched against the 'p' field of manifest.json entries: lowercase,",
+    "forward slashes, relative to the data root. A pattern ending in /** matches",
+    "everything below that directory; anything else is matched with fnmatch.",
+    "tools/android/make_minimal_data.py is the only reader."
+  ],
+  "profiles": {
+    "login": {
+      "summary": "Login screen, character select and character creation. No world.",
+      "include": [
+        "db/**",
+        "misc/fonts/**",
+        "interface/**",
+        "character/**",
+        "environment/**"
+      ],
+      "exclude": [
+        "interface/worldmap/**",
+        "interface/cinematics/**"
+      ],
+      "exclude_reasons": {
+        "interface/worldmap/**": "the world map cannot be opened before entering the world",
+        "interface/cinematics/**": "the intro movie is skippable and is 118 MB"
+      }
+    },
+    "world": {
+      "summary": "Everything in login, plus enough to enter and render the chosen maps.",
+      "include": [
+        "db/**",
+        "misc/fonts/**",
+        "misc/tileset/**",
+        "misc/xtextures/**",
+        "misc/dungeons/**",
+        "interface/**",
+        "character/**",
+        "environment/**",
+        "item/**",
+        "creature/**",
+        "spell/**",
+        "world/**",
+        "terrain/textures/**",
+        "terrain/minimap/**",
+        "terrain/maps/**"
+      ],
+      "exclude": [
+        "interface/cinematics/**"
+      ],
+      "default_maps": [
+        "azeroth"
+      ],
+      "exclude_reasons": {
+        "interface/cinematics/**": "the intro movie is skippable and is 118 MB"
+      }
+    },
+    "full": {
+      "summary": "Everything the extraction produced, minus what no client reads.",
+      "include": [
+        "**"
+      ],
+      "exclude": [
+        "misc/world of warcraft.app/**",
+        "misc/world of warcraft launcher.app/**",
+        "misc/background downloader.app/**",
+        "misc/data/*/documentation/**",
+        "interface/cinematics/**"
+      ],
+      "exclude_reasons": {
+        "misc/world of warcraft.app/**": "a macOS application bundle from the original install",
+        "misc/world of warcraft launcher.app/**": "a macOS application bundle from the original install",
+        "misc/background downloader.app/**": "a macOS application bundle from the original install",
+        "misc/data/*/documentation/**": "the manual and credits pages",
+        "interface/cinematics/**": "the intro movie is skippable and is 118 MB"
+      }
+    }
+  }
+}
