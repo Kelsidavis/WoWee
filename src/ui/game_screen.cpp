@@ -1686,8 +1686,13 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                             // the running client, and a line only the info
                             // level shows is a line nobody has. This says it
                             // where the default log will keep it.
+                            // rawget, not truth: a missing GameMenuFrame is
+                            // answered by the no-op object, whose IsShown
+                            // returns another one, so this reported the menu
+                            // shown whether or not the frame existed.
                             if (gameHandler.askInterface(
-                                    "GameMenuFrame and GameMenuFrame:IsShown()")) {
+                                    "type(rawget(_G, 'GameMenuFrame')) == 'table' "
+                                    "and GameMenuFrame:IsShown()")) {
                                 LOG_INFO("Escape: the interface's menu is now shown");
                             } else {
                                 LOG_WARNING(

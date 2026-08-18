@@ -1069,6 +1069,13 @@ SENTENCES = [
     ("settings_without_a_control.py",
      "has something to change it with",
      "a setting reachable only by editing settings.cfg by hand"),
+    # Feature detection against an interface whose missing names answer with a
+    # truthy no-op. Escape shipped asking three close-functions this way: the
+    # first answered whether or not it existed, and the press never reached the
+    # branch that opens the game menu.
+    ("interface_feature_check.py",
+     "a missing one cannot answer",
+     "a Lua global tested for truth, which a missing one passes"),
     # What this client draws itself, scaled to the screen. Four things pick a
     # default from the height and they have to pick the same, or neighbouring
     # parts of one HUD come up at different sizes - the buff bar was at 2.0 on a
