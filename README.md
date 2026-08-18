@@ -136,7 +136,7 @@ For Windows/MSYS2, Visual Studio, and platform-specific notes, see the
 git clone --recurse-submodules https://github.com/Kelsidavis/WoWee.git
 cd WoWee
 
-LDFLAGS="-lstorm -lz -lbz2" cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ```
 
