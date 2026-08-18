@@ -15,6 +15,16 @@ public:
 
     // Keyboard
     [[nodiscard]] bool isKeyPressed(SDL_Scancode key) const;
+
+    /// Holds a key down from somewhere that is not a keyboard.
+    ///
+    /// The on-screen stick is the reason: movement, its animations and the
+    /// packets that announce it are a long chain that starts at
+    /// isKeyPressed(SDL_SCANCODE_W), and a phone has no W. Setting the key here
+    /// drives all of it without any of it knowing where the press came from.
+    /// Merged over the hardware state, so a keyboard still works alongside.
+    void setVirtualKey(SDL_Scancode key, bool held);
+    void clearVirtualKeys();
     [[nodiscard]] bool isKeyJustPressed(SDL_Scancode key) const;
 
     // Mouse
@@ -37,6 +47,7 @@ private:
     static constexpr int NUM_MOUSE_BUTTONS = 8;
 
     std::array<bool, NUM_KEYS> currentKeyState = {};
+    std::array<bool, NUM_KEYS> virtualKeyState = {};
     std::array<bool, NUM_KEYS> previousKeyState = {};
 
     std::array<bool, NUM_MOUSE_BUTTONS> currentMouseState = {};

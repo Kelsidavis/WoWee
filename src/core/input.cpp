@@ -17,7 +17,7 @@ void Input::update() {
     // Get current keyboard state
     const Uint8* keyState = SDL_GetKeyboardState(nullptr);
     for (int i = 0; i < NUM_KEYS; ++i) {
-        currentKeyState[i] = keyState[i];
+        currentKeyState[i] = keyState[i] || virtualKeyState[i];
     }
 
     // Get current mouse state
@@ -34,6 +34,15 @@ void Input::update() {
 
     // Calculate mouse delta
     mouseDelta = mousePosition - previousMousePosition;
+}
+
+void Input::setVirtualKey(SDL_Scancode key, bool held) {
+    if (key < 0 || key >= NUM_KEYS) return;
+    virtualKeyState[key] = held;
+}
+
+void Input::clearVirtualKeys() {
+    virtualKeyState.fill(false);
 }
 
 bool Input::isKeyPressed(SDL_Scancode key) const {

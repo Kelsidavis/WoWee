@@ -48,6 +48,25 @@ public:
     void setM2Renderer(M2Renderer* m2) { m2Renderer = m2; }
     void setWaterRenderer(WaterRenderer* wr) { waterRenderer = wr; }
 
+    /// Holds the view still while something else owns the finger that is
+    /// moving the mouse. The on-screen stick is that something: SDL reports the
+    /// first finger as a held left button wherever it goes, and without this
+    /// the camera spins every time the player walks.
+    void setRotationSuppressed(bool suppressed) { rotationSuppressed_ = suppressed; }
+
+    /// Turns the view by a drag this controller never saw as a mouse.
+    ///
+    /// SDL reports only the first finger as a mouse, so with a thumb on the
+    /// movement stick a second finger dragging to look produces nothing at all.
+    /// The touch controls read that finger themselves and hand the movement
+    /// here, in the same pixels and through the same sensitivity and limits a
+    /// mouse drag goes through.
+    void applyLookDelta(float dxPixels, float dyPixels);
+
+    /// While a finger is steering, the character faces where the view does -
+    /// what holding the right mouse button means on a desktop.
+    void setSteering(bool steering) { steering_ = steering; }
+
     void processMouseWheel(float delta);
     void setFollowTarget(glm::vec3* target);
     void setDefaultSpawn(const glm::vec3& position, float yawDeg, float pitchDeg) {
@@ -495,6 +514,8 @@ private:
     bool wasFalling = false;
     bool wasAscending_ = false;   // Space held while flyingActive_
     bool wasDescending_ = false;  // X held while flyingActive_
+    bool rotationSuppressed_ = false;
+    bool steering_ = false;
     bool moveForwardActive = false;
     bool moveBackwardActive = false;
     bool strafeLeftActive = false;

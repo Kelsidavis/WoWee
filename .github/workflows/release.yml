@@ -471,9 +471,67 @@ jobs:
         path: wowee-*.zip
         if-no-files-found: error
 
+  build-android:
+    name: Build (android arm64)
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        submodules: true
+
+    - name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+
+    - name: Install the NDK the project pins
+      run: |
+        # android/app/build.gradle names this version; the runner ships another.
+        yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
+          --install "ndk;28.2.13676358" "platforms;android-34" "build-tools;34.0.0" >/dev/null
+
+    - name: Cache OpenSSL for Android
+      id: cache-openssl
+      uses: actions/cache@v4
+      with:
+        path: build-android-deps
+        key: android-openssl-${{ hashFiles('tools/build-android-deps.sh') }}
+
+    - name: Build OpenSSL for arm64
+      if: steps.cache-openssl.outputs.cache-hit != 'true'
+      run: |
+        # ANDROID_HOME is set by the runner image, so it is read in the shell
+        # rather than through an expression, which only sees workflow env.
+        export ANDROID_NDK_ROOT="${ANDROID_HOME}/ndk/28.2.13676358"
+        tools/build-android-deps.sh arm64-v8a
+
+    - name: Build the APK
+      working-directory: android
+      run: |
+        export ANDROID_NDK_ROOT="${ANDROID_HOME}/ndk/28.2.13676358"
+        ./gradlew :app:assembleRelease --no-daemon
+
+    - name: Name it after the tag
+      run: |
+        TAG="${GITHUB_REF_NAME}"
+        APK=android/app/build/outputs/apk/release/app-release.apk
+        # assembleRelease is signed with the debug key: this is a sideloaded
+        # build, not a Play listing, and an unsigned APK will not install at all.
+        test -f "${APK}" || APK=android/app/build/outputs/apk/release/app-release-unsigned.apk
+        cp "${APK}" "wowee-${TAG}-android-arm64.apk"
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wowee-android-arm64
+        path: wowee-*-android-arm64.apk
+
   release:
     name: Create Release
-    needs: [ build-linux, build-macos, build-windows ]
+    needs: [ build-linux, build-macos, build-windows, build-android ]
     runs-on: ubuntu-latest
 
     steps:

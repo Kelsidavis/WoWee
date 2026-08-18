@@ -65,6 +65,7 @@
 #include "pipeline/wdt_loader.hpp"
 #include "pipeline/dbc_loader.hpp"
 #include "ui/ui_manager.hpp"
+#include "ui/touch_controls.hpp"
 #include "ui/ui_services.hpp"
 #include "auth/auth_handler.hpp"
 #include "game/game_handler.hpp"
@@ -1301,6 +1302,16 @@ void Application::run() {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
 #ifdef __ANDROID__
+            // The stick and the pinch read the finger events SDL sends
+            // alongside the mouse ones. They claim nothing else: every panel,
+            // slider and action button keeps working through the mouse SDL
+            // already makes of the first finger.
+            {
+                int tw = 0, th = 0;
+                if (window) SDL_GetWindowSize(window->getSDLWindow(), &tw, &th);
+                ui::touchControls().handleEvent(event, tw, th);
+            }
+
             // The activity going to the background takes the native window with
             // it, and the Vulkan surface and swapchain built on it die at the
             // same moment. Drawing to them afterwards is what left the client on
@@ -3261,6 +3272,18 @@ void Application::updateInGame(float deltaTime, const char*& updateCheckpoint) {
     };
     inGameStep = "gameHandler update";
     updateCheckpoint = "in_game: gameHandler update";
+#ifdef __ANDROID__
+    ui::touchControls().update();
+    if (renderer && renderer->getCameraController()) {
+        auto* cam = renderer->getCameraController();
+        ui::touchControls().setCameraController(cam);
+        // The touch controls turn the view themselves, from whichever finger is
+        // doing it. SDL's own translation of the first finger must not turn it
+        // as well, or a drag counts twice and the stick swings the camera.
+        cam->setRotationSuppressed(true);
+        cam->setSteering(ui::touchControls().isSteering());
+    }
+#endif
     runInGameStage("gameHandler->update", [&] {
         if (gameHandler) {
             gameHandler->update(deltaTime);
@@ -3647,6 +3670,13 @@ void Application::render() {
             LOG_WARNING("SLOW render stage '", stageName, "': ", stageMs, "ms");
         }
     };
+
+#ifdef __ANDROID__
+    // Drawn into the background list, under everything the interface puts on
+    // screen, and only while a thumb is holding it.
+    ui::touchControls().setInWorld(state == AppState::IN_GAME);
+    ui::touchControls().draw();
+#endif
 
     renderingFrame_ = true;
     runRenderStage("beginFrame", [&] { renderer->beginFrame(); });

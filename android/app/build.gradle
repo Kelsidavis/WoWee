@@ -120,11 +120,23 @@ android {
     }
 }
 
-tasks.configureEach {
-    if (name.startsWith('merge') && name.endsWith('Assets')) {
-        dependsOn 'stageAssets'
-        if (name.contains('Debug')) dependsOn 'stageMusic'
-    }
+// Everything that reads the staged assets has to be told where they come from.
+// Merging is the obvious one; lint and packaging read the same directory, and
+// the release build failed on exactly that with no ordering between them.
+tasks.configureEach { t ->
+    if (t.name == 'stageAssets' || t.name == 'stageMusic') return
+
+    final String n = t.name
+    final boolean readsAssets =
+        (n.startsWith('merge') && n.endsWith('Assets')) ||
+        n.toLowerCase().contains('lint') ||
+        n.startsWith('package') ||
+        n.startsWith('bundle')
+    if (!readsAssets) return
+
+    t.dependsOn 'stageAssets'
+    // The music is a debug-only source set, so only debug tasks wait for it.
+    if (n.contains('Debug')) t.dependsOn 'stageMusic'
 }
 
 // SDLActivity and its eight siblings are Java, so they cannot come out of the

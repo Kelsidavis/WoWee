@@ -2463,7 +2463,12 @@ void CameraController::update(float deltaTime) {
     //
     // Only while there is movement input. Treading on the spot and orbiting the
     // camera to look around should not spin the character on the water.
-    bool cameraDrivesFacing = rightMouseDown || mouseAutorun || (swimming && hasMoveInput);
+    // steering_ is the touch controls saying a finger is dragging the view.
+    // On a phone that is what the right mouse button is on a desktop: the
+    // character turns to face where the player is looking, so that walking
+    // forward goes where the screen points.
+    bool cameraDrivesFacing = rightMouseDown || mouseAutorun || steering_ ||
+                              (swimming && hasMoveInput);
     // During taxi flights, orientation is controlled by the flight path, not player input
     if (cameraDrivesFacing && !externalFollow_) {
         facingYaw = yaw;
@@ -2727,6 +2732,9 @@ void CameraController::processMouseMotion(const SDL_MouseMotionEvent& event) {
     }
 
     if (!mouseButtonDown) {
+        return;
+    }
+    if (rotationSuppressed_) {
         return;
     }
 
@@ -3077,6 +3085,16 @@ void CameraController::teleportTo(const glm::vec3& pos) {
     }
 
     LOG_INFO("Teleported to (", pos.x, ", ", pos.y, ", ", pos.z, ")");
+}
+
+void CameraController::applyLookDelta(float dxPixels, float dyPixels) {
+    if (!enabled || !camera || introActive) return;
+
+    yaw -= dxPixels * mouseSensitivity;
+    const float invert = invertMouse ? 1.0f : -1.0f;
+    pitch += dyPixels * mouseSensitivity * invert;
+    pitch = glm::clamp(pitch, MIN_PITCH, MAX_PITCH);
+    camera->setRotation(yaw, pitch);
 }
 
 void CameraController::processMouseWheel(float delta) {

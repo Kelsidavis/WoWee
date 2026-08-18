@@ -79,6 +79,7 @@ bool Window::initialize() {
     // the session out. Letting it run keeps the connection; the surface is
     // released separately and the frame is skipped while it is gone.
     SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "0");
+
 #endif
 
     // Initialize SDL

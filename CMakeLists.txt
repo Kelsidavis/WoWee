@@ -998,6 +998,7 @@ set(WOWEE_SOURCES
     src/ui/toast_manager.cpp
     src/ui/dialog_manager.cpp
     src/ui/settings_panel.cpp
+    src/ui/touch_controls.cpp
     src/ui/combat_ui.cpp
     src/ui/social_panel.cpp
     src/ui/window_manager.cpp

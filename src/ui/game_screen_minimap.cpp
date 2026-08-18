@@ -1425,24 +1425,34 @@ void GameScreen::renderMinimapReadouts(const MinimapFrame& frame, game::GameHand
                 weatherColor = IM_COL32(160, 160, 190, 220);
             }
 
-            const std::string fullLabel = weatherIcon ? zoneName + weatherIcon : zoneName;
-            ImVec2 ts = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, fullLabel.c_str());
-            float tx = frame.centerX - ts.x * 0.5f;
-            float ty = frame.centerY - frame.mapRadius + 4.0f;  // just inside top edge of the circle
-            float pad = 2.0f;
-            drawList->AddRectFilled(
-                ImVec2(tx - pad, ty - pad),
-                ImVec2(tx + ts.x + pad, ty + ts.y + pad),
-                IM_COL32(0, 0, 0, 160), 2.0f);
-            drawList->AddText(font, fontSize, ImVec2(tx + 1.0f, ty + 1.0f),
-                              IM_COL32(0, 0, 0, 180), zoneName.c_str());
-            drawList->AddText(font, fontSize, ImVec2(tx, ty),
-                              IM_COL32(255, 230, 150, 220), zoneName.c_str());
-            if (weatherIcon) {
-                const ImVec2 nameSize = font->CalcTextSizeA(
-                    fontSize, FLT_MAX, 0.0f, zoneName.c_str());
-                drawList->AddText(font, fontSize, ImVec2(tx + nameSize.x, ty),
-                                  weatherColor, weatherIcon);
+            // FrameXML's MinimapZoneText names the zone above the minimap, so
+            // naming it again inside the circle put it on screen twice. The
+            // name is drawn here only when this client owns the minimap; the
+            // weather glyph has no counterpart over there and stays either way.
+            const bool nameIsOurs = !frameXmlOwns(UiElement::Minimap);
+            const std::string fullLabel = nameIsOurs
+                ? (weatherIcon ? zoneName + weatherIcon : zoneName)
+                : (weatherIcon ? std::string(weatherIcon) : std::string());
+            if (!fullLabel.empty()) {
+                ImVec2 ts = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, fullLabel.c_str());
+                float tx = frame.centerX - ts.x * 0.5f;
+                float ty = frame.centerY - frame.mapRadius + 4.0f;  // just inside the top edge
+                float pad = 2.0f;
+                drawList->AddRectFilled(
+                    ImVec2(tx - pad, ty - pad),
+                    ImVec2(tx + ts.x + pad, ty + ts.y + pad),
+                    IM_COL32(0, 0, 0, 160), 2.0f);
+                float iconX = tx;
+                if (nameIsOurs) {
+                    drawList->AddText(font, fontSize, ImVec2(tx + 1.0f, ty + 1.0f),
+                                      IM_COL32(0, 0, 0, 180), zoneName.c_str());
+                    drawList->AddText(font, fontSize, ImVec2(tx, ty),
+                                      IM_COL32(255, 230, 150, 220), zoneName.c_str());
+                    iconX += font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, zoneName.c_str()).x;
+                }
+                if (weatherIcon) {
+                    drawList->AddText(font, fontSize, ImVec2(iconX, ty), weatherColor, weatherIcon);
+                }
             }
         }
     }
