@@ -147,6 +147,13 @@ bool WoweeTerrainLoader::loadMetadata(const std::string& wotPath, ADTTerrain& te
                     if (raw < 0 || raw > 0xFFFF) raw = 0;
                     terrain.chunks[ci].holes = static_cast<uint16_t>(raw);
                 }
+                // Optional, absent from most custom maps: quads where ground
+                // effect doodads (grass) must not grow, as in the ADT format.
+                if (cl.contains("noEffectDoodad") &&
+                    cl["noEffectDoodad"].is_number_unsigned()) {
+                    terrain.chunks[ci].noEffectDoodad =
+                        cl["noEffectDoodad"].get<uint64_t>();
+                }
             }
         }
 

@@ -175,6 +175,7 @@ public:
     bool pendingGrassEnabled = false;
     int pendingGrassDensity = 100;   // 0-300
     int pendingGrassHeight = 100;    // 50-300
+    int pendingGrassDistance = 45;   // 30-800 yards; density thins past 45
     int pendingAntiAliasing = 1;  // 0=Off, 1=2x, 2=4x, 3=8x
     bool pendingFXAA = false;     // FXAA post-process (combinable with MSAA)
     bool pendingNormalMapping = true;   // on by default

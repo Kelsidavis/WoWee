@@ -17,8 +17,10 @@
 // growth between the stones.
 //
 // So the profile is the weighted mix of those categories, not a table of
-// zones. Nothing here knows what Elwynn or Durotar is, and adding a zone would
-// be the wrong fix for any of it looking wrong.
+// zones. Nothing here knows what Elwynn or Durotar is: what grows is the
+// effect data's answer. How it *looks* per region is a separate layer -
+// grass_biomes.hpp holds an authored table of per-zone overrides that the
+// renderer applies on top of the profile this file derives.
 
 namespace wowee {
 namespace pipeline {
@@ -42,6 +44,15 @@ struct GrassProfile {
     /// Chance a blade has bolted to seed: taller, wispier, a pale seed head.
     /// Highest for dry growth - going to seed is what drying grass does.
     float seedChance = 0.20f;
+    /// The bloom palette's two anchors; each blade's flower is a per-seed
+    /// blend between them, so two anchors give a family of related colours
+    /// rather than two flowers. Defaults are a warm meadow yellow and pink.
+    glm::vec3 bloomColorA{0.95f, 0.80f, 0.25f};
+    glm::vec3 bloomColorB{0.90f, 0.45f, 0.65f};
+    /// The seed head's range, straw through plum by default. Wheat country
+    /// narrows this to golds.
+    glm::vec3 headColorA{0.72f, 0.64f, 0.42f};
+    glm::vec3 headColorB{0.32f, 0.22f, 0.24f};
 };
 
 /// The categories the three-letter type codes fall into.

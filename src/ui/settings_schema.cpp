@@ -142,6 +142,9 @@ constexpr SettingDesc kSchema[] = {
      "How much grass grows, against the amount the terrain asks for.", "", 100},
     {"grassheight", "Height", SettingKind::Float, 50, 300, 5, "Grass", "",
      "How tall it grows. Taller grass shows the wind crossing it more.", "", 100},
+    {"grassdistance", "Distance", SettingKind::Float, 30, 800, 5, "Grass", "",
+     "How far out grass draws, in yards. Past 45 the field thins with\n"
+     "distance, and a long range rebuilds over a few seconds as you move.", "", 45},
 
 #if WOWEE_HAS_AMD_FSR3_FRAMEGEN
     {"framegen", "Frame generation", SettingKind::Bool, 0, 0, 0, "Upscaling", "",

@@ -392,6 +392,8 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                 renderer->setGrassScales(
                     static_cast<float>(settingsPanel_.pendingGrassDensity) / 100.0f,
                     static_cast<float>(settingsPanel_.pendingGrassHeight) / 100.0f);
+                renderer->setGrassDistance(
+                    static_cast<float>(settingsPanel_.pendingGrassDistance));
                 settingsPanel_.terrainSettingsApplied_ = true;
             }
             }

@@ -4027,5 +4027,37 @@ void WMORenderer::recreatePipelines() {
     core::Logger::getInstance().info("WMORenderer: pipelines recreated");
 }
 
+void WMORenderer::collectGrassClearings(float minX, float minY, float maxX, float maxY,
+                                        std::vector<pipeline::GrassClearingSource>& out) const {
+    // How far past a wall the clearing runs, and how far past that the grass
+    // takes to stand back up. A building presses harder on its surroundings
+    // than a cart does, so these are wider than the M2 numbers.
+    constexpr float kClearing = 1.5f;
+    constexpr float kEase = 9.0f;
+    const float reach = kClearing + kEase;
+
+    for (const auto& inst : instances) {
+        if (inst.worldBoundsMax.x + reach < minX || inst.worldBoundsMin.x - reach > maxX ||
+            inst.worldBoundsMax.y + reach < minY || inst.worldBoundsMin.y - reach > maxY) {
+            continue;
+        }
+        // Per-group boxes where they exist; the outer bounds only as the
+        // fallback. The outer box of a large WMO swallows its courtyards and
+        // half its village, and that is where grass belongs.
+        if (!inst.worldGroupBounds.empty()) {
+            for (const auto& [mn, mx] : inst.worldGroupBounds) {
+                if (mx.x + reach < minX || mn.x - reach > maxX ||
+                    mx.y + reach < minY || mn.y - reach > maxY) {
+                    continue;
+                }
+                out.push_back({mn.x, mn.y, mx.x, mx.y, kClearing, kEase});
+            }
+        } else {
+            out.push_back({inst.worldBoundsMin.x, inst.worldBoundsMin.y,
+                           inst.worldBoundsMax.x, inst.worldBoundsMax.y, kClearing, kEase});
+        }
+    }
+}
+
 } // namespace rendering
 } // namespace wowee

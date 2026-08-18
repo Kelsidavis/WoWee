@@ -1275,5 +1275,31 @@ void M2Renderer::recreatePipelines() {
     core::Logger::getInstance().info("M2Renderer: pipelines recreated");
 }
 
+void M2Renderer::collectGrassClearings(float minX, float minY, float maxX, float maxY,
+                                       std::vector<pipeline::GrassClearingSource>& out) const {
+    constexpr float kEase = 4.0f;
+    for (const auto& inst : instances) {
+        // The ground detail IS the grass's kin - clutter clearing the ground
+        // around clutter would eat the whole field.
+        if (inst.cachedIsGroundDetail) continue;
+
+        // Footprint radius from the horizontal bounds, capped: a fence post
+        // clears its foot, a wagon its wheelbase, and a tree its trunk - not
+        // the shadow of its crown, or every forest would be bald.
+        const float ex = inst.worldBoundsMax.x - inst.worldBoundsMin.x;
+        const float ey = inst.worldBoundsMax.y - inst.worldBoundsMin.y;
+        const float clearing = std::clamp(0.35f * std::max(ex, ey), 0.4f, 3.0f);
+        const float reach = clearing + kEase;
+
+        const float cx = 0.5f * (inst.worldBoundsMin.x + inst.worldBoundsMax.x);
+        const float cy = 0.5f * (inst.worldBoundsMin.y + inst.worldBoundsMax.y);
+        if (cx + reach < minX || cx - reach > maxX ||
+            cy + reach < minY || cy - reach > maxY) {
+            continue;
+        }
+        out.push_back({cx, cy, cx, cy, clearing, kEase});
+    }
+}
+
 } // namespace rendering
 } // namespace wowee

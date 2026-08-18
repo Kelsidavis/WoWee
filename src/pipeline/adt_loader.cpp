@@ -307,6 +307,23 @@ void ADTLoader::parseMCNK(std::span<const uint8_t> data, int chunkIndex, ADTTerr
     // Each bit represents a 2x2 block of the 8x8 quad grid
     chunk.holes = readUInt16(data, 60);
 
+    // doodadMapping (at offset 0x40 = 64): two bits per quad of the 8x8 grid,
+    // naming which of the four texture layers the quad takes its ground
+    // effect from. Paint blends per texel but growth follows the quad's
+    // dominant layer, so a few faint grassy texels bleeding over dirt do not
+    // seed the dirt.
+    for (size_t i = 0; i < chunk.doodadMapping.size(); ++i) {
+        chunk.doodadMapping[i] = data[64 + i];
+    }
+
+    // noEffectDoodad (at offset 0x50 = 80): one bit per quad of the 8x8 grid,
+    // set where the map forbids ground effect doodads. Tilled farm rows,
+    // building footprints and WMO interior floors are painted with textures
+    // whose effects otherwise grow, and this mask is the only thing in the
+    // data that says nothing should.
+    chunk.noEffectDoodad = static_cast<uint64_t>(readUInt32(data, 80)) |
+                           (static_cast<uint64_t>(readUInt32(data, 84)) << 32);
+
     // Read layer count and offsets from MCNK header
     uint32_t nLayers = readUInt32(data, 12);
     uint32_t ofsHeight = readUInt32(data, 20);   // MCVT offset

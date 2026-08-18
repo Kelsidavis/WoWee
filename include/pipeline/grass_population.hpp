@@ -50,9 +50,11 @@ struct GrassProfileRef {
     float densityScale = 1.0f;
 };
 
-/// Profile for a ground effect. An empty function means one profile for
-/// everything, which is what the phase before this had.
-using ProfileLookupFn = std::function<GrassProfileRef(uint32_t effectId)>;
+/// Profile for a ground effect on a given area's ground. The area id is what
+/// keys the per-zone biome overrides; a caller with no regional table just
+/// ignores it. An empty function means one profile for everything, which is
+/// what the phase before this had.
+using ProfileLookupFn = std::function<GrassProfileRef(uint32_t effectId, uint32_t areaId)>;
 
 struct GrassPopulationParams {
     /// Lattice pitch in yards. One candidate blade per cell.
@@ -81,6 +83,13 @@ struct GrassPopulationParams {
     float baseWidth = 0.09f;
     /// Mixed into every hash. Changing it reshuffles the whole world's grass.
     uint32_t seed = 0x9e3779b9u;
+    /// Radius inside which density is untouched by distance. Beyond it the
+    /// keep probability falls as (fullDensityRadius / d)^2, so a ring at any
+    /// distance costs the same number of blades and a large window's total
+    /// grows with the log of its radius rather than its area. Zero disables
+    /// the falloff, which is what a window no bigger than the near field
+    /// wants.
+    float fullDensityRadius = 0.0f;
 };
 
 /// What the terrain says at a world position.
@@ -99,6 +108,58 @@ bool populateArea(float centerX, float centerY, float radius,
                   std::vector<GrassBladeSample>& out,
                   size_t maxBlades,
                   const ProfileLookupFn& profileFor = {});
+
+/// populateArea, spread over frames.
+///
+/// A 45 yard window walks a couple of hundred thousand lattice cells and fits
+/// in a frame; the windows the grass distance slider allows walk tens of
+/// millions and do not. begin() records the window and step() advances
+/// through it a bounded number of cells at a time, so a rebuild costs the
+/// same per frame however large the window is - it just takes more frames,
+/// and the field grows in rather than hitching.
+///
+/// Blade identity is the world-anchored cell hash, so a population built in
+/// slices is identical to one built in a single call. populateArea itself is
+/// begin() plus one unbounded step(), which is what keeps the two one code
+/// path.
+class GrassPopulationBuilder {
+public:
+    /// Start a build. Replaces any build in progress.
+    void begin(float centerX, float centerY, float radius,
+               const GrassPopulationParams& params, size_t maxBlades);
+
+    /// Walk up to `cellBudget` lattice cells. Returns true when the window is
+    /// finished (including a window that hit maxBlades and stopped early).
+    bool step(const SuitabilitySampler& sample, const ProfileLookupFn& profileFor,
+              size_t cellBudget);
+
+    /// A build has begun and step() has not yet finished it.
+    [[nodiscard]] bool active() const { return active_; }
+    /// The finished window covered every cell; false when maxBlades cut it off.
+    [[nodiscard]] bool complete() const { return complete_; }
+
+    [[nodiscard]] float centerX() const { return centerX_; }
+    [[nodiscard]] float centerY() const { return centerY_; }
+
+    /// The blades built so far; the full population once step() returns true.
+    [[nodiscard]] std::vector<GrassBladeSample>& blades() { return out_; }
+
+private:
+    GrassPopulationParams params_{};
+    std::vector<GrassBladeSample> out_;
+    size_t maxBlades_ = 0;
+    float centerX_ = 0.0f;
+    float centerY_ = 0.0f;
+    float radiusSq_ = 0.0f;
+    float capFactor_ = 1.0f;
+    int32_t minCellX_ = 0;
+    int32_t maxCellX_ = 0;
+    int32_t maxCellY_ = 0;
+    int32_t cursorX_ = 0;
+    int32_t cursorY_ = 0;
+    bool active_ = false;
+    bool complete_ = false;
+};
 
 } // namespace pipeline
 } // namespace wowee

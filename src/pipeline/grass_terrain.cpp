@@ -105,8 +105,12 @@ bool ChunkGrassContext::build(const MapChunk& chunk, const GroundEffectDensityFn
         effectId[i] = layer.effectId;
         const uint32_t density = (effectId[i] != 0 && densityFor) ? densityFor(effectId[i]) : 0;
         grows[i] = density != 0;
-        // Nothing grows out of a road, and only the name says so.
-        if (grows[i] && textureNameFor && isRoadLikeTexture(textureNameFor(layer.textureId))) {
+        // Nothing grows out of a road, and only the name says so. The name is
+        // remembered as well: the verge easing wants to know a road from
+        // ground that merely grows nothing, because meadow gives way toward a
+        // path but not toward every patch of forest floor.
+        if (textureNameFor && isRoadLikeTexture(textureNameFor(layer.textureId))) {
+            roadLike[i] = true;
             grows[i] = false;
             effectId[i] = 0;
         }
@@ -139,6 +143,7 @@ GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk&
     fracX = std::clamp(fracX, 0.0f, GRASS_CHUNK_QUADS);
     fracY = std::clamp(fracY, 0.0f, GRASS_CHUNK_QUADS);
 
+    out.areaId = chunk.areaId;
     out.slope = sampleSlope(chunk, fracX, fracY);
     out.rootHeight = sampleHeight(chunk, fracX, fracY);
     out.submerged = context.hasWater && out.rootHeight < context.waterHeight;
@@ -152,6 +157,12 @@ GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk&
     const int quadX = std::clamp(static_cast<int>(std::floor(fracX)), 0, 7);
     const int quadY = std::clamp(static_cast<int>(std::floor(fracY)), 0, 7);
     if (chunk.isHole(quadY, quadX) ) return out;
+
+    // The map's own "nothing grows here" mask. Tilled farm rows, building
+    // footprints and interior floors sit on textures whose effects grow, and
+    // this per-quad bit is the only thing in the data that keeps clutter off
+    // them - it is how the original client kept grass out of the abbey.
+    if (chunk.isEffectDisabled(quadY, quadX)) return out;
 
     // The alpha maps are 64x64 across the chunk, indexed the way the clutter
     // scatterer indexes them.
@@ -193,19 +204,49 @@ GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk&
         out.hasGroundColor = true;
     }
 
-    // Each layer contributes its own weight if its ground effect grows
-    // anything. Weighted rather than thresholded, so a texel that is half
-    // grass and half road is half suitable instead of one or the other.
-    float best = 0.0f;
-    for (size_t i = 0; i < context.layerCount; ++i) {
-        if (weight[i] <= 0.0f || !context.grows[i]) continue;
-        out.suitability += weight[i];
-        if (weight[i] > best) {
-            best = weight[i];
-            out.effectId = context.effectId[i];
-        }
+    // The quad's own layer, not a blend of every layer that grows. The map
+    // assigns each quad the layer its ground effect comes from - the
+    // dominant paint - and the original client grows clutter from that layer
+    // alone. Summing every growing layer's weight let a faint wash of grass
+    // alpha seed ground whose dominant texture is bare dirt. The mapped
+    // layer's blend weight still scales the density, so a boundary fades out
+    // instead of ending on the quad grid.
+    const uint32_t mapped = chunk.effectLayerFor(quadY, quadX);
+    if (mapped < context.layerCount && context.grows[mapped]) {
+        out.suitability = clamp01(weight[mapped]);
+        out.effectId = context.effectId[mapped];
     }
-    out.suitability = clamp01(out.suitability);
+
+    // The verge: how far this point stands from the nearest quad that is a
+    // road, a path, or masked no-grow (a farm row, a building footprint).
+    // The generator shortens and thins by this, so full meadow does not grow
+    // to the last texel of tarmac and then stop - it gives way over about a
+    // quad and a half. Chunk-local by design: a road in the next chunk over
+    // eases its own side from its own quads.
+    if (out.suitability > 0.0f) {
+        constexpr float kVergeQuads = 1.4f;  // ~6 yards
+        float nearest = kVergeQuads;
+        for (int vy = quadY - 2; vy <= quadY + 2; ++vy) {
+            for (int vx = quadX - 2; vx <= quadX + 2; ++vx) {
+                if (vx < 0 || vx > 7 || vy < 0 || vy > 7) continue;
+                bool bare = chunk.isEffectDisabled(vy, vx);
+                if (!bare) {
+                    const uint32_t layer = chunk.effectLayerFor(vy, vx);
+                    bare = layer < context.layerCount && context.roadLike[layer];
+                }
+                if (!bare) continue;
+                // Distance to the quad's rectangle, not its centre, so a
+                // straight road edge eases evenly along its whole length.
+                const float dx = std::max({static_cast<float>(vx) - fracX,
+                                           fracX - static_cast<float>(vx + 1), 0.0f});
+                const float dy = std::max({static_cast<float>(vy) - fracY,
+                                           fracY - static_cast<float>(vy + 1), 0.0f});
+                nearest = std::min(nearest, std::sqrt(dx * dx + dy * dy));
+            }
+        }
+        const float t = clamp01(nearest / kVergeQuads);
+        out.wildness = t * t * (3.0f - 2.0f * t);
+    }
 
     // Steep ground holds less, and holds none at all past the point where it
     // reads as a cliff face.

@@ -560,6 +560,17 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                     applySettingSideEffects("grassheight");
                     saveCallback();
                 }
+                if (ImGui::SliderInt("Grass Distance", &pendingGrassDistance,
+                                     30, 800, "%d yd")) {
+                    applySettingSideEffects("grassdistance");
+                    saveCallback();
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("How far out grass draws. Past 45 yards the field\n"
+                                      "thins with distance, so long ranges cost blades\n"
+                                      "slowly; very long ranges rebuild over a few seconds\n"
+                                      "as you move.");
+                }
 
                 ImGui::Spacing();
                 ImGui::SeparatorText("Upscaling");
@@ -932,6 +943,7 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "grassenabled",   .asBool  = &SettingsPanel::pendingGrassEnabled},
     {.key = "grassdensity",   .asInt   = &SettingsPanel::pendingGrassDensity},
     {.key = "grassheight",    .asInt   = &SettingsPanel::pendingGrassHeight},
+    {.key = "grassdistance",  .asInt   = &SettingsPanel::pendingGrassDistance},
     {.key = "groundclutter",  .asInt   = &SettingsPanel::pendingGroundClutterDensity,
      .fraction = true},
     {.key = "effectsvolume",  .asInt   = &SettingsPanel::pendingEffectsVolume,
@@ -1249,7 +1261,8 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
                 }
             }
         }
-    } else if (key == "grassenabled" || key == "grassdensity" || key == "grassheight") {
+    } else if (key == "grassenabled" || key == "grassdensity" || key == "grassheight" ||
+               key == "grassdistance") {
         // Grass belonged in its own branch all along. These calls were sitting
         // inside the soundtrack's, so changing the soundtrack applied the grass
         // settings and changing a grass setting did nothing at all - the key
@@ -1258,6 +1271,7 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
             renderer->setGrassEnabled(pendingGrassEnabled);
             renderer->setGrassScales(static_cast<float>(pendingGrassDensity) / 100.0f,
                                      static_cast<float>(pendingGrassHeight) / 100.0f);
+            renderer->setGrassDistance(static_cast<float>(pendingGrassDistance));
         }
     } else if (isVolumeKey(key)) {
         // Every volume goes through one call, because each of them is a balance

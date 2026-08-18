@@ -75,22 +75,31 @@ static_assert(sizeof(GrassCullUniformsGPU) == 128,
 static_assert(offsetof(GrassCullUniformsGPU, cameraPos) == 96);
 static_assert(offsetof(GrassCullUniformsGPU, bladeCount) == 112);
 
-/// One vegetation profile, as the vertex and fragment shaders read it.
+/// One vegetation profile, as the vertex shader reads it.
 ///
-/// Matches `GrassProfile` in `grass.vert.glsl` and `grass.frag.glsl` (std430).
-/// Only what the GPU needs: the scales that change a blade's geometry and how
-/// many of them there are were already applied when the population was
-/// generated, so they never reach the device.
+/// Matches `GrassProfile` in `grass.vert.glsl` (std430). Only what the GPU
+/// needs: the scales that change a blade's geometry and how many of them
+/// there are were already applied when the population was generated, so they
+/// never reach the device. The bloom and head anchors are per-profile so a
+/// biome can put tulips in one zone and wheat gold in another.
 struct GrassProfileGPU {
     glm::vec4 rootColor{};   ///< xyz colour, w unused
     glm::vec4 tipColor{};    ///< xyz colour, w unused
     glm::vec4 params{};      ///< x colourVariation, y stiffness, z bloomChance, w seedChance
+    glm::vec4 bloomColorA{}; ///< xyz colour, w unused; blade blends A toward B
+    glm::vec4 bloomColorB{};
+    glm::vec4 headColorA{};  ///< xyz colour, w unused; seed head range
+    glm::vec4 headColorB{};
 };
 
-static_assert(sizeof(GrassProfileGPU) == 48,
-              "GrassProfileGPU must be 48 bytes to match the std430 GrassProfile");
+static_assert(sizeof(GrassProfileGPU) == 112,
+              "GrassProfileGPU must be 112 bytes to match the std430 GrassProfile");
 static_assert(offsetof(GrassProfileGPU, tipColor) == 16);
 static_assert(offsetof(GrassProfileGPU, params) == 32);
+static_assert(offsetof(GrassProfileGPU, bloomColorA) == 48);
+static_assert(offsetof(GrassProfileGPU, bloomColorB) == 64);
+static_assert(offsetof(GrassProfileGPU, headColorA) == 80);
+static_assert(offsetof(GrassProfileGPU, headColorB) == 96);
 
 } // namespace rendering
 } // namespace wowee

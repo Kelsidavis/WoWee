@@ -30,6 +30,9 @@ struct GrassSuitability {
     /// The ground effect contributing most of that, or 0 when none does. What
     /// Phase 4 turns into a vegetation profile.
     uint32_t effectId = 0;
+    /// The chunk's AreaTable id, for the per-zone biome overrides. Carried
+    /// whether or not anything grows, since it costs nothing to read.
+    uint32_t areaId = 0;
     /// 0 flat, 1 vertical. From the chunk's own normals.
     ///
     /// Only meaningful when suitability is above zero. A chunk where nothing
@@ -52,6 +55,12 @@ struct GrassSuitability {
     /// with no bloom - because light does not reach it and nothing flowers
     /// under a pond.
     bool submerged = false;
+    /// 0 beside a road, path or no-grow ground, easing to 1 in open country.
+    /// The generator shortens and thins by this, so a verge gives way to the
+    /// wild over a few yards instead of full meadow growing to the last
+    /// texel of tarmac. Callers with their own clearings (buildings, props)
+    /// multiply theirs in.
+    float wildness = 1.0f;
 };
 
 /// Density for a ground-effect id; 0 (or an unknown id) means no vegetation.
@@ -72,6 +81,10 @@ struct ChunkGrassContext {
     std::vector<uint8_t> alpha[4];
     /// Whether each layer's ground effect grows anything.
     bool grows[4] = {};
+    /// Whether the layer's texture is a made surface - road, path, cobble.
+    /// Kept apart from grows so the verge easing knows a road from ground
+    /// that merely grows nothing.
+    bool roadLike[4] = {};
     uint32_t effectId[4] = {};
     size_t layerCount = 0;
     /// False when no layer's ground effect grows anything, which makes every

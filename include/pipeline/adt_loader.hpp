@@ -50,6 +50,12 @@ struct MapChunk {
     uint32_t indexY = 0;
     uint32_t areaId = 0;     // AreaTable ID for this precise terrain chunk
     uint16_t holes = 0;      // 4x4 bitmask for terrain holes (cave entrances, etc.)
+    uint64_t noEffectDoodad = 0;  // 8x8 quad bitmask: 1 = no ground effect doodads
+    // 2 bits per quad of the 8x8 grid: which of the four texture layers this
+    // quad takes its ground effect from. A quad whose dominant paint is dirt
+    // points at the dirt layer, and grows what dirt grows - nothing - even
+    // where a grassy layer's alpha bleeds a few faint texels across it.
+    std::array<uint8_t, 16> doodadMapping{};
     float position[3] = {};  // World position (X, Y, Z)
 
     HeightMap heightMap;
@@ -68,6 +74,22 @@ struct MapChunk {
         int row = x / 2;
         int bit = 1 << (column * 4 + row);
         return (bit & holes) != 0;
+    }
+
+    // Whether the map forbids ground effect doodads on a quad (indices 0-7).
+    // This is how the data keeps clutter off tilled fields, building
+    // footprints and interior floors: the ground there is often painted with
+    // a texture whose effect grows, and only this mask says not to.
+    // Bit order matches isHole's: y-major, x fastest.
+    [[nodiscard]] bool isEffectDisabled(int y, int x) const {
+        return (noEffectDoodad >> (y * 8 + x)) & 1u;
+    }
+
+    // Which layer (0-3) a quad takes its ground effect from. Same y-major
+    // order as the masks above, two bits per quad.
+    [[nodiscard]] uint32_t effectLayerFor(int y, int x) const {
+        const int quad = y * 8 + x;
+        return (doodadMapping[quad / 4] >> ((quad % 4) * 2)) & 3u;
     }
 };
 

@@ -6,6 +6,7 @@
 #include "rendering/shadow_params.hpp"
 
 #include "pipeline/blp_loader.hpp"
+#include "pipeline/grass_clearing.hpp"
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
@@ -339,6 +340,16 @@ public:
 
     /** Dump diagnostic info about WMO groups overlapping a position */
     void debugDumpGroupsAtPosition(float glX, float glY, float glZ) const;
+
+    /**
+     * Append the 2D footprints of instances touching the given window, for
+     * the grass generator's clearings - grass grows short and sparse beside
+     * a building the way it does beside a road. Per-group boxes rather than
+     * the instance's outer bounds: a keep's outer box swallows its own
+     * courtyards, and a courtyard is exactly where grass belongs.
+     */
+    void collectGrassClearings(float minX, float minY, float maxX, float maxY,
+                               std::vector<pipeline::GrassClearingSource>& out) const;
 
     /**
      * Check wall collision and adjust position

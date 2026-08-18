@@ -134,6 +134,10 @@ GrassProfile deriveProfile(const std::vector<std::string>& modelPaths,
     out.stiffness = 0.0f;
     out.bloomChance = 0.0f;
     out.seedChance = 0.0f;
+    out.bloomColorA = glm::vec3(0.0f);
+    out.bloomColorB = glm::vec3(0.0f);
+    out.headColorA = glm::vec3(0.0f);
+    out.headColorB = glm::vec3(0.0f);
 
     for (size_t i = 0; i < modelPaths.size(); ++i) {
         const float w = equalWeights
@@ -151,6 +155,10 @@ GrassProfile deriveProfile(const std::vector<std::string>& modelPaths,
         out.stiffness += p.stiffness * k;
         out.bloomChance += p.bloomChance * k;
         out.seedChance += p.seedChance * k;
+        out.bloomColorA += p.bloomColorA * k;
+        out.bloomColorB += p.bloomColorB * k;
+        out.headColorA += p.headColorA * k;
+        out.headColorB += p.headColorB * k;
     }
     return out;
 }

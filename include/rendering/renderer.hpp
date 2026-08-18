@@ -16,6 +16,9 @@
 #include "rendering/sky_system.hpp"
 #include "pipeline/custom_zone_discovery.hpp"
 
+#include "pipeline/grass_biomes.hpp"
+#include "pipeline/grass_clearing.hpp"
+#include "pipeline/grass_population.hpp"
 #include "pipeline/grass_profile.hpp"
 
 namespace wowee {
@@ -459,11 +462,22 @@ private:
     // reproduces every blade that is still in range rather than reshuffling.
     glm::vec3 grassWindowCenter_{0.0f};
     bool grassWindowValid_ = false;
+    // The window being generated, a bounded number of lattice cells per
+    // frame. Small windows still finish inside one; the ones the distance
+    // slider allows take as many frames as they take, and upload when done.
+    pipeline::GrassPopulationBuilder grassBuilder_;
+    glm::vec3 grassBuildCenter_{0.0f};
+    // Clearings around placed WMOs and props for the window being built,
+    // gathered once per rebuild from the renderers that own the instances.
+    pipeline::GrassClearingField grassClearing_;
     void updateGrassPopulation();
 public:
     /** Grass density and height, as fractions of the generator's defaults.
      * Set from the settings panel; either changing rebuilds the field. */
     void setGrassScales(float density, float height);
+    /** How far out grass draws, in yards. Density thins with distance past
+     * the near field, so range costs blades logarithmically, not by area. */
+    void setGrassDistance(float yards);
     /** Turn grass on or off. Off is the default: it is new, it costs
      * generation time on the main thread, and turning it off has to release
      * what it was holding rather than merely stop drawing. */
@@ -472,12 +486,20 @@ private:
     bool grassEnabled_ = false;
     float grassDensityScale_ = 1.0f;
     float grassHeightScale_ = 1.0f;
-    // effectId -> index into the profile table, built as effects are met.
-    // Grass profiles are a blend of five categories, so distinct ones are far
-    // fewer than the hundreds of ground effects that map onto them.
-    std::unordered_map<uint32_t, uint32_t> grassProfileIndex_;
+    float grassDistance_ = 45.0f;
+    // (biome, effectId) -> index into the profile table, built as effects are
+    // met. Grass profiles are a blend of five categories crossed with the
+    // biome overrides, so distinct ones stay far fewer than the hundreds of
+    // ground effects that map onto them.
+    std::unordered_map<uint64_t, uint32_t> grassProfileIndex_;
     std::vector<pipeline::GrassProfile> grassProfiles_;
-    uint32_t grassProfileFor(uint32_t effectId);
+    uint32_t grassProfileFor(uint32_t effectId, uint32_t areaId);
+    // The per-zone look table from assets/grass_biomes.json, loaded on first
+    // use, and a memo of which biome each area resolved to - resolution walks
+    // AreaTable parentage and runs per blade sample without it.
+    pipeline::GrassBiomeSet grassBiomes_;
+    bool grassBiomesLoaded_ = false;
+    std::unordered_map<uint32_t, uint32_t> grassBiomeForArea_;
     // Session totals, reported once at shutdown. The log is bounded and the
     // per-rebuild lines rotate out of it whenever the player stands still for
     // a minute, so the tail is the only place a "check the log" can rely on.

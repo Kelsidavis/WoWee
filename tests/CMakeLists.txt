@@ -1945,6 +1945,22 @@ wowee_add_test(test_grass_profile
     SOURCES test_grass_profile.cpp
             ${CMAKE_SOURCE_DIR}/src/pipeline/grass_profile.cpp)
 
+# ── test_grass_biomes ──────────────────────────────────
+# The per-zone look table: parsing, subzone-over-zone matching, and that an
+# override multiplies the scales and replaces the colours it names while
+# leaving everything else the effect data derived.
+wowee_add_test(test_grass_biomes
+    SOURCES test_grass_biomes.cpp
+            ${CMAKE_SOURCE_DIR}/src/pipeline/grass_biomes.cpp
+            ${CMAKE_SOURCE_DIR}/src/pipeline/grass_profile.cpp)
+
+# ── test_grass_clearing ────────────────────────────────
+# The clearings the placed world presses into the grass: box distance, the
+# cleared ring, the ease band, and the minimum across overlapping sources.
+wowee_add_test(test_grass_clearing
+    SOURCES test_grass_clearing.cpp
+            ${CMAKE_SOURCE_DIR}/src/pipeline/grass_clearing.cpp)
+
 # ── test_grass_cull_math ───────────────────────────────
 # The frustum arithmetic the grass cull performs, run for a camera turned all
 # the way round. Grass vanishing in one world direction is a claim about this

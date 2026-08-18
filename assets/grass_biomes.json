@@ -1,0 +1,384 @@
+// Per-zone grass art direction. What GROWS is the map data's decision
+// (ground effects, alpha weights, the no-grow masks); this file only decides
+// what it looks like there. See include/pipeline/grass_biomes.hpp.
+//
+// Matching: "areas" matches a chunk's AreaTable id directly (subzones) and
+// wins over "zones", which matches after walking AreaTable parentage up to
+// the zone. First matching entry wins, so put specific rows first.
+//
+// Fields: heightScale / widthScale / densityScale MULTIPLY the profile the
+// effect data derived (densityScale 0 = no grass at all). Everything else
+// REPLACES: rootColor / tipColor ([r,g,b] 0-1; still blended toward the
+// ground texture's own tones by the shader), colorVariation, stiffness,
+// bloomChance, seedChance, and the two-anchor palettes bloomColorA/B (each
+// blade's flower blends between them) and headColorA/B (seed head range).
+{
+  "biomes": [
+    // ── Eastern Kingdoms ─────────────────────────────────────────────
+    {
+      "name": "Elwynn Forest",
+      "zones": [12],
+      "heightScale": 0.75,
+      "tipColor": [0.32, 0.52, 0.18],
+      "bloomChance": 0.30,
+      "bloomColorA": [0.85, 0.16, 0.14],   // tulip red
+      "bloomColorB": [0.95, 0.78, 0.20],   // tulip yellow
+      "seedChance": 0.08
+    },
+    {
+      "name": "Westfall",
+      "zones": [40],
+      "heightScale": 1.35,
+      "rootColor": [0.35, 0.28, 0.10],
+      "tipColor": [0.78, 0.64, 0.22],
+      "colorVariation": 0.10,
+      "stiffness": 1.3,
+      "bloomChance": 0.01,
+      "seedChance": 0.85,
+      "headColorA": [0.85, 0.74, 0.42],    // pale wheat gold
+      "headColorB": [0.62, 0.48, 0.18]     // deep ripe gold
+    },
+    {
+      "name": "Duskwood",
+      "zones": [10],
+      "heightScale": 1.25,
+      "rootColor": [0.20, 0.18, 0.10],
+      "tipColor": [0.62, 0.55, 0.26],
+      "colorVariation": 0.12,
+      "bloomChance": 0.0,
+      "seedChance": 0.80,
+      "headColorA": [0.70, 0.62, 0.38],    // wheat, dimmed for the gloom
+      "headColorB": [0.45, 0.38, 0.20]
+    },
+    {
+      "name": "Redridge Mountains",
+      "zones": [44],
+      "tipColor": [0.45, 0.44, 0.16],
+      "bloomChance": 0.06,
+      "bloomColorA": [0.80, 0.25, 0.10],   // poppy red
+      "bloomColorB": [0.90, 0.55, 0.15],   // orange
+      "seedChance": 0.35
+    },
+    {
+      "name": "Stranglethorn Vale",
+      "zones": [33],
+      "heightScale": 1.3,
+      "widthScale": 1.3,
+      "rootColor": [0.05, 0.14, 0.04],
+      "tipColor": [0.16, 0.45, 0.14],
+      "stiffness": 1.2,
+      "bloomChance": 0.10,
+      "bloomColorA": [0.90, 0.20, 0.35],   // hibiscus
+      "bloomColorB": [0.95, 0.60, 0.20],
+      "seedChance": 0.05
+    },
+    {
+      "name": "Dun Morogh",
+      "zones": [1],
+      "heightScale": 0.6,
+      "densityScale": 0.55,
+      "rootColor": [0.15, 0.20, 0.16],
+      "tipColor": [0.42, 0.52, 0.42],      // frosted sage
+      "bloomChance": 0.02,
+      "bloomColorA": [0.92, 0.94, 0.98],   // snowdrop white
+      "bloomColorB": [0.55, 0.65, 0.90],   // alpine blue
+      "seedChance": 0.10
+    },
+    {
+      "name": "Loch Modan",
+      "zones": [38],
+      "tipColor": [0.38, 0.50, 0.20],
+      "bloomChance": 0.08,
+      "bloomColorA": [0.95, 0.85, 0.30],
+      "bloomColorB": [0.92, 0.92, 0.85]
+    },
+    {
+      "name": "Wetlands",
+      "zones": [11],
+      "heightScale": 1.35,
+      "rootColor": [0.08, 0.12, 0.06],
+      "tipColor": [0.25, 0.40, 0.18],
+      "bloomChance": 0.03,
+      "seedChance": 0.30
+    },
+    {
+      "name": "Badlands",
+      "zones": [3],
+      "densityScale": 0.15,
+      "heightScale": 0.5,
+      "tipColor": [0.55, 0.42, 0.22],
+      "bloomChance": 0.0,
+      "seedChance": 0.6
+    },
+    { "name": "Searing Gorge",   "zones": [51], "densityScale": 0.0 },
+    { "name": "Burning Steppes", "zones": [46], "densityScale": 0.0 },
+    {
+      "name": "Blasted Lands",
+      "zones": [4],
+      "densityScale": 0.08,
+      "tipColor": [0.45, 0.28, 0.16],
+      "bloomChance": 0.0,
+      "seedChance": 0.5
+    },
+    {
+      "name": "Swamp of Sorrows",
+      "zones": [8],
+      "heightScale": 1.2,
+      "tipColor": [0.22, 0.38, 0.16],
+      "bloomChance": 0.02
+    },
+    {
+      "name": "Deadwind Pass",
+      "zones": [41],
+      "densityScale": 0.25,
+      "tipColor": [0.38, 0.36, 0.30],
+      "bloomChance": 0.0,
+      "seedChance": 0.7,
+      "headColorA": [0.55, 0.52, 0.44],    // gray straw
+      "headColorB": [0.30, 0.28, 0.24]
+    },
+    {
+      "name": "Tirisfal Glades",
+      "zones": [85],
+      "densityScale": 0.7,
+      "tipColor": [0.35, 0.42, 0.24],
+      "bloomChance": 0.03,
+      "bloomColorA": [0.80, 0.78, 0.60],   // pale sickly
+      "bloomColorB": [0.60, 0.62, 0.45],
+      "seedChance": 0.35
+    },
+    {
+      "name": "Silverpine Forest",
+      "zones": [130],
+      "densityScale": 0.7,
+      "tipColor": [0.30, 0.38, 0.26],
+      "bloomChance": 0.02
+    },
+    {
+      "name": "Hillsbrad Foothills",
+      "zones": [267],
+      "tipColor": [0.35, 0.55, 0.20],
+      "bloomChance": 0.12,
+      "bloomColorA": [0.95, 0.85, 0.30],
+      "bloomColorB": [0.92, 0.92, 0.85],
+      "seedChance": 0.12
+    },
+    {
+      "name": "Alterac Mountains",
+      "zones": [36],
+      "heightScale": 0.7,
+      "tipColor": [0.36, 0.46, 0.30],
+      "bloomChance": 0.06,
+      "bloomColorA": [0.92, 0.94, 0.98],
+      "bloomColorB": [0.55, 0.65, 0.90]
+    },
+    {
+      "name": "Arathi Highlands",
+      "zones": [45],
+      "tipColor": [0.52, 0.50, 0.22],
+      "bloomChance": 0.04,
+      "seedChance": 0.45
+    },
+    {
+      "name": "The Hinterlands",
+      "zones": [47],
+      "heightScale": 1.15,
+      "tipColor": [0.22, 0.44, 0.18],
+      "bloomChance": 0.06,
+      "bloomColorA": [0.60, 0.45, 0.85],
+      "bloomColorB": [0.90, 0.90, 0.95]
+    },
+    {
+      "name": "Western Plaguelands",
+      "zones": [28],
+      "densityScale": 0.6,
+      "tipColor": [0.48, 0.50, 0.24],
+      "bloomChance": 0.01
+    },
+    {
+      "name": "Eastern Plaguelands",
+      "zones": [139],
+      "densityScale": 0.4,
+      "tipColor": [0.42, 0.34, 0.18],
+      "bloomChance": 0.0,
+      "seedChance": 0.6
+    },
+
+    // ── Kalimdor ─────────────────────────────────────────────────────
+    {
+      "name": "Durotar",
+      "zones": [14],
+      "densityScale": 0.6,
+      "heightScale": 0.9,
+      "tipColor": [0.55, 0.45, 0.20],
+      "seedChance": 0.5,
+      "headColorA": [0.80, 0.68, 0.38],
+      "headColorB": [0.55, 0.42, 0.18]
+    },
+    {
+      "name": "The Barrens",
+      "zones": [17],
+      "heightScale": 1.3,
+      "rootColor": [0.25, 0.20, 0.08],
+      "tipColor": [0.62, 0.52, 0.22],
+      "stiffness": 1.3,
+      "bloomChance": 0.01,
+      "seedChance": 0.55,
+      "headColorA": [0.85, 0.74, 0.42],
+      "headColorB": [0.60, 0.48, 0.22]
+    },
+    {
+      "name": "Mulgore",
+      "zones": [215],
+      "tipColor": [0.45, 0.50, 0.20],
+      "bloomChance": 0.15,
+      "bloomColorA": [0.95, 0.85, 0.30],
+      "bloomColorB": [0.92, 0.92, 0.85],
+      "seedChance": 0.25
+    },
+    {
+      "name": "Teldrassil",
+      "zones": [141],
+      "tipColor": [0.25, 0.48, 0.32],
+      "bloomChance": 0.18,
+      "bloomColorA": [0.60, 0.40, 0.85],   // violet
+      "bloomColorB": [0.85, 0.50, 0.75],   // pink
+      "seedChance": 0.05
+    },
+    {
+      "name": "Darkshore",
+      "zones": [148],
+      "densityScale": 0.75,
+      "tipColor": [0.28, 0.38, 0.28],
+      "bloomChance": 0.03
+    },
+    {
+      "name": "Ashenvale",
+      "zones": [331],
+      "tipColor": [0.18, 0.40, 0.20],
+      "bloomChance": 0.12,
+      "bloomColorA": [0.90, 0.90, 0.95],
+      "bloomColorB": [0.60, 0.45, 0.85]
+    },
+    {
+      "name": "Stonetalon Mountains",
+      "zones": [406],
+      "densityScale": 0.6,
+      "tipColor": [0.42, 0.42, 0.20],
+      "seedChance": 0.4
+    },
+    {
+      "name": "Desolace",
+      "zones": [405],
+      "densityScale": 0.1,
+      "tipColor": [0.40, 0.38, 0.32],
+      "bloomChance": 0.0,
+      "seedChance": 0.5
+    },
+    {
+      "name": "Dustwallow Marsh",
+      "zones": [15],
+      "heightScale": 1.2,
+      "tipColor": [0.20, 0.32, 0.14],
+      "bloomChance": 0.01
+    },
+    {
+      "name": "Feralas",
+      "zones": [357],
+      "heightScale": 1.25,
+      "tipColor": [0.20, 0.48, 0.18],
+      "bloomChance": 0.12,
+      "bloomColorA": [0.90, 0.45, 0.65],
+      "bloomColorB": [0.95, 0.85, 0.30]
+    },
+    {
+      "name": "Thousand Needles",
+      "zones": [400],
+      "densityScale": 0.25,
+      "tipColor": [0.55, 0.40, 0.18],
+      "seedChance": 0.5
+    },
+    { "name": "Tanaris",  "zones": [440],  "densityScale": 0.0 },
+    {
+      "name": "Un'Goro Crater",
+      "zones": [490],
+      "heightScale": 1.4,
+      "widthScale": 1.4,
+      "tipColor": [0.18, 0.48, 0.16],
+      "bloomChance": 0.15,
+      "bloomColorA": [0.95, 0.35, 0.20],
+      "bloomColorB": [0.90, 0.75, 0.20]
+    },
+    { "name": "Silithus", "zones": [1377], "densityScale": 0.0 },
+    {
+      "name": "Felwood",
+      "zones": [361],
+      "densityScale": 0.65,
+      "tipColor": [0.32, 0.44, 0.16],
+      "bloomChance": 0.05,
+      "bloomColorA": [0.65, 0.75, 0.20],   // sickly green-yellow
+      "bloomColorB": [0.50, 0.60, 0.15]
+    },
+    {
+      "name": "Azshara",
+      "zones": [16],
+      "tipColor": [0.50, 0.44, 0.18],
+      "bloomChance": 0.05,
+      "bloomColorA": [0.90, 0.55, 0.15],
+      "bloomColorB": [0.85, 0.35, 0.15]
+    },
+    {
+      "name": "Winterspring",
+      "zones": [618],
+      "densityScale": 0.35,
+      "heightScale": 0.55,
+      "tipColor": [0.50, 0.58, 0.52],
+      "bloomChance": 0.03,
+      "bloomColorA": [0.92, 0.94, 0.98],
+      "bloomColorB": [0.55, 0.65, 0.90]
+    },
+    {
+      "name": "Moonglade",
+      "zones": [493],
+      "tipColor": [0.28, 0.50, 0.26],
+      "bloomChance": 0.14,
+      "bloomColorA": [0.90, 0.90, 0.95],
+      "bloomColorB": [0.60, 0.45, 0.85]
+    },
+
+    // ── Outland ──────────────────────────────────────────────────────
+    { "name": "Hellfire Peninsula", "zones": [3483], "densityScale": 0.0 },
+    {
+      "name": "Zangarmarsh",
+      "zones": [3521],
+      "tipColor": [0.22, 0.45, 0.45],
+      "bloomChance": 0.10,
+      "bloomColorA": [0.40, 0.75, 0.85],
+      "bloomColorB": [0.70, 0.50, 0.85]
+    },
+    {
+      "name": "Terokkar Forest",
+      "zones": [3519],
+      "densityScale": 0.7,
+      "tipColor": [0.40, 0.42, 0.24]
+    },
+    {
+      "name": "Nagrand",
+      "zones": [3518],
+      "heightScale": 1.2,
+      "tipColor": [0.30, 0.52, 0.22],
+      "bloomChance": 0.14,
+      "bloomColorA": [0.92, 0.92, 0.85],
+      "bloomColorB": [0.95, 0.85, 0.30]
+    },
+    {
+      "name": "Blade's Edge Mountains",
+      "zones": [3522],
+      "densityScale": 0.3,
+      "tipColor": [0.48, 0.40, 0.22],
+      "seedChance": 0.4
+    },
+    { "name": "Netherstorm",      "zones": [3523], "densityScale": 0.0 },
+    { "name": "Shadowmoon Valley", "zones": [3520], "densityScale": 0.0 }
+  ]
+}

@@ -6,6 +6,7 @@
 
 #include "pipeline/m2_loader.hpp"
 #include "pipeline/blp_loader.hpp"
+#include "pipeline/grass_clearing.hpp"
 #include "rendering/m2_model_classifier.hpp"
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
@@ -509,6 +510,15 @@ public:
     [[nodiscard]] uint32_t getInstanceCount() const { return static_cast<uint32_t>(instances.size()); }
     [[nodiscard]] uint32_t getTotalTriangleCount() const;
     [[nodiscard]] uint32_t getDrawCallCount() const { return lastDrawCallCount; }
+
+    /**
+     * Append the 2D footprints of placed props touching the given window,
+     * for the grass generator's clearings. Ground detail is skipped - it is
+     * the clutter itself - and the footprint radius is capped so a tree
+     * clears the ground at its trunk, not under its whole crown.
+     */
+    void collectGrassClearings(float minX, float minY, float maxX, float maxY,
+                               std::vector<pipeline::GrassClearingSource>& out) const;
 
     // Lighting/fog/shadow are now in per-frame UBO; these are no-ops for API compat
     void setFog(const glm::vec3& /*color*/, float /*start*/, float /*end*/) {}

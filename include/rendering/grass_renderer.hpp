@@ -70,8 +70,10 @@ public:
     bool setProfiles(const std::vector<pipeline::GrassProfile>& profiles);
 
     /// Profiles the table can hold. Ground effects number in the hundreds but
-    /// distinct profiles do not, because they are a blend of five categories.
-    static constexpr uint32_t kMaxProfiles = 64;
+    /// distinct profiles do not, because they are a blend of five categories -
+    /// crossed now with the biome the effect was met in, so the table is
+    /// sized for a session that wanders several zones.
+    static constexpr uint32_t kMaxProfiles = 128;
 
     /// Log how many blades the cull kept, once. Diagnostic only.
     void reportCullResult();
@@ -79,16 +81,28 @@ public:
     [[nodiscard]] bool isReady() const { return pipeline_ != VK_NULL_HANDLE; }
     [[nodiscard]] uint32_t bladeCount() const { return bladeCount_; }
 
-    /// Capacity of the source buffer, in blades.
-    static constexpr uint32_t kMaxBlades = 450000;
+    /// Capacity of the source buffer, in blades. Sized for the largest window
+    /// the grass distance setting allows: past the full-density radius the
+    /// generator thins with distance, so a window's total grows with the log
+    /// of its radius and a million covers the slider's whole range. 64 MB of
+    /// source buffer, allocated once.
+    static constexpr uint32_t kMaxBlades = 1000000;
 
-    /// How far out a blade can draw, and where it starts shrinking away.
-    /// The generation window must stay ahead of kCullDistance even at its
-    /// stalest - renderer.cpp asserts that - and the vertex shader fades
-    /// height over the last stretch so the field never shows a cut edge.
-    /// grass.vert.glsl carries these two numbers; change them together.
+    /// Default draw distance, and the radius inside which density never
+    /// thins. The grass distance setting replaces the former at runtime via
+    /// setCullDistance; the fade band and generation window are derived from
+    /// it, so nothing else changes by hand.
     static constexpr float kCullDistance = 45.0f;
-    static constexpr float kFadeStart = 32.0f;
+
+    /// Where the height fade begins, as a fraction of the cull distance.
+    /// 0.71 of 45 is the 32 the fade always started at.
+    static constexpr float kFadeStartFraction = 32.0f / 45.0f;
+
+    /// The grass distance setting. Blades past this never draw, and the
+    /// height fade tracks it so the field still thins away rather than
+    /// ending on a cut line.
+    void setCullDistance(float yards) { cullDistance_ = yards; }
+    [[nodiscard]] float cullDistance() const { return cullDistance_; }
 
 private:
     bool createSourceBuffer();
@@ -100,6 +114,7 @@ private:
     VkContext* vkCtx_ = nullptr;
     VkDescriptorSetLayout perFrameLayout_ = VK_NULL_HANDLE;
     uint32_t bladeCount_ = 0;
+    float cullDistance_ = kCullDistance;
     bool cullReported_ = false;
     uint32_t framesSincePopulated_ = 0;
     bool drawReported_ = false;

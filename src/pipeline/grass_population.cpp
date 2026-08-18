@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "core/coordinates.hpp"
 
@@ -56,27 +57,28 @@ float smoothNoise(float x, float y, float scale, uint32_t salt) {
 
 } // namespace
 
-bool populateArea(float centerX, float centerY, float radius,
-                  const GrassPopulationParams& params,
-                  const SuitabilitySampler& sample,
-                  std::vector<GrassBladeSample>& out,
-                  size_t maxBlades,
-                  const ProfileLookupFn& profileFor) {
-    out.clear();
-    if (!sample || params.spacing <= 0.0f || radius <= 0.0f) return true;
+void GrassPopulationBuilder::begin(float centerX, float centerY, float radius,
+                                   const GrassPopulationParams& params, size_t maxBlades) {
+    params_ = params;
+    out_.clear();
+    maxBlades_ = maxBlades;
+    centerX_ = centerX;
+    centerY_ = centerY;
+    radiusSq_ = radius * radius;
+    active_ = false;
+    complete_ = true;
+    if (params.spacing <= 0.0f || radius <= 0.0f) return;
 
     const float spacing = params.spacing;
 
     // Anchor the lattice to the world rather than to the centre. Walking east
     // must slide a window over a population that was always there, not shift
     // every blade along with the player.
-    const auto minCellX = static_cast<int32_t>(std::floor((centerX - radius) / spacing));
-    const auto maxCellX = static_cast<int32_t>(std::floor((centerX + radius) / spacing));
-    const auto minCellY = static_cast<int32_t>(std::floor((centerY - radius) / spacing));
-    const auto maxCellY = static_cast<int32_t>(std::floor((centerY + radius) / spacing));
-
-    const float densityScale = std::max(params.densityScale, 0.0f);
-    const float radiusSq = radius * radius;
+    minCellX_ = static_cast<int32_t>(std::floor((centerX - radius) / spacing));
+    maxCellX_ = static_cast<int32_t>(std::floor((centerX + radius) / spacing));
+    cursorY_ = static_cast<int32_t>(std::floor((centerY - radius) / spacing));
+    maxCellY_ = static_cast<int32_t>(std::floor((centerY + radius) / spacing));
+    cursorX_ = minCellX_;
 
     // If the window holds more candidates than the cap allows, thin every one
     // of them by the same factor rather than filling until full and stopping.
@@ -84,15 +86,61 @@ bool populateArea(float centerX, float centerY, float radius,
     // outright - the field simply ends on a line, and which line depends on
     // nothing the player can see. Thinning uniformly degrades the whole window
     // instead, and being hash-driven it stays stable frame to frame.
-    const auto totalCells = static_cast<size_t>(maxCellX - minCellX + 1) *
-                            static_cast<size_t>(maxCellY - minCellY + 1);
-    const float capFactor =
-        (totalCells > maxBlades)
-            ? 0.95f * static_cast<float>(maxBlades) / static_cast<float>(totalCells)
+    //
+    // With a distance falloff the candidates are not the cells: a ring at any
+    // distance past the full-density radius costs the same number of blades,
+    // so what the cap has to be measured against is the falloff's own
+    // integral - pi r0^2 (1 + 2 ln(R / r0)) - not the area that integral is
+    // spread over. Measuring against the cell count thinned a large window's
+    // near field down to nothing, which is the one part of it the player is
+    // standing in.
+    const float r0 = params.fullDensityRadius;
+    double effectiveCells;
+    if (r0 > 0.0f && radius > r0) {
+        const double r0Cells = static_cast<double>(r0) / spacing;
+        effectiveCells = 3.14159265 * r0Cells * r0Cells *
+                         (1.0 + 2.0 * std::log(static_cast<double>(radius) / r0));
+    } else {
+        const double rCells = static_cast<double>(radius) / spacing;
+        effectiveCells = 3.14159265 * rCells * rCells;
+    }
+    // 0.9, not 0.95: the estimate above is the mean of a hash-driven draw,
+    // and a small cap's fluctuation is a few percent of itself. The margin
+    // has to absorb it, or the cap gets hit anyway and cuts the north side
+    // off - the exact failure thinning exists to prevent.
+    capFactor_ =
+        (effectiveCells > static_cast<double>(maxBlades))
+            ? 0.9f * static_cast<float>(static_cast<double>(maxBlades) / effectiveCells)
             : 1.0f;
 
-    for (int32_t cy = minCellY; cy <= maxCellY; ++cy) {
-        for (int32_t cx = minCellX; cx <= maxCellX; ++cx) {
+    active_ = true;
+    complete_ = false;
+}
+
+bool GrassPopulationBuilder::step(const SuitabilitySampler& sample,
+                                  const ProfileLookupFn& profileFor, size_t cellBudget) {
+    if (!active_) return true;
+    if (!sample) {
+        active_ = false;
+        complete_ = true;
+        return true;
+    }
+
+    const GrassPopulationParams& params = params_;
+    const float spacing = params.spacing;
+    const float densityScale = std::max(params.densityScale, 0.0f);
+    const float r0sq = params.fullDensityRadius * params.fullDensityRadius;
+
+    size_t walked = 0;
+    for (int32_t cy = cursorY_; cy <= maxCellY_; ++cy) {
+        for (int32_t cx = cursorX_; cx <= maxCellX_; ++cx) {
+            if (walked >= cellBudget) {
+                cursorY_ = cy;
+                cursorX_ = cx;
+                return false;
+            }
+            ++walked;
+
             // Off the lattice, hard enough that no lattice shows through.
             //
             // A jitter of half a cell keeps every blade inside its own cell,
@@ -111,26 +159,48 @@ bool populateArea(float centerX, float centerY, float radius,
             // Round, not square. Grass draws within a radius of the player, so
             // the corners of a square window were a quarter of the generation
             // cost spent where nothing is ever drawn.
-            const float ddx = wx - centerX;
-            const float ddy = wy - centerY;
-            if (ddx * ddx + ddy * ddy > radiusSq) continue;
+            const float ddx = wx - centerX_;
+            const float ddy = wy - centerY_;
+            const float distSq = ddx * ddx + ddy * ddy;
+            if (distSq > radiusSq_) continue;
+
+            // Thinner with distance, decided before the terrain is consulted.
+            // The keep hash is drawn here so far cells fail their roll cheaply:
+            // suitability and the profile only ever lower the threshold, so a
+            // roll the falloff alone rejects never needed the sample. The same
+            // roll then decides the full test, which keeps a blade's identity
+            // one hash whether or not a falloff is in force.
+            float falloff = 1.0f;
+            if (r0sq > 0.0f && distSq > r0sq) falloff = r0sq / distSq;
+            const float keep = hashUnit(cx, cy, params.seed ^ 0x03u);
+            if (keep >= densityScale * capFactor_ * falloff) continue;
 
             const GrassSuitability fit = sample(wx, wy);
             if (fit.suitability <= 0.0f) continue;
 
-            // What grows here, from what the map plants here. Scree thins
-            // further than meadow does on ground both call suitable.
+            // What grows here, from what the map plants here - and where
+            // "here" is, for the regional overrides. Scree thins further
+            // than meadow does on ground both call suitable.
             const GrassProfileRef profile =
-                profileFor ? profileFor(fit.effectId) : GrassProfileRef{};
+                profileFor ? profileFor(fit.effectId, fit.areaId) : GrassProfileRef{};
 
             // Thin by suitability rather than cutting at a threshold: this is
             // what makes a blend boundary fade out instead of ending on a line.
-            const float keep = hashUnit(cx, cy, params.seed ^ 0x03u);
-            if (keep >= fit.suitability * densityScale * profile.densityScale * capFactor) {
+            // Wildness thins the verges the same way: a stand beside a road or
+            // a wall keeps about a seventh of its blades, easing back to all
+            // of them in the open. The floor is deliberate - trodden-looking
+            // sparse growth beside a path reads as worn, bare ground as paved.
+            const float verges = 0.15f + 0.85f * fit.wildness;
+            if (keep >= fit.suitability * densityScale * profile.densityScale * capFactor_ *
+                            falloff * verges) {
                 continue;
             }
 
-            if (out.size() >= maxBlades) return false;
+            if (out_.size() >= maxBlades_) {
+                active_ = false;
+                complete_ = false;
+                return true;
+            }
 
             GrassBladeSample blade;
             blade.x = wx;
@@ -148,6 +218,11 @@ bool populateArea(float centerX, float centerY, float radius,
                 0.8f + 0.85f * smoothstep01(std::clamp((depthNoise - 0.4f) / 0.35f, 0.0f, 1.0f));
 
             blade.height = params.baseHeight * profile.heightScale * verge * meadowDepth *
+                           // Short beside the built and the paved, full height
+                           // in the wild - the same signal that thinned the
+                           // stand above, so verges look worn rather than
+                           // merely sparse.
+                           (0.45f + 0.55f * fit.wildness) *
                            (1.0f - params.heightVariation +
                             2.0f * params.heightVariation * hashUnit(cx, cy, params.seed ^ 0x04u));
             blade.facing = hashUnit(cx, cy, params.seed ^ 0x05u) * core::coords::TWO_PI;
@@ -161,10 +236,30 @@ bool populateArea(float centerX, float centerY, float radius,
             blade.groundHighlight = fit.groundHighlight;
             blade.hasGroundColor = fit.hasGroundColor;
             blade.submerged = fit.submerged;
-            out.push_back(blade);
+            out_.push_back(blade);
         }
+        // Resuming mid-row starts the inner loop at the cursor; every later
+        // row starts at the window's edge.
+        cursorX_ = minCellX_;
     }
+
+    active_ = false;
+    complete_ = true;
     return true;
+}
+
+bool populateArea(float centerX, float centerY, float radius,
+                  const GrassPopulationParams& params,
+                  const SuitabilitySampler& sample,
+                  std::vector<GrassBladeSample>& out,
+                  size_t maxBlades,
+                  const ProfileLookupFn& profileFor) {
+    GrassPopulationBuilder builder;
+    builder.begin(centerX, centerY, radius, params, maxBlades);
+    while (!builder.step(sample, profileFor, std::numeric_limits<size_t>::max())) {
+    }
+    out = std::move(builder.blades());
+    return builder.complete();
 }
 
 } // namespace pipeline

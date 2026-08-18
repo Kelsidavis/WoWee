@@ -1,6 +1,7 @@
 #include "rendering/renderer.hpp"
 
 #include <fstream>
+#include <iterator>
 #include "addons/lua_api_registrations.hpp"
 #include "core/env_flag.hpp"
 #include "rendering/sky_params_from_lighting.hpp"
@@ -638,6 +639,8 @@ bool Renderer::initialize(core::Window* win) {
     grassRenderer_ = std::make_unique<GrassRenderer>();
     if (!grassRenderer_->initialize(vkCtx, perFrameSetLayout))
         LOG_WARNING("Grass renderer initialization failed (non-fatal)");
+    // The distance setting may have been applied before this existed.
+    grassRenderer_->setCullDistance(grassDistance_);
 
     questMarkerRenderer = std::make_unique<QuestMarkerRenderer>();
     footprintRenderer = std::make_unique<FootprintRenderer>();
@@ -1934,6 +1937,7 @@ void Renderer::setGrassEnabled(bool enabled) {
         // it was holding is the point of turning it off.
         grassRenderer_->setPopulation(nullptr, 0);
     }
+    grassBuilder_ = pipeline::GrassPopulationBuilder{};
     grassWindowValid_ = false;
 }
 
@@ -1947,27 +1951,83 @@ void Renderer::setGrassScales(float density, float height) {
     grassDensityScale_ = d;
     grassHeightScale_ = h;
     // The live population was generated with the old numbers, so it has to go
-    // rather than wait for the player to walk far enough to be rebuilt.
+    // rather than wait for the player to walk far enough to be rebuilt - and
+    // so does a build in progress, which froze them when it began.
+    grassBuilder_ = pipeline::GrassPopulationBuilder{};
     grassWindowValid_ = false;
 }
 
-uint32_t Renderer::grassProfileFor(uint32_t effectId) {
-    const auto known = grassProfileIndex_.find(effectId);
+void Renderer::setGrassDistance(float yards) {
+    // The slider's own range. The ceiling is generosity rather than promise:
+    // a 0.4 yard blade is under a pixel tall past a couple of hundred yards,
+    // so the far end of a long range is carried by the taller seeded stems
+    // and by density, not by every blade surviving.
+    const float d = glm::clamp(yards, 30.0f, 800.0f);
+    if (d == grassDistance_) return;
+    grassDistance_ = d;
+    if (grassRenderer_) grassRenderer_->setCullDistance(d);
+    // Regenerate: the window radius and the falloff are both functions of the
+    // distance, so neither the live population nor a build in progress
+    // matches it any more.
+    grassBuilder_ = pipeline::GrassPopulationBuilder{};
+    grassWindowValid_ = false;
+}
+
+uint32_t Renderer::grassProfileFor(uint32_t effectId, uint32_t areaId) {
+    // The biome table, read once. Its absence is fine - grass then looks the
+    // way the effect data alone says - but a file that exists and does not
+    // parse is an authoring error worth a line.
+    if (!grassBiomesLoaded_) {
+        grassBiomesLoaded_ = true;
+        std::ifstream f("assets/grass_biomes.json");
+        if (f) {
+            const std::string text((std::istreambuf_iterator<char>(f)),
+                                   std::istreambuf_iterator<char>());
+            std::string parseError;
+            grassBiomes_ = pipeline::loadGrassBiomes(text, parseError);
+            if (!parseError.empty()) {
+                LOG_WARNING("Grass biomes: ", parseError);
+            } else {
+                LOG_INFO("Grass biomes: ", grassBiomes_.size(), " regions");
+            }
+        }
+    }
+
+    // Which biome this ground belongs to, memoised per area: the zone walk
+    // costs a few map lookups and this is called for every sampled blade.
+    uint32_t biomeIdx = 0;
+    const auto cachedBiome = grassBiomeForArea_.find(areaId);
+    if (cachedBiome != grassBiomeForArea_.end()) {
+        biomeIdx = cachedBiome->second;
+    } else {
+        const uint32_t zoneId =
+            zoneManager ? zoneManager->resolveAreaZoneId(areaId) : areaId;
+        biomeIdx = grassBiomes_.findFor(areaId, zoneId);
+        grassBiomeForArea_[areaId] = biomeIdx;
+    }
+
+    // Derived once per (biome, effect) and kept. The table is uploaded whole
+    // whenever it grows, which happens a handful of times as the player
+    // crosses into ground they have not stood on before and then stops.
+    const uint64_t key = (static_cast<uint64_t>(biomeIdx) << 32) | effectId;
+    const auto known = grassProfileIndex_.find(key);
     if (known != grassProfileIndex_.end()) return known->second;
 
-    // Derived once per effect and kept. The table is uploaded whole whenever
-    // it grows, which happens a handful of times as the player crosses into
-    // ground they have not stood on before and then stops.
     std::vector<std::string> models;
     std::vector<uint32_t> weights;
     if (terrainManager) terrainManager->getGroundEffectDoodads(effectId, models, weights);
 
+    pipeline::GrassProfile profile = pipeline::deriveProfile(models, weights);
+    if (const auto* biome = grassBiomes_.biome(biomeIdx)) {
+        biome->override_.apply(profile);
+    }
+
     uint32_t index = 0;
     if (grassProfiles_.size() < GrassRenderer::kMaxProfiles) {
         index = static_cast<uint32_t>(grassProfiles_.size());
-        grassProfiles_.push_back(pipeline::deriveProfile(models, weights));
+        grassProfiles_.push_back(profile);
     }
-    grassProfileIndex_[effectId] = index;
+    grassProfileIndex_[key] = index;
     return index;
 }
 
@@ -1976,23 +2036,37 @@ void Renderer::updateGrassPopulation() {
     if (!grassRenderer_ || !grassRenderer_->isReady() || !terrainManager) return;
 
     // How far out blades are generated, and how far the player may walk before
-    // the window is rebuilt. The margin between them is the invariant: at its
-    // stalest the window centre lags the player by a full step, so the grass
-    // ahead reaches (radius - step) - and that must clear the cull distance,
-    // or the field ends at a visible edge on one side of the player and pops
-    // forward on every rebuild. The first set of numbers here had the window
-    // *inside* the cull distance, which is exactly how it looked.
-    constexpr float kWindowRadius = 64.0f;
-    constexpr float kRebuildStep = 18.0f;
-    static_assert(kWindowRadius - kRebuildStep >= GrassRenderer::kCullDistance,
-                  "the stalest window must still reach past the draw distance");
+    // the window is rebuilt. Both follow the grass distance setting. The
+    // margin between them is the invariant: at its stalest the window centre
+    // lags the player by a full step, so the grass ahead reaches
+    // (radius - step) - and that must clear the cull distance, or the field
+    // ends at a visible edge on one side of the player and pops forward on
+    // every rebuild. The first numbers this had put the window *inside* the
+    // cull distance, which is exactly how it looked; building the radius as
+    // distance + step keeps the margin by construction at every distance the
+    // slider allows.
+    const float rebuildStep = std::max(18.0f, grassDistance_ * 0.15f);
+    const float windowRadius = grassDistance_ + rebuildStep;
+    const float rebuildStepSq = rebuildStep * rebuildStep;
 
     const glm::vec3 center = characterPosition;
-    if (grassWindowValid_) {
-        const glm::vec2 moved(center.x - grassWindowCenter_.x, center.y - grassWindowCenter_.y);
-        if (glm::dot(moved, moved) < kRebuildStep * kRebuildStep) return;
-    }
     if (glm::dot(center, center) <= 0.0f) return;  // no character yet
+
+    // Whether a new build has to start. While one is running the comparison
+    // is against its centre rather than the live window's, so walking far
+    // during a long build restarts it around where the player now is instead
+    // of finishing a window they have already left.
+    bool needBegin;
+    if (grassBuilder_.active()) {
+        const glm::vec2 moved(center.x - grassBuildCenter_.x, center.y - grassBuildCenter_.y);
+        needBegin = glm::dot(moved, moved) >= rebuildStepSq;
+    } else if (grassWindowValid_) {
+        const glm::vec2 moved(center.x - grassWindowCenter_.x, center.y - grassWindowCenter_.y);
+        needBegin = glm::dot(moved, moved) >= rebuildStepSq;
+    } else {
+        needBegin = true;
+    }
+    if (!needBegin && !grassBuilder_.active()) return;
 
     // One chunk decoded at a time. populateArea walks cells in world order, so
     // consecutive samples land in the same chunk and this memo almost always
@@ -2110,12 +2184,22 @@ void Renderer::updateGrassPopulation() {
                          " -> suitability=", fit.suitability, " slope=", fit.slope);
             }
         }
-        return pipeline::evaluateGrass(context, *chunk, fracX, fracY);
+        auto fit = pipeline::evaluateGrass(context, *chunk, fracX, fracY);
+        // The terrain's verge eased toward roads; the placed world eases the
+        // same number toward walls and wagon wheels.
+        if (fit.suitability > 0.0f) {
+            fit.wildness = std::min(fit.wildness, grassClearing_.wildness(wx, wy));
+        }
+        return fit;
     };
 
     pipeline::GrassPopulationParams params;
     params.densityScale = grassDensityScale_;
     params.baseHeight *= grassHeightScale_;
+    // Full density out to the default range; past it the keep probability
+    // falls as the square of distance, so the long ranges the slider allows
+    // cost blades by the log of the radius rather than by its area.
+    params.fullDensityRadius = GrassRenderer::kCullDistance;
 
     // Zero means the player turned grass off. Said out loud once: a density of
     // zero produces an empty population through a chain that is otherwise
@@ -2128,17 +2212,41 @@ void Renderer::updateGrassPopulation() {
             LOG_WARNING("Grass: density is 0, so no grass will grow. "
                         "Raise Grass Density in Settings > Graphics to see any.");
         }
+        grassBuilder_ = pipeline::GrassPopulationBuilder{};
         grassRenderer_->setPopulation(nullptr, 0);
         grassWindowCenter_ = center;
         grassWindowValid_ = true;
         return;
     }
 
+    if (needBegin) {
+        // Clearings around the built and the placed, gathered once per
+        // rebuild: the terrain's own verges handle roads and paths, but a
+        // building is a placement, and only its renderer knows where it is.
+        std::vector<pipeline::GrassClearingSource> clearings;
+        const float winMinX = center.x - windowRadius;
+        const float winMaxX = center.x + windowRadius;
+        const float winMinY = center.y - windowRadius;
+        const float winMaxY = center.y + windowRadius;
+        if (wmoRenderer) {
+            wmoRenderer->collectGrassClearings(winMinX, winMinY, winMaxX, winMaxY, clearings);
+        }
+        if (m2Renderer) {
+            m2Renderer->collectGrassClearings(winMinX, winMinY, winMaxX, winMaxY, clearings);
+        }
+        grassClearing_.build(std::move(clearings), winMinX, winMinY, winMaxX, winMaxY);
+
+        grassBuilder_.begin(center.x, center.y, windowRadius, params,
+                            GrassRenderer::kMaxBlades);
+        grassBuildCenter_ = center;
+    }
+
     // WOWEE_GRASS_DEBUG=1: everything about the ground the player is standing
     // on. Screenshots cannot say whether a stretch of cobble resolved to a
     // road layer that was suppressed, a dirt layer that was not, or a grass
     // layer underneath showing through - and those want three different fixes.
-    if (rendering::envFlagEnabled("WOWEE_GRASS_DEBUG")) {
+    // Once per build, not per slice.
+    if (needBegin && rendering::envFlagEnabled("WOWEE_GRASS_DEBUG")) {
         float fx = 0.0f;
         float fy = 0.0f;
         const TerrainTile* tile = nullptr;
@@ -2163,16 +2271,25 @@ void Renderer::updateGrassPopulation() {
                           (road ? " ROAD-SUPPRESSED " : " ") + name;
             }
             const auto fit = pipeline::evaluateGrass(ctx, *here, fx, fy);
+            // The no-effect mask in full, plus the player's own quad. Stand on
+            // a farm row or an abbey floor and this is the line that says
+            // whether the data flags it and whether the bit order reads it
+            // the right way round.
+            const int qx = std::clamp(static_cast<int>(fx), 0, 7);
+            const int qy = std::clamp(static_cast<int>(fy), 0, 7);
             LOG_INFO("Grass under player: frac=(", fx, ",", fy, ") suitability=",
                      fit.suitability, " growsAnything=", ctx.growsAnything ? 1 : 0,
+                     " noEffectDoodad=0x", std::hex, here->noEffectDoodad, std::dec,
+                     " thisQuad=", here->isEffectDisabled(qy, qx) ? "no-grow" : "grows",
+                     " mappedLayer=", here->effectLayerFor(qy, qx),
                      report);
         }
     }
 
     const size_t profilesBefore = grassProfiles_.size();
-    auto profileFor = [this](uint32_t effectId) {
+    auto profileFor = [this](uint32_t effectId, uint32_t areaId) {
         pipeline::GrassProfileRef ref;
-        ref.index = grassProfileFor(effectId);
+        ref.index = grassProfileFor(effectId, areaId);
         const auto& p = grassProfiles_[ref.index];
         ref.heightScale = p.heightScale;
         ref.widthScale = p.widthScale;
@@ -2180,19 +2297,36 @@ void Renderer::updateGrassPopulation() {
         return ref;
     };
 
+    // A bounded number of lattice cells per frame, so a rebuild costs the
+    // same per frame at any window size - a large one just takes more frames
+    // and the field grows in when it lands. The default 45 yard window is a
+    // couple of slices; the slider's far end is a few hundred, several
+    // seconds of background growth in exchange for not hitching once.
+    constexpr size_t kCellsPerSlice = 250000;
     const auto started = std::chrono::steady_clock::now();
-    std::vector<pipeline::GrassBladeSample> blades;
-    const bool complete = populateArea(center.x, center.y, kWindowRadius, params,
-                                       sampler, blades, GrassRenderer::kMaxBlades,
-                                       profileFor);
+    const bool done = grassBuilder_.step(sampler, profileFor, kCellsPerSlice);
 
-    // Only when it grew. The shaders index this by blade, so it has to reach
-    // the device before the population that refers to it does.
+    // Only when it grew, and after every slice rather than at the end: the
+    // shaders index this by blade, so it has to reach the device before the
+    // population that refers to it does.
     if (grassProfiles_.size() != profilesBefore) {
         grassRenderer_->setProfiles(grassProfiles_);
     }
     const double generateMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+    grassWorstGenerateMs_ = std::max(grassWorstGenerateMs_, generateMs);
+    if (!done) return;
+
+    std::vector<pipeline::GrassBladeSample>& blades = grassBuilder_.blades();
+    const bool complete = grassBuilder_.complete();
+    if (!complete) {
+        // The window met the blade cap. The generator thins uniformly when it
+        // can see this coming, so meeting it anyway means the density slider
+        // and the terrain conspired past the estimate - worth a line, because
+        // the visible symptom is a field that ends early on its north side.
+        LOG_WARNING("Grass population truncated at ", blades.size(),
+                    " blades; lower Grass Density or Grass Distance");
+    }
 
     // WOWEE_GRASS_DUMP=1: write the first generated population to a CSV so
     // the field's actual shape around the player can be analysed offline. The
@@ -2213,11 +2347,14 @@ void Renderer::updateGrassPopulation() {
     }
 
     grassRenderer_->setPopulation(blades.data(), blades.size());
-    grassWindowCenter_ = center;
+    // The build's centre, not where the player stands now: they may have
+    // walked most of a rebuild step while the window generated, and measuring
+    // future movement from here rather than from them is what keeps the
+    // stale-window margin honest.
+    grassWindowCenter_ = grassBuildCenter_;
     grassWindowValid_ = true;
     ++grassRebuilds_;
     grassLastCount_ = blades.size();
-    grassWorstGenerateMs_ = std::max(grassWorstGenerateMs_, generateMs);
 
     const double totalMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
@@ -2236,9 +2373,9 @@ void Renderer::updateGrassPopulation() {
         LOG_INFO("Grass population empty: ", sampled, " samples, ", noChunk,
                  " with no chunk under them");
     }
-    LOG_INFO("Grass population rebuilt: ", blades.size(), " blades in ",
+    LOG_INFO("Grass population rebuilt: ", blades.size(), " blades, final slice ",
              static_cast<int>(totalMs), "ms (generate ", static_cast<int>(generateMs),
-             "ms, density ", params.densityScale, ")",
+             "ms, density ", params.densityScale, ", distance ", grassDistance_, ")",
              complete ? "" : " - hit the blade cap");
 }
 

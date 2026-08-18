@@ -250,3 +250,80 @@ TEST_CASE("hitting the blade cap thins the whole window, not its far side",
     REQUIRE(north * 4 > south);
     REQUIRE(south * 4 > north);
 }
+
+TEST_CASE("a build in slices is the build in one call", "[grass][population]") {
+    // The incremental builder exists so a large window can be walked a
+    // bounded number of cells per frame. Slicing must be invisible in the
+    // result: blade identity is the world-anchored cell hash, so however the
+    // walk is divided, the same blades come out in the same order.
+    const GrassPopulationParams params;
+    std::vector<GrassBladeSample> oneCall;
+    REQUIRE(populateArea(50.0f, -30.0f, 12.0f, params, everywhere, oneCall, 100000));
+
+    wowee::pipeline::GrassPopulationBuilder builder;
+    builder.begin(50.0f, -30.0f, 12.0f, params, 100000);
+    REQUIRE(builder.active());
+    size_t slices = 0;
+    while (!builder.step(everywhere, {}, 500)) {
+        ++slices;
+    }
+    REQUIRE(slices > 1);  // small budget, so slicing actually happened
+    REQUIRE(builder.complete());
+
+    const auto& sliced = builder.blades();
+    REQUIRE(!oneCall.empty());
+    REQUIRE(sliced.size() == oneCall.size());
+    for (size_t i = 0; i < sliced.size(); ++i) {
+        REQUIRE(sameBlade(sliced[i], oneCall[i]));
+    }
+}
+
+TEST_CASE("distance falloff thins the far field and leaves the near alone",
+          "[grass][population]") {
+    // Past fullDensityRadius the keep probability falls as 1/d^2, so a ring
+    // at any distance costs the same number of blades. The near field must
+    // not notice: the same roll decides a blade with or without the falloff,
+    // so inside the radius the very same blades come out.
+    GrassPopulationParams params;
+    std::vector<GrassBladeSample> baseline;
+    REQUIRE(populateArea(0.0f, 0.0f, 24.0f, params, everywhere, baseline, 200000));
+
+    params.fullDensityRadius = 8.0f;
+    std::vector<GrassBladeSample> thinned;
+    REQUIRE(populateArea(0.0f, 0.0f, 24.0f, params, everywhere, thinned, 200000));
+
+    auto within = [](const std::vector<GrassBladeSample>& blades, float lo, float hi) {
+        std::vector<GrassBladeSample> out;
+        for (const auto& b : blades) {
+            const float d = std::sqrt(b.x * b.x + b.y * b.y);
+            if (d >= lo && d < hi) out.push_back(b);
+        }
+        return out;
+    };
+
+    // Identical inside the full-density radius.
+    const auto nearBase = within(baseline, 0.0f, 8.0f);
+    const auto nearThin = within(thinned, 0.0f, 8.0f);
+    REQUIRE(!nearBase.empty());
+    REQUIRE(nearThin.size() == nearBase.size());
+    for (size_t i = 0; i < nearThin.size(); ++i) {
+        REQUIRE(sameBlade(nearThin[i], nearBase[i]));
+    }
+
+    // At double the radius the density is about a quarter; assert the half,
+    // which no fluctuation of these counts crosses.
+    const auto farBase = within(baseline, 16.0f, 24.0f);
+    const auto farThin = within(thinned, 16.0f, 24.0f);
+    REQUIRE(!farThin.empty());  // thinner, never gone
+    REQUIRE(farThin.size() * 2 < farBase.size());
+
+    // And every far blade the falloff kept is one the baseline had: thinning
+    // removes blades, it never invents or moves them.
+    size_t matched = 0;
+    for (const auto& t : farThin) {
+        for (const auto& b : farBase) {
+            if (sameBlade(t, b)) { ++matched; break; }
+        }
+    }
+    REQUIRE(matched == farThin.size());
+}

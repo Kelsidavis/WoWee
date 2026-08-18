@@ -137,6 +137,10 @@ bool GrassRenderer::createSourceBuffer() {
         g.tipColor = glm::vec4(meadow.tipColor, 0.0f);
         g.params = glm::vec4(meadow.colorVariation, meadow.stiffness,
                              meadow.bloomChance, meadow.seedChance);
+        g.bloomColorA = glm::vec4(meadow.bloomColorA, 0.0f);
+        g.bloomColorB = glm::vec4(meadow.bloomColorB, 0.0f);
+        g.headColorA = glm::vec4(meadow.headColorA, 0.0f);
+        g.headColorB = glm::vec4(meadow.headColorB, 0.0f);
     }
     AllocatedBuffer profiles = uploadBuffer(*vkCtx_, defaults.data(),
                                             sizeof(GrassProfileGPU) * kMaxProfiles,
@@ -418,7 +422,13 @@ bool GrassRenderer::buildDrawPipeline() {
                                   "assets/shaders/grass.frag.spv", "grass");
     if (!shaders) return false;
 
-    pipelineLayout_ = createPipelineLayout(device, {perFrameLayout_, drawSetLayout_}, {});
+    // The fade band, which tracks the grass distance setting rather than
+    // living in the shader as numbers that had to be changed alongside it.
+    VkPushConstantRange fadeRange{};
+    fadeRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    fadeRange.offset = 0;
+    fadeRange.size = sizeof(float) * 2;
+    pipelineLayout_ = createPipelineLayout(device, {perFrameLayout_, drawSetLayout_}, {fadeRange});
     if (pipelineLayout_ == VK_NULL_HANDLE) return false;
 
     // No vertex input: the shader builds the quad from gl_VertexIndex and reads
@@ -509,7 +519,7 @@ void GrassRenderer::dispatchCull(VkCommandBuffer cmd, uint32_t frameIndex, const
         }
         // Frustum from the camera; range from the player the window is built
         // around. Two different centres on purpose - see the shader comment.
-        uniforms.cameraPos = glm::vec4(rangeCenter, kCullDistance * kCullDistance);
+        uniforms.cameraPos = glm::vec4(rangeCenter, cullDistance_ * cullDistance_);
         // Read once, the way every rendering diagnostic flag is.
         static const bool noFrustum = envFlagEnabled("WOWEE_GRASS_NOCULL");
         static const bool noDistance = envFlagEnabled("WOWEE_GRASS_NODIST");
@@ -574,6 +584,10 @@ bool GrassRenderer::setProfiles(const std::vector<pipeline::GrassProfile>& profi
         packed[i].tipColor = glm::vec4(profiles[i].tipColor, 0.0f);
         packed[i].params = glm::vec4(profiles[i].colorVariation, profiles[i].stiffness,
                                      profiles[i].bloomChance, profiles[i].seedChance);
+        packed[i].bloomColorA = glm::vec4(profiles[i].bloomColorA, 0.0f);
+        packed[i].bloomColorB = glm::vec4(profiles[i].bloomColorB, 0.0f);
+        packed[i].headColorA = glm::vec4(profiles[i].headColorA, 0.0f);
+        packed[i].headColorB = glm::vec4(profiles[i].headColorB, 0.0f);
     }
 
     const VkDeviceSize bytes = sizeof(GrassProfileGPU) * count;
@@ -668,6 +682,8 @@ void GrassRenderer::render(VkCommandBuffer cmd, uint32_t frameIndex,
                             &perFrameSet, 0, nullptr);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 1, 1,
                             &drawSet_[frameIndex], 0, nullptr);
+    const float fade[2] = {cullDistance_ * kFadeStartFraction, cullDistance_};
+    vkCmdPushConstants(cmd, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(fade), fade);
     vkCmdBindIndexBuffer(cmd, indexBuffer_, 0, VK_INDEX_TYPE_UINT16);
     // One command, and its instance count came from the GPU.
     vkCmdDrawIndexedIndirect(cmd, indirectBuffer_[frameIndex], 0, 1,

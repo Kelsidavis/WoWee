@@ -167,10 +167,21 @@ TEST_CASE("grass blending into dirt is continuous across the boundary",
 }
 
 TEST_CASE("suitability follows the dominant layer's effect", "[grass][terrain]") {
+    // "Dominant" is the map's word, not an inference from alpha: the
+    // doodadMapping names each quad's effect layer, and where it names the
+    // grass layer, growth scales with that layer's blend weight. The right
+    // half of this chunk is mapped to the grass overlay; the left half stays
+    // on the road base, however much faint grass alpha reaches it.
     MapChunk chunk = makeFlatChunk();
     chunk.layers.push_back(makeLayer(kRoadEffect));
     const uint32_t offset = appendAlpha(chunk, rampAlpha());
     chunk.layers.push_back(makeLayer(kGrassEffect, 0x100, offset));
+
+    // Quads x >= 4 take their effect from layer 1. Two bits per quad, four
+    // quads per byte: the high byte of each row covers x = 4..7.
+    for (int y = 0; y < 8; ++y) {
+        chunk.doodadMapping[y * 2 + 1] = 0b01010101;
+    }
 
     // Left edge: almost all road. Right edge: almost all grass.
     REQUIRE(evaluateGrass(chunk, 0.16f, 4.0f, densityFor).suitability < 0.1f);
@@ -442,4 +453,103 @@ TEST_CASE("a road over dirt grows nothing, though the dirt would",
     wowee::pipeline::ChunkGrassContext context;
     context.build(chunk, densityFor, nameFor);
     REQUIRE(evaluateGrass(context, chunk, 4.0f, 4.0f).suitability == Catch::Approx(0.0f));
+}
+
+TEST_CASE("a quad the map marks no-effect grows nothing", "[grass][terrain]") {
+    // The MCNK noEffectDoodad mask, one bit per quad of the 8x8 grid. Tilled
+    // farm rows, building footprints and WMO interior floors sit on textures
+    // whose effects grow, and this mask is the only thing in the data that
+    // says nothing should - it is how the original client kept grass off the
+    // fields and out of the abbey.
+    MapChunk chunk = makeFlatChunk();
+    chunk.layers.push_back(makeLayer(kGrassEffect));
+
+    // Quad x=2, y=3, bit order y-major like the hole mask's.
+    chunk.noEffectDoodad = 1ull << (3 * 8 + 2);
+
+    // Inside the marked quad: nothing, though the layer under it grows.
+    REQUIRE(evaluateGrass(chunk, 2.5f, 3.5f, densityFor).suitability ==
+            Catch::Approx(0.0f));
+    // The neighbouring quads are untouched.
+    REQUIRE(evaluateGrass(chunk, 3.5f, 3.5f, densityFor).suitability ==
+            Catch::Approx(1.0f));
+    REQUIRE(evaluateGrass(chunk, 2.5f, 4.5f, densityFor).suitability ==
+            Catch::Approx(1.0f));
+}
+
+TEST_CASE("a faint wash of grass over dirt does not seed the dirt",
+          "[grass][terrain]") {
+    // The doodadMapping: growth follows the layer each quad is assigned to,
+    // not every layer whose alpha touches it. Bare dirt with a few faint
+    // grassy texels blended across stays bare - it was growing a thin stand
+    // of grass from paint the eye reads as dirt.
+    MapChunk chunk = makeFlatChunk();
+    chunk.layers.push_back(makeLayer(kRoadEffect));            // [0] dirt, grows nothing
+
+    std::vector<uint8_t> faint(wowee::pipeline::ALPHA_MAP_SIZE, 40);
+    const uint32_t grassOffset = appendAlpha(chunk, faint);
+    chunk.layers.push_back(makeLayer(kGrassEffect, 0x100, grassOffset));  // [1] faint grass
+
+    // Quad (x=4, y=4) is the one quad the map assigns to the grass layer.
+    // quad index 36: byte 9, bits 0-1.
+    chunk.doodadMapping[9] = 1;
+
+    // A dirt-mapped quad grows nothing, though the grass layer's alpha
+    // touches it.
+    REQUIRE(evaluateGrass(chunk, 2.5f, 4.5f, densityFor).suitability ==
+            Catch::Approx(0.0f));
+
+    // The grass-mapped quad grows at the grass layer's own blend weight.
+    const auto onGrass = evaluateGrass(chunk, 4.5f, 4.5f, densityFor);
+    REQUIRE(onGrass.suitability == Catch::Approx(40.0f / 255.0f).margin(0.02));
+    REQUIRE(onGrass.effectId == kGrassEffect);
+}
+
+TEST_CASE("grass eases toward a road instead of growing to its edge",
+          "[grass][terrain]") {
+    // The verge: wildness is 0 beside a road quad and 1 in the open, and the
+    // generator shortens and thins by it. Suitability itself is untouched -
+    // what grows is still the map's answer; the verge only tempers it.
+    MapChunk chunk = makeFlatChunk();
+    chunk.layers.push_back(makeLayer(kGrassEffect));           // [0] grass
+
+    // A road down the west half: solid alpha on texels x < 32.
+    std::vector<uint8_t> westHalf(wowee::pipeline::ALPHA_MAP_SIZE, 0);
+    for (size_t y = 0; y < wowee::pipeline::ALPHA_MAP_DIM; ++y) {
+        for (size_t x = 0; x < 32; ++x) {
+            westHalf[y * wowee::pipeline::ALPHA_MAP_DIM + x] = 255;
+        }
+    }
+    const uint32_t roadOffset = appendAlpha(chunk, westHalf);
+    TextureLayer road = makeLayer(kRoadEffect, 0x100, roadOffset);
+    road.textureId = 5;
+    chunk.layers.push_back(road);
+
+    // Quads x < 4 take their effect from the road layer.
+    for (int y = 0; y < 8; ++y) {
+        chunk.doodadMapping[y * 2 + 0] = 0b01010101;
+    }
+
+    auto nameFor = [](uint32_t texId) -> std::string {
+        return texId == 5 ? "Tileset\\Elwynn\\ElwynnCobbleRoad.blp" : "";
+    };
+    wowee::pipeline::ChunkGrassContext context;
+    context.build(chunk, densityFor, nameFor);
+
+    // Just east of the road: growing, but tame.
+    const auto verge = evaluateGrass(context, chunk, 4.3f, 4.0f);
+    REQUIRE(verge.suitability > 0.9f);
+    REQUIRE(verge.wildness < 0.2f);
+
+    // Far east: the wild.
+    const auto open = evaluateGrass(context, chunk, 7.5f, 4.0f);
+    REQUIRE(open.suitability > 0.9f);
+    REQUIRE(open.wildness == Catch::Approx(1.0f));
+
+    // The same shape without a road name is just ground that grows nothing -
+    // no verge, because meadow does not shrink from every patch of dirt.
+    wowee::pipeline::ChunkGrassContext plain;
+    plain.build(chunk, densityFor);
+    const auto noRoad = evaluateGrass(plain, chunk, 4.3f, 4.0f);
+    REQUIRE(noRoad.wildness == Catch::Approx(1.0f));
 }

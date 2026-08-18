@@ -50,15 +50,27 @@ layout(std430, set = 1, binding = 1) readonly buffer VisibleIndices {
 
 // Matches GrassProfileGPU in include/rendering/grass_blade.hpp (std430).
 // What grows on this patch of ground, derived from the detail doodads the map
-// plants there.
+// plants there and art-directed per zone by assets/grass_biomes.json.
 struct GrassProfile {
     vec4 rootColor;
     vec4 tipColor;
-    vec4 params;   // x = colour variation, y = stiffness, z = bloom, w = seed
+    vec4 params;      // x = colour variation, y = stiffness, z = bloom, w = seed
+    vec4 bloomColorA; // each blade's flower blends A toward B by its own seed
+    vec4 bloomColorB;
+    vec4 headColorA;  // the seed head's range, straw..plum by default
+    vec4 headColorB;
 };
 
 layout(std430, set = 1, binding = 2) readonly buffer GrassProfiles {
     GrassProfile profiles[];
+};
+
+// The fade band, from GrassRenderer::render. Tracks the grass distance
+// setting: x is where height starts sinking, y the cull distance it reaches
+// zero at, so the field thins away at any range instead of ending on a line.
+layout(push_constant) uniform GrassFade {
+    float fadeStart;
+    float fadeEnd;
 };
 
 layout(location = 0) out float vHeightT;
@@ -76,18 +88,10 @@ const float kSegments = 5.0;
 // How far the wind can lay a blade over, as a fraction of its height.
 const float kWindBend = 0.32;
 
-// The bloom palette. Four is enough for a meadow to read as mixed wildflowers;
-// which one a blade gets is its own seed's business.
-const vec3 kBloomColors[4] = vec3[4](
-    vec3(0.95, 0.80, 0.25),   // yellow
-    vec3(0.90, 0.45, 0.65),   // pink
-    vec3(0.92, 0.92, 0.85),   // white
-    vec3(0.55, 0.45, 0.85));  // violet
-
-// A seed head runs from pale straw to the dark plum-brown of a fescue
-// panicle; where a blade sits between the two is its own seed's business.
-const vec3 kSeedStraw = vec3(0.72, 0.64, 0.42);
-const vec3 kSeedPlum  = vec3(0.32, 0.22, 0.24);
+// Bloom and seed head colours come from the profile now, two anchors each: a
+// blade blends between them by its own seed, so a pair gives a family of
+// related flowers rather than two flowers - and a biome can hand one zone
+// tulips and another wheat gold without either being named here.
 
 // A slow world-space blob field, 0..1, blobs a couple of dozen yards across.
 // What turns "20% of blades" into "most blades over there, few here".
@@ -131,12 +135,11 @@ void main() {
         height *= 0.92;
     }
 
-    // Sink into the ground over the last stretch before the cull distance
-    // (GrassRenderer::kCullDistance / kFadeStart - change together), so the
-    // field thins away instead of ending on a cut line. Distance from the
-    // player, like the cull: the camera orbits, and a fade measured from it
-    // slid around the field as the view turned.
-    height *= 1.0 - smoothstep(32.0, 45.0, distance(root.xy, playerPos.xy));
+    // Sink into the ground over the last stretch before the cull distance,
+    // so the field thins away instead of ending on a cut line. Distance from
+    // the player, like the cull: the camera orbits, and a fade measured from
+    // it slid around the field as the view turned.
+    height *= 1.0 - smoothstep(fadeStart, fadeEnd, distance(root.xy, playerPos.xy));
 
     // Row up the blade and which side of it this vertex is.
     float row  = floor(float(gl_VertexIndex) * 0.5);
@@ -344,13 +347,15 @@ void main() {
     // blade. Seed heads also dry the blade below them a little, which is what
     // sells "gone to seed" rather than "green grass wearing a hat".
     if (seeded) {
-        vec3 headCol = mix(kSeedStraw, kSeedPlum, fract(seed * 53.71));
+        vec3 headCol = mix(profile.headColorA.rgb, profile.headColorB.rgb,
+                           fract(seed * 53.71));
         vHeadColor = vec4(headCol * tint, 1.0);
-        // The stem below a seed head has dried toward straw, whatever colour
-        // the head above it ripened to.
-        vTipColor = mix(vTipColor, kSeedStraw, 0.45);
+        // The stem below a seed head has dried toward the pale end of the
+        // head's own range, whatever colour the head above it ripened to.
+        vTipColor = mix(vTipColor, profile.headColorA.rgb, 0.45);
     } else if (bloom) {
-        vHeadColor = vec4(kBloomColors[int(fract(seed * 71.13) * 4.0) & 3], 1.0);
+        vHeadColor = vec4(mix(profile.bloomColorA.rgb, profile.bloomColorB.rgb,
+                              fract(seed * 71.13)), 1.0);
     } else {
         vHeadColor = vec4(0.0);
     }
