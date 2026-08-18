@@ -111,9 +111,13 @@ public:
     [[nodiscard]] const UIServices& getServices() const { return services_; }
 
 private:
+#ifdef __ANDROID__
     /// Whether the on-screen keyboard is up, so it is raised and lowered once
-    /// per change rather than every frame. Android only; unused elsewhere.
+    /// per change rather than every frame. Declared only where it is read:
+    /// clang makes an unused private field an error, and the desktop builds
+    /// that use gcc did not say so.
     bool softKeyboardUp_ = false;
+#endif
 
     /// How much bigger than a desktop layout this display needs the interface
     /// drawn. Decided once at start-up; the style and the font atlas both use
