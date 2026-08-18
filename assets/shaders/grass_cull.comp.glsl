@@ -65,9 +65,15 @@ void main() {
     // measured from the camera, a swing of the view put the far edge of the
     // draw range outside the generated window, and which side of the field
     // was missing followed the camera around.
+    //
+    // Each blade also carries its own fade distance (groundHighlight.w, sign
+    // borrowed for the submerged flag): its octave level's range, past which
+    // the vertex shader has sunk it to nothing - so a blade past its own
+    // fade is dead weight the draw need not carry.
+    float fadeDist = abs(blade.groundHighlight.w);
     vec3 toCenter = root - rangeCenter.xyz;
     float distSq = dot(toCenter, toCenter);
-    if ((debugFlags & 2u) == 0u && distSq > rangeCenter.w) return;
+    if ((debugFlags & 2u) == 0u && distSq > min(rangeCenter.w, fadeDist * fadeDist)) return;
 
     // Frustum cull. The bounding sphere is centred at half height and sized to
     // cover the blade at full bend, so a blade leaning out of its upright

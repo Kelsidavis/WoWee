@@ -1973,7 +1973,7 @@ void Renderer::setGrassDistance(float yards) {
     // a 0.4 yard blade is under a pixel tall past a couple of hundred yards,
     // so the far end of a long range is carried by the taller seeded stems
     // and by density, not by every blade surviving.
-    const float d = glm::clamp(yards, 30.0f, 800.0f);
+    const float d = glm::clamp(yards, 30.0f, 2000.0f);
     if (d == grassDistance_) return;
     grassDistance_ = d;
     if (grassRenderer_) grassRenderer_->setCullDistance(d);
@@ -2056,7 +2056,13 @@ void Renderer::updateGrassPopulation() {
     // cull distance, which is exactly how it looked; building the radius as
     // distance + step keeps the margin by construction at every distance the
     // slider allows.
-    const float rebuildStep = std::max(18.0f, grassDistance_ * 0.15f);
+    // Constant, not scaled by the distance setting: the octave walk made
+    // rebuild cost grow with the log of the window rather than its area, so
+    // frequent small steps beat rare big ones - and the slack every ring
+    // must carry to cover a stale centre is the step, which at three
+    // hundred yards would have meant full-density generation far past the
+    // near field.
+    const float rebuildStep = 24.0f;
     const float windowRadius = grassDistance_ + rebuildStep;
     const float rebuildStepSq = rebuildStep * rebuildStep;
 
@@ -2207,10 +2213,13 @@ void Renderer::updateGrassPopulation() {
     pipeline::GrassPopulationParams params;
     params.densityScale = grassDensityScale_;
     params.baseHeight *= grassHeightScale_;
-    // Full density out to the default range; past it the keep probability
-    // falls as the square of distance, so the long ranges the slider allows
-    // cost blades by the log of the radius rather than by its area.
+    // Full density out to the base range; past it the lattice coarsens by
+    // octaves, so the long ranges the slider allows cost blades - and build
+    // time - by the log of the radius rather than by its area. The slack
+    // keeps blades in the buffer a rebuild step before they fade in, so a
+    // ride toward them never outruns the window.
     params.fullDensityRadius = GrassRenderer::kCullDistance;
+    params.ringSlack = rebuildStep;
 
     // Zero means the player turned grass off. Said out loud once: a density of
     // zero produces an empty population through a chain that is otherwise
@@ -2308,12 +2317,13 @@ void Renderer::updateGrassPopulation() {
         return ref;
     };
 
-    // A bounded number of lattice cells per frame, so a rebuild costs the
+    // A bounded number of lattice blocks per frame, so a rebuild costs the
     // same per frame at any window size - a large one just takes more frames
-    // and the field grows in when it lands. The default 45 yard window is a
-    // couple of slices; the slider's far end is a few hundred, several
-    // seconds of background growth in exchange for not hitching once.
-    constexpr size_t kCellsPerSlice = 250000;
+    // and the field grows in when it lands. Since the octave walk, nearly
+    // every block surveyed becomes a terrain sample, so the budget is set by
+    // the cost of sampling rather than of walking: small enough to stay off
+    // the frame, large enough that a default window lands in a few slices.
+    constexpr size_t kCellsPerSlice = 64000;
     const auto started = std::chrono::steady_clock::now();
     const bool done = grassBuilder_.step(sampler, profileFor, kCellsPerSlice);
 
