@@ -92,6 +92,17 @@ struct BLPImage {
  * Handles DXT1/3/5 compression and palette formats
  * Format specification: https://wowdev.wiki/BLP
  */
+/// Whether this GPU can sample BC1/BC2/BC3, which is what a DXT BLP's blocks
+/// are handed to it as.
+///
+/// Desktop GPUs all can. Mobile ones generally cannot: Mali and Adreno carry
+/// ASTC and ETC2 instead, and asking them for a BC image gives an untextured
+/// surface rather than an error. Set once from the renderer after the device is
+/// chosen; true until then, which is what every desktop wants and what the
+/// tools that load textures with no device at all want too.
+void setBlockCompressionSupported(bool supported);
+bool blockCompressionSupported();
+
 class BLPLoader {
 public:
     /**

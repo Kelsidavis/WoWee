@@ -194,6 +194,11 @@ public:
     [[nodiscard]] bool areFsr2ComputeFeaturesSupported() const {
         return fsr2ComputeFeaturesSupported_;
     }
+    /// False on hardware without textureCompressionBC, where a DXT BLP has to
+    /// be unpacked to RGBA8 before the GPU can sample it.
+    [[nodiscard]] bool isBlockCompressionSupported() const {
+        return blockCompressionSupported_;
+    }
 
     /// Whether barriers can be recorded as VkDependencyInfo. False means the
     /// same barriers still record, through the legacy entry point.
@@ -465,6 +470,7 @@ private:
     bool samplerAnisotropySupported_ = false;
     bool fillModeNonSolidSupported_ = false;
     bool fsr2ComputeFeaturesSupported_ = false;
+    bool blockCompressionSupported_ = false;
     /// True when the swapchain was built with a transform the surface is not
     /// using, which makes VK_SUBOPTIMAL_KHR permanent rather than a signal.
     bool presentsOffNativeTransform_ = false;

@@ -111,6 +111,18 @@ std::vector<uint8_t> BLPLoader::decodeBaseLevel(const BLPImage& image) {
     return rgba;
 }
 
+namespace {
+bool g_blockCompressionSupported = true;
+}  // namespace
+
+void setBlockCompressionSupported(bool supported) {
+    g_blockCompressionSupported = supported;
+}
+
+bool blockCompressionSupported() {
+    return g_blockCompressionSupported;
+}
+
 BLPImage BLPLoader::load(const std::vector<uint8_t>& blpData, bool keepCompressed) {
     if (blpData.size() < 8) {  // Minimum: magic + first field
         LOG_ERROR("BLP data too small");

@@ -204,6 +204,10 @@ void AssetManager::setBaseFallbackPath(const std::string& basePath) {
 
 BLPImage AssetManager::loadTexture(const std::string& path, bool keepCompressed) {
     ZoneScopedN("AssetManager::loadTexture");
+    // Callers ask for the blocks to save the decompression and the memory. On a
+    // GPU that cannot sample them the saving is a blank surface, so the answer
+    // is no and the loader unpacks to RGBA8 instead.
+    keepCompressed = keepCompressed && blockCompressionSupported();
     if (!initialized) {
         LOG_ERROR("AssetManager not initialized");
         return BLPImage();

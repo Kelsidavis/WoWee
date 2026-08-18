@@ -7,6 +7,7 @@
 #include <fstream>
 #include "rendering/vk_utils.hpp"
 #include "core/logger.hpp"
+#include "pipeline/blp_loader.hpp"
 #include <VkBootstrap.h>
 #include <SDL2/SDL_vulkan.h>
 #include <imgui_impl_vulkan.h>
@@ -536,10 +537,19 @@ bool VkContext::selectPhysicalDevice() {
     fsr2ComputeFeaturesSupported_ =
         enableIfPresent(&VkPhysicalDeviceFeatures::shaderStorageImageWriteWithoutFormat) &&
         enableIfPresent(&VkPhysicalDeviceFeatures::shaderInt16);
+    // A DXT BLP is handed to the GPU as BC1/BC2/BC3. Mobile parts carry ASTC
+    // and ETC2 instead and sample a BC image as nothing at all, which is an
+    // untextured wall and a black doodad rather than an error. Told to the
+    // loader, which then unpacks to RGBA8.
+    blockCompressionSupported_ =
+        enableIfPresent(&VkPhysicalDeviceFeatures::textureCompressionBC);
+    pipeline::setBlockCompressionSupported(blockCompressionSupported_);
     LOG_INFO("Sampler anisotropy supported: ", samplerAnisotropySupported_ ? "YES" : "NO");
     LOG_INFO("Wireframe views supported: ", fillModeNonSolidSupported_ ? "YES" : "NO");
     LOG_INFO("FSR2 compute features supported: ",
              fsr2ComputeFeaturesSupported_ ? "YES" : "NO");
+    LOG_INFO("Block compressed textures (BC1/2/3) supported: ",
+             blockCompressionSupported_ ? "YES" : "NO");
 
     VkPhysicalDeviceDepthStencilResolveProperties dsResolveProps{};
     dsResolveProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_STENCIL_RESOLVE_PROPERTIES;
