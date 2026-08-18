@@ -99,12 +99,6 @@ bool VkContext::initialize(SDL_Window* window) {
     if (!createSyncObjects()) return false;
     if (!createImGuiResources()) return false;
 
-    // Query anisotropy support from the physical device.
-    VkPhysicalDeviceFeatures supportedFeatures{};
-    vkGetPhysicalDeviceFeatures(physicalDevice, &supportedFeatures);
-    samplerAnisotropySupported_ = (supportedFeatures.samplerAnisotropy == VK_TRUE);
-    LOG_INFO("Sampler anisotropy supported: ", samplerAnisotropySupported_ ? "YES" : "NO");
-
     sInstance_ = this;
 
     LOG_INFO("Vulkan context initialized successfully");
@@ -452,21 +446,65 @@ bool VkContext::createSurface(SDL_Window* window) {
     return true;
 }
 
+/// Names every device the loader offers and what each one lacks.
+///
+/// Selection failure otherwise reports "no_suitable_device" and nothing else,
+/// which says neither which devices were considered nor what was wanted of
+/// them. On a phone, where the answer cannot be read off a desktop driver, that
+/// is the whole diagnosis.
+void VkContext::reportUnsuitableDevices() const {
+    uint32_t count = 0;
+    if (vkEnumeratePhysicalDevices(instance, &count, nullptr) != VK_SUCCESS || count == 0) {
+        LOG_ERROR("  the loader offers no Vulkan device at all.");
+        return;
+    }
+    std::vector<VkPhysicalDevice> devices(count);
+    vkEnumeratePhysicalDevices(instance, &count, devices.data());
+
+    LOG_ERROR("  ", count, " device(s) offered:");
+    for (VkPhysicalDevice device : devices) {
+        VkPhysicalDeviceProperties props{};
+        vkGetPhysicalDeviceProperties(device, &props);
+
+        uint32_t familyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &familyCount, nullptr);
+        std::vector<VkQueueFamilyProperties> families(familyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &familyCount, families.data());
+
+        bool graphics = false;
+        bool present = false;
+        for (uint32_t i = 0; i < familyCount; ++i) {
+            if (families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) graphics = true;
+            VkBool32 supported = VK_FALSE;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &supported);
+            if (supported) present = true;
+        }
+
+        LOG_ERROR("    ", props.deviceName,
+                  " - Vulkan ", VK_VERSION_MAJOR(props.apiVersion),
+                  ".", VK_VERSION_MINOR(props.apiVersion),
+                  ", graphics queue: ", graphics ? "yes" : "NO",
+                  ", can present to this surface: ", present ? "yes" : "NO");
+    }
+}
+
 bool VkContext::selectPhysicalDevice() {
+    // Nothing is demanded of the device here beyond a queue that can draw and
+    // present. The four features this used to require - samplerAnisotropy,
+    // fillModeNonSolid, and the two FSR2 compute features - each already had a
+    // fallback further in: the sampler clamps anisotropy off, the terrain
+    // wireframe is a debug view that warns and draws filled, and FSR2 is a
+    // setting that can be off. Requiring them at selection turned four soft
+    // degradations into one hard refusal to start, which is what a Pixel 9a got.
     vkb::PhysicalDeviceSelector selector{vkbInstance_};
-    VkPhysicalDeviceFeatures requiredFeatures{};
-    requiredFeatures.samplerAnisotropy = VK_TRUE;
-    requiredFeatures.fillModeNonSolid = VK_TRUE;  // wireframe debug pipelines
-    requiredFeatures.shaderStorageImageWriteWithoutFormat = VK_TRUE;  // FSR2 compute shaders
-    requiredFeatures.shaderInt16 = VK_TRUE;  // FSR2 compute shaders
     selector.set_surface(surface)
             .set_minimum_version(1, 1)
-            .set_required_features(requiredFeatures)
             .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete);
 
     auto physRet = selector.select();
     if (!physRet) {
         LOG_ERROR("Failed to select Vulkan physical device: ", physRet.error().message());
+        reportUnsuitableDevices();
         return false;
     }
 
@@ -483,6 +521,25 @@ bool VkContext::selectPhysicalDevice() {
     // terminates and truncates on its own.
     std::snprintf(gpuName_, sizeof(gpuName_), "%s", props.deviceName);
     LOG_INFO("GPU: ", gpuName_, " (vendor 0x", std::hex, gpuVendorId_, std::dec, ")");
+
+    // Each of these has to be enabled before createLogicalDevice constructs the
+    // DeviceBuilder, for the reason spelled out at the top of that function.
+    // One call per feature: enable_features_if_present is all or nothing, so
+    // asking for four at once loses which of them the device actually has.
+    auto enableIfPresent = [this](VkBool32 VkPhysicalDeviceFeatures::*field) {
+        VkPhysicalDeviceFeatures wanted{};
+        wanted.*field = VK_TRUE;
+        return vkbPhysicalDevice_.enable_features_if_present(wanted);
+    };
+    samplerAnisotropySupported_ = enableIfPresent(&VkPhysicalDeviceFeatures::samplerAnisotropy);
+    fillModeNonSolidSupported_ = enableIfPresent(&VkPhysicalDeviceFeatures::fillModeNonSolid);
+    fsr2ComputeFeaturesSupported_ =
+        enableIfPresent(&VkPhysicalDeviceFeatures::shaderStorageImageWriteWithoutFormat) &&
+        enableIfPresent(&VkPhysicalDeviceFeatures::shaderInt16);
+    LOG_INFO("Sampler anisotropy supported: ", samplerAnisotropySupported_ ? "YES" : "NO");
+    LOG_INFO("Wireframe views supported: ", fillModeNonSolidSupported_ ? "YES" : "NO");
+    LOG_INFO("FSR2 compute features supported: ",
+             fsr2ComputeFeaturesSupported_ ? "YES" : "NO");
 
     VkPhysicalDeviceDepthStencilResolveProperties dsResolveProps{};
     dsResolveProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_STENCIL_RESOLVE_PROPERTIES;
@@ -789,7 +846,20 @@ bool VkContext::createAllocator() {
     allocInfo.instance = instance;
     allocInfo.physicalDevice = physicalDevice;
     allocInfo.device = device;
-    allocInfo.vulkanApiVersion = instanceApiVersion_;
+    // VMA asserts when handed a version newer than the headers it was compiled
+    // against, and the two do not have to agree: the NDK ships Vulkan 1.3
+    // headers while a Pixel's loader reports an instance at 1.4. Telling it a
+    // version it has no code for is wrong even where the assert is compiled
+    // out, so clamp rather than raise the ceiling.
+    const uint32_t vmaCeiling = VK_MAKE_API_VERSION(
+        0, VMA_VULKAN_VERSION / 1000000, (VMA_VULKAN_VERSION / 1000) % 1000, 0);
+    allocInfo.vulkanApiVersion = std::min(instanceApiVersion_, vmaCeiling);
+    if (instanceApiVersion_ > vmaCeiling) {
+        LOG_INFO("Instance is Vulkan ", VK_VERSION_MAJOR(instanceApiVersion_), ".",
+                 VK_VERSION_MINOR(instanceApiVersion_), " but VMA was built for ",
+                 VK_VERSION_MAJOR(vmaCeiling), ".", VK_VERSION_MINOR(vmaCeiling),
+                 "; the allocator is told the lower one");
+    }
 
     if (vmaCreateAllocator(&allocInfo, &allocator) != VK_SUCCESS) {
         LOG_ERROR("Failed to create VMA allocator");
@@ -908,6 +978,37 @@ void VkContext::savePipelineCache() {
     LOG_INFO("Pipeline cache saved to disk (", dataSize, " bytes)");
 }
 
+/// Asks for an unrotated swapchain where the surface allows it.
+///
+/// Android hands a portrait-native panel to a landscape activity by reporting
+/// currentTransform as a 90 degree rotation, and vk-bootstrap adopts that when
+/// nothing else is asked for. Adopting it is a promise to rotate the rendering
+/// to match, which this renderer does not do, so the whole interface came out
+/// turned on its side. Asking for identity moves the rotation to the display
+/// controller, which costs a composition pass and is what an engine without
+/// pre-rotation should do.
+///
+/// A surface that cannot present unrotated keeps its own transform, and the
+/// caller is no worse off than before.
+/// Returns true when it asked for a transform the surface is not already using,
+/// which makes VK_SUBOPTIMAL_KHR the permanent answer from then on.
+static bool requestIdentityTransform(vkb::SwapchainBuilder& builder,
+                                     VkPhysicalDevice physicalDevice,
+                                     VkSurfaceKHR surface) {
+    VkSurfaceCapabilitiesKHR caps{};
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &caps) != VK_SUCCESS) {
+        return false;
+    }
+    if (caps.currentTransform == VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) return false;
+    if (!(caps.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)) {
+        LOG_WARNING("Surface reports transform 0x", std::hex, caps.currentTransform, std::dec,
+                    " and cannot present unrotated; the image will be rotated");
+        return false;
+    }
+    builder.set_pre_transform_flags(VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
+    return true;
+}
+
 bool VkContext::createSwapchain(int width, int height) {
     vkb::SwapchainBuilder swapchainBuilder{physicalDevice, device, surface};
 
@@ -917,6 +1018,8 @@ bool VkContext::createSwapchain(int width, int height) {
         .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
         .set_desired_min_image_count(2)
         .set_old_swapchain(swapchain);
+
+    presentsOffNativeTransform_ = requestIdentityTransform(builder, physicalDevice, surface);
 
     if (vsync_) {
         builder.set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR);
@@ -2067,6 +2170,8 @@ bool VkContext::recreateSwapchain(int width, int height) {
         .set_desired_min_image_count(2)
         .set_old_swapchain(oldSwapchain);
 
+    presentsOffNativeTransform_ = requestIdentityTransform(builder, physicalDevice, surface);
+
     if (vsync_) {
         builder.set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR);
     } else {
@@ -2413,7 +2518,13 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
     presentInfo.pImageIndices = &imageIndex;
 
     VkResult result = vkQueuePresentKHR(presentQueue, &presentInfo);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    // Presenting unrotated onto a rotated surface is suboptimal by definition,
+    // and says so on every frame for as long as the swapchain lives. Rebuilding
+    // on that answer rebuilds every frame, which is what stopped the client
+    // dead on the login screen rather than merely making it slow.
+    const bool suboptimalIsExpected = presentsOffNativeTransform_;
+    if (result == VK_ERROR_OUT_OF_DATE_KHR ||
+        (result == VK_SUBOPTIMAL_KHR && !suboptimalIsExpected)) {
         swapchainDirty = true;
     }
 

@@ -2,6 +2,9 @@
 #include "rendering/vk_utils.hpp"
 #include "core/logger.hpp"
 #include <fstream>
+#include <filesystem>
+#include <cstring>
+#include <cerrno>
 
 namespace wowee {
 namespace rendering {
@@ -28,7 +31,13 @@ VkShaderModule& VkShaderModule::operator=(VkShaderModule&& other) noexcept {
 bool VkShaderModule::loadFromFile(VkDevice device, const std::string& path) {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
     if (!file.is_open()) {
-        LOG_ERROR("Failed to open shader file: ", path);
+        // A relative shader path resolves against the working directory, which
+        // is the process's and not this file's to assume. Naming it, and what
+        // the system said, turns "failed to open" into something actionable.
+        std::error_code ec;
+        const std::string cwd = std::filesystem::current_path(ec).string();
+        LOG_ERROR("Failed to open shader file: ", path, " (", std::strerror(errno),
+                  "; working directory ", ec ? "unknown" : cwd, ")");
         return false;
     }
 

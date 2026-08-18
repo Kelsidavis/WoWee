@@ -11,6 +11,9 @@
 #include <ranges>
 #include "core/local_time.hpp"
 #include <cstdio>
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 namespace wowee {
 namespace core {
@@ -157,6 +160,21 @@ void Logger::emitLineLocked(LogLevel level, const std::string& message) {
     if (echoToStdout_) {
         std::cout << line.str() << '\n';
     }
+#ifdef __ANDROID__
+    // stdout goes nowhere on Android and the file has to be pulled off the
+    // device to be read, so every line also goes to logcat, where `adb logcat
+    // -s wowee` shows it live. The timestamp and level are logcat's own job,
+    // so this passes the message rather than the formatted line.
+    int priority = ANDROID_LOG_INFO;
+    switch (level) {
+        case LogLevel::DEBUG:   priority = ANDROID_LOG_DEBUG; break;
+        case LogLevel::INFO:    priority = ANDROID_LOG_INFO; break;
+        case LogLevel::WARNING: priority = ANDROID_LOG_WARN; break;
+        case kLogLevelError:    priority = ANDROID_LOG_ERROR; break;
+        case LogLevel::FATAL:   priority = ANDROID_LOG_FATAL; break;
+    }
+    __android_log_write(priority, "wowee", message.c_str());
+#endif
     if (fileStream.is_open()) {
         fileStream << line.str() << '\n';
         bool shouldFlush = (level >= LogLevel::WARNING);

@@ -3,6 +3,7 @@
 #include <cmath>
 #include "core/env.hpp"
 #include "core/logger.hpp"
+#include "core/config_paths.hpp"
 #include "stb_image.h"
 #include "rendering/vk_context.hpp"
 #include <SDL2/SDL_vulkan.h>
@@ -61,6 +62,16 @@ bool Window::initialize() {
     // Before SDL_Init spins up NSApplication: holding a key should repeat it,
     // not open the accent chooser over the game.
     disablePressAndHoldAccents();
+#endif
+
+#ifdef __ANDROID__
+    // Without this the manifest's screenOrientation does not survive: SDL calls
+    // setOrientation itself when it creates the window, and with no hint and a
+    // resizable window it asks for FULL_USER, which follows the phone's own
+    // rotation lock. That is portrait, and the interface is laid out for a
+    // landscape screen. Naming both landscape orientations leaves the phone
+    // free to flip between them.
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
 #endif
 
     // Initialize SDL
@@ -142,6 +153,13 @@ bool Window::initialize() {
     if (config.fullscreen) {
         flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
     }
+#ifdef __ANDROID__
+    // A phone has no windows to be one of. Fullscreen is also what makes SDL
+    // put the activity in immersive mode, which is what hides the navigation
+    // bar; without it the client draws into 2272x954 of a 2424x1080 panel and
+    // the rest is system chrome.
+    flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+#endif
     if (config.resizable) {
         flags |= SDL_WINDOW_RESIZABLE;
     }
@@ -169,6 +187,11 @@ bool Window::initialize() {
         LOG_ERROR("Failed to initialize Vulkan context");
         return false;
     }
+
+    // SDL and the Vulkan driver leave the working directory at /system/bin on
+    // Android, and everything after this opens its files relative to it: the
+    // skybox shader was the first to fail, one call after this returned.
+    core::enterResourceRoot();
 
     LOG_INFO("Window initialized successfully (Vulkan)");
     return true;

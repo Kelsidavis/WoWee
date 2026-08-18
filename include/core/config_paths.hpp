@@ -25,4 +25,17 @@ std::string getConfigRoot();
 // read.
 void migratePortableConfigIfNeeded();
 
+// Enters the directory named by WOWEE_RESOURCE_ROOT, which holds assets/ and
+// Data/ in the layout a desktop install has.
+//
+// Only Android sets that variable, and only Android needs this: a process there
+// starts in a directory holding neither, and shaders, interface art and the
+// expansion profiles are all opened through relative paths. It is not enough to
+// do this once at startup, because SDL and the Vulkan driver leave the working
+// directory at /system/bin, so this is called again once they are up.
+//
+// A no-op wherever WOWEE_RESOURCE_ROOT is unset. Returns false only if the
+// variable names a directory that cannot be entered.
+bool enterResourceRoot();
+
 }  // namespace wowee::core

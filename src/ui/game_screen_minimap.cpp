@@ -1,5 +1,6 @@
 #include "game/group_defines.hpp"
 #include "ui/game_screen.hpp"
+#include "ui/settings_schema.hpp"
 #include "ui/framexml_takeover.hpp"
 #include "ui/ui_raid_icons.hpp"
 #include "ui/ui_colors.hpp"
@@ -1839,6 +1840,16 @@ void GameScreen::saveSettings() {
     LOG_INFO("Settings saved to ", path);
 }
 
+namespace {
+/// What the window scale's own row accepts, so the loader cannot clamp to a
+/// range the control no longer has.
+std::pair<float, float> windowUiScaleRange() {
+    float lo = 0.75f, hi = 3.0f;
+    settingRange("windowuiscale", lo, hi);
+    return {lo, hi};
+}
+}  // namespace
+
 void GameScreen::loadSettings() {
     std::string path = SettingsPanel::getSettingsPath();
     std::ifstream in(path);
@@ -1880,7 +1891,9 @@ void GameScreen::loadSettings() {
                     settingsPanel_.uiOpacity_ = static_cast<float>(v) / 100.0f;
                 }
             } else if (key == "window_ui_scale") {
-                settingsPanel_.pendingWindowUiScale = std::clamp(std::stof(val), 0.75f, 1.5f);
+                settingsPanel_.pendingWindowUiScale =
+                    std::clamp(std::stof(val), windowUiScaleRange().first,
+                               windowUiScaleRange().second);
                 windowScaleLoaded = true;
             } else if (key == "minimap_rotate") {
                 // Deliberately not honoured: the saved value is read and

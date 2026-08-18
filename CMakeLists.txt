@@ -266,7 +266,57 @@ if(Python3_Interpreter_FOUND)
 endif()
 
 # Find required packages
-find_package(SDL2 REQUIRED)
+#
+# Android has no system SDL2, so it is fetched and built with the client. SDL's
+# own CMake provides the same SDL2::SDL2 target find_package would, so nothing
+# downstream changes.
+#
+# Pinned to the last SDL2 release rather than to what the desktop packages
+# carry: 2.30 calls ALooper_pollAll, which NDK 28 marks unavailable, so it does
+# not compile against a current NDK at all.
+if(ANDROID)
+    include(FetchContent)
+    set(SDL_SHARED ON  CACHE BOOL "" FORCE)   # SDLActivity loads libSDL2.so
+    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    set(SDL_TEST   OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(SDL2
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG        release-2.32.10
+        GIT_SHALLOW    TRUE)
+    FetchContent_MakeAvailable(SDL2)
+
+    # This client includes <SDL2/SDL.h>, the layout the Linux and macOS packages
+    # install. SDL's own build tree puts the headers at the top of include/, so
+    # a directory holding one link named SDL2 makes the same spelling work
+    # without touching the 30-odd files that use it.
+    set(WOWEE_SDL2_COMPAT_INC ${CMAKE_BINARY_DIR}/sdl2-compat-include)
+    file(MAKE_DIRECTORY ${WOWEE_SDL2_COMPAT_INC})
+    file(CREATE_LINK ${sdl2_SOURCE_DIR}/include ${WOWEE_SDL2_COMPAT_INC}/SDL2
+         SYMBOLIC COPY_ON_ERROR)
+    include_directories(${WOWEE_SDL2_COMPAT_INC})
+
+    # Header-only, and there is no system copy to find on Android.
+    FetchContent_Declare(glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG        1.0.1
+        GIT_SHALLOW    TRUE)
+    FetchContent_MakeAvailable(glm)
+    include_directories(${glm_SOURCE_DIR})
+
+    # log is Android's logging, which Catch2 writes through as well as this
+    # client; android carries ANativeWindow and the asset manager. Directory
+    # scope, so every target below gets them without being named.
+    link_libraries(log android)
+
+    # miniaudio's OpenSL and AAudio backends are only compiled on Android, and
+    # they have unused parameters that this build treats as errors. It is
+    # vendored, so the warning is turned off for the one unit that compiles it
+    # rather than patched out of the header.
+    set_source_files_properties(src/audio/audio_engine.cpp PROPERTIES
+                                COMPILE_OPTIONS "-Wno-unused-parameter")
+else()
+    find_package(SDL2 REQUIRED)
+endif()
 find_package(Vulkan QUIET)
 if(NOT Vulkan_FOUND)
     # For Windows cross-compilation the host pkg-config finds the Linux libvulkan-dev
@@ -369,7 +419,16 @@ if(WIN32)
 else()
     find_package(PkgConfig REQUIRED)
 endif()
-if(PkgConfig_FOUND)
+if(ANDROID)
+    # Not through pkg-config. There is no Android FFmpeg to find and the host's
+    # copy answers with the host's include path, which puts glibc headers in
+    # front of the NDK sysroot and fails on the first system header. The same
+    # trap the Windows cross build hit with Vulkan, one probe further down.
+    #
+    # Cinematics are the only thing behind this, and the no-FFmpeg path is
+    # already supported.
+    set(FFMPEG_FOUND FALSE)
+elseif(PkgConfig_FOUND)
     pkg_check_modules(FFMPEG libavformat libavcodec libswscale libavutil)
 else()
     # Fallback for MSVC/vcpkg - find FFmpeg libraries manually
@@ -1133,9 +1192,27 @@ target_include_directories(lua51 SYSTEM PUBLIC ${LUA_DIR})
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(lua51 PRIVATE -w)
 endif()
+if(ANDROID)
+    # Lua stores a string's bytes immediately after the TString union that
+    # describes them, and reaches them with (ts + 1). That pointer is one past
+    # the declared object, so __builtin_object_size answers 0, and bionic's
+    # fortified strchr aborts on a read that is in bounds of the allocation and
+    # NUL terminated. lgc.c does exactly that on every garbage collection that
+    # walks a table with a __mode field, so the client died during startup as
+    # soon as one existed. glibc does not check, which is why only Android saw
+    # it. The bound is wrong, not the read.
+    target_compile_options(lua51 PRIVATE -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0)
+endif()
 
 # Create executable
-add_executable(wowee ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES})
+# On Android the client is a shared library, not a program: SDLActivity loads
+# it and calls SDL_main, and SDL_main.h has already renamed main() to that - so
+# an executable link asks for a main that no longer exists.
+if(ANDROID)
+    add_library(wowee SHARED ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES})
+else()
+    add_executable(wowee ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES})
+endif()
 
 # Tracy profiler - zero overhead when WOWEE_ENABLE_TRACY is OFF
 if(WOWEE_ENABLE_TRACY)
@@ -1272,7 +1349,9 @@ if(HAVE_FFMPEG)
 endif()
 
 # Platform-specific libraries
-if(UNIX AND NOT APPLE)
+# Android is UNIX and not APPLE, and has no X11: the ungrab path in main.cpp is
+# compiled out there, so there is nothing to link.
+if(UNIX AND NOT APPLE AND NOT ANDROID)
     target_link_libraries(wowee PRIVATE X11)
 endif()
 if(APPLE)

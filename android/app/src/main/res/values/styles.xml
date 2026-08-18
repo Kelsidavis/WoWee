@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        No title bar, no status bar, and content drawn into the cutout.
+
+        The default theme costs three things at once: an action bar saying
+        "Wowee", a status bar that in landscape reserves a strip down the left
+        edge, and a surface inset to 2272x954 on a 2424x1080 panel. The client
+        draws its own interface and wants the whole display.
+    -->
+    <style name="WoweeFullscreen" parent="@android:style/Theme.NoTitleBar.Fullscreen">
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowContentTransitions">false</item>
+    </style>
+</resources>

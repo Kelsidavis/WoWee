@@ -186,6 +186,14 @@ public:
 
     // Whether the physical device supports sampler anisotropy.
     [[nodiscard]] bool isSamplerAnisotropySupported() const { return samplerAnisotropySupported_; }
+    /// False on hardware without fillModeNonSolid, where a VK_POLYGON_MODE_LINE
+    /// pipeline cannot be built and the wireframe views are unavailable.
+    [[nodiscard]] bool isWireframeSupported() const { return fillModeNonSolidSupported_; }
+    /// False on hardware missing shaderStorageImageWriteWithoutFormat or
+    /// shaderInt16, which the FSR2 compute shaders both need.
+    [[nodiscard]] bool areFsr2ComputeFeaturesSupported() const {
+        return fsr2ComputeFeaturesSupported_;
+    }
 
     /// Whether barriers can be recorded as VkDependencyInfo. False means the
     /// same barriers still record, through the legacy entry point.
@@ -225,6 +233,7 @@ private:
     bool createInstance(SDL_Window* window);
     bool createSurface(SDL_Window* window);
     bool selectPhysicalDevice();
+    void reportUnsuitableDevices() const;
     bool createLogicalDevice();
     bool createAllocator();
     bool createSwapchain(int width, int height);
@@ -454,6 +463,11 @@ private:
     std::mutex samplerCacheMutex_;
     std::unordered_map<uint64_t, VkSampler> samplerCache_;
     bool samplerAnisotropySupported_ = false;
+    bool fillModeNonSolidSupported_ = false;
+    bool fsr2ComputeFeaturesSupported_ = false;
+    /// True when the swapchain was built with a transform the surface is not
+    /// using, which makes VK_SUBOPTIMAL_KHR permanent rather than a signal.
+    bool presentsOffNativeTransform_ = false;
     float anisotropyLimit_ = 16.0f;
 
     static VkContext* sInstance_;

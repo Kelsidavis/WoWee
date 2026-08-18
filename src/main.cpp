@@ -19,15 +19,23 @@
 // which left a macOS crash with no backtrace and no log at all. Only the X11
 // mouse ungrab below is genuinely Linux-specific.
 #if defined(__linux__) || defined(__APPLE__)
-#define WOWEE_HAS_BACKTRACE 1
-#include <execinfo.h>
 #include <unistd.h>
 #include <libgen.h>
 #include <cstdio>
 #include <cstring>
+// Bionic ships execinfo.h but declares backtrace() only from API 33, and this
+// build targets lower. The crash log keeps everything but its stack section on
+// Android, where logcat carries a native trace anyway.
+#if !defined(__ANDROID__)
+#define WOWEE_HAS_BACKTRACE 1
+#include <execinfo.h>
+#endif
 #endif
 
-#ifdef __linux__
+// Android defines __linux__ and has no X11, so the mouse-ungrab path is gated
+// on both. The other Linux branches in this file - /proc/self/exe, the
+// backtrace - are correct there and are left alone.
+#if defined(__linux__) && !defined(__ANDROID__)
 #include <X11/Xlib.h>
 
 // Keep a persistent X11 connection for emergency mouse release in signal handlers.
@@ -122,6 +130,11 @@ static void selectMacUserDataPath() {
 #endif
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
+#ifdef __ANDROID__
+    // Everything after this opens its files relative to the working directory,
+    // which on Android is not a directory that holds any of them.
+    wowee::core::enterResourceRoot();
+#endif
 #ifndef _WIN32
     // Writing to a socket the server has already closed raises SIGPIPE, whose
     // default action is to terminate - the client would vanish mid-frame with
@@ -136,7 +149,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     // wants SIGPIPE for anything.
     std::signal(SIGPIPE, SIG_IGN);
 #endif
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
     g_emergencyDisplay = XOpenDisplay(nullptr);
 #endif
 #ifdef WOWEE_HAS_BACKTRACE
@@ -152,6 +165,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     }
     std::signal(SIGTERM, [](int) { std::_Exit(1); });
     std::signal(SIGINT,  [](int) { std::_Exit(1); });
+#elif defined(__ANDROID__)
+    // Android already has a crash reporter, and it is a far better one than
+    // this: debuggerd writes a symbolised tombstone and the abort message to
+    // logcat. Ours writes a backtrace to stderr, which on Android goes nowhere,
+    // and installing it costs the tombstone. So only the two exit signals here.
+    std::signal(SIGTERM, crashHandler);
+    std::signal(SIGINT,  crashHandler);
 #else
     std::signal(SIGSEGV, crashHandler);
     std::signal(SIGABRT, crashHandler);
@@ -206,7 +226,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         app.shutdown();
 
         LOG_INFO("Application exited successfully");
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
         if (g_emergencyDisplay) { XCloseDisplay(g_emergencyDisplay); g_emergencyDisplay = nullptr; }
 #endif
         return 0;

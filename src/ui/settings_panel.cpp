@@ -787,7 +787,11 @@ void SettingsPanel::restoreSchemaDefaults(const char* category) {
 void SettingsPanel::applyWindowUiScale() {
     if (!ImGui::GetCurrentContext()) return;
 
-    pendingWindowUiScale = std::clamp(pendingWindowUiScale, 0.75f, 1.5f);
+    // From the row, not from a copy of its numbers: the two drifted once
+    // already and the setting snapped back on the next start.
+    float lo = 0.75f, hi = 3.0f;
+    settingRange("windowuiscale", lo, hi);
+    pendingWindowUiScale = std::clamp(pendingWindowUiScale, lo, hi);
     if (windowUiScaleEditing_) return;
     if (std::abs(appliedWindowUiScale_ - pendingWindowUiScale) < 0.0001f) {
         ImGui::GetIO().FontGlobalScale = pendingWindowUiScale;
