@@ -1614,31 +1614,32 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                     // CloseAllWindows would hide the frame and leave the server
                     // believing the vendor was still open.
                     //
-                    // In ToggleGameMenu's order, stopping at the first that
-                    // answers. A dropdown open over a panel has to go before
-                    // the panel does, or Escape closes the window out from
-                    // under the menu; the special windows are the list addons
-                    // add themselves to, and nothing has ever walked it.
+                    // Ask ToggleGameMenu and nothing else, when the
+                    // interface owns the menu.
                     //
-                    // Each name is checked with rawget and type, not for
-                    // truth. The missing-API fallback answers an unknown
-                    // global with a no-op object, which is truthy and
-                    // callable and returns another truthy no-op - so
-                    // `CloseMenus and CloseMenus()` was satisfied by a
-                    // function that does not exist. Escape reported closing a
-                    // panel on every press, including with nothing open, and
-                    // so never reached the branch that opens the game menu:
-                    // it could shut the menu and never raise it. The log says
-                    // as much at startup - "unknown globals answer with a
-                    // no-op, so feature detection will read wrong" - and this
-                    // is feature detection.
-                    const bool closed = gameHandler.askInterface(
-                        "(type(rawget(_G, 'CloseMenus')) == 'function' "
-                        "  and CloseMenus()) or "
-                        "(type(rawget(_G, 'CloseSpecialWindows')) == 'function' "
-                        "  and CloseSpecialWindows()) or "
-                        "(type(rawget(_G, 'CloseAllWindows')) == 'function' "
-                        "  and CloseAllWindows()) or false");
+                    // This used to close menus, special windows and all
+                    // windows itself first, and skip ToggleGameMenu whenever
+                    // one of them answered - which is a fragment of the very
+                    // cascade ToggleGameMenu already runs, in the same order,
+                    // and ending differently. Blizzard's version tries static
+                    // popups, the option frames, dropdowns, casting, targeting
+                    // and CloseAllWindows in turn and then, if none of them
+                    // wanted the key, opens the game menu. Ours consumed the
+                    // press before it could reach that last step, so Escape
+                    // could shut the menu and never raise it.
+                    //
+                    // The order the old comment cared about - a dropdown over
+                    // a panel closing before the panel - is ToggleGameMenu's
+                    // own order, and it keeps it.
+                    const bool closed = frameXmlOwns(UiElement::GameMenu)
+                        ? false
+                        : gameHandler.askInterface(
+                              "(type(rawget(_G, 'CloseMenus')) == 'function' "
+                              "  and CloseMenus()) or "
+                              "(type(rawget(_G, 'CloseSpecialWindows')) == 'function' "
+                              "  and CloseSpecialWindows()) or "
+                              "(type(rawget(_G, 'CloseAllWindows')) == 'function' "
+                              "  and CloseAllWindows()) or false");
                     const EscapeOutcome outcome = resolveAfterInterface(
                         closed, frameXmlOwns(UiElement::GameMenu));
                     // At warning, because this is the press the report is
