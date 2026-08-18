@@ -188,10 +188,15 @@ bool Window::initialize() {
         return false;
     }
 
+#ifdef __ANDROID__
     // SDL and the Vulkan driver leave the working directory at /system/bin on
     // Android, and everything after this opens its files relative to it: the
     // skybox shader was the first to fail, one call after this returned.
+    //
+    // Guarded rather than relying on the no-op, so a target that links this
+    // file does not have to link config_paths with it. The editor does not.
     core::enterResourceRoot();
+#endif
 
     LOG_INFO("Window initialized successfully (Vulkan)");
     return true;
