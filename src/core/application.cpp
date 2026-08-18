@@ -3624,6 +3624,10 @@ void Application::render() {
         if (ImGui::GetCurrentContext() && ImGui::GetFrameCount() > 0) {
             ImGui::EndFrame();
         }
+        // The loop still runs, to keep reading the socket. It does not need to
+        // run at frame rate to do that, and a phone in someone's pocket should
+        // not be spending a core on it.
+        SDL_Delay(50);
         return;
     }
 #endif

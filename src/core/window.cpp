@@ -72,6 +72,13 @@ bool Window::initialize() {
     // landscape screen. Naming both landscape orientations leaves the phone
     // free to flip between them.
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+
+    // By default SDL parks the thread that called SDL_main for as long as the
+    // activity is in the background. That thread is the one that reads the
+    // socket, so a few seconds behind the home button and the server has timed
+    // the session out. Letting it run keeps the connection; the surface is
+    // released separately and the frame is skipped while it is gone.
+    SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "0");
 #endif
 
     // Initialize SDL
