@@ -18,6 +18,7 @@
 #include "ui/settings_schema.hpp"
 #include "imgui.h"
 #include "addons/lua_api_helpers.hpp"
+#include "addons/chat_window_background.hpp"
 #include "ui/display_modes.hpp"
 #include "ui/widget_tree.hpp"
 #include "rendering/camera_controller.hpp"
@@ -2750,8 +2751,10 @@ struct ChatWindowSettings {
     // These were white at full alpha. FCF_LoadChatSettings hands whatever is
     // here to FCF_SetWindowColor and FCF_SetWindowAlpha for every window that
     // has no saved settings of its own, so the chat opened behind an opaque
-    // white panel with the text on it.
-    float r = 0.0f, g = 0.0f, b = 0.0f, alpha = 0.25f;
+    // white panel with the text on it. Installs that ran such a build saved
+    // that white, and loadInterfaceState repairs it on the way back in.
+    float r = kChatBackgroundDefault[0], g = kChatBackgroundDefault[1];
+    float b = kChatBackgroundDefault[2], alpha = kChatBackgroundDefault[3];
     bool shown = false;
     bool locked = false;
     int  docked = 0;            // 0 = not docked; otherwise its place on the dock
@@ -2916,6 +2919,7 @@ static void loadInterfaceState() {
     auto& windows = chatWindows();
     std::string line;
     size_t loaded = 0;
+    bool repaired = false;
     while (std::getline(in, line)) {
         const size_t eq = line.find('=');
         if (eq == std::string::npos || eq == 0) continue;
@@ -2954,6 +2958,15 @@ static void loadInterfaceState() {
             if (std::sscanf(value.c_str(), "%f,%f,%f,%f", &cr, &cg, &cb, &ca) == 4 &&
                 std::isfinite(cr) && std::isfinite(cg) && std::isfinite(cb) &&
                 std::isfinite(ca)) {
+                // A white panel is the one this client wrote before it had the
+                // interface's own default, not one anybody picked, and at full
+                // alpha it covers the chat with the text lost in it.
+                if (repairChatBackground(cr, cg, cb, ca)) {
+                    LOG_WARNING("Chat window ", idx,
+                                " had a white background saved, which hides the "
+                                "text; restoring the default.");
+                    repaired = true;
+                }
                 w.r = cr;
                 w.g = cg;
                 w.b = cb;
@@ -3008,6 +3021,10 @@ static void loadInterfaceState() {
     }
     LOG_INFO("Interface state: loaded ", loaded, " value(s) from ",
              interfaceStatePath());
+    // Written back at once rather than left for whatever saves next, so the
+    // repair happens once and a player reading the file sees what the client
+    // is actually using.
+    if (repaired) saveInterfaceState();
 }
 
 /// A chat window's saved settings. FCF_SetWindowAlpha takes the alpha from
@@ -3065,17 +3082,24 @@ static int lua_SetChatWindowSize(lua_State* L) {
     saveInterfaceState();
     return 0;
 }
+// A missing component keeps what the window already has rather than falling to
+// a number of this function's choosing. FCF_SetWindowColor passes on whatever
+// FCF_GetChatWindowInfo answered, and that is nil for a window the interface
+// has no settings for - so a default of 1 here reads "the interface said
+// nothing" as "the interface said white", and saves it. The white background
+// this client shipped with is what that looks like once it is on disk.
 static int lua_SetChatWindowColor(lua_State* L) {
     if (auto* w = chatWindow(L, 1)) {
-        w->r = static_cast<float>(luaL_optnumber(L, 2, 1.0));
-        w->g = static_cast<float>(luaL_optnumber(L, 3, 1.0));
-        w->b = static_cast<float>(luaL_optnumber(L, 4, 1.0));
+        w->r = static_cast<float>(luaL_optnumber(L, 2, w->r));
+        w->g = static_cast<float>(luaL_optnumber(L, 3, w->g));
+        w->b = static_cast<float>(luaL_optnumber(L, 4, w->b));
     }
     saveInterfaceState();
     return 0;
 }
 static int lua_SetChatWindowAlpha(lua_State* L) {
-    if (auto* w = chatWindow(L, 1)) w->alpha = static_cast<float>(luaL_optnumber(L, 2, 1.0));
+    if (auto* w = chatWindow(L, 1))
+        w->alpha = static_cast<float>(luaL_optnumber(L, 2, w->alpha));
     saveInterfaceState();
     return 0;
 }

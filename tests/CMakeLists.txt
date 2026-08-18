@@ -384,6 +384,15 @@ endif()
 wowee_add_test(test_chat_types
     SOURCES test_chat_types.cpp)
 
+# ── test_chat_window_background ─────────────────────────────────
+# The chat panel is a white image the interface tints, so the colour this client
+# saves is the whole of what it looks like - and it saved white at full alpha,
+# which covers the chat with the text lost in it. Fixing the default left every
+# install that had already written that white unfixed, and it came back as a
+# report after the fix had shipped.
+wowee_add_test(test_chat_window_background
+    SOURCES test_chat_window_background.cpp)
+
 # ── test_text_tokens ────────────────────────────────────────
 # The server writes the player as a blank - "$N, you have done well" - and the
 # client fills it in. Nothing did on the chat path, so every scripted NPC in the
