@@ -1619,46 +1619,26 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                     // the panel does, or Escape closes the window out from
                     // under the menu; the special windows are the list addons
                     // add themselves to, and nothing has ever walked it.
-                    // Which frame answered, before asking anything to close.
-                    // Escape reported closing a panel on every press with
-                    // nothing open, so the menu never opened - and the chain
-                    // can only say that something was shown, not what. Named
-                    // once, because a frame that is always shown is the bug
-                    // rather than the closing.
-                    static bool namedTheOpenFrame = false;
-                    if (!namedTheOpenFrame) {
-                        namedTheOpenFrame = true;
-                        // Wrapped in a call, because askInterface puts the
-                        // text inside `return (...)` - a bare block is a
-                        // syntax error there, which is what the first attempt
-                        // logged instead of an answer.
-                        gameHandler.askInterface(
-                            "(function() "
-                            "  local n = {} "
-                            "  for _, v in pairs(UISpecialFrames or {}) do "
-                            "    local f = _G[v] "
-                            "    if f and f.IsShown and f:IsShown() then n[#n+1] = v end "
-                            "  end "
-                            "  if #n > 0 then "
-                            "    print('Escape: UISpecialFrames already shown: ' "
-                            "          .. table.concat(n, ', ')) "
-                            "  else print('Escape: no UISpecialFrame is shown') end "
-                            "  local m = {} "
-                            "  for _, v in pairs(UIMenus or {}) do "
-                            "    local f = _G[v] "
-                            "    if f and f.IsShown and f:IsShown() then m[#m+1] = v end "
-                            "  end "
-                            "  if #m > 0 then "
-                            "    print('Escape: UIMenus already shown: ' "
-                            "          .. table.concat(m, ', ')) end "
-                            "  return false "
-                            "end)()");
-                    }
-
+                    //
+                    // Each name is checked with rawget and type, not for
+                    // truth. The missing-API fallback answers an unknown
+                    // global with a no-op object, which is truthy and
+                    // callable and returns another truthy no-op - so
+                    // `CloseMenus and CloseMenus()` was satisfied by a
+                    // function that does not exist. Escape reported closing a
+                    // panel on every press, including with nothing open, and
+                    // so never reached the branch that opens the game menu:
+                    // it could shut the menu and never raise it. The log says
+                    // as much at startup - "unknown globals answer with a
+                    // no-op, so feature detection will read wrong" - and this
+                    // is feature detection.
                     const bool closed = gameHandler.askInterface(
-                        "(CloseMenus and CloseMenus()) or "
-                        "(CloseSpecialWindows and CloseSpecialWindows()) or "
-                        "(CloseAllWindows and CloseAllWindows()) or false");
+                        "(type(rawget(_G, 'CloseMenus')) == 'function' "
+                        "  and CloseMenus()) or "
+                        "(type(rawget(_G, 'CloseSpecialWindows')) == 'function' "
+                        "  and CloseSpecialWindows()) or "
+                        "(type(rawget(_G, 'CloseAllWindows')) == 'function' "
+                        "  and CloseAllWindows()) or false");
                     const EscapeOutcome outcome = resolveAfterInterface(
                         closed, frameXmlOwns(UiElement::GameMenu));
                     // At warning, because this is the press the report is
