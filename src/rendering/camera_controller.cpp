@@ -676,7 +676,15 @@ glm::vec3 CameraController::moveFollowedCharacter(float /*deltaTime*/, FrameInpu
         coyoteTimer -= f.physicsDeltaTime;
 
         // Apply gravity (skip when server has disabled f.gravity, e.g. Levitate spell)
-        if (gravityDisabled_) {
+        //
+        // ...and skip it while the ground has not arrived. An unloaded tile and
+        // a hole both answer nothing when asked for a height, and only one of
+        // them should be fallen through. Entering the world is faster than
+        // streaming the tile under it on a slow device, so without this the
+        // character falls from the spawn point until the server kills it.
+        if (groundNotStreamedYet(targetPos.x, targetPos.y)) {
+            verticalVelocity = 0.0f;
+        } else if (gravityDisabled_) {
             // Float in place: bleed off any downward velocity, allow upward to decay slowly
             if (verticalVelocity < 0.0f) verticalVelocity = 0.0f;
             else verticalVelocity *= std::max(0.0f, 1.0f - 3.0f * f.physicsDeltaTime);
@@ -2088,9 +2096,14 @@ void CameraController::updateFreeFlyCamera(float /*deltaTime*/, FrameInput& f) {
         jumpBufferTimer -= f.physicsDeltaTime;
         coyoteTimer -= f.physicsDeltaTime;
 
-        // Apply f.gravity
-        verticalVelocity += f.gravity * f.physicsDeltaTime;
-        newPos.z += verticalVelocity * f.physicsDeltaTime;
+        // Apply f.gravity, unless the ground under the character has not
+        // streamed in yet. See the note at the other gravity site.
+        if (groundNotStreamedYet(newPos.x, newPos.y)) {
+            verticalVelocity = 0.0f;
+        } else {
+            verticalVelocity += f.gravity * f.physicsDeltaTime;
+            newPos.z += verticalVelocity * f.physicsDeltaTime;
+        }
     }
 
     // Wall sweep collision before grounding (skip when stationary).
@@ -3085,6 +3098,10 @@ void CameraController::teleportTo(const glm::vec3& pos) {
     }
 
     LOG_INFO("Teleported to (", pos.x, ", ", pos.y, ", ", pos.z, ")");
+}
+
+bool CameraController::groundNotStreamedYet(float x, float y) const {
+    return terrainManager != nullptr && !terrainManager->isTileLoadedAt(x, y);
 }
 
 void CameraController::applyLookDelta(float dxPixels, float dyPixels) {

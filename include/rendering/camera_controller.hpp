@@ -514,6 +514,10 @@ private:
     bool wasFalling = false;
     bool wasAscending_ = false;   // Space held while flyingActive_
     bool wasDescending_ = false;  // X held while flyingActive_
+    /// True while the tile under a position has not finished streaming, which
+    /// is when there is no floor to find and gravity must wait for one.
+    [[nodiscard]] bool groundNotStreamedYet(float x, float y) const;
+
     bool rotationSuppressed_ = false;
     bool steering_ = false;
     bool moveForwardActive = false;

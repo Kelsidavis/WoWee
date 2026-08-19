@@ -295,6 +295,18 @@ public:
     [[nodiscard]] bool isHoleAt(float glX, float glY) const;
 
     /**
+     * Whether the tile covering a world position has finished streaming in.
+     *
+     * getHeightAt answers nothing both for a hole, which the character should
+     * fall through, and for a tile that has not arrived yet, which it should
+     * not. Physics cannot tell those apart from the height alone, and on a
+     * slow device the second one is what happens at every login: the character
+     * enters the world before the ground does and falls until the server kills
+     * it.
+     */
+    [[nodiscard]] bool isTileLoadedAt(float glX, float glY) const;
+
+    /**
      * The chunk under a world position, plus the offsets within it that
      * getHeightAt samples and isHoleAt reads a quad from. Shared so those two
      * cannot drift: the first copy of this search that was written by hand
