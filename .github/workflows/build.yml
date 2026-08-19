@@ -527,7 +527,17 @@ jobs:
         update: false
         # See note above: avoid the stale cached keyring/DB "unknown trust" failure.
         cache: false
-        install: >-
+
+    # Installed in a retried step rather than through the action's `install:`
+    # list, for the same reason the arm64 job does it: a mirror that stalls
+    # mid-download fails the whole transaction, and the action has no retry -
+    # so one slow mirror reads as a broken build. Seen on p11-kit, pixman and
+    # openblas from mirror.msys2.org and ftp2.osuosl.org, at "less than 1
+    # bytes/sec", before a single file of this project was compiled.
+    - name: Install dependencies with mirror retry
+      shell: msys2 {0}
+      run: |
+        packages=(
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-ninja
@@ -545,6 +555,15 @@ jobs:
           mingw-w64-x86_64-libtommath
           mingw-w64-x86_64-libtomcrypt
           git
+        )
+        for attempt in 1 2 3; do
+          if pacman -S --noconfirm --needed "${packages[@]}"; then
+            exit 0
+          fi
+          echo "MSYS2 package download failed on attempt ${attempt}; retrying..."
+          sleep $((attempt * 10))
+        done
+        exit 1
 
     - name: Build StormLib from source
       shell: msys2 {0}
