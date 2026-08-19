@@ -37,7 +37,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::ActionBar,    "actionbar"},
     {UiElement::StanceBar,    "stancebar"},
     {UiElement::BagBar,       "bagbar"},
-    {UiElement::MicroMenu,    "micromenu"},
+    {UiElement::MicroMenu,    "micromenu", false},
     {UiElement::XpBar,        "xpbar"},
     {UiElement::RepBar,       "repbar"},
     {UiElement::CastBar,      "castbar", false},
@@ -53,7 +53,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::Gossip,       "gossip"},
     {UiElement::Mail,         "mail"},
     {UiElement::Vendor,       "vendor"},
-    {UiElement::Loot,         "loot"},
+    {UiElement::Loot,         "loot", false},
     {UiElement::Bank,         "bank"},
     {UiElement::PartyFrames,  "partyframes"},
     {UiElement::Social,       "social"},
@@ -736,12 +736,6 @@ const Suppress kSuppress[] = {
         // MERCHANT_SHOW, LOOT_OPENED, BANKFRAME_OPENED, PARTY_MEMBERS_CHANGED
         // and FRIENDLIST_UPDATE, so all of them were appearing in pairs.
         {UiElement::Vendor,      "MerchantFrame"},
-        // The four roll windows go with the loot window. They are opened by
-        // LootFrame's own START_LOOT_ROLL handler, which runs whether or not
-        // that frame is drawn, and they are top-level frames of their own - so
-        // hiding LootFrame left them showing beside this client's roll dialog.
-        {UiElement::Loot,        "LootFrame GroupLootFrame1 GroupLootFrame2 "
-                                 "GroupLootFrame3 GroupLootFrame4"},
         {UiElement::Bank,        "BankFrame"},
         // The party frames' shared backdrop, which is a top-level frame of its
         // own rather than a child of any of them.
@@ -899,11 +893,6 @@ const Suppress kSuppress[] = {
         {UiElement::BagBar,     "MainMenuBarBackpackButton CharacterBag0Slot "
                                 "CharacterBag1Slot CharacterBag2Slot CharacterBag3Slot "
                                 "KeyRingButton"},
-        {UiElement::MicroMenu,  "CharacterMicroButton SpellbookMicroButton "
-                                "TalentMicroButton AchievementMicroButton "
-                                "QuestLogMicroButton SocialsMicroButton "
-                                "PVPMicroButton LFDMicroButton MainMenuBarPerformanceBar "
-                                "HelpMicroButton MainMenuMicroButton"},
     };
 }  // namespace
 

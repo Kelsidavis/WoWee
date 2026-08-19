@@ -19,7 +19,6 @@ namespace wowee { namespace ui {
 
 namespace {
     using namespace wowee::ui::colors;
-    constexpr auto& kColorDarkGray = kDarkGray;
     constexpr auto& kColorGreen    = kGreen;
 } // namespace
 
@@ -50,15 +49,6 @@ void DialogManager::renderDialogs(game::GameHandler& gameHandler,
     // exactly this and the rest were not.
     if (!frameXmlOwns(UiElement::Dialogs)) renderDuelRequestPopup(gameHandler);
     renderDuelCountdown(gameHandler);
-    // The roll dialog belongs to the loot window, and FrameXML has four of its
-    // own that open on the same roll. Whichever side draws the loot window
-    // draws the roll that comes out of it.
-    if (!frameXmlOwns(UiElement::Loot)) {
-        // GroupLootFrame1..4, which belong to the loot element rather than to
-    // dialogs - they are frames of their own, not static popups.
-    if (!frameXmlOwns(UiElement::Loot))
-        renderLootRollPopup(gameHandler, inventoryScreen, chatPanel);
-    }
     // The trade request and the trade window belong to different elements on
     // FrameXML's side: uiparent.lua answers TRADE_REQUEST with StaticPopup
     // "TRADE", while TradeFrame opens on TRADE_SHOW. This client fires both
@@ -533,152 +523,6 @@ void DialogManager::renderTradeWindow(game::GameHandler& gameHandler,
     if (!open) {
         gameHandler.cancelTrade();
     }
-}
-
-void DialogManager::renderLootRollPopup(game::GameHandler& gameHandler,
-                                         InventoryScreen& inventoryScreen,
-                                         ChatPanel& chatPanel) {
-    if (!gameHandler.hasPendingLootRoll()) return;
-
-    const auto& roll = gameHandler.getPendingLootRoll();
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - 175, 310), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(350, 0), ImGuiCond_Always);
-
-    if (ImGui::Begin("Loot Roll", nullptr, kDialogFlags)) {
-        // Quality color for item name
-        uint8_t q = roll.itemQuality;
-        ImVec4 col = ui::getQualityColor(static_cast<game::ItemQuality>(q));
-
-        // Countdown bar
-        {
-            auto now = std::chrono::steady_clock::now();
-            float elapsedMs = static_cast<float>(
-                std::chrono::duration_cast<std::chrono::milliseconds>(now - roll.rollStartedAt).count());
-            float totalMs   = static_cast<float>(roll.rollCountdownMs > 0 ? roll.rollCountdownMs : 60000);
-            float fraction  = 1.0f - std::min(elapsedMs / totalMs, 1.0f);
-            float remainSec = (totalMs - elapsedMs) / 1000.0f;
-            if (remainSec < 0.0f) remainSec = 0.0f;
-
-            // Color: green → yellow → red
-            ImVec4 barColor;
-            if (fraction > 0.5f)
-                barColor = ImVec4(0.2f + (1.0f - fraction) * 1.4f, 0.85f, 0.2f, 1.0f);
-            else if (fraction > 0.2f)
-                barColor = ImVec4(1.0f, fraction * 1.7f, 0.1f, 1.0f);
-            else {
-                float pulse = 0.7f + 0.3f * std::sin(static_cast<float>(ImGui::GetTime()) * 6.0f);
-                barColor = ImVec4(pulse, 0.1f * pulse, 0.1f * pulse, 1.0f);
-            }
-
-            char timeBuf[16];
-            std::snprintf(timeBuf, sizeof(timeBuf), "%.0fs", remainSec);
-            ImGui::PushStyleColor(ImGuiCol_PlotHistogram, barColor);
-            ImGui::ProgressBar(fraction, ImVec2(-1, 12), timeBuf);
-            ImGui::PopStyleColor();
-        }
-
-        ImGui::Text("An item is up for rolls:");
-
-        // Show item icon if available
-        const auto* rollInfo = gameHandler.getItemInfo(roll.itemId);
-        uint32_t rollDisplayId = rollInfo ? rollInfo->displayInfoId : 0;
-        VkDescriptorSet rollIcon = rollDisplayId ? inventoryScreen.getItemIcon(rollDisplayId) : VK_NULL_HANDLE;
-        if (rollIcon) {
-            ImGui::Image((ImTextureID)(uintptr_t)rollIcon, ImVec2(24, 24));
-            ImGui::SameLine();
-        }
-        // Prefer live item info (arrives via SMSG_ITEM_QUERY_SINGLE_RESPONSE after the
-        // roll popup opens); fall back to the name cached at SMSG_LOOT_START_ROLL time.
-        const char* displayName = (rollInfo && rollInfo->valid && !rollInfo->name.empty())
-            ? rollInfo->name.c_str()
-            : roll.itemName.c_str();
-        if (rollInfo && rollInfo->valid)
-            col = ui::getQualityColor(static_cast<game::ItemQuality>(rollInfo->quality));
-        ImGui::TextColored(col, "[%s]", displayName);
-        if (ImGui::IsItemHovered() && rollInfo && rollInfo->valid) {
-            inventoryScreen.renderItemTooltip(*rollInfo);
-        }
-        if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
-            ImGui::GetIO().KeyShift && rollInfo && rollInfo->valid && !rollInfo->name.empty()) {
-            std::string link = game::itemChatLink(rollInfo->entry, rollInfo->quality, rollInfo->name);
-            chatPanel.insertChatLink(link);
-        }
-        ImGui::Spacing();
-
-        // voteMask bits: 0x01=pass, 0x02=need, 0x04=greed, 0x08=disenchant.
-        // CMSG_LOOT_ROLL rollType (WotLK RollVote enum):
-        //   0=PASS, 1=NEED, 2=GREED, 3=DISENCHANT
-        // Do NOT confuse the bit position in voteMask with the rollType to send.
-        const uint8_t vm = roll.voteMask;
-        bool first = true;
-        if (vm & 0x02) {
-            if (ImGui::Button("Need", ImVec2(80, 30)))
-                gameHandler.sendLootRoll(roll.objectGuid, roll.slot, 1);
-            first = false;
-        }
-        if (vm & 0x04) {
-            if (!first) ImGui::SameLine();
-            if (ImGui::Button("Greed", ImVec2(80, 30)))
-                gameHandler.sendLootRoll(roll.objectGuid, roll.slot, 2);
-            first = false;
-        }
-        if (vm & 0x08) {
-            if (!first) ImGui::SameLine();
-            if (ImGui::Button("Disenchant", ImVec2(95, 30)))
-                gameHandler.sendLootRoll(roll.objectGuid, roll.slot, 3);
-            first = false;
-        }
-        if (vm & 0x01) {
-            if (!first) ImGui::SameLine();
-            if (ImGui::Button("Pass", ImVec2(70, 30)))
-                gameHandler.sendLootRoll(roll.objectGuid, roll.slot, 0);
-        }
-
-        // Live roll results from group members
-        if (!roll.playerRolls.empty()) {
-            ImGui::Separator();
-            ImGui::TextDisabled("Rolls so far:");
-            // Roll-type label + color, indexed by RollVote enum
-            // (0=Pass, 1=Need, 2=Greed, 3=Disenchant).
-            static constexpr const char* kRollLabels[] = {"Pass", "Need", "Greed", "Disenchant"};
-            static constexpr ImVec4 kRollColors[] = {
-                kColorDarkGray,                    // Pass - gray
-                ImVec4(0.2f, 0.9f, 0.2f, 1.0f),  // Need  - green
-                ImVec4(0.3f, 0.6f, 1.0f, 1.0f),  // Greed - blue
-                ImVec4(0.7f, 0.3f, 0.9f, 1.0f),  // Disenchant - purple
-            };
-            auto rollTypeIndex = [](uint8_t t) -> int {
-                return (t < 4) ? static_cast<int>(t) : 0;
-            };
-
-            if (ImGui::BeginTable("##lootrolls", 3,
-                    ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg)) {
-                ImGui::TableSetupColumn("Player", ImGuiTableColumnFlags_WidthStretch);
-                ImGui::TableSetupColumn("Type",   ImGuiTableColumnFlags_WidthFixed, 72.0f);
-                ImGui::TableSetupColumn("Roll",   ImGuiTableColumnFlags_WidthFixed, 32.0f);
-                for (const auto& r : roll.playerRolls) {
-                    int ri = rollTypeIndex(r.rollType);
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::TextUnformatted(r.playerName.c_str());
-                    ImGui::TableSetColumnIndex(1);
-                    ImGui::TextColored(kRollColors[ri], "%s", kRollLabels[ri]);
-                    ImGui::TableSetColumnIndex(2);
-                    if (r.rollType != 0) {
-                        ImGui::TextColored(kRollColors[ri], "%d", static_cast<int>(r.rollNum));
-                    } else {
-                        ImGui::TextDisabled("-");
-                    }
-                }
-                ImGui::EndTable();
-            }
-        }
-    }
-    ImGui::End();
 }
 
 void DialogManager::renderGuildInvitePopup(game::GameHandler& gameHandler) {

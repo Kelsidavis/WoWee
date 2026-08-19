@@ -59,9 +59,6 @@ private:
     void renderTradeWindow(game::GameHandler& gameHandler,
                            InventoryScreen& inventoryScreen,
                            ChatPanel& chatPanel);
-    void renderLootRollPopup(game::GameHandler& gameHandler,
-                             InventoryScreen& inventoryScreen,
-                             ChatPanel& chatPanel);
     void renderGuildInvitePopup(game::GameHandler& gameHandler);
     void renderReadyCheckPopup(game::GameHandler& gameHandler);
     void renderBgInvitePopup(game::GameHandler& gameHandler);

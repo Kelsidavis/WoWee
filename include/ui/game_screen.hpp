@@ -331,7 +331,6 @@ private:
     void renderMinimapChrome(game::GameHandler& gameHandler, float centerX,
                              float centerY, float mapRadius);
     void refreshQuestObjectiveCache(game::GameHandler& gameHandler);
-    void renderMicroMenu(game::GameHandler& gameHandler);
     void renderQuestObjectiveTracker(game::GameHandler& gameHandler);
     void renderNameplates(game::GameHandler& gameHandler);
 
