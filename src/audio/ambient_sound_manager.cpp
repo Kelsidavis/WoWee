@@ -591,6 +591,7 @@ void AmbientSoundManager::setZoneId(uint32_t zoneId) {
         case 493:  // Moonglade
         case 361:  // Felwood
         case 331:  // Ashenvale
+        case 394:  // Grizzly Hills
         case 357:  // Feralas
         case 15:   // Dustwallow Marsh (lush)
         case 267:  // Hillsbrad Foothills
@@ -600,13 +601,15 @@ void AmbientSoundManager::setZoneId(uint32_t zoneId) {
             zone = ZoneType::FOREST_NORMAL; break;
 
         case 1:    // Dun Morogh
-        case 196:  // Winterspring
+        case 618:  // Winterspring
         case 3:    // Badlands (actually dry but close enough)
         case 2817: // Crystalsong Forest
-        case 66:   // Storm Peaks
-        case 67:   // Icecrown
-        case 394:  // Dragonblight
-        case 65:   // Howling Fjord
+        case 66:   // Zul'Drak
+        case 67:   // The Storm Peaks
+        case 210:  // Icecrown
+        case 65:   // Dragonblight
+        case 495:  // Howling Fjord
+        case 3537: // Borean Tundra
             zone = ZoneType::FOREST_SNOW; break;
 
         // ---- Grasslands / plains ----
@@ -625,14 +628,13 @@ void AmbientSoundManager::setZoneId(uint32_t zoneId) {
 
         case 46:   // Burning Steppes
         case 51:   // Searing Gorge
-        case 241:  // Eastern Plaguelands (barren)
+        case 4:    // Blasted Lands
         case 28:   // Western Plaguelands
             zone = ZoneType::DESERT_CANYON; break;
 
         // ---- Jungle ----
         case 33:   // Stranglethorn Vale
-        case 78:   // Un'Goro Crater
-        case 210:  // Uldaman
+        case 490:  // Un'Goro Crater
         case 1377: // Silithus (arid but closest)
             zone = ZoneType::JUNGLE; break;
 
@@ -640,13 +642,19 @@ void AmbientSoundManager::setZoneId(uint32_t zoneId) {
         case 8:    // Swamp of Sorrows
         case 11:   // Wetlands
         case 139:  // Eastern Plaguelands
-        case 763:  // Zangarmarsh
+        case 3521: // Zangarmarsh
             zone = ZoneType::MARSH; break;
 
         // ---- Beach / coast ----
-        case 4:    // Barrens coast (Merchant Coast)
-        case 3537: // Azuremyst Isle
-        case 3524: // Bloodmyst Isle
+        //
+        // Every id here is AreaTable's, checked against the file rather than
+        // remembered. Eleven of them were not: 4 was labelled a Barrens coast
+        // and is the Blasted Lands, which is how a blighted red waste came to
+        // have seabirds and surf over it; 210 was labelled Uldaman and is
+        // Icecrown; four Northrend ids each named the zone belonging to
+        // another; 78 and 763 name nothing at all.
+        case 3524: // Azuremyst Isle
+        case 3525: // Bloodmyst Isle
             zone = ZoneType::BEACH; break;
 
         default: break;
