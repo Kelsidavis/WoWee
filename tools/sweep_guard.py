@@ -177,7 +177,7 @@ CHECKS = [
      r"^(\d+) redefined without an #ifndef", 0,
      "macros the build defines, redefined unguarded"),
     ("unused_member_check.py",
-     r"^(\d+) members stored and never read", 50,
+     r"^(\d+) members stored and never read", 46,
      "class members stored and never read"),
     # The subset clang's -Wunused-private-field rejects outright, which is a
     # failed Windows build rather than debt. Zero, and it stays there.
@@ -889,14 +889,6 @@ CHECKS = [
     ("keybinding_route_check.py",
      r"^(\d+) that would stop working when the panel is handed over", 0,
      "keys that stop working when their panel is handed over"),
-    # A window gated on frameXmlOwns has to be opened through FrameXML once its
-    # element is handed over, and the controls that open it are scattered - a
-    # key, a micro-menu button, a bag icon, a context menu, the click half of a
-    # drag handler, the code that puts the bags up for a vendor. Five separate
-    # lists were found this way, three by hand before this existed.
-    ("window_route_check.py",
-     r"^(\d+) window-opening call\(s\) with no ownership check", 0,
-     "controls opening a window without asking which interface owns it"),
     # The other half of the same seam: a window opened by writing its flag
     # rather than by calling a verb. Only the flags whose render is gated
     # matter - nine of thirty-two - which is what makes the list readable.

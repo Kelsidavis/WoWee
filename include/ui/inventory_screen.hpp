@@ -22,7 +22,6 @@ public:
     ~InventoryScreen();
 
     /// Render bags window (B key). Positioned at bottom of screen.
-    void render(game::Inventory& inventory, uint64_t moneyCopper);
 
     /// Render character screen (C key). Standalone equipment window.
 
@@ -35,10 +34,6 @@ public:
     void setOpen(bool o) { open = o; }
 
     // Separate bag window controls
-    void toggleBackpack();
-    void toggleBag(int idx);
-    void openAllBags();
-    void closeAllBags();
     void setSeparateBags(bool sep) { separateBags_ = sep; }
     [[nodiscard]] bool isSeparateBags() const { return separateBags_; }
     void toggleCompactBags() { compactBags_ = !compactBags_; }
@@ -81,7 +76,6 @@ public:
 private:
     bool open = false;
     bool characterOpen = false;
-    bool bKeyWasDown = false;
     bool separateBags_ = true;
     bool compactBags_ = false;
     bool showKeyring_ = true;
@@ -135,42 +129,12 @@ private:
     VkDescriptorSet castCursorTexture();
 
     // Click-and-hold pickup tracking
-    bool pickupPending_ = false;
-    float pickupPressTime_ = 0.0f;
-    SlotKind pickupSlotKind_ = SlotKind::BACKPACK;
-    int pickupBackpackIndex_ = -1;
-    int pickupBagIndex_ = -1;
-    int pickupBagSlotIndex_ = -1;
-    int pickupKeyringIndex_ = -1;
-    game::EquipSlot pickupEquipSlot_ = game::EquipSlot::NUM_SLOTS;
     static constexpr float kPickupHoldThreshold = 0.10f; // seconds
 
-    void renderSeparateBags(game::Inventory& inventory, uint64_t moneyCopper);
-    void renderAggregateBags(game::Inventory& inventory, uint64_t moneyCopper);
-    void renderBagWindow(const char* title, bool& isOpen, game::Inventory& inventory,
-                         int bagIndex, float defaultX, float defaultY, uint64_t moneyCopper);
     /// Shared footer for the backpack / All Bags windows: Sort Bags button + money display.
-    void renderBagsFooter(uint64_t moneyCopper);
-    void renderStatsPanel(game::Inventory& inventory, uint32_t playerLevel, int32_t serverArmor = 0,
-                          const int32_t* serverStats = nullptr, const int32_t* serverResists = nullptr,
-                          const game::GameHandler* gh = nullptr);
 
-    void renderItemSlot(game::Inventory& inventory, const game::ItemSlot& slot,
-                        float size, const char* label,
-                        SlotKind kind, int backpackIndex,
-                        game::EquipSlot equipSlot,
-                        int bagIndex = -1, int bagSlotIndex = -1,
-                        int keyringIndex = -1);
 
     // Held item helpers
-    void pickupFromBackpack(game::Inventory& inv, int index);
-    void pickupFromBag(game::Inventory& inv, int bagIndex, int slotIndex);
-    void pickupFromEquipment(game::Inventory& inv, game::EquipSlot slot);
-    void pickupFromKeyring(game::Inventory& inv, int index);
-    void placeInBackpack(game::Inventory& inv, int index);
-    void placeInBag(game::Inventory& inv, int bagIndex, int slotIndex);
-    void placeInEquipment(game::Inventory& inv, game::EquipSlot slot);
-    void placeInKeyring(game::Inventory& inv, int index);
     void cancelPickup(game::Inventory& inv);
 
     /// Where the held item came from, as the (container, slot) pair the server
@@ -181,38 +145,15 @@ private:
     /// six. The keyring was missing from two of them, so dragging a key onto an
     /// equipment slot or into the bank did nothing at all.
     bool heldItemWireSource(uint8_t& srcBag, uint8_t& srcSlot) const;
-    void playPickupSoundFor(const game::ItemDef& item) const;
-    game::EquipSlot getEquipSlotForType(uint8_t inventoryType, game::Inventory& inv);
-    void renderHeldItem();
-    void renderEquipConfirmationPopup(game::Inventory& inventory);
 
     // Drop confirmation (drag-outside-window destroy)
-    bool dropConfirmOpen_ = false;
-    std::string dropItemName_;
 
     // Destroy confirmation (Shift+right-click destroy)
-    bool destroyConfirmOpen_ = false;
-    uint8_t destroyBag_ = 0xFF;
-    uint8_t destroySlot_ = 0;
-    uint8_t destroyCount_ = 1;
-    std::string destroyItemName_;
 
     // Stack split popup state
-    bool splitConfirmOpen_ = false;
-    uint8_t splitBag_ = 0xFF;
-    uint8_t splitSlot_ = 0;
-    int splitMax_ = 1;
-    int splitCount_ = 1;
-    std::string splitItemName_;
 
     // Binding-on-equip confirmation. The item remains on the cursor until the
     // player explicitly accepts, including when the destination is a bag slot.
-    bool equipConfirmOpen_ = false;
-    bool equipConfirmAuto_ = false;
-    uint8_t equipConfirmBag_ = 0xFF;
-    uint8_t equipConfirmSourceSlot_ = 0;
-    game::EquipSlot equipConfirmSlot_ = game::EquipSlot::NUM_SLOTS;
-    std::string equipConfirmItemName_;
 
     // ImGui starts window movement before item widgets run for the frame, so
     // keep bag windows title-bar-draggable while bags are open.

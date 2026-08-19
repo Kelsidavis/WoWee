@@ -77,9 +77,6 @@ public:
     void playPickupBag();
     /// Picking an item up sounds like the thing it is - cloth, food or a gem.
     /// Chosen by item class; anything else keeps the bag rustle.
-    void playPickupCloth();
-    void playPickupFood();
-    void playPickupGem();
     void playPickupBook();
 
     // Eating/drinking
@@ -139,9 +136,6 @@ private:
     std::vector<UISample> dropSounds_;
     std::vector<UISample> pickupBagSounds_;
     std::vector<UISample> pickupBookSounds_;
-    std::vector<UISample> pickupClothSounds_;
-    std::vector<UISample> pickupFoodSounds_;
-    std::vector<UISample> pickupGemSounds_;
 
     std::vector<UISample> eatingSounds_;
     std::vector<UISample> drinkingSounds_;

@@ -273,15 +273,8 @@ namespace {
 constexpr const char* kOpenBagsCommand =
     "OpenBackpack() for i = 1, 4 do OpenBag(i) end";
 
-void openBagsForTrading(game::GameHandler& gameHandler,
-                        InventoryScreen& inventoryScreen) {
-    if (frameXmlOwns(UiElement::Bags)) {
-        gameHandler.runInterfaceCommand(kOpenBagsCommand);
-    } else if (inventoryScreen.isSeparateBags()) {
-        inventoryScreen.openAllBags();
-    } else if (!inventoryScreen.isOpen()) {
-        inventoryScreen.setOpen(true);
-    }
+void openBagsForTrading(game::GameHandler& gameHandler) {
+    gameHandler.runInterfaceCommand(kOpenBagsCommand);
 }
 
 }  // namespace
@@ -770,7 +763,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     if (gameHandler.isVendorWindowOpen()) {
         if (!windowManager_.vendorBagsOpened_) {
             windowManager_.vendorBagsOpened_ = true;
-            openBagsForTrading(gameHandler, inventoryScreen);
+            openBagsForTrading(gameHandler);
         }
     } else {
         windowManager_.vendorBagsOpened_ = false;
@@ -781,17 +774,13 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     if (gameHandler.isGuildBankOpen()) {
         if (!windowManager_.guildBankBagsOpened_) {
             windowManager_.guildBankBagsOpened_ = true;
-            openBagsForTrading(gameHandler, inventoryScreen);
+            openBagsForTrading(gameHandler);
         }
     } else {
         windowManager_.guildBankBagsOpened_ = false;
     }
 
     inventoryScreen.setGameHandler(&gameHandler);
-    if (!frameXmlOwns(UiElement::Bags)) {
-        inventoryScreen.render(gameHandler.getInventory(), gameHandler.getMoneyCopper());
-    }
-
     // Item-target cursor (sharpening stone / oil awaiting the item it applies to)
     inventoryScreen.renderItemTargetCursor();
 
@@ -1523,15 +1512,11 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
             }
 
             if (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_INVENTORY)) {
-                if (frameXmlOwns(UiElement::Bags)) {
-                    // ToggleAllBags is a later addition and is not in this
-                    // FrameXML, so this key did nothing at all once the bags
-                    // were handed over. OpenAllBags is 3.3.5's own name for
-                    // it, and it toggles rather than only opening.
-                    gameHandler.runInterfaceCommand("OpenAllBags()");
-                } else {
-                    inventoryScreen.toggle();
-                }
+                // ToggleAllBags is a later addition and is not in this
+                // FrameXML, so this key did nothing at all once the bags were
+                // handed over. OpenAllBags is 3.3.5's own name for it, and it
+                // toggles rather than only opening.
+                gameHandler.runInterfaceCommand("OpenAllBags()");
             }
 
             if (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_NAMEPLATES)) {

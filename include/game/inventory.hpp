@@ -233,12 +233,10 @@ public:
     // Equipment
     [[nodiscard]] const ItemSlot& getEquipSlot(EquipSlot slot) const;
     bool setEquipSlot(EquipSlot slot, const ItemDef& item);
-    bool clearEquipSlot(EquipSlot slot);
 
     // Keyring
     [[nodiscard]] const ItemSlot& getKeyringSlot(int index) const;
     bool setKeyringSlot(int index, const ItemDef& item);
-    bool clearKeyringSlot(int index);
     [[nodiscard]] int getKeyringSize() const { return KEYRING_SLOTS; }
 
     // Extra bags
@@ -246,11 +244,9 @@ public:
     void setBagSize(int bagIndex, int size);
     // Special containers (quivers, ammo pouches, profession bags) only accept
     // their own item type: sorting skips them and the UI marks their slots.
-    [[nodiscard]] bool isBagSpecial(int bagIndex) const;
     void setBagSpecial(int bagIndex, bool special);
     [[nodiscard]] const ItemSlot& getBagSlot(int bagIndex, int slotIndex) const;
     bool setBagSlot(int bagIndex, int slotIndex, const ItemDef& item);
-    bool clearBagSlot(int bagIndex, int slotIndex);
 
     // Bank slots (28 main + 7 bank bags)
     [[nodiscard]] const ItemSlot& getBankSlot(int index) const;

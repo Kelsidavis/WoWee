@@ -40,13 +40,6 @@ bool Inventory::setEquipSlot(EquipSlot slot, const ItemDef& item) {
     return true;
 }
 
-bool Inventory::clearEquipSlot(EquipSlot slot) {
-    int idx = static_cast<int>(slot);
-    if (idx < 0 || idx >= NUM_EQUIP_SLOTS) return false;
-    equipment[idx].item = ItemDef{};
-    return true;
-}
-
 const ItemSlot& Inventory::getKeyringSlot(int index) const {
     if (index < 0 || index >= KEYRING_SLOTS) return EMPTY_SLOT;
     return keyring_[index];
@@ -58,12 +51,6 @@ bool Inventory::setKeyringSlot(int index, const ItemDef& item) {
     return true;
 }
 
-bool Inventory::clearKeyringSlot(int index) {
-    if (index < 0 || index >= KEYRING_SLOTS) return false;
-    keyring_[index].item = ItemDef{};
-    return true;
-}
-
 int Inventory::getBagSize(int bagIndex) const {
     if (bagIndex < 0 || bagIndex >= NUM_BAG_SLOTS) return 0;
     return bags[bagIndex].size;
@@ -72,11 +59,6 @@ int Inventory::getBagSize(int bagIndex) const {
 void Inventory::setBagSize(int bagIndex, int size) {
     if (bagIndex < 0 || bagIndex >= NUM_BAG_SLOTS) return;
     bags[bagIndex].size = std::min(size, MAX_BAG_SIZE);
-}
-
-bool Inventory::isBagSpecial(int bagIndex) const {
-    if (bagIndex < 0 || bagIndex >= NUM_BAG_SLOTS) return false;
-    return bags[bagIndex].special;
 }
 
 void Inventory::setBagSpecial(int bagIndex, bool special) {
@@ -94,13 +76,6 @@ bool Inventory::setBagSlot(int bagIndex, int slotIndex, const ItemDef& item) {
     if (bagIndex < 0 || bagIndex >= NUM_BAG_SLOTS) return false;
     if (slotIndex < 0 || slotIndex >= bags[bagIndex].size) return false;
     bags[bagIndex].slots[slotIndex].item = item;
-    return true;
-}
-
-bool Inventory::clearBagSlot(int bagIndex, int slotIndex) {
-    if (bagIndex < 0 || bagIndex >= NUM_BAG_SLOTS) return false;
-    if (slotIndex < 0 || slotIndex >= bags[bagIndex].size) return false;
-    bags[bagIndex].slots[slotIndex].item = ItemDef{};
     return true;
 }
 

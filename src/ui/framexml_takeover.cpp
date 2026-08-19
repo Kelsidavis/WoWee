@@ -46,7 +46,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::QuestTracker, "questtracker"},
     {UiElement::WorldMap,     "worldmap"},
     {UiElement::CharacterFrame, "characterframe", false},
-    {UiElement::Bags,         "bags"},
+    {UiElement::Bags,         "bags", false},
     {UiElement::Spellbook,    "spellbook", false},
     {UiElement::QuestLog,     "questlog"},
     {UiElement::QuestGiver,   "questgiver"},
@@ -737,21 +737,6 @@ const Suppress kSuppress[] = {
         // and FRIENDLIST_UPDATE, so all of them were appearing in pairs.
         {UiElement::Vendor,      "MerchantFrame"},
         {UiElement::Bank,        "BankFrame"},
-        // The bags had no suppression entry at all - they are handed over by
-        // default, so nothing showed twice and the gap never surfaced. All
-        // thirteen container frames, because a player with four bags open has
-        // ContainerFrame1 through 5 on screen and naming only the first would
-        // leave the rest of them beside this client's own.
-        //
-        // StackSplitFrame belongs here rather than to itself: this client's
-        // split dialog is drawn *inside* its bag window, so the two are the
-        // same feature and go together. With bags handed over FrameXML's is
-        // the only one, which is correct.
-        {UiElement::Bags,        "ContainerFrame1 ContainerFrame2 ContainerFrame3 "
-                                 "ContainerFrame4 ContainerFrame5 ContainerFrame6 "
-                                 "ContainerFrame7 ContainerFrame8 ContainerFrame9 "
-                                 "ContainerFrame10 ContainerFrame11 ContainerFrame12 "
-                                 "ContainerFrame13 StackSplitFrame"},
         {UiElement::Social,      "FriendsFrame"},
         // Both of these were live: TRADE_SHOW and READY_CHECK are fired, and
         // this client draws its own trade window and its own ready-check popup
