@@ -327,6 +327,7 @@ ACCOUNTED = {
     "GameScreen::renderPlayerInfo":               "debug window",
     "GameScreen::renderWeatherOverlay":           "debug overlay",
     "InventoryScreen::renderItemTargetCursor":    "cursor art",
+    "PaperUI::begin":                             "the pre-game screens' controls; the walk matched a generic name",
     "ToastManager::renderAreaTriggerToasts":      "no counterpart",
     "ToastManager::renderDingEffect":             "no counterpart",
     "ToastManager::renderDiscoveryToast":         "no counterpart",
