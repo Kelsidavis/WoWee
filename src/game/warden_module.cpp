@@ -599,27 +599,61 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
     enum class PairFormat {
         CopyDataSkip,  // [copy][data][skip]
         SkipCopyData,  // [skip][copy][data]
-        CopySkipData   // [copy][skip][data]
+        CopySkipData,  // [copy][skip][data]
+        /// [copy][data][skip] again, but ending when the image is full rather
+        /// than on a zero pair. A stream written this way has no terminator to
+        /// find, so the three above walk it correctly and then run off the end
+        /// still looking for one - which is what "the stream ended without a
+        /// terminating pair" means when all three say it and the image is full.
+        CopyDataSkipToFill
     };
+
+    // How far a layout got before it gave up. "All known layouts failed" says
+    // nothing a reader can act on: whether the stream is a different shape,
+    // or this one ran off the end of a truncated module, or the header's size
+    // is wrong, are three different faults with one message between them.
+    struct Attempt {
+        int pairs = 0;
+        size_t pos = 0;
+        size_t dest = 0;
+        const char* why = "not tried";
+    };
+    Attempt attempts[4];
 
     auto tryParsePairs = [&](PairFormat format,
                              std::vector<uint8_t>& imageOut,
                              size_t& relocPosOut,
                              size_t& finalOffsetOut,
-                             int& pairCountOut) -> bool {
+                             int& pairCountOut,
+                             Attempt& record) -> bool {
         imageOut.assign(moduleSize_, 0);
         size_t pos = 4; // Skip 4-byte final size header
         size_t destOffset = 0;
         int pairCount = 0;
+        const auto note = [&](const char* why) {
+            record = {pairCount, pos, destOffset, why};
+            return false;
+        };
 
         while (pos + 2 <= exeData.size()) {
             uint16_t copyCount = 0;
             uint16_t skipCount = 0;
 
+            if (format == PairFormat::CopyDataSkipToFill && destOffset == moduleSize_) {
+                relocPosOut = pos;
+                finalOffsetOut = destOffset;
+                pairCountOut = pairCount;
+                return true;
+            }
+
             switch (format) {
+                case PairFormat::CopyDataSkipToFill:
                 case PairFormat::CopyDataSkip: {
                     copyCount = readU16LE(pos);
                     pos += 2;
+                    if (copyCount == 0 && format == PairFormat::CopyDataSkipToFill) {
+                        return note("a zero pair, so this stream does have a terminator");
+                    }
                     if (copyCount == 0) {
                         relocPosOut = pos;
                         finalOffsetOut = destOffset;
@@ -628,26 +662,21 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
                         return true;
                     }
 
-                    if (pos + copyCount > exeData.size() || destOffset + copyCount > moduleSize_) {
-                        return false;
-                    }
+                    if (pos + copyCount > exeData.size()) return note("a copy runs past the end of the module");
+                    if (destOffset + copyCount > moduleSize_) return note("a copy runs past the image the header sized");
 
                     std::memcpy(imageOut.data() + destOffset, exeData.data() + pos, copyCount);
                     pos += copyCount;
                     destOffset += copyCount;
 
-                    if (pos + 2 > exeData.size()) {
-                        return false;
-                    }
+                    if (pos + 2 > exeData.size()) return note("the module ends where a skip count should be");
                     skipCount = readU16LE(pos);
                     pos += 2;
                     break;
                 }
 
                 case PairFormat::SkipCopyData: {
-                    if (pos + 4 > exeData.size()) {
-                        return false;
-                    }
+                    if (pos + 4 > exeData.size()) return note("the module ends inside a pair header");
                     skipCount = readU16LE(pos);
                     pos += 2;
                     copyCount = readU16LE(pos);
@@ -661,14 +690,11 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
                         return true;
                     }
 
-                    if (destOffset + skipCount > moduleSize_) {
-                        return false;
-                    }
+                    if (destOffset + skipCount > moduleSize_) return note("a skip runs past the image the header sized");
                     destOffset += skipCount;
 
-                    if (pos + copyCount > exeData.size() || destOffset + copyCount > moduleSize_) {
-                        return false;
-                    }
+                    if (pos + copyCount > exeData.size()) return note("a copy runs past the end of the module");
+                    if (destOffset + copyCount > moduleSize_) return note("a copy runs past the image the header sized");
                     std::memcpy(imageOut.data() + destOffset, exeData.data() + pos, copyCount);
                     pos += copyCount;
                     destOffset += copyCount;
@@ -676,9 +702,7 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
                 }
 
                 case PairFormat::CopySkipData: {
-                    if (pos + 4 > exeData.size()) {
-                        return false;
-                    }
+                    if (pos + 4 > exeData.size()) return note("the module ends inside a pair header");
                     copyCount = readU16LE(pos);
                     pos += 2;
                     skipCount = readU16LE(pos);
@@ -692,9 +716,8 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
                         return true;
                     }
 
-                    if (pos + copyCount > exeData.size() || destOffset + copyCount > moduleSize_) {
-                        return false;
-                    }
+                    if (pos + copyCount > exeData.size()) return note("a copy runs past the end of the module");
+                    if (destOffset + copyCount > moduleSize_) return note("a copy runs past the image the header sized");
                     std::memcpy(imageOut.data() + destOffset, exeData.data() + pos, copyCount);
                     pos += copyCount;
                     destOffset += copyCount;
@@ -702,14 +725,12 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
                 }
             }
 
-            if (destOffset + skipCount > moduleSize_) {
-                return false;
-            }
+            if (destOffset + skipCount > moduleSize_) return note("a skip runs past the image the header sized");
             destOffset += skipCount;
             pairCount++;
         }
 
-        return false;
+        return note("the stream ended without a terminating pair");
     };
 
     std::vector<uint8_t> parsedImage;
@@ -718,14 +739,29 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
     int parsedPairCount = 0;
 
     PairFormat usedFormat = PairFormat::CopyDataSkip;
-    bool parsed = tryParsePairs(PairFormat::CopyDataSkip, parsedImage, parsedRelocPos, parsedFinalOffset, parsedPairCount);
+    bool parsed = tryParsePairs(PairFormat::CopyDataSkip, parsedImage, parsedRelocPos,
+                                parsedFinalOffset, parsedPairCount, attempts[0]);
     if (!parsed) {
         usedFormat = PairFormat::SkipCopyData;
-        parsed = tryParsePairs(PairFormat::SkipCopyData, parsedImage, parsedRelocPos, parsedFinalOffset, parsedPairCount);
+        parsed = tryParsePairs(PairFormat::SkipCopyData, parsedImage, parsedRelocPos,
+                               parsedFinalOffset, parsedPairCount, attempts[1]);
     }
     if (!parsed) {
         usedFormat = PairFormat::CopySkipData;
-        parsed = tryParsePairs(PairFormat::CopySkipData, parsedImage, parsedRelocPos, parsedFinalOffset, parsedPairCount);
+        parsed = tryParsePairs(PairFormat::CopySkipData, parsedImage, parsedRelocPos,
+                               parsedFinalOffset, parsedPairCount, attempts[2]);
+    }
+    if (!parsed) {
+        // Last, and only on an exact fill. A wrong reading of a pair stream
+        // will not land on the image's last byte by luck, and accepting one
+        // that did would hand the emulator rubbish to run.
+        usedFormat = PairFormat::CopyDataSkipToFill;
+        parsed = tryParsePairs(PairFormat::CopyDataSkipToFill, parsedImage, parsedRelocPos,
+                               parsedFinalOffset, parsedPairCount, attempts[3]);
+        if (parsed && parsedFinalOffset != finalCodeSize) {
+            parsed = false;
+            attempts[3].why = "it did not fill the image exactly";
+        }
     }
 
     if (parsed) {
@@ -736,6 +772,7 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
         const char* formatName = "copy/data/skip";
         if (usedFormat == PairFormat::SkipCopyData) formatName = "skip/copy/data";
         if (usedFormat == PairFormat::CopySkipData) formatName = "copy/skip/data";
+        if (usedFormat == PairFormat::CopyDataSkipToFill) formatName = "copy/data/skip to fill";
 
         LOG_INFO("WardenModule: Parsed ", parsedPairCount, " pairs using format ",
                  formatName, ", final offset: ", parsedFinalOffset, "/", finalCodeSize);
@@ -752,7 +789,32 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
     }
     relocDataOffset_ = 0;
     moduleImageUsable_ = false;
-    LOG_WARNING("WardenModule: Could not parse copy/skip pairs (all known layouts failed); using raw payload fallback");
+
+    // Everything a reader needs to tell one fault from another, because the
+    // module itself cannot be attached to a report: it arrives encrypted with
+    // a key that is not kept, so the only account of it is this one.
+    LOG_WARNING("WardenModule: no known layout unpacks this module. ",
+                exeData.size(), " bytes decompressed, header asks for an image of ",
+                finalCodeSize, ".");
+    {
+        std::string head;
+        char byteText[4];
+        for (size_t i = 0; i < exeData.size() && i < 32; ++i) {
+            std::snprintf(byteText, sizeof(byteText), "%02X", exeData[i]);
+            head += byteText;
+            head += ' ';
+        }
+        LOG_WARNING("WardenModule: it begins ", head);
+    }
+    static const char* const kFormatNames[4] = {"copy/data/skip", "skip/copy/data",
+                                                "copy/skip/data", "copy/data/skip to fill"};
+    for (int i = 0; i < 4; ++i) {
+        LOG_WARNING("WardenModule:   ", kFormatNames[i], " read ", attempts[i].pairs,
+                    " pair(s), reaching byte ", attempts[i].pos, " of the module and ",
+                    attempts[i].dest, " of the image, then stopped: ", attempts[i].why);
+    }
+    LOG_WARNING("WardenModule: falling back to the raw payload, which the emulator "
+                "will not be given - the checks answer from the stubs instead.");
     return true;
 }
 
