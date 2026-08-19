@@ -585,8 +585,23 @@ bool Renderer::initialize(core::Window* win) {
         // a path this renderer handles gently. setShadowMapSize clamps to 4096
         // for the same reason.
         constexpr uint32_t kShadowSideForLevel[] = {512, 1024, 2048, 4096, 4096};
+        // 4096 was the default, and the arithmetic above says what that costs:
+        // 64 MB a map, two of them in flight, 128 MB of depth before anything
+        // is drawn, refilled every frame. That is a lot to ask of a machine
+        // nobody checked, and a good part of the reports of this client running
+        // badly are hardware that was never going to carry it. 2048 is a
+        // quarter of the fill and 32 MB for the pair, and the slider still
+        // reaches the top for anyone who wants to spend it.
+        //
+        // A phone starts lower again: its GPU memory is the system's memory.
+#ifdef __ANDROID__
+        constexpr const char* kDefaultShadowLevel = "1";   // 1024, 8 MB the pair
+#else
+        constexpr const char* kDefaultShadowLevel = "2";   // 2048, 32 MB the pair
+#endif
         const int level = std::clamp(
-            std::atoi(addons::storedCVarValue("extShadowQuality", "3").c_str()), 0, 4);
+            std::atoi(addons::storedCVarValue("extShadowQuality", kDefaultShadowLevel).c_str()),
+            0, 4);
         setShadowMapSize(kShadowSideForLevel[level]);
     }
 

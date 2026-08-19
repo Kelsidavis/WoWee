@@ -3266,6 +3266,7 @@ void Application::updateInGame(float deltaTime, const char*& updateCheckpoint) {
         }
         auto stageEnd = std::chrono::steady_clock::now();
         float stageMs = std::chrono::duration<float, std::milli>(stageEnd - stageStart).count();
+        noteStageTime(stageName, stageMs);
         if (stageMs > 50.0f) {
             LOG_WARNING("SLOW update stage '", stageName, "': ", stageMs, "ms");
         }
@@ -3661,11 +3662,12 @@ void Application::render() {
 
     // Mirrors the IN_GAME update stages: a frame that blocks long enough to trip the
     // watchdog needs to say which phase did it.
-    auto runRenderStage = [](const char* stageName, auto&& fn) {
+    auto runRenderStage = [this](const char* stageName, auto&& fn) {
         auto stageStart = std::chrono::steady_clock::now();
         fn();
         float stageMs = std::chrono::duration<float, std::milli>(
             std::chrono::steady_clock::now() - stageStart).count();
+        noteStageTime(stageName, stageMs);
         if (stageMs > 50.0f) {
             LOG_WARNING("SLOW render stage '", stageName, "': ", stageMs, "ms");
         }
@@ -4479,8 +4481,55 @@ void Application::render() {
     }
 
     runRenderStage("endFrame", [&] { renderer->endFrame(); });
+
+    stageStatFrames_ += 1;
+    reportStageTimes();
     renderingFrame_ = false;
     processDeferredLogoutToLogin();
+}
+
+void Application::noteStageTime(const char* stage, float milliseconds) {
+    auto& stat = stageStats_[stage];
+    stat.totalMs += milliseconds;
+    stat.frames += 1;
+    if (milliseconds > stat.worstMs) stat.worstMs = milliseconds;
+}
+
+void Application::reportStageTimes() {
+    using namespace std::chrono;
+    const auto now = steady_clock::now();
+    if (stageStatsSince_.time_since_epoch().count() == 0) {
+        stageStatsSince_ = now;
+        return;
+    }
+    const float windowMs = duration<float, std::milli>(now - stageStatsSince_).count();
+    if (windowMs < 10000.0f) return;
+
+    if (stageStatFrames_ > 0) {
+        const float fps = stageStatFrames_ * 1000.0f / windowMs;
+        LOG_INFO("frame budget over ", static_cast<int>(windowMs / 1000.0f), "s: ",
+                 stageStatFrames_, " frames, ", fps, " fps, ",
+                 windowMs / static_cast<float>(stageStatFrames_), "ms each");
+        // Worst first: the stage to look at is the one taking the time, and a
+        // long tail matters more than an average on a device that stutters.
+        std::vector<std::pair<double, std::string>> byCost;
+        byCost.reserve(stageStats_.size());
+        for (const auto& [name, stat] : stageStats_) {
+            byCost.emplace_back(stat.totalMs, name);
+        }
+        std::sort(byCost.rbegin(), byCost.rend());
+        for (const auto& [total, name] : byCost) {
+            const auto& stat = stageStats_[name];
+            if (stat.frames == 0) continue;
+            LOG_INFO("  ", name, ": ", static_cast<float>(total / stageStatFrames_),
+                     "ms/frame avg, ", stat.worstMs, "ms worst, ",
+                     static_cast<int>(100.0 * total / windowMs), "% of the window");
+        }
+    }
+
+    stageStats_.clear();
+    stageStatFrames_ = 0;
+    stageStatsSince_ = now;
 }
 
 void Application::setupUICallbacks() {

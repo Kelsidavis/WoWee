@@ -11,6 +11,7 @@
 #include "game/game_services.hpp"
 #include "pipeline/blp_loader.hpp"
 #include <memory>
+#include <map>
 #include <string>
 #include <vector>
 #include <deque>
@@ -150,6 +151,25 @@ private:
     void render();
     void performLogoutToLogin();
     void processDeferredLogoutToLogin();
+    /// Records how long one named stage of a frame took.
+    ///
+    /// The per-stage timings only ever spoke up above 50ms, which says which
+    /// stage stalled and nothing about where a frame's time normally goes. On
+    /// a phone the whole budget is 33ms, so every stage was silent and the
+    /// client was slow for reasons nothing reported. This keeps a running
+    /// average and worst case per stage and prints the breakdown periodically.
+    void noteStageTime(const char* stage, float milliseconds);
+    void reportStageTimes();
+
+    struct StageStat {
+        double totalMs = 0.0;
+        float worstMs = 0.0f;
+        int frames = 0;
+    };
+    std::map<std::string, StageStat> stageStats_;
+    std::chrono::steady_clock::time_point stageStatsSince_{};
+    int stageStatFrames_ = 0;
+
     void setupUICallbacks();
     void spawnPlayerCharacter();
     // Re-spawn the in-world player model in place after a live appearance change
