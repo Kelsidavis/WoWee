@@ -392,6 +392,10 @@ void UIManager::render(core::AppState appState, auth::AuthHandler* authHandler, 
 
         case core::AppState::REALM_SELECTION:
             authScreen->stopLoginMusic();
+            // The realm and character screens are drawn on the same paper the
+            // login screen is, so they keep its backdrop rather than dropping
+            // to a black window between one and the next.
+            authScreen->drawBackdrop();
             if (authHandler) {
                 realmScreen->render(*authHandler);
             }
@@ -399,6 +403,7 @@ void UIManager::render(core::AppState appState, auth::AuthHandler* authHandler, 
 
         case core::AppState::CHARACTER_CREATION:
             authScreen->stopLoginMusic();
+            authScreen->drawBackdrop();
             if (gameHandler) {
                 characterCreateScreen->render(*gameHandler);
             }
@@ -406,6 +411,7 @@ void UIManager::render(core::AppState appState, auth::AuthHandler* authHandler, 
 
         case core::AppState::CHARACTER_SELECTION:
             authScreen->stopLoginMusic();
+            authScreen->drawBackdrop();
             if (gameHandler) {
                 characterScreen->render(*gameHandler);
             }

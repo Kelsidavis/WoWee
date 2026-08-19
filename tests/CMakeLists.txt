@@ -438,6 +438,12 @@ target_link_libraries(test_widget_tree PRIVATE catch2_main)
 add_test(NAME widget_tree COMMAND test_widget_tree)
 register_test_target(test_widget_tree)
 
+# ── test_text_edit ──────────────────────────────────────────
+wowee_add_test(test_text_edit SOURCES
+    test_text_edit.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/text_edit.cpp
+)
+
 # ── test_escape_action ──────────────────────────────────────
 add_executable(test_escape_action
     test_escape_action.cpp

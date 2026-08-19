@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ui/paper_ui.hpp"
 #include "ui/ui_services.hpp"
 #include "game/game_handler.hpp"
 #include <imgui.h>
@@ -119,9 +120,24 @@ private:
      */
     [[nodiscard]] ImVec4 getFactionColor(game::Race race) const;
 
-    /// AddOns management window (list + enable/disable), opened from the footer.
+    /// The controls. See paper_ui.hpp - this screen is drawn rather than
+    /// asked for, the same as the login and realm screens before it.
+    PaperUI ui_;
+
+    /// The states with nothing to choose from - still loading, disconnected,
+    /// or an account with no characters on this realm. One small sheet
+    /// between them, since each is a sentence and a row of buttons.
+    void renderNotice(game::GameHandler& gameHandler, float screenW, float screenH);
+    /// The picture, the name and everything known about whoever is selected.
+    void renderDetails(game::GameHandler& gameHandler, const game::Character& character,
+                       ImVec2 a, ImVec2 b);
+    /// Both halves of "are you sure", over a scrim.
+    void renderDeleteConfirm(const game::Character& character, float screenW,
+                             float screenH);
+
+    /// AddOns management sheet (list + enable/disable), opened from the footer.
     bool showAddonsWindow_ = false;
-    void renderAddonsWindow();
+    void renderAddonsSheet(float screenW, float screenH);
 
     /**
      * Persist / restore last selected character GUID

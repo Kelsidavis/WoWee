@@ -957,6 +957,8 @@ set(WOWEE_SOURCES
     src/ui/framexml_takeover.cpp
     src/ui/unit_portrait.cpp
     src/ui/interface_fonts.cpp
+    src/ui/text_edit.cpp
+    src/ui/paper_ui.cpp
     src/ui/widget_renderer.cpp
     src/ui/ui_raid_icons.cpp
     src/ui/ui_texture_load.cpp

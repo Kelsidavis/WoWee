@@ -1,6 +1,7 @@
 #pragma once
 
 #include "auth/auth_handler.hpp"
+#include "ui/paper_ui.hpp"
 #include <imgui.h>
 #include <string>
 #include <functional>
@@ -79,6 +80,10 @@ private:
     // Status
     std::string statusMessage;
 
+    /// The controls. See paper_ui.hpp - this screen is drawn rather than
+    /// asked for, the same as the login screen it follows.
+    PaperUI ui_;
+
     // Callbacks
     std::function<void(const std::string&, const std::string&)> onRealmSelected;
     std::function<void()> onBack;
@@ -97,6 +102,11 @@ private:
      * Get population color
      */
     [[nodiscard]] ImVec4 getPopulationColor(float population) const;
+
+    /// What the population number is called.
+    [[nodiscard]] static const char* getPopulationName(float population);
+    /// What the type icon means.
+    [[nodiscard]] static const char* getRealmType(uint8_t icon);
 };
 
 }} // namespace wowee::ui

@@ -3,6 +3,8 @@
 #include "ui/settings_panel.hpp"
 #include <future>
 
+#include "ui/paper_ui.hpp"
+#include "ui/text_edit.hpp"
 #include "ui/ui_services.hpp"
 #include "auth/auth_handler.hpp"
 #include <vulkan/vulkan.h>
@@ -50,6 +52,14 @@ public:
 
     void stopLoginMusic();
 
+    /// Draws the login art, filling the window.
+    ///
+    /// Public, and called by UIManager for the realm and character screens
+    /// too: those sit on the same sheet of paper this does, and the art is
+    /// already decoded and uploaded by the time they are reached. It is owned
+    /// here because this is the screen that pays to load it.
+    void drawBackdrop();
+
     /**
      * Get status message
      */
@@ -74,10 +84,20 @@ private:
     };
 
     // UI state
-    char hostname[256] = "localhost";
-    char username[256] = "";
-    char password[256] = "";
-    char pinCode[32] = "";
+    //
+    // The fields are TextEdits rather than char buffers because the screen
+    // draws its own boxes now: what used to be ImGui's business - where the
+    // caret is, what is selected - is this screen's, and TextEdit is where
+    // that lives. See paper_ui.hpp for why the boxes are drawn at all.
+    TextEdit hostname_{255};
+    TextEdit username_{255};
+    TextEdit password_{255};
+    TextEdit pinCode_{31};
+    /// The port as it is being typed. `port` is what the rest of the screen
+    /// reads, and is re-derived from this whenever it changes - a half-typed
+    /// port is a string with no number in it yet, and the connect path should
+    /// never see one.
+    TextEdit portText_{5};
     int port = 3724;
     int expansionIndex = 0;     // Index into expansion registry profiles
     std::string assetProfileId_; // Empty follows expansionIndex automatically
@@ -85,6 +105,18 @@ private:
     bool showPassword = false;
     bool pinAutoSubmitted_ = false;
     bool securityPromptFocused_ = false;
+
+    /// The controls, and the frame-to-frame state behind them.
+    PaperUI ui_;
+    /// The server, port, expansion and asset rows, which most players never
+    /// need to touch and which used to be the first thing the screen showed.
+    bool advancedOpen_ = false;
+    /// Whether the password box had the keyboard last frame, so that taking
+    /// it can offer a remembered password up for replacement rather than for
+    /// editing - there is nothing in the box to edit, only a stored hash.
+    bool passwordFocused_ = false;
+    /// Set the port and the text of it together.
+    void setPort(int value);
 
     // Status
     std::string statusMessage;
@@ -176,8 +208,8 @@ private:
     bool loginMusicVolumeAdjusted_ = false;
     int savedMusicVolume_ = 30;
 
-    // ----- Login-screen graphics settings popup -----
-    bool showLoginSettings_ = false;
+    // ----- Login-screen graphics settings sheet -----
+    bool settingsOpen_ = false;
 
     // Local copies of the settings keys we expose in the login popup.
     // Loaded on first open; saved on Apply.
@@ -225,7 +257,16 @@ private:
     LoginGraphicsState loginGfx_;
     bool loginGfxLoaded_ = false;
 
-    void renderLoginSettingsWindow();
+    /// Draws the card and everything on it. Answers the rect it took, so the
+    /// caller can hand the pointer over the whole sheet rather than only over
+    /// the controls on it.
+    void renderCard(auth::AuthHandler& authHandler, float screenW, float screenH);
+    void renderLoginSettingsSheet(float screenW, float screenH);
+    /// The paper strip a disconnect is announced on, across the top of the
+    /// screen rather than inside the card.
+    void renderProminentStatus(float screenW, float screenH);
+    /// The login music, which has nothing to do with the controls.
+    void updateMusic();
     void loadLoginGraphicsState();
     void saveLoginGraphicsState();
     static void applyPresetToState(LoginGraphicsState& s, int preset);

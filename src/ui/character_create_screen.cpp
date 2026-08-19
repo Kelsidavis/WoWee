@@ -1,5 +1,4 @@
 #include "ui/character_create_screen.hpp"
-#include "ui/selection_screen_layout.hpp"
 #include "core/logger.hpp"
 #include "ui/ui_colors.hpp"
 #include "rendering/character_preview.hpp"
@@ -123,7 +122,7 @@ void CharacterCreateScreen::setExpansionConstraints(
 }
 
 void CharacterCreateScreen::reset() {
-    std::memset(nameBuffer, 0, sizeof(nameBuffer));
+    name_.clear();
     raceIndex = 0;
     classIndex = 0;
     genderIndex = 0;
@@ -383,6 +382,28 @@ void CharacterCreateScreen::updateAppearanceRanges() {
     prevRangeHairStyle_ = hairStyle;
 }
 
+namespace {
+
+// Written in units and drawn at a scale taken from the window, the same way
+// the login card is. See paper_ui.hpp.
+constexpr float kSheetWidth  = 1160.0f;
+constexpr float kSheetHeight = 740.0f;
+constexpr float kPad         = 34.0f;
+constexpr float kTitleSize   = 40.0f;
+constexpr float kLabelSize   = 14.0f;
+constexpr float kBodySize    = 15.0f;
+constexpr float kSmallSize   = 13.0f;
+constexpr float kFieldHeight = 38.0f;
+constexpr float kChipHeight  = 30.0f;
+constexpr float kButtonH     = 44.0f;
+constexpr float kColumnGap   = 28.0f;
+
+/// Alliance blue and Horde red, before the paper takes the glare off them.
+constexpr ImVec4 kAllianceColour{0.30f, 0.50f, 1.00f, 1.0f};
+constexpr ImVec4 kHordeColour{0.85f, 0.25f, 0.22f, 1.0f};
+
+} // namespace
+
 void CharacterCreateScreen::render(game::GameHandler& /*gameHandler*/) {
     // Resolve valid DBC option IDs before loading the preview. Doing this after
     // loadCharacter left race/style changes using the previous option mapping.
@@ -394,269 +415,330 @@ void CharacterCreateScreen::render(game::GameHandler& /*gameHandler*/) {
         preview_->render();
         preview_->requestComposite();
     }
+    const bool hasPreview = (preview_ && preview_->getTextureId() != nullptr &&
+                             preview_->getWidth() > 0 && preview_->getHeight() > 0);
 
-    bool hasPreview = (preview_ && preview_->getTextureId() != nullptr);
-    ImGuiViewport* vp = ImGui::GetMainViewport();
-    const SelectionScreenLayout layout = makeSelectionScreenLayout(*vp);
+    const ImVec2 screen = ImGui::GetIO().DisplaySize;
+    // This sheet carries more at once than the others and none of it can be
+    // scrolled to, so it shrinks to fit the window rather than running off the
+    // bottom of it.
+    float scale = std::clamp(std::min(screen.x / 1280.0f, screen.y / 760.0f), 0.62f, 2.6f);
+    scale = std::min(scale, (screen.y - 32.0f) / kSheetHeight);
+    scale = std::min(scale, (screen.x - 32.0f) / kSheetWidth);
+    scale = std::max(scale, 0.34f);
 
-    ImGui::SetNextWindowPos(layout.windowPos, ImGuiCond_Always);
-    ImGui::SetNextWindowSize(layout.windowSize, ImGuiCond_Always);
+    ui_.begin(ImGui::GetIO().DeltaTime, scale);
+    ui_.setLayer(PaperLayer::Page);
 
-    ImGui::Begin("Create Character", nullptr,
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
-    ImGui::SetWindowFontScale(layout.scale);
+    const PaperTheme& theme = ui_.theme();
+    const auto px = [this](float units) { return ui_.px(units); };
 
-    ImGui::TextColored(ui::colors::kWarmGold, "Create a Character");
-    ImGui::TextDisabled("Choose your hero's identity and appearance.");
-    ImGui::Separator();
+    const float sheetW = px(kSheetWidth);
+    const float sheetH = px(kSheetHeight);
+    const ImVec2 a((screen.x - sheetW) * 0.5f, (screen.y - sheetH) * 0.5f);
+    const ImVec2 b(a.x + sheetW, a.y + sheetH);
+    ui_.sheet(a, b);
+    ui_.claimMouse(a, b);
 
-    const float bodyHeight = std::max(
-        320.0f,
-        ImGui::GetContentRegionAvail().y - layout.footerHeight() -
-            ImGui::GetStyle().ItemSpacing.y);
-    const float availableWidth = ImGui::GetContentRegionAvail().x;
-    const float previewWidth = hasPreview
-        ? std::min(680.0f * layout.scale,
-                   std::max(360.0f * layout.scale, availableWidth * 0.44f))
-        : 0.0f;
+    const float titleSize = px(kTitleSize);
+    const float bodySize = px(kBodySize);
+    const float smallSize = px(kSmallSize);
+    const float labelSize = px(kLabelSize);
+    const float labelRow = ui_.lineHeight(labelSize) + px(3);
+    const float chipH = px(kChipHeight);
+    const float chipGap = px(6);
 
+    Column page{a.x + px(kPad), b.x - px(kPad), a.y + px(kPad)};
+
+    // ---- heading ----------------------------------------------------------
+    ui_.text(page.at(), "Create a Hero", titleSize, theme.ink, /*titleFace=*/true);
+    {
+        const float w = ui_.textWidth("Create a Hero", titleSize, true);
+        const float y = page.y + titleSize;
+        ui_.squiggle(ImVec2(page.x0, y), ImVec2(page.x0 + w * 1.04f, y), theme.crayonRed,
+                     px(2.0f), 0x7731u);
+    }
+    ui_.textRight(page.x1, page.y + titleSize * 0.55f, "Who are you going to be?", smallSize,
+                  theme.pencil);
+    page.gap(titleSize + px(18));
+
+    // ---- three columns ----------------------------------------------------
+    const float footerH = px(kButtonH) + ui_.lineHeight(smallSize) + px(20);
+    const float bodyTop = page.y;
+    const float bodyBottom = b.y - px(kPad) - footerH;
+    const float columnsW = page.width() - px(kColumnGap) * 2.0f;
+    const float previewW = columnsW * 0.37f;
+    const float identityW = columnsW * 0.34f;
+    const float appearanceW = columnsW - previewW - identityW;
+    const float identityX = page.x0 + previewW + px(kColumnGap);
+    const float appearanceX = identityX + identityW + px(kColumnGap);
+
+    {
+        const float dividers[] = {identityX - px(kColumnGap) * 0.5f,
+                                  appearanceX - px(kColumnGap) * 0.5f};
+        for (uint32_t i = 0; i < 2; ++i) {
+            ui_.rule(ImVec2(dividers[i], bodyTop), ImVec2(dividers[i], bodyBottom),
+                     paperFade(theme.pencil, 0.5f), px(1.0f), 0x3355u + i);
+        }
+    }
+
+    // ---- the picture ------------------------------------------------------
     if (hasPreview) {
-        // Left panel: 3D preview
-        ImGui::BeginChild("##preview_panel", ImVec2(previewWidth, bodyHeight), true);
-        {
-            float imgW = ImGui::GetContentRegionAvail().x;
-            float imgH = imgW * (static_cast<float>(preview_->getHeight()) /
-                                  static_cast<float>(preview_->getWidth()));
-            const float maxImageH = std::max(200.0f, bodyHeight - 42.0f * layout.scale);
-            if (imgH > maxImageH) {
-                imgH = maxImageH;
-                imgW = imgH * (static_cast<float>(preview_->getWidth()) /
-                               static_cast<float>(preview_->getHeight()));
+        const float aspect = static_cast<float>(preview_->getHeight()) /
+                             static_cast<float>(preview_->getWidth());
+        const float mat = px(9);
+        const float hintH = ui_.lineHeight(smallSize) + px(8);
+        float imgW = previewW - mat * 2.0f;
+        float imgH = imgW * aspect;
+        const float roomH = (bodyBottom - bodyTop) - mat * 2.0f - hintH;
+        if (imgH > roomH) {
+            imgH = std::max(roomH, px(120));
+            imgW = imgH / aspect;
+        }
+        const float imgX = page.x0 + (previewW - imgW) * 0.5f;
+        const ImVec2 imgA(imgX, bodyTop + mat);
+        const ImVec2 imgB(imgX + imgW, bodyTop + mat + imgH);
+        ui_.image(reinterpret_cast<ImTextureID>(preview_->getTextureId()), imgA, imgB);
+
+        // Mouse drag rotation and hover-only wheel zoom on the preview image.
+        if (ui_.hover(imgA, imgB)) {
+            if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+                preview_->rotate(ImGui::GetIO().MouseDelta.x * 0.2f);
             }
-
-            const float indent = (ImGui::GetContentRegionAvail().x - imgW) * 0.5f;
-            if (indent > 0.0f) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
-
-            if (preview_->getTextureId()) {
-                ImGui::Image(
-                    reinterpret_cast<ImTextureID>(preview_->getTextureId()),
-                    ImVec2(imgW, imgH));
-            }
-
-            const bool previewHovered = ImGui::IsItemHovered();
-
-            // Mouse drag rotation and hover-only wheel zoom on the preview image.
-            if (previewHovered && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-                float deltaX = ImGui::GetIO().MouseDelta.x;
-                preview_->rotate(deltaX * 0.2f);
-            }
-            if (previewHovered && ImGui::GetIO().MouseWheel != 0.0f) {
+            if (ImGui::GetIO().MouseWheel != 0.0f) {
                 preview_->zoom(ImGui::GetIO().MouseWheel);
             }
-
-            ImGui::TextDisabled("Drag to rotate  -  Scroll to zoom");
         }
-        ImGui::EndChild();
-
-        ImGui::SameLine(0.0f, layout.gap());
+        ui_.textCentered(page.x0 + previewW * 0.5f, imgB.y + mat + px(4),
+                         "Drag to turn  -  scroll to zoom", smallSize, theme.pencil);
+    } else {
+        ui_.textCentered(page.x0 + previewW * 0.5f, bodyTop + px(20),
+                         "No picture yet.", bodySize, theme.pencil);
     }
 
-    // Right panel: controls remain independently scrollable on short windows.
-    ImGui::BeginChild("##controls_panel", ImVec2(0.0f, bodyHeight), true);
+    // ---- who they are -----------------------------------------------------
+    Column who{identityX, identityX + identityW, bodyTop};
 
-    // Name input
-    ImGui::Text("Name:");
-    ImGui::SameLine(100.0f * layout.scale);
-    ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputText("##name", nameBuffer, sizeof(nameBuffer));
-
-    ImGui::Spacing();
-
-    // Race selection (filtered by expansion)
-    int raceCount = static_cast<int>(availableRaces_.size());
-    ImGui::Text("Race:");
-    ImGui::Spacing();
-    ImGui::Indent(10.0f * layout.scale);
-    auto continueButtonRow = [&](const char* label, bool first) {
-        if (first) return;
-        const float buttonWidth = ImGui::CalcTextSize(label).x +
-                                  ImGui::GetStyle().FramePadding.x * 2.0f;
-        const float nextRight = ImGui::GetItemRectMax().x +
-                                ImGui::GetStyle().ItemSpacing.x + buttonWidth;
-        const float contentRight = ImGui::GetWindowPos().x +
-                                   ImGui::GetContentRegionMax().x;
-        if (nextRight <= contentRight) ImGui::SameLine();
+    // Rows of pills that wrap when they run out of line.
+    float flowX = who.x0;
+    float flowY = who.y;
+    const auto beginFlow = [&]() {
+        flowX = who.x0;
+        flowY = who.y;
     };
-    if (allianceRaceCount_ > 0) {
-        ImGui::TextColored(ImVec4(0.3f, 0.5f, 1.0f, 1.0f), "Alliance:");
-        for (int i = 0; i < allianceRaceCount_; ++i) {
-            const char* raceName = game::getRaceName(availableRaces_[i]);
-            continueButtonRow(raceName, i == 0);
-            bool selected = (raceIndex == i);
-            if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.5f, 1.0f, 0.8f));
-            if (ImGui::SmallButton(raceName)) {
-                if (raceIndex != i) {
-                    raceIndex = i;
-                    classIndex = 0;
-                    skin = face = hairStyle = hairColor = facialHair = 0;
-                    updateAvailableClasses();
-                }
-            }
-            if (selected) ImGui::PopStyleColor();
+    const auto pill = [&](const char* label, bool selected, ImVec4 accent) {
+        const float w = ui_.chipWidth(label, chipH);
+        if (flowX + w > who.x1 && flowX > who.x0) {
+            flowX = who.x0;
+            flowY += chipH + chipGap;
         }
+        const bool hit = ui_.chip(label, ImVec2(flowX, flowY), ImVec2(flowX + w, flowY + chipH),
+                                  label, selected, ui_.onPaper(accent));
+        flowX += w + chipGap;
+        return hit;
+    };
+    const auto endFlow = [&](float trailingGap) {
+        who.y = flowY + chipH + trailingGap;
+    };
+
+    ui_.text(who.at(), "Name", labelSize, theme.inkSoft);
+    ui_.textRight(who.x1, who.y + (labelSize - smallSize) * 0.5f, "12 letters", smallSize,
+                  theme.pencil);
+    who.gap(labelRow);
+    {
+        const auto [fa, fb] = who.row(px(kFieldHeight));
+        PaperUI::FieldOpts opts;
+        opts.placeholder = "name your hero";
+        const PaperUI::FieldResult r = ui_.field("name", fa, fb, name_, opts);
+        if (r.changed && statusIsError) setStatus("", false);
+        who.gap(px(14));
+    }
+
+    const int raceCount = static_cast<int>(availableRaces_.size());
+    const auto pickRace = [&](int i) {
+        if (raceIndex == i) return;
+        raceIndex = i;
+        classIndex = 0;
+        skin = face = hairStyle = hairColor = facialHair = 0;
+        updateAvailableClasses();
+    };
+
+    if (allianceRaceCount_ > 0) {
+        ui_.text(who.at(), "Alliance", labelSize, ui_.onPaper(kAllianceColour));
+        who.gap(labelRow);
+        beginFlow();
+        for (int i = 0; i < allianceRaceCount_; ++i) {
+            if (pill(game::getRaceName(availableRaces_[static_cast<size_t>(i)]), raceIndex == i,
+                     kAllianceColour)) {
+                pickRace(i);
+            }
+        }
+        endFlow(px(12));
     }
     if (allianceRaceCount_ < raceCount) {
-        ImGui::TextColored(ui::colors::kRed, "Horde:");
+        ui_.text(who.at(), "Horde", labelSize, ui_.onPaper(kHordeColour));
+        who.gap(labelRow);
+        beginFlow();
         for (int i = allianceRaceCount_; i < raceCount; ++i) {
-            const char* raceName = game::getRaceName(availableRaces_[i]);
-            continueButtonRow(raceName, i == allianceRaceCount_);
-            bool selected = (raceIndex == i);
-            if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.3f, 0.3f, 0.8f));
-            if (ImGui::SmallButton(raceName)) {
-                if (raceIndex != i) {
-                    raceIndex = i;
-                    classIndex = 0;
-                    skin = face = hairStyle = hairColor = facialHair = 0;
-                    updateAvailableClasses();
-                }
+            if (pill(game::getRaceName(availableRaces_[static_cast<size_t>(i)]), raceIndex == i,
+                     kHordeColour)) {
+                pickRace(i);
             }
-            if (selected) ImGui::PopStyleColor();
         }
+        endFlow(px(14));
     }
-    ImGui::Unindent(10.0f * layout.scale);
 
-    ImGui::Spacing();
-
-    // Class selection
-    ImGui::Text("Class:");
-    if (!availableClasses.empty()) {
-        ImGui::BeginGroup();
+    ui_.text(who.at(), "Class", labelSize, theme.inkSoft);
+    who.gap(labelRow);
+    if (availableClasses.empty()) {
+        ui_.text(who.at(), "No class this race can be.", smallSize, theme.crayonRed);
+        who.gap(ui_.lineHeight(smallSize) + px(14));
+    } else {
+        beginFlow();
         for (int i = 0; i < static_cast<int>(availableClasses.size()); ++i) {
-            const char* className = game::getClassName(availableClasses[i]);
-            continueButtonRow(className, i == 0);
-            bool selected = (classIndex == i);
-            if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.2f, 0.8f));
-            if (ImGui::SmallButton(className)) {
+            const auto cls = availableClasses[static_cast<size_t>(i)];
+            if (pill(game::getClassName(cls), classIndex == i,
+                     ui::getClassColor(static_cast<uint8_t>(cls)))) {
                 classIndex = i;
             }
-            if (selected) ImGui::PopStyleColor();
         }
-        ImGui::EndGroup();
+        endFlow(px(14));
     }
 
-    ImGui::Spacing();
+    ui_.text(who.at(), "Gender", labelSize, theme.inkSoft);
+    who.gap(labelRow);
+    beginFlow();
+    if (pill("Male", genderIndex == 0, kAllianceColour)) genderIndex = 0;
+    if (pill("Female", genderIndex == 1, kHordeColour)) genderIndex = 1;
+    endFlow(px(12));
 
-    // Gender
-    ImGui::Text("Gender:");
-    ImGui::SameLine(100.0f * layout.scale);
-    ImGui::RadioButton("Male", &genderIndex, 0);
-    ImGui::SameLine();
-    ImGui::RadioButton("Female", &genderIndex, 1);
-
-    // TODO(server): Re-enable the nonbinary radio button and body-type controls
+    // TODO(server): Re-enable the nonbinary option and the body-type controls
     // once character creation accepts gender=2 plus the selected model body.
-    // The renderer/data plumbing remains in place so server support can enable it.
-    // ImGui::SameLine();
-    // ImGui::RadioButton("Nonbinary", &genderIndex, 2);
-    // if (genderIndex == 2) {
-    //     ImGui::Text("Body Type:");
-    //     ImGui::SameLine(80);
-    //     ImGui::RadioButton("Masculine", &bodyTypeIndex, 0);
-    //     ImGui::SameLine();
-    //     ImGui::RadioButton("Feminine", &bodyTypeIndex, 1);
-    // }
+    // The renderer/data plumbing remains in place so server support can enable
+    // it: it would be one more pill here and a pair below it for the body.
 
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    // Appearance sliders
-    // Race/body controls above may have changed this frame; refresh their option
+    // ---- what they look like ----------------------------------------------
+    //
+    // Race and gender above may have changed this frame; refresh their option
     // lists before presenting customization controls.
     updateAppearanceRanges();
-    game::Gender currentGender = static_cast<game::Gender>(genderIndex);
+    const game::Gender currentGender = static_cast<game::Gender>(genderIndex);
 
-    ImGui::Text("Appearance");
-    ImGui::Spacing();
+    Column look{appearanceX, appearanceX + appearanceW, bodyTop};
+    ui_.text(look.at(), "Appearance", px(22), theme.ink, /*titleFace=*/true);
+    look.gap(px(30));
 
-    const float labelCol = 120.0f * layout.scale;
-
-    auto slider = [&](const char* label, int* val, int maxVal) {
-        ImGui::Text("%s", label);
-        ImGui::SameLine(labelCol);
-        ImGui::SetNextItemWidth(-1.0f);
-        char id[32];
-        snprintf(id, sizeof(id), "##%s", label);
-        ImGui::SliderInt(id, val, 0, maxVal);
+    const auto appearanceSlider = [&](const char* id, const char* label, int* value, int maxVal) {
+        ui_.text(look.at(), label, labelSize, theme.inkSoft);
+        look.gap(labelRow);
+        const auto [sa, sb] = look.row(px(30));
+        // One choice is no choice; a slider from zero to zero is a control
+        // that cannot be moved and should not look as though it could.
+        if (maxVal > 0) {
+            ui_.sliderInt(id, sa, sb, value, 0, maxVal);
+        } else {
+            ui_.text(ImVec2(sa.x, sa.y + px(6)), "only one to choose from", smallSize,
+                     theme.pencil);
+        }
+        look.gap(px(10));
     };
 
-    slider("Skin",           &skin,      maxSkin);
-    slider("Face",           &face,      maxFace);
-    slider("Hair Style",     &hairStyle, maxHairStyle);
-    slider("Hair Color",     &hairColor, maxHairColor);
-    slider("Facial Feature", &facialHair, maxFacialHair);
+    appearanceSlider("look.skin", "Skin", &skin, maxSkin);
+    appearanceSlider("look.face", "Face", &face, maxFace);
+    appearanceSlider("look.hairstyle", "Hair style", &hairStyle, maxHairStyle);
+    appearanceSlider("look.haircolor", "Hair colour", &hairColor, maxHairColor);
+    appearanceSlider("look.facialhair", "Facial feature", &facialHair, maxFacialHair);
 
     // Skin and hairstyle choose the valid face/color subsets. Refresh now so a
     // Create click in this same frame sends IDs from the newly selected subset.
     updateAppearanceRanges();
 
-    ImGui::Spacing();
+    // ---- footer -----------------------------------------------------------
+    page.y = bodyBottom + px(10);
+    ui_.rule(ImVec2(page.x0, page.y), ImVec2(page.x1, page.y), paperFade(theme.pencil, 0.55f),
+             px(1.0f), 0x5512u);
+    page.gap(px(8));
 
-    ImGui::EndChild(); // controls_panel
-
-    // Shared footer: Back remains left, primary Create action remains right.
-    ImGui::BeginChild("CharacterCreateFooter", ImVec2(0.0f, layout.footerHeight()), true);
     if (!statusMessage.empty()) {
-        ImVec4 color = statusIsError ? ui::colors::kRed : ui::colors::kBrightGreen;
-        ImGui::TextColored(color, "%s", statusMessage.c_str());
+        ui_.text(page.at(), statusMessage.c_str(), smallSize,
+                 statusIsError ? theme.crayonRed : theme.crayonGreen);
     } else {
-        ImGui::TextDisabled("Names may contain up to 12 characters.");
+        ui_.text(page.at(), "Pick a race, then a class it can be. Names may run to twelve "
+                            "letters.", smallSize, theme.pencil);
     }
-    ImGui::Spacing();
+    page.gap(ui_.lineHeight(smallSize) + px(8));
 
-    if (ImGui::Button("Back", layout.button())) {
-        if (onCancel) onCancel();
-    }
-
-    const ImVec2 createSize = layout.primaryButton(180.0f);
-    ImGui::SameLine(ImGui::GetContentRegionMax().x - createSize.x);
-    if (ImGui::Button("Create Character", createSize)) {
-        std::string name(nameBuffer);
+    const auto submit = [&]() {
+        std::string name = name_.text();
         // Trim whitespace
-        size_t start = name.find_first_not_of(" \t\r\n");
-        size_t end = name.find_last_not_of(" \t\r\n");
+        const size_t start = name.find_first_not_of(" \t\r\n");
+        const size_t end = name.find_last_not_of(" \t\r\n");
         if (start == std::string::npos) {
             name.clear();
         } else {
             name = name.substr(start, end - start + 1);
         }
         if (name.empty()) {
-            setStatus("Please enter a character name.", true);
-        } else if (availableClasses.empty()) {
+            setStatus("Give your hero a name first.", true);
+            ui_.focus("name");
+            return;
+        }
+        if (availableClasses.empty()) {
             setStatus("No valid class for this race.", true);
-        } else {
-            setStatus("Creating character...", false);
-            createTimer_ = 0.0f;
-            game::CharCreateData data;
-            data.name = name;
-            data.race = availableRaces_[raceIndex];
-            data.characterClass = availableClasses[classIndex];
-            data.gender = currentGender;
-            data.useFemaleModel = (genderIndex == 2 && bodyTypeIndex == 1);  // Nonbinary + Feminine
-            data.skin = selectedAppearanceId(skinIds_, skin);
-            data.face = selectedAppearanceId(faceIds_, face);
-            data.hairStyle = selectedAppearanceId(hairStyleIds_, hairStyle);
-            data.hairColor = selectedAppearanceId(hairColorIds_, hairColor);
-            data.facialHair = selectedAppearanceId(facialHairIds_, facialHair);
-            if (onCreate) {
-                onCreate(data);
+            return;
+        }
+        setStatus("Creating character...", false);
+        createTimer_ = 0.0f;
+        game::CharCreateData data;
+        data.name = name;
+        data.race = availableRaces_[static_cast<size_t>(raceIndex)];
+        data.characterClass = availableClasses[static_cast<size_t>(classIndex)];
+        data.gender = currentGender;
+        data.useFemaleModel = (genderIndex == 2 && bodyTypeIndex == 1);  // Nonbinary + Feminine
+        data.skin = selectedAppearanceId(skinIds_, skin);
+        data.face = selectedAppearanceId(faceIds_, face);
+        data.hairStyle = selectedAppearanceId(hairStyleIds_, hairStyle);
+        data.hairColor = selectedAppearanceId(hairColorIds_, hairColor);
+        data.facialHair = selectedAppearanceId(facialHairIds_, facialHair);
+        if (onCreate) {
+            onCreate(data);
+        }
+    };
+
+    {
+        const float y = page.y;
+        const float h = px(kButtonH);
+        if (ui_.button("create.back", ImVec2(page.x0, y), ImVec2(page.x0 + px(110), y + h),
+                       "Back")) {
+            if (onCancel) onCancel();
+        }
+        const float createW = px(210);
+        const bool waiting = (createTimer_ >= 0.0f);
+        if (ui_.button("create.go", ImVec2(page.x1 - createW, y), ImVec2(page.x1, y + h),
+                       waiting ? "Creating..." : "Create Hero",
+                       PaperUI::ButtonKind::Primary, !waiting)) {
+            submit();
+        }
+    }
+
+    // Enter in the name box, or with the keyboard nowhere, is the same as
+    // pressing the button.
+    if (createTimer_ < 0.0f &&
+        (ImGui::IsKeyPressed(ImGuiKey_Enter, false) ||
+         ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))) {
+        submit();
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+        if (!ui_.popupOpen()) {
+            if (ui_.wantsTextInput()) {
+                ui_.clearFocus();
+            } else if (onCancel) {
+                onCancel();
             }
         }
     }
 
-    ImGui::EndChild();
-
-    ImGui::End();
+    ui_.end();
 }
 
 } // namespace ui
