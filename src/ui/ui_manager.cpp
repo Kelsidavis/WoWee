@@ -425,18 +425,17 @@ void UIManager::render(core::AppState appState, auth::AuthHandler* authHandler, 
             break;
 
         case core::AppState::DISCONNECTED:
+            // Nothing draws here, and nothing reaches here: no code sets this
+            // state. A dropped world connection goes through
+            // Application::handleWorldDisconnect, which tears the world down
+            // the way a logout does and puts the reason on the login screen -
+            // which is where WoW puts it, and where AuthScreen now draws it
+            // across the top of the page.
+            //
+            // What stood here was an ImGui window announcing the disconnect,
+            // with a Return to Login button whose body was the comment "will
+            // be handled by application". Nothing handled it.
             authScreen->stopLoginMusic();
-            ImGui::SetNextWindowSize(ImVec2(400, 150), ImGuiCond_Always);
-            ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f - 200,
-                                           ImGui::GetIO().DisplaySize.y * 0.5f - 75),
-                                    ImGuiCond_Always);
-            ImGui::Begin("Disconnected", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
-            ImGui::TextWrapped("You have been disconnected from the server.");
-            ImGui::Spacing();
-            if (ImGui::Button("Return to Login", ImVec2(-1, 0))) {
-                // Will be handled by application
-            }
-            ImGui::End();
             break;
     }
 

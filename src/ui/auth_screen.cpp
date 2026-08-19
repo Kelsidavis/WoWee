@@ -3,7 +3,6 @@
 #include <chrono>
 #include "rendering/pom_quality.hpp"
 #include "ui/graphics_presets.hpp"
-#include "ui/ui_colors.hpp"
 #include "ui/settings_panel.hpp"
 #include "auth/crypto.hpp"
 #include "core/application.hpp"

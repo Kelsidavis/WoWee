@@ -163,7 +163,7 @@ void UIScreenCallbackHandler::setupCallbacks() {
         uiManager_.getCharacterScreen().setStatus("Login failed: " + reason, true);
     });
 
-    // "Create Character" button on character screen
+    // "New Hero" button on character screen
     uiManager_.getCharacterScreen().setOnCreateCharacter([this]() {
         uiManager_.getCharacterCreateScreen().reset();
         // Apply expansion race/class constraints before showing the screen

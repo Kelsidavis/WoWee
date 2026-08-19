@@ -4,11 +4,9 @@
 #include "rendering/character_preview.hpp"
 #include "rendering/renderer.hpp"
 #include "core/application.hpp"
-#include "game/game_handler.hpp"
 #include "pipeline/asset_manager.hpp"
 #include "pipeline/dbc_layout.hpp"
 #include <imgui.h>
-#include <cstring>
 #include <algorithm>
 
 namespace wowee {
