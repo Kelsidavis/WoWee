@@ -810,9 +810,18 @@ void ChatHandler::handleMessageChat(network::Packet& packet) {
                             data.senderName, "'");
             }
         }
+        // arg2 is the name the interface prints, and for an outgoing whisper
+        // that is the person written to rather than the one writing:
+        // CHAT_WHISPER_INFORM_GET is "To %s: " and takes the same argument
+        // CHAT_WHISPER_GET does. Passing the sender there addressed every
+        // whisper the player sent to the player themselves.
+        const std::string& shownName =
+            (data.type == ChatType::WHISPER_INFORM && !data.receiverName.empty())
+                ? data.receiverName
+                : data.senderName;
         owner_.addonEventCallbackRef()(eventName, {
             data.message,
-            data.senderName,
+            shownName,
             lang,
             data.channelName,
             data.receiverName,

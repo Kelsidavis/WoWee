@@ -1955,7 +1955,7 @@ void GameHandler::registerRemainingOpcodes() {
         }
     };
     // WotLK 3.3.5a format:
-    //   uint8  status  - 1=no ticket, 6=has open ticket, 3=closed, 10=suspended
+    //   uint8  status  - 6=has open ticket, 3=closed, anything else none
     // If status == 6 (GMTICKET_STATUS_HASTEXT):
     //   cstring ticketText
     //   uint32  ticketAge       (seconds old)
@@ -1963,7 +1963,7 @@ void GameHandler::registerRemainingOpcodes() {
     //   float   waitTimeHours   (estimated GM wait time)
     dispatchTable_[Opcode::SMSG_GMTICKET_GETTICKET] = [this](network::Packet& packet) {
         // WotLK 3.3.5a format:
-        //   uint8  status  - 1=no ticket, 6=has open ticket, 3=closed, 10=suspended
+        //   uint8  status  - 6=has open ticket, 3=closed, anything else none
         // If status == 6 (GMTICKET_STATUS_HASTEXT):
         //   cstring ticketText
         //   uint32  ticketAge       (seconds old)
@@ -2025,14 +2025,15 @@ void GameHandler::registerRemainingOpcodes() {
             // No arguments at all is how the interface is told there is no
             // ticket: it reads the first one and stops if it is absent.
             fireAddonEvent("UPDATE_TICKET", {});
-        } else if (gmStatus == 10) {
-            gmTicketActive_ = false;
-            gmTicketText_.clear();
-            addSystemChatMessage("Your GM ticket has been suspended.");
-            LOG_INFO("SMSG_GMTICKET_GETTICKET: ticket suspended");
-            fireAddonEvent("UPDATE_TICKET", {});
         } else {
-            // Status 1 = no open ticket (default/no ticket)
+            // Everything else is "no ticket", including 10.
+            //
+            // 10 was read as "suspended" and announced in chat, and this is
+            // asked on every login - so an account that had never filed a
+            // ticket was told at each one that the one it did not have had
+            // been suspended. 0x0A is GMTICKET_STATUS_DEFAULT, the answer a
+            // server gives when the player has no ticket at all, which is why
+            // it arrived every time and why nothing else ever followed it.
             gmTicketActive_ = false;
             gmTicketText_.clear();
             LOG_DEBUG("SMSG_GMTICKET_GETTICKET: no open ticket (status=", static_cast<int>(gmStatus), ")");
