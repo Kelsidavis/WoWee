@@ -55,7 +55,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::Vendor,       "vendor"},
     {UiElement::Loot,         "loot", false},
     {UiElement::Bank,         "bank"},
-    {UiElement::PartyFrames,  "partyframes"},
+    {UiElement::PartyFrames,  "partyframes", false},
     {UiElement::Social,       "social"},
     {UiElement::TradeSkill,   "tradeskill"},
     {UiElement::ClassTrainer, "classtrainer"},
@@ -737,9 +737,6 @@ const Suppress kSuppress[] = {
         // and FRIENDLIST_UPDATE, so all of them were appearing in pairs.
         {UiElement::Vendor,      "MerchantFrame"},
         {UiElement::Bank,        "BankFrame"},
-        // The party frames' shared backdrop, which is a top-level frame of its
-        // own rather than a child of any of them.
-        {UiElement::PartyFrames, "PartyMemberBackground"},
         // The bags had no suppression entry at all - they are handed over by
         // default, so nothing showed twice and the gap never surfaced. All
         // thirteen container frames, because a player with four bags open has
@@ -755,8 +752,6 @@ const Suppress kSuppress[] = {
                                  "ContainerFrame7 ContainerFrame8 ContainerFrame9 "
                                  "ContainerFrame10 ContainerFrame11 ContainerFrame12 "
                                  "ContainerFrame13 StackSplitFrame"},
-        {UiElement::PartyFrames, "PartyMemberFrame1 PartyMemberFrame2 "
-                                 "PartyMemberFrame3 PartyMemberFrame4"},
         {UiElement::Social,      "FriendsFrame"},
         // Both of these were live: TRADE_SHOW and READY_CHECK are fired, and
         // this client draws its own trade window and its own ready-check popup

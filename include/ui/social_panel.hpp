@@ -36,7 +36,6 @@ public:
     // ---- Toggle booleans (written by slash commands / escape handler / keybinds / UI buttons) ----
     bool showSocialFrame_ = false;   // O key toggles social/friends list
     bool showGuildRoster_ = false;
-    bool showRaidFrames_ = true;     // F key toggles raid/party frames
     bool showWhoWindow_ = false;
     bool showDungeonFinder_ = false;
     bool showInspectWindow_ = false;
@@ -65,9 +64,6 @@ public:
     uint32_t lfgSelectedDungeon_ = 861;  // default: random dungeon (entry 861)
 
     // ---- Public render methods ----
-    void renderPartyFrames(game::GameHandler& gameHandler,
-                           ChatPanel& chatPanel,
-                           const SpellIconFn& getSpellIcon);
     // Takes the panels the markup renderer needs: the guild info text and the
     // MOTD are server strings that carry item, spell, quest and achievement
     // links, and rendering them as plain text left every link inert.

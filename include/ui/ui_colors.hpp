@@ -71,28 +71,6 @@ namespace colors {
     constexpr ImVec4 kGold   = {1.00f, 0.82f, 0.00f, 1.0f};
     constexpr ImVec4 kSilver = {0.80f, 0.80f, 0.80f, 1.0f};
     constexpr ImVec4 kCopper = {0.72f, 0.45f, 0.20f, 1.0f};
-// ---- Health bar colour ----
-//
-// Green above half, yellow above a fifth, red below. Every unit frame agreed on
-// where the two thresholds are and none of them agreed on the three colours:
-// four palettes across seven bars, so a mob at a third health was one yellow on
-// the target frame and a slightly duller one on the frame below it. These are
-// the shades the target frame and the party list were already using.
-//
-// The player's own bar is not one of these - it ramps continuously between the
-// thresholds and pulses when critical - and neither is the boss frame, which is
-// deliberately a red-to-yellow scale rather than a green one.
-inline ImVec4 healthBarColor(float pct) {
-    if (pct > 0.5f) return kHealthGreen;
-    if (pct > 0.2f) return kMidHealthYellow;
-    return kLowHealthRed;
-}
-
-/// The same colour packed the way a draw list wants it.
-inline ImU32 healthBarColorU32(float pct) {
-    return ImGui::ColorConvertFloat4ToU32(healthBarColor(pct));
-}
-
 /// An item's durability, coloured the same way in the bag and in the tooltip.
 ///
 /// Two copies with the same thresholds and different greens, so the strip under
@@ -114,19 +92,6 @@ inline ImVec4 durabilityColor(float pct) {
 // `fallback` is what an unrecognised type gets. Mana blue everywhere except the
 // raid list, which greys a power it does not know rather than claiming it is
 // mana.
-inline ImVec4 powerTypeColor(uint8_t powerType, ImVec4 fallback = kManaBlue) {
-    switch (powerType) {
-        case 0: return kManaBlue;
-        case 1: return kDarkRed;            // rage
-        case 2: return kOrange;             // focus
-        case 3: return kEnergyYellow;       // energy
-        case 4: return kHappinessGreen;     // happiness - a hunter pet's
-        case 6: return kRunicRed;           // runic power
-        case 7: return kSoulShardPurple;    // soul shards
-        default: return fallback;
-    }
-}
-
 } // namespace colors
 
 // ---- Item quality colors ----
@@ -212,26 +177,6 @@ inline const char* getInventorySlotName(uint32_t inventoryType) {
         case 26: return "Ranged";
         case 28: return "Relic";
         default: return "";
-    }
-}
-
-// ---- Aura border colours ----
-//
-// One colour per dispel type, and green for anything that is a buff. Five
-// places drew this border and four agreed; the raid panel's copy was a shade
-// off on all four types - brighter magic, deeper curse, lighter disease and
-// poison - so the same debuff was one colour on a unit frame and another in the
-// raid list.
-//
-// The four that agreed are the ones kept, on the same grounds as any other
-// majority: they are what the game has been showing.
-inline ImVec4 dispelTypeColor(uint8_t dispelType) {
-    switch (dispelType) {
-        case 1:  return ImVec4(0.15f, 0.50f, 1.00f, 0.9f);  // magic: blue
-        case 2:  return ImVec4(0.70f, 0.20f, 0.90f, 0.9f);  // curse: purple
-        case 3:  return ImVec4(0.55f, 0.30f, 0.10f, 0.9f);  // disease: brown
-        case 4:  return ImVec4(0.10f, 0.70f, 0.10f, 0.9f);  // poison: green
-        default: return ImVec4(0.80f, 0.20f, 0.20f, 0.9f);  // undispellable: red
     }
 }
 

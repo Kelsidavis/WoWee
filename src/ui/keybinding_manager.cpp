@@ -37,7 +37,6 @@ void KeybindingManager::initializeDefaults() {
     bindings_[static_cast<int>(Action::TOGGLE_DUNGEON_FINDER)] = ImGuiKey_J;  // Originally I, reassigned to avoid conflict
     bindings_[static_cast<int>(Action::TOGGLE_WORLD_MAP)] = ImGuiKey_M;  // WoW standard: M opens world map
     bindings_[static_cast<int>(Action::TOGGLE_NAMEPLATES)] = ImGuiKey_V;
-    bindings_[static_cast<int>(Action::TOGGLE_RAID_FRAMES)] = ImGuiKey_F;  // Reassigned from R (now camera reset)
     bindings_[static_cast<int>(Action::TOGGLE_ACHIEVEMENTS)] = ImGuiKey_Y;  // WoW standard key (Shift+Y in retail)
     bindings_[static_cast<int>(Action::TOGGLE_SKILLS)]      = ImGuiKey_K;  // WoW standard: K opens Skills/Professions
 }
@@ -140,7 +139,6 @@ const char* KeybindingManager::getActionName(Action action) {
         case Action::TOGGLE_DUNGEON_FINDER: return "Dungeon Finder";
         case Action::TOGGLE_WORLD_MAP: return "World Map";
         case Action::TOGGLE_NAMEPLATES: return "Nameplates";
-        case Action::TOGGLE_RAID_FRAMES: return "Raid Frames";
         case Action::TOGGLE_ACHIEVEMENTS: return "Achievements";
         case Action::TOGGLE_SKILLS: return "Skills / Professions";
         case Action::ACTION_COUNT: break;
@@ -205,7 +203,6 @@ void KeybindingManager::loadFromConfigFile(const std::string& filePath) {
         else if (action == "toggle_dungeon_finder") actionIdx = static_cast<int>(Action::TOGGLE_DUNGEON_FINDER);
         else if (action == "toggle_world_map") actionIdx = static_cast<int>(Action::TOGGLE_WORLD_MAP);
         else if (action == "toggle_nameplates") actionIdx = static_cast<int>(Action::TOGGLE_NAMEPLATES);
-        else if (action == "toggle_raid_frames") actionIdx = static_cast<int>(Action::TOGGLE_RAID_FRAMES);
         else if (action == "toggle_quest_log") actionIdx = static_cast<int>(Action::TOGGLE_QUESTS);  // legacy alias
         else if (action == "toggle_achievements") actionIdx = static_cast<int>(Action::TOGGLE_ACHIEVEMENTS);
         else if (action == "toggle_skills") actionIdx = static_cast<int>(Action::TOGGLE_SKILLS);
@@ -305,7 +302,6 @@ void KeybindingManager::saveToConfigFile(const std::string& filePath) const {
         {.action = Action::TOGGLE_DUNGEON_FINDER, .name = "toggle_dungeon_finder"},
         {.action = Action::TOGGLE_WORLD_MAP, .name = "toggle_world_map"},
         {.action = Action::TOGGLE_NAMEPLATES, .name = "toggle_nameplates"},
-        {.action = Action::TOGGLE_RAID_FRAMES, .name = "toggle_raid_frames"},
         {.action = Action::TOGGLE_ACHIEVEMENTS, .name = "toggle_achievements"},
         {.action = Action::TOGGLE_SKILLS, .name = "toggle_skills"},
     };

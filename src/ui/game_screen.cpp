@@ -662,11 +662,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // way the minimap measures MinimapCluster, but nothing reads it yet.
     combatUI_.renderDPSMeter(gameHandler, settingsPanel_, -1.0f);
     toastManager_.renderEarlyToasts(ImGui::GetIO().DeltaTime, gameHandler);
-    if (socialPanel_.showRaidFrames_) {
-        if (!frameXmlOwns(UiElement::PartyFrames)) {
-            socialPanel_.renderPartyFrames(gameHandler, chatPanel_, spellIconFn);
-        }
-    }
     dialogManager_.renderDialogs(gameHandler, inventoryScreen, chatPanel_);
     // FriendsFrame is what "social" suppresses, and its tabs are the friends
     // list, the who list and the guild roster. Only the friends list was gated
@@ -1604,10 +1599,6 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 if (frameXmlOwns(UiElement::Minimap)) {
                     gameHandler.runInterfaceCommand("ToggleMinimap()");
                 }
-            }
-
-            if (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_RAID_FRAMES)) {
-                socialPanel_.showRaidFrames_ = !socialPanel_.showRaidFrames_;
             }
 
             if (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_ACHIEVEMENTS)) {
