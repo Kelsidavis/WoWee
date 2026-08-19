@@ -13,11 +13,24 @@ namespace wowee::ui {
 
 namespace {
 
-struct Entry { UiElement element; std::string_view name; };
+/// `clientDraws` is false once this client's own version of an element has
+/// been deleted and FrameXML is the only one left that draws it.
+///
+/// The unaccounted-element report exists to catch an element that is neither
+/// handed over nor suppressed, because that one is on screen twice. An
+/// element nothing here draws can never be, so reporting it would be a false
+/// alarm - and the report is only worth reading while every line of it is
+/// real. Elements are expected to move to false one at a time as the handover
+/// finishes; when they all have, the report and this flag go together.
+struct Entry {
+    UiElement element;
+    std::string_view name;
+    bool clientDraws = true;
+};
 
 // One row per element, and the only place a name is written down.
 constexpr std::array<Entry, 52> kElements{{
-    {UiElement::PlayerFrame,  "playerframe"},
+    {UiElement::PlayerFrame,  "playerframe", false},
     {UiElement::TargetFrame,  "targetframe"},
     {UiElement::PetFrame,     "petframe"},
     {UiElement::FocusFrame,   "focusframe"},
@@ -868,12 +881,6 @@ const Suppress kSuppress[] = {
         // own set in renderBossFrames.
         {UiElement::TargetFrame, "Boss1TargetFrame Boss2TargetFrame "
                                  "Boss3TargetFrame Boss4TargetFrame"},
-        // Breath, fatigue and feign death. This client draws all three itself
-        // and fires MIRROR_TIMER_START, so FrameXML raises its own beside them:
-        // two breath bars, both counting down, on the way to drowning. Filed
-        // under the player frame because that is the player's own state and the
-        // two would sensibly be handed over together.
-        {UiElement::PlayerFrame, "MirrorTimer1 MirrorTimer2 MirrorTimer3"},
         // Found by the unaccounted-element check on its first run. The world
         // map is neither handed over nor hidden, so FrameXML's draws over this
         // client's own. It appears in the check list, which is what made it
@@ -979,6 +986,7 @@ void frameXmlReportUnaccountedElements() {
     const std::vector<std::string> suppressed = frameXmlSuppressedFrames();
     for (const Entry& e : kElements) {
         if (frameXmlOwns(e.element)) continue;
+        if (!e.clientDraws) continue;  // FrameXML's is the only one there is
         // Suppressed elements contribute frame names; an element that
         // contributes none while not being owned is unaccounted for.
         bool hasFrames = false;

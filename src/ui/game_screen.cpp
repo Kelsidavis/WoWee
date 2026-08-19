@@ -582,8 +582,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // Process targeting input before UI windows
     processTargetInput(gameHandler);
 
-    if (!frameXmlOwns(UiElement::PlayerFrame)) renderPlayerFrame(gameHandler);
-
     // Pet frame (below player frame, only when player has an active pet)
     if (gameHandler.hasPet() && !frameXmlOwns(UiElement::PetFrame)) {
         renderPetFrame(gameHandler);
@@ -659,9 +657,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     auto spellIconFn = [this](uint32_t id, pipeline::AssetManager* am) { return getSpellIcon(id, am); };
     if (!frameXmlOwns(UiElement::CastBar))
         combatUI_.renderCastBar(gameHandler, spellIconFn);
-    if (!frameXmlOwns(UiElement::PlayerFrame)) {
-        renderMirrorTimers(gameHandler);
-    }
     combatUI_.renderCooldownTracker(gameHandler, settingsPanel_, spellIconFn);
     if (!frameXmlOwns(UiElement::QuestTracker))
         renderQuestObjectiveTracker(gameHandler);

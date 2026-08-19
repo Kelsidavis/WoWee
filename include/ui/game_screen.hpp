@@ -214,7 +214,6 @@ private:
     /**
      * Render player unit frame (top-left)
      */
-    void renderPlayerFrame(game::GameHandler& gameHandler);
 
     /**
      * Render target frame
@@ -254,7 +253,6 @@ private:
     void updateCharacterTextures(game::Inventory& inventory);
 
 
-    void renderMirrorTimers(game::GameHandler& gameHandler);
     void renderUIErrors(game::GameHandler& gameHandler, float deltaTime);
     void renderMinimapMarkers(game::GameHandler& gameHandler);
 
