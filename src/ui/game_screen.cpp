@@ -313,11 +313,9 @@ void GameScreen::render(game::GameHandler& gameHandler) {
             if (auto* ac = services_.audioCoordinator) {
                 if (auto* sfx = ac->getUiSoundManager()) sfx->playError();
             }
-            // Both interfaces show these, and the event that carries them
-            // reaches whichever is drawing.
-            if (frameXmlOwns(UiElement::UiErrors)) return;
-            uiErrors_.push_back({.text = msg, .age = 0.0f});
-            if (uiErrors_.size() > 5) uiErrors_.erase(uiErrors_.begin());
+            // UIErrorsFrame draws the text now. The sound above is still
+            // ours: FrameXML plays none for these, so it would go silent.
+            (void)msg;
         });
         uiErrorCallbackSet_ = true;
     }
@@ -582,11 +580,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // Process targeting input before UI windows
     processTargetInput(gameHandler);
 
-    // Pet frame (below player frame, only when player has an active pet)
-    if (gameHandler.hasPet() && !frameXmlOwns(UiElement::PetFrame)) {
-        renderPetFrame(gameHandler);
-    }
-
     // Auto-open pet rename modal when server signals the pet is renameable (first tame)
     if (gameHandler.consumePetRenameablePending()) {
         petRenameOpen_ = true;
@@ -596,11 +589,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // Totem frame (Shaman only, when any totem is active)
     if (gameHandler.getPlayerClass() == 7 && !frameXmlOwns(UiElement::Totems)) {
         renderTotemFrame(gameHandler);
-    }
-
-    // Focus target frame (only when we have a focus)
-    if (gameHandler.hasFocus() && !frameXmlOwns(UiElement::FocusFrame)) {
-        renderFocusFrame(gameHandler);
     }
 
     // Render windows
@@ -674,16 +662,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // own position. FrameXML's TargetFrame has one, and could be measured the
     // way the minimap measures MinimapCluster, but nothing reads it yet.
     combatUI_.renderDPSMeter(gameHandler, settingsPanel_, -1.0f);
-    if (!frameXmlOwns(UiElement::Durability)) {
-        renderDurabilityWarning(gameHandler);
-    }
-    // Half of this handover was in place: UIErrorsFrame is suppressed when
-    // this client owns the errors, and this client kept drawing its own when
-    // FrameXML owned them. So every refusal the server sent was still shown
-    // twice, in the one direction the suppression could not reach.
-    if (!frameXmlOwns(UiElement::UiErrors)) {
-        renderUIErrors(gameHandler, ImGui::GetIO().DeltaTime);
-    }
     toastManager_.renderEarlyToasts(ImGui::GetIO().DeltaTime, gameHandler);
     if (socialPanel_.showRaidFrames_) {
         if (!frameXmlOwns(UiElement::PartyFrames)) {

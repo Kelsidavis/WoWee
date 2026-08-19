@@ -218,15 +218,6 @@ bool SpellbookScreen::renderSpellInfoTooltip(uint32_t spellId, game::GameHandler
     return true;
 }
 
-std::string SpellbookScreen::lookupSpellName(uint32_t spellId, pipeline::AssetManager* assetManager) {
-    if (!dbcLoadAttempted) {
-        loadSpellDBC(assetManager);
-    }
-    auto it = spellData.find(spellId);
-    if (it != spellData.end()) return it->second.name;
-    return {};
-}
-
 uint32_t SpellbookScreen::getSpellMaxRange(uint32_t spellId, pipeline::AssetManager* assetManager) {
     if (!dbcLoadAttempted) {
         loadSpellDBC(assetManager);

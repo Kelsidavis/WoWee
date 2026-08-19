@@ -44,7 +44,6 @@ public:
     void setOpen(bool o) { open = o; }
 
     // Spell name lookup - triggers DBC load if needed, used by action bar tooltips
-    std::string lookupSpellName(uint32_t spellId, pipeline::AssetManager* assetManager);
 
     // Rich tooltip - renders a full spell tooltip (inside an already-open BeginTooltip block).
     // Triggers DBC load if needed. Returns true if spell data was found.

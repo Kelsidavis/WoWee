@@ -235,13 +235,6 @@ inline ImVec4 dispelTypeColor(uint8_t dispelType) {
     }
 }
 
-/// The border an aura icon is drawn with: green when it is a buff, otherwise
-/// the colour of what would remove it.
-inline ImVec4 auraBorderColor(bool isBuff, uint8_t dispelType) {
-    if (isBuff) return ImVec4(0.2f, 0.8f, 0.2f, 0.9f);
-    return dispelTypeColor(dispelType);
-}
-
 // ---- Binding type display ----
 inline void renderBindingType(uint32_t bindType) {
     if (const char* text = game::itemBindText(bindType)) {

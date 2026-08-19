@@ -32,8 +32,8 @@ struct Entry {
 constexpr std::array<Entry, 52> kElements{{
     {UiElement::PlayerFrame,  "playerframe", false},
     {UiElement::TargetFrame,  "targetframe", false},
-    {UiElement::PetFrame,     "petframe"},
-    {UiElement::FocusFrame,   "focusframe"},
+    {UiElement::PetFrame,     "petframe", false},
+    {UiElement::FocusFrame,   "focusframe", false},
     {UiElement::ActionBar,    "actionbar"},
     {UiElement::StanceBar,    "stancebar"},
     {UiElement::BagBar,       "bagbar"},
@@ -65,7 +65,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::DungeonFinder, "dungeonfinder"},
     {UiElement::Petition,     "petition"},
     {UiElement::Buffs,        "buffs", false},
-    {UiElement::Durability,   "durability"},
+    {UiElement::Durability,   "durability", false},
     {UiElement::ZoneText,     "zonetext"},
     {UiElement::Trade,        "trade"},
     {UiElement::ReadyCheck,   "readycheck"},
@@ -81,7 +81,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::BattlegroundScore, "bgscore"},
     {UiElement::Totems,       "totems"},
     {UiElement::Talents,      "talents"},
-    {UiElement::UiErrors,     "uierrors"},
+    {UiElement::UiErrors,     "uierrors", false},
 }};
 
 /// Parsed once. An unknown name is reported rather than dropped: a typo would
@@ -743,7 +743,6 @@ const Suppress kSuppress[] = {
         {UiElement::Loot,        "LootFrame GroupLootFrame1 GroupLootFrame2 "
                                  "GroupLootFrame3 GroupLootFrame4"},
         {UiElement::Bank,        "BankFrame"},
-        {UiElement::Durability,  "DurabilityFrame"},
         // The party frames' shared backdrop, which is a top-level frame of its
         // own rather than a child of any of them.
         {UiElement::PartyFrames, "PartyMemberBackground"},
@@ -863,10 +862,6 @@ const Suppress kSuppress[] = {
         // the Reputation tab of a window FrameXML is supposed to be drawing.
         {UiElement::Totems,     "TotemFrame MultiCastActionBarFrame"},
         {UiElement::Talents,    "PlayerTalentFrame", /*lazy=*/true},
-        // Errors are fired as UI_ERROR_MESSAGE, which UIErrorsFrame listens
-        // for - so every refusal the server sends was shown twice, once by
-        // each interface.
-        {UiElement::UiErrors,   "UIErrorsFrame"},
         // Found by the unaccounted-element check on its first run. The world
         // map is neither handed over nor hidden, so FrameXML's draws over this
         // client's own. It appears in the check list, which is what made it
@@ -901,8 +896,6 @@ const Suppress kSuppress[] = {
         {UiElement::Minimap,    "MinimapCluster"},
         {UiElement::CharacterFrame, "CharacterFrame"},
         {UiElement::Spellbook,  "SpellBookFrame"},
-        {UiElement::PetFrame,   "PetFrame"},
-        {UiElement::FocusFrame, "FocusFrame"},
         {UiElement::BagBar,     "MainMenuBarBackpackButton CharacterBag0Slot "
                                 "CharacterBag1Slot CharacterBag2Slot CharacterBag3Slot "
                                 "KeyRingButton"},

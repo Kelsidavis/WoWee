@@ -177,10 +177,7 @@ private:
 
 
     // UIErrorsFrame: WoW-style center-bottom error messages (spell fails, out of range, etc.)
-    struct UIErrorEntry { std::string text; float age = 0.0f; };
-    std::vector<UIErrorEntry> uiErrors_;
     bool uiErrorCallbackSet_ = false;
-    static constexpr float kUIErrorLifetime = 2.5f;
 
     bool showPlayerInfo = false;
     bool showWorldMap_ = false;  // W key toggles world map
@@ -215,12 +212,10 @@ private:
     // (settings arrive as separate key/value lines).
     float dpsMeterSavedX_ = -1.0f;
     float dpsMeterSavedY_ = -1.0f;
-    void renderFocusFrame(game::GameHandler& gameHandler);
 
     /**
      * Render pet frame (below player frame when player has an active pet)
      */
-    void renderPetFrame(game::GameHandler& gameHandler);
     void renderTotemFrame(game::GameHandler& gameHandler);
 
     /**
@@ -239,7 +234,6 @@ private:
     void updateCharacterTextures(game::Inventory& inventory);
 
 
-    void renderUIErrors(game::GameHandler& gameHandler, float deltaTime);
     void renderMinimapMarkers(game::GameHandler& gameHandler);
 
     /// The furniture around the minimap - mute, friends and zoom buttons, the
@@ -340,7 +334,6 @@ private:
     void renderMicroMenu(game::GameHandler& gameHandler);
     void renderQuestObjectiveTracker(game::GameHandler& gameHandler);
     void renderNameplates(game::GameHandler& gameHandler);
-    void renderDurabilityWarning(game::GameHandler& gameHandler);
 
     /**
      * Inventory screen
