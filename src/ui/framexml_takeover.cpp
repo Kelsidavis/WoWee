@@ -45,9 +45,9 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::Chat,         "chat"},
     {UiElement::QuestTracker, "questtracker"},
     {UiElement::WorldMap,     "worldmap"},
-    {UiElement::CharacterFrame, "characterframe"},
+    {UiElement::CharacterFrame, "characterframe", false},
     {UiElement::Bags,         "bags"},
-    {UiElement::Spellbook,    "spellbook"},
+    {UiElement::Spellbook,    "spellbook", false},
     {UiElement::QuestLog,     "questlog"},
     {UiElement::QuestGiver,   "questgiver"},
     {UiElement::Gossip,       "gossip"},
@@ -883,8 +883,6 @@ const Suppress kSuppress[] = {
         // the ring, the zoom buttons and the zone text, and MainMenuBarBackpack
         // Button carries the four bag slots beside it.
         {UiElement::Minimap,    "MinimapCluster"},
-        {UiElement::CharacterFrame, "CharacterFrame"},
-        {UiElement::Spellbook,  "SpellBookFrame"},
         {UiElement::BagBar,     "MainMenuBarBackpackButton CharacterBag0Slot "
                                 "CharacterBag1Slot CharacterBag2Slot CharacterBag3Slot "
                                 "KeyRingButton"},

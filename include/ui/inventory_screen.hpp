@@ -25,7 +25,6 @@ public:
     void render(game::Inventory& inventory, uint64_t moneyCopper);
 
     /// Render character screen (C key). Standalone equipment window.
-    void renderCharacterScreen(game::GameHandler& gameHandler);
 
     /// Draw the item-target cursor armed by using a sharpening stone / weightstone /
     /// weapon oil, and handle cancelling it. Call once per frame, after the windows.
@@ -57,7 +56,6 @@ public:
     [[nodiscard]] bool isBagOpen(int idx) const { return idx >= 0 && idx < 4 ? bagOpen_[idx] : false; }
 
     [[nodiscard]] bool isCharacterOpen() const { return characterOpen; }
-    void toggleCharacter() { characterOpen = !characterOpen; }
     void setCharacterOpen(bool o) { characterOpen = o; }
 
     /// Enable vendor mode: right-clicking bag items sells them.
@@ -71,13 +69,8 @@ public:
     void setAssetManager(pipeline::AssetManager* am) { assetManager_ = am; }
 
     /// Store player appearance for character preview
-    void setPlayerAppearance(game::Race race, game::Gender gender,
-                             uint8_t skin, uint8_t face,
-                             uint8_t hairStyle, uint8_t hairColor,
-                             uint8_t facialHair);
 
     /// Mark the character preview as needing equipment update
-    void markPreviewDirty() { previewDirty_ = true; }
 
 
     /// Returns true if equipment changed since last call, and clears the flag.
@@ -88,7 +81,6 @@ public:
 private:
     bool open = false;
     bool characterOpen = false;
-    float characterUiScale_ = 1.0f;
     bool bKeyWasDown = false;
     bool separateBags_ = true;
     bool compactBags_ = false;
@@ -114,22 +106,9 @@ public:
 private:
 
     // Character model preview
-    std::unique_ptr<rendering::CharacterPreview> charPreview_;
-    bool previewInitialized_ = false;
-    bool previewDirty_ = false;
 
     // Stored player appearance for preview
-    game::Race playerRace_ = game::Race::HUMAN;
-    game::Gender playerGender_ = game::Gender::MALE;
-    uint8_t playerSkin_ = 0;
-    uint8_t playerFace_ = 0;
-    uint8_t playerHairStyle_ = 0;
-    uint8_t playerHairColor_ = 0;
-    uint8_t playerFacialHair_ = 0;
 
-    void initPreview();
-    void updatePreviewEquipment(game::Inventory& inventory,
-                                bool showHelm, bool showCloak);
 
     // Drag-and-drop held item state
     bool holdingItem = false;
@@ -172,11 +151,9 @@ private:
                          int bagIndex, float defaultX, float defaultY, uint64_t moneyCopper);
     /// Shared footer for the backpack / All Bags windows: Sort Bags button + money display.
     void renderBagsFooter(uint64_t moneyCopper);
-    void renderEquipmentPanel(game::Inventory& inventory);
     void renderStatsPanel(game::Inventory& inventory, uint32_t playerLevel, int32_t serverArmor = 0,
                           const int32_t* serverStats = nullptr, const int32_t* serverResists = nullptr,
                           const game::GameHandler* gh = nullptr);
-    void renderReputationPanel(game::GameHandler& gameHandler);
 
     void renderItemSlot(game::Inventory& inventory, const game::ItemSlot& slot,
                         float size, const char* label,

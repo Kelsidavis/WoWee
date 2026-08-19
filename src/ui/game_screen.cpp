@@ -738,10 +738,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         questLogScreen.render(gameHandler, inventoryScreen);
     }
 
-    if (!frameXmlOwns(UiElement::Spellbook)) {
-        spellbookScreen.render(gameHandler, services_.assetManager);
-    }
-
     // Insert spell link into chat if player shift-clicked a spellbook entry
     {
         std::string pendingSpellLink = spellbookScreen.getAndClearPendingChatLink();
@@ -762,17 +758,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
             auto* am = services_.assetManager;
             if (am) {
                 inventoryScreen.setAssetManager(am);
-                const auto* ch = gameHandler.getActiveCharacter();
-                if (ch) {
-                    uint8_t skin = ch->appearanceBytes & 0xFF;
-                    uint8_t face = (ch->appearanceBytes >> 8) & 0xFF;
-                    uint8_t hairStyle = (ch->appearanceBytes >> 16) & 0xFF;
-                    uint8_t hairColor = (ch->appearanceBytes >> 24) & 0xFF;
-                    inventoryScreen.setPlayerAppearance(
-                        ch->race, ch->gender, skin, face,
-                        hairStyle, hairColor, ch->facialFeatures);
-                    inventoryScreenCharGuid_ = activeGuid;
-                }
+                inventoryScreenCharGuid_ = activeGuid;
             }
         }
     }
@@ -806,11 +792,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         inventoryScreen.render(gameHandler.getInventory(), gameHandler.getMoneyCopper());
     }
 
-    // Character screen (C key toggle handled inside render())
-    if (!frameXmlOwns(UiElement::CharacterFrame)) {
-        inventoryScreen.renderCharacterScreen(gameHandler);
-    }
-
     // Item-target cursor (sharpening stone / oil awaiting the item it applies to)
     inventoryScreen.renderItemTargetCursor();
 
@@ -826,7 +807,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         updateCharacterGeosets(gameHandler.getInventory());
         updateCharacterTextures(gameHandler.getInventory());
         if (appearanceComposer_) appearanceComposer_->loadEquippedWeapons();
-        inventoryScreen.markPreviewDirty();
         // Update renderer weapon type for animation selection
         auto* r = services_.renderer;
         if (r) {
@@ -1534,27 +1514,11 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
         if (!textFocus) {
             // Toggle character screen (C) and inventory/bags (I)
             if (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_CHARACTER_SCREEN)) {
-                // Whichever interface owns the character sheet is the one the
-                // key has to reach. Toggling this client's own state while
-                // FrameXML draws the window left the key doing nothing
-                // visible at all.
-                if (frameXmlOwns(UiElement::CharacterFrame)) {
-                    // Nothing, deliberately: the handover route table in
-                    // application.cpp already calls ToggleCharacter for this
-                    // key. Calling it here as well was the whole of the bug
-                    // reported three times. IsKeyPressed does not consume, so
-                    // both sites saw the same press and toggled in the same
-                    // frame - open, then shut, and nothing on screen. Every
-                    // link in the chain read correct because the chain was;
-                    // it simply ran twice.
-                    //
-                    // The other two handovers written here hid the same fault
-                    // by being broken: ToggleAllBags and ToggleWorldMap do not
-                    // exist in 3.3.5, so those calls did nothing and the route
-                    // table's single call was left to work.
-                } else {
-                    inventoryScreen.toggleCharacter();
-                }
+                // The route table in application.cpp calls ToggleCharacter for
+                // this key. Calling it here as well was the whole of a bug
+                // reported three times: IsKeyPressed does not consume, so both
+                // sites saw the same press and toggled in the same frame -
+                // open, then shut, and nothing on screen.
                 if (gameHandler.isConnected()) gameHandler.requestPlayedTime();
             }
 

@@ -31,14 +31,8 @@ struct SpellInfo {
     [[nodiscard]] bool isPassive() const { return (attributes & 0x40) != 0; }
 };
 
-struct SpellTabInfo {
-    std::string name;
-    std::vector<const SpellInfo*> spells;
-};
-
 class SpellbookScreen {
 public:
-    void render(game::GameHandler& gameHandler, pipeline::AssetManager* assetManager);
     [[nodiscard]] bool isOpen() const { return open; }
     void toggle() { open = !open; }
     void setOpen(bool o) { open = o; }
@@ -78,7 +72,6 @@ public:
 
 private:
     bool open = false;
-    bool pKeyWasDown = false;
 
     // Spell data (loaded from Spell.dbc)
     bool dbcLoaded = false;
@@ -90,19 +83,8 @@ private:
     std::unordered_map<uint32_t, std::string> spellIconPaths; // SpellIconID -> path
     std::unordered_map<uint32_t, VkDescriptorSet> spellIconCache; // SpellIconID -> texture
 
-    // Skill line data (loaded from SkillLine.dbc + SkillLineAbility.dbc)
-    bool skillLineDbLoaded = false;
-    std::unordered_map<uint32_t, std::string> skillLineNames;
-    std::unordered_map<uint32_t, uint32_t> skillLineCategories;
-    std::unordered_multimap<uint32_t, uint32_t> spellToSkillLine;
-
-    // Categorized spell tabs
-    std::vector<SpellTabInfo> spellTabs;
-    size_t lastKnownSpellCount = 0;
-    bool categorizedWithSkillLines = false;
 
     // Search filter
-    char searchFilter_[128] = "";
 
     // Drag-and-drop from spellbook to action bar
     bool draggingSpell_ = false;
@@ -114,8 +96,6 @@ private:
 
     void loadSpellDBC(pipeline::AssetManager* assetManager);
     void loadSpellIconDBC(pipeline::AssetManager* assetManager);
-    void loadSkillLineDBCs(pipeline::AssetManager* assetManager);
-    void categorizeSpells(const std::unordered_set<uint32_t>& knownSpells);
     VkDescriptorSet getSpellIcon(uint32_t iconId, pipeline::AssetManager* assetManager);
     [[nodiscard]] const SpellInfo* getSpellInfo(uint32_t spellId) const;
 

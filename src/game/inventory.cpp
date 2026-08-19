@@ -527,34 +527,5 @@ std::vector<Inventory::SwapOp> Inventory::computeBankBagSortSwaps(int bagIndex) 
 
     return swapsToSort(entries);
 }
-const char* getEquipSlotName(EquipSlot slot) {
-    switch (slot) {
-        case EquipSlot::HEAD:       return "Head";
-        case EquipSlot::NECK:       return "Neck";
-        case EquipSlot::SHOULDERS:  return "Shoulders";
-        case EquipSlot::SHIRT:      return "Shirt";
-        case EquipSlot::CHEST:      return "Chest";
-        case EquipSlot::WAIST:      return "Waist";
-        case EquipSlot::LEGS:       return "Legs";
-        case EquipSlot::FEET:       return "Feet";
-        case EquipSlot::WRISTS:     return "Wrists";
-        case EquipSlot::HANDS:      return "Hands";
-        case EquipSlot::RING1:      return "Ring 1";
-        case EquipSlot::RING2:      return "Ring 2";
-        case EquipSlot::TRINKET1:   return "Trinket 1";
-        case EquipSlot::TRINKET2:   return "Trinket 2";
-        case EquipSlot::BACK:       return "Back";
-        case EquipSlot::MAIN_HAND:  return "Main Hand";
-        case EquipSlot::OFF_HAND:   return "Off Hand";
-        case EquipSlot::RANGED:     return "Ranged";
-        case EquipSlot::TABARD:     return "Tabard";
-        case EquipSlot::BAG1:       return "Bag 1";
-        case EquipSlot::BAG2:       return "Bag 2";
-        case EquipSlot::BAG3:       return "Bag 3";
-        case EquipSlot::BAG4:       return "Bag 4";
-        default:                    return "Unknown";
-    }
-}
-
 } // namespace game
 } // namespace wowee

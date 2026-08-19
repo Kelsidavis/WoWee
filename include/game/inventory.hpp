@@ -364,7 +364,6 @@ private:
     uint8_t purchasedBankBagSlots_ = 0;
 };
 
-const char* getEquipSlotName(EquipSlot slot);
 
 } // namespace game
 } // namespace wowee
