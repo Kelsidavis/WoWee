@@ -34,6 +34,14 @@ struct ExpansionProfile {
     std::vector<uint32_t> races;
     std::vector<uint32_t> classes;
 
+    /// The RSA public key this realm signs its Warden module with, 256 bytes.
+    ///
+    /// Empty means Blizzard's own, which is what a server running a genuine
+    /// module uses. A server that builds its own signs it with a key of its
+    /// own, and checking that signature against Blizzard's says only that the
+    /// two differ. Written in the profile as 512 hex characters.
+    std::vector<uint8_t> wardenRsaModulus;
+
     [[nodiscard]] std::string versionString() const;  // e.g. "3.3.5a"
 };
 

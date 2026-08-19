@@ -8,6 +8,7 @@
 #include "network/packet.hpp"
 #include "auth/crypto.hpp"
 #include "core/application.hpp"
+#include "game/expansion_profile.hpp"
 #include "pipeline/asset_manager.hpp"
 #include "core/logger.hpp"
 #include "game/warden_constants.hpp"
@@ -443,6 +444,14 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
 
                 // Load the module (decrypt, decompress, parse, relocate, init)
                 wardenLoadedModule_ = std::make_shared<WardenModule>();
+                // Check the signature against the key this realm actually
+                // signs with, when its profile names one.
+                if (auto* reg = core::Application::getInstance().getExpansionRegistry()) {
+                    if (const auto* profile = reg->getActive();
+                        profile && !profile->wardenRsaModulus.empty()) {
+                        wardenLoadedModule_->setRsaModulus(profile->wardenRsaModulus);
+                    }
+                }
                 // Inject crypto and socket so module callbacks (sendPacket, generateRC4)
                 // can reach the network layer during initializeModule().
                 wardenLoadedModule_->setCallbackDependencies(

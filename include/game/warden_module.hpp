@@ -124,6 +124,14 @@ public:
      */
     void unload();
 
+    /// The RSA public key this module's signature is checked against.
+    ///
+    /// Must be 256 bytes; anything else is ignored and Blizzard's own key is
+    /// used, which is what a server running a genuine module wants. A server
+    /// that builds its own module signs it with its own key and names that
+    /// key in its expansion profile.
+    void setRsaModulus(std::vector<uint8_t> modulus);
+
     [[nodiscard]] const void* getModuleMemory() const { return moduleMemory_; }
     [[nodiscard]] size_t getModuleSize() const { return moduleSize_; }
     [[nodiscard]] const std::vector<uint8_t>& getDecompressedData() const { return decompressedData_; }
@@ -135,6 +143,7 @@ public:
     void setCallbackDependencies(WardenCrypto* crypto, SendPacketFunc sendFunc);
 
 private:
+    std::vector<uint8_t> rsaModulus_;              // Empty or 256 bytes; see setRsaModulus
     bool loaded_ = false;                          // Module successfully loaded
     // False when the module did not unpack into a real code image - typically because
     // the server sent something other than a genuine Blizzard Warden module, which is
