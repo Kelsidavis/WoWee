@@ -1,5 +1,26 @@
 # Changelog
 
+## [v3.1.7] - 2026-08-19
+
+### Changed
+- **The screens before the game are drawn rather than asked for.** The login, realm selection, character selection and character creation screens no longer use ImGui widgets. What reads as ImGui is the shape of the controls themselves - the flat rectangles, the label on the right, the uniform spacing - so restyling could not have fixed a grey title bar and a drag handle sitting on a crayon drawing of a tavern. `paper_ui.cpp` is the smallest set of controls those four screens need, drawn into an ImDrawList as ink on paper: sheets with a hand-drawn border and taped corners, fields ruled like a form, a crayon button, pills, dropdowns, lists and sliders. The waver in every line is hashed from where the line is, so a control is the same shape every frame rather than boiling. The login screen leads with the account and the password and puts the address, port, expansion and asset override behind a disclosure; character creation lays its preview, its identity and its appearance out in three columns so it fits without scrolling. The login art now carries through all four screens instead of giving way to a black window after login
+- **The caret and the selection are this client's own.** `text_edit.cpp` is the half of a text field that has nothing to do with drawing - where the caret sits, what is selected, and what Ctrl+Left does when the caret is already at the start of a word. It needs no font, no device and no frame, so it is tested: word motion through a hostname, a paste that arrives with a newline on the end of it, and a byte cap that must not cut a character in half. Every motion lands on a codepoint boundary, because half of a multi-byte character is not a place a caret can be
+- **Grass thins by octaves rather than by a dice re-rolled every rebuild.** The re-roll was the pop: a ride toward a stand had blades blinking in at the rebuild cadence. Each distance doubling past the 45-yard near field keeps one cell in four by nested descent, so the far blades are always an exact subset of the near ones, and each blade carries its own fade distance and sinks by live distance from the player. Build cost grows with the log of the window rather than its area, which pays for the rest: the default range rises to 150 yards and the slider reaches 2000
+- **Defaults sized for the machine.** Shadows defaulted to 4096, which is 64 MB a map and two in flight - 128 MB of depth before anything is drawn, refilled every frame, and a good part of the reports of this client running badly is hardware that was never going to carry that. The default is 2048, and 1024 on Android where GPU memory is the system's memory. The asset file cache took half of available RAM, which is a desktop rule; Android kills a process that passes its per-app limit rather than swapping, so a phone with 8 GB was being handed 840 MB
+- **macOS is built and published for x86-64 as well**, and the retired macos-13 runner is replaced by macos-15-intel
+
+### Added
+- **A frame budget that reports itself.** The per-stage timings only spoke above 50ms, which names the stage that stalled and says nothing about where a frame's time goes. On a phone the whole budget is 33ms, so every stage was silent and the client was slow for reasons nothing reported. Each stage keeps a running average and worst case, and the breakdown prints every ten seconds
+
+### Fixed
+- **The character fell through the world on every login on a phone.** Asking for a height answers nothing both for a hole, which the character should fall through, and for a tile that has not streamed in, which it should not. Gravity could not tell those apart, so a device slow enough to enter the world before the ground arrived fell from the spawn point until the server killed it. Not gated to Android: it is a race, and a slow disk can lose it anywhere
+- **A stalled package mirror read as a broken Windows build.** The x86-64 job installed its dependencies through the setup action's list, which has no retry, so one mirror at "less than 1 bytes/sec" failed the whole transaction before a single file was compiled. It now uses the retried step the arm64 job and the release workflow already had
+- **The login background leaked its decoded image on every run** - 2.4 MB of pixels that nothing freed after they were copied to the GPU
+- **A disconnect window that could never appear.** `AppState::DISCONNECTED` is set by nothing; a dropped world connection returns to login and says why there. What stood on that state was an ImGui window whose Return to Login button had no implementation
+
+### Removed
+- **The player, target, pet and focus frames, the cast bar, the buff bar, the boss frames, the durability warning and the error text.** All nine are the interface's own by default and clean in the readiness report, so around 3,200 lines behind their gates were the version nobody saw. Suppression goes with each of them: it hides the interface's frames for elements this client still draws, so leaving those rows would have hidden the mirror timers, the combo points and the boss frames with nothing left to draw them. The error sound stays - the interface plays none for a refusal, so removing the callback with the overlay would have made every one of them silent
+
 ## [v3.1.6] - 2026-08-18
 
 ### Added
