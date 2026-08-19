@@ -62,7 +62,6 @@ public:
     bool dpsMeterUserPositioned_ = false;
 
     // ---- Public render methods ----
-    void renderCastBar(game::GameHandler& gameHandler, const SpellIconFn& getSpellIcon);
     void renderCooldownTracker(game::GameHandler& gameHandler,
                                const SettingsPanel& settings,
                                const SpellIconFn& getSpellIcon);
@@ -83,11 +82,6 @@ public:
         dpsMeterUserPositioned_ = true;
     }
     // inventoryScreen supplies the weapon item icons shown for temporary weapon enchants.
-    void renderBuffBar(game::GameHandler& gameHandler,
-                       SpellbookScreen& spellbookScreen,
-                       InventoryScreen& inventoryScreen,
-                       const SettingsPanel& settings,
-                       const SpellIconFn& getSpellIcon);
     void renderBattlegroundScore(game::GameHandler& gameHandler);
     void renderCombatLog(game::GameHandler& gameHandler,
                          SpellbookScreen& spellbookScreen);

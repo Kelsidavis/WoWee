@@ -68,9 +68,6 @@ public:
     void renderPartyFrames(game::GameHandler& gameHandler,
                            ChatPanel& chatPanel,
                            const SpellIconFn& getSpellIcon);
-    void renderBossFrames(game::GameHandler& gameHandler,
-                          SpellbookScreen& spellbookScreen,
-                          const SpellIconFn& getSpellIcon);
     // Takes the panels the markup renderer needs: the guild info text and the
     // MOTD are server strings that carry item, spell, quest and achievement
     // links, and rendering them as plain text left every link inert.

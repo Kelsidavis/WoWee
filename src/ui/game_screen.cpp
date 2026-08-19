@@ -598,11 +598,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         renderTotemFrame(gameHandler);
     }
 
-    // Target frame (only when we have a target)
-    if (gameHandler.hasTarget() && !frameXmlOwns(UiElement::TargetFrame)) {
-        renderTargetFrame(gameHandler);
-    }
-
     // Focus target frame (only when we have a focus)
     if (gameHandler.hasFocus() && !frameXmlOwns(UiElement::FocusFrame)) {
         renderFocusFrame(gameHandler);
@@ -655,8 +650,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // ---- New UI elements ----
     if (!frameXmlOwns(UiElement::MicroMenu)) renderMicroMenu(gameHandler);
     auto spellIconFn = [this](uint32_t id, pipeline::AssetManager* am) { return getSpellIcon(id, am); };
-    if (!frameXmlOwns(UiElement::CastBar))
-        combatUI_.renderCastBar(gameHandler, spellIconFn);
     combatUI_.renderCooldownTracker(gameHandler, settingsPanel_, spellIconFn);
     if (!frameXmlOwns(UiElement::QuestTracker))
         renderQuestObjectiveTracker(gameHandler);
@@ -677,7 +670,10 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         addons::storedCVarValue("enableCombatText", "1") != "0") {
         combatUI_.renderCombatText(gameHandler);
     }
-    combatUI_.renderDPSMeter(gameHandler, settingsPanel_, lastTargetFrameBottom_);
+    // No target frame of ours to park under any more, so the meter takes its
+    // own position. FrameXML's TargetFrame has one, and could be measured the
+    // way the minimap measures MinimapCluster, but nothing reads it yet.
+    combatUI_.renderDPSMeter(gameHandler, settingsPanel_, -1.0f);
     if (!frameXmlOwns(UiElement::Durability)) {
         renderDurabilityWarning(gameHandler);
     }
@@ -694,9 +690,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
             socialPanel_.renderPartyFrames(gameHandler, chatPanel_, spellIconFn);
         }
     }
-    if (!frameXmlOwns(UiElement::TargetFrame)) {
-        socialPanel_.renderBossFrames(gameHandler, spellbookScreen, spellIconFn);
-    }
     dialogManager_.renderDialogs(gameHandler, inventoryScreen, chatPanel_);
     // FriendsFrame is what "social" suppresses, and its tabs are the friends
     // list, the who list and the guild roster. Only the friends list was gated
@@ -708,11 +701,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     }
     if (!frameXmlOwns(UiElement::Social)) {
         socialPanel_.renderSocialFrame(gameHandler, chatPanel_);
-    }
-    // FrameXML's buff frame is checked as in use beside the minimap cluster,
-    // and this one was drawn regardless - two bars of the same auras.
-    if (!frameXmlOwns(UiElement::Buffs)) {
-        combatUI_.renderBuffBar(gameHandler, spellbookScreen, inventoryScreen, settingsPanel_, spellIconFn);
     }
     windowManager_.renderGmCommandScreen(gameHandler);
     if (!frameXmlOwns(UiElement::DungeonFinder)) {

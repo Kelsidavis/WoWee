@@ -31,7 +31,7 @@ struct Entry {
 // One row per element, and the only place a name is written down.
 constexpr std::array<Entry, 52> kElements{{
     {UiElement::PlayerFrame,  "playerframe", false},
-    {UiElement::TargetFrame,  "targetframe"},
+    {UiElement::TargetFrame,  "targetframe", false},
     {UiElement::PetFrame,     "petframe"},
     {UiElement::FocusFrame,   "focusframe"},
     {UiElement::ActionBar,    "actionbar"},
@@ -40,7 +40,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::MicroMenu,    "micromenu"},
     {UiElement::XpBar,        "xpbar"},
     {UiElement::RepBar,       "repbar"},
-    {UiElement::CastBar,      "castbar"},
+    {UiElement::CastBar,      "castbar", false},
     {UiElement::Minimap,      "minimap"},
     {UiElement::Chat,         "chat"},
     {UiElement::QuestTracker, "questtracker"},
@@ -64,7 +64,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::Inspect,      "inspect"},
     {UiElement::DungeonFinder, "dungeonfinder"},
     {UiElement::Petition,     "petition"},
-    {UiElement::Buffs,        "buffs"},
+    {UiElement::Buffs,        "buffs", false},
     {UiElement::Durability,   "durability"},
     {UiElement::ZoneText,     "zonetext"},
     {UiElement::Trade,        "trade"},
@@ -743,12 +743,6 @@ const Suppress kSuppress[] = {
         {UiElement::Loot,        "LootFrame GroupLootFrame1 GroupLootFrame2 "
                                  "GroupLootFrame3 GroupLootFrame4"},
         {UiElement::Bank,        "BankFrame"},
-        // Buffs and durability had no suppression entry either, for the same
-        // reason the bags did not: both are handed over by default, so nothing
-        // ever showed twice and the gap stayed invisible. ConsolidatedBuffs and
-        // TemporaryEnchantFrame ride with the buff bar - this client draws the
-        // weapon enchant inside renderBuffBar, so the three go together.
-        {UiElement::Buffs,       "BuffFrame ConsolidatedBuffs TemporaryEnchantFrame"},
         {UiElement::Durability,  "DurabilityFrame"},
         // The party frames' shared backdrop, which is a top-level frame of its
         // own rather than a child of any of them.
@@ -873,14 +867,6 @@ const Suppress kSuppress[] = {
         // for - so every refusal the server sends was shown twice, once by
         // each interface.
         {UiElement::UiErrors,   "UIErrorsFrame"},
-        // This client draws combo points on both the player and the target
-        // frame, so FrameXML's separate display is a third set of them.
-        {UiElement::TargetFrame, "ComboFrame"},
-        // The boss frames are target frames in all but name - same file, same
-        // template - so they go with the target frame. This client draws its
-        // own set in renderBossFrames.
-        {UiElement::TargetFrame, "Boss1TargetFrame Boss2TargetFrame "
-                                 "Boss3TargetFrame Boss4TargetFrame"},
         // Found by the unaccounted-element check on its first run. The world
         // map is neither handed over nor hidden, so FrameXML's draws over this
         // client's own. It appears in the check list, which is what made it
@@ -915,7 +901,6 @@ const Suppress kSuppress[] = {
         {UiElement::Minimap,    "MinimapCluster"},
         {UiElement::CharacterFrame, "CharacterFrame"},
         {UiElement::Spellbook,  "SpellBookFrame"},
-        {UiElement::CastBar,    "CastingBarFrame"},
         {UiElement::PetFrame,   "PetFrame"},
         {UiElement::FocusFrame, "FocusFrame"},
         {UiElement::BagBar,     "MainMenuBarBackpackButton CharacterBag0Slot "

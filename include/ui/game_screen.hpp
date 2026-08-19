@@ -211,20 +211,6 @@ private:
      */
     void renderEntityList(game::GameHandler& gameHandler);
 
-    /**
-     * Render player unit frame (top-left)
-     */
-
-    /**
-     * Render target frame
-     */
-    void renderTargetFrame(game::GameHandler& gameHandler);
-    // Last measured width of the auto-sizing target frame, used to keep it centered
-    // (position is set before the window lays out, so it lags by one frame).
-    float lastTargetFrameWidth_ = 250.0f;
-    // Screen Y of the target frame's bottom edge, or -1 when nothing is
-    // targeted. The DPS meter parks itself just below this.
-    float lastTargetFrameBottom_ = -1.0f;
     // Halves of the saved DPS meter position, applied once both have been read
     // (settings arrive as separate key/value lines).
     float dpsMeterSavedX_ = -1.0f;
