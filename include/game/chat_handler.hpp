@@ -90,6 +90,12 @@ public:
     void submitGmTicket(const std::string& text);
     /// Replace the text of the ticket already open.
     void updateGmTicket(const std::string& text);
+
+    /// Release the lines held for `guid`, now that its name is known.
+    void flushChatAwaitingName(uint64_t guid);
+    /// Release anything whose wait has run out, named or not. A line nobody
+    /// answers for is still a line the player should see.
+    void expireChatAwaitingName();
     void handleMotd(network::Packet& packet);
 
     // --- State accessors ---
@@ -103,8 +109,23 @@ public:
     ChatAutoJoin chatAutoJoin;
 
 private:
+    /// A chat line waiting for its sender's name. See deliverChatMessage.
+    struct ChatAwaitingName {
+        MessageChatData data;
+        uint64_t guid = 0;
+        double deadline = 0.0;
+    };
+    std::deque<ChatAwaitingName> chatAwaitingName_;
+    /// Long enough for a name query to come back on a working connection,
+    /// short enough that a line does not feel withheld.
+    static constexpr double kNameWaitSeconds = 1.0;
     // --- Packet handlers ---
     void handleMessageChat(network::Packet& packet);
+    /// Deliver a parsed chat line: resolve its sender, filter it, store it and
+    /// tell the interface. Split from handleMessageChat so a line held back
+    /// for its sender's name can be run through it again once the name lands.
+    void deliverChatMessage(MessageChatData data, bool alreadyWaited);
+
     void handleTextEmote(network::Packet& packet);
     void handleChannelNotify(network::Packet& packet);
     void handleChannelList(network::Packet& packet);

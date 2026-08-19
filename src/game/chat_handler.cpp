@@ -406,6 +406,10 @@ void ChatHandler::handleMessageChat(network::Packet& packet) {
         return;
     }
 
+    deliverChatMessage(std::move(data), /*alreadyWaited=*/false);
+}
+
+void ChatHandler::deliverChatMessage(MessageChatData data, bool alreadyWaited) {
     // Resolve sender name from entity/cache if not already set by parser
     if (data.senderName.empty() && data.senderGuid != 0) {
         auto nameIt = owner_.getPlayerNameCache().find(data.senderGuid);
@@ -463,6 +467,22 @@ void ChatHandler::handleMessageChat(network::Packet& packet) {
 
         if (data.senderName.empty()) {
             owner_.queryPlayerName(data.senderGuid);
+            // Hold the line rather than showing it with nobody's name on it.
+            //
+            // SMSG_MESSAGECHAT carries a guid and no name for a player line,
+            // and every source above is somebody nearby, in the party or in
+            // the guild. A whisper is characteristically from none of those -
+            // that is what makes it a whisper - so it missed all of them, went
+            // out with an empty name, and the interface printed it with no
+            // sender. The backfill that follows a name query reaches this
+            // client's own history and not what the interface has already
+            // drawn, so the name has to be there the first time.
+            if (!alreadyWaited) {
+                const uint64_t waitingOn = data.senderGuid;
+                chatAwaitingName_.push_back({std::move(data), waitingOn,
+                                             core::appTimeSeconds() + kNameWaitSeconds});
+                return;
+            }
         }
     }
 
@@ -840,6 +860,39 @@ void ChatHandler::sendTextEmote(uint32_t textEmoteId, uint64_t targetGuid) {
     if (owner_.getState() != WorldState::IN_WORLD || !owner_.getSocket()) return;
     auto packet = TextEmotePacket::build(textEmoteId, targetGuid);
     owner_.getSocket()->send(packet);
+}
+
+void ChatHandler::flushChatAwaitingName(uint64_t guid) {
+    if (chatAwaitingName_.empty() || guid == 0) return;
+    std::vector<MessageChatData> ready;
+    for (auto it = chatAwaitingName_.begin(); it != chatAwaitingName_.end();) {
+        if (it->guid == guid) {
+            ready.push_back(std::move(it->data));
+            it = chatAwaitingName_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    // Delivered outside the walk: each one runs the whole chat path, which can
+    // hold another line of its own.
+    for (auto& data : ready) deliverChatMessage(std::move(data), /*alreadyWaited=*/true);
+}
+
+void ChatHandler::expireChatAwaitingName() {
+    if (chatAwaitingName_.empty()) return;
+    const double now = core::appTimeSeconds();
+    std::vector<MessageChatData> ready;
+    for (auto it = chatAwaitingName_.begin(); it != chatAwaitingName_.end();) {
+        if (now >= it->deadline) {
+            LOG_WARNING("Chat: no name for ", formatChatLogGuid(it->guid),
+                        " within ", kNameWaitSeconds, "s - showing the line without one");
+            ready.push_back(std::move(it->data));
+            it = chatAwaitingName_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    for (auto& data : ready) deliverChatMessage(std::move(data), /*alreadyWaited=*/true);
 }
 
 void ChatHandler::handleTextEmote(network::Packet& packet) {

@@ -294,6 +294,11 @@ void GameHandler::updateNetworking() {
         movementHandler_->monsterMovePacketsDroppedThisTickRef() = 0;
     }
 
+    // Anything still waiting on a name query that never came back. After the
+    // socket below would be a tick later than it needs to be; before it means
+    // a line waits one extra tick at most.
+    if (chatHandler_) chatHandler_->expireChatAwaitingName();
+
     // Update socket (processes incoming data and triggers callbacks)
     if (socket) {
         auto socketStart = std::chrono::steady_clock::now();

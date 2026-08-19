@@ -2820,6 +2820,8 @@ void EntityController::handleNameQueryResponse(network::Packet& packet) {
 
     if (data.isValid()) {
         playerNameCache[data.guid] = data.name;
+        // Chat lines held back for this name can go out now, with it on them.
+        if (owner_.getChatHandler()) owner_.getChatHandler()->flushChatAwaitingName(data.guid);
         // Cache class/race from name query for UnitClass/UnitRace fallback
         if (data.classId != 0 || data.race != 0) {
             playerClassRaceCache_[data.guid] = {.classId = data.classId, .raceId = data.race};
