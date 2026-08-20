@@ -1616,8 +1616,18 @@ if(WOWEE_BUILD_FRAMEXML_RUN)
     get_target_property(_wowee_libs wowee LINK_LIBRARIES)
     get_target_property(_wowee_incs wowee INCLUDE_DIRECTORIES)
     get_target_property(_wowee_defs wowee COMPILE_DEFINITIONS)
+    # And where to find them. Three of the four properties were copied and this
+    # one was not, so a dependency named by pkg-config as a bare library - which
+    # is every one of them on a Homebrew prefix - linked for wowee and not for
+    # this: "ld: library 'avformat' not found", from a target built out of the
+    # same sources. The tool that exists to answer questions about the running
+    # interface could not be built at all on that setup.
+    get_target_property(_wowee_libdirs wowee LINK_DIRECTORIES)
     if(_wowee_libs)
         target_link_libraries(framexml_run PRIVATE ${_wowee_libs})
+    endif()
+    if(_wowee_libdirs)
+        target_link_directories(framexml_run PRIVATE ${_wowee_libdirs})
     endif()
     if(_wowee_incs)
         target_include_directories(framexml_run PRIVATE ${_wowee_incs})
