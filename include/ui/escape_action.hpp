@@ -2,9 +2,9 @@
 
 // What the Escape key does, as a decision separate from the doing of it.
 //
-// Escape is not one action. It is nineteen, ordered, and the first whose
-// condition holds is the one that runs: close the settings window, else the
-// client's own menu, else cancel the cast, else close whichever server-side
+// Escape is not one action. It is eighteen, ordered, and the first whose
+// condition holds is the one that runs: put a held item back, else close the
+// settings window, else cancel the cast, else close whichever server-side
 // window is open - and only when none of that applies does the question reach
 // the interface and then the game menu.
 //
@@ -29,7 +29,6 @@ enum class EscapeAction {
     /// Put a picked-up item back where it came from.
     ReturnHeldItem,
     CloseSettingsWindow,
-    CloseClientMenu,
     CancelCast,
     CloseLoot,
     CloseGossip,
@@ -54,10 +53,9 @@ enum class EscapeAction {
 enum class EscapeOutcome {
     /// FrameXML had a panel open and closed it.
     InterfaceClosedAPanel,
-    /// Nothing left to close, and the interface draws the game menu.
+    /// Nothing left to close, so the game menu opens. The interface draws
+    /// it; this client has no menu of its own any more.
     ToggleInterfaceMenu,
-    /// Nothing left to close, and this client draws the game menu.
-    OpenClientMenu,
 };
 
 /// Everything the chain reads, gathered before it is asked.
@@ -76,9 +74,10 @@ struct EscapeState {
     /// An item is on the cursor, picked up from a bag or a vendor.
     bool holdingItem = false;
 
-    // This client's own windows.
+    /// This client's own settings window, which is drawn over everything.
+    /// The only window of its own it has left: the game menu beside it was
+    /// handed to the interface.
     bool settingsWindowShown = false;
-    bool clientMenuShown = false;
 
     // Things the server knows about. Each of these has to be closed through
     // the client so the closing packet is sent - hiding the frame instead
@@ -105,11 +104,11 @@ EscapeAction resolveEscape(const EscapeState& state);
 /// What is left once the interface has been asked.
 ///
 /// `interfaceClosedAPanel` is what the interface answered; `frameXmlOwnsMenu`
-/// is whether the game menu has been handed over. The second decides which of
-/// two menus opens, and getting it wrong is silent: this branch used to set
-/// the flag behind *this* client's menu unconditionally, and that menu is only
-/// drawn while the element is not handed over - so with the menu handed over,
-/// Escape set a flag nobody read and nothing appeared.
+/// is whether the game menu has been handed over, which it now always has.
+/// It used to decide which of two menus opened, and getting it wrong was
+/// silent: this branch set the flag behind *this* client's menu
+/// unconditionally, and that menu was only drawn while the element was not
+/// handed over - so Escape set a flag nobody read and nothing appeared.
 EscapeOutcome resolveAfterInterface(bool interfaceClosedAPanel,
                                     bool frameXmlOwnsMenu);
 

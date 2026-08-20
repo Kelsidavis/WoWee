@@ -672,9 +672,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     }
     dialogManager_.renderLateDialogs(gameHandler);
     chatPanel_.renderBubbles(gameHandler);
-    if (!frameXmlOwns(UiElement::GameMenu)) {
-        windowManager_.renderEscapeMenu(settingsPanel_, gameHandler);
-    }
     // Not gated on GameMenu ownership. FrameXML's own options frames are shells
     // - its menu buttons are routed here through ShowUIPanel - and this window
     // draws nothing unless something opened it, so leaving it out cost every
@@ -1284,7 +1281,6 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
             // an item still stuck to the pointer.
             st.holdingItem           = inventoryScreen.isHoldingItem() ||
                                        !frameXmlCursorItem().empty();
-            st.clientMenuShown       = windowManager_.showEscapeMenu;
             st.casting               = gameHandler.isCasting();
             st.lootOpen              = gameHandler.isLootWindowOpen();
             st.gossipOpen            = gameHandler.isGossipWindowOpen();
@@ -1313,16 +1309,10 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
             // a working press sounds like.
             //
             // One line per press, and Escape is not a key anyone holds down.
-            LOG_WARNING("Escape: ", escapeActionName(action),
-                        " (the interface owns the game menu: ",
-                        frameXmlOwns(UiElement::GameMenu) ? "yes" : "no", ")");
+            LOG_WARNING("Escape: ", escapeActionName(action));
             switch (action) {
                 case EscapeAction::CloseSettingsWindow:
                     settingsPanel_.showSettingsWindow = false;
-                    break;
-                case EscapeAction::CloseClientMenu:
-                    windowManager_.showEscapeMenu = false;
-                    settingsPanel_.showEscapeSettingsNotice = false;
                     break;
                 case EscapeAction::CancelCast:             gameHandler.cancelCast(); break;
                 case EscapeAction::CloseLoot:              gameHandler.closeLoot(); break;
@@ -1369,17 +1359,14 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                     // The order the old comment cared about - a dropdown over
                     // a panel closing before the panel - is ToggleGameMenu's
                     // own order, and it keeps it.
-                    const bool closed = frameXmlOwns(UiElement::GameMenu)
-                        ? false
-                        : gameHandler.askInterface(
-                              "(type(rawget(_G, 'CloseMenus')) == 'function' "
-                              "  and CloseMenus()) or "
-                              "(type(rawget(_G, 'CloseSpecialWindows')) == 'function' "
-                              "  and CloseSpecialWindows()) or "
-                              "(type(rawget(_G, 'CloseAllWindows')) == 'function' "
-                              "  and CloseAllWindows()) or false");
+                    // Nothing is asked of the interface first. ToggleGameMenu
+                    // closes menus, special windows and all windows in that
+                    // order before it opens anything, and it is the interface
+                    // that draws the menu now - so asking here would only be
+                    // this client doing the first half of ToggleGameMenu's own
+                    // work, in ToggleGameMenu's own order, ahead of it.
                     const EscapeOutcome outcome = resolveAfterInterface(
-                        closed, frameXmlOwns(UiElement::GameMenu));
+                        /*interfaceClosedAPanel=*/false, /*frameXmlOwnsMenu=*/true);
                     // At warning, because this is the press the report is
                     // about and the default log is warnings only.
                     //
@@ -1438,9 +1425,6 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                                     "menu and GameMenuFrame is still not shown "
                                     "- ToggleGameMenu ran and left it hidden");
                             }
-                            break;
-                        case EscapeOutcome::OpenClientMenu:
-                            windowManager_.showEscapeMenu = true;
                             break;
                     }
                     break;

@@ -27,14 +27,15 @@ TEST_CASE("With nothing open at all, Escape reaches the interface",
     CHECK(resolveEscape(nothing) == EscapeAction::AskTheInterface);
 }
 
-TEST_CASE("And then opens whichever game menu is being drawn", "[escape]") {
-    // Two menus exist and only one is on screen. Choosing wrongly is silent:
-    // the flag behind this client's menu can be set all day while FrameXML is
-    // the one drawing, and nothing appears.
+TEST_CASE("And then opens the game menu", "[escape]") {
+    // The interface draws it. This client used to draw one too, and choosing
+    // wrongly between them was silent - the flag behind this client's menu
+    // could be set all day while FrameXML was the one drawing, and nothing
+    // appeared. There is one menu now, so there is one answer.
     CHECK(resolveAfterInterface(false, /*frameXmlOwnsMenu=*/true) ==
           EscapeOutcome::ToggleInterfaceMenu);
     CHECK(resolveAfterInterface(false, /*frameXmlOwnsMenu=*/false) ==
-          EscapeOutcome::OpenClientMenu);
+          EscapeOutcome::ToggleInterfaceMenu);
 
     // And when the interface closed one of its own panels, neither menu opens.
     // Escape closing the top window before opening a menu is how WoW behaves;
@@ -75,7 +76,6 @@ TEST_CASE("Each window closes itself when it is the only one open", "[escape]") 
     struct Case { bool EscapeState::*flag; EscapeAction want; const char* what; };
     static const Case kCases[] = {
         {&EscapeState::settingsWindowShown,   EscapeAction::CloseSettingsWindow,     "settings"},
-        {&EscapeState::clientMenuShown,       EscapeAction::CloseClientMenu,         "client menu"},
         {&EscapeState::casting,               EscapeAction::CancelCast,              "casting"},
         {&EscapeState::lootOpen,              EscapeAction::CloseLoot,               "loot"},
         {&EscapeState::gossipOpen,            EscapeAction::CloseGossip,             "gossip"},
@@ -97,26 +97,22 @@ TEST_CASE("Each window closes itself when it is the only one open", "[escape]") 
         INFO("only open: " << c.what);
         CHECK(resolveEscape(s) == c.want);
     }
-    // Sixteen, and the count is asserted: a branch added without a case here
+    // Fifteen, and the count is asserted: a branch added without a case here
     // would be untested and would look tested.
-    CHECK(sizeof(kCases) / sizeof(kCases[0]) == 16u);
+    CHECK(sizeof(kCases) / sizeof(kCases[0]) == 15u);
 }
 
-TEST_CASE("This client's own windows are closed before anything under them",
+TEST_CASE("This client's own window is closed before anything under it",
           "[escape]") {
-    // The settings window and the client's menu draw over everything. With one
-    // of them up, Escape has to take it and not the vendor behind it -
-    // otherwise the key closes a window the player cannot see the effect of
-    // while the one they are looking at stays.
+    // The settings window draws over everything. With it up, Escape has to
+    // take it and not the vendor behind it - otherwise the key closes a window
+    // the player cannot see the effect of while the one they are looking at
+    // stays.
     EscapeState s;
     s.vendorOpen = true;
     s.mailboxOpen = true;
     s.settingsWindowShown = true;
     CHECK(resolveEscape(s) == EscapeAction::CloseSettingsWindow);
-
-    s.settingsWindowShown = false;
-    s.clientMenuShown = true;
-    CHECK(resolveEscape(s) == EscapeAction::CloseClientMenu);
 }
 
 TEST_CASE("A cast in progress beats any window that happens to be open",
@@ -152,7 +148,7 @@ TEST_CASE("Every action has a name", "[escape]") {
         INFO("action " << i);
         CHECK(std::string(escapeActionName(a)) != "?");
     }
-    for (int i = 0; i <= static_cast<int>(EscapeOutcome::OpenClientMenu); ++i) {
+    for (int i = 0; i <= static_cast<int>(EscapeOutcome::ToggleInterfaceMenu); ++i) {
         const auto o = static_cast<EscapeOutcome>(i);
         INFO("outcome " << i);
         CHECK(std::string(escapeOutcomeName(o)) != "?");

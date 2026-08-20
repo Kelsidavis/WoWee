@@ -1,8 +1,10 @@
 """Whether a line sits in an if/else chain that tests who owns an element.
 
-Shared by the three checks that ask it - window_route_check, window_flag_check
-and dialog_gate_check - because all three had the same bug independently and
-fixing it three times is how the three would drift apart.
+Written for the three checks that asked it - window_route_check,
+window_flag_check and dialog_gate_check - because all three had the same bug
+independently and fixing it three times is how the three would drift apart.
+The first two have been retired with the windows they watched; dialog_gate_check
+is the one left asking.
 
 THE BUG THIS EXISTS TO PREVENT
 

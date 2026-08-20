@@ -10,8 +10,8 @@ EscapeAction resolveEscape(const EscapeState& s) {
     if (s.interfaceConsumedKey) return EscapeAction::None;
     // In order, and the order is the behaviour. Two rules hold it together:
     //
-    // This client's own windows go first, because they are drawn over
-    // everything and closing what is underneath while one is up would take the
+    // This client's own settings window goes first, because it is drawn over
+    // everything and closing what is underneath while it is up would take the
     // wrong thing away.
     // An item on the cursor goes before every window, because closing one
     // while carrying an item is exactly how it gets stranded: pick something up
@@ -20,7 +20,6 @@ EscapeAction resolveEscape(const EscapeState& s) {
     // WoW, and it was the one thing this chain could not do.
     if (s.holdingItem)             return EscapeAction::ReturnHeldItem;
     if (s.settingsWindowShown)     return EscapeAction::CloseSettingsWindow;
-    if (s.clientMenuShown)         return EscapeAction::CloseClientMenu;
     // A cast in progress goes before any window: Escape cancelling a cast is
     // what the key is most often for, and a window that happens to be open
     // should not eat it.
@@ -49,9 +48,12 @@ EscapeAction resolveEscape(const EscapeState& s) {
 EscapeOutcome resolveAfterInterface(bool interfaceClosedAPanel,
                                     bool frameXmlOwnsMenu) {
     if (interfaceClosedAPanel) return EscapeOutcome::InterfaceClosedAPanel;
-    // Whoever draws the menu is who Escape has to ask.
-    return frameXmlOwnsMenu ? EscapeOutcome::ToggleInterfaceMenu
-                            : EscapeOutcome::OpenClientMenu;
+    // The interface draws the menu, and there is no longer another answer.
+    // frameXmlOwnsMenu is kept so the shape of the question survives its one
+    // remaining answer, and so a client menu coming back is a change here
+    // rather than at every call site.
+    (void)frameXmlOwnsMenu;
+    return EscapeOutcome::ToggleInterfaceMenu;
 }
 
 const char* escapeActionName(EscapeAction action) {
@@ -59,7 +61,6 @@ const char* escapeActionName(EscapeAction action) {
         case EscapeAction::None:                    return "nothing";
         case EscapeAction::ReturnHeldItem:          return "put the held item back";
         case EscapeAction::CloseSettingsWindow:     return "close the settings window";
-        case EscapeAction::CloseClientMenu:         return "close this client's menu";
         case EscapeAction::CancelCast:              return "cancel the cast";
         case EscapeAction::CloseLoot:               return "close loot";
         case EscapeAction::CloseGossip:             return "close gossip";
@@ -85,8 +86,6 @@ const char* escapeOutcomeName(EscapeOutcome outcome) {
             return "the interface closed a panel of its own";
         case EscapeOutcome::ToggleInterfaceMenu:
             return "toggle the interface's game menu";
-        case EscapeOutcome::OpenClientMenu:
-            return "open this client's own menu";
     }
     return "?";
 }

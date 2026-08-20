@@ -799,10 +799,16 @@ const Suppress kSuppress[] = {
         // the code that asked for it. UseContainerItem reaches it now.
         {UiElement::Taxi,         "TaxiFrame"},
         {UiElement::Stable,       "PetStableFrame"},
-        // All three open from the micro buttons, which belong to the bar this
+        // Both open from the micro buttons, which belong to the bar this
         // branch draws - so they appear without anyone deciding they should,
-        // beside this client's own escape menu, settings and ticket window.
-        {UiElement::GameMenu,   "GameMenuFrame InterfaceOptionsFrame "
+        // beside this client's own settings and ticket window.
+        //
+        // GameMenuFrame is not among them any more: the escape menu it stood
+        // beside is gone and FrameXML's is the one that opens. The three
+        // options frames stay, because the menu's Video, Sound and Interface
+        // buttons are routed to this client's settings panel - FrameXML's are
+        // shells and the sixty-odd settings live here.
+        {UiElement::GameMenu,   "InterfaceOptionsFrame "
                                 "VideoOptionsFrame AudioOptionsFrame"},
         {UiElement::Help,       "HelpFrame TicketStatusFrame"},
         // The end-of-match scoreboard and the live score line above it. The

@@ -36,8 +36,6 @@ public:
     /// shows. Call it once the renderer is wired.
     void applyLoadedSettings();
 
-    // ---- Settings UI visibility flags (written by EscapeMenu / Escape key) ----
-    bool showEscapeSettingsNotice = false;
     bool showSettingsWindow = false;
     /// Which tab to jump to on the next draw, set by whoever opened the window.
     /// Cleared once honoured, so a later click on a tab is not fought over.

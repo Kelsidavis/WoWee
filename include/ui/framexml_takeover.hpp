@@ -131,9 +131,10 @@ enum class UiElement {
     Stable,
     Book,
     /// The game menu and the options panels behind it, the help window, and
-    /// the battleground scoreboard. Each has a working equivalent here, and
-    /// each is reachable from the micro buttons on the bar this branch has
-    /// taken over - so they open without anyone choosing them.
+    /// the battleground scoreboard. Each is reachable from the micro buttons
+    /// on the bar this branch has taken over. The menu itself is FrameXML's
+    /// now; the options panels behind it are still this client's settings
+    /// window, which its Video, Sound and Interface buttons open.
     GameMenu,
     Help,
     BattlegroundScore,
