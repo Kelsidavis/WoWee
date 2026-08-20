@@ -31,5 +31,11 @@ plist_add_string CFBundleDisplayName "Wowee Asset Extractor"
 plist_add_string CFBundleIconFile Wowee.icns
 plist_add_string CFBundleVersion "${VERSION}"
 plist_add_string CFBundleShortVersionString "${VERSION}"
+# Kept even though the applet no longer sends an Apple event: without it macOS
+# refuses one silently rather than prompting, which is the failure this app
+# already shipped once. If anything here ever talks to another app again, the
+# consent dialog is the thing that should happen.
+plist_add_string NSAppleEventsUsageDescription \
+    "Wowee Asset Extractor opens a Terminal window to show extraction progress."
 /usr/libexec/PlistBuddy -c "Delete :LSUIElement" "${PLIST}" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "${PLIST}"

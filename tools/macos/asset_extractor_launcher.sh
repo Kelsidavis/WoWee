@@ -18,9 +18,12 @@ trap finish EXIT
 
 DIST_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 APP_PATH="${DIST_ROOT}/Wowee.app"
-if [ ! -d "${APP_PATH}" ] && [ -d "/Applications/Wowee.app" ]; then
-    APP_PATH="/Applications/Wowee.app"
-fi
+# Beside this app first, then the two places an app is installed. ~/Applications
+# is where #117's reporter had put both, and only /Applications was looked at.
+for candidate in "/Applications/Wowee.app" "${HOME}/Applications/Wowee.app"; do
+    [ -d "${APP_PATH}" ] && break
+    [ -d "${candidate}" ] && APP_PATH="${candidate}"
+done
 
 EXTRACTOR="${APP_PATH}/Contents/MacOS/asset_extract"
 BUNDLED_DATA="${APP_PATH}/Contents/Resources/Data"
@@ -28,7 +31,8 @@ OUTPUT_ROOT="${HOME}/Library/Application Support/Wowee/Data"
 
 if [ ! -x "${EXTRACTOR}" ]; then
     echo "Could not find the bundled asset extractor."
-    echo "Keep Wowee Asset Extractor.app beside Wowee.app, or install Wowee.app in /Applications."
+    echo "Keep Wowee Asset Extractor.app beside Wowee.app, or install Wowee.app"
+    echo "in /Applications or ~/Applications."
     exit 1
 fi
 
