@@ -15,7 +15,6 @@ namespace ui {
 
 class InventoryScreen;
 class SpellbookScreen;
-class QuestLogScreen;
 
 /**
  * Context needed by the renderer to display links, tooltips, and icons.
@@ -24,7 +23,6 @@ struct MarkupRenderContext {
     game::GameHandler*  gameHandler   = nullptr;
     InventoryScreen*    inventory     = nullptr;
     SpellbookScreen*    spellbook     = nullptr;
-    QuestLogScreen*     questLog      = nullptr;
     pipeline::AssetManager* assetMgr  = nullptr;
     // Spell icon callback - same as ChatPanel::getSpellIcon
     std::function<VkDescriptorSet(uint32_t, pipeline::AssetManager*)> getSpellIcon;

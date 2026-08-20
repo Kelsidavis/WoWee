@@ -7,7 +7,6 @@
 #include "ui/chat/gm_command_data.hpp"
 #include "ui/inventory_screen.hpp"
 #include "ui/spellbook_screen.hpp"
-#include "ui/quest_log_screen.hpp"
 #include "ui/ui_colors.hpp"
 #include "rendering/vk_context.hpp"
 #include "core/application.hpp"

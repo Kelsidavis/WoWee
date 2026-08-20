@@ -2,11 +2,11 @@
 // Moved from ChatPanel::render() inline lambdas (Phase 2.2).
 // Item tooltip rendering extracted to ItemTooltipRenderer (Phase 6.7).
 #include "ui/chat/chat_markup_renderer.hpp"
+#include "addons/lua_api_helpers.hpp"
 #include "ui/chat/item_tooltip_renderer.hpp"
 #include "ui/ui_colors.hpp"
 #include "ui/inventory_screen.hpp"
 #include "ui/spellbook_screen.hpp"
-#include "ui/quest_log_screen.hpp"
 #include "game/game_handler.hpp"
 #include "pipeline/asset_manager.hpp"
 #include <imgui.h>
@@ -215,8 +215,8 @@ void ChatMarkupRenderer::render(
             // would do BOTH (open the log and insert), losing the user's
             // intent.
             if (ImGui::IsItemClicked() && !ImGui::GetIO().KeyShift &&
-                seg.id > 0 && ctx.questLog) {
-                ctx.questLog->openAndSelectQuest(seg.id);
+                seg.id > 0 && ctx.gameHandler) {
+                addons::openInterfaceQuestLog(*ctx.gameHandler, seg.id);
             }
             // Shift-click: insert link
             shiftClickInsert(seg, ctx);

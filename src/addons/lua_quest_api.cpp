@@ -116,6 +116,32 @@ std::vector<QuestRow> questRows(game::GameHandler* gh) {
     return rows;
 }
 
+}  // namespace
+
+// Declared in lua_api_helpers.hpp; defined here because questRows above is the
+// one list every quest log index is counted against.
+int questLogRowForQuest(game::GameHandler* gh, uint32_t questId) {
+    if (!gh || questId == 0) return 0;
+    const auto rows = questRows(gh);
+    for (size_t i = 0; i < rows.size(); ++i) {
+        if (!rows[i].isHeader && rows[i].quest && rows[i].quest->questId == questId) {
+            return static_cast<int>(i) + 1;  // the interface counts from one
+        }
+    }
+    return 0;
+}
+
+void openInterfaceQuestLog(game::GameHandler& gh, uint32_t questId) {
+    const int row = questLogRowForQuest(&gh, questId);
+    if (row > 0) {
+        gh.runInterfaceCommand("QuestLog_OpenToQuest(" + std::to_string(row) + ")");
+    } else {
+        gh.runInterfaceCommand("ToggleFrame(QuestLogFrame)");
+    }
+}
+
+namespace {
+
 /// The quest at a display index, or null when that row is a header or the index
 /// is off either end. This is what every "…(questLogIndex)" binding needs: a
 /// header row genuinely has no quest, and answering with the wrong one is how a

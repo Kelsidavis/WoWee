@@ -19,6 +19,27 @@
 #include "core/app_clock.hpp"
 #include "ui/widget_tree.hpp"
 
+namespace wowee::addons {
+
+/// The row FrameXML's quest log shows this quest at, or 0 for none.
+///
+/// Not the quest's index in the log: the displayed list carries a header per
+/// zone, and a collapsed group hides its quests entirely, so quest three of
+/// the log can be row five of the display or absent from it. Everything that
+/// takes a quest log index goes through the same row list this does, which is
+/// the only reason the number means anything on the other side.
+int questLogRowForQuest(game::GameHandler* gh, uint32_t questId);
+
+/// Put FrameXML's quest log in front of `questId`.
+///
+/// Asked for by a quest link in chat and by the objective tracker, neither of
+/// which has a log of its own to open any more. Without a row the log is
+/// opened on whatever it had selected: an approximation of the ask beats
+/// nothing happening.
+void openInterfaceQuestLog(game::GameHandler& gh, uint32_t questId);
+
+}  // namespace wowee::addons
+
 extern "C" {
 #include <lua.h>
 #include <lauxlib.h>

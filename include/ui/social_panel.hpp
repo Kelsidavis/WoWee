@@ -17,7 +17,6 @@ namespace ui {
 class ChatPanel;
 class SpellbookScreen;
 class InventoryScreen;
-class QuestLogScreen;
 
 /**
  * Social panel manager (extracted from GameScreen)
@@ -71,7 +70,6 @@ public:
                            ChatPanel& chatPanel,
                            InventoryScreen& inventoryScreen,
                            SpellbookScreen& spellbookScreen,
-                           QuestLogScreen& questLogScreen,
                            const SpellIconFn& getSpellIcon);
     void renderSocialFrame(game::GameHandler& gameHandler,
                            ChatPanel& chatPanel);

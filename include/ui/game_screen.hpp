@@ -5,7 +5,6 @@
 // WorldMap is now owned by Renderer, accessed via getWorldMap()
 #include "rendering/character_preview.hpp"
 #include "ui/inventory_screen.hpp"
-#include "ui/quest_log_screen.hpp"
 #include "ui/spellbook_screen.hpp"
 #include "ui/talent_screen.hpp"
 #include "ui/keybinding_manager.hpp"
@@ -341,7 +340,6 @@ private:
 
     InventoryScreen inventoryScreen;
     uint64_t inventoryScreenCharGuid_ = 0;  // GUID of character inventory screen was initialized for
-    QuestLogScreen questLogScreen;
     SpellbookScreen spellbookScreen;
     TalentScreen talentScreen;
     // WorldMap is now owned by Renderer (accessed via renderer->getWorldMap())

@@ -61,6 +61,7 @@
 
 #include <unordered_set>
 #include "ui/framexml_takeover.hpp"
+#include "addons/lua_api_helpers.hpp"
 #include "core/local_time.hpp"
 #include "pipeline/spell_icon_paths.hpp"
 
@@ -74,6 +75,8 @@ namespace {
 }
 
 namespace wowee { namespace ui {
+
+
 
 void GameScreen::updateCharacterGeosets(game::Inventory& inventory) {
     auto& app = core::Application::getInstance();
@@ -1079,7 +1082,7 @@ void GameScreen::renderQuestObjectiveTracker(game::GameHandler& gameHandler) {
             ImGui::PushStyleColor(ImGuiCol_Text, titleCol);
             if (ImGui::Selectable(titleLabel.c_str(), false,
                                    ImGuiSelectableFlags_DontClosePopups, ImVec2(titleW, 0))) {
-                questLogScreen.openAndSelectQuest(q.questId);
+                addons::openInterfaceQuestLog(gameHandler, q.questId);
             }
             if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("##QTCtx")) {
                 ImGui::SetTooltip("Click: open Quest Log  |  Right-click: tracking options");
@@ -1092,7 +1095,7 @@ void GameScreen::renderQuestObjectiveTracker(game::GameHandler& gameHandler) {
                 ImGui::TextDisabled("%s", q.title.c_str());
                 ImGui::Separator();
                 if (ImGui::MenuItem("Open in Quest Log")) {
-                    questLogScreen.openAndSelectQuest(q.questId);
+                    addons::openInterfaceQuestLog(gameHandler, q.questId);
                 }
                 bool mapVisible = gameHandler.isQuestShownOnMap(q.questId);
                 if (ImGui::MenuItem("Show on Map", nullptr, mapVisible)) {

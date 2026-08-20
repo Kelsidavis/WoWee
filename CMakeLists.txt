@@ -1008,7 +1008,6 @@ set(WOWEE_SOURCES
     src/ui/bis_gear_data.cpp
     src/ui/inventory_screen.cpp
     src/ui/item_tooltip.cpp
-    src/ui/quest_log_screen.cpp
     src/ui/spellbook_screen.cpp
     src/ui/talent_screen.cpp
     src/ui/keybinding_manager.cpp

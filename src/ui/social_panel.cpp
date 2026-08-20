@@ -6,7 +6,6 @@
 // ============================================================
 #include "ui/framexml_takeover.hpp"
 #include "ui/social_panel.hpp"
-#include "ui/quest_log_screen.hpp"
 #include "ui/ui_raid_icons.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/spellbook_screen.hpp"
@@ -46,7 +45,6 @@ void SocialPanel::renderGuildRoster(game::GameHandler& gameHandler,
                                        ChatPanel& chatPanel,
                                        InventoryScreen& inventoryScreen,
                                        SpellbookScreen& spellbookScreen,
-                                       QuestLogScreen& questLogScreen,
                                        const SpellIconFn& getSpellIcon) {
     // Guild Roster toggle (customizable keybind)
     if (!chatPanel.isChatInputActive() && !ImGui::GetIO().WantTextInput &&
@@ -405,7 +403,6 @@ void SocialPanel::renderGuildRoster(game::GameHandler& gameHandler,
                 markupCtx.gameHandler  = &gameHandler;
                 markupCtx.inventory    = &inventoryScreen;
                 markupCtx.spellbook    = &spellbookScreen;
-                markupCtx.questLog     = &questLogScreen;
                 markupCtx.assetMgr     = services_.assetManager;
                 markupCtx.getSpellIcon = getSpellIcon;
                 markupCtx.insertLink   = [&chatPanel](const std::string& link) {

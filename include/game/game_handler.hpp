@@ -2095,7 +2095,6 @@ public:
     // Reconcile collect-item quest objectives against current bag contents.
     // Forwards to QuestHandler; called by InventoryHandler after each rebuild.
     void reconcileQuestItemObjectives(const std::unordered_map<uint32_t, uint32_t>& carriedCounts);
-    int getMaxQuestLogSlots() const;
     // QuestSort.dbc name for negative ZoneOrSort values (class/profession/seasonal)
     const std::string& getQuestSortName(uint32_t sortId) const;
     int getSelectedQuestLogIndex() const;

@@ -662,7 +662,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // windows drawing beside FrameXML's tabs.
     if (!frameXmlOwns(UiElement::Social)) {
         socialPanel_.renderGuildRoster(gameHandler, chatPanel_, inventoryScreen,
-                                       spellbookScreen, questLogScreen, spellIconFn);
+                                       spellbookScreen, spellIconFn);
     }
     if (!frameXmlOwns(UiElement::Social)) {
         socialPanel_.renderSocialFrame(gameHandler, chatPanel_);
@@ -726,10 +726,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // whether the map is wanted; under FrameXML that is FrameXML's frame being
     // on screen rather than this client's own flag.
     renderWorldMap(gameHandler);
-
-    if (!frameXmlOwns(UiElement::QuestLog)) {
-        questLogScreen.render(gameHandler, inventoryScreen);
-    }
 
     // Insert spell link into chat if player shift-clicked a spellbook entry
     {

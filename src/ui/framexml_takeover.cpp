@@ -48,7 +48,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::CharacterFrame, "characterframe", false},
     {UiElement::Bags,         "bags", false},
     {UiElement::Spellbook,    "spellbook", false},
-    {UiElement::QuestLog,     "questlog"},
+    {UiElement::QuestLog,     "questlog", false},
     {UiElement::QuestGiver,   "questgiver"},
     {UiElement::Gossip,       "gossip"},
     {UiElement::Mail,         "mail"},
@@ -709,7 +709,6 @@ const Suppress kSuppress[] = {
                               "GeneralDockManager GeneralDockManagerOverflowButton "
                               "ChatFrameMenuButton FriendsMicroButton "
                               "CombatLogQuickButtonFrame_Custom", true},
-        {UiElement::QuestLog, "QuestLogFrame QuestLogDetailFrame"},
         // Talking to an NPC opened two of everything: this client's gossip and
         // quest windows, which work, and FrameXML's, which cannot - the calls
         // behind them are among the names the missing-API report lists every

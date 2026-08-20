@@ -22,7 +22,6 @@ namespace ui {
 
 class InventoryScreen;
 class SpellbookScreen;
-class QuestLogScreen;
 
 /**
  * Self-contained chat UI panel extracted from GameScreen.
@@ -41,8 +40,7 @@ public:
      */
     void render(game::GameHandler& gameHandler,
                InventoryScreen& inventoryScreen,
-               SpellbookScreen& spellbookScreen,
-               QuestLogScreen& questLogScreen);
+               SpellbookScreen& spellbookScreen);
 
     /**
      * Render 3D-projected chat bubbles above entities.

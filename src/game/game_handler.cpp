@@ -4183,9 +4183,6 @@ void GameHandler::reconcileQuestItemObjectives(
     const std::unordered_map<uint32_t, uint32_t>& carriedCounts) {
     if (questHandler_) questHandler_->reconcileItemObjectivesFromInventory(carriedCounts);
 }
-int GameHandler::getMaxQuestLogSlots() const {
-    return questHandler_ ? questHandler_->maxQuestLogSlots() : 25;
-}
 const std::string& GameHandler::getQuestSortName(uint32_t sortId) const {
     static const std::string empty;
     return questHandler_ ? questHandler_->getQuestSortName(sortId) : empty;
