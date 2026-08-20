@@ -4,11 +4,32 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <mutex>
+#include <set>
 
 namespace wowee {
 namespace pipeline {
 
 static const DBCLayout* g_activeDBCLayout = nullptr;
+
+void noteMissingLayoutField(const std::string& dbc, const std::string& field) {
+    // Deduped, so this is at worst one line per missing name for the life of
+    // the process - a list of what the installed layout is behind on, rather
+    // than a message repeated from inside a loop.
+    static std::mutex lock;
+    static std::set<std::string> said;
+    const std::string key = dbc + "." + field;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        if (!said.insert(key).second) return;
+    }
+    LOG_WARNING("DBCLayout: ", dbc.empty() ? "a layout" : dbc.c_str(),
+                " does not declare '", field,
+                "', so everything read from that column is skipped. The file is "
+                "dbc_layouts.json in the data directory, which is copied there "
+                "when assets are extracted and does not refresh itself - "
+                "re-extract, or copy the one from Data/expansions.");
+}
 
 void setActiveDBCLayout(const DBCLayout* layout) { g_activeDBCLayout = layout; }
 const DBCLayout* getActiveDBCLayout() { return g_activeDBCLayout; }
@@ -80,6 +101,7 @@ bool DBCLayout::loadFromJson(const std::string& path) {
         }
 
         if (!fieldMap.fields.empty()) {
+            fieldMap.dbc = dbcName;
             layouts_[dbcName] = std::move(fieldMap);
             ++loaded;
         }

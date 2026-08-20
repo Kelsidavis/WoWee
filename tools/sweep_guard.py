@@ -897,6 +897,29 @@ CHECKS = [
     ("keybinding_route_check.py",
      r"^(\d+) that would stop working when the panel is handed over", 0,
      "keys that stop working when their panel is handed over"),
+    # The other way a user action goes missing, and the one that cost the most
+    # this week: the binding is reached, declines, and says nothing - so a verb
+    # that refused and a verb that was never wired look identical from outside.
+    # Three of the four found by hand were this shape, and the fourth,
+    # DoTradeSkill, carried the right line at debug, which the log a report
+    # arrives with does not include. Under it was a use-after-free no other
+    # sweep here could see.
+    #
+    # Ceilings to ratchet, not zeroes to hold: most of these refusals are
+    # correct and only unrecorded. The state arm is the one worth reading -
+    # a lookup that missed is what a player walks into, where an argument
+    # bound is the interface's to keep.
+    ("silent_refusal_check.py",
+     r"^(\d+) state or lookup refusal", 21,
+     "action bindings that refuse on missing state and say nothing"),
+    ("silent_refusal_check.py",
+     r"^(\d+) argument-bound refusal", 28,
+     "action bindings that refuse an out-of-range argument and say nothing"),
+    # Zero, and it stays there: a refusal with a line already written is one
+    # word from being useful, so there is no reason to carry any.
+    ("silent_refusal_check.py",
+     r"^(\d+) that speak below warning", 0,
+     "refusals logged below the level a bug report carries"),
     # "Owned or suppressed" applied to dialogs one at a time. Seven were drawn
     # twice on 2026-08-05, three of them under the plain defaults. The shared
     # quest joined them later the same day, once QUEST_ACCEPT_CONFIRM started

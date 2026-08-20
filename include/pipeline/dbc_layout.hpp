@@ -12,13 +12,29 @@ namespace pipeline {
  * Maps DBC field names to column indices for a single DBC file.
  * Column indices vary between WoW expansions.
  */
+/// Reports a field name the layout does not declare. Once per name, ever.
+///
+/// Defined in the .cpp so this header stays free of the logger.
+void noteMissingLayoutField(const std::string& dbc, const std::string& field);
+
 struct DBCFieldMap {
     std::unordered_map<std::string, uint32_t> fields;
+    /// Which file this describes, so a miss can say which one it was.
+    std::string dbc;
 
     /** Get column index by field name. Returns 0xFFFFFFFF if unknown. */
     [[nodiscard]] uint32_t field(const std::string& name) const {
         auto it = fields.find(name);
-        return (it != fields.end()) ? it->second : 0xFFFFFFFF;
+        if (it != fields.end()) return it->second;
+        // A name this layout does not carry, which every caller turns into a
+        // read it simply does not do. That is silent, and it is how a whole
+        // feature disappears: the installed dbc_layouts.json is a copy taken
+        // when the assets were extracted and does not refresh, so a field
+        // added to the code outruns it. Reagent0 and EffectItemType0 outran it
+        // by nine days and no profession window would open for any character,
+        // with nothing logged and spell names still resolving.
+        noteMissingLayoutField(dbc, name);
+        return 0xFFFFFFFF;
     }
 
     /** Convenience operator for shorter syntax: layout["Name"] */
