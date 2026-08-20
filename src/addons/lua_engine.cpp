@@ -2538,6 +2538,50 @@ static void appendEnchantLines(wowee::ui::Widget* w, game::GameHandler* gh,
     addLine(temporaryId);
 }
 
+/// The random suffix an instance rolled, on top of a tooltip built from the
+/// item's template.
+///
+/// "Bracers of Arcane Protection" is one item to a player and a base item plus
+/// an ItemRandomSuffix.dbc row here. Both bag and paperdoll tooltips are built
+/// from an item *id* - _WoweePopulateItemTooltip calls GetItemInfo, which
+/// answers for the template - so the name came out as "Bracers" and the stats
+/// the suffix rolled did not appear at all. Neither is reachable from an id,
+/// which is the same gap appendEnchantLines fills for enchants.
+///
+/// The stats are asked for again rather than read off the ItemDef. buildItemDef
+/// folds them into the base figures, and those are not what the tooltip is
+/// showing: it is showing the template's.
+static void appendRandomSuffix(wowee::ui::Widget* w, game::GameHandler* gh,
+                               const game::ItemDef& item) {
+    if (!w || !gh || item.randomPropertyId == 0 || w->tooltipLines.empty()) return;
+
+    const std::string suffix = gh->getRandomPropertyName(item.randomPropertyId);
+    if (!suffix.empty()) {
+        // Appended once. A tooltip is refreshed in place for as long as the
+        // pointer stays on the slot, and only SetText clears the lines, so a
+        // blind append would grow the name on every frame.
+        std::string& title = w->tooltipLines.front().left;
+        const bool already = title.size() >= suffix.size() &&
+            title.compare(title.size() - suffix.size(), suffix.size(), suffix) == 0;
+        if (!already) title += " " + suffix;
+    }
+
+    // Green and after the item's own lines, where the real client puts them.
+    for (const auto& b : gh->getRandomStatBonuses(item.randomPropertyId,
+                                                  item.suffixFactor)) {
+        if (b.value == 0) continue;
+        const char* statName = game::itemStatName(b.statType);
+        if (!statName) continue;
+        char buf[96];
+        std::snprintf(buf, sizeof(buf), "%+d %s", b.value, statName);
+        wowee::ui::Widget::TooltipLine line;
+        line.left = buf;
+        line.lc[0] = 0.0f; line.lc[1] = 1.0f; line.lc[2] = 0.0f; line.lc[3] = 1.0f;
+        line.rc[0] = line.rc[1] = line.rc[2] = line.rc[3] = 1.0f;
+        w->tooltipLines.push_back(std::move(line));
+    }
+}
+
 /// _WoweeAppendItemEnchants(self, bag, slot) - the enchants on a bag item.
 ///
 /// The bag tooltip is built in Lua and had no way to reach an item's GUID,
@@ -2550,6 +2594,13 @@ int lua_Tooltip_AppendItemEnchants(lua_State* L) {
     const int bag = static_cast<int>(luaL_optnumber(L, 2, -1));
     const int slot = static_cast<int>(luaL_optnumber(L, 3, 0));
     if (slot < 1) return 0;
+    // The suffix first, because it renames the line the template put at the
+    // top and the enchants below are appended after it.
+    if (const game::ItemSlot* s =
+            wowee::addons::containerItemSlot(gh->getInventory(), bag, slot);
+        s && !s->empty()) {
+        appendRandomSuffix(w, gh, s->item);
+    }
     appendEnchantLines(w, gh, gh->getBagItemGuid(bag, slot - 1));
     return 0;
 }
@@ -2584,6 +2635,10 @@ int lua_Tooltip_SetInventoryItem(lua_State* L) {
     if (!fillItemTooltipById(L, gh, s.item.itemId)) {
         fillItemTooltip(w, s.item, gh);
         fireTooltipSetItem(L);
+    } else {
+        // Only on the by-id path. fillItemTooltip builds from the instance and
+        // has named the suffix itself.
+        appendRandomSuffix(w, gh, s.item);
     }
     appendEnchantLines(w, gh, gh->getEquipSlotGuid(slot - 1));
     lua_pushboolean(L, 1);

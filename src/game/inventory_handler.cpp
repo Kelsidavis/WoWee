@@ -4526,6 +4526,7 @@ ItemDef InventoryHandler::buildItemDef(uint32_t entry, uint32_t stackCount,
     // ITEM_FLAG_SOULBOUND (0x1): a BoE item that has already bound must not re-prompt.
     def.soulbound = (flags & 0x1u) != 0;
     def.randomPropertyId = randomPropertyId;
+    def.suffixFactor = suffixFactor;
 
     auto infoIt = owner_.itemInfoCacheRef().find(entry);
     if (infoIt != owner_.itemInfoCacheRef().end()) {

@@ -2307,7 +2307,23 @@ static int lua_GetContainerItemLink(lua_State* L) {
     const auto* info = gh->getItemInfo(itemSlot->item.itemId);
     std::string name = info ? info->name : ("Item #" + std::to_string(itemSlot->item.itemId));
     uint32_t q = info ? info->quality : 0;
-    const std::string link = game::itemChatLink(itemSlot->item.itemId, q, name);
+    // The suffix is part of the name a player reads, and part of what the link
+    // says the item is. Both were dropped: a link to "Bracers of Arcane
+    // Protection" named plain bracers and carried a random-property id of zero,
+    // so anything reading the link back - a shift-click into chat, a comparison
+    // tooltip - described a different item from the one in the slot.
+    if (itemSlot->item.randomPropertyId != 0) {
+        const std::string suffix = gh->getRandomPropertyName(itemSlot->item.randomPropertyId);
+        if (!suffix.empty()) name += " " + suffix;
+    }
+    // The enchant on it goes in the link too, for the same reason the guild
+    // bank's does: a link written without one shows an enchanted item as plain.
+    const auto [permanentId, temporaryId] =
+        gh->getItemEnchantIds(gh->getBagItemGuid(container, slot - 1));
+    (void)temporaryId;   // not part of a link; it is not a property of the item
+    const std::string link = game::itemChatLink(itemSlot->item.itemId, q, name,
+                                                permanentId,
+                                                itemSlot->item.randomPropertyId);
     lua_pushstring(L, link.c_str());
     return 1;
 }

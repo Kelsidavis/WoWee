@@ -181,6 +181,12 @@ struct ItemDef {
     // Per-instance ITEM_FIELD_RANDOM_PROPERTIES_ID: >0 → ItemRandomProperties.dbc (prefix),
     // <0 → ItemRandomSuffix.dbc (e.g. "of the Bear"). 0 means no random property rolled.
     int32_t randomPropertyId = 0;
+    // ITEM_FIELD_PROPERTY_SEED, which scales what a suffix rolled. Kept beside
+    // the id because the two only mean anything together, and because a
+    // tooltip built from the item template has neither - the stats below are
+    // the base item's, with the roll already folded in, so anything wanting to
+    // name the roll on its own has to ask for it again.
+    uint32_t suffixFactor = 0;
     std::string description;    // Flavor/lore text shown in tooltip (italic yellow)
     uint32_t pageTextId = 0;     // Non-zero: item opens readable page text
     // Generic stat pairs for non-primary stats (hit, crit, haste, AP, SP, etc.)
