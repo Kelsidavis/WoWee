@@ -162,6 +162,16 @@ public:
     /// Whether the pointer is over anything of ours, so the rest of the
     /// client leaves the click alone.
     [[nodiscard]] bool wantsMouse() const { return mouseWanted_; }
+    /// Ignore the rest of the press in flight.
+    ///
+    /// A control that appears under the pointer must not act on the click
+    /// that put it there. Opening a sheet on a gear press puts a whole panel
+    /// of controls under the cursor, one of which is then holding a press it
+    /// never saw begin - a slider takes the value it was dropped on, a button
+    /// fires on the release. Called by whatever raises the new surface; the
+    /// press is ignored until the mouse comes up.
+    void swallowPress() { pressSwallowed_ = true; }
+
     /// Claims the pointer over a region no control covers - the sheet's own
     /// margins, which are still not the world behind it.
     void claimMouse(ImVec2 a, ImVec2 b);
@@ -321,6 +331,8 @@ private:
         return inert_ == 0 && (openPopup_ == 0 || openPopup_ == id);
     }
     bool hovered(ImVec2 a, ImVec2 b);
+    /// A fresh left-button press that this frame's controls may act on.
+    [[nodiscard]] bool pressed() const;
     void resetBlink() { blink_ = 0.0f; }
 
     void drawSheetBody(ImDrawList* dl, ImVec2 a, ImVec2 b, bool taped);
@@ -349,6 +361,8 @@ private:
     float blink_ = 0.0f;
     int inert_ = 0;
     bool textInputWanted_ = false;
+    /// The press that opened something is not a press on what it opened.
+    bool pressSwallowed_ = false;
     bool mouseWanted_ = false;
 
     ImU32 focus_ = 0;

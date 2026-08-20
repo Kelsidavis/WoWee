@@ -146,6 +146,7 @@ void PaperUI::end() {
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
         active_ = 0;
         dragging_ = 0;
+        pressSwallowed_ = false;
     }
 
     if (textInputWanted_) {
@@ -170,6 +171,10 @@ void PaperUI::claimMouse(ImVec2 a, ImVec2 b) {
 }
 
 ImFont* PaperUI::face(bool titleFace) const { return titleFace ? titleFace_ : bodyFace_; }
+
+bool PaperUI::pressed() const {
+    return !pressSwallowed_ && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+}
 
 bool PaperUI::hovered(ImVec2 a, ImVec2 b) {
     const ImVec2 m = ImGui::GetIO().MousePos;
@@ -401,7 +406,7 @@ bool PaperUI::button(const char* idStr, ImVec2 a, ImVec2 b, const char* label,
     if (over) mouseWanted_ = true;
 
     bool clicked = false;
-    if (over && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) active_ = id;
+    if (over && pressed()) active_ = id;
     const bool held = (active_ == id && ImGui::IsMouseDown(ImGuiMouseButton_Left));
     if (active_ == id && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         clicked = over;
@@ -463,7 +468,7 @@ bool PaperUI::chip(const char* idStr, ImVec2 a, ImVec2 b, const char* label, boo
     if (over) mouseWanted_ = true;
 
     bool clicked = false;
-    if (over && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) active_ = id;
+    if (over && pressed()) active_ = id;
     const bool held = (active_ == id && ImGui::IsMouseDown(ImGuiMouseButton_Left));
     if (active_ == id && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         clicked = over;
@@ -542,7 +547,7 @@ bool PaperUI::glyphButton(const char* idStr, ImVec2 center, float radius, Glyph 
     if (over) mouseWanted_ = true;
 
     bool clicked = false;
-    if (over && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) active_ = id;
+    if (over && pressed()) active_ = id;
     if (active_ == id && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         clicked = over;
         active_ = 0;
@@ -565,7 +570,7 @@ bool PaperUI::link(const char* idStr, ImVec2 at, const char* label, float size, 
     if (over) mouseWanted_ = true;
 
     bool clicked = false;
-    if (over && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) active_ = id;
+    if (over && pressed()) active_ = id;
     if (active_ == id && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         clicked = over;
         active_ = 0;
@@ -702,7 +707,7 @@ PaperUI::FieldResult PaperUI::field(const char* idStr, ImVec2 a, ImVec2 b, TextE
     const bool over = live && hovered(a, b);
     if (over) mouseWanted_ = true;
 
-    if (over && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    if (over && pressed()) {
         focus_ = id;
         justFocused_ = 0;
         active_ = id;
@@ -717,7 +722,7 @@ PaperUI::FieldResult PaperUI::field(const char* idStr, ImVec2 a, ImVec2 b, TextE
             edit.setCaret(byteAtOffset(edit, dx, opts.password, size), io.KeyShift);
         }
         resetBlink();
-    } else if (live && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && focus_ == id) {
+    } else if (live && pressed() && focus_ == id) {
         // A click anywhere else puts the keyboard down.
         focus_ = 0;
     }
@@ -959,7 +964,7 @@ PaperUI::ListResult PaperUI::list(const char* idStr, ImVec2 a, ImVec2 b, int row
 
         drawRow(i, rowA, rowB, isSelected, rowHovered);
 
-        if (rowHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        if (rowHovered && pressed()) {
             out.clicked = i;
             if (ImGui::GetMouseClickedCount(ImGuiMouseButton_Left) >= 2) out.activated = i;
         }
@@ -977,7 +982,7 @@ PaperUI::ListResult PaperUI::list(const char* idStr, ImVec2 a, ImVec2 b, int row
     const float thumbH = std::max(px(26), trackH * (viewH / contentH));
     const ImVec2 barA(trackX - px(5), a.y);
     const ImVec2 barB(b.x, b.y);
-    if (live && hovered(barA, barB) && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    if (live && hovered(barA, barB) && pressed())
         active_ = id;
     if (active_ == id && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
         const float t = std::clamp((ImGui::GetIO().MousePos.y - trackTop - thumbH * 0.5f) /
@@ -1029,7 +1034,7 @@ bool PaperUI::dropdown(const char* idStr, ImVec2 a, ImVec2 b, const std::string&
         }
         if (hovered(la, lb)) mouseWanted_ = true;
 
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        if (pressed()) {
             if (hoveredRow >= 0) {
                 // Picking the row that was already picked is not a change.
                 // Callers act on this - switching expansion reloads every
@@ -1047,7 +1052,7 @@ bool PaperUI::dropdown(const char* idStr, ImVec2 a, ImVec2 b, const std::string&
         if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) openPopup_ = 0;
     }
 
-    if (over && live && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    if (over && live && pressed()) {
         openPopup_ = open ? 0u : id;
     }
 
@@ -1102,7 +1107,7 @@ bool PaperUI::checkbox(const char* idStr, ImVec2 at, float boxSize, const char* 
     if (over) mouseWanted_ = true;
 
     bool changed = false;
-    if (over && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) active_ = id;
+    if (over && pressed()) active_ = id;
     if (active_ == id && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         if (over && value) {
             *value = !*value;
@@ -1156,7 +1161,7 @@ bool PaperUI::sliderFloat(const char* idStr, ImVec2 a, ImVec2 b, float* value, f
     if (over) mouseWanted_ = true;
 
     bool changed = false;
-    if (over && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) active_ = id;
+    if (over && pressed()) active_ = id;
     if (active_ == id && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
         const float t = std::clamp((ImGui::GetIO().MousePos.x - x0) / std::max(x1 - x0, 1.0f),
                                    0.0f, 1.0f);

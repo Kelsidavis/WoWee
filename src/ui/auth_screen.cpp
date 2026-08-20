@@ -328,9 +328,14 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
     // The card hears nothing while the settings sheet is over it, but it is
     // still drawn - a modal that blanks what it covers loses the player's
     // place.
-    if (settingsOpen_) ui_.pushInert();
+    //
+    // Asked once. The gear is on the card, so rendering it can turn the sheet
+    // on halfway through, and asking again afterwards popped an inertness
+    // that had never been pushed.
+    const bool sheetWasOpen = settingsOpen_;
+    if (sheetWasOpen) ui_.pushInert();
     renderCard(authHandler, screen.x, screen.y);
-    if (settingsOpen_) ui_.popInert();
+    if (sheetWasOpen) ui_.popInert();
 
     if (settingsOpen_) renderLoginSettingsSheet(screen.x, screen.y);
 
@@ -765,6 +770,11 @@ void AuthScreen::renderCard(auth::AuthHandler& authHandler, float screenW, float
                             PaperUI::Glyph::Gear)) {
             settingsOpen_ = true;
             loginGfxLoaded_ = false;  // reload from disk each time it opens
+            // The sheet lands under the pointer, and one of its controls is
+            // wherever this gear is. Without this the press carries into it:
+            // at 1280x760 the gear sits on the ground-clutter slider, which
+            // takes the value it was dropped on and drags while held.
+            ui_.swallowPress();
         }
     }
 
