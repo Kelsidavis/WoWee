@@ -67,10 +67,19 @@ static std::string cacheKey(const std::string& path, bool add) {
     return add ? path + "|add" : path;
 }
 
+const VkDescriptorSet* WidgetRenderer::cachedTexture(const std::string& path,
+                                                     bool add) const {
+    // The suffixed key is only built for additive art, which is a handful of
+    // frames rather than the whole screen. Everything else looks the path up
+    // as it stands and allocates nothing.
+    auto it = add ? textures_.find(cacheKey(path, true)) : textures_.find(path);
+    return (it == textures_.end()) ? nullptr : &it->second;
+}
+
 VkDescriptorSet WidgetRenderer::resident(const std::string& path, bool add) const {
     if (path.empty()) return kMissing;
-    auto it = textures_.find(cacheKey(path, add));
-    return (it == textures_.end()) ? kMissing : it->second;
+    const VkDescriptorSet* set = cachedTexture(path, add);
+    return set ? *set : kMissing;
 }
 
 std::vector<uint8_t> WidgetRenderer::readTextureFile(const std::string& path,
@@ -1707,7 +1716,7 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
     wanted.reserve(kUploadsPerFrame);
     auto want = [&](const std::string& path, bool add = false) {
         if (static_cast<int>(wanted.size()) >= kUploadsPerFrame || path.empty()) return;
-        if (textures_.find(cacheKey(path, add)) != textures_.end()) return;
+        if (cachedTexture(path, add)) return;
         for (const auto& p : wanted) if (*p.first == path && p.second == add) return;
         wanted.emplace_back(&path, add);
     };
@@ -2103,9 +2112,10 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
             } else {
                 // Only what is already resident. Anything still queued draws on
                 // a later frame rather than forcing an upload here.
-                auto it = textures_.find(cacheKey(w->texturePath, w->blendAdd));
-                if (it == textures_.end() || it->second == kMissing) continue;
-                tex = it->second;
+                const VkDescriptorSet* set =
+                    cachedTexture(w->texturePath, w->blendAdd);
+                if (!set || *set == kMissing) continue;
+                tex = *set;
             }
             if (tex == VK_NULL_HANDLE) continue;
             // SetTexCoord is left/right/top/bottom in WoW's own order, and its

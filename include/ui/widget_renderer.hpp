@@ -147,6 +147,15 @@ private:
     pipeline::AssetManager* assets_ = nullptr;
     rendering::VkContext* vkCtx_ = nullptr;
     std::unordered_map<std::string, VkDescriptorSet> textures_;
+    /// The cached set for a path, or null when nothing is cached for it -
+    /// which is different from a cached kMissing, and both callers care.
+    ///
+    /// Here rather than through cacheKey because cacheKey returns a string by
+    /// value, so the ordinary case copied the path onto the heap purely to
+    /// look it up. The draw pass does that twice for every texture on screen,
+    /// every frame.
+    [[nodiscard]] const VkDescriptorSet* cachedTexture(const std::string& path,
+                                                       bool add) const;
     /// Image dimensions by path, including the ones that could not be read -
     /// stored as zero so a missing file is looked for once and not once a frame.
     std::unordered_map<std::string, std::pair<float, float>> textureSizes_;

@@ -166,6 +166,11 @@ private:
         float worstMs = 0.0f;
         int frames = 0;
     };
+    /// WOWEE_FRAME_PROFILE. The breakdown below is reported at info, which the
+    /// log a bug report arrives with does not carry - so the one measurement
+    /// that answers "where does the frame go" was never in the logs it was
+    /// built for. With the flag set it is reported at warning instead.
+    bool frameProfileEnabled_ = false;
     std::map<std::string, StageStat> stageStats_;
     std::chrono::steady_clock::time_point stageStatsSince_{};
     int stageStatFrames_ = 0;

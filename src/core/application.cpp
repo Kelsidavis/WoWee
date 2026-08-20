@@ -1190,9 +1190,10 @@ void Application::run() {
     // on Linux. Pinning here silently confined every later render worker to
     // CPU 0 and defeated all command-recording parallelism.
 
-    const bool frameProfileEnabled = core::envFlagEnabled("WOWEE_FRAME_PROFILE", false);
-    if (frameProfileEnabled) {
-        LOG_INFO("Frame timing profile enabled (WOWEE_FRAME_PROFILE=1)");
+    frameProfileEnabled_ = core::envFlagEnabled("WOWEE_FRAME_PROFILE", false);
+    if (frameProfileEnabled_) {
+        LOG_WARNING("Frame timing profile enabled (WOWEE_FRAME_PROFILE=1) - "
+                    "the per-stage breakdown will be reported at warning");
     }
 
     auto lastTime = std::chrono::high_resolution_clock::now();
@@ -4505,9 +4506,12 @@ void Application::reportStageTimes() {
 
     if (stageStatFrames_ > 0) {
         const float fps = stageStatFrames_ * 1000.0f / windowMs;
-        LOG_INFO("frame budget over ", static_cast<int>(windowMs / 1000.0f), "s: ",
-                 stageStatFrames_, " frames, ", fps, " fps, ",
-                 windowMs / static_cast<float>(stageStatFrames_), "ms each");
+        const bool loud = frameProfileEnabled_;
+        std::ostringstream head;
+        head << "frame budget over " << static_cast<int>(windowMs / 1000.0f)
+             << "s: " << stageStatFrames_ << " frames, " << fps << " fps, "
+             << windowMs / static_cast<float>(stageStatFrames_) << "ms each";
+        if (loud) LOG_WARNING(head.str()); else LOG_INFO(head.str());
         // Worst first: the stage to look at is the one taking the time, and a
         // long tail matters more than an average on a device that stutters.
         std::vector<std::pair<double, std::string>> byCost;
@@ -4519,9 +4523,12 @@ void Application::reportStageTimes() {
         for (const auto& [total, name] : byCost) {
             const auto& stat = stageStats_[name];
             if (stat.frames == 0) continue;
-            LOG_INFO("  ", name, ": ", static_cast<float>(total / stageStatFrames_),
-                     "ms/frame avg, ", stat.worstMs, "ms worst, ",
-                     static_cast<int>(100.0 * total / windowMs), "% of the window");
+            std::ostringstream line;
+            line << "  " << name << ": "
+                 << static_cast<float>(total / stageStatFrames_) << "ms/frame avg, "
+                 << stat.worstMs << "ms worst, "
+                 << static_cast<int>(100.0 * total / windowMs) << "% of the window";
+            if (loud) LOG_WARNING(line.str()); else LOG_INFO(line.str());
         }
     }
 
