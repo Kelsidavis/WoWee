@@ -79,9 +79,6 @@ private:
     std::unordered_map<uint32_t, SpellInfo> spellData;
 
     // Icon data (loaded from SpellIcon.dbc)
-    bool iconDbLoaded = false;
-    std::unordered_map<uint32_t, std::string> spellIconPaths; // SpellIconID -> path
-    std::unordered_map<uint32_t, VkDescriptorSet> spellIconCache; // SpellIconID -> texture
 
 
     // Search filter
@@ -95,8 +92,6 @@ private:
     std::string pendingChatSpellLink_;
 
     void loadSpellDBC(pipeline::AssetManager* assetManager);
-    void loadSpellIconDBC(pipeline::AssetManager* assetManager);
-    VkDescriptorSet getSpellIcon(uint32_t iconId, pipeline::AssetManager* assetManager);
     [[nodiscard]] const SpellInfo* getSpellInfo(uint32_t spellId) const;
 
     // Tooltip rendering helper (showUsageHints=false when called from action bar)

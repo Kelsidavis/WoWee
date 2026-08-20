@@ -579,10 +579,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         petRenameBuf_[0] = '\0';
     }
 
-    // Totem frame (Shaman only, when any totem is active)
-    if (gameHandler.getPlayerClass() == 7 && !frameXmlOwns(UiElement::Totems)) {
-        renderTotemFrame(gameHandler);
-    }
 
     // Render windows
     if (showPlayerInfo) {
@@ -735,10 +731,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         }
     }
 
-    // Talents (N key toggle handled inside)
-    if (!frameXmlOwns(UiElement::Talents)) {
-        talentScreen.render(gameHandler);
-    }
 
     // Set up inventory screen asset manager + player appearance (re-init on character switch)
     {

@@ -79,8 +79,8 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::GameMenu,          "gamemenu"},
     {UiElement::Help,              "help"},
     {UiElement::BattlegroundScore, "bgscore"},
-    {UiElement::Totems,       "totems"},
-    {UiElement::Talents,      "talents"},
+    {UiElement::Totems,       "totems", false},
+    {UiElement::Talents,      "talents", false},
     {UiElement::UiErrors,     "uierrors", false},
 }};
 
@@ -830,8 +830,6 @@ const Suppress kSuppress[] = {
         // than standing alone - and that is owned, with this client's whole
         // character screen already gated on it. Suppressing the frame blanked
         // the Reputation tab of a window FrameXML is supposed to be drawing.
-        {UiElement::Totems,     "TotemFrame MultiCastActionBarFrame"},
-        {UiElement::Talents,    "PlayerTalentFrame", /*lazy=*/true},
         // Found by the unaccounted-element check on its first run. The world
         // map is neither handed over nor hidden, so FrameXML's draws over this
         // client's own. It appears in the check list, which is what made it

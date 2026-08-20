@@ -236,24 +236,6 @@ void SpellbookScreen::getSpellAuraStateInfo(uint32_t spellId, pipeline::AssetMan
     }
 }
 
-void SpellbookScreen::loadSpellIconDBC(pipeline::AssetManager* assetManager) {
-    if (iconDbLoaded) return;
-
-    if (!assetManager || !assetManager->isInitialized()) return;
-    // Not an attempt: the assets are not up yet, and a caller can reach
-    // this before they are. Latching here recorded "read" for a file
-    // never opened, and disabled it for the rest of the session.
-    iconDbLoaded = true;
-
-    pipeline::loadSpellIconPaths(assetManager, spellIconPaths);
-}
-
-VkDescriptorSet SpellbookScreen::getSpellIcon(uint32_t iconId, pipeline::AssetManager* assetManager) {
-    return ui::cachedIconTexture(iconId, assetManager,
-                                 core::Application::getInstance().getWindow(),
-                                 spellIconPaths, spellIconCache);
-}
-
 const SpellInfo* SpellbookScreen::getSpellInfo(uint32_t spellId) const {
     auto it = spellData.find(spellId);
     return (it != spellData.end()) ? &it->second : nullptr;

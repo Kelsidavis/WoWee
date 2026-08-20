@@ -1009,7 +1009,6 @@ set(WOWEE_SOURCES
     src/ui/inventory_screen.cpp
     src/ui/item_tooltip.cpp
     src/ui/spellbook_screen.cpp
-    src/ui/talent_screen.cpp
     src/ui/keybinding_manager.cpp
 
     # Addons
@@ -1146,7 +1145,6 @@ set(WOWEE_HEADERS
     include/ui/game_screen.hpp
     include/ui/inventory_screen.hpp
     include/ui/spellbook_screen.hpp
-    include/ui/talent_screen.hpp
     include/ui/keybinding_manager.hpp
 )
 
