@@ -21,7 +21,7 @@ namespace wowee {
 
 // Forward declarations
 namespace rendering { class Renderer; }
-namespace pipeline { class AssetManager; class DBCLayout; struct M2Model; struct WMOModel; }
+namespace pipeline { class AssetManager; struct M2Model; struct WMOModel; }
 namespace audio { enum class VoiceType; }
 namespace game { class GameHandler; }
 
@@ -34,7 +34,6 @@ public:
     EntitySpawner(rendering::Renderer* renderer,
                   pipeline::AssetManager* assetManager,
                   game::GameHandler* gameHandler,
-                  pipeline::DBCLayout* dbcLayout,
                   game::GameServices* gameServices);
     ~EntitySpawner();
 
@@ -301,7 +300,6 @@ private:
     rendering::Renderer* renderer_;
     pipeline::AssetManager* assetManager_;
     game::GameHandler* gameHandler_;
-    pipeline::DBCLayout* dbcLayout_;
     game::GameServices* gameServices_;
 
     // --- Creature display data (from DBC files) ---

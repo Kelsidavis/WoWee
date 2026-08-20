@@ -41,7 +41,6 @@ namespace wowee::game {
     class WardenCrypto;
     class WardenMemory;
     class WardenModule;
-    class WardenModuleManager;
     class PacketParsers;
     class ChatHandler;
     class MovementHandler;
@@ -4313,7 +4312,6 @@ private:
     // Talents (dual-spec support)
     std::unordered_map<uint32_t, TalentEntry> talentCache_;      // talentId -> entry
     std::unordered_map<uint32_t, TalentTabEntry> talentTabCache_; // tabId -> entry
-    bool talentDbcLoaded_ = false;
 
     // ---- Area trigger detection ----
     bool areaTriggerDbcLoaded_ = false;
@@ -4542,12 +4540,10 @@ private:
     std::unordered_map<uint32_t, TaxiNode> taxiNodes_;
     std::vector<TaxiPathEdge> taxiPathEdges_;
     std::unordered_map<uint32_t, std::vector<TaxiPathNode>> taxiPathNodes_;  // pathId -> ordered waypoints
-    bool taxiDbcLoaded_ = false;
     // No taxiWindowOpen_ or taxiNpcGuid_ here: the movement handler owns both,
     // and the copies this class kept were never written after the split.
     bool onTaxiFlight_ = false;
     bool taxiMountActive_ = false;
-    uint32_t taxiMountDisplayId_ = 0;
     bool taxiActivatePending_ = false;
     float taxiActivateTimer_ = 0.0f;
     bool taxiClientActive_ = false;

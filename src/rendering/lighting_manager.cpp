@@ -47,7 +47,6 @@ bool LightingManager::initialize(pipeline::AssetManager* assetManager) {
         return false;
     }
 
-    assetManager_ = assetManager;
 
     // Load DBCs (non-fatal if missing, will use fallback lighting)
     loadLightDbc(assetManager);
@@ -313,7 +312,6 @@ void LightingManager::update(const glm::vec3& playerPos, uint32_t mapId, uint32_
 
     // Update player position and map
     currentPlayerPos_ = playerPos;
-    currentMapId_ = mapId;
 
     // Find light volumes for blending
     activeVolumes_ = findLightVolumes(playerPos, mapId);

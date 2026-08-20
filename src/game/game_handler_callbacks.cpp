@@ -788,7 +788,6 @@ void GameHandler::handleLoginVerifyWorld(network::Packet& packet) {
     // state reset so the recovery check below can detect a mid-flight reconnect.
     taxiStartGrace_ = 0.0f;
     currentMountDisplayId_ = 0;
-    taxiMountDisplayId_ = 0;
     vehicleId_ = 0;
     if (mountCallback_) {
         mountCallback_(0);

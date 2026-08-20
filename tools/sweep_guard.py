@@ -177,7 +177,7 @@ CHECKS = [
      r"^(\d+) redefined without an #ifndef", 0,
      "macros the build defines, redefined unguarded"),
     ("unused_member_check.py",
-     r"^(\d+) members stored and never read", 24,
+     r"^(\d+) members stored and never read", 0,
      "class members stored and never read"),
     # The subset clang's -Wunused-private-field rejects outright, which is a
     # failed Windows build rather than debt. Zero, and it stays there.

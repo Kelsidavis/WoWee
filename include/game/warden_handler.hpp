@@ -17,7 +17,6 @@ class GameHandler;
 class WardenCrypto;
 class WardenMemory;
 class WardenModule;
-class WardenModuleManager;
 
 class WardenHandler {
 public:
@@ -34,7 +33,6 @@ public:
     void reset();
 
     /** Initialize warden module manager (called once from GameHandler ctor). */
-    void initModuleManager();
 
     /** Whether the server requires Warden (gates char enum / create). */
     [[nodiscard]] bool requiresWarden() const { return requiresWarden_; }
@@ -66,7 +64,6 @@ private:
     bool wardenCharEnumBlockedLogged_ = false;
     std::unique_ptr<WardenCrypto> wardenCrypto_;
     std::unique_ptr<WardenMemory> wardenMemory_;
-    std::unique_ptr<WardenModuleManager> wardenModuleManager_;
 
     // Warden module download state
     enum class WardenState {

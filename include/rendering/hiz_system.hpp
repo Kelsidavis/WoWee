@@ -102,9 +102,6 @@ private:
     VkContext* ctx_ = nullptr;
     bool ready_ = false;
 
-    // Pyramid dimensions (mip 0 = half of full-res depth)
-    uint32_t fullWidth_ = 0;
-    uint32_t fullHeight_ = 0;
     uint32_t pyramidWidth_ = 0;
     uint32_t pyramidHeight_ = 0;
     uint32_t mipLevels_ = 0;

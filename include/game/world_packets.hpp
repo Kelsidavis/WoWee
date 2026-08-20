@@ -3217,7 +3217,6 @@ struct AuctionCommandResult {
 
 struct AuctionHelloData {
     uint64_t auctioneerGuid = 0;
-    uint32_t auctionHouseId = 0;
     uint8_t enabled = 1;
 };
 

@@ -605,7 +605,10 @@ bool AuctionHelloParser::parse(network::Packet& packet, AuctionHelloData& data) 
         return false;
     }
     data.auctioneerGuid = packet.readUInt64();
-    data.auctionHouseId = packet.readUInt32();
+    // The auction house's own id, which nothing asks for: the window is opened
+    // by the auctioneer's guid and the server keys everything else off that.
+    // Read rather than skipped, so the enabled byte below still lands.
+    /*uint32_t auctionHouseId =*/ packet.readUInt32();
     // WotLK has an extra uint8 enabled field; Vanilla does not
     if (packet.hasData()) {
         data.enabled = packet.readUInt8();

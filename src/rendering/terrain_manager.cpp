@@ -1701,7 +1701,6 @@ void TerrainManager::softReset() {
         std::lock_guard<std::mutex> lock(tileCacheMutex_);
         tileCache_.clear();
         tileCacheLru_.clear();
-        tileCacheBytes_ = 0;
     }
 
     LOG_INFO("Soft-resetting terrain (clearing tiles + water + cache, workers stay alive)");

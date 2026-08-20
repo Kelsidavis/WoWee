@@ -8,7 +8,6 @@ namespace wowee {
 namespace audio {
 
 MountSoundManager::MountSoundManager() {
-    lastSoundUpdate_ = std::chrono::steady_clock::now();
 }
 
 MountSoundManager::~MountSoundManager() {
@@ -334,7 +333,6 @@ void MountSoundManager::update(float deltaTime) {
 
 void MountSoundManager::onMount(uint32_t creatureDisplayId, bool isFlying, const std::string& modelPath) {
     mounted_ = true;
-    currentDisplayId_ = creatureDisplayId;
     currentMountType_ = detectMountType(creatureDisplayId);
 
     // Prefer model path detection (reliable) over display ID ranges (fragile)
@@ -361,7 +359,6 @@ void MountSoundManager::onDismount() {
     mounted_ = false;
     currentMountType_ = MountType::NONE;
     currentMountFamily_ = MountFamily::UNKNOWN;
-    currentDisplayId_ = 0;
     flying_ = false;
     moving_ = false;
 }
@@ -620,7 +617,6 @@ void MountSoundManager::updateMountSounds() {
                 AudioEngine::instance().playSound2D(
                     sample.data, volumeDist(rng) * volumeScale_, pitchDist(rng));
                 soundLoopTimer_ = 0.0f;
-                playingMovementSound_ = true;
             }
         } else if (!moving_ && !wingIdleSounds_.empty()) {
             if (soundLoopTimer_ >= 3.5f) {
@@ -631,7 +627,6 @@ void MountSoundManager::updateMountSounds() {
                 AudioEngine::instance().playSound2D(
                     sample.data, volumeDist(rng) * volumeScale_, pitchDist(rng));
                 soundLoopTimer_ = 0.0f;
-                playingIdleSound_ = true;
             }
         }
     }
@@ -655,7 +650,6 @@ void MountSoundManager::updateMountSounds() {
                 AudioEngine::instance().playSound2D(
                     sample.data, volumeDist(rng) * volumeScale_, pitchDist(rng));
                 soundLoopTimer_ = 0.0f;
-                playingMovementSound_ = true;
             }
         } else if (!moving_ && !sounds.idle.empty()) {
             if (soundLoopTimer_ >= 4.5f) {
@@ -666,15 +660,12 @@ void MountSoundManager::updateMountSounds() {
                 AudioEngine::instance().playSound2D(
                     sample.data, volumeDist(rng) * volumeScale_, pitchDist(rng));
                 soundLoopTimer_ = 0.0f;
-                playingIdleSound_ = true;
             }
         }
     }
 }
 
 void MountSoundManager::stopAllMountSounds() {
-    playingMovementSound_ = false;
-    playingIdleSound_ = false;
     soundLoopTimer_ = 0.0f;
 }
 

@@ -186,63 +186,6 @@ private:
     bool initializeModule();
 };
 
-/**
- * Warden module manager
- *
- * Handles multiple module downloads and lifecycle.
- * Servers can send different modules per session.
- */
-class WardenModuleManager {
-public:
-    WardenModuleManager();
-    ~WardenModuleManager();
-
-
-    /**
-     * Get or create module instance
-     *
-     * @param md5Hash Module identifier
-     * @return Module instance (may not be loaded yet)
-     */
-    std::shared_ptr<WardenModule> getModule(const std::vector<uint8_t>& md5Hash);
-
-    /**
-     * Receive module data chunk from server
-     *
-     * Modules may be sent in multiple SMSG_WARDEN_DATA packets.
-     * This accumulates chunks until complete.
-     *
-     * @param md5Hash Module identifier
-     * @param chunkData Data chunk
-     * @param isComplete true if this is the last chunk
-     * @return true if chunk accepted
-     */
-    bool receiveModuleChunk(const std::vector<uint8_t>& md5Hash,
-                           const std::vector<uint8_t>& chunkData,
-                           bool isComplete);
-
-    /**
-     * Save module to disk cache
-     *
-     * Cached modules skip re-download on reconnect.
-     * Cache directory: ~/.local/share/wowee/warden_cache/
-     */
-    bool cacheModule(const std::vector<uint8_t>& md5Hash,
-                     const std::vector<uint8_t>& moduleData);
-
-    /**
-     * Load module from disk cache
-     */
-    bool loadCachedModule(const std::vector<uint8_t>& md5Hash,
-                         std::vector<uint8_t>& moduleDataOut);
-
-private:
-    std::map<std::vector<uint8_t>, std::shared_ptr<WardenModule>> modules_;
-    std::map<std::vector<uint8_t>, std::vector<uint8_t>> downloadBuffer_; // Partial downloads
-    std::string cacheDirectory_;
-
-    std::string getCachePath(const std::vector<uint8_t>& md5Hash);
-};
 
 } // namespace game
 } // namespace wowee

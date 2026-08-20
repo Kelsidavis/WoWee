@@ -110,7 +110,6 @@ private:
 
     M2Renderer* m2Renderer_ = nullptr;
     bool casterModelLoaded_ = false;
-    bool impactModelLoaded_ = false;
 
     uint32_t activeCasterInstanceId_ = 0;
     struct ActiveM2 {

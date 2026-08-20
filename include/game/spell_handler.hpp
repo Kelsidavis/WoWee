@@ -522,7 +522,6 @@ private:
 
     // Pet talent respec confirm dialog
     bool petUnlearnPending_ = false;
-    uint64_t petUnlearnGuid_ = 0;
     uint32_t petUnlearnCost_ = 0;
 };
 

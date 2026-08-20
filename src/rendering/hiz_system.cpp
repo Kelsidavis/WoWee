@@ -16,8 +16,6 @@ HiZSystem::~HiZSystem() {
 bool HiZSystem::initialize(VkContext* ctx, uint32_t width, uint32_t height) {
     if (!ctx || width == 0 || height == 0) return false;
     ctx_ = ctx;
-    fullWidth_ = width;
-    fullHeight_ = height;
 
     // Pyramid mip 0 is half the full resolution (the first downscale)
     pyramidWidth_ = std::max(1u, width / 2);
@@ -55,8 +53,6 @@ bool HiZSystem::resize(uint32_t width, uint32_t height) {
     destroyDescriptors();
     destroyPyramidImage();
 
-    fullWidth_ = width;
-    fullHeight_ = height;
     pyramidWidth_ = std::max(1u, width / 2);
     pyramidHeight_ = std::max(1u, height / 2);
     mipLevels_ = static_cast<uint32_t>(std::floor(std::log2(std::max(pyramidWidth_, pyramidHeight_)))) + 1;

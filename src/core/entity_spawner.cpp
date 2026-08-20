@@ -52,12 +52,10 @@ namespace core {
 EntitySpawner::EntitySpawner(rendering::Renderer* renderer,
                              pipeline::AssetManager* assetManager,
                              game::GameHandler* gameHandler,
-                             pipeline::DBCLayout* dbcLayout,
                              game::GameServices* gameServices)
     : renderer_(renderer)
     , assetManager_(assetManager)
     , gameHandler_(gameHandler)
-    , dbcLayout_(dbcLayout)
     , gameServices_(gameServices)
 {
 }

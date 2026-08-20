@@ -22,7 +22,6 @@ void MountFSM::configure(const MountAnimSet& anims, bool taxiFlight) {
     idleSoundTimer_ = 0.0f;
     prevYaw_ = 0.0f;
     roll_ = 0.0f;
-    lastMountAnim_ = 0;
 
     // Seed per-instance RNG
     std::random_device rd;
@@ -44,7 +43,6 @@ void MountFSM::clear() {
     fidgetTimer_ = 0.0f;
     activeFidget_ = 0;
     idleSoundTimer_ = 0.0f;
-    lastMountAnim_ = 0;
 }
 
 // ── Event handling ───────────────────────────────────────────────────────────
@@ -184,7 +182,6 @@ MountFSM::Output MountFSM::evaluate(const Input& in) {
             out.mountBob = std::sin(norm * core::coords::TWO_PI * 2.0f) * 0.12f;
         }
 
-        lastMountAnim_ = out.mountAnimId;
         return out;
     }
 
@@ -199,7 +196,6 @@ MountFSM::Output MountFSM::evaluate(const Input& in) {
             out.mountAnimChanged = true;
             out.playJumpSound = true;
             out.triggerMountJump = true;
-            lastMountAnim_ = out.mountAnimId;
 
             // Bob calc
             if (in.haveMountState && in.curMountDuration > 1.0f) {
@@ -217,7 +213,6 @@ MountFSM::Output MountFSM::evaluate(const Input& in) {
             out.mountAnimLoop = false;
             out.mountAnimChanged = true;
             out.playRearUpSound = true;
-            lastMountAnim_ = out.mountAnimId;
             return out;
         }
     }
@@ -278,7 +273,6 @@ MountFSM::Output MountFSM::evaluate(const Input& in) {
             float norm = wrappedTime / in.curMountDuration;
             out.mountBob = std::sin(norm * core::coords::TWO_PI) * 0.12f;
         }
-        lastMountAnim_ = out.mountAnimId;
         return out;
     }
 
@@ -291,7 +285,6 @@ MountFSM::Output MountFSM::evaluate(const Input& in) {
         out.mountAnimId = mountAnimId;
         out.mountAnimLoop = true;
         out.mountAnimChanged = true;
-        lastMountAnim_ = out.mountAnimId;
 
         // Bob calc
         if (in.haveMountState && in.curMountDuration > 1.0f) {
@@ -326,7 +319,6 @@ MountFSM::Output MountFSM::evaluate(const Input& in) {
             out.mountAnimId = fidgetAnim;
             out.mountAnimLoop = false;
             out.mountAnimChanged = true;
-            lastMountAnim_ = out.mountAnimId;
             return out;
         }
     }
@@ -363,7 +355,6 @@ MountFSM::Output MountFSM::evaluate(const Input& in) {
         out.mountBob = std::sin(norm * core::coords::TWO_PI * bobSpeed) * 0.12f;
     }
 
-    lastMountAnim_ = out.mountAnimId;
     return out;
 }
 

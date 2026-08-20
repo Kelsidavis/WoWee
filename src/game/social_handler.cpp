@@ -1737,7 +1737,10 @@ void SocialHandler::reportPlayer(uint64_t targetGuid, const std::string& reason)
 void SocialHandler::handleDuelRequested(network::Packet& packet) {
     if (!packet.hasRemaining(16)) { packet.skipAll(); return; }
     duelChallengerGuid_ = packet.readUInt64();
-    duelFlagGuid_       = packet.readUInt64();
+    // The duel flag's guid follows, and nothing here wants it - the arbiter
+    // object is the server's business. Read rather than skipped so the two
+    // stay one statement apart if a third field is ever added.
+    packet.readUInt64();
     duelChallengerName_.clear();
     auto entity = owner_.getEntityManager().getEntity(duelChallengerGuid_);
     if (auto* unit = dynamic_cast<Unit*>(entity.get()))

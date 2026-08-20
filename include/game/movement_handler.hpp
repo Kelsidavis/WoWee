@@ -194,7 +194,6 @@ public:
     // Taxi state references for GameHandler update/processing
     bool& onTaxiFlightRef() { return onTaxiFlight_; }
     bool& taxiMountActiveRef() { return taxiMountActive_; }
-    uint32_t& taxiMountDisplayIdRef() { return taxiMountDisplayId_; }
     bool& taxiActivatePendingRef() { return taxiActivatePending_; }
     float& taxiActivateTimerRef() { return taxiActivateTimer_; }
     bool& taxiClientActiveRef() { return taxiClientActive_; }
@@ -338,7 +337,6 @@ private:
     // the node's registered coordinate the way GM teleports/.gps do.
     uint32_t taxiDestNodeId_ = 0;
     bool taxiMountActive_ = false;
-    uint32_t taxiMountDisplayId_ = 0;
     bool taxiActivatePending_ = false;
     float taxiActivateTimer_ = 0.0f;
     // How long to wait for SMSG_ACTIVATETAXIREPLY before giving up - see

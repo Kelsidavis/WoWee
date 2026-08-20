@@ -352,8 +352,7 @@ bool Application::initialize() {
 
         // Eagerly load creature display DBC lookups so first spawn doesn't stall
         entitySpawner_ = std::make_unique<EntitySpawner>(
-            renderer.get(), assetManager.get(), gameHandler.get(),
-            dbcLayout_.get(), &gameServices_);
+            renderer.get(), assetManager.get(), gameHandler.get(), &gameServices_);
         entitySpawner_->initialize();
 
         appearanceComposer_ = std::make_unique<AppearanceComposer>(
@@ -2134,7 +2133,6 @@ void Application::performLogoutToLogin() {
     if (worldEntryCallbacks_) worldEntryCallbacks_->resetState();
     facingSendCooldown_ = 0.0f;
     lastSentCanonicalYaw_ = 1000.0f;
-    taxiStreamCooldown_ = 0.0f;
     idleYawned_ = false;
 
     // --- Charge state ---

@@ -95,7 +95,6 @@ GameHandler::GameHandler(GameServices& services)
     socialHandler_    = std::make_unique<SocialHandler>(*this);
     questHandler_     = std::make_unique<QuestHandler>(*this);
     wardenHandler_    = std::make_unique<WardenHandler>(*this);
-    wardenHandler_->initModuleManager();
 
     // Default action bar layout
     actionBar[0].type = ActionBarSlot::SPELL;
@@ -217,14 +216,12 @@ void GameHandler::resetDbcCaches() {
     skillLineCategories_.clear();
     skillLineAbilityLoaded_ = false;
     spellToSkillLine_.clear();
-    taxiDbcLoaded_ = false;
     taxiNodes_.clear();
     taxiPathEdges_.clear();
     taxiPathNodes_.clear();
     areaTriggerDbcLoaded_ = false;
     areaTriggers_.clear();
     activeAreaTriggers_.clear();
-    talentDbcLoaded_ = false;
     talentCache_.clear();
     talentTabCache_.clear();
     // The copies that are actually read live in the sub-handlers - the getters
@@ -406,7 +403,6 @@ if (!onTaxiFlight_ && taxiMountActive_) {
     } else {
         if (mountCallback_) mountCallback_(0);
         taxiMountActive_ = false;
-        taxiMountDisplayId_ = 0;
         currentMountDisplayId_ = 0;
         movementInfo.flags = 0;
         movementInfo.flags2 = 0;
@@ -468,7 +464,6 @@ if (taxiActivatePending_) {
             mountCallback_(0);
         }
         taxiMountActive_ = false;
-        taxiMountDisplayId_ = 0;
         taxiClientActive_ = false;
         taxiClientPath_.clear();
         onTaxiFlight_ = false;

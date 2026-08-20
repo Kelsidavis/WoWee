@@ -243,7 +243,6 @@ private:
     glm::vec3 lastMountSeatTarget_ = glm::vec3(0.0f);
     bool taxiFlight_ = false;
     bool m2TransportRiding_ = false;
-    bool sprintAuraActive_ = false;
 
     // ── Private helpers ──────────────────────────────────────────────────
     uint32_t resolveMeleeAnimId();

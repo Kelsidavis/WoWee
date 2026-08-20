@@ -161,7 +161,6 @@ private:
     };
     std::unordered_map<uint32_t, ApiHookEntry> apiHandlers_;
     uint32_t nextApiStubAddr_ = kApiStubBase;  // next free stub slot
-    bool apiCodeHookRegistered_ = false; // true once UC_HOOK_CODE for stub range is added
 
     // Memory allocation tracking
     std::unordered_map<uint32_t, size_t> allocations_;

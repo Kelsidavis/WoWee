@@ -2464,7 +2464,6 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
             // Use isInsideInteriorWMO (flag 0x2000) - not isInsideWMO which includes
             // outdoor WMO groups like archways/bridges that should receive shadows.
             m2Renderer->setInsideInterior(cameraController->isInsideInteriorWMO());
-            m2Renderer->setOnTaxi(cameraController->isOnTaxi());
         }
         auto prepStart = std::chrono::steady_clock::now();
         if (wmoRenderer) wmoRenderer->prepareRender();
@@ -2709,7 +2708,6 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
             if (cameraController) {
                 // Use isInsideInteriorWMO (flag 0x2000) for correct indoor detection
                 m2Renderer->setInsideInterior(cameraController->isInsideInteriorWMO());
-                m2Renderer->setOnTaxi(cameraController->isOnTaxi());
             }
             m2Renderer->prepareRender(frameIdx, *camera);
             auto m2Start = std::chrono::steady_clock::now();

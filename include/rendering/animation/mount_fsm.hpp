@@ -133,8 +133,6 @@ private:
     float prevYaw_ = 0.0f;
     float roll_ = 0.0f;
 
-    // Last mount animation for change detection
-    uint32_t lastMountAnim_ = 0;
 
     /// Resolve the mount animation for the given input (non-taxi).
     [[nodiscard]] uint32_t resolveGroundOrFlyAnim(const Input& in) const;

@@ -3429,7 +3429,6 @@ void InventoryHandler::handleAuctionHello(network::Packet& packet) {
     // needed the same expansion difference written a second time to.
     AuctionHelloData data;
     if (!AuctionHelloParser::parse(packet, data)) return;
-    auctionHouseId_ = data.auctionHouseId;
     openAuctionHouse(data.auctioneerGuid);
     owner_.closeGossip();
 }

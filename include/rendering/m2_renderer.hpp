@@ -545,7 +545,6 @@ public:
 
     void setSuppressBakedStars(bool suppress) { suppressBakedStars_ = suppress; }
     void setInsideInterior(bool inside) { insideInterior = inside; }
-    void setOnTaxi(bool onTaxi) { onTaxi_ = onTaxi; }
     void setViewDistance(float distance) {
         viewDistanceRaw_ = std::clamp(distance, 400.0f, 2400.0f);
         // And the distance itself, as a ceiling. The scale multiplies a
@@ -590,7 +589,6 @@ public:
 private:
     bool initialized_ = false;
     bool insideInterior = false;
-    bool onTaxi_ = false;
     pipeline::AssetManager* assetManager = nullptr;
 
     // Vulkan context

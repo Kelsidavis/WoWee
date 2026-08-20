@@ -593,7 +593,7 @@ void SpellHandler::registerOpcodes(DispatchTable& table) {
     // The other pet opcodes have different formats and must NOT set unlearn state.
     table[Opcode::SMSG_PET_UNLEARN_CONFIRM] = [this](network::Packet& packet) {
         if (packet.hasRemaining(12)) {
-            petUnlearnGuid_ = packet.readUInt64();
+            packet.readUInt64();   // the pet's guid; the cost is what is asked for
             petUnlearnCost_ = packet.readUInt32();
             petUnlearnPending_ = true;
         }
@@ -1262,7 +1262,6 @@ void SpellHandler::confirmPetUnlearn() {
     owner_.addSystemChatMessage(
         "Pet talent reset requested. This server resets pet talents at the "
         "next login rather than on request.");
-    petUnlearnGuid_ = 0;
     petUnlearnCost_ = 0;
 }
 

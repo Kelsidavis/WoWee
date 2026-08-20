@@ -475,7 +475,6 @@ private:
     // THREAD-SAFE: protected by tileCacheMutex_.
     std::unordered_map<TileCoord, CachedTile, TileCoord::Hash> tileCache_;
     std::list<TileCoord> tileCacheLru_;
-    size_t tileCacheBytes_ = 0;
     size_t tileCacheBudgetBytes_ = 8ull * 1024 * 1024 * 1024; // Dynamic, set at init based on RAM
     std::mutex tileCacheMutex_;
 

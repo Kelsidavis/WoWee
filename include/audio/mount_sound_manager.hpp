@@ -85,7 +85,6 @@ private:
     bool flying_ = false;
     MountType currentMountType_ = MountType::NONE;
     MountFamily currentMountFamily_ = MountFamily::UNKNOWN;
-    uint32_t currentDisplayId_ = 0;
     float volumeScale_ = 0.7f;
 
     // Mount sound samples (loaded from MPQ)
@@ -104,10 +103,6 @@ private:
     // Helper to get sounds for current family (unknown/unloaded -> silent)
     [[nodiscard]] const FamilySounds& getCurrentFamilySounds() const;
 
-    // Sound state tracking
-    bool playingMovementSound_ = false;
-    bool playingIdleSound_ = false;
-    std::chrono::steady_clock::time_point lastSoundUpdate_;
     std::chrono::steady_clock::time_point lastActionSoundTime_;  // Cooldown for action sounds
     float soundLoopTimer_ = 0.0f;
 };

@@ -259,7 +259,6 @@ private:
 
     VkBuffer indirectBuffer_ = VK_NULL_HANDLE;
     VmaAllocation indirectAlloc_ = VK_NULL_HANDLE;
-    void* indirectMapped_ = nullptr;
     static constexpr uint32_t MAX_INDIRECT_DRAWS = 8192;
 };
 

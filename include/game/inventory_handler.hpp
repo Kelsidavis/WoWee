@@ -715,7 +715,6 @@ private:
     // ---- Auction House state ----
     bool auctionOpen_ = false;
     uint64_t auctioneerGuid_ = 0;
-    uint32_t auctionHouseId_ = 0;
     AuctionListResult auctionBrowseResults_;
     AuctionListResult auctionOwnerResults_;
     AuctionListResult auctionBidderResults_;

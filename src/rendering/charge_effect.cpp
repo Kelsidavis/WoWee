@@ -290,7 +290,6 @@ void ChargeEffect::tryLoadM2Models(M2Renderer* m2Renderer, pipeline::AssetManage
                 pipeline::M2Loader::loadSkin(skinData, model);
         }
         if (m2Renderer_->loadModel(model, IMPACT_MODEL_ID)) {
-            impactModelLoaded_ = true;
             LOG_INFO("ChargeEffect: loaded impact model from ", path);
             break;
         }

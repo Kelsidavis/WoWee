@@ -270,7 +270,6 @@ private:
      */
     [[nodiscard]] glm::vec3 dbcColorToVec3(uint32_t dbcColor) const;
 
-    pipeline::AssetManager* assetManager_ = nullptr;
 
     // Light volumes by map
     std::map<uint32_t, std::vector<LightVolume>> lightVolumesByMap_;
@@ -283,7 +282,6 @@ private:
     LightingParams currentParams_;
     std::vector<WeightedVolume> activeVolumes_;
     glm::vec3 currentPlayerPos_{0.0f};
-    uint32_t currentMapId_ = 0;
     float timeOfDay_ = 0.5f;  // Start at noon
     float visualTimeOfDayHours_ = 12.0f;
     std::string activeSkyboxPath_;

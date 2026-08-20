@@ -146,10 +146,6 @@ const std::unordered_map<std::string, std::array<uint8_t, 20>>& knownDoorHashes(
 WardenHandler::WardenHandler(GameHandler& owner)
     : owner_(owner) {}
 
-void WardenHandler::initModuleManager() {
-    wardenModuleManager_ = std::make_unique<WardenModuleManager>();
-}
-
 // ---------------------------------------------------------------------------
 // Opcode registration
 // ---------------------------------------------------------------------------

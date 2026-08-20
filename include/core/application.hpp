@@ -310,7 +310,6 @@ private:
 
     float facingSendCooldown_ = 0.0f;        // Rate-limits MSG_MOVE_SET_FACING
     float lastSentCanonicalYaw_ = 1000.0f;   // Sentinel - triggers first send
-    float taxiStreamCooldown_ = 0.0f;
     bool idleYawned_ = false;
 
     // M2 transport riding: last frame's locked (canonical) render position, used to

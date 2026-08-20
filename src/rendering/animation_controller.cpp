@@ -230,7 +230,8 @@ void AnimationController::setStealthed(bool stealth) {
 // ── Sprint aura ──────────────────────────────────────────────────────────────
 
 void AnimationController::setSprintAuraActive(bool active) {
-    sprintAuraActive_ = active;
+    // Straight through. The animator keeps the copy the locomotion state
+    // machine reads; this class kept one of its own and read it nowhere.
     characterAnimator_.setSprintAuraActive(active);
 }
 

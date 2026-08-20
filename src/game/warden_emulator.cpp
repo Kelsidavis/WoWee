@@ -36,7 +36,6 @@ bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint3
     hooks_.clear();
     nextHeapAddr_ = heapBase_;
     nextApiStubAddr_ = apiStubBase_;
-    apiCodeHookRegistered_ = false;
 
     {
         char addrBuf[32];
@@ -138,7 +137,6 @@ bool WardenEmulator::initialize(const void* moduleCode, size_t moduleSize, uint3
     uc_hook_add(uc_, &apiHook, UC_HOOK_CODE, (void*)hookCode, this,
                 kApiStubBase, kApiStubBase + 0x10000 - 1);
     hooks_.push_back(apiHook);
-    apiCodeHookRegistered_ = true;
 
     {
         char sBuf[128];

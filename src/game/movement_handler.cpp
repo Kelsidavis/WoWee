@@ -842,7 +842,6 @@ void MovementHandler::forceClearTaxiAndMovementState() {
         owner_.mountCallbackRef()(0);
     }
     taxiMountActive_ = false;
-    taxiMountDisplayId_ = 0;
     // A normal mount is owned by its aura/update-field path. Do not silently
     // zero it here without firing the mount callback: that leaves the rendered
     // mount behind and reconciliation spawns a duplicate. Unstuck explicitly
@@ -908,7 +907,6 @@ void MovementHandler::dismount() {
         }
         owner_.currentMountDisplayIdRef() = 0;
         taxiMountActive_ = false;
-        taxiMountDisplayId_ = 0;
         owner_.mountAuraSpellIdRef() = 0;
         LOG_INFO("Dismount: cleared local mount state, onTaxiFlight=", onTaxiFlight_);
     }
@@ -2132,7 +2130,6 @@ void MovementHandler::handleNewWorld(network::Packet& packet) {
     taxiRecoverPending_ = false;
     taxiStartGrace_ = 0.0f;
     owner_.currentMountDisplayIdRef() = 0;
-    taxiMountDisplayId_ = 0;
     if (owner_.mountCallbackRef()) {
         owner_.mountCallbackRef()(0);
     }
@@ -2366,7 +2363,6 @@ void MovementHandler::applyTaxiMountForCurrentNode() {
             default: break;
         }
         uint32_t mountId = isAlliance ? 1210u : 1310u;
-        taxiMountDisplayId_ = mountId;
         taxiMountActive_ = true;
         LOG_INFO("Taxi mount fallback (node ", currentTaxiData_.nearestNode, " not in DBC): displayId=", mountId);
         owner_.mountCallbackRef()(mountId);
@@ -2417,7 +2413,6 @@ void MovementHandler::applyTaxiMountForCurrentNode() {
         mountId = isAlliance ? 30412u : 30413u;
     }
     if (mountId != 0) {
-        taxiMountDisplayId_ = mountId;
         taxiMountActive_ = true;
         LOG_INFO("Taxi mount apply: displayId=", mountId);
         owner_.mountCallbackRef()(mountId);
@@ -2646,7 +2641,6 @@ void MovementHandler::finishClientTaxiFlight(bool snapToFinalWaypoint) {
         owner_.mountCallbackRef()(0);
     }
     taxiMountActive_ = false;
-    taxiMountDisplayId_ = 0;
     owner_.currentMountDisplayIdRef() = 0;
     // Some WotLK servers expose the taxi mount through vehicle data.
     // Clear that cached ID at landing so the dismount control does not
@@ -2709,7 +2703,6 @@ void MovementHandler::updateClientTaxi(float deltaTime) {
                 owner_.mountCallbackRef()(0);
             }
             taxiMountActive_ = false;
-            taxiMountDisplayId_ = 0;
             onTaxiFlight_ = false;
         }
     }
@@ -2891,7 +2884,6 @@ void MovementHandler::handleActivateTaxiReply(network::Packet& packet) {
             owner_.mountCallbackRef()(0);
         }
         taxiMountActive_ = false;
-        taxiMountDisplayId_ = 0;
         onTaxiFlight_ = false;
     }
 }
@@ -2914,7 +2906,6 @@ void MovementHandler::closeTaxi() {
         owner_.mountCallbackRef()(0);
     }
     taxiMountActive_ = false;
-    taxiMountDisplayId_ = 0;
 
     taxiActivatePending_ = false;
     onTaxiFlight_ = false;

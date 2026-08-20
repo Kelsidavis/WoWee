@@ -260,7 +260,6 @@ bool TerrainRenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameL
         VmaAllocationInfo indInfo{};
         if (vmaCreateBuffer(allocator, &indCI, &indAllocCI,
                 &indirectBuffer_, &indirectAlloc_, &indInfo) == VK_SUCCESS) {
-            indirectMapped_ = indInfo.pMappedData;
         } else {
             LOG_WARNING("TerrainRenderer: indirect buffer allocation failed");
         }
@@ -343,7 +342,7 @@ void TerrainRenderer::shutdown() {
     // Destroy mega buffers and indirect draw buffer
     if (megaVB_) { vmaDestroyBuffer(allocator, megaVB_, megaVBAlloc_); megaVB_ = VK_NULL_HANDLE; megaVBAlloc_ = VK_NULL_HANDLE; megaVBMapped_ = nullptr; }
     if (megaIB_) { vmaDestroyBuffer(allocator, megaIB_, megaIBAlloc_); megaIB_ = VK_NULL_HANDLE; megaIBAlloc_ = VK_NULL_HANDLE; megaIBMapped_ = nullptr; }
-    if (indirectBuffer_) { vmaDestroyBuffer(allocator, indirectBuffer_, indirectAlloc_); indirectBuffer_ = VK_NULL_HANDLE; indirectAlloc_ = VK_NULL_HANDLE; indirectMapped_ = nullptr; }
+    if (indirectBuffer_) { vmaDestroyBuffer(allocator, indirectBuffer_, indirectAlloc_); indirectBuffer_ = VK_NULL_HANDLE; indirectAlloc_ = VK_NULL_HANDLE; }
     megaVBUsed_ = 0;
     megaIBUsed_ = 0;
 
