@@ -528,6 +528,119 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
         return false;
     }
 
+    // Turtle-derived realms use the native Warden image format, not the older
+    // copy/skip stream assumed below. Its fixed header is followed by 12-byte
+    // section descriptors; those descriptors are metadata and are not copied
+    // into the image. The copy stream alternates copied and zero-filled spans.
+    //
+    // Keep the legacy parser below for retail modules: a candidate must pass
+    // every native-header bound check before we accept this interpretation.
+    if (exeData.size() >= 0x28) {
+        const auto readU16LE = [&](size_t offset) -> uint16_t {
+            return static_cast<uint16_t>(exeData[offset]) |
+                   (static_cast<uint16_t>(exeData[offset + 1]) << 8);
+        };
+        const auto readU32LE = [&](size_t offset) -> uint32_t {
+            return static_cast<uint32_t>(exeData[offset]) |
+                   (static_cast<uint32_t>(exeData[offset + 1]) << 8) |
+                   (static_cast<uint32_t>(exeData[offset + 2]) << 16) |
+                   (static_cast<uint32_t>(exeData[offset + 3]) << 24);
+        };
+
+        const uint32_t imageSize = readU32LE(0x00);
+        const uint32_t candidateRelocOffset = readU32LE(0x08);
+        const uint32_t candidateRelocCount = readU32LE(0x0C);
+        const uint32_t candidateExportOffset = readU32LE(0x10);
+        const uint32_t candidateExportCount = readU32LE(0x14);
+        const uint32_t candidateExportBase = readU32LE(0x18);
+        const uint32_t candidateImportOffset = readU32LE(0x1C);
+        const uint32_t candidateImportCount = readU32LE(0x20);
+        const uint32_t candidateSectionCount = readU32LE(0x24);
+        const size_t sectionTableSize = static_cast<size_t>(candidateSectionCount) * 12u;
+        const size_t copyStreamOffset = 0x28u + sectionTableSize;
+
+        if (imageSize != 0 && imageSize <= 5 * 1024 * 1024 &&
+            candidateSectionCount > 0 && candidateSectionCount <= 128 &&
+            copyStreamOffset <= exeData.size()) {
+            const uint32_t firstSectionOffset = readU32LE(0x28);
+            if (firstSectionOffset < imageSize) {
+                std::vector<uint8_t> nativeImage(imageSize, 0);
+                std::memcpy(nativeImage.data(), exeData.data(), 0x28);
+
+                size_t sourceOffset = copyStreamOffset;
+                size_t destinationOffset = firstSectionOffset;
+                bool copySpan = true;
+                uint32_t spanCount = 0;
+                bool validStream = true;
+                while (destinationOffset < nativeImage.size()) {
+                    if (sourceOffset + 2 > exeData.size()) {
+                        validStream = false;
+                        break;
+                    }
+                    const uint16_t span = readU16LE(sourceOffset);
+                    sourceOffset += 2;
+                    if (span == 0 || destinationOffset + span > nativeImage.size()) {
+                        validStream = false;
+                        break;
+                    }
+                    if (copySpan) {
+                        if (sourceOffset + span > exeData.size()) {
+                            validStream = false;
+                            break;
+                        }
+                        std::memcpy(nativeImage.data() + destinationOffset,
+                                    exeData.data() + sourceOffset, span);
+                        sourceOffset += span;
+                    }
+                    destinationOffset += span;
+                    copySpan = !copySpan;
+                    ++spanCount;
+                }
+
+                if (validStream && destinationOffset == nativeImage.size()) {
+                    #ifdef _WIN32
+                    moduleMemory_ = VirtualAlloc(nullptr, imageSize, MEM_COMMIT | MEM_RESERVE,
+                                                 PAGE_EXECUTE_READWRITE);
+                    #else
+                    #ifdef HAVE_UNICORN
+                    const int mmapProt = PROT_READ | PROT_WRITE;
+                    const int mmapFlags = MAP_PRIVATE | MAP_ANONYMOUS;
+                    #elif defined(__APPLE__)
+                    const int mmapProt = PROT_READ | PROT_WRITE | PROT_EXEC;
+                    const int mmapFlags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_JIT;
+                    #else
+                    const int mmapProt = PROT_READ | PROT_WRITE | PROT_EXEC;
+                    const int mmapFlags = MAP_PRIVATE | MAP_ANONYMOUS;
+                    #endif
+                    moduleMemory_ = mmap(nullptr, imageSize, mmapProt, mmapFlags, -1, 0);
+                    if (moduleMemory_ == MAP_FAILED) moduleMemory_ = nullptr;
+                    #endif
+
+                    if (!moduleMemory_) {
+                        LOG_ERROR("WardenModule: Failed to allocate native image");
+                        return false;
+                    }
+                    std::memcpy(moduleMemory_, nativeImage.data(), nativeImage.size());
+                    moduleSize_ = imageSize;
+                    relocOffset_ = candidateRelocOffset;
+                    relocCount_ = candidateRelocCount;
+                    exportTableOffset_ = candidateExportOffset;
+                    exportCount_ = candidateExportCount;
+                    exportBaseIndex_ = candidateExportBase;
+                    importTableOffset_ = candidateImportOffset;
+                    importCount_ = candidateImportCount;
+                    sectionCount_ = candidateSectionCount;
+                    relocDataOffset_ = 0;
+                    moduleImageUsable_ = true;
+                    LOG_INFO("WardenModule: Parsed native image: ", imageSize,
+                             " bytes, ", sectionCount_, " sections, ", spanCount,
+                             " spans, relocations=", relocCount_, ", imports=", importCount_);
+                    return true;
+                }
+            }
+        }
+    }
+
     // Read final code size (little-endian 4 bytes)
     uint32_t finalCodeSize =
         exeData[0] |
@@ -859,6 +972,49 @@ bool WardenModule::applyRelocations() {
         return false;
     }
 
+    if (moduleImageUsable_ && relocCount_ != 0) {
+        if (relocOffset_ >= moduleSize_) {
+            LOG_ERROR("WardenModule: Native relocation table offset out of bounds: ", relocOffset_);
+            return false;
+        }
+
+        auto* image = static_cast<uint8_t*>(moduleMemory_);
+        size_t relocationPos = relocOffset_;
+        uint32_t currentOffset = 0;
+        uint32_t appliedCount = 0;
+        for (uint32_t i = 0; i < relocCount_; ++i) {
+            if (relocationPos + 2 > moduleSize_) {
+                LOG_ERROR("WardenModule: Native relocation table is truncated");
+                return false;
+            }
+            const uint8_t first = image[relocationPos++];
+            if ((first & 0x80u) == 0) {
+                currentOffset += (static_cast<uint32_t>(first) << 8) | image[relocationPos++];
+            } else {
+                if (relocationPos + 3 > moduleSize_) {
+                    LOG_ERROR("WardenModule: Native absolute relocation is truncated");
+                    return false;
+                }
+                currentOffset = (static_cast<uint32_t>(first) << 24) |
+                                (static_cast<uint32_t>(image[relocationPos]) << 16) |
+                                (static_cast<uint32_t>(image[relocationPos + 1]) << 8) |
+                                image[relocationPos + 2];
+                relocationPos += 3;
+            }
+            if (currentOffset + 4 > moduleSize_) {
+                LOG_ERROR("WardenModule: Native relocation target out of bounds: ", currentOffset);
+                return false;
+            }
+            uint32_t value = 0;
+            std::memcpy(&value, image + currentOffset, sizeof(value));
+            value += moduleBase_;
+            std::memcpy(image + currentOffset, &value, sizeof(value));
+            ++appliedCount;
+        }
+        LOG_INFO("WardenModule: Applied ", appliedCount, " native relocations");
+        return true;
+    }
+
     // Relocation data is in decompressedData_ starting at relocDataOffset_
     // Format: delta-encoded 2-byte LE offsets, terminated by 0x0000
     // Each offset in the module image has moduleBase_ added to the 32-bit value there
@@ -909,6 +1065,77 @@ bool WardenModule::bindAPIs() {
     }
 
     LOG_INFO("WardenModule: Binding Windows APIs for module...");
+
+    if (moduleImageUsable_ && importCount_ != 0) {
+        if (importTableOffset_ + static_cast<size_t>(importCount_) * 8u > moduleSize_) {
+            LOG_ERROR("WardenModule: Native import table out of bounds");
+            return false;
+        }
+
+        auto* image = static_cast<uint8_t*>(moduleMemory_);
+        const auto readImageU32 = [&](uint32_t offset) -> uint32_t {
+            uint32_t value = 0;
+            if (offset + 4 <= moduleSize_) std::memcpy(&value, image + offset, sizeof(value));
+            return value;
+        };
+        const auto readImageString = [&](uint32_t offset) -> std::string {
+            std::string value;
+            while (offset < moduleSize_ && image[offset] != 0) value.push_back(static_cast<char>(image[offset++]));
+            return value;
+        };
+
+        uint32_t totalImports = 0;
+        uint32_t resolvedImports = 0;
+        for (uint32_t libraryIndex = 0; libraryIndex < importCount_; ++libraryIndex) {
+            const uint32_t descriptorOffset = importTableOffset_ + libraryIndex * 8u;
+            const uint32_t libraryNameOffset = readImageU32(descriptorOffset);
+            const uint32_t thunkOffset = readImageU32(descriptorOffset + 4);
+            if (libraryNameOffset >= moduleSize_ || thunkOffset >= moduleSize_) {
+                LOG_WARNING("WardenModule: Native import descriptor ", libraryIndex, " is out of bounds");
+                continue;
+            }
+            const std::string libraryName = readImageString(libraryNameOffset);
+            for (uint32_t thunk = thunkOffset; thunk + 4 <= moduleSize_; thunk += 4) {
+                const uint32_t importValue = readImageU32(thunk);
+                if (importValue == 0) break;
+                ++totalImports;
+                std::string functionName;
+                if ((importValue & 0x80000000u) != 0) {
+                    functionName = "#" + std::to_string(importValue & 0x7fffffffu);
+                } else if (importValue < moduleSize_) {
+                    functionName = readImageString(importValue);
+                }
+                if (functionName.empty()) functionName = "unknown";
+
+                uint32_t resolvedAddress = 0;
+                #ifdef HAVE_UNICORN
+                if (emulator_) {
+                    resolvedAddress = emulator_->getAPIAddress(libraryName, functionName);
+                    if (resolvedAddress == 0) {
+                        resolvedAddress = emulator_->hookAPI(libraryName, functionName,
+                            [](WardenEmulator&, const std::vector<uint32_t>&) -> uint32_t { return 0; });
+                    }
+                }
+                #endif
+                if (resolvedAddress != 0) {
+                    std::memcpy(image + thunk, &resolvedAddress, sizeof(resolvedAddress));
+                    #ifdef HAVE_UNICORN
+                    // The emulator copied moduleMemory_ during initialize(), so
+                    // mirror the IAT patch into its mapped image as well.
+                    if (emulator_ && !emulator_->writeMemory(moduleBase_ + thunk,
+                                                            &resolvedAddress,
+                                                            sizeof(resolvedAddress))) {
+                        LOG_WARNING("WardenModule: Failed to mirror native IAT entry into emulator");
+                    }
+                    #endif
+                    ++resolvedImports;
+                }
+            }
+        }
+        LOG_INFO("WardenModule: Bound ", resolvedImports, "/", totalImports,
+                 " native API imports");
+        return true;
+    }
 
     // The Warden module import table lives in decompressedData_ immediately after
     // the relocation entries (which are terminated by a 0x0000 delta). Format:
@@ -1003,6 +1230,20 @@ bool WardenModule::bindAPIs() {
     LOG_INFO("WardenModule: Bound ", resolvedImports, "/", totalImports,
              " API imports (", iatSlotIndex, " IAT slots patched)");
     return true;
+}
+
+uint32_t WardenModule::resolveExport(uint32_t ordinal) const {
+    if (!moduleImageUsable_ || !moduleMemory_ || exportTableOffset_ == 0 || exportCount_ == 0 ||
+        ordinal < exportBaseIndex_) {
+        return 0;
+    }
+    const uint32_t index = ordinal - exportBaseIndex_;
+    const uint32_t slot = exportTableOffset_ + index * 4u;
+    if (index >= exportCount_ || slot + 4 > moduleSize_) return 0;
+
+    uint32_t offset = 0;
+    std::memcpy(&offset, static_cast<const uint8_t*>(moduleMemory_) + slot, sizeof(offset));
+    return offset < moduleSize_ ? moduleBase_ + offset : 0;
 }
 
 bool WardenModule::initializeModule() {
@@ -1165,9 +1406,10 @@ bool WardenModule::initializeModule() {
             LOG_INFO("WardenModule: Prepared ClientCallbacks at ", cbBuf);
         }
 
-        // Call module entry point
-        // Entry point is typically at module base (offset 0)
-        uint32_t entryPoint = moduleBase_;
+        // Native modules export their entry point by ordinal; legacy modules
+        // retain the historical offset-zero entry point.
+        uint32_t entryPoint = resolveExport(1);
+        if (entryPoint == 0) entryPoint = moduleBase_;
 
         {
             char epBuf[32];
