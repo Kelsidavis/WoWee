@@ -42,7 +42,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::RepBar,       "repbar"},
     {UiElement::CastBar,      "castbar", false},
     {UiElement::Minimap,      "minimap"},
-    {UiElement::Chat,         "chat"},
+    {UiElement::Chat,         "chat", false},
     {UiElement::QuestTracker, "questtracker", false},
     {UiElement::WorldMap,     "worldmap"},
     {UiElement::CharacterFrame, "characterframe", false},

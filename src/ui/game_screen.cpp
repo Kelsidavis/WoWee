@@ -653,7 +653,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // windows drawing beside FrameXML's tabs.
     windowManager_.renderGmCommandScreen(gameHandler);
     if (!frameXmlOwns(UiElement::DungeonFinder)) {
-        socialPanel_.renderDungeonFinderWindow(gameHandler, chatPanel_);
+        socialPanel_.renderDungeonFinderWindow(gameHandler);
     }
     windowManager_.renderInstanceLockouts(gameHandler);
     combatUI_.renderCombatLog(gameHandler, spellbookScreen);
@@ -1172,11 +1172,9 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
     // and a poll never went through that loop to be stopped by it. So typing
     // did walk the character and did fire bindings, and the one question both
     // paths now ask is interfaceTakingTypedInput.
-    const bool frameXmlChat = frameXmlOwns(UiElement::Chat);
     if (!io.WantTextInput && !interfaceTakingTypedInput() &&
-        !chatPanel_.isChatInputActive() && input.isKeyJustPressed(SDL_SCANCODE_SLASH)) {
-        if (frameXmlChat) gameHandler.runInterfaceCommand("ChatFrame_OpenChat(\"/\")");
-        else              chatPanel_.activateSlashInput();
+        input.isKeyJustPressed(SDL_SCANCODE_SLASH)) {
+        gameHandler.runInterfaceCommand("ChatFrame_OpenChat(\"/\")");
     }
     // The same one line as Escape, for the same reason: the chain reads sound
     // and the key does nothing, so what is wanted is which branch ran. The
@@ -1184,19 +1182,15 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
     // likeliest answer and is the one that leaves no other trace.
     if (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_CHAT, false)) {
         if (io.WantTextInput || interfaceTakingTypedInput() ||
-            interfaceConsumedKey(ImGuiKey_Enter) ||
-            chatPanel_.isChatInputActive()) {
+            interfaceConsumedKey(ImGuiKey_Enter)) {
             LOG_WARNING("Chat key: refused - ImGui wants text: ",
                      io.WantTextInput ? "yes" : "no",
                      ", the interface's box has focus: ",
                      interfaceTakingTypedInput() ? "yes" : "no",
                      ", the interface's box already took this press: ",
-                     interfaceConsumedKey(ImGuiKey_Enter) ? "yes" : "no",
-                     ", this client's chat input: ",
-                     chatPanel_.isChatInputActive() ? "active" : "idle");
+                     interfaceConsumedKey(ImGuiKey_Enter) ? "yes" : "no");
         } else {
-            LOG_WARNING("Chat key: opening ",
-                     frameXmlChat ? "the interface's box" : "this client's box");
+            LOG_WARNING("Chat key: opening the interface's box");
         }
     }
     // The interface's box gets this press first when it has focus, and Enter
@@ -1204,11 +1198,10 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
     // ends in ChatEdit_OnEscapePressed, which hides the box. That is also what
     // clears the focus this poll's guard reads - so the press that sent the
     // message opened the box again behind it.
-    if (!io.WantTextInput && !chatPanel_.isChatInputActive() &&
+    if (!io.WantTextInput &&
         !interfaceConsumedKey(ImGuiKey_Enter) &&
         KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_CHAT, false)) {
-        if (frameXmlChat) gameHandler.runInterfaceCommand("ChatFrame_OpenChat(\"\")");
-        else              chatPanel_.activateInput();
+        gameHandler.runInterfaceCommand("ChatFrame_OpenChat(\"\")");
     }
 
     // Anything at all is taking typed input: this client's chat box, an ImGui
@@ -1221,8 +1214,7 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
     // fired action bar slots. The two places that had noticed named the
     // interface's box separately, which is how the third came to be missing
     // from the rest.
-    const bool textFocus = chatPanel_.isChatInputActive() || io.WantTextInput ||
-                           interfaceTakingTypedInput();
+    const bool textFocus = io.WantTextInput || interfaceTakingTypedInput();
 
     // Game hotkeys - gate on textFocus (chat/text-input active) rather than
     // WantCaptureKeyboard so that toggle keys like M, C, I still work when an
@@ -1280,9 +1272,8 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
             }
         }
         if (escapePressed && textFocus) {
-            LOG_WARNING("Escape: swallowed before the chain - chat input ",
-                     chatPanel_.isChatInputActive() ? "active" : "idle",
-                     ", ImGui wants text: ", io.WantTextInput ? "yes" : "no",
+            LOG_WARNING("Escape: swallowed before the chain - ",
+                     "ImGui wants text: ", io.WantTextInput ? "yes" : "no",
                      ", the interface's box has focus: ",
                      interfaceTakingTypedInput() ? "yes" : "no");
         }

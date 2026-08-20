@@ -55,19 +55,13 @@ public:
 
     // ---- Input helpers (called by GameScreen keybind handling) ----
 
-    [[nodiscard]] bool isChatInputActive() const { return chatInputActive_; }
 
     /** Insert a spell / item link into the chat input buffer (shift-click). */
     void insertChatLink(const std::string& link);
 
-    /** Activate the input field with a leading '/' (slash key). */
-    void activateSlashInput();
 
-    /** Activate (focus) the input field (Enter key). */
-    void activateInput();
 
     /** Request that the chat input be focused next frame. */
-    void requestRefocus() { refocusChatInput_ = true; }
 
     /** Set up a whisper to the given player name and focus input. */
     void setWhisperTarget(const std::string& name);
@@ -140,8 +134,6 @@ public:
     void setServices(const UIServices& services) { services_ = services; }
 
     // ---- Accessors for command system (Phase 3) ----
-    char* getChatInputBuffer() { return chatInputBuffer_; }
-    [[nodiscard]] size_t getChatInputBufferSize() const { return sizeof(chatInputBuffer_); }
     char* getWhisperTargetBuffer() { return whisperTargetBuffer_; }
     [[nodiscard]] size_t getWhisperTargetBufferSize() const { return sizeof(whisperTargetBuffer_); }
     [[nodiscard]] int  getSelectedChatType() const { return selectedChatType_; }
@@ -163,14 +155,13 @@ private:
     // decomposition and never used by anything; it was removed rather than
     // left as a destination nobody was travelling to, since FrameXML's edit
     // box now owns typing whenever it owns chat at all.
+    /// Not an input box any more - the interface draws that. This is the
+    /// scratch a macro's chat line is assembled in before sendChatMessage
+    /// reads it, which is the only writer left.
     char chatInputBuffer_[512] = "";
     char whisperTargetBuffer_[256] = "";
-    bool chatInputActive_ = false;
-    int  chatInputCooldown_ = 0;  // frames to suppress re-activation after send
     int  selectedChatType_ = 0;  // 0=SAY .. 10=CHANNEL
     int  selectedChannelIdx_ = 0;
-    bool chatInputMoveCursorToEnd_ = false;
-    bool refocusChatInput_ = false;
 
     // Sent-message history (Up/Down arrow recall)
     std::vector<std::string> chatSentHistory_;

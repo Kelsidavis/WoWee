@@ -56,8 +56,7 @@ public:
     // Takes the panels the markup renderer needs: the guild info text and the
     // MOTD are server strings that carry item, spell, quest and achievement
     // links, and rendering them as plain text left every link inert.
-    void renderDungeonFinderWindow(game::GameHandler& gameHandler,
-                                   ChatPanel& chatPanel);
+    void renderDungeonFinderWindow(game::GameHandler& gameHandler);
 
     // UIServices injection (singleton breaking)
     void setServices(const UIServices& services) { services_ = services; }

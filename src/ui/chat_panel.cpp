@@ -112,58 +112,22 @@ std::string asLuaString(const std::string& text) {
 }  // namespace
 
 void ChatPanel::insertChatLink(const std::string& link) {
-    if (link.empty()) return;
-    // Shift-clicking an item, spell or achievement anywhere in the client
-    // comes here, from seventeen call sites. With the chat window handed to
-    // FrameXML, appending to this panel's buffer wrote into a box that is
-    // never drawn, so every one of those clicks did nothing at all.
-    //
     // ChatEdit_InsertLink is what the interface uses for the same gesture: it
-    // finds the active edit box, opening one if none is, and inserts there.
-    if (frameXmlOwns(UiElement::Chat)) {
-        if (cachedGameHandler_) {
-            // Insert into the open box, or open one holding the link.
-            // ChatEdit_InsertLink answers false when no edit box is active,
-            // and on its own that drops the click entirely.
-            cachedGameHandler_->runInterfaceCommand(
-                "local l = " + asLuaString(link) +
-                " if not ChatEdit_InsertLink(l) then ChatFrame_OpenChat(l) end");
-        }
-        return;
-    }
-    size_t curLen = strlen(chatInputBuffer_);
-    if (curLen + link.size() + 1 <= sizeof(chatInputBuffer_)) {
-        strncat(chatInputBuffer_, link.c_str(), sizeof(chatInputBuffer_) - curLen - 1);
-        chatInputMoveCursorToEnd_ = true;
-        refocusChatInput_ = true;
-    }
+    // finds the active edit box and inserts there, answering false when none
+    // is active - which on its own would drop the click, hence the open behind
+    // it. There is no box on this side to append to any more.
+    if (!cachedGameHandler_) return;
+    cachedGameHandler_->runInterfaceCommand(
+        "local l = " + asLuaString(link) +
+        " if not ChatEdit_InsertLink(l) then ChatFrame_OpenChat(l) end");
 }
 
-void ChatPanel::activateSlashInput() {
-    if (frameXmlOwns(UiElement::Chat)) {
-        if (cachedGameHandler_) cachedGameHandler_->runInterfaceCommand("ChatFrame_OpenChat(\"/\")");
-        return;
-    }
-    refocusChatInput_ = true;
-    chatInputBuffer_[0] = '/';
-    chatInputBuffer_[1] = '\0';
-    chatInputMoveCursorToEnd_ = true;
-}
 
-void ChatPanel::activateInput() {
-    if (frameXmlOwns(UiElement::Chat)) {
-        if (cachedGameHandler_) cachedGameHandler_->runInterfaceCommand("ChatFrame_OpenChat(\"\")");
-        return;
-    }
-    if (chatInputCooldown_ > 0) return;
-    refocusChatInput_ = true;
-}
 
 void ChatPanel::setWhisperTarget(const std::string& name) {
     selectedChatType_ = 4;  // WHISPER
     strncpy(whisperTargetBuffer_, name.c_str(), sizeof(whisperTargetBuffer_) - 1);
     whisperTargetBuffer_[sizeof(whisperTargetBuffer_) - 1] = '\0';
-    refocusChatInput_ = true;
 }
 
 ChatPanel::SlashCommands ChatPanel::consumeSlashCommands() {

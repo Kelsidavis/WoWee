@@ -66,10 +66,9 @@ uint8_t allowedLfgRolesForClass(uint8_t classId) {
 }
 } // namespace
 
-void SocialPanel::renderDungeonFinderWindow(game::GameHandler& gameHandler,
-                                               ChatPanel& chatPanel) {
+void SocialPanel::renderDungeonFinderWindow(game::GameHandler& gameHandler) {
     // Toggle Dungeon Finder (customizable keybind)
-    if (!chatPanel.isChatInputActive() && !ImGui::GetIO().WantTextInput &&
+    if (!ImGui::GetIO().WantTextInput &&
         KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_DUNGEON_FINDER)) {
         showDungeonFinder_ = !showDungeonFinder_;
     }
