@@ -621,13 +621,14 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
     Attempt attempts[4];
 
     auto tryParsePairs = [&](PairFormat format,
+                             size_t startOffset,
                              std::vector<uint8_t>& imageOut,
                              size_t& relocPosOut,
                              size_t& finalOffsetOut,
                              int& pairCountOut,
                              Attempt& record) -> bool {
         imageOut.assign(moduleSize_, 0);
-        size_t pos = 4; // Skip 4-byte final size header
+        size_t pos = startOffset;
         size_t destOffset = 0;
         int pairCount = 0;
         const auto note = [&](const char* why) {
@@ -739,16 +740,16 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
     int parsedPairCount = 0;
 
     PairFormat usedFormat = PairFormat::CopyDataSkip;
-    bool parsed = tryParsePairs(PairFormat::CopyDataSkip, parsedImage, parsedRelocPos,
+    bool parsed = tryParsePairs(PairFormat::CopyDataSkip, 4, parsedImage, parsedRelocPos,
                                 parsedFinalOffset, parsedPairCount, attempts[0]);
     if (!parsed) {
         usedFormat = PairFormat::SkipCopyData;
-        parsed = tryParsePairs(PairFormat::SkipCopyData, parsedImage, parsedRelocPos,
+        parsed = tryParsePairs(PairFormat::SkipCopyData, 4, parsedImage, parsedRelocPos,
                                parsedFinalOffset, parsedPairCount, attempts[1]);
     }
     if (!parsed) {
         usedFormat = PairFormat::CopySkipData;
-        parsed = tryParsePairs(PairFormat::CopySkipData, parsedImage, parsedRelocPos,
+        parsed = tryParsePairs(PairFormat::CopySkipData, 4, parsedImage, parsedRelocPos,
                                parsedFinalOffset, parsedPairCount, attempts[2]);
     }
     if (!parsed) {
@@ -756,11 +757,45 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
         // will not land on the image's last byte by luck, and accepting one
         // that did would hand the emulator rubbish to run.
         usedFormat = PairFormat::CopyDataSkipToFill;
-        parsed = tryParsePairs(PairFormat::CopyDataSkipToFill, parsedImage, parsedRelocPos,
+        parsed = tryParsePairs(PairFormat::CopyDataSkipToFill, 4, parsedImage, parsedRelocPos,
                                parsedFinalOffset, parsedPairCount, attempts[3]);
         if (parsed && parsedFinalOffset != finalCodeSize) {
             parsed = false;
             attempts[3].why = "it did not fill the image exactly";
+        }
+    }
+
+    // Nothing starting four bytes in works. The four-byte header is an
+    // assumption, and a module whose header is longer puts the pair stream
+    // somewhere this has not looked - so look, over the header lengths a
+    // structure of 32-bit fields can have.
+    //
+    // Only an exact fill is taken. A pair stream read from the wrong offset
+    // does not arrive on the image's last byte, and one that did would hand
+    // the emulator rubbish; the stubs it would replace are the better answer.
+    size_t foundOffset = 4;
+    if (!parsed) {
+        static constexpr PairFormat kFormats[4] = {
+            PairFormat::CopyDataSkip, PairFormat::SkipCopyData,
+            PairFormat::CopySkipData, PairFormat::CopyDataSkipToFill};
+        Attempt scratch;
+        for (size_t offset = 8; !parsed && offset <= 128; offset += 4) {
+            for (PairFormat format : kFormats) {
+                if (!tryParsePairs(format, offset, parsedImage, parsedRelocPos,
+                                   parsedFinalOffset, parsedPairCount, scratch)) {
+                    continue;
+                }
+                if (parsedFinalOffset != finalCodeSize) continue;
+                usedFormat = format;
+                foundOffset = offset;
+                parsed = true;
+                break;
+            }
+        }
+        if (parsed) {
+            LOG_WARNING("WardenModule: the pair stream starts ", foundOffset,
+                        " bytes in, not 4 - this module's header is longer than "
+                        "the one the format is written for");
         }
     }
 
@@ -799,7 +834,7 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
     {
         std::string head;
         char byteText[4];
-        for (size_t i = 0; i < exeData.size() && i < 32; ++i) {
+        for (size_t i = 0; i < exeData.size() && i < 64; ++i) {
             std::snprintf(byteText, sizeof(byteText), "%02X", exeData[i]);
             head += byteText;
             head += ' ';
