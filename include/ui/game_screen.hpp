@@ -13,7 +13,6 @@
 #include "ui/settings_panel.hpp"
 #include "ui/minimap_projection.hpp"
 #include "ui/combat_ui.hpp"
-#include "ui/social_panel.hpp"
 #include "ui/action_bar_panel.hpp"
 #include "ui/window_manager.hpp"
 #include "ui/ui_services.hpp"
@@ -50,6 +49,19 @@ public:
         settingsPanel_.showSettingsWindow = true;
         if (tab) settingsPanel_.requestedTab_ = tab;
     }
+
+    /// Put the inspect window up, whichever interface draws it.
+    ///
+    /// Seven places used to set a flag behind this client's own window and its
+    /// render was gated on FrameXML not owning the element, so with that handed
+    /// over inspecting sent the request and showed nothing. The request goes
+    /// out from the caller either way - this is only the window.
+    ///
+    /// The last thing SocialPanel did. That class had owned the party frames,
+    /// the boss frames, the guild roster, the friends list, the dungeon finder
+    /// and the who window, all of which are FrameXML's now, and what was left
+    /// was this one line beside four unread text buffers.
+    void openInspectWindow(game::GameHandler& gameHandler);
 
     /// Display pacing, for the interface's gxVSync checkbox.
     ///
@@ -153,9 +165,6 @@ private:
 
     // Combat UI (extracted from GameScreen - owns all combat overlay rendering)
     CombatUI combatUI_;
-
-    // Social panel (extracted from GameScreen - owns all social/group UI rendering)
-    SocialPanel socialPanel_;
 
     // Action bar panel (extracted from GameScreen - owns action/stance/bag/xp/rep bars)
     ActionBarPanel actionBarPanel_;
@@ -350,8 +359,6 @@ private:
     float runeClientFill_[6] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
 
     // Pet rename modal (triggered from pet frame context menu)
-    bool petRenameOpen_ = false;
-    char petRenameBuf_[16] = {};
 
     // Left-click targeting: distinguish click from camera drag
     glm::vec2 leftClickPressPos_ = glm::vec2(0.0f);

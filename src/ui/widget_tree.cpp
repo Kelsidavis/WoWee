@@ -189,7 +189,6 @@ void WidgetTree::hideOrphanedTooltips() {
         tip->shown = false;
         tip->visible = false;
         tip->visibleChain = false;
-        layoutDirty_ = true;
     }
 }
 
@@ -665,7 +664,6 @@ void WidgetTree::layout(float pixelW, float pixelH) {
     struct Done { bool& f; ~Done() { f = false; } } done{layingOut_};
     lastPixelW_ = pixelW;
     lastPixelH_ = pixelH;
-    layoutDirty_ = false;
     // How many pixels one interface unit is worth. Everything below works in
     // units; only the renderer and hit testing convert.
     // The screen's height decides the base, and the player's UI Scale

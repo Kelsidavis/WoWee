@@ -20,10 +20,11 @@ namespace {
 /// handed over nor suppressed, because that one is on screen twice. An
 /// element nothing here draws can never be, so reporting it would be a false
 /// alarm - and the report is only worth reading while every line of it is
-/// real. Four lines of it were not: the action bar, the stance bar and the two
-/// thin bars are the only elements not owned by default, and action_bar_panel
-/// was deleted whole, so each warned on every start about a window that had
-/// not existed for some time.
+/// real. The action bar, the stance bar and the two thin bars had it wrong for
+/// some time: action_bar_panel was deleted whole and the flag was not moved.
+/// Silent, because the report skips an owned element first and coveredByGroup
+/// owns all four through "mainmenubar" - the four names appear nowhere in the
+/// default list, which is what makes reading it by eye say otherwise.
 ///
 /// It is also what says whether an element may have a suppression row. Hiding
 /// FrameXML's frame is only right while something else is drawing, so the two

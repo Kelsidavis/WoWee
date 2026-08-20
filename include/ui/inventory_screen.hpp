@@ -53,11 +53,6 @@ public:
     [[nodiscard]] bool isCharacterOpen() const { return characterOpen; }
     void setCharacterOpen(bool o) { characterOpen = o; }
 
-    /// Enable vendor mode: right-clicking bag items sells them.
-    void setVendorMode(bool enabled, game::GameHandler* handler) {
-        vendorMode_ = enabled;
-        gameHandler_ = handler;
-    }
     void setGameHandler(game::GameHandler* handler) { gameHandler_ = handler; }
 
     /// Set asset manager for icon/model loading
@@ -86,7 +81,6 @@ private:
     bool inventoryDirty = false;
 
     // Vendor sell mode
-    bool vendorMode_ = false;
     game::GameHandler* gameHandler_ = nullptr;
 
     // Asset manager for icons and preview

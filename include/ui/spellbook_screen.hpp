@@ -47,7 +47,7 @@ public:
     // Drag-and-drop state for action bar assignment
     [[nodiscard]] bool isDraggingSpell() const { return draggingSpell_; }
     [[nodiscard]] uint32_t getDragSpellId() const { return dragSpellId_; }
-    void consumeDragSpell() { draggingSpell_ = false; dragSpellId_ = 0; dragSpellIconTex_ = VK_NULL_HANDLE; }
+    void consumeDragSpell() { draggingSpell_ = false; dragSpellId_ = 0; }
 
     /// Returns the max range in yards for a spell (0 if self-cast, unknown, or melee).
     /// Triggers DBC load if needed. Used by the action bar for out-of-range tinting.
@@ -86,7 +86,6 @@ private:
     // Drag-and-drop from spellbook to action bar
     bool draggingSpell_ = false;
     uint32_t dragSpellId_ = 0;
-    VkDescriptorSet dragSpellIconTex_ = VK_NULL_HANDLE;
 
     // Pending chat spell link from shift-click
     std::string pendingChatSpellLink_;

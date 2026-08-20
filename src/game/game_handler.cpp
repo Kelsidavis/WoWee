@@ -279,6 +279,10 @@ void GameHandler::sortBankBag(int bagIndex) {
     for (auto& s : swaps) sortSwapQueue_.push_back(s);
 }
 
+void GameHandler::queuePacedChat(std::vector<std::string> lines) {
+    for (std::string& line : lines) pacedChatQueue_.push_back(std::move(line));
+}
+
 void GameHandler::updateNetworking() {
     // One queued sort move per tick. A sort is dozens of swaps and the server
     // drops a burst of them, so they go out at the rate anything else does.
@@ -292,6 +296,14 @@ void GameHandler::updateNetworking() {
     if (movementHandler_) {
         movementHandler_->monsterMovePacketsThisTickRef() = 0;
         movementHandler_->monsterMovePacketsDroppedThisTickRef() = 0;
+    }
+
+    // One queued chat line per tick, for the same reason and at the same rate
+    // as the sort moves above.
+    if (!pacedChatQueue_.empty()) {
+        const std::string line = std::move(pacedChatQueue_.front());
+        pacedChatQueue_.pop_front();
+        sendChatMessage(ChatType::SAY, line, "");
     }
 
     // Anything still waiting on a name query that never came back. After the

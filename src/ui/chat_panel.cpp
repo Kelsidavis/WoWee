@@ -177,7 +177,6 @@ void ChatPanel::sendChatMessage(game::GameHandler& gameHandler) {
             }
         }
     }
-    chatHistoryIdx_ = -1;
 
     game::ChatType type = game::ChatType::SAY;
     std::string message = input;

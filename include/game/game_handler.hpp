@@ -3056,6 +3056,15 @@ public:
     /// SortBags(). One queue, drained a swap per tick - the server refuses a
     /// burst of them, and a sort is dozens.
     void sortBags();
+    /// Send these one per tick rather than all at once.
+    ///
+    /// The server's flood protection drops a burst, which for a sequence of
+    /// dot-commands means most of it silently does not happen. Same reason
+    /// sortBags has a queue, and the same drain beside it.
+    void queuePacedChat(std::vector<std::string> lines);
+    /// How many of those are still waiting, so a caller can say so.
+    size_t pacedChatRemaining() const { return pacedChatQueue_.size(); }
+
     /// Whether a sort is still sending. The button reads it to disable itself.
     /// One item sort at a time, whichever container it is over.
     ///
@@ -4699,6 +4708,9 @@ private:
 
     /// Sort moves still to send, one per tick. See sortBags.
     std::deque<Inventory::SwapOp> sortSwapQueue_;
+
+    /// Chat lines still to send, one per tick. See queuePacedChat.
+    std::deque<std::string> pacedChatQueue_;
 
     // Area name cache (lazy-loaded from WorldMapArea.dbc; maps AreaTable ID → display name)
     mutable std::unordered_map<uint32_t, std::string> areaNameCache_;

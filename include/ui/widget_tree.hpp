@@ -783,7 +783,7 @@ public:
     void scrollContentExtent(uint32_t childId, float& outW, float& outH) const;
 
     /// Something moved, resized or changed parent - every rect is stale.
-    void markLayoutDirty() { layoutDirty_ = true; ++layoutGeneration_; }
+    void markLayoutDirty() { ++layoutGeneration_; }
 
     /// Pixels per interface unit, from the last layout.
     /// How many pixels one interface unit is worth, after the player's own
@@ -814,7 +814,10 @@ public:
                             : (scale > kMaxUserScale ? kMaxUserScale : scale);
         if (clamped == userScale_) return;
         userScale_ = clamped;
-        layoutDirty_ = true;
+        // Every rect is stale after a scale change, and this said so through
+        // layoutDirty_ - the half of the mechanism nothing read. The live half
+        // is the generation counter, so it says it through that now.
+        markLayoutDirty();
     }
     [[nodiscard]] float userScale() const { return userScale_; }
 
@@ -947,9 +950,6 @@ private:
     /// needs no further work; one from an older generation is stale.
     uint64_t layoutGeneration_ = 1;
 
-    /// Set by anything that moves or resizes a widget, cleared by layout().
-    /// Starts true so the first measurement of a fresh tree resolves.
-    bool  layoutDirty_ = true;
     /// The size the last full pass ran at, so an on-demand one can match it.
     float lastPixelW_ = 0.0f;
     float lastPixelH_ = 0.0f;

@@ -110,6 +110,12 @@ GameScreen::GameScreen() {
     loadSettings();
 }
 
+void GameScreen::openInspectWindow(game::GameHandler& gameHandler) {
+    // Loads Blizzard_InspectUI and shows it. The inspect request itself is
+    // already on its way from the caller; this only puts a window up.
+    gameHandler.runInterfaceCommand("InspectUnit(\"target\")");
+}
+
 void GameScreen::applySavedAntiAliasing(rendering::Renderer* renderer) {
     if (!renderer) return;
     settingsPanel_.msaaSettingsApplied_ = true;
@@ -222,7 +228,6 @@ void GameScreen::setServices(const UIServices& services) {
     settingsPanel_.setChatSettings(&chatPanel_.settings);
     settingsPanel_.setInventoryScreen(&inventoryScreen);
     combatUI_.setServices(services);
-    socialPanel_.setServices(services);
     windowManager_.setServices(services);
     applyCameraControlSettings();
     // The settings file is read in the constructor, before there is a renderer
@@ -573,12 +578,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // Process targeting input before UI windows
     processTargetInput(gameHandler);
 
-    // Auto-open pet rename modal when server signals the pet is renameable (first tame)
-    if (gameHandler.consumePetRenameablePending()) {
-        petRenameOpen_ = true;
-        petRenameBuf_[0] = '\0';
-    }
-
 
     // Render windows
     if (showPlayerInfo) {
@@ -599,7 +598,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // /inspect, /threat, /bgscore, /gm and /who all did nothing at all.
     {
         auto cmds = chatPanel_.consumeSlashCommands();
-        if (cmds.showInspect) socialPanel_.openInspectWindow(gameHandler);
+        if (cmds.showInspect) openInspectWindow(gameHandler);
         if (cmds.toggleThreat) combatUI_.showThreatWindow_ = !combatUI_.showThreatWindow_;
         // Both windows are gated on their element, so with either handed over
         // the slash command set a flag whose only reader is switched off.
@@ -647,7 +646,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // list, the who list and the guild roster. Only the friends list was gated
     // on this side, so handing social over left two of this client's three
     // windows drawing beside FrameXML's tabs.
-    windowManager_.renderGmCommandScreen(gameHandler);
     windowManager_.renderInstanceLockouts(gameHandler);
     combatUI_.renderCombatLog(gameHandler, spellbookScreen);
     windowManager_.renderSkillsWindow(gameHandler);
@@ -711,7 +709,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     }
 
     // Set vendor mode before rendering inventory
-    inventoryScreen.setVendorMode(gameHandler.isVendorWindowOpen(), &gameHandler);
+    inventoryScreen.setGameHandler(&gameHandler);
 
     // Auto-open bags once when vendor window first opens
     if (gameHandler.isVendorWindowOpen()) {

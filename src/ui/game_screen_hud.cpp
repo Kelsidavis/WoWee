@@ -1604,7 +1604,7 @@ void GameScreen::renderNameplates(game::GameHandler& gameHandler) {
                     if (ImGui::MenuItem("Inspect")) {
                         gameHandler.setTarget(nameplateCtxGuid_);
                         gameHandler.inspectTarget();
-                        socialPanel_.openInspectWindow(gameHandler);
+                        openInspectWindow(gameHandler);
                     }
                     ImGui::Separator();
                     if (ImGui::MenuItem("Add Friend"))

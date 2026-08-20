@@ -165,7 +165,6 @@ private:
 
     // Sent-message history (Up/Down arrow recall)
     std::vector<std::string> chatSentHistory_;
-    int chatHistoryIdx_ = -1;
 
     // ---- History search filter ----
     char chatFilterBuffer_[128] = "";
