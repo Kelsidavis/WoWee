@@ -19,7 +19,6 @@ namespace wowee { namespace ui {
 
 namespace {
     using namespace wowee::ui::colors;
-    constexpr auto& kColorGreen    = kGreen;
 } // namespace
 
 
@@ -39,13 +38,6 @@ void DialogManager::renderDialogs(game::GameHandler& gameHandler) {
     // counts down to the start.
     renderDuelCountdown(gameHandler);
 
-    // LFDDungeonReadyPopup and LFDRoleCheckPopup, both named in the dungeon
-    // finder's suppression list, so these stand down for their own element
-    // rather than for dialogs.
-    if (!frameXmlOwns(UiElement::DungeonFinder)) {
-        renderLfgProposalPopup(gameHandler);
-        renderLfgRoleCheckPopup(gameHandler);
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -104,120 +96,6 @@ void DialogManager::renderDuelCountdown(game::GameHandler& gameHandler) {
     // Drop shadow
     dl->AddText(font, scaledSize, ImVec2(tx + 2.0f, ty + 2.0f), IM_COL32(0, 0, 0, alpha / 2), buf);
     dl->AddText(font, scaledSize, ImVec2(tx, ty), color, buf);
-}
-
-void DialogManager::renderLfgProposalPopup(game::GameHandler& gameHandler) {
-    using LfgState = game::GameHandler::LfgState;
-    if (gameHandler.getLfgState() != LfgState::Proposal) return;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-    float screenH = window ? static_cast<float>(window->getHeight()) : 720.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2.0f - 175.0f, screenH / 2.0f - 65.0f), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(350.0f, 0.0f), ImGuiCond_Always);
-
-    ImGui::PushStyleColor(ImGuiCol_WindowBg,      ImVec4(0.08f, 0.14f, 0.08f, 0.96f));
-    ImGui::PushStyleColor(ImGuiCol_Border,        ImVec4(0.3f, 0.8f, 0.3f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.1f, 0.3f, 0.1f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
-
-    const ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
-
-    if (ImGui::Begin("Dungeon Finder", nullptr, flags)) {
-        ImGui::TextColored(kColorGreen, "A group has been found!");
-        ImGui::Spacing();
-        ImGui::TextWrapped("Please accept or decline to join the dungeon.");
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        ImGui::PushStyleColor(ImGuiCol_Button,        colors::kBtnGreen);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colors::kFriendlyGreen);
-        if (ImGui::Button("Accept", ImVec2(155.0f, 30.0f))) {
-            gameHandler.lfgAcceptProposal(gameHandler.getLfgProposalId(), true);
-        }
-        ImGui::PopStyleColor(2);
-
-        ImGui::SameLine();
-
-        ImGui::PushStyleColor(ImGuiCol_Button,        colors::kBtnRed);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colors::kDangerRed);
-        if (ImGui::Button("Decline", ImVec2(155.0f, 30.0f))) {
-            gameHandler.lfgAcceptProposal(gameHandler.getLfgProposalId(), false);
-        }
-        ImGui::PopStyleColor(2);
-    }
-    ImGui::End();
-
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(3);
-}
-
-void DialogManager::renderLfgRoleCheckPopup(game::GameHandler& gameHandler) {
-    using LfgState = game::GameHandler::LfgState;
-    if (gameHandler.getLfgState() != LfgState::RoleCheck) return;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-    float screenH = window ? static_cast<float>(window->getHeight()) : 720.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2.0f - 160.0f, screenH / 2.0f - 80.0f), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(320.0f, 0.0f), ImGuiCond_Always);
-
-    ImGui::PushStyleColor(ImGuiCol_WindowBg,      ImVec4(0.08f, 0.08f, 0.18f, 0.96f));
-    ImGui::PushStyleColor(ImGuiCol_Border,        ImVec4(0.3f, 0.5f, 0.9f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.1f, 0.1f, 0.3f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
-
-    const ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
-
-    if (ImGui::Begin("Role Check##LfgRoleCheck", nullptr, flags)) {
-        ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), "Confirm your role:");
-        ImGui::Spacing();
-
-        // Role checkboxes
-        bool isTank   = (lfgRoles_ & 0x02) != 0;
-        bool isHealer = (lfgRoles_ & 0x04) != 0;
-        bool isDps    = (lfgRoles_ & 0x08) != 0;
-
-        if (ImGui::Checkbox("Tank",   &isTank))   lfgRoles_ = (lfgRoles_ & ~0x02) | (isTank   ? 0x02 : 0);
-        ImGui::SameLine(120.0f);
-        if (ImGui::Checkbox("Healer", &isHealer)) lfgRoles_ = (lfgRoles_ & ~0x04) | (isHealer ? 0x04 : 0);
-        ImGui::SameLine(220.0f);
-        if (ImGui::Checkbox("DPS",    &isDps))    lfgRoles_ = (lfgRoles_ & ~0x08) | (isDps    ? 0x08 : 0);
-
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        bool hasRole = (lfgRoles_ & 0x0E) != 0;
-        if (!hasRole) ImGui::BeginDisabled();
-
-        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.15f, 0.4f, 0.15f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.6f, 0.2f, 1.0f));
-        if (ImGui::Button("Accept", ImVec2(140.0f, 28.0f))) {
-            gameHandler.lfgSetRoles(lfgRoles_);
-        }
-        ImGui::PopStyleColor(2);
-
-        if (!hasRole) ImGui::EndDisabled();
-
-        ImGui::SameLine();
-
-        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.4f, 0.15f, 0.15f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
-        if (ImGui::Button("Leave Queue", ImVec2(140.0f, 28.0f))) {
-            gameHandler.lfgLeave();
-        }
-        ImGui::PopStyleColor(2);
-    }
-    ImGui::End();
-
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(3);
 }
 
 // ============================================================

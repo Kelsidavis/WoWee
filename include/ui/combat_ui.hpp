@@ -36,7 +36,6 @@ public:
     bool showCombatLog_ = false;
     bool showThreatWindow_ = false;
 
-    bool raidWarnCallbackSet_ = false;
     size_t raidWarnChatSeenCount_ = 0;
 
     // ---- DPS meter state ----

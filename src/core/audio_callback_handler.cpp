@@ -128,7 +128,7 @@ void AudioCallbackHandler::setupCallbacks() {
 
     // Open dungeon finder callback - server sends SMSG_OPEN_LFG_DUNGEON_FINDER
     gameHandler_.setOpenLfgCallback([this]() {
-        if (uiManager_) uiManager_->getGameScreen().openDungeonFinder();
+        if (uiManager_) uiManager_->getGameScreen().openDungeonFinder(gameHandler_);
     });
 }
 

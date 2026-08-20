@@ -385,7 +385,14 @@ private:
     void renderWeatherOverlay(game::GameHandler& gameHandler);
 
 public:
-    void openDungeonFinder() { socialPanel_.showDungeonFinder_ = true; }
+    /// The server asking for the window (SMSG_OPEN_LFG_DUNGEON_FINDER).
+    ///
+    /// Shown rather than toggled: this is not the player pressing the key, and
+    /// a toggle would shut a window that was already open.
+    void openDungeonFinder(game::GameHandler& gameHandler) {
+        gameHandler.runInterfaceCommand(
+            "if not LFDParentFrame:IsShown() then ToggleLFDParentFrame() end");
+    }
     ToastManager& toastManager() { return toastManager_; }
     /// Reached by the barber bindings, which need state this owns.
     WindowManager& windowManager() { return windowManager_; }

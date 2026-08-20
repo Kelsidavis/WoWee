@@ -648,9 +648,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // on this side, so handing social over left two of this client's three
     // windows drawing beside FrameXML's tabs.
     windowManager_.renderGmCommandScreen(gameHandler);
-    if (!frameXmlOwns(UiElement::DungeonFinder)) {
-        socialPanel_.renderDungeonFinderWindow(gameHandler);
-    }
     windowManager_.renderInstanceLockouts(gameHandler);
     combatUI_.renderCombatLog(gameHandler, spellbookScreen);
     windowManager_.renderSkillsWindow(gameHandler);

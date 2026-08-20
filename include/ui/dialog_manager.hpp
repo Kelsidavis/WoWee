@@ -44,12 +44,9 @@ private:
         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize;
 
     // ---- LFG role state ----
-    uint8_t lfgRoles_ = 0x08;  // default: DPS (0x02=tank, 0x04=healer, 0x08=dps)
 
     // ---- Individual dialog renderers ----
     void renderDuelCountdown(game::GameHandler& gameHandler);
-    void renderLfgProposalPopup(game::GameHandler& gameHandler);
-    void renderLfgRoleCheckPopup(game::GameHandler& gameHandler);
     void renderPetUnlearnConfirmDialog(game::GameHandler& gameHandler);
 };
 

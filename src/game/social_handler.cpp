@@ -3803,13 +3803,9 @@ void SocialHandler::handleLfgPlayerReward(network::Packet& packet) {
     // be written before this fires.
     if (owner_.addonEventCallbackRef()) owner_.addonEventCallbackRef()("LFG_COMPLETION_REWARD", {});
 
-    // ...and the hand-built chat line only when this client is drawing its own
-    // chat, for the same reason /played's is conditional: FrameXML says this
-    // its own way, in a toast rather than a line, and printing both is two
-    // announcements of one reward.
-    if (!ui::frameXmlOwns(ui::UiElement::DungeonFinder)) {
-        owner_.addSystemChatMessage(rewardMsg);
-    }
+    // No hand-built chat line: FrameXML announces the reward its own way, in
+    // a toast rather than a line, and printing both is two announcements of
+    // one reward.
 }
 
 void SocialHandler::handleLfgBootProposalUpdate(network::Packet& packet) {

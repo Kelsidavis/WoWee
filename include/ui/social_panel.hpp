@@ -33,7 +33,6 @@ public:
     using SpellIconFn = std::function<VkDescriptorSet(uint32_t spellId, pipeline::AssetManager*)>;
 
     // ---- Toggle booleans (written by slash commands / escape handler / keybinds / UI buttons) ----
-    bool showDungeonFinder_ = false;
     /// Put the inspect window up, whichever interface draws it.
     ///
     /// Seven places set the flag above directly and the window's render is
@@ -49,14 +48,11 @@ public:
     char addRankNameBuffer_[64] = {0};
 
     // ---- LFG state ----
-    uint8_t lfgRoles_ = 0x08;           // default: DPS (0x02=tank, 0x04=healer, 0x08=dps)
-    uint32_t lfgSelectedDungeon_ = 861;  // default: random dungeon (entry 861)
 
     // ---- Public render methods ----
     // Takes the panels the markup renderer needs: the guild info text and the
     // MOTD are server strings that carry item, spell, quest and achievement
     // links, and rendering them as plain text left every link inert.
-    void renderDungeonFinderWindow(game::GameHandler& gameHandler);
 
     // UIServices injection (singleton breaking)
     void setServices(const UIServices& services) { services_ = services; }

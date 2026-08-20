@@ -62,7 +62,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::AuctionHouse, "auctionhouse"},
     {UiElement::GuildBank,    "guildbank"},
     {UiElement::Inspect,      "inspect", false},
-    {UiElement::DungeonFinder, "dungeonfinder"},
+    {UiElement::DungeonFinder, "dungeonfinder", false},
     {UiElement::Petition,     "petition", false},
     {UiElement::Buffs,        "buffs", false},
     {UiElement::Durability,   "durability", false},
@@ -722,7 +722,6 @@ const Suppress kSuppress[] = {
         // beside this client's own on every group that formed. The role-check
         // popup could not appear because LFG_ROLE_CHECK_SHOW was never fired,
         // and the browser only from a micro button this branch has taken over.
-        {UiElement::DungeonFinder, "LFDParentFrame LFDDungeonReadyPopup LFDRoleCheckPopup"},
         // The charter windows. All three are live duplicates: this client
         // fires GUILD_REGISTRAR_SHOW and PETITION_VENDOR_SHOW from one handler
         // and PETITION_SHOW from the next, and each raises the FrameXML frame
@@ -770,7 +769,6 @@ const Suppress kSuppress[] = {
         // that opened but laid out to nothing shows itself.
         {UiElement::Vendor,       "MerchantFrame MerchantItem1 MerchantMoneyFrame "
                                   "MerchantNextPageButton"},
-        {UiElement::DungeonFinder, "LFDParentFrame", true},
         // BARBER_SHOP_OPEN is fired and the achievements micro button belongs
         // to the bar this branch has taken over, so both of these can open
         // beside the client's own.
