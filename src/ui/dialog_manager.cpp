@@ -27,62 +27,24 @@ namespace {
 // Render early dialogs (group invite through LFG role check)
 // ---------------------------------------------------------------------------
 void DialogManager::renderDialogs(game::GameHandler& gameHandler) {
-    // The prompts FrameXML asks with a StaticPopup of its own, on events this
-    // client fires: the group invite here, the trade request and summon below,
-    // and the resurrect and talent wipe in renderLateDialogs. Whichever side
-    // asks the question answers it - AcceptGroup, DeclineGroup,
-    // AcceptResurrect, ConfirmSummon, ConfirmTalentWipe, BeginTrade and
-    // CancelTrade are all bound, so FrameXML's buttons do the same thing these
-    // do.
+    // The prompts uiparent.lua raises with a StaticPopup of its own, on events
+    // this client fires, are gone from here: the group invite, the duel, the
+    // trade request, the summon, the shared quest, the guild invite and both
+    // battleground invitations. Every one of them asked the same question
+    // twice while dialogs were handed over, which they are by default.
     //
-    // The rest below have no FrameXML counterpart that can appear: the duel,
-    // the guild invite, the battleground invites and the LFG pair are all
-    // raised from events that are not fired. That claim is only true for the
-    // ones named - it read "the rest" when trade and the ready check were also
-    // in the list, and both were being drawn twice.
-    if (!frameXmlOwns(UiElement::Dialogs)) renderGroupInvitePopup(gameHandler);
-    // FrameXML answers DUEL_REQUESTED with StaticPopup_Show("DUEL_REQUESTED"),
-    // and this client fires that event - so with dialogs handed over both
-    // appeared. Three of the popups in this function were already gated on
-    // exactly this and the rest were not.
-    if (!frameXmlOwns(UiElement::Dialogs)) renderDuelRequestPopup(gameHandler);
+    // What is left is what FrameXML has nothing for.
+
+    // No counterpart: FrameXML has the duel request popup and nothing that
+    // counts down to the start.
     renderDuelCountdown(gameHandler);
-    // The trade request and the trade window belong to different elements on
-    // FrameXML's side: uiparent.lua answers TRADE_REQUEST with StaticPopup
-    // "TRADE", while TradeFrame opens on TRADE_SHOW. This client fires both
-    // events, so each surface has to stand down for its own owner.
-    if (!frameXmlOwns(UiElement::Dialogs)) renderTradeRequestPopup(gameHandler);
-    if (!frameXmlOwns(UiElement::Dialogs)) renderSummonRequestPopup(gameHandler);
-    // Beside the summon popup now that QUEST_ACCEPT_CONFIRM is fired.
-    // uiparent.lua raises "QUEST_ACCEPT" - or "QUEST_ACCEPT_LOG_FULL", which
-    // this client's version has no equivalent of - so leaving this ungated
-    // asks the same question twice.
-    if (!frameXmlOwns(UiElement::Dialogs)) renderSharedQuestPopup(gameHandler);
-    // StaticPopupDialogs["GUILD_INVITE"], shown from UIParent's own handler
-    // for GUILD_INVITE_REQUEST.
-    if (!frameXmlOwns(UiElement::Dialogs)) renderGuildInvitePopup(gameHandler);
-    // The battleground invitation, which was the fourth and was missed.
-    //
-    // FrameXML answers the same three invitations below from staticpopup.lua,
-    // and this client fires every event that raises them - so both were on
-    // screen. This one is no different: UPDATE_BATTLEFIELD_STATUS is fired
-    // from social_handler, battlefieldframe.lua raises
-    // CONFIRM_BATTLEFIELD_ENTRY on it, and "dialogs" has been handed over from
-    // the start. Every battleground invitation put up two accept buttons.
-    //
-    // tools/framexml_ungated_draws.py had it the whole time, in among the
-    // surfaces this client draws on purpose - the nameplates, the toasts, the
-    // damage meter - which is what a report of thirty entries costs when only
-    // some of them are faults.
-    if (!frameXmlOwns(UiElement::Dialogs)) renderBgInvitePopup(gameHandler);
-    if (!frameXmlOwns(UiElement::Dialogs)) {
-        renderBfMgrInvitePopup(gameHandler);
-    }
+
+    // LFDDungeonReadyPopup and LFDRoleCheckPopup, both named in the dungeon
+    // finder's suppression list, so these stand down for their own element
+    // rather than for dialogs.
     if (!frameXmlOwns(UiElement::DungeonFinder)) {
-        // LFDDungeonReadyPopup and LFDRoleCheckPopup, both named in the dungeon
-    // finder's suppression list.
-    if (!frameXmlOwns(UiElement::DungeonFinder)) renderLfgProposalPopup(gameHandler);
-        if (!frameXmlOwns(UiElement::DungeonFinder)) renderLfgRoleCheckPopup(gameHandler);
+        renderLfgProposalPopup(gameHandler);
+        renderLfgRoleCheckPopup(gameHandler);
     }
 }
 
@@ -90,71 +52,18 @@ void DialogManager::renderDialogs(game::GameHandler& gameHandler) {
 // Render late dialogs (resurrect, talent wipe, pet unlearn)
 // ---------------------------------------------------------------------------
 void DialogManager::renderLateDialogs(game::GameHandler& gameHandler) {
-    if (!frameXmlOwns(UiElement::Dialogs)) {
-        // ShowResurrectRequest, from UIParent's RESURRECT_REQUEST handler.
-    if (!frameXmlOwns(UiElement::Dialogs)) renderResurrectDialog(gameHandler);
-        // uiparent.lua answers CONFIRM_TALENT_WIPE with StaticPopup_Show for the
-    // same name, and this client fires that event - the binding for the
-    // popup's own accept button says so in as many words.
-    if (!frameXmlOwns(UiElement::Dialogs)) renderTalentWipeConfirmDialog(gameHandler);
-    }
-    // Not gated: FrameXML has the string for this one and no dialog behind it.
-    // staticpopup.lua declares no CONFIRM_PET_UNLEARN, so this client's is the
-    // only one and hiding it would leave the confirmation with no answer.
+    // The resurrect request and the talent wipe are uiparent.lua's, raised
+    // from events this client fires.
+    //
+    // The pet unlearn is not: staticpopup.lua declares no CONFIRM_PET_UNLEARN,
+    // so this client's is the only one there is and hiding it would leave the
+    // confirmation with nothing to answer it.
     renderPetUnlearnConfirmDialog(gameHandler);
 }
 
 // ============================================================
 // Group Invite Popup
 // ============================================================
-
-void DialogManager::renderGroupInvitePopup(game::GameHandler& gameHandler) {
-    if (!gameHandler.hasPendingGroupInvite()) return;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - 150, 200), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(300, 0), ImGuiCond_Always);
-
-    if (ImGui::Begin("Group Invite", nullptr, kDialogFlags)) {
-        ImGui::Text("%s has invited you to a group.", gameHandler.getPendingInviterName().c_str());
-        ImGui::Spacing();
-
-        if (ImGui::Button("Accept", ImVec2(130, 30))) {
-            gameHandler.acceptGroupInvite();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Decline", ImVec2(130, 30))) {
-            gameHandler.declineGroupInvite();
-        }
-    }
-    ImGui::End();
-}
-
-void DialogManager::renderDuelRequestPopup(game::GameHandler& gameHandler) {
-    if (!gameHandler.hasPendingDuelRequest()) return;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - 150, 250), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(300, 0), ImGuiCond_Always);
-
-    if (ImGui::Begin("Duel Request", nullptr, kDialogFlags)) {
-        ImGui::Text("%s challenges you to a duel!", gameHandler.getDuelChallengerName().c_str());
-        ImGui::Spacing();
-
-        if (ImGui::Button("Accept", ImVec2(130, 30))) {
-            gameHandler.acceptDuel();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Decline", ImVec2(130, 30))) {
-            gameHandler.forfeitDuel();
-        }
-    }
-    ImGui::End();
-}
 
 void DialogManager::renderDuelCountdown(game::GameHandler& gameHandler) {
     float remaining = gameHandler.getDuelCountdownRemaining();
@@ -195,250 +104,6 @@ void DialogManager::renderDuelCountdown(game::GameHandler& gameHandler) {
     // Drop shadow
     dl->AddText(font, scaledSize, ImVec2(tx + 2.0f, ty + 2.0f), IM_COL32(0, 0, 0, alpha / 2), buf);
     dl->AddText(font, scaledSize, ImVec2(tx, ty), color, buf);
-}
-
-void DialogManager::renderSharedQuestPopup(game::GameHandler& gameHandler) {
-    if (!gameHandler.hasPendingSharedQuest()) return;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - 175, 490), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(350, 0), ImGuiCond_Always);
-
-    if (ImGui::Begin("Shared Quest", nullptr, kDialogFlags)) {
-        ImGui::Text("%s has shared a quest with you:", gameHandler.getSharedQuestSharerName().c_str());
-        ImGui::TextColored(colors::kBrightGold, "\"%s\"", gameHandler.getSharedQuestTitle().c_str());
-        ImGui::Spacing();
-
-        if (ImGui::Button("Accept", ImVec2(130, 30))) {
-            gameHandler.acceptSharedQuest();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Decline", ImVec2(130, 30))) {
-            gameHandler.declineSharedQuest();
-        }
-    }
-    ImGui::End();
-}
-
-void DialogManager::renderSummonRequestPopup(game::GameHandler& gameHandler) {
-    if (!gameHandler.hasPendingSummonRequest()) return;
-
-    // Tick the timeout down
-    float dt = ImGui::GetIO().DeltaTime;
-    gameHandler.tickSummonTimeout(dt);
-    if (!gameHandler.hasPendingSummonRequest()) return;  // expired
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - 175, 430), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(350, 0), ImGuiCond_Always);
-
-    if (ImGui::Begin("Summon Request", nullptr, kDialogFlags)) {
-        ImGui::Text("%s is summoning you.", gameHandler.getSummonerName().c_str());
-        float t = gameHandler.getSummonTimeoutSec();
-        if (t > 0.0f) {
-            ImGui::Text("Time remaining: %.0fs", t);
-        }
-        ImGui::Spacing();
-
-        if (ImGui::Button("Accept", ImVec2(130, 30))) {
-            gameHandler.acceptSummon();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Decline", ImVec2(130, 30))) {
-            gameHandler.declineSummon();
-        }
-    }
-    ImGui::End();
-}
-
-void DialogManager::renderTradeRequestPopup(game::GameHandler& gameHandler) {
-    if (!gameHandler.hasPendingTradeRequest()) return;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - 150, 370), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(300, 0), ImGuiCond_Always);
-
-    if (ImGui::Begin("Trade Request", nullptr, kDialogFlags)) {
-        ImGui::Text("%s wants to trade with you.", gameHandler.getTradePeerName().c_str());
-        ImGui::Spacing();
-
-        if (ImGui::Button("Accept", ImVec2(130, 30))) {
-            gameHandler.acceptTradeRequest();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Decline", ImVec2(130, 30))) {
-            gameHandler.declineTradeRequest();
-        }
-    }
-    ImGui::End();
-}
-
-void DialogManager::renderGuildInvitePopup(game::GameHandler& gameHandler) {
-    if (!gameHandler.hasPendingGuildInvite()) return;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - 175, 250), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(350, 0), ImGuiCond_Always);
-
-    if (ImGui::Begin("Guild Invite", nullptr, kDialogFlags)) {
-        ImGui::TextWrapped("%s has invited you to join %s.",
-                           gameHandler.getPendingGuildInviterName().c_str(),
-                           gameHandler.getPendingGuildInviteGuildName().c_str());
-        ImGui::Spacing();
-
-        if (ImGui::Button("Accept", ImVec2(155, 30))) {
-            gameHandler.acceptGuildInvite();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Decline", ImVec2(155, 30))) {
-            gameHandler.declineGuildInvite();
-        }
-    }
-    ImGui::End();
-}
-
-void DialogManager::renderBgInvitePopup(game::GameHandler& gameHandler) {
-    if (!gameHandler.hasPendingBgInvite()) return;
-
-    const auto& queues = gameHandler.getBgQueues();
-    // Find the first WAIT_JOIN slot
-    const game::GameHandler::BgQueueSlot* slot = nullptr;
-    for (const auto& s : queues) {
-        if (s.statusId == 2) { slot = &s; break; }
-    }
-    if (!slot) return;
-
-    // Compute time remaining
-    auto now = std::chrono::steady_clock::now();
-    double elapsed = std::chrono::duration<double>(now - slot->inviteReceivedTime).count();
-    double remaining = static_cast<double>(slot->inviteTimeout) - elapsed;
-
-    // If invite has expired, clear it silently (server will handle the queue)
-    if (remaining <= 0.0) {
-        gameHandler.declineBattlefield(slot->queueSlot);
-        return;
-    }
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-    float screenH = window ? static_cast<float>(window->getHeight()) : 720.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - 190, screenH / 2 - 70), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(380, 0), ImGuiCond_Always);
-
-    ImGui::PushStyleColor(ImGuiCol_WindowBg,   ImVec4(0.08f, 0.08f, 0.18f, 0.95f));
-    ImGui::PushStyleColor(ImGuiCol_Border,     ImVec4(0.4f, 0.4f, 1.0f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.15f, 0.15f, 0.4f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
-
-    const ImGuiWindowFlags popupFlags =
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
-
-    if (ImGui::Begin("Battleground Ready!", nullptr, popupFlags)) {
-        // BG name from stored queue data
-        std::string bgName = slot->bgName.empty() ? "Battleground" : slot->bgName;
-        ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "%s", bgName.c_str());
-        ImGui::TextWrapped("A spot has opened! You have %d seconds to enter.", static_cast<int>(remaining));
-        ImGui::Spacing();
-
-        // Countdown progress bar
-        float frac = static_cast<float>(remaining / static_cast<double>(slot->inviteTimeout));
-        frac = std::clamp(frac, 0.0f, 1.0f);
-        ImVec4 barColor = frac > 0.5f ? colors::kHealthGreen
-                        : frac > 0.25f ? ImVec4(0.9f, 0.7f, 0.1f, 1.0f)
-                                       : colors::kDarkRed;
-        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, barColor);
-        char countdownLabel[32];
-        snprintf(countdownLabel, sizeof(countdownLabel), "%ds", static_cast<int>(remaining));
-        ImGui::ProgressBar(frac, ImVec2(-1, 16), countdownLabel);
-        ImGui::PopStyleColor();
-        ImGui::Spacing();
-
-        ImGui::PushStyleColor(ImGuiCol_Button,        colors::kBtnGreen);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colors::kFriendlyGreen);
-        if (ImGui::Button("Enter Battleground", ImVec2(180, 30))) {
-            gameHandler.acceptBattlefield(slot->queueSlot);
-        }
-        ImGui::PopStyleColor(2);
-
-        ImGui::SameLine();
-
-        ImGui::PushStyleColor(ImGuiCol_Button,        colors::kBtnRed);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colors::kDangerRed);
-        if (ImGui::Button("Leave Queue", ImVec2(175, 30))) {
-            gameHandler.declineBattlefield(slot->queueSlot);
-        }
-        ImGui::PopStyleColor(2);
-    }
-    ImGui::End();
-
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(3);
-}
-
-void DialogManager::renderBfMgrInvitePopup(game::GameHandler& gameHandler) {
-    // Only shown on WotLK servers (outdoor battlefields like Wintergrasp use the BF Manager)
-    if (!gameHandler.hasBfMgrInvite()) return;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-    float screenH = window ? static_cast<float>(window->getHeight()) : 720.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2.0f - 190.0f, screenH / 2.0f - 55.0f), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(380.0f, 0.0f), ImGuiCond_Always);
-
-    ImGui::PushStyleColor(ImGuiCol_WindowBg,      ImVec4(0.08f, 0.10f, 0.20f, 0.96f));
-    ImGui::PushStyleColor(ImGuiCol_Border,        ImVec4(0.5f, 0.5f, 1.0f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.15f, 0.15f, 0.45f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
-
-    const ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
-
-    if (ImGui::Begin("Battlefield", nullptr, flags)) {
-        // Resolve zone name for Wintergrasp (zoneId 4197)
-        uint32_t zoneId = gameHandler.getBfMgrZoneId();
-        const char* zoneName = nullptr;
-        if (zoneId == 4197) zoneName = "Wintergrasp";
-        else if (zoneId == 5095) zoneName = "Tol Barad";
-
-        if (zoneName) {
-            ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "%s", zoneName);
-        } else {
-            ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "Outdoor Battlefield");
-        }
-        ImGui::Spacing();
-        ImGui::TextWrapped("You are invited to join the outdoor battlefield. Do you want to enter?");
-        ImGui::Spacing();
-
-        ImGui::PushStyleColor(ImGuiCol_Button,        colors::kBtnGreen);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colors::kFriendlyGreen);
-        if (ImGui::Button("Enter Battlefield", ImVec2(178, 28))) {
-            gameHandler.acceptBfMgrInvite();
-        }
-        ImGui::PopStyleColor(2);
-
-        ImGui::SameLine();
-
-        ImGui::PushStyleColor(ImGuiCol_Button,        colors::kBtnRed);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colors::kDangerRed);
-        if (ImGui::Button("Decline", ImVec2(175, 28))) {
-            gameHandler.declineBfMgrInvite();
-        }
-        ImGui::PopStyleColor(2);
-    }
-    ImGui::End();
-
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(3);
 }
 
 void DialogManager::renderLfgProposalPopup(game::GameHandler& gameHandler) {
@@ -555,127 +220,9 @@ void DialogManager::renderLfgRoleCheckPopup(game::GameHandler& gameHandler) {
     ImGui::PopStyleColor(3);
 }
 
-void DialogManager::renderResurrectDialog(game::GameHandler& gameHandler) {
-    if (!gameHandler.showResurrectDialog()) return;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-    float screenH = window ? static_cast<float>(window->getHeight()) : 720.0f;
-
-    float dlgW = 300.0f;
-    float dlgH = 110.0f;
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - dlgW / 2, screenH * 0.3f), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(dlgW, dlgH), ImGuiCond_Always);
-
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.15f, 0.95f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.4f, 0.4f, 0.8f, 1.0f));
-
-    if (ImGui::Begin("##ResurrectDialog", nullptr,
-            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
-
-        ImGui::Spacing();
-        const std::string& casterName = gameHandler.getResurrectCasterName();
-        std::string text = casterName.empty()
-            ? "Return to life?"
-            : casterName + " wishes to resurrect you.";
-        float textW = ImGui::CalcTextSize(text.c_str()).x;
-        ImGui::SetCursorPosX(std::max(4.0f, (dlgW - textW) / 2));
-        ImGui::TextColored(ImVec4(0.8f, 0.9f, 1.0f, 1.0f), "%s", text.c_str());
-
-        ImGui::Spacing();
-        ImGui::Spacing();
-
-        float btnW = 100.0f;
-        float spacing = 20.0f;
-        ImGui::SetCursorPosX((dlgW - btnW * 2 - spacing) / 2);
-
-        ImGui::PushStyleColor(ImGuiCol_Button, colors::kBtnDkGreen);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colors::kBtnDkGreenHover);
-        if (ImGui::Button("Accept", ImVec2(btnW, 30))) {
-            gameHandler.acceptResurrect();
-        }
-        ImGui::PopStyleColor(2);
-
-        ImGui::SameLine(0, spacing);
-
-        ImGui::PushStyleColor(ImGuiCol_Button, colors::kBtnDkRed);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colors::kBtnDkRedHover);
-        if (ImGui::Button("Decline", ImVec2(btnW, 30))) {
-            gameHandler.declineResurrect();
-        }
-        ImGui::PopStyleColor(2);
-    }
-    ImGui::End();
-    ImGui::PopStyleColor(2);
-    ImGui::PopStyleVar();
-}
-
 // ============================================================
 // Talent Wipe Confirm Dialog
 // ============================================================
-
-void DialogManager::renderTalentWipeConfirmDialog(game::GameHandler& gameHandler) {
-    if (!gameHandler.showTalentWipeConfirmDialog()) return;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-    float screenH = window ? static_cast<float>(window->getHeight()) : 720.0f;
-
-    float dlgW = 340.0f;
-    float dlgH = 130.0f;
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - dlgW / 2, screenH * 0.3f), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(dlgW, dlgH), ImGuiCond_Always);
-
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.15f, 0.95f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.8f, 0.7f, 0.2f, 1.0f));
-
-    if (ImGui::Begin("##TalentWipeDialog", nullptr,
-            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
-
-        ImGui::Spacing();
-        uint32_t cost = gameHandler.getTalentWipeCost();
-        const std::string costStr = game::formatCopperPrice(cost);
-
-        std::string text = "Reset your talents for ";
-        text += costStr;
-        text += "?";
-        float textW = ImGui::CalcTextSize(text.c_str()).x;
-        ImGui::SetCursorPosX(std::max(4.0f, (dlgW - textW) / 2));
-        ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.4f, 1.0f), "%s", text.c_str());
-
-        ImGui::Spacing();
-        ImGui::SetCursorPosX(8.0f);
-        ImGui::TextDisabled("All talent points will be refunded.");
-        ImGui::Spacing();
-
-        float btnW = 110.0f;
-        float spacing = 20.0f;
-        ImGui::SetCursorPosX((dlgW - btnW * 2 - spacing) / 2);
-
-        ImGui::PushStyleColor(ImGuiCol_Button, colors::kBtnDkGreen);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colors::kBtnDkGreenHover);
-        if (ImGui::Button("Confirm", ImVec2(btnW, 30))) {
-            gameHandler.confirmTalentWipe();
-        }
-        ImGui::PopStyleColor(2);
-
-        ImGui::SameLine(0, spacing);
-
-        ImGui::PushStyleColor(ImGuiCol_Button, colors::kBtnDkRed);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colors::kBtnDkRedHover);
-        if (ImGui::Button("Cancel", ImVec2(btnW, 30))) {
-            gameHandler.cancelTalentWipe();
-        }
-        ImGui::PopStyleColor(2);
-    }
-    ImGui::End();
-    ImGui::PopStyleColor(2);
-    ImGui::PopStyleVar();
-}
 
 void DialogManager::renderPetUnlearnConfirmDialog(game::GameHandler& gameHandler) {
     if (!gameHandler.showPetUnlearnDialog()) return;

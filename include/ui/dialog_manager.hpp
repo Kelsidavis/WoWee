@@ -47,19 +47,9 @@ private:
     uint8_t lfgRoles_ = 0x08;  // default: DPS (0x02=tank, 0x04=healer, 0x08=dps)
 
     // ---- Individual dialog renderers ----
-    void renderGroupInvitePopup(game::GameHandler& gameHandler);
-    void renderDuelRequestPopup(game::GameHandler& gameHandler);
     void renderDuelCountdown(game::GameHandler& gameHandler);
-    void renderSharedQuestPopup(game::GameHandler& gameHandler);
-    void renderSummonRequestPopup(game::GameHandler& gameHandler);
-    void renderTradeRequestPopup(game::GameHandler& gameHandler);
-    void renderGuildInvitePopup(game::GameHandler& gameHandler);
-    void renderBgInvitePopup(game::GameHandler& gameHandler);
-    void renderBfMgrInvitePopup(game::GameHandler& gameHandler);
     void renderLfgProposalPopup(game::GameHandler& gameHandler);
     void renderLfgRoleCheckPopup(game::GameHandler& gameHandler);
-    void renderResurrectDialog(game::GameHandler& gameHandler);
-    void renderTalentWipeConfirmDialog(game::GameHandler& gameHandler);
     void renderPetUnlearnConfirmDialog(game::GameHandler& gameHandler);
 };
 

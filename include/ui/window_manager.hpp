@@ -44,9 +44,6 @@ public:
     /// The game handler is only for the Help button, which has to reach
     /// FrameXML's help frame when that element is handed over.
     void renderEscapeMenu(SettingsPanel& settingsPanel, game::GameHandler& gameHandler);
-    void renderLogoutCountdown(game::GameHandler& gameHandler);
-    void renderDeathScreen(game::GameHandler& gameHandler);
-    void renderReclaimCorpseButton(game::GameHandler& gameHandler);
     void renderInstanceLockouts(game::GameHandler& gameHandler);
     void renderTitlesWindow(game::GameHandler& gameHandler);
     void renderEquipSetWindow(game::GameHandler& gameHandler);
@@ -98,8 +95,6 @@ public:
     // GM Ticket
 
     // Death screen
-    float deathElapsed_ = 0.0f;
-    bool deathTimerRunning_ = false;
     static constexpr float kForcedReleaseSec = 360.0f;
 
     // Escape menu

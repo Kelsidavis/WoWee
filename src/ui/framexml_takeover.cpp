@@ -43,7 +43,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::CastBar,      "castbar", false},
     {UiElement::Minimap,      "minimap"},
     {UiElement::Chat,         "chat"},
-    {UiElement::QuestTracker, "questtracker"},
+    {UiElement::QuestTracker, "questtracker", false},
     {UiElement::WorldMap,     "worldmap"},
     {UiElement::CharacterFrame, "characterframe", false},
     {UiElement::Bags,         "bags", false},
@@ -70,7 +70,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::Trade,        "trade", false},
     {UiElement::ReadyCheck,   "readycheck", false},
     {UiElement::RaidWarning,  "raidwarning"},
-    {UiElement::Dialogs,      "dialogs"},
+    {UiElement::Dialogs,      "dialogs", false},
     {UiElement::Achievements, "achievements", false},
     {UiElement::BarberShop,   "barbershop"},
     {UiElement::Taxi,         "taxi"},
@@ -756,8 +756,6 @@ const Suppress kSuppress[] = {
         // Symmetric with the four client dialogs gated on this element: a
         // run that hands the prompts back to this client hides FrameXML's,
         // or the duplicate simply swaps sides.
-        {UiElement::Dialogs,     "StaticPopup1 StaticPopup2 StaticPopup3 "
-                                 "StaticPopup4"},
         // These four arrive with the load-on-demand addons, which now load -
         // so making them work is what put a second window beside the client's
         // at every profession, trainer, auctioneer and guild bank. The panels
@@ -1093,7 +1091,6 @@ const Check kChecks[] = {
         {UiElement::Trade,        "TradeFrame TradeFrameRecipientNameText"},
         {UiElement::ReadyCheck,   "ReadyCheckFrame ReadyCheckFrameText"},
         {UiElement::RaidWarning,  "RaidWarningFrame RaidBossEmoteFrame"},
-        {UiElement::Dialogs,      "StaticPopup1 StaticPopup1Text StaticPopup1Button1"},
         {UiElement::Taxi,         "TaxiFrame TaxiRouteMap"},
         {UiElement::Stable,       "PetStableFrame"},
         {UiElement::Book,         "ItemTextFrame ItemTextPageText"},

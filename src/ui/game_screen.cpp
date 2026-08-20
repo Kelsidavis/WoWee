@@ -627,8 +627,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // ---- New UI elements ----
     auto spellIconFn = [this](uint32_t id, pipeline::AssetManager* am) { return getSpellIcon(id, am); };
     combatUI_.renderCooldownTracker(gameHandler, settingsPanel_, spellIconFn);
-    if (!frameXmlOwns(UiElement::QuestTracker))
-        renderQuestObjectiveTracker(gameHandler);
     renderNameplates(gameHandler);  // player names always shown; NPC plates gated by showNameplates_
     combatUI_.renderBattlegroundScore(gameHandler);
     combatUI_.renderRaidWarningOverlay(gameHandler);
@@ -695,9 +693,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     if (showMinimap_) {
         renderMinimapMarkers(gameHandler);
     }
-    windowManager_.renderLogoutCountdown(gameHandler);
-    windowManager_.renderDeathScreen(gameHandler);
-    windowManager_.renderReclaimCorpseButton(gameHandler);
     dialogManager_.renderLateDialogs(gameHandler);
     chatPanel_.renderBubbles(gameHandler);
     if (!frameXmlOwns(UiElement::GameMenu)) {

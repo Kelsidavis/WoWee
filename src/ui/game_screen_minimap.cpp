@@ -1823,12 +1823,6 @@ void GameScreen::saveSettings() {
     out << "camera_shake=" << settingsPanel_.pendingCameraShake << "\n";
 
     // Quest tracker position/size
-    out << "quest_tracker_right_offset=" << questTrackerRightOffset_ << "\n";
-    out << "quest_tracker_y=" << questTrackerPos_.y << "\n";
-    out << "quest_tracker_w=" << questTrackerSize_.x << "\n";
-    out << "quest_tracker_h=" << questTrackerSize_.y << "\n";
-    out << "quest_tracker_filter=" << questTrackerFilter_ << "\n";
-    out << "quest_tracker_collapsed=" << (questTrackerCollapsed_ ? 1 : 0) << "\n";
 
     // Chat
     out << "chat_timestamps=" << (chatPanel_.chatShowTimestamps ? 1 : 0) << "\n";
@@ -1884,7 +1878,6 @@ void GameScreen::loadSettings() {
     bool bagScaleLoaded = false;
     bool windowScaleLoaded = false;
     bool actionBarScaleLoaded = false;
-    bool trackerSizeLoaded = false;
     std::string line;
     while (std::getline(in, line)) {
         size_t eq = line.find('=');
@@ -2088,39 +2081,6 @@ void GameScreen::loadSettings() {
             else if (key == "fov") settingsPanel_.pendingFov = std::clamp(std::stof(val), 45.0f, 110.0f);
             else if (key == "camera_shake") settingsPanel_.pendingCameraShake = std::clamp(std::stof(val), 0.0f, 1.0f);
             // Quest tracker position/size
-            else if (key == "quest_tracker_x") {
-                // Legacy: ignore absolute X (right_offset supersedes it)
-                (void)val;
-            }
-            else if (key == "quest_tracker_right_offset") {
-                // Negative would put the tracker off the right edge instead.
-                // The far end is the screen width and belongs where the drawing
-                // knows it, as with the y above.
-                questTrackerRightOffset_ = std::max(0.0f, std::stof(val));
-                questTrackerPosInit_ = true;
-            }
-            else if (key == "quest_tracker_y") {
-                // Only the near end can be held here. The far end is the screen
-                // height, and this runs from the constructor where there is no
-                // screen to ask - so the tracker's own drawing holds it, every
-                // frame, the way it recomputes x from the right edge.
-                questTrackerPos_.y = std::max(0.0f, std::stof(val));
-                questTrackerPosInit_ = true;
-            }
-            else if (key == "quest_tracker_w") {
-                questTrackerSize_.x = std::max(100.0f, std::stof(val));
-                trackerSizeLoaded = true;
-            }
-            else if (key == "quest_tracker_h") {
-                questTrackerSize_.y = std::max(60.0f, std::stof(val));
-                trackerSizeLoaded = true;
-            }
-            else if (key == "quest_tracker_filter") {
-                questTrackerFilter_ = std::clamp(std::stoi(val), 0, 3);
-            }
-            else if (key == "quest_tracker_collapsed") {
-                questTrackerCollapsed_ = (std::stoi(val) != 0);
-            }
             // Chat
             else if (key == "chat_timestamps") chatPanel_.chatShowTimestamps = (std::stoi(val) != 0);
             else if (key == "chat_font_size") chatPanel_.chatFontSize = std::clamp(std::stoi(val), 0, 2);
@@ -2153,17 +2113,6 @@ void GameScreen::loadSettings() {
         if (!actionBarScaleLoaded) {
             settingsPanel_.pendingActionBarScale =
                 SettingsPanel::recommendedPixelScale(defaultHeight, 0.5f, 2.0f);
-        }
-        if (!trackerSizeLoaded) {
-            // The box this client draws the tracked quests in, which is a
-            // number of pixels and so does not follow a tall screen - while the
-            // text inside it does, the fonts being scaled by the window scale
-            // that now follows the screen itself. Left alone, a 2160-line
-            // display drew bigger words in the same small box.
-            const float scale = SettingsPanel::recommendedPixelScale(defaultHeight,
-                                                                     0.75f, 1.5f);
-            questTrackerSize_.x *= scale;
-            questTrackerSize_.y *= scale;
         }
     }
 
