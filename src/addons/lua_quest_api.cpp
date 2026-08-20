@@ -1988,7 +1988,23 @@ static std::vector<TradeSkillRow> buildTradeSkillRows(game::GameHandler* gh) {
 /// to change it - a filter, a heading opened or closed - or the game says the
 /// trade skill data itself moved. Late item info then lands at the next
 /// TRADE_SKILL_UPDATE rather than in the middle of a redraw.
-static std::vector<TradeSkillRow> tradeSkillRows(game::GameHandler* gh) {
+/// The cached row list, by reference.
+///
+/// This returned by value, and every caller does
+///
+///     const auto* rec = tradeSkillRecipeAt(tradeSkillRows(gh), i);
+///
+/// which takes a pointer into the temporary the call just made and reads it on
+/// the next line, after the temporary is gone. Reported as crafting doing
+/// nothing: DoTradeSkill said `row 4 '' spell=0` and then
+/// `row 1 '' spell=2661056113` for the same window - an empty name and a spell
+/// id out of freed memory, which is what a press of Create was sending.
+///
+/// Safe as a reference because the list is deliberately held still between
+/// TRADE_SKILL_UPDATE and TRADE_SKILL_SHOW - see fireEvent, which invalidates
+/// it only there, precisely because the frame reads it many times to draw one
+/// selection. Nothing can rebuild it underneath a caller mid-read.
+static const std::vector<TradeSkillRow>& tradeSkillRows(game::GameHandler* gh) {
     static std::vector<TradeSkillRow> cached;
     static uint64_t cachedGen = 0;
     static const game::GameHandler* cachedFor = nullptr;
@@ -2005,6 +2021,12 @@ void invalidateTradeSkillRows() { ++tradeSkillRowsGeneration(); }
 /// Every binding taking a trade skill index goes through this, because an
 /// index that lands on a heading must not be treated as the recipe that used
 /// to sit at that offset - DoTradeSkill would craft it.
+/// Refuses a temporary outright, because the pointer it answers with would
+/// outlive it. That is the fault above, and a compiler error is a better guard
+/// than remembering.
+static const game::GameHandler::CraftRecipe* tradeSkillRecipeAt(
+        std::vector<TradeSkillRow>&&, int) = delete;
+
 static const game::GameHandler::CraftRecipe* tradeSkillRecipeAt(
         const std::vector<TradeSkillRow>& rows, int index) {
     if (index < 1 || index > static_cast<int>(rows.size())) return nullptr;
