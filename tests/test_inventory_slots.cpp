@@ -76,3 +76,40 @@ TEST_CASE("No two regions inside the no-container overlap", "[bank][slots]") {
     REQUIRE(backpackWireSlot(kBackpackCount - 1) < kBankGeneralFirst);
     REQUIRE(bankBagWireSlot(kBankBagCount - 1) < kKeyringFirst);
 }
+
+// ---------------------------------------------------------------------------
+// Where the cursor's item came from, which is a slot number like any other and
+// went wrong the same way.
+
+TEST_CASE("An item picked up off the action bar names no source slot",
+          "[cursor][slots]") {
+    // Reported: dragging a food off the action bar into a bag moved the
+    // player's equipped bracers into it instead.
+    //
+    // Every negative source used to mean the paperdoll, and an item action
+    // carries a real itemId, so a food lifted off a button was indistinguisha-
+    // ble from one lifted off worn equipment - and the only number the pickup
+    // had was which button it came from. Button nine less one is eight, which
+    // is EquipSlot::WRISTS, so the swap sent named the bracers as its source.
+    // Not the ninth button in particular: every button below twenty-four
+    // pointed at something worn.
+    REQUIRE_FALSE(cursorSourceIsInventory(kCursorNoSource));
+
+    // The three kinds that do name a place, and still do.
+    REQUIRE(cursorSourceIsInventory(-1));   // the paperdoll
+    REQUIRE(cursorSourceIsInventory(0));    // the backpack
+    for (int bag = 1; bag <= kWornBagCount; ++bag) {
+        INFO("worn bag " << bag);
+        REQUIRE(cursorSourceIsInventory(bag));
+    }
+}
+
+TEST_CASE("The no-source marker is not a container number", "[cursor][slots]") {
+    // It has to sit outside every value a real source can take, or it would
+    // read as one of them - which is exactly how the paperdoll came to stand
+    // in for the action bar.
+    for (int bag = -1; bag <= kWornBagCount; ++bag) {
+        INFO("source " << bag);
+        REQUIRE(kCursorNoSource != bag);
+    }
+}

@@ -40,7 +40,10 @@ enum class CursorType { NONE, SPELL, ITEM, ACTION, MACRO, MERCHANT, MONEY, GUILD
 static CursorType s_cursorType = CursorType::NONE;
 static uint32_t   s_cursorId   = 0;    // spellId, itemId, or action slot
 static int        s_cursorSlot = 0;    // source slot for placement
-static int        s_cursorBag  = -1;   // source bag for container items
+/// Which container the cursor's item came out of, and one of the four values
+/// game::slots documents: 0 the backpack, 1-4 a worn bag, -1 the paperdoll,
+/// kCursorNoSource the action bar. See cursorSourceIsInventory.
+static int        s_cursorBag  = -1;
 static uint64_t   s_cursorMoney = 0;   // copper, when the cursor carries money
 /// How much of a guild bank stack the cursor took, or zero for all of it. The
 /// wire carries the split on the *withdrawal*, not on the pickup, so the amount
@@ -51,6 +54,11 @@ static void setCursorType(lua_State* L, CursorType type);
 /// because the guild bank pickup above needs it and it is defined further down
 /// with the other cursor helpers.
 static bool cursorWireSlot(uint8_t& bag, uint8_t& slot);
+/// Whether a drop on an inventory slot is a move at all, and puts the cursor
+/// down when it is not. See kCursorNoSource: an item off the action bar has
+/// nowhere to be moved from, so dropping it in a bag or on the paperdoll does
+/// nothing but end the drag, which is what the real client does.
+static bool droppedItemFromNowhere(lua_State* L);
 
 uint64_t cursorMoney() {
     return s_cursorType == CursorType::MONEY ? s_cursorMoney : 0;
@@ -561,6 +569,18 @@ static int lua_PickupAction(lua_State* L) {
                        CursorType::ACTION);
         s_cursorId = existing.id;
         s_cursorSlot = slot;
+        // Which button, not which slot of which bag - a fourth numbering, and
+        // the reason the source has to say so. An item action carries a real
+        // itemId, so without this the cursor was indistinguishable from one
+        // lifted off the paperdoll and the button number was spent as an
+        // equipment slot. See kCursorNoSource.
+        s_cursorBag = game::slots::kCursorNoSource;
+        // The shared cursor as well, which is a separate record of the same
+        // thing and would otherwise still be naming wherever the *previous*
+        // pickup came from: clicking a button while carrying a bag item swaps
+        // the two, and the bag slot it left behind stayed on this cursor as
+        // the source PutItemInBag would have moved from.
+        cursorItemSlot() = {};
         // And on the pointer, or the drag reads as not having started.
         if (existing.type == game::ActionBarSlot::SPELL) {
             wowee::ui::frameXmlSetCursorItem(gh->getSpellIconPath(existing.id));
@@ -646,6 +666,8 @@ static int lua_PickupGuildBankItem(lua_State* L) {
     const int tab = static_cast<int>(luaL_optnumber(L, 1, 0));
     const int slot = static_cast<int>(luaL_optnumber(L, 2, 0));
     if (!gh || tab < 1 || slot < 1) return 0;
+
+    if (droppedItemFromNowhere(L)) return 0;
 
     // Carrying a bag item, so this is the deposit.
     uint8_t srcBag = 0, srcSlot = 0;
@@ -739,6 +761,10 @@ static int lua_PickupSpellBookItem(lua_State* L) {
 /// translation this client's own bag window does before sending a swap.
 static bool cursorWireSlot(uint8_t& bag, uint8_t& slot) {
     if (s_cursorType != CursorType::ITEM) return false;
+    // Nowhere to move it from. This used to fall into the equipped branch
+    // below, because everything negative was the paperdoll - see
+    // kCursorNoSource for what that cost.
+    if (!game::slots::cursorSourceIsInventory(s_cursorBag)) return false;
     if (s_cursorBag < 0) {                    // an equipped item
         bag = 0xFF;
         slot = static_cast<uint8_t>(s_cursorSlot - 1);
@@ -762,6 +788,13 @@ static void clearCursorItem(lua_State* L) {
     s_cursorBag = -1;
     wowee::ui::frameXmlSetCursorItem(std::string());
     cursorItemSlot() = {};
+}
+
+static bool droppedItemFromNowhere(lua_State* L) {
+    if (s_cursorType != CursorType::ITEM) return false;
+    if (game::slots::cursorSourceIsInventory(s_cursorBag)) return false;
+    clearCursorItem(L);
+    return true;
 }
 
 void pickupMerchantItem(lua_State* L, int index) {
@@ -946,6 +979,12 @@ static int lua_PickupContainerItem(lua_State* L) {
         return 0;
     }
 
+    // Carrying something the bags cannot take: the drag ends here and nothing
+    // moves. Before cursorWireSlot, which would otherwise answer no and let
+    // this fall through to the pickup below - putting the bag's own item on a
+    // cursor that is already holding one.
+    if (droppedItemFromNowhere(L)) return 0;
+
     // Already carrying something, so this is the drop rather than the pickup.
     // One function does both halves of a drag in WoW, and without this half a
     // dragged item was picked up and never put down anywhere.
@@ -1061,6 +1100,8 @@ static int lua_PickupBagFromSlot(lua_State* L) {
     // bag bar was handed over, because this client's own bar never called it.
     if (!isBank && !isWorn) return 0;
 
+    if (droppedItemFromNowhere(L)) return 0;
+
     // Carrying something: this is the drop, into the bag slot.
     uint8_t srcBag = 0, srcSlot = 0;
     if (cursorWireSlot(srcBag, srcSlot)) {
@@ -1139,6 +1180,8 @@ static int lua_PickupInventoryItem(lua_State* L) {
     // Worn gear is what usually needs repairing, and the paperdoll has no
     // branch of its own for it either.
     if (slot <= 19 && repairedHeldItem(gh, gh->getEquipSlotGuid(slot - 1))) return 0;
+
+    if (droppedItemFromNowhere(L)) return 0;
 
     // Carrying something: equip it here, which is the other half of the drag.
     uint8_t srcBag = 0, srcSlot = 0;
