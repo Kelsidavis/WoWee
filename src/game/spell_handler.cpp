@@ -746,7 +746,10 @@ void SpellHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
     // window client-side instead of being sent as casts - matching the real
     // client, where these spells just open the tradeskill UI.
     if (uint32_t craftSkillLine = tradeskillOpenerSkillLine(spellId)) {
-        LOG_INFO("castSpell: spell ", spellId, " opens crafting window for skill line ", craftSkillLine);
+        // At warning, with the three refusals above it, so one press says which
+        // of the four things happened.
+        LOG_WARNING("Profession: spell ", spellId, " (", owner_.getSpellName(spellId),
+                    ") opens the trade skill window for skill line ", craftSkillLine);
         openCraftingWindow(craftSkillLine);
         return;
     }
@@ -3348,12 +3351,25 @@ uint32_t SpellHandler::tradeskillOpenerSkillLine(uint32_t spellId) {
     // What "this spell opens the trade skill window" is actually written as.
     static constexpr uint32_t SPELL_EFFECT_TRADE_SKILL = 47;
 
+    // Silent until now, and this chain has four ways to answer no that look
+    // identical from outside the client: the profession spell is cast, nothing
+    // opens, nothing is said. It was reported that way for First Aid. The one
+    // line it did have was at info, and the log a bug report arrives with is
+    // warnings only - so the report came back with no line about it at all.
+    //
+    // Only for a spell that reached a profession skill line, which is a
+    // handful of casts rather than every one.
     auto slIt = owner_.spellToSkillLineRef().find(spellId);
     if (slIt == owner_.spellToSkillLineRef().end()) return 0;
     const uint32_t skillLine = slIt->second;
 
     auto catIt = owner_.skillLineCategoriesRef().find(skillLine);
-    if (catIt == owner_.skillLineCategoriesRef().end()) return 0;
+    if (catIt == owner_.skillLineCategoriesRef().end()) {
+        LOG_WARNING("Profession: spell ", spellId, " (", owner_.getSpellName(spellId),
+                    ") is in skill line ", skillLine,
+                    ", which SkillLine.dbc has no category for - not opening a window");
+        return 0;
+    }
     if (catIt->second != CAT_SECONDARY && catIt->second != CAT_PROFESSION) return 0;
 
     // Spell.dbc says which spells open this window: effect 47, on eighty-one of
@@ -3384,7 +3400,13 @@ uint32_t SpellHandler::tradeskillOpenerSkillLine(uint32_t spellId) {
                       nameIt != owner_.skillLineNamesRef().end() &&
                       spellName == nameIt->second;
     }
-    if (!opensWindow) return 0;
+    if (!opensWindow) {
+        LOG_WARNING("Profession: spell ", spellId, " (", owner_.getSpellName(spellId),
+                    ") is in skill line ", skillLine,
+                    " but has no trade-skill effect and is not named after the line - "
+                    "casting it normally");
+        return 0;
+    }
 
     // Only open a window that will actually list something: require at least
     // one known recipe (creates an item or consumes reagents) in this line.
@@ -3402,6 +3424,13 @@ uint32_t SpellHandler::tradeskillOpenerSkillLine(uint32_t spellId) {
         }
         if (entry.createdItemId != 0 || hasReagents) return skillLine;
     }
+    // An opener with nothing behind it. Fishing reaches here every cast and is
+    // meant to; a profession reaching it means the recipes are missing, which
+    // is not the same fault and cannot be told apart from outside.
+    LOG_WARNING("Profession: spell ", spellId, " (", owner_.getSpellName(spellId),
+                ") opens skill line ", skillLine,
+                " but no known spell in that line creates an item or takes "
+                "reagents - not opening an empty window");
     return 0;
 }
 
