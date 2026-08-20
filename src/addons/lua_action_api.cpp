@@ -59,6 +59,8 @@ static bool cursorWireSlot(uint8_t& bag, uint8_t& slot);
 /// nowhere to be moved from, so dropping it in a bag or on the paperdoll does
 /// nothing but end the drag, which is what the real client does.
 static bool droppedItemFromNowhere(lua_State* L);
+/// Sell what the cursor is holding. Defined below, beside the buy it mirrors.
+static void soldHeldItem(lua_State* L);
 
 uint64_t cursorMoney() {
     return s_cursorType == CursorType::MONEY ? s_cursorMoney : 0;
@@ -798,7 +800,20 @@ static bool droppedItemFromNowhere(lua_State* L) {
 }
 
 void pickupMerchantItem(lua_State* L, int index) {
-    if (index < 1) return;
+    // Index zero is not a pickup at all: it means "put what the cursor is
+    // holding into the merchant's sell slot", which is how 3.3.5 sells from a
+    // bag. ContainerFrameItemButton_OnClick picks the item up and calls this
+    // with no argument, and luaL_optnumber turns that into the zero below.
+    //
+    // This returned here, so a right-click at a vendor lifted the item onto
+    // the cursor, asked to sell it, was answered with nothing, and left it
+    // stuck to the pointer. ShowContainerSellCursor beside this is the other
+    // half of the same path and is a no-op for a reason - it only changes the
+    // cursor art - which is what made this one look deliberate too.
+    if (index < 1) {
+        soldHeldItem(L);
+        return;
+    }
     setCursorType(L, CursorType::MERCHANT);
     s_cursorId = static_cast<uint32_t>(index);
     s_cursorSlot = 0;
@@ -812,6 +827,32 @@ void pickupMerchantItem(lua_State* L, int index) {
                 gh->getItemIconPath(items[index - 1].displayInfoId));
         }
     }
+}
+
+/// Sell whatever the cursor is holding, and put it down either way.
+///
+/// Bags and the backpack only. An item on the paperdoll can be dragged to a
+/// merchant in the real client, but the two sell verbs here are the ones that
+/// keep the buyback list, and neither knows an equipment slot - inventing a
+/// third path for a case a right-click in a bag cannot reach would be guessing
+/// at the bookkeeping rather than restoring behaviour.
+static void soldHeldItem(lua_State* L) {
+    // A merchant item on the cursor was never taken out of anything, so there
+    // is nothing to sell and nothing to put back.
+    if (s_cursorType == CursorType::MERCHANT) { clearCursorItem(L); return; }
+    if (s_cursorType != CursorType::ITEM) return;
+    auto* gh = getGameHandler(L);
+    if (!gh) return;
+    if (!game::slots::cursorSourceIsInventory(s_cursorBag)) return;
+
+    if (s_cursorBag == 0) {
+        gh->sellItemBySlot(s_cursorSlot - 1);
+    } else if (s_cursorBag > 0) {
+        gh->sellItemInBag(s_cursorBag - 1, s_cursorSlot - 1);
+    } else {
+        return;   // worn, and held rather than dropped on the floor
+    }
+    clearCursorItem(L);
 }
 
 bool boughtHeldMerchantItem(lua_State* L) {
