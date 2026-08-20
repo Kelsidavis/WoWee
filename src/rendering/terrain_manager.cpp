@@ -1806,6 +1806,9 @@ void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile
 
     size_t modelMissing = 0;
     size_t modelInvalid = 0;
+    // How many placements ended up as the Elwynn proxy because the doodad the
+    // texture actually asked for would not load.
+    size_t proxyFallbackUsed = 0;
     auto ensureModelPrepared = [&](const std::string& m2Path, uint32_t modelId) -> bool {
         if (preparedModelIds.count(modelId)) return true;
 
@@ -2015,6 +2018,7 @@ void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile
                         if (!ensureModelPrepared(kGroundClutterProxyModel, modelId)) {
                             continue;
                         }
+                        ++proxyFallbackUsed;
                     }
 
                     const glm::vec3 surfacePoint = pipeline::TerrainMeshGenerator::chunkSurfacePoint(
@@ -2106,8 +2110,13 @@ void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile
     if (added > 0) {
         static int clutterLogCount = 0;
         if (clutterLogCount < 12) {
-            LOG_INFO("Ground clutter tile [", pending->coord.x, ",", pending->coord.y,
+            // At warning, with the counts beside it. Elwynn grass was
+            // reported growing in Hellfire Peninsula, and the two places that
+            // can put it there - a doodad whose model will not load, and the
+            // minimum-per-tile floor below - both report only here.
+            LOG_WARNING("Ground clutter tile [", pending->coord.x, ",", pending->coord.y,
                      "] added=", added, " attempts=", attemptsTotal,
+                     " proxyFallback=", proxyFallbackUsed,
                      " fallbackAdded=", fallbackAdded,
                      " baselineAdded=", baselineAdded,
                      " roadRejected=", roadRejected);
@@ -2116,7 +2125,7 @@ void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile
     } else {
         static int noClutterLogCount = 0;
         if (noClutterLogCount < 8) {
-            LOG_INFO("Ground clutter tile [", pending->coord.x, ",", pending->coord.y,
+            LOG_WARNING("Ground clutter tile [", pending->coord.x, ",", pending->coord.y,
                      "] added=0 attempts=", attemptsTotal,
                      " alphaRejected=", alphaRejected,
                      " roadRejected=", roadRejected,

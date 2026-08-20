@@ -4532,6 +4532,28 @@ void Application::reportStageTimes() {
         }
     }
 
+    // The GPU's own breakdown, from the last completed frame rather than an
+    // average: the CPU stages above are where the frame *waits*, and once
+    // beginFrame and endFrame dominate they say nothing about which pass the
+    // GPU spent it in. One frame is enough to rank the passes, and reading a
+    // window of them would mean keeping the marks alive across slots.
+    if (renderer && renderer->getVkContext()) {
+        const auto& gpu = renderer->getVkContext()->gpuTimings();
+        if (!gpu.empty()) {
+            double total = 0.0;
+            for (const auto& [name, ms] : gpu) total += ms;
+            std::ostringstream head;
+            head << "  GPU, last frame: " << total << "ms across " << gpu.size()
+                 << " passes";
+            if (frameProfileEnabled_) LOG_WARNING(head.str()); else LOG_INFO(head.str());
+            for (const auto& [name, ms] : gpu) {
+                std::ostringstream line;
+                line << "    " << name << ": " << ms << "ms";
+                if (frameProfileEnabled_) LOG_WARNING(line.str()); else LOG_INFO(line.str());
+            }
+        }
+    }
+
     stageStats_.clear();
     stageStatFrames_ = 0;
     stageStatsSince_ = now;

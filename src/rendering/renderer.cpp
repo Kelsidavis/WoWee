@@ -2674,6 +2674,7 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
         if (terrainRenderer && camera && terrainEnabled && !skipTerrain) {
             auto terrainStart = std::chrono::steady_clock::now();
             terrainRenderer->render(currentCmd, perFrameSet, *camera);
+            if (vkCtx) vkCtx->gpuMark(currentCmd, "terrain");
             lastTerrainRenderMs = std::chrono::duration<double, std::milli>(
                 std::chrono::steady_clock::now() - terrainStart).count();
         }
@@ -2682,12 +2683,14 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
         // is occluded by everything standing on it.
         if (grassRenderer_ && vkCtx) {
             grassRenderer_->render(currentCmd, vkCtx->getCurrentFrame(), perFrameSet);
+            if (vkCtx) vkCtx->gpuMark(currentCmd, "grass");
         }
 
         if (wmoRenderer && camera && !skipWMO) {
             wmoRenderer->prepareRender();
             auto wmoStart = std::chrono::steady_clock::now();
             wmoRenderer->render(currentCmd, perFrameSet, *camera, &characterPosition);
+            if (vkCtx) vkCtx->gpuMark(currentCmd, "wmo");
             lastWMORenderMs = std::chrono::duration<double, std::milli>(
                 std::chrono::steady_clock::now() - wmoStart).count();
         }
@@ -2702,6 +2705,7 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
         if (characterRenderer && camera && !skipChars) {
             characterRenderer->prepareRender(frameIdx);
             characterRenderer->render(currentCmd, perFrameSet, *camera);
+            if (vkCtx) vkCtx->gpuMark(currentCmd, "characters");
         }
 
         if (m2Renderer && camera && !skipM2) {
@@ -2715,6 +2719,7 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
             m2Renderer->renderSmokeParticles(currentCmd, perFrameSet);
             m2Renderer->renderM2Particles(currentCmd, perFrameSet);
             m2Renderer->renderM2Ribbons(currentCmd, perFrameSet);
+            if (vkCtx) vkCtx->gpuMark(currentCmd, "m2");
             lastM2RenderMs = std::chrono::duration<double, std::milli>(
                 std::chrono::steady_clock::now() - m2Start).count();
         }
@@ -2722,6 +2727,7 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
         if (waterRenderer && camera && !waterDrawsInContinuePass()) {
             waterRenderer->setRenderExtent(activeRenderExtent_);
             waterRenderer->render(currentCmd, perFrameSet, *camera, globalTime, false, frameIdx);
+            if (vkCtx) vkCtx->gpuMark(currentCmd, "water");
         }
         if (weather && camera) weather->render(currentCmd, perFrameSet);
         if (lightning && camera && lightning->isEnabled()) lightning->render(currentCmd, perFrameSet);
@@ -3851,6 +3857,7 @@ void Renderer::renderShadowPass() {
     b2Dep.pImageMemoryBarriers = &b2;
     cmdPipelineBarrier2(currentCmd, b2Dep);
     shadowDepthLayout_[frame] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    if (vkCtx) vkCtx->gpuMark(currentCmd, "shadows");
 }
 
 // Build the per-frame render graph for off-screen pre-passes.

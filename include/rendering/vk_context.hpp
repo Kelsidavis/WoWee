@@ -136,6 +136,27 @@ public:
     [[nodiscard]] bool isNvidiaGpu() const { return gpuVendorId_ == 0x10DE; }
     [[nodiscard]] VkQueue getGraphicsQueue() const { return graphicsQueue; }
     [[nodiscard]] uint32_t getGraphicsQueueFamily() const { return graphicsQueueFamily; }
+
+    // ---- GPU timing ------------------------------------------------------
+    //
+    // The CPU stage timings say where the *frame* goes and cannot see where the
+    // GPU does. A profile showing beginFrame and endFrame taking 45% of a
+    // 25ms frame is the CPU blocking on the GPU, and says nothing at all about
+    // which pass the GPU spent it in - which is the number that matters once
+    // the client is GPU bound, as it measurably is.
+    //
+    // Markers rather than nested zones: the passes run one after another, so
+    // the cost of each is the gap between its mark and the next. Names are
+    // string literals held by pointer, never copied - this is per pass per
+    // frame and must not allocate.
+    /// Record a point in the frame. Does nothing when the device or the queue
+    /// cannot timestamp, which is checked once at device selection.
+    void gpuMark(VkCommandBuffer cmd, const char* label);
+    [[nodiscard]] bool gpuTimingSupported() const { return gpuTimingSupported_; }
+    /// The last completed frame's marks, as (label, milliseconds since the
+    /// previous mark). Empty until a frame has come round and been read back.
+    [[nodiscard]] const std::vector<std::pair<const char*, double>>&
+        gpuTimings() const { return gpuTimings_; }
     [[nodiscard]] bool hasDedicatedTransferQueue() const { return hasDedicatedTransfer_; }
     [[nodiscard]] VmaAllocator getAllocator() const { return allocator; }
     [[nodiscard]] VkSurfaceKHR getSurface() const { return surface; }
@@ -292,6 +313,22 @@ private:
     VkQueue graphicsQueue = VK_NULL_HANDLE;
     VkQueue presentQueue = VK_NULL_HANDLE;
     uint32_t graphicsQueueFamily = 0;
+
+    /// One pool per frame slot, read back when that slot comes round again -
+    /// by then its fence has been waited on, so the results are ready and the
+    /// read never blocks.
+    static constexpr uint32_t kMaxGpuMarks = 32;
+    VkQueryPool gpuQueryPools_[MAX_FRAMES_IN_FLIGHT]{};
+    const char* gpuMarkLabels_[MAX_FRAMES_IN_FLIGHT][kMaxGpuMarks]{};
+    uint32_t gpuMarkCount_[MAX_FRAMES_IN_FLIGHT]{};
+    /// Whether this slot has been written since the pool was last reset, so a
+    /// slot that has never run is not read back as garbage.
+    bool gpuMarksPending_[MAX_FRAMES_IN_FLIGHT]{};
+    std::vector<std::pair<const char*, double>> gpuTimings_;
+    float timestampPeriodNs_ = 0.0f;
+    bool gpuTimingSupported_ = false;
+    void createGpuQueryPools();
+    void readGpuTimings(uint32_t slot);
     uint32_t presentQueueFamily = 0;
 
     // Dedicated transfer queue (second queue from same graphics family)

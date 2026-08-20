@@ -98,6 +98,7 @@ bool VkContext::initialize(SDL_Window* window) {
 
     if (!createCommandPools()) return false;
     if (!createSyncObjects()) return false;
+    createGpuQueryPools();
     if (!createImGuiResources()) return false;
 
     sInstance_ = this;
@@ -145,6 +146,9 @@ void VkContext::shutdown() {
         if (frame.inFlightFence) vkDestroyFence(device, frame.inFlightFence, nullptr);
         if (frame.commandPool) vkDestroyCommandPool(device, frame.commandPool, nullptr);
         frame = {};
+    }
+    for (auto& pool : gpuQueryPools_) {
+        if (pool) { vkDestroyQueryPool(device, pool, nullptr); pool = VK_NULL_HANDLE; }
     }
     for (auto sem : imageAcquiredSemaphores_) { if (sem) vkDestroySemaphore(device, sem, nullptr); }
     imageAcquiredSemaphores_.clear();
@@ -522,6 +526,11 @@ bool VkContext::selectPhysicalDevice() {
     // terminates and truncates on its own.
     std::snprintf(gpuName_, sizeof(gpuName_), "%s", props.deviceName);
     LOG_INFO("GPU: ", gpuName_, " (vendor 0x", std::hex, gpuVendorId_, std::dec, ")");
+
+    // What a timestamp tick is worth. Whether the queue can actually write one
+    // is asked in createGpuQueryPools, which runs after the queue family has
+    // been chosen - it is not known here.
+    timestampPeriodNs_ = props.limits.timestampPeriod;
 
     // Each of these has to be enabled before createLogicalDevice constructs the
     // DeviceBuilder, for the reason spelled out at the top of that function.
@@ -1135,6 +1144,78 @@ bool VkContext::createCommandPools() {
     }
 
     return true;
+}
+
+void VkContext::createGpuQueryPools() {
+    // A period of zero means the device does not timestamp; a queue family can
+    // report zero valid bits even on a device that does, which MoltenVK and
+    // some mobile drivers do. Both have to hold.
+    uint32_t familyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, nullptr);
+    std::vector<VkQueueFamilyProperties> families(familyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, families.data());
+    const uint32_t validBits = (graphicsQueueFamily < familyCount)
+        ? families[graphicsQueueFamily].timestampValidBits : 0;
+    gpuTimingSupported_ = (timestampPeriodNs_ > 0.0f) && (validBits > 0);
+    if (!gpuTimingSupported_) {
+        LOG_WARNING("GPU timing unavailable: timestampPeriod=", timestampPeriodNs_,
+                    ", the graphics queue reports ", validBits,
+                    " valid timestamp bits - the per-pass GPU breakdown will be empty");
+        return;
+    }
+
+    VkQueryPoolCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+    info.queryType = VK_QUERY_TYPE_TIMESTAMP;
+    info.queryCount = kMaxGpuMarks;
+    for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+        if (vkCreateQueryPool(device, &info, nullptr, &gpuQueryPools_[i]) != VK_SUCCESS) {
+            LOG_WARNING("Could not create the GPU timestamp pool; per-pass GPU "
+                        "timings will be empty");
+            gpuTimingSupported_ = false;
+            return;
+        }
+    }
+    LOG_INFO("GPU timing enabled: ", timestampPeriodNs_, "ns per tick, ",
+             kMaxGpuMarks, " marks per frame");
+}
+
+void VkContext::gpuMark(VkCommandBuffer cmd, const char* label) {
+    if (!gpuTimingSupported_ || cmd == VK_NULL_HANDLE) return;
+    uint32_t& n = gpuMarkCount_[currentFrame];
+    if (n >= kMaxGpuMarks) return;   // the tail of a frame is lost, not the frame
+    gpuMarkLabels_[currentFrame][n] = label;
+    // Bottom of pipe: the mark is "everything before this has finished", which
+    // is what makes the gap to the next mark the cost of the pass between them.
+    vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                        gpuQueryPools_[currentFrame], n);
+    ++n;
+}
+
+void VkContext::readGpuTimings(uint32_t slot) {
+    const uint32_t n = gpuMarkCount_[slot];
+    if (!gpuTimingSupported_ || !gpuMarksPending_[slot] || n < 2) return;
+
+    uint64_t stamps[kMaxGpuMarks]{};
+    // No WAIT bit: this slot's fence has already been waited on by the caller,
+    // so the results are there. Asking the driver to wait here would put a
+    // second block in the frame for something already finished.
+    const VkResult r = vkGetQueryPoolResults(
+        device, gpuQueryPools_[slot], 0, n, sizeof(stamps), stamps,
+        sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
+    if (r != VK_SUCCESS) return;   // VK_NOT_READY on a frame that never ran
+
+    gpuTimings_.clear();
+    for (uint32_t i = 1; i < n; ++i) {
+        // Unsigned subtraction, so a wrapped or out-of-order pair reads as an
+        // enormous positive number rather than a negative one. Drop those
+        // rather than reporting a pass that took four seconds.
+        if (stamps[i] < stamps[i - 1]) continue;
+        const double ms = static_cast<double>(stamps[i] - stamps[i - 1]) *
+                          static_cast<double>(timestampPeriodNs_) / 1.0e6;
+        if (ms > 1000.0) continue;
+        gpuTimings_.emplace_back(gpuMarkLabels_[slot][i], ms);
+    }
 }
 
 bool VkContext::createSyncObjects() {
@@ -2443,6 +2524,10 @@ VkCommandBuffer VkContext::beginFrame(uint32_t& imageIndex) {
     // Any work queued for this frame slot is now guaranteed to be unused by the GPU.
     runDeferredCleanup(currentFrame);
 
+    // The wait above is what makes this slot's timestamps readable: the submit
+    // that wrote them has completed. Read before the pool is reset below.
+    readGpuTimings(currentFrame);
+
     // Acquire next swapchain image using the free semaphore.
     // After acquiring we swap it into the per-image slot so the old per-image
     // semaphore (now released by the presentation engine) becomes the free one.
@@ -2476,6 +2561,17 @@ VkCommandBuffer VkContext::beginFrame(uint32_t& imageIndex) {
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
     vkBeginCommandBuffer(frame.commandBuffer, &beginInfo);
+
+    // Reset outside any render pass, which is where this sits, and before the
+    // first mark. A pool that is written without being reset returns stale
+    // results for the queries that were not rewritten.
+    if (gpuTimingSupported_) {
+        vkCmdResetQueryPool(frame.commandBuffer, gpuQueryPools_[currentFrame],
+                            0, kMaxGpuMarks);
+        gpuMarkCount_[currentFrame] = 0;
+        gpuMarksPending_[currentFrame] = true;
+        gpuMark(frame.commandBuffer, "frame start");
+    }
 
     // If async upload batches are still in flight (submitted to the transfer queue),
     // wait for their fences and insert a memory barrier so the graphics queue sees
