@@ -37,7 +37,6 @@ public:
     bool showGuildRoster_ = false;
     bool showWhoWindow_ = false;
     bool showDungeonFinder_ = false;
-    bool showInspectWindow_ = false;
     /// Put the inspect window up, whichever interface draws it.
     ///
     /// Seven places set the flag above directly and the window's render is
@@ -77,15 +76,12 @@ public:
                                    ChatPanel& chatPanel);
     void renderWhoWindow(game::GameHandler& gameHandler,
                          ChatPanel& chatPanel);
-    void renderInspectWindow(game::GameHandler& gameHandler,
-                             InventoryScreen& inventoryScreen);
 
     // UIServices injection (singleton breaking)
     void setServices(const UIServices& services) { services_ = services; }
 
 private:
     UIServices services_;
-    uint64_t inspectWindowAutoRequestGuid_ = 0;
     // Shared with chat: the guild info text and MOTD carry the same markup.
     ChatMarkupParser   guildMarkupParser_;
     ChatMarkupRenderer guildMarkupRenderer_;

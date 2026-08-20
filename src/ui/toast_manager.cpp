@@ -160,7 +160,6 @@ void ToastManager::renderLateToasts(game::GameHandler& gameHandler) {
     // owned. So with it owned both popups appeared, one over the other, on
     // every achievement - the same shape the zone banner had before its own
     // gate went in a few lines below.
-    if (!frameXmlOwns(UiElement::Achievements)) renderAchievementToast();
     renderDiscoveryToast();
     renderWhisperToasts();
     renderQuestProgressToasts();
@@ -551,87 +550,17 @@ void ToastManager::renderDingEffect() {
     }
 }
 
-void ToastManager::triggerAchievementToast(uint32_t achievementId, std::string name) {
-    achievementToastId_    = achievementId;
-    achievementToastName_  = std::move(name);
-    // alertframes.lua registers ACHIEVEMENT_EARNED itself and raises
-    // AchievementAlertFrame, so leaving the timer at zero is how this banner
-    // stands down. The sound below still plays: FrameXML's alert frame plays
-    // one only for LFG rewards, so handing the badge over would otherwise
-    // earn achievements in silence.
-    if (!frameXmlOwns(UiElement::Achievements)) {
-        achievementToastTimer_ = ACHIEVEMENT_TOAST_DURATION;
-    }
-
-    // Play a UI sound if available
+void ToastManager::playAchievementEarned() {
+    // alertframes.lua registers ACHIEVEMENT_EARNED and raises the badge, so
+    // there is nothing of ours left to put on screen. The sound stays:
+    // FrameXML's alert frame plays one only for LFG rewards, and an
+    // achievement earned in silence is worse than one announced twice.
     auto* ac = services_.audioCoordinator;
     if (ac) {
         if (auto* sfx = ac->getUiSoundManager()) {
             sfx->playAchievementAlert();
         }
     }
-}
-
-void ToastManager::renderAchievementToast() {
-    if (achievementToastTimer_ <= 0.0f) return;
-
-    float dt = ImGui::GetIO().DeltaTime;
-    achievementToastTimer_ -= dt;
-    if (achievementToastTimer_ < 0.0f) achievementToastTimer_ = 0.0f;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth())  : 1280.0f;
-    float screenH = window ? static_cast<float>(window->getHeight()) :  720.0f;
-
-    // Slide in from the right - fully visible for most of the duration, slides out at end
-    constexpr float SLIDE_TIME = 0.4f;
-    float  slideIn  = std::min(achievementToastTimer_, ACHIEVEMENT_TOAST_DURATION - achievementToastTimer_);
-    float  slideFrac = (ACHIEVEMENT_TOAST_DURATION > 0.0f && SLIDE_TIME > 0.0f)
-                         ? std::min(slideIn / SLIDE_TIME, 1.0f)
-                         : 1.0f;
-
-    constexpr float TOAST_W = 280.0f;
-    constexpr float TOAST_H =  60.0f;
-    float xFull   = screenW - TOAST_W - 20.0f;
-    float xHidden = screenW + 10.0f;
-    float toastX  = xHidden + (xFull - xHidden) * slideFrac;
-    float toastY  = screenH - TOAST_H - 80.0f;  // above action bar area
-
-    float alpha = std::min(1.0f, achievementToastTimer_ / 0.5f);  // fade at very end
-
-    ImDrawList* draw = ImGui::GetForegroundDrawList();
-
-    // Background panel (gold border, dark fill)
-    ImVec2 tl(toastX,            toastY);
-    ImVec2 br(toastX + TOAST_W,  toastY + TOAST_H);
-    draw->AddRectFilled(tl, br, IM_COL32(30, 20, 10, static_cast<int>(alpha * 230)), 6.0f);
-    draw->AddRect(tl, br, IM_COL32(200, 170, 50, static_cast<int>(alpha * 255)), 6.0f, 0, 2.0f);
-
-    // Title
-    ImFont* font = ImGui::GetFont();
-    float   titleSize = 14.0f;
-    float   bodySize  = 12.0f;
-    const char* title = "Achievement Earned!";
-    float titleW = font->CalcTextSizeA(titleSize, FLT_MAX, 0.0f, title).x;
-    float titleX = toastX + (TOAST_W - titleW) * 0.5f;
-    draw->AddText(font, titleSize, ImVec2(titleX + 1, toastY + 8 + 1),
-                  IM_COL32(0, 0, 0, static_cast<int>(alpha * 180)), title);
-    draw->AddText(font, titleSize, ImVec2(titleX, toastY + 8),
-                  IM_COL32(255, 215, 0, static_cast<int>(alpha * 255)), title);
-
-    // Achievement name (falls back to ID if name not available)
-    char idBuf[256];
-    const char* achText = achievementToastName_.empty()
-        ? nullptr : achievementToastName_.c_str();
-    if (achText) {
-        std::snprintf(idBuf, sizeof(idBuf), "%s", achText);
-    } else {
-        std::snprintf(idBuf, sizeof(idBuf), "Achievement #%u", achievementToastId_);
-    }
-    float idW = font->CalcTextSizeA(bodySize, FLT_MAX, 0.0f, idBuf).x;
-    float idX = toastX + (TOAST_W - idW) * 0.5f;
-    draw->AddText(font, bodySize, ImVec2(idX, toastY + 28),
-                  IM_COL32(220, 200, 150, static_cast<int>(alpha * 255)), idBuf);
 }
 
 // ---------------------------------------------------------------------------

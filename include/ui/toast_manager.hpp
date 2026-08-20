@@ -39,7 +39,8 @@ public:
                      uint32_t intel = 0, uint32_t spi = 0);
 
     /// Fire achievement earned toast + sound
-    void triggerAchievementToast(uint32_t achievementId, std::string name = {});
+    /// The sound an achievement makes. The badge is FrameXML's.
+    void playAchievementEarned();
 
     // UIServices injection (Phase B singleton breaking)
     void setServices(const UIServices& services) { services_ = services; }
@@ -63,10 +64,6 @@ private:
 
     // ---- Achievement toast ----
     static constexpr float ACHIEVEMENT_TOAST_DURATION = 5.0f;
-    float achievementToastTimer_ = 0.0f;
-    uint32_t achievementToastId_ = 0;
-    std::string achievementToastName_;
-    void renderAchievementToast();
 
     // ---- Area discovery toast ----
     static constexpr float DISCOVERY_TOAST_DURATION = 4.0f;

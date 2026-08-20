@@ -61,7 +61,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::ClassTrainer, "classtrainer"},
     {UiElement::AuctionHouse, "auctionhouse"},
     {UiElement::GuildBank,    "guildbank"},
-    {UiElement::Inspect,      "inspect"},
+    {UiElement::Inspect,      "inspect", false},
     {UiElement::DungeonFinder, "dungeonfinder"},
     {UiElement::Petition,     "petition"},
     {UiElement::Buffs,        "buffs", false},
@@ -71,7 +71,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::ReadyCheck,   "readycheck", false},
     {UiElement::RaidWarning,  "raidwarning"},
     {UiElement::Dialogs,      "dialogs"},
-    {UiElement::Achievements, "achievements"},
+    {UiElement::Achievements, "achievements", false},
     {UiElement::BarberShop,   "barbershop"},
     {UiElement::Taxi,         "taxi"},
     {UiElement::Stable,       "stable"},
@@ -767,7 +767,6 @@ const Suppress kSuppress[] = {
         {UiElement::ClassTrainer, "ClassTrainerFrame", true},
         {UiElement::AuctionHouse, "AuctionFrame", true},
         {UiElement::GuildBank,    "GuildBankFrame", true},
-        {UiElement::Inspect,      "InspectFrame", true},
         // The vendor had no check entry at all, because the candidates list
         // named it "merchant" and so never handed it over - there was nothing
         // to report on. MerchantItem1 is the first of the ten wares and
@@ -779,7 +778,6 @@ const Suppress kSuppress[] = {
         // BARBER_SHOP_OPEN is fired and the achievements micro button belongs
         // to the bar this branch has taken over, so both of these can open
         // beside the client's own.
-        {UiElement::Achievements, "AchievementFrame", true},
         // The earned-achievement toast, which is not part of the achievement
         // addon at all - alertframes.lua is core FrameXML and registers
         // ACHIEVEMENT_EARNED itself, an event this client fires. So the badge
@@ -788,7 +786,6 @@ const Suppress kSuppress[] = {
         //
         // Found by the unaccounted-frame sweep rather than by eye: AlertFrame
         // is not an element and never was, so nothing had an opinion about it.
-        {UiElement::Achievements, "AlertFrame"},
         {UiElement::BarberShop,   "BarberShopFrame", true},
         // All three of these are live now, and the note that used to sit here
         // saying otherwise was stale in the way these notes go stale: someone

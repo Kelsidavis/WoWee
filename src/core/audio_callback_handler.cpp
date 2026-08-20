@@ -57,9 +57,10 @@ void AudioCallbackHandler::setupCallbacks() {
     });
 
     // Achievement earned callback - show toast banner
-    gameHandler_.setAchievementEarnedCallback([this](uint32_t achievementId, const std::string& name) {
+    gameHandler_.setAchievementEarnedCallback([this](uint32_t /*achievementId*/,
+                                                    const std::string& /*name*/) {
         if (uiManager_) {
-            uiManager_->getGameScreen().toastManager().triggerAchievementToast(achievementId, name);
+            uiManager_->getGameScreen().toastManager().playAchievementEarned();
         }
     });
 

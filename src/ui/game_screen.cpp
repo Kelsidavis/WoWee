@@ -675,9 +675,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     windowManager_.renderSkillsWindow(gameHandler);
     windowManager_.renderTitlesWindow(gameHandler);
     windowManager_.renderEquipSetWindow(gameHandler);
-    if (!frameXmlOwns(UiElement::Inspect)) {
-        socialPanel_.renderInspectWindow(gameHandler, inventoryScreen);
-    }
     combatUI_.renderThreatWindow(gameHandler);
     if (!frameXmlOwns(UiElement::BattlegroundScore)) {
         combatUI_.renderBgScoreboard(gameHandler);
