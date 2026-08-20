@@ -3107,6 +3107,29 @@ void SpellHandler::loadSpellNameCache() const {
     const bool hasEffectFields =
         effect0Field != 0xFFFFFFFF && effect2Field < fieldCount &&
         itemTypeFields[0] != 0xFFFFFFFF && itemTypeFields[2] < fieldCount;
+    // Say so, because the consequence is a feature quietly gone rather than
+    // anything that looks like a fault. With either of these false no spell
+    // gets a created item or a reagent, getCraftingRecipes filters every recipe
+    // out, and tradeskillOpenerSkillLine will not open a window with nothing in
+    // it - so no profession opens at all, for any character, with nothing said.
+    //
+    // Reported as "first aid window not opening". The layout in the installed
+    // data directory is a copy taken when the assets were extracted, and it
+    // predated the columns this reads: the repository had Reagent0 and
+    // EffectItemType0 and the file the client actually loads did not. Names
+    // still worked, because their fallback happens to be the right column for
+    // WotLK, which is what made the cache look loaded.
+    if (!hasReagentFields || !hasEffectFields) {
+        LOG_WARNING("Spell.dbc layout is missing the columns recipes are read "
+                    "from - Reagent0/ReagentCount0 ",
+                    hasReagentFields ? "ok" : "MISSING",
+                    ", Effect0-2/EffectItemType0-2 ",
+                    hasEffectFields ? "ok" : "MISSING",
+                    ". No recipe will be found and no profession window will "
+                    "open. The layout is dbc_layouts.json in the data "
+                    "directory, which is copied there when assets are "
+                    "extracted and does not refresh itself.");
+    }
     const uint32_t aura0Field = spellL ? spellL->field("EffectApplyAuraName0") : 0xFFFFFFFF;
     const uint32_t aura1Field = spellL ? spellL->field("EffectApplyAuraName1") : 0xFFFFFFFF;
     const uint32_t aura2Field = spellL ? spellL->field("EffectApplyAuraName2") : 0xFFFFFFFF;

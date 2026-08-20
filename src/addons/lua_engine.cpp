@@ -9738,6 +9738,30 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
                     // cursor keeps what it is carrying, and the bar looks like
                     // it refused the spell.
                     const uint32_t dropOn = dropOwnerOf(hit);
+                    // Said out loud, the way the click below it is. A click
+                    // reports which of its three conditions refused it because
+                    // "the button looks right and does nothing" is otherwise
+                    // unreadable; a drop has exactly the same problem and was
+                    // saying nothing at all. Dragging a spell to the bar and
+                    // having it stay on the cursor was reported, and the log it
+                    // came with had a line for the press, a line for the drag
+                    // starting and a line for the release - and nothing about
+                    // where what was being carried actually went.
+                    if (const auto* target = dropOn ? widgets_.get(dropOn) : nullptr) {
+                        LOG_WARNING("WidgetInput: drop on ",
+                                    target->name.empty() ? "(unnamed)"
+                                                         : target->name.c_str(),
+                                    dropOn == draggingWid_
+                                        ? " - the frame it was dragged from, so nothing was offered"
+                                        : " - OnReceiveDrag ran");
+                    } else {
+                        const auto* under = hit ? widgets_.get(hit) : nullptr;
+                        LOG_WARNING("WidgetInput: drop over ",
+                                    under && !under->name.empty() ? under->name.c_str()
+                                                                  : "nothing",
+                                    " - nothing at or above it takes a drop, so the "
+                                    "cursor keeps what it is carrying");
+                    }
                     if (dropOn != 0 && dropOn != draggingWid_) {
                         callFrameScript(dropOn, "OnReceiveDrag", b.name);
                     } else if (dropOn == 0 && L_) {
