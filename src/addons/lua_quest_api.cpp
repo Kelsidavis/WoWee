@@ -3543,14 +3543,21 @@ void registerQuestLuaAPI(lua_State* L) {
             // end, or the cast may go out and be refused with nothing shown.
             // This names which, and it is the only place that knows the index
             // and the spell at the same time.
+            // At warning, like the profession chain it sits next to. This was
+            // written to answer "a craft that does nothing is indistinguishable
+            // from a button that was never wired" and then said it at debug,
+            // which the log a bug report arrives with does not carry - so a
+            // report of crafting not working came back with nothing about the
+            // press at all. The same mistake the Escape chain made.
             if (!rec) {
-                LOG_DEBUG("DoTradeSkill: no recipe at row ", i,
-                          " - the row is a heading or the index is past the end");
+                LOG_WARNING("DoTradeSkill: no recipe at row ", i,
+                            " of ", tradeSkillRows(gh).size(),
+                            " - the row is a heading or the index is past the end");
                 return 0;
             }
             if (count < 1) count = 1;
-            LOG_DEBUG("DoTradeSkill: row ", i, " '", rec->name,
-                      "' spell=", rec->spellId, " count=", count);
+            LOG_WARNING("DoTradeSkill: row ", i, " '", rec->name,
+                        "' spell=", rec->spellId, " count=", count);
             gh->startCraftQueue(rec->spellId, count);
             return 0;
         }},

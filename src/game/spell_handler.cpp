@@ -806,6 +806,12 @@ void SpellHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
             queuedSpellTarget_ = targetGuid != 0 ? targetGuid : owner_.getTargetGuid();
             LOG_INFO("Spell queue: queued spellId=", spellId, " (", castTimeRemaining_ * 1000.0f,
                      "ms remaining)");
+        } else if (craftQueueSpellId_ == spellId) {
+            // Outside that window the press is dropped, which for a craft is
+            // the whole action gone with nothing said - and a bandage is a
+            // three second cast, so this is the easy one to hit.
+            LOG_WARNING("Craft: spell ", spellId, " not sent - a cast is already "
+                        "running with ", castTimeRemaining_, "s left");
         }
         return;
     }
@@ -1098,6 +1104,10 @@ void SpellHandler::startCraftQueue(uint32_t spellId, int count) {
     }
     craftQueueSpellId_ = spellId;
     craftQueueRemaining_ = count;
+    // castSpell has several silent refusals - already casting, a cast-time
+    // spell while moving, a mount - and each of them leaves the queue set with
+    // nothing sent, which reads as the Create button doing nothing.
+    LOG_WARNING("Craft: queued spell ", spellId, " x", count, ", casting now");
     castSpell(spellId, 0);
 }
 
