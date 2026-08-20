@@ -655,7 +655,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // way the minimap measures MinimapCluster, but nothing reads it yet.
     combatUI_.renderDPSMeter(gameHandler, settingsPanel_, -1.0f);
     toastManager_.renderEarlyToasts(ImGui::GetIO().DeltaTime, gameHandler);
-    dialogManager_.renderDialogs(gameHandler, inventoryScreen, chatPanel_);
+    dialogManager_.renderDialogs(gameHandler);
     // FriendsFrame is what "social" suppresses, and its tabs are the friends
     // list, the who list and the guild roster. Only the friends list was gated
     // on this side, so handing social over left two of this client's three

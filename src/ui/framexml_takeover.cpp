@@ -67,15 +67,15 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::Buffs,        "buffs", false},
     {UiElement::Durability,   "durability", false},
     {UiElement::ZoneText,     "zonetext"},
-    {UiElement::Trade,        "trade"},
-    {UiElement::ReadyCheck,   "readycheck"},
+    {UiElement::Trade,        "trade", false},
+    {UiElement::ReadyCheck,   "readycheck", false},
     {UiElement::RaidWarning,  "raidwarning"},
     {UiElement::Dialogs,      "dialogs"},
     {UiElement::Achievements, "achievements"},
     {UiElement::BarberShop,   "barbershop"},
     {UiElement::Taxi,         "taxi"},
     {UiElement::Stable,       "stable"},
-    {UiElement::Book,         "book"},
+    {UiElement::Book,         "book", false},
     {UiElement::GameMenu,          "gamemenu"},
     {UiElement::Help,              "help"},
     {UiElement::BattlegroundScore, "bgscore"},
@@ -741,8 +741,6 @@ const Suppress kSuppress[] = {
         // this client draws its own trade window and its own ready-check popup
         // in dialog_manager - so FrameXML raised a second one of each. Neither
         // was an element, so nothing in this list had an opinion about them.
-        {UiElement::Trade,       "TradeFrame"},
-        {UiElement::ReadyCheck,  "ReadyCheckFrame"},
         // CHAT_MSG_RAID_WARNING and CHAT_MSG_RAID_BOSS_EMOTE are both fired,
         // so this suppression is live rather than precautionary. The note here
         // used to say the first was not fired; it is, and had been all along -
@@ -810,7 +808,6 @@ const Suppress kSuppress[] = {
         // the code that asked for it. UseContainerItem reaches it now.
         {UiElement::Taxi,         "TaxiFrame"},
         {UiElement::Stable,       "PetStableFrame"},
-        {UiElement::Book,         "ItemTextFrame"},
         // All three open from the micro buttons, which belong to the bar this
         // branch draws - so they appear without anyone deciding they should,
         // beside this client's own escape menu, settings and ticket window.

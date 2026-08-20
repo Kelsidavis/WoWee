@@ -26,9 +26,7 @@ namespace {
 // ---------------------------------------------------------------------------
 // Render early dialogs (group invite through LFG role check)
 // ---------------------------------------------------------------------------
-void DialogManager::renderDialogs(game::GameHandler& gameHandler,
-                                  InventoryScreen& inventoryScreen,
-                                  ChatPanel& chatPanel) {
+void DialogManager::renderDialogs(game::GameHandler& gameHandler) {
     // The prompts FrameXML asks with a StaticPopup of its own, on events this
     // client fires: the group invite here, the trade request and summon below,
     // and the resurrect and talent wipe in renderLateDialogs. Whichever side
@@ -54,27 +52,15 @@ void DialogManager::renderDialogs(game::GameHandler& gameHandler,
     // "TRADE", while TradeFrame opens on TRADE_SHOW. This client fires both
     // events, so each surface has to stand down for its own owner.
     if (!frameXmlOwns(UiElement::Dialogs)) renderTradeRequestPopup(gameHandler);
-    if (!frameXmlOwns(UiElement::Trade)) {
-        // TradeFrame is its own element, and its suppression entry names exactly
-    // that frame - so with trade handed over this drew a second trade window
-    // beside FrameXML's, both live, both showing the same slots.
-    if (!frameXmlOwns(UiElement::Trade))
-        renderTradeWindow(gameHandler, inventoryScreen, chatPanel);
-    }
     if (!frameXmlOwns(UiElement::Dialogs)) renderSummonRequestPopup(gameHandler);
     // Beside the summon popup now that QUEST_ACCEPT_CONFIRM is fired.
     // uiparent.lua raises "QUEST_ACCEPT" - or "QUEST_ACCEPT_LOG_FULL", which
     // this client's version has no equivalent of - so leaving this ungated
     // asks the same question twice.
     if (!frameXmlOwns(UiElement::Dialogs)) renderSharedQuestPopup(gameHandler);
-    // ItemTextFrame answers ITEM_TEXT_BEGIN, which this client fires. This is
-    // the client's remaining page-text surface, and it reads different state
-    // from the book window that used to sit beside it.
-    if (!frameXmlOwns(UiElement::Book)) renderItemTextWindow(gameHandler);
     // StaticPopupDialogs["GUILD_INVITE"], shown from UIParent's own handler
     // for GUILD_INVITE_REQUEST.
     if (!frameXmlOwns(UiElement::Dialogs)) renderGuildInvitePopup(gameHandler);
-    if (!frameXmlOwns(UiElement::ReadyCheck)) renderReadyCheckPopup(gameHandler);
     // The battleground invitation, which was the fourth and was missed.
     //
     // FrameXML answers the same three invitations below from staticpopup.lua,
@@ -211,44 +197,6 @@ void DialogManager::renderDuelCountdown(game::GameHandler& gameHandler) {
     dl->AddText(font, scaledSize, ImVec2(tx, ty), color, buf);
 }
 
-void DialogManager::renderItemTextWindow(game::GameHandler& gameHandler) {
-    if (!gameHandler.isItemTextOpen()) return;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-    float screenH = window ? static_cast<float>(window->getHeight()) :  720.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW * 0.5f - 200, screenH * 0.15f),
-                            ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
-
-    bool open = true;
-    if (!ImGui::Begin("Book", &open, ImGuiWindowFlags_NoCollapse)) {
-        ImGui::End();
-        if (!open) gameHandler.closeItemText();
-        return;
-    }
-    if (!open) {
-        ImGui::End();
-        gameHandler.closeItemText();
-        return;
-    }
-
-    // Parchment-toned background text. Resolve WoW $-tokens ($g himself:herself, $n
-    // player name, $b line break, ...) the same way quest and chat text does.
-    std::string itemText = chat_utils::replaceGenderPlaceholders(gameHandler.getItemText(), gameHandler);
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 0.1f, 0.0f, 1.0f));
-    ImGui::TextWrapped("%s", itemText.c_str());
-    ImGui::PopStyleColor();
-
-    ImGui::Spacing();
-    if (ImGui::Button("Close", ImVec2(80, 0))) {
-        gameHandler.closeItemText();
-    }
-
-    ImGui::End();
-}
-
 void DialogManager::renderSharedQuestPopup(game::GameHandler& gameHandler) {
     if (!gameHandler.hasPendingSharedQuest()) return;
 
@@ -331,200 +279,6 @@ void DialogManager::renderTradeRequestPopup(game::GameHandler& gameHandler) {
     ImGui::End();
 }
 
-void DialogManager::renderTradeWindow(game::GameHandler& gameHandler,
-                                       InventoryScreen& inventoryScreen,
-                                       ChatPanel& chatPanel) {
-    if (!gameHandler.isTradeOpen()) return;
-
-    const auto& mySlots   = gameHandler.getMyTradeSlots();
-    const auto& peerSlots = gameHandler.getPeerTradeSlots();
-    const uint64_t myGold   = gameHandler.getMyTradeGold();
-    const uint64_t peerGold = gameHandler.getPeerTradeGold();
-    const auto& peerName = gameHandler.getTradePeerName();
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-    float screenH = window ? static_cast<float>(window->getHeight()) : 720.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2.0f - 240.0f, screenH / 2.0f - 180.0f), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(480.0f, 360.0f), ImGuiCond_Once);
-
-    bool open = true;
-    if (ImGui::Begin(("Trade with " + peerName).c_str(), &open,
-                     kDialogFlags)) {
-
-        auto formatGold = [](uint64_t copper, char* buf, size_t bufsz) {
-            uint64_t g = copper / 10000;
-            uint64_t s = (copper % 10000) / 100;
-            uint64_t c = copper % 100;
-            if (g > 0) std::snprintf(buf, bufsz, "%llug %llus %lluc",
-                                     (unsigned long long)g, (unsigned long long)s, (unsigned long long)c);
-            else if (s > 0) std::snprintf(buf, bufsz, "%llus %lluc",
-                                          (unsigned long long)s, (unsigned long long)c);
-            else std::snprintf(buf, bufsz, "%lluc", (unsigned long long)c);
-        };
-
-        auto renderSlotColumn = [&](const char* label,
-                                    const std::array<game::GameHandler::TradeSlot,
-                                                     game::GameHandler::TRADE_SLOT_COUNT>& slots,
-                                    uint64_t gold, bool isMine) {
-            ImGui::Text("%s", label);
-            ImGui::Separator();
-
-            for (int i = 0; i < game::GameHandler::TRADE_SLOT_COUNT; ++i) {
-                const auto& slot = slots[i];
-                const bool isNonTraded = (i == game::GameHandler::TRADE_SLOT_NONTRADED);
-                ImGui::PushID(i * (isMine ? 1 : -1) - (isMine ? 0 : 100));
-
-                // The non-traded slot is set apart: it stays with its owner and only exists
-                // so the other party can enchant/craft on the item placed here.
-                if (isNonTraded) {
-                    ImGui::Spacing();
-                    ImGui::Separator();
-                    ImGui::TextDisabled("Will not be traded:");
-                }
-
-                if (slot.occupied && slot.itemId != 0) {
-                    const auto* info = gameHandler.getItemInfo(slot.itemId);
-                    std::string name = (info && info->valid && !info->name.empty())
-                        ? info->name
-                        : ("Item " + std::to_string(slot.itemId));
-                    if (slot.stackCount > 1)
-                        name += " x" + std::to_string(slot.stackCount);
-                    ImVec4 qc = (info && info->valid)
-                        ? InventoryScreen::getQualityColor(static_cast<game::ItemQuality>(info->quality))
-                        : ImVec4(1.0f, 0.9f, 0.5f, 1.0f);
-                    if (info && info->valid && info->displayInfoId != 0) {
-                        VkDescriptorSet iconTex = inventoryScreen.getItemIcon(info->displayInfoId);
-                        if (iconTex) {
-                            ImGui::Image((ImTextureID)(uintptr_t)iconTex, ImVec2(16, 16));
-                            ImGui::SameLine();
-                        }
-                    }
-                    if (isNonTraded) ImGui::TextColored(qc, "%s", name.c_str());
-                    else             ImGui::TextColored(qc, "%d. %s", i + 1, name.c_str());
-                    if (isMine && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-                        gameHandler.clearTradeItem(static_cast<uint8_t>(i));
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        if (info && info->valid) inventoryScreen.renderItemTooltip(*info);
-                        else if (isMine) ImGui::SetTooltip("Double-click to remove");
-                    }
-                    if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
-                        ImGui::GetIO().KeyShift && info && info->valid && !info->name.empty()) {
-                        std::string link = game::itemChatLink(info->entry, info->quality, info->name);
-                        chatPanel.insertChatLink(link);
-                    }
-                } else {
-                    if (isNonTraded) ImGui::TextDisabled("  (empty - place item to enchant/craft)");
-                    else             ImGui::TextDisabled("  %d. (empty)", i + 1);
-
-                    // Allow dragging inventory items into trade slots via right-click context menu
-                    char addItemId[16]; snprintf(addItemId, sizeof(addItemId), "##additem%d", i);
-                    if (isMine && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-                        ImGui::OpenPopup(addItemId);
-                    }
-
-                    // Dropped out of a handed-over bag. The popup below lists
-                    // the backpack only, so with the bags drawn by FrameXML a
-                    // drag was the natural way to offer something and there was
-                    // nothing here to catch it - and anything in one of the four
-                    // worn bags could not be traded at all.
-                    if (isMine && ImGui::IsItemHovered() &&
-                        ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-                        uint8_t srcBag = 0, srcSlot = 0;
-                        if (frameXmlCursorWireSlot(srcBag, srcSlot)) {
-                            gameHandler.setTradeItem(static_cast<uint8_t>(i), srcBag, srcSlot);
-                            frameXmlPutCursorDown();
-                        }
-                    }
-                }
-
-                if (isMine) {
-                    char addItemId[16]; snprintf(addItemId, sizeof(addItemId), "##additem%d", i);
-                    // Drag-from-inventory: show small popup listing bag items
-                    if (ImGui::BeginPopup(addItemId)) {
-                        ImGui::TextDisabled("Add from inventory:");
-                        const auto& inv = gameHandler.getInventory();
-                        // Backpack slots 0-15 (bag=255)
-                        for (int si = 0; si < game::Inventory::BACKPACK_SLOTS; ++si) {
-                            const auto& slot = inv.getBackpackSlot(si);
-                            if (slot.empty()) continue;
-                            const auto* ii = gameHandler.getItemInfo(slot.item.itemId);
-                            std::string iname = (ii && ii->valid && !ii->name.empty())
-                                ? ii->name
-                                : (!slot.item.name.empty() ? slot.item.name
-                                   : ("Item " + std::to_string(slot.item.itemId)));
-                            if (ImGui::Selectable(iname.c_str())) {
-                                // Container 255 is the flat space the server
-                                // reads with GetItemByPos, where the backpack
-                                // starts after the equipment - not at zero.
-                                // Sending the backpack index raw named an
-                                // equipment slot, and an offer the server finds
-                                // no item for cancels the trade outright.
-                                gameHandler.setTradeItem(
-                                    static_cast<uint8_t>(i), 255u,
-                                    static_cast<uint8_t>(game::slots::backpackWireSlot(si)));
-                                ImGui::CloseCurrentPopup();
-                            }
-                        }
-                        ImGui::EndPopup();
-                    }
-                }
-                ImGui::PopID();
-            }
-
-            // Gold row
-            char gbuf[48];
-            formatGold(gold, gbuf, sizeof(gbuf));
-            ImGui::Spacing();
-            if (isMine) {
-                ImGui::Text("Gold offered: %s", gbuf);
-                static char goldInput[32] = "0";
-                ImGui::SetNextItemWidth(120.0f);
-                if (ImGui::InputText("##goldset", goldInput, sizeof(goldInput),
-                                     ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_EnterReturnsTrue)) {
-                    uint64_t copper = std::strtoull(goldInput, nullptr, 10);
-                    gameHandler.setTradeGold(copper);
-                }
-                ImGui::SameLine();
-                ImGui::TextDisabled("(copper, Enter to set)");
-            } else {
-                ImGui::Text("Gold offered: %s", gbuf);
-            }
-        };
-
-        // Two-column layout: my offer | peer offer
-        float colW = ImGui::GetContentRegionAvail().x * 0.5f - 4.0f;
-        ImGui::BeginChild("##myoffer", ImVec2(colW, 240.0f), true);
-        renderSlotColumn("Your offer", mySlots, myGold, true);
-        ImGui::EndChild();
-
-        ImGui::SameLine();
-
-        ImGui::BeginChild("##peroffer", ImVec2(colW, 240.0f), true);
-        renderSlotColumn((peerName + "'s offer").c_str(), peerSlots, peerGold, false);
-        ImGui::EndChild();
-
-        // Buttons
-        ImGui::Spacing();
-        ImGui::Separator();
-        float bw = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-        if (ImGui::Button("Accept Trade", ImVec2(bw, 0))) {
-            gameHandler.acceptTrade();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(bw, 0))) {
-            gameHandler.cancelTrade();
-        }
-    }
-    ImGui::End();
-
-    if (!open) {
-        gameHandler.cancelTrade();
-    }
-}
-
 void DialogManager::renderGuildInvitePopup(game::GameHandler& gameHandler) {
     if (!gameHandler.hasPendingGuildInvite()) return;
 
@@ -546,61 +300,6 @@ void DialogManager::renderGuildInvitePopup(game::GameHandler& gameHandler) {
         ImGui::SameLine();
         if (ImGui::Button("Decline", ImVec2(155, 30))) {
             gameHandler.declineGuildInvite();
-        }
-    }
-    ImGui::End();
-}
-
-void DialogManager::renderReadyCheckPopup(game::GameHandler& gameHandler) {
-    if (!gameHandler.hasPendingReadyCheck()) return;
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth()) : 1280.0f;
-    float screenH = window ? static_cast<float>(window->getHeight()) : 720.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(screenW / 2 - 175, screenH / 2 - 60), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(350, 0), ImGuiCond_Always);
-
-    if (ImGui::Begin("Ready Check", nullptr, kDialogFlags)) {
-        const std::string& initiator = gameHandler.getReadyCheckInitiator();
-        if (initiator.empty()) {
-            ImGui::Text("A ready check has been initiated!");
-        } else {
-            ImGui::TextWrapped("%s has initiated a ready check!", initiator.c_str());
-        }
-        ImGui::Spacing();
-
-        if (ImGui::Button("Ready", ImVec2(155, 30))) {
-            gameHandler.respondToReadyCheck(true);
-            gameHandler.dismissReadyCheck();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Not Ready", ImVec2(155, 30))) {
-            gameHandler.respondToReadyCheck(false);
-            gameHandler.dismissReadyCheck();
-        }
-
-        // Live player responses
-        const auto& results = gameHandler.getReadyCheckResults();
-        if (!results.empty()) {
-            ImGui::Separator();
-            if (ImGui::BeginTable("##rcresults", 2,
-                    ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg)) {
-                ImGui::TableSetupColumn("Player", ImGuiTableColumnFlags_WidthStretch);
-                ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 72.0f);
-                for (const auto& r : results) {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::TextUnformatted(r.name.c_str());
-                    ImGui::TableSetColumnIndex(1);
-                    if (r.ready) {
-                        ImGui::TextColored(ImVec4(0.2f, 0.9f, 0.2f, 1.0f), "Ready");
-                    } else {
-                        ImGui::TextColored(ImVec4(0.9f, 0.3f, 0.3f, 1.0f), "Not Ready");
-                    }
-                }
-                ImGui::EndTable();
-            }
         }
     }
     ImGui::End();

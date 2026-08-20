@@ -27,9 +27,7 @@ public:
 
     /// Render "early" dialogs (group invite through LFG role check)
     /// called in render() before guild roster / social frame
-    void renderDialogs(game::GameHandler& gameHandler,
-                       InventoryScreen& inventoryScreen,
-                       ChatPanel& chatPanel);
+    void renderDialogs(game::GameHandler& gameHandler);
 
     /// Render "late" dialogs (resurrect, talent wipe, pet unlearn)
     /// called in render() after reclaim corpse button
@@ -52,15 +50,10 @@ private:
     void renderGroupInvitePopup(game::GameHandler& gameHandler);
     void renderDuelRequestPopup(game::GameHandler& gameHandler);
     void renderDuelCountdown(game::GameHandler& gameHandler);
-    void renderItemTextWindow(game::GameHandler& gameHandler);
     void renderSharedQuestPopup(game::GameHandler& gameHandler);
     void renderSummonRequestPopup(game::GameHandler& gameHandler);
     void renderTradeRequestPopup(game::GameHandler& gameHandler);
-    void renderTradeWindow(game::GameHandler& gameHandler,
-                           InventoryScreen& inventoryScreen,
-                           ChatPanel& chatPanel);
     void renderGuildInvitePopup(game::GameHandler& gameHandler);
-    void renderReadyCheckPopup(game::GameHandler& gameHandler);
     void renderBgInvitePopup(game::GameHandler& gameHandler);
     void renderBfMgrInvitePopup(game::GameHandler& gameHandler);
     void renderLfgProposalPopup(game::GameHandler& gameHandler);
