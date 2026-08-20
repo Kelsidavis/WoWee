@@ -604,10 +604,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         // Both windows are gated on their element, so with either handed over
         // the slash command set a flag whose only reader is switched off.
         if (cmds.showBgScore) {
-            if (frameXmlOwns(UiElement::BattlegroundScore))
-                gameHandler.runInterfaceCommand("ToggleWorldStateScoreFrame()");
-            else
-                combatUI_.showBgScoreboard_ = !combatUI_.showBgScoreboard_;
+            gameHandler.runInterfaceCommand("ToggleWorldStateScoreFrame()");
         }
         if (cmds.showGmTicket) {
             gameHandler.runInterfaceCommand("ToggleHelpFrame()");
@@ -625,8 +622,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     auto spellIconFn = [this](uint32_t id, pipeline::AssetManager* am) { return getSpellIcon(id, am); };
     combatUI_.renderCooldownTracker(gameHandler, settingsPanel_, spellIconFn);
     renderNameplates(gameHandler);  // player names always shown; NPC plates gated by showNameplates_
-    combatUI_.renderBattlegroundScore(gameHandler);
-    combatUI_.renderRaidWarningOverlay(gameHandler);
+    combatUI_.playSoundsForNewChat(gameHandler);
     // Blizzard_CombatText draws its own once it is loaded, which happens the
     // moment the player touches the float-mode dropdown in the interface
     // options. Not an element gate: the addon arrives mid-run, so this has to
@@ -661,9 +657,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     windowManager_.renderTitlesWindow(gameHandler);
     windowManager_.renderEquipSetWindow(gameHandler);
     combatUI_.renderThreatWindow(gameHandler);
-    if (!frameXmlOwns(UiElement::BattlegroundScore)) {
-        combatUI_.renderBgScoreboard(gameHandler);
-    }
     // The blips, whoever draws the ring around them.
     //
     // This was gated on the element the way every other pass is, and the

@@ -69,7 +69,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::ZoneText,     "zonetext"},
     {UiElement::Trade,        "trade", false},
     {UiElement::ReadyCheck,   "readycheck", false},
-    {UiElement::RaidWarning,  "raidwarning"},
+    {UiElement::RaidWarning,  "raidwarning", false},
     {UiElement::Dialogs,      "dialogs", false},
     {UiElement::Achievements, "achievements", false},
     {UiElement::BarberShop,   "barbershop"},
@@ -78,7 +78,7 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::Book,         "book", false},
     {UiElement::GameMenu,          "gamemenu"},
     {UiElement::Help,              "help"},
-    {UiElement::BattlegroundScore, "bgscore"},
+    {UiElement::BattlegroundScore, "bgscore", false},
     {UiElement::Totems,       "totems", false},
     {UiElement::Talents,      "talents", false},
     {UiElement::UiErrors,     "uierrors", false},
@@ -751,7 +751,6 @@ const Suppress kSuppress[] = {
         // This client draws its raid warnings by scanning the chat history
         // rather than from the event, so the two do not cancel out: without
         // this entry both banners appear.
-        {UiElement::RaidWarning, "RaidWarningFrame RaidBossEmoteFrame"},
         // Symmetric with the four client dialogs gated on this element: a
         // run that hands the prompts back to this client hides FrameXML's,
         // or the duplicate simply swaps sides.
@@ -812,8 +811,6 @@ const Suppress kSuppress[] = {
         // always-up frame was drawing unaccounted: it registers
         // UPDATE_WORLD_STATES, which this client fires, and only stayed empty
         // because GetNumWorldStateUI was stubbed to zero.
-        {UiElement::BattlegroundScore,
-         "WorldStateScoreFrame WorldStateAlwaysUpFrame"},
         // Reachable only since their APIs were finished: a window whose
         // functions all answer opens where before it stayed empty and
         // unnoticed. This client draws a totem bar and a talent screen of its
@@ -1089,13 +1086,11 @@ const Check kChecks[] = {
         {UiElement::Social,       "FriendsFrame FriendsFrameTitleText"},
         {UiElement::Trade,        "TradeFrame TradeFrameRecipientNameText"},
         {UiElement::ReadyCheck,   "ReadyCheckFrame ReadyCheckFrameText"},
-        {UiElement::RaidWarning,  "RaidWarningFrame RaidBossEmoteFrame"},
         {UiElement::Taxi,         "TaxiFrame TaxiRouteMap"},
         {UiElement::Stable,       "PetStableFrame"},
         {UiElement::Book,         "ItemTextFrame ItemTextPageText"},
         {UiElement::GameMenu,     "GameMenuFrame GameMenuButtonLogout"},
         {UiElement::Help,         "HelpFrame TicketStatusFrame"},
-        {UiElement::BattlegroundScore, "WorldStateScoreFrame"},
         {UiElement::Totems,       "TotemFrame MultiCastActionBarFrame"},
         {UiElement::UiErrors,     "UIErrorsFrame"},
 

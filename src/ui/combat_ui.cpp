@@ -149,106 +149,26 @@ void CombatUI::renderCooldownTracker(game::GameHandler& gameHandler,
 // Raid Warning / Boss Emote Center-Screen Overlay
 // ============================================================
 
-void CombatUI::renderRaidWarningOverlay(game::GameHandler& gameHandler) {
-    // FrameXML's RaidWarningFrame and RaidBossEmoteFrame answer
-    // CHAT_MSG_RAID_WARNING and CHAT_MSG_RAID_BOSS_EMOTE, both of which this
-    // client fires - so when it owns them, collect no entries and the empty
-    // check below returns before anything is drawn. The gate is here rather
-    // than at the top of the function because the same scan plays the whisper
-    // sound, which belongs to no element and has to keep happening.
-    const bool ownsWarnings = frameXmlOwns(UiElement::RaidWarning);
-
-    // Scan chat history for new RAID_WARNING / RAID_BOSS_EMOTE messages
+// ============================================================================
+// The sound a whisper makes
+// ============================================================================
+//
+// What is left of the raid warning overlay. RaidWarningFrame is FrameXML's and
+// answers CHAT_MSG_RAID_WARNING itself, so the banner went; the walk through
+// new chat lines stayed, because the whisper sound was being played from
+// inside it and belongs to no element - FrameXML plays none for a whisper.
+void CombatUI::playSoundsForNewChat(game::GameHandler& gameHandler) {
     const auto& chatHistory = gameHandler.getChatHistory();
-    size_t newCount = chatHistory.size();
-    if (newCount > raidWarnChatSeenCount_) {
-        // Walk only the new messages (deque - iterate from back by skipping old ones)
-        size_t toScan = newCount - raidWarnChatSeenCount_;
-        size_t startIdx = newCount > toScan ? newCount - toScan : 0;
-        for (size_t i = startIdx; i < newCount; ++i) {
-            const auto& msg = chatHistory[i];
-            if (!ownsWarnings &&
-                (msg.type == game::ChatType::RAID_WARNING ||
-                 msg.type == game::ChatType::RAID_BOSS_EMOTE ||
-                 msg.type == game::ChatType::MONSTER_EMOTE)) {
-                bool isBoss = (msg.type != game::ChatType::RAID_WARNING);
-                // Limit display text length to avoid giant overlay
-                std::string text = msg.message;
-                if (text.size() > 200) text = text.substr(0, 200) + "...";
-                raidWarnEntries_.push_back({.text = text, .age = 0.0f, .isBossEmote = isBoss});
-                if (raidWarnEntries_.size() > 3)
-                    raidWarnEntries_.erase(raidWarnEntries_.begin());
-            }
-            // Whisper audio notification
-            if (msg.type == game::ChatType::WHISPER) {
-                if (auto* ac = services_.audioCoordinator) {
-                    if (auto* ui = ac->getUiSoundManager())
-                        ui->playWhisperReceived();
-                }
-            }
+    const size_t newCount = chatHistory.size();
+    if (newCount <= raidWarnChatSeenCount_) return;
+
+    for (size_t i = raidWarnChatSeenCount_; i < newCount; ++i) {
+        if (chatHistory[i].type != game::ChatType::WHISPER) continue;
+        if (auto* ac = services_.audioCoordinator) {
+            if (auto* ui = ac->getUiSoundManager()) ui->playWhisperReceived();
         }
-        raidWarnChatSeenCount_ = newCount;
     }
-
-    // Age and remove expired entries
-    float dt = ImGui::GetIO().DeltaTime;
-    for (auto& e : raidWarnEntries_) e.age += dt;
-    raidWarnEntries_.erase(
-        std::remove_if(raidWarnEntries_.begin(), raidWarnEntries_.end(),
-            [](const RaidWarnEntry& e){ return e.age >= RaidWarnEntry::LIFETIME; }),
-        raidWarnEntries_.end());
-
-    if (raidWarnEntries_.empty()) return;
-
-    ImGuiIO& io = ImGui::GetIO();
-    float screenW = io.DisplaySize.x;
-    float screenH = io.DisplaySize.y;
-    ImDrawList* fg = ImGui::GetForegroundDrawList();
-
-    // Stack entries vertically near upper-center (below target frame area)
-    float baseY = screenH * 0.28f;
-    for (const auto& e : raidWarnEntries_) {
-        float alpha = std::clamp(1.0f - (e.age / RaidWarnEntry::LIFETIME), 0.0f, 1.0f);
-        // Fade in quickly, hold, then fade out last 20%
-        if (e.age < 0.3f) alpha = e.age / 0.3f;
-
-        // Truncate to fit screen width reasonably
-        const char* txt = e.text.c_str();
-        const float fontSize = 22.0f;
-        ImFont* font = ImGui::GetFont();
-
-        // Word-wrap manually: compute text size, center horizontally
-        float maxW = screenW * 0.7f;
-        ImVec2 textSz = font->CalcTextSizeA(fontSize, maxW, maxW, txt);
-        float tx = (screenW - textSz.x) * 0.5f;
-
-        ImU32 shadowCol = IM_COL32(0, 0, 0, static_cast<int>(alpha * 200));
-        ImU32 mainCol;
-        if (e.isBossEmote) {
-            mainCol = IM_COL32(255, 185, 60, static_cast<int>(alpha * 255));   // amber
-        } else {
-            // Raid warning: alternating red/yellow flash during first second
-            float flashT = std::fmod(e.age * 4.0f, 1.0f);
-            if (flashT < 0.5f)
-                mainCol = IM_COL32(255, 50, 50, static_cast<int>(alpha * 255));
-            else
-                mainCol = IM_COL32(255, 220, 50, static_cast<int>(alpha * 255));
-        }
-
-        // Background dim box for readability
-        float pad = 8.0f;
-        fg->AddRectFilled(ImVec2(tx - pad, baseY - pad),
-                           ImVec2(tx + textSz.x + pad, baseY + textSz.y + pad),
-                           IM_COL32(0, 0, 0, static_cast<int>(alpha * 120)), 4.0f);
-
-        // Shadow + main text
-        fg->AddText(font, fontSize, ImVec2(tx + 2.0f, baseY + 2.0f), shadowCol, txt,
-                    nullptr, maxW);
-        fg->AddText(font, fontSize, ImVec2(tx,         baseY),         mainCol,  txt,
-                    nullptr, maxW);
-
-        baseY += textSz.y + 6.0f;
-    }
+    raidWarnChatSeenCount_ = newCount;
 }
 
 
@@ -841,93 +761,6 @@ void CombatUI::renderDPSMeter(game::GameHandler& gameHandler,
 // Buff/Debuff Bar
 // ============================================================
 
-//   WSG  489 – Alliance / Horde flag captures (max 3)
-//   AB   529 – Alliance / Horde resource scores (max 1600)
-//   AV    30 – Alliance / Horde reinforcements
-//   EotS 566 – Alliance / Horde resource scores (max 1600)
-// ============================================================================
-void CombatUI::renderBattlegroundScore(game::GameHandler& gameHandler) {
-    // FrameXML presents the same scores through WorldStateAlwaysUpFrame, which
-    // reads the shared table below via GetWorldStateUIInfo.
-    if (frameXmlOwns(UiElement::BattlegroundScore)) return;
-
-    // Only show when in a recognised battleground map
-    uint32_t mapId = gameHandler.getWorldStateMapId();
-
-    const game::BgScoreDef* def = game::findBgScoreDef(mapId);
-    if (!def) return;
-
-    auto allianceOpt = gameHandler.getWorldState(def->allianceKey);
-    auto hordeOpt    = gameHandler.getWorldState(def->hordeKey);
-    if (!allianceOpt && !hordeOpt) return;
-
-    uint32_t allianceScore = allianceOpt.value_or(0);
-    uint32_t hordeScore    = hordeOpt.value_or(0);
-    uint32_t maxScore      = def->hardcodedMax;
-    if (def->maxKey != 0) {
-        if (auto mv = gameHandler.getWorldState(def->maxKey)) maxScore = *mv;
-    }
-
-    auto* window = services_.window;
-    float screenW = window ? static_cast<float>(window->getWidth())  : 1280.0f;
-
-    // Width scales with screen but stays reasonable
-    float frameW = 260.0f;
-    float frameH = 60.0f;
-    float posX   = screenW / 2.0f - frameW / 2.0f;
-    float posY   = 4.0f;
-
-    ImGui::SetNextWindowPos(ImVec2(posX, posY), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(frameW, frameH), ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.75f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(6.0f, 4.0f));
-
-    if (ImGui::Begin("##BGScore", nullptr,
-            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBringToFrontOnFocus |
-            ImGuiWindowFlags_NoSavedSettings)) {
-
-        // BG name centred at top
-        float nameW = ImGui::CalcTextSize(def->name).x;
-        ImGui::SetCursorPosX((frameW - nameW) / 2.0f);
-        ImGui::TextColored(colors::kBrightGold, "%s", def->name);
-
-        // Alliance score | separator | Horde score
-        float innerW  = frameW - 12.0f;
-        float halfW   = innerW / 2.0f - 4.0f;
-
-        ImGui::SetCursorPosX(6.0f);
-        ImGui::BeginGroup();
-        {
-            // Alliance (blue)
-            char aBuf[32];
-            if (maxScore > 0 && strlen(def->unit) > 0)
-                snprintf(aBuf, sizeof(aBuf), "\xF0\x9F\x94\xB5 %u / %u", allianceScore, maxScore);
-            else
-                snprintf(aBuf, sizeof(aBuf), "\xF0\x9F\x94\xB5 %u", allianceScore);
-            ImGui::TextColored(colors::kLightBlue, "%s", aBuf);
-        }
-        ImGui::EndGroup();
-
-        ImGui::SameLine(halfW + 16.0f);
-
-        ImGui::BeginGroup();
-        {
-            // Horde (red)
-            char hBuf[32];
-            if (maxScore > 0 && strlen(def->unit) > 0)
-                snprintf(hBuf, sizeof(hBuf), "\xF0\x9F\x94\xB4 %u / %u", hordeScore, maxScore);
-            else
-                snprintf(hBuf, sizeof(hBuf), "\xF0\x9F\x94\xB4 %u", hordeScore);
-            ImGui::TextColored(colors::kHostileRed, "%s", hBuf);
-        }
-        ImGui::EndGroup();
-    }
-    ImGui::End();
-    ImGui::PopStyleVar(2);
-}
-
 
 // ─── Combat Log Window ────────────────────────────────────────────────────────
 void CombatUI::renderCombatLog(game::GameHandler& gameHandler,
@@ -1370,170 +1203,6 @@ void CombatUI::renderThreatWindow(game::GameHandler& gameHandler) {
     ImGui::End();
 }
 
-
-// ─── BG Scoreboard ────────────────────────────────────────────────────────────
-void CombatUI::renderBgScoreboard(game::GameHandler& gameHandler) {
-    if (!showBgScoreboard_) return;
-
-    const game::GameHandler::BgScoreboardData* data = gameHandler.getBgScoreboard();
-
-    ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(150, 100), ImGuiCond_FirstUseEver);
-
-    const char* title = data && data->isArena ? "Arena Score###BgScore"
-                                              : "Battleground Score###BgScore";
-    if (!ImGui::Begin(title, &showBgScoreboard_, ImGuiWindowFlags_NoCollapse)) {
-        ImGui::End();
-        return;
-    }
-
-    if (!data) {
-        ImGui::TextDisabled("No score data yet.");
-        ImGui::TextDisabled("Use /score to request the scoreboard while in a battleground or arena.");
-        ImGui::End();
-        return;
-    }
-
-    // Arena team rating banner (shown only for arenas)
-    if (data->isArena) {
-        for (int t = 0; t < 2; ++t) {
-            const auto& at = data->arenaTeams[t];
-            if (at.teamName.empty()) continue;
-            int32_t ratingDelta = static_cast<int32_t>(at.ratingChange);
-            ImVec4 teamCol = (t == 0) ? colors::kHostileRed   // team 0: red
-                                      : colors::kLightBlue;    // team 1: blue
-            ImGui::TextColored(teamCol, "%s", at.teamName.c_str());
-            ImGui::SameLine();
-            char ratingBuf[32];
-            if (ratingDelta >= 0)
-                std::snprintf(ratingBuf, sizeof(ratingBuf), "Rating: %u (+%d)", at.newRating, ratingDelta);
-            else
-                std::snprintf(ratingBuf, sizeof(ratingBuf), "Rating: %u (%d)", at.newRating, ratingDelta);
-            ImGui::TextDisabled("%s", ratingBuf);
-        }
-        ImGui::Separator();
-    }
-
-    // Winner banner
-    if (data->hasWinner) {
-        const char* winnerStr;
-        ImVec4 winnerColor;
-        if (data->isArena) {
-            // For arenas, winner byte 0/1 refers to team index in arenaTeams[]
-            const auto& winTeam = data->arenaTeams[data->winner & 1];
-            winnerStr  = winTeam.teamName.empty() ? "Team 1" : winTeam.teamName.c_str();
-            winnerColor = (data->winner == 0) ? colors::kHostileRed
-                                              : colors::kLightBlue;
-        } else {
-            winnerStr  = (data->winner == 1) ? "Alliance" : "Horde";
-            winnerColor = (data->winner == 1) ? colors::kLightBlue
-                                              : colors::kHostileRed;
-        }
-        float textW = ImGui::CalcTextSize(winnerStr).x + ImGui::CalcTextSize("  Victory!").x;
-        ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - textW) * 0.5f);
-        ImGui::TextColored(winnerColor, "%s", winnerStr);
-        ImGui::SameLine(0, 4);
-        ImGui::TextColored(colors::kBrightGold, "Victory!");
-        ImGui::Separator();
-    }
-
-    // Refresh button
-    if (ImGui::SmallButton("Refresh")) {
-        gameHandler.requestPvpLog();
-    }
-    ImGui::SameLine();
-    ImGui::TextDisabled("%zu players", data->players.size());
-
-    // Score table
-    constexpr ImGuiTableFlags kTableFlags =
-        ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
-        ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
-        ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Sortable;
-
-    // Build dynamic column count based on what BG-specific stats are present
-    int numBgCols = 0;
-    std::vector<std::string> bgColNames;
-    for (const auto& ps : data->players) {
-        for (const auto& [fieldName, val] : ps.bgStats) {
-            // Extract short name after last '.' (e.g. "BattlegroundAB.AbFlagCaptures" → "Caps")
-            std::string shortName = fieldName;
-            auto dotPos = fieldName.rfind('.');
-            if (dotPos != std::string::npos) shortName = fieldName.substr(dotPos + 1);
-            bool found = false;
-            for (const auto& n : bgColNames) { if (n == shortName) { found = true; break; } }
-            if (!found) bgColNames.push_back(shortName);
-        }
-    }
-    numBgCols = static_cast<int>(bgColNames.size());
-
-    // Fixed cols: Team | Name | KB | Deaths | HKs | Honor; then BG-specific
-    int totalCols = 6 + numBgCols;
-    float tableH = ImGui::GetContentRegionAvail().y;
-    if (ImGui::BeginTable("##BgScoreTable", totalCols, kTableFlags, ImVec2(0.0f, tableH))) {
-        ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("Team",   ImGuiTableColumnFlags_WidthFixed,   56.0f);
-        ImGui::TableSetupColumn("Name",   ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("KB",     ImGuiTableColumnFlags_WidthFixed,   38.0f);
-        ImGui::TableSetupColumn("Deaths", ImGuiTableColumnFlags_WidthFixed,   52.0f);
-        ImGui::TableSetupColumn("HKs",    ImGuiTableColumnFlags_WidthFixed,   38.0f);
-        ImGui::TableSetupColumn("Honor",  ImGuiTableColumnFlags_WidthFixed,   52.0f);
-        for (const auto& col : bgColNames)
-            ImGui::TableSetupColumn(col.c_str(), ImGuiTableColumnFlags_WidthFixed, 52.0f);
-        ImGui::TableHeadersRow();
-
-        // Sort: Alliance first, then Horde; within each team by KB desc
-        std::vector<const game::GameHandler::BgPlayerScore*> sorted;
-        sorted.reserve(data->players.size());
-        for (const auto& ps : data->players) sorted.push_back(&ps);
-        std::stable_sort(sorted.begin(), sorted.end(),
-            [](const game::GameHandler::BgPlayerScore* a,
-               const game::GameHandler::BgPlayerScore* b) {
-                if (a->team != b->team) return a->team > b->team;  // Alliance(1) first
-                return a->killingBlows > b->killingBlows;
-            });
-
-        uint64_t playerGuid = gameHandler.getPlayerGuid();
-        for (const auto* ps : sorted) {
-            ImGui::TableNextRow();
-
-            // Team
-            ImGui::TableNextColumn();
-            if (ps->team == 1)
-                ImGui::TextColored(colors::kLightBlue, "Alliance");
-            else
-                ImGui::TextColored(colors::kHostileRed, "Horde");
-
-            // Name (highlight player's own row)
-            ImGui::TableNextColumn();
-            bool isSelf = (ps->guid == playerGuid);
-            if (isSelf) ImGui::PushStyleColor(ImGuiCol_Text, colors::kBrightGold);
-            const char* nameStr = ps->name.empty() ? "Unknown" : ps->name.c_str();
-            ImGui::TextUnformatted(nameStr);
-            if (isSelf) ImGui::PopStyleColor();
-
-            ImGui::TableNextColumn(); ImGui::Text("%u", ps->killingBlows);
-            ImGui::TableNextColumn(); ImGui::Text("%u", ps->deaths);
-            ImGui::TableNextColumn(); ImGui::Text("%u", ps->honorableKills);
-            ImGui::TableNextColumn(); ImGui::Text("%u", ps->bonusHonor);
-
-            for (const auto& col : bgColNames) {
-                ImGui::TableNextColumn();
-                uint32_t val = 0;
-                for (const auto& [fieldName, fval] : ps->bgStats) {
-                    std::string shortName = fieldName;
-                    auto dotPos = fieldName.rfind('.');
-                    if (dotPos != std::string::npos) shortName = fieldName.substr(dotPos + 1);
-                    if (shortName == col) { val = fval; break; }
-                }
-                if (val > 0) ImGui::Text("%u", val);
-                else ImGui::TextDisabled("-");
-            }
-        }
-        ImGui::EndTable();
-    }
-
-    ImGui::End();
-}
 
 
 } // namespace ui
