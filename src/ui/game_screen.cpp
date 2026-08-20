@@ -615,10 +615,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         // Tab two is the who list. The client's own who window is gated on
         // the social element like the rest of that panel's windows.
         if (cmds.showWho) {
-            if (frameXmlOwns(UiElement::Social))
-                gameHandler.runInterfaceCommand("ToggleFriendsFrame(2)");
-            else
-                socialPanel_.showWhoWindow_ = true;
+            gameHandler.runInterfaceCommand("ToggleFriendsFrame(2)");
         }
         if (cmds.toggleCombatLog) combatUI_.showCombatLog_ = !combatUI_.showCombatLog_;
         if (cmds.takeScreenshot) takeScreenshot();
@@ -654,21 +651,11 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // list, the who list and the guild roster. Only the friends list was gated
     // on this side, so handing social over left two of this client's three
     // windows drawing beside FrameXML's tabs.
-    if (!frameXmlOwns(UiElement::Social)) {
-        socialPanel_.renderGuildRoster(gameHandler, chatPanel_, inventoryScreen,
-                                       spellbookScreen, spellIconFn);
-    }
-    if (!frameXmlOwns(UiElement::Social)) {
-        socialPanel_.renderSocialFrame(gameHandler, chatPanel_);
-    }
     windowManager_.renderGmCommandScreen(gameHandler);
     if (!frameXmlOwns(UiElement::DungeonFinder)) {
         socialPanel_.renderDungeonFinderWindow(gameHandler, chatPanel_);
     }
     windowManager_.renderInstanceLockouts(gameHandler);
-    if (!frameXmlOwns(UiElement::Social)) {
-        socialPanel_.renderWhoWindow(gameHandler, chatPanel_);
-    }
     combatUI_.renderCombatLog(gameHandler, spellbookScreen);
     windowManager_.renderSkillsWindow(gameHandler);
     windowManager_.renderTitlesWindow(gameHandler);

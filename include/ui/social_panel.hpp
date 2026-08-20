@@ -33,9 +33,6 @@ public:
     using SpellIconFn = std::function<VkDescriptorSet(uint32_t spellId, pipeline::AssetManager*)>;
 
     // ---- Toggle booleans (written by slash commands / escape handler / keybinds / UI buttons) ----
-    bool showSocialFrame_ = false;   // O key toggles social/friends list
-    bool showGuildRoster_ = false;
-    bool showWhoWindow_ = false;
     bool showDungeonFinder_ = false;
     /// Put the inspect window up, whichever interface draws it.
     ///
@@ -46,16 +43,10 @@ public:
     void openInspectWindow(game::GameHandler& gameHandler);
 
     // ---- Guild roster state ----
-    std::string selectedGuildMember_;
-    bool showGuildNoteEdit_ = false;
-    bool editingOfficerNote_ = false;
     char guildNoteEditBuffer_[256] = {0};
-    int guildRosterTab_ = 0;         // 0=Roster, 1=Guild Info
     char guildMotdEditBuffer_[256] = {0};
-    bool showMotdEdit_ = false;
     char petitionNameBuffer_[64] = {0};
     char addRankNameBuffer_[64] = {0};
-    bool showAddRankModal_ = false;
 
     // ---- LFG state ----
     uint8_t lfgRoles_ = 0x08;           // default: DPS (0x02=tank, 0x04=healer, 0x08=dps)
@@ -65,17 +56,8 @@ public:
     // Takes the panels the markup renderer needs: the guild info text and the
     // MOTD are server strings that carry item, spell, quest and achievement
     // links, and rendering them as plain text left every link inert.
-    void renderGuildRoster(game::GameHandler& gameHandler,
-                           ChatPanel& chatPanel,
-                           InventoryScreen& inventoryScreen,
-                           SpellbookScreen& spellbookScreen,
-                           const SpellIconFn& getSpellIcon);
-    void renderSocialFrame(game::GameHandler& gameHandler,
-                           ChatPanel& chatPanel);
     void renderDungeonFinderWindow(game::GameHandler& gameHandler,
                                    ChatPanel& chatPanel);
-    void renderWhoWindow(game::GameHandler& gameHandler,
-                         ChatPanel& chatPanel);
 
     // UIServices injection (singleton breaking)
     void setServices(const UIServices& services) { services_ = services; }
@@ -83,8 +65,6 @@ public:
 private:
     UIServices services_;
     // Shared with chat: the guild info text and MOTD carry the same markup.
-    ChatMarkupParser   guildMarkupParser_;
-    ChatMarkupRenderer guildMarkupRenderer_;
 };
 
 } // namespace ui

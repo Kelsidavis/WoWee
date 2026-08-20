@@ -923,10 +923,10 @@ bool GuildInfoParser::parse(network::Packet& packet, GuildInfoData& data) {
     // with AppendPackedTime, so reading a day, a month and a year took twelve
     // bytes where the server sent four - the date was nonsense and the two
     // counts after it were read from the wrong offset as well.
-    const WowDate created = unpackWowPackedTime(packet.readUInt32());
-    data.creationDay = static_cast<uint32_t>(created.day);
-    data.creationMonth = static_cast<uint32_t>(created.month);
-    data.creationYear = static_cast<uint32_t>(created.fullYear());
+    // Read and dropped. Nothing shows a guild's founding date since the roster
+    // window went to FrameXML, but the four bytes still have to come off the
+    // packet or the two counts after them are read from the wrong offset.
+    packet.readUInt32();
     data.numMembers = packet.readUInt32();
     data.numAccounts = packet.readUInt32();
     LOG_INFO("Parsed SMSG_GUILD_INFO: ", data.guildName, " members=", data.numMembers);

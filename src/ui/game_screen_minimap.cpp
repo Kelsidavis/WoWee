@@ -256,22 +256,13 @@ void GameScreen::renderMinimapButtons(game::GameHandler& gameHandler, float cent
             ImVec2 p = ImGui::GetCursorScreenPos();
             ImVec2 sz(20.0f, 20.0f);
             if (ImGui::InvisibleButton("##FriendsBtnInv", sz)) {
-                // One branch, not two nested. The same routing was applied to
-                // this button twice at some point and the second copy landed
-                // inside the first's else, where the condition it tests is
-                // already known false - dead, and it read as though the two
-                // halves disagreed.
-                if (frameXmlOwns(UiElement::Social)) {
-                    gameHandler.runInterfaceCommand("ToggleFriendsFrame(1)");
-                } else {
-                    socialPanel_.showSocialFrame_ = !socialPanel_.showSocialFrame_;
-                }
+                gameHandler.runInterfaceCommand("ToggleFriendsFrame(1)");
             }
+            // No lit state any more: FriendsFrame is FrameXML's and nothing
+            // here can ask whether it is up. The button still opens it, and
+            // still answers the pointer.
             bool hovered = ImGui::IsItemHovered();
-            ImU32 bg = socialPanel_.showSocialFrame_
-                ? IM_COL32(42, 100, 42, 230)
-                : IM_COL32(38, 38, 38, 210);
-            if (hovered) bg = socialPanel_.showSocialFrame_ ? IM_COL32(58, 130, 58, 230) : IM_COL32(65, 65, 65, 220);
+            ImU32 bg = hovered ? IM_COL32(65, 65, 65, 220) : IM_COL32(38, 38, 38, 210);
             draw->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), bg, 4.0f);
             draw->AddRect(ImVec2(p.x + 0.5f, p.y + 0.5f),
                           ImVec2(p.x + sz.x - 0.5f, p.y + sz.y - 0.5f),

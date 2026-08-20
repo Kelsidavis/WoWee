@@ -56,14 +56,14 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::Loot,         "loot", false},
     {UiElement::Bank,         "bank"},
     {UiElement::PartyFrames,  "partyframes", false},
-    {UiElement::Social,       "social"},
+    {UiElement::Social,       "social", false},
     {UiElement::TradeSkill,   "tradeskill"},
     {UiElement::ClassTrainer, "classtrainer"},
     {UiElement::AuctionHouse, "auctionhouse"},
     {UiElement::GuildBank,    "guildbank"},
     {UiElement::Inspect,      "inspect", false},
     {UiElement::DungeonFinder, "dungeonfinder"},
-    {UiElement::Petition,     "petition"},
+    {UiElement::Petition,     "petition", false},
     {UiElement::Buffs,        "buffs", false},
     {UiElement::Durability,   "durability", false},
     {UiElement::ZoneText,     "zonetext"},
@@ -736,7 +736,6 @@ const Suppress kSuppress[] = {
         // and FRIENDLIST_UPDATE, so all of them were appearing in pairs.
         {UiElement::Vendor,      "MerchantFrame"},
         {UiElement::Bank,        "BankFrame"},
-        {UiElement::Social,      "FriendsFrame"},
         // Both of these were live: TRADE_SHOW and READY_CHECK are fired, and
         // this client draws its own trade window and its own ready-check popup
         // in dialog_manager - so FrameXML raised a second one of each. Neither

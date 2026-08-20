@@ -1336,9 +1336,6 @@ public:
 /** SMSG_GUILD_INFO data */
 struct GuildInfoData {
     std::string guildName;
-    uint32_t creationDay = 0;
-    uint32_t creationMonth = 0;
-    uint32_t creationYear = 0;
     uint32_t numMembers = 0;
     uint32_t numAccounts = 0;
 
