@@ -196,6 +196,13 @@ CHECKS = [
     ("handover_halves_check.py",
      r"^(\d+) with no suppression entry", 0,
      "elements FrameXML draws while this client still owns them"),
+    # And the same seam the other way: a row hiding a frame with nothing behind
+    # it. Seventeen of them, left by handovers that deleted the drawing and not
+    # the row, and invisible because suppression is skipped for an owned element
+    # and all seventeen were owned by default.
+    ("handover_halves_check.py",
+     r"^(\d+) suppressed while this client draws nothing", 0,
+     "frames hidden with nothing behind them"),
     ("handover_check.py",
      r"^(\d+) call\(s\) naming nothing that exists", 0,
      "interface commands naming a function that does not exist"),
@@ -571,12 +578,13 @@ CHECKS = [
     # deleting the bridge is what makes it fail. Verified that way.
     # Verbs this client's own windows can reach and FrameXML cannot. The
     # question that found the slash-command registry, so it is worth running
-    # rather than remembering - 2.7s. Sixty-six, all triaged in the tool:
+    # rather than remembering - 2.7s. Thirty-three, down from sixty-six as the
+    # windows that reached them were handed over, and all triaged in the tool:
     # callback wiring, the glue screen, the 3D world, five with a bound
     # FrameXML equivalent, and window state FrameXML replaces whole. The
-    # sixty-seventh is the one to look at.
+    # thirty-fourth is the one to look at.
     ("framexml_unreachable_verbs.py",
-     r"^(\d+) verbs this client's own windows can reach", 66,
+     r"^(\d+) verbs this client's own windows can reach", 33,
      "verbs only this client's own windows could reach"),
     # Emote tokens FrameXML can hand DoEmote that it cannot answer. One,
     # named "unused", which is a placeholder in FrameXML's own list. It was

@@ -18,8 +18,21 @@ point, each for one of these two reasons.
 
 WHAT IT CHECKS
 
-For every element named in the defaults or the candidates: that some entry in
-kSuppress names it, and that some file under src/ gates on it.
+Both halves, for every element named in the defaults or the candidates, and
+both of them against `clientDraws` in the element table - which is the one
+place that says whether this client still has a version of its own.
+
+  * a gate, unless this client draws nothing, in which case there is nothing
+    to gate and the exemption is that flag rather than a list here;
+  * a suppression entry, if this client draws its own;
+  * **no** suppression entry, if it does not. That half is the late one. A row
+    here outlives its element: once the drawing behind it is deleted, hiding
+    FrameXML's frame leaves a blank where a working window would have been.
+    Seventeen rows were in that state, silently, because suppression is
+    skipped for an owned element and all seventeen are owned by default - so
+    the fault could only appear in a run naming a subset, which is the only
+    thing the table is for. Found by asking why the exemption list here named
+    twelve elements the table still claimed this client drew.
 
 WHAT IT CANNOT SEE
 
@@ -39,56 +52,12 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TAKEOVER = ROOT / "src/ui/framexml_takeover.cpp"
 
-# Elements this client does not draw, so there is nothing to gate. Either it
-# never had its own version, or that version has been removed now that
-# FrameXML's is the one on screen. An entry here is a deletion recorded, not an
-# exemption: the element must have no drawing left in src/ui at all.
-NOTHING_TO_GATE = {
-    # src/ui/crafting_window.cpp, removed once the trade skill window was
-    # FrameXML's. Its two difficulty helpers moved to window_manager.cpp,
-    # where the trainer list still uses them.
-    "TradeSkill",
-    # src/ui/window_manager.cpp's renderStableWindow, removed once the stable
-    # was FrameXML's. Its pet list comes from the same handler either way.
-    "Stable",
-    # src/ui/window_manager.cpp's renderGmTicketWindow, removed once the help
-    # panel was FrameXML's. Both openers - the escape menu button and the slash
-    # command - call ToggleHelpFrame now.
-    "Help",
-    # src/ui/window_manager.cpp's three quest windows - details, request items
-    # and offer reward - removed once the quest giver was FrameXML's. Gossip
-    # keeps a gate of its own, but it is a behaviour one: this client sends
-    # CMSG_BINDER_ACTIVATE on the innkeeper option, where FrameXML waits for
-    # the server's confirm.
-    "QuestGiver",
-    # src/ui/window_manager.cpp's renderTrainerWindow, and with it the two
-    # recipe-difficulty helpers that were its last callers.
-    "ClassTrainer",
-    # src/ui/window_manager.cpp's renderAuctionHouseWindow and its browse,
-    # filter and sell state.
-    "AuctionHouse",
-    # src/ui/window_manager.cpp's renderVendorWindow, with its buy confirmation.
-    # The auto-open of the bags when a vendor opens stays: it routes to the
-    # interface's own bags.
-    "Vendor",
-    # renderMailWindow and renderMailComposeWindow, with the compose buffers.
-    "Mail",
-    # renderGuildBankWindow and its money input.
-    "GuildBank",
-    # renderBankWindow, and with it the "Combine bags" view option it was the
-    # only reader of - see settings_file_round_trip for the key that went.
-    "Bank",
-    # renderBarberShopWindow and the character preview only it drew. The barber
-    # logic behind it stays: the style lists, the cost and the apply are Lua
-    # services, and the interface's own barber panel is built on them.
-    "BarberShop",
-    # src/ui/action_bar_panel.cpp, removed whole: the action bar, stance bar,
-    # bag bar and the two thin bars are one frame in FrameXML and this client
-    # draws none of them. What is left of the class is the page and slot
-    # arithmetic the number keys need.
-    "BagBar",
-}
-
+# The exemption from needing a gate used to be a list here, one entry per
+# element with a note on what was deleted. It is read from `clientDraws` in the
+# element table now. The two said the same thing and had drifted: this list had
+# twelve elements the table still recorded as drawn by this client, which is
+# how the stale suppression rows stayed invisible. What each handover deleted
+# is in the commit that deleted it.
 
 def main():
     if not TAKEOVER.exists():
@@ -97,7 +66,12 @@ def main():
     cpp = TAKEOVER.read_text(errors="ignore")
 
     table = re.search(r"\{UiElement::PlayerFrame.*?\n\};", cpp, re.S)
-    names = dict(re.findall(r'\{UiElement::(\w+),\s*"([a-z]\w*)"\}', table.group(0)))
+    # The third field says whether this client still draws its own version.
+    # Absent means it does; an explicit false means the drawing was deleted.
+    rows = re.findall(r'\{UiElement::(\w+),\s*"([a-z]\w*)"(,\s*\w+)?\}',
+                      table.group(0))
+    names = {e: n for e, n, _ in rows}
+    draws = {e: "false" not in (flag or "") for e, _, flag in rows}
     # Only rows inside kSuppress count.
     #
     # This used to match any row in the file whose first string was
@@ -134,8 +108,10 @@ def main():
 
     live = sorted(e for e, n in names.items()
                   if n in defaults or n in candidates)
-    no_gate = [e for e in live if e not in gates and e not in NOTHING_TO_GATE]
-    no_suppress = [e for e in live if e not in suppress]
+    no_gate = [e for e in live if e not in gates and draws[e]]
+    no_suppress = [e for e in live if e not in suppress and draws[e]]
+    # And the other way: a row hiding FrameXML's frame with nothing behind it.
+    stale_suppress = [e for e in live if e in suppress and not draws[e]]
 
     print(f"{len(live)} elements handed over, {len(defaults)} by default and "
           f"{len(candidates)} named by 'candidates'\n")
@@ -152,6 +128,13 @@ def main():
     for e in no_suppress:
         print(f'    {e:<20} "{names[e]}"')
     if not no_suppress:
+        print("    (none)")
+
+    print(f"\n{len(stale_suppress)} suppressed while this client draws nothing "
+          f"- FrameXML's frame is hidden with nothing behind it:")
+    for e in stale_suppress:
+        print(f'    {e:<20} "{names[e]}"')
+    if not stale_suppress:
         print("    (none)")
     return 0
 

@@ -20,8 +20,21 @@ namespace {
 /// handed over nor suppressed, because that one is on screen twice. An
 /// element nothing here draws can never be, so reporting it would be a false
 /// alarm - and the report is only worth reading while every line of it is
-/// real. Elements are expected to move to false one at a time as the handover
-/// finishes; when they all have, the report and this flag go together.
+/// real. Four lines of it were not: the action bar, the stance bar and the two
+/// thin bars are the only elements not owned by default, and action_bar_panel
+/// was deleted whole, so each warned on every start about a window that had
+/// not existed for some time.
+///
+/// It is also what says whether an element may have a suppression row. Hiding
+/// FrameXML's frame is only right while something else is drawing, so the two
+/// have to move together - see kSuppress, and handover_halves_check, which
+/// fails if they disagree. Seventeen rows outlived their element before that
+/// rule existed.
+///
+/// Five elements are left drawing: the minimap, the world map, the zone text,
+/// the taxi picker and the settings panel behind the game menu. The first four
+/// are shared surfaces, where this client draws into a frame FrameXML owns
+/// rather than beside it, so this flag has no last one to turn off.
 struct Entry {
     UiElement element;
     std::string_view name;
@@ -34,12 +47,12 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::TargetFrame,  "targetframe", false},
     {UiElement::PetFrame,     "petframe", false},
     {UiElement::FocusFrame,   "focusframe", false},
-    {UiElement::ActionBar,    "actionbar"},
-    {UiElement::StanceBar,    "stancebar"},
-    {UiElement::BagBar,       "bagbar"},
+    {UiElement::ActionBar,    "actionbar", false},
+    {UiElement::StanceBar,    "stancebar", false},
+    {UiElement::BagBar,       "bagbar", false},
     {UiElement::MicroMenu,    "micromenu", false},
-    {UiElement::XpBar,        "xpbar"},
-    {UiElement::RepBar,       "repbar"},
+    {UiElement::XpBar,        "xpbar", false},
+    {UiElement::RepBar,       "repbar", false},
     {UiElement::CastBar,      "castbar", false},
     {UiElement::Minimap,      "minimap"},
     {UiElement::Chat,         "chat", false},
@@ -49,18 +62,18 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::Bags,         "bags", false},
     {UiElement::Spellbook,    "spellbook", false},
     {UiElement::QuestLog,     "questlog", false},
-    {UiElement::QuestGiver,   "questgiver"},
-    {UiElement::Gossip,       "gossip"},
-    {UiElement::Mail,         "mail"},
-    {UiElement::Vendor,       "vendor"},
+    {UiElement::QuestGiver,   "questgiver", false},
+    {UiElement::Gossip,       "gossip", false},
+    {UiElement::Mail,         "mail", false},
+    {UiElement::Vendor,       "vendor", false},
     {UiElement::Loot,         "loot", false},
-    {UiElement::Bank,         "bank"},
+    {UiElement::Bank,         "bank", false},
     {UiElement::PartyFrames,  "partyframes", false},
     {UiElement::Social,       "social", false},
-    {UiElement::TradeSkill,   "tradeskill"},
-    {UiElement::ClassTrainer, "classtrainer"},
-    {UiElement::AuctionHouse, "auctionhouse"},
-    {UiElement::GuildBank,    "guildbank"},
+    {UiElement::TradeSkill,   "tradeskill", false},
+    {UiElement::ClassTrainer, "classtrainer", false},
+    {UiElement::AuctionHouse, "auctionhouse", false},
+    {UiElement::GuildBank,    "guildbank", false},
     {UiElement::Inspect,      "inspect", false},
     {UiElement::DungeonFinder, "dungeonfinder", false},
     {UiElement::Petition,     "petition", false},
@@ -72,12 +85,12 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::RaidWarning,  "raidwarning", false},
     {UiElement::Dialogs,      "dialogs", false},
     {UiElement::Achievements, "achievements", false},
-    {UiElement::BarberShop,   "barbershop"},
+    {UiElement::BarberShop,   "barbershop", false},
     {UiElement::Taxi,         "taxi"},
-    {UiElement::Stable,       "stable"},
+    {UiElement::Stable,       "stable", false},
     {UiElement::Book,         "book", false},
     {UiElement::GameMenu,          "gamemenu"},
-    {UiElement::Help,              "help"},
+    {UiElement::Help,              "help", false},
     {UiElement::BattlegroundScore, "bgscore", false},
     {UiElement::Totems,       "totems", false},
     {UiElement::Talents,      "talents", false},
@@ -698,168 +711,46 @@ struct Suppress {
     bool lazy = false;
 };
 const Suppress kSuppress[] = {
-        // The tabs are parented to UIParent rather than to the frame they
-        // belong to, so hiding the chat windows leaves a row of tabs behind.
-        // The combat log is ChatFrame2 with its own strip of buttons.
-        {UiElement::Chat,     "ChatFrame1 ChatFrame2 ChatFrame3 ChatFrame4 ChatFrame5 "
-                              "ChatFrame6 ChatFrame7 ChatFrame8 ChatFrame9 ChatFrame10 "
-                              "ChatFrame1Tab ChatFrame2Tab ChatFrame3Tab ChatFrame4Tab "
-                              "ChatFrame5Tab ChatFrame6Tab ChatFrame7Tab "
-                              "ChatFrame8Tab ChatFrame9Tab ChatFrame10Tab "
-                              "GeneralDockManager GeneralDockManagerOverflowButton "
-                              "ChatFrameMenuButton FriendsMicroButton "
-                              "CombatLogQuickButtonFrame_Custom", true},
-        // Talking to an NPC opened two of everything: this client's gossip and
-        // quest windows, which work, and FrameXML's, which cannot - the calls
-        // behind them are among the names the missing-API report lists every
-        // run. The greeting and detail panels are children of QuestFrame and
-        // go with it.
-        {UiElement::QuestGiver, "QuestFrame"},
-        {UiElement::Gossip,     "GossipFrame"},
-        {UiElement::Mail,       "MailFrame OpenMailFrame"},
-        // The dungeon finder's three top-level frames. The ready popup is the
-        // live duplicate - LFG_PROPOSAL_SHOW is fired, so FrameXML raised it
-        // beside this client's own on every group that formed. The role-check
-        // popup could not appear because LFG_ROLE_CHECK_SHOW was never fired,
-        // and the browser only from a micro button this branch has taken over.
-        // The charter windows. All three are live duplicates: this client
-        // fires GUILD_REGISTRAR_SHOW and PETITION_VENDOR_SHOW from one handler
-        // and PETITION_SHOW from the next, and each raises the FrameXML frame
-        // named here beside a popup this client draws for the same packet.
-        // PVPBannerFrame comes with the arena registrar and is opened from it.
-        {UiElement::Petition,     "PetitionFrame GuildRegistrarFrame "
-                                  "ArenaRegistrarFrame PVPBannerFrame"},
-        // Every one of these has a working window in this client and a
-        // FrameXML twin that shows on the same event. The client fires
-        // MERCHANT_SHOW, LOOT_OPENED, BANKFRAME_OPENED, PARTY_MEMBERS_CHANGED
-        // and FRIENDLIST_UPDATE, so all of them were appearing in pairs.
-        {UiElement::Vendor,      "MerchantFrame"},
-        {UiElement::Bank,        "BankFrame"},
-        // Both of these were live: TRADE_SHOW and READY_CHECK are fired, and
-        // this client draws its own trade window and its own ready-check popup
-        // in dialog_manager - so FrameXML raised a second one of each. Neither
-        // was an element, so nothing in this list had an opinion about them.
-        // CHAT_MSG_RAID_WARNING and CHAT_MSG_RAID_BOSS_EMOTE are both fired,
-        // so this suppression is live rather than precautionary. The note here
-        // used to say the first was not fired; it is, and had been all along -
-        // the whole CHAT_MSG_ family is built by concatenating the chat type
-        // onto a prefix, so grepping the source for the literal name finds
-        // nothing and says nothing. combat_ui, which gates this client's own
-        // banner on the same element, had it right.
+        // What is left is the short list of elements this client still draws.
         //
-        // This client draws its raid warnings by scanning the chat history
-        // rather than from the event, so the two do not cancel out: without
-        // this entry both banners appear.
-        // Symmetric with the four client dialogs gated on this element: a
-        // run that hands the prompts back to this client hides FrameXML's,
-        // or the duplicate simply swaps sides.
-        // These four arrive with the load-on-demand addons, which now load -
-        // so making them work is what put a second window beside the client's
-        // at every profession, trainer, auctioneer and guild bank. The panels
-        // themselves are finished and waiting; this only decides which of the
-        // two is on screen.
-        {UiElement::TradeSkill,   "TradeSkillFrame", true},
-        {UiElement::ClassTrainer, "ClassTrainerFrame", true},
-        {UiElement::AuctionHouse, "AuctionFrame", true},
-        {UiElement::GuildBank,    "GuildBankFrame", true},
-        // The vendor had no check entry at all, because the candidates list
-        // named it "merchant" and so never handed it over - there was nothing
-        // to report on. MerchantItem1 is the first of the ten wares and
-        // MerchantMoneyFrame the purse beneath them, which is where a window
-        // that opened but laid out to nothing shows itself.
-        {UiElement::Vendor,       "MerchantFrame MerchantItem1 MerchantMoneyFrame "
-                                  "MerchantNextPageButton"},
-        // BARBER_SHOP_OPEN is fired and the achievements micro button belongs
-        // to the bar this branch has taken over, so both of these can open
-        // beside the client's own.
-        // The earned-achievement toast, which is not part of the achievement
-        // addon at all - alertframes.lua is core FrameXML and registers
-        // ACHIEVEMENT_EARNED itself, an event this client fires. So the badge
-        // was raised twice on every achievement, once by FrameXML's
-        // AchievementAlertFrame and once by this client's own toast.
+        // A suppression row outlives its element. Everything else that was in
+        // this table has been handed over and its own drawing deleted, and a
+        // row for an element nothing draws hides FrameXML's frame with nothing
+        // behind it - a blank where a working window would have been.
+        // Seventeen rows were doing that, and doing it invisibly: suppression
+        // is skipped for an owned element and all seventeen are owned by
+        // default, so the fault could only show in a run that names a subset,
+        // which is the one thing this table exists for.
         //
-        // Found by the unaccounted-frame sweep rather than by eye: AlertFrame
-        // is not an element and never was, so nothing had an opinion about it.
-        {UiElement::BarberShop,   "BarberShopFrame", true},
-        // All three of these are live now, and the note that used to sit here
-        // saying otherwise was stale in the way these notes go stale: someone
-        // fires the event later and nobody comes back to the comment that says
-        // it is unfired. TAXIMAP_OPENED is fired from movement_handler.cpp,
-        // PET_STABLE_SHOW from spell_handler.cpp, and ITEM_TEXT_BEGIN from the
-        // item text query response.
-        //
-        // That matters more than a stale comment usually does: each of these
-        // suppresses a window this client draws and works. If the event were
-        // genuinely unfired, handing the element over would not swap two
-        // versions of a window - it would remove the feature.
-        //
-        // ITEM_TEXT_BEGIN needed one thing more than the event: its *trigger*.
-        // readItemBySlot had a single caller, this client's own bag window,
-        // which is handed over - so the event was fired and nothing could reach
-        // the code that asked for it. UseContainerItem reaches it now.
-        {UiElement::Taxi,         "TaxiFrame"},
-        {UiElement::Stable,       "PetStableFrame"},
-        // Both open from the micro buttons, which belong to the bar this
-        // branch draws - so they appear without anyone deciding they should,
-        // beside this client's own settings and ticket window.
-        //
-        // GameMenuFrame is not among them any more: the escape menu it stood
-        // beside is gone and FrameXML's is the one that opens. The three
-        // options frames stay, because the menu's Video, Sound and Interface
-        // buttons are routed to this client's settings panel - FrameXML's are
-        // shells and the sixty-odd settings live here.
+        // The rule is in handover_halves_check now, both ways round: an
+        // element this client draws needs a row, and an element it does not
+        // draw may not have one.
+
+        // The world map's flight-map mode is this client's own taxi picker and
+        // is still drawn - SMSG_SHOWTAXINODES puts the map into it. Without
+        // this, talking to a flight master put TaxiFrame over this client's
+        // map, each with its own set of pins.
+        {UiElement::Taxi,       "TaxiFrame"},
+        // The menu itself is FrameXML's. The three options frames behind it
+        // are not: its Video, Sound and Interface buttons are routed to this
+        // client's settings panel, because FrameXML's own are shells and the
+        // sixty-odd settings live here.
         {UiElement::GameMenu,   "InterfaceOptionsFrame "
                                 "VideoOptionsFrame AudioOptionsFrame"},
-        {UiElement::Help,       "HelpFrame TicketStatusFrame"},
-        // The end-of-match scoreboard and the live score line above it. The
-        // always-up frame was drawing unaccounted: it registers
-        // UPDATE_WORLD_STATES, which this client fires, and only stayed empty
-        // because GetNumWorldStateUI was stubbed to zero.
-        // Reachable only since their APIs were finished: a window whose
-        // functions all answer opens where before it stayed empty and
-        // unnoticed. This client draws a totem bar and a talent screen of its
-        // own.
-        //
-        // ReputationFrame is deliberately absent. It is one of
-        // CHARACTERFRAME_SUBFRAMES, so it belongs to the character frame rather
-        // than standing alone - and that is owned, with this client's whole
-        // character screen already gated on it. Suppressing the frame blanked
-        // the Reputation tab of a window FrameXML is supposed to be drawing.
         // Found by the unaccounted-element check on its first run. The world
-        // map is neither handed over nor hidden, so FrameXML's draws over this
+        // map was neither handed over nor hidden, so FrameXML's drew over this
         // client's own. It appears in the check list, which is what made it
         // look accounted for on every reading by eye.
         {UiElement::WorldMap,   "WorldMapFrame WorldMapDetailFrame "
                                 "WorldMapButton WorldMapZoneMinimapDropDown"},
-        // WatchFrameTitle is the "Objectives" label, and the buttons beside it
-        // ride on the same frame.
-        {UiElement::QuestTracker, "WatchFrame"},
         // Both, because the sub-zone line is a separate frame that fades on its
         // own - naming only the zone would leave "Trade District" announcing
         // itself twice while "Stormwind City" announced itself once.
         {UiElement::ZoneText,   "ZoneTextFrame SubZoneTextFrame"},
-        // The eight oldest elements, which had no suppression rows at all.
-        //
-        // They are the first fourteen's survivors: handed over before this
-        // table existed and owned by default ever since, so nothing exercised
-        // the half of the contract they were missing. It only shows in a run
-        // that names a subset - WOWEE_FRAMEXML_UI=playerframe left FrameXML's
-        // minimap, character sheet, spellbook, cast bar, pet and focus frames
-        // and both halves of the bag and micro rows drawn beside this
-        // client's own, which is the exact fault this table is for.
-        //
-        // Found by fixing handover_halves_check, whose suppression half had
-        // been answering zero for every element that has a check row -
-        // including all eight of these.
-        //
-        // Frames are the top ones from each element's check row, plus the
-        // container where hiding one hides the rest: MinimapCluster carries
-        // the ring, the zoom buttons and the zone text, and MainMenuBarBackpack
-        // Button carries the four bag slots beside it.
+        // MinimapCluster carries the ring, the zoom buttons and the zone text,
+        // so hiding it hides the rest. WOWEE_FRAMEXML_UI=playerframe left
+        // FrameXML's minimap drawn beside this client's own.
         {UiElement::Minimap,    "MinimapCluster"},
-        {UiElement::BagBar,     "MainMenuBarBackpackButton CharacterBag0Slot "
-                                "CharacterBag1Slot CharacterBag2Slot CharacterBag3Slot "
-                                "KeyRingButton"},
     };
 }  // namespace
 
