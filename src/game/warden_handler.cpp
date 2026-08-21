@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -539,6 +540,21 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
 
                 bool isTurtle = isActiveExpansion("turtle");
                 bool isClassic = (owner_.getBuild() <= 6005) && !isTurtle;
+                const char* turtleFallbackEnv = std::getenv("WOWEE_WARDEN_TURTLE_NO_CR");
+                const bool turtleFallbackAllowed =
+                    turtleFallbackEnv && std::string(turtleFallbackEnv) == "fallback";
+
+                if (isTurtle && !turtleFallbackAllowed) {
+                    // Turtle-derived servers close the world connection when given an
+                    // invented HASH_RESULT. Without a verified .cr entry, preserving
+                    // the cipher state and waiting for follow-up checks is the only
+                    // safe protocol behavior.
+                    LOG_WARNING("Warden: HASH_REQUEST seed=", seedHex,
+                                " - no CR match, skipping response for Turtle "
+                                "(set WOWEE_WARDEN_TURTLE_NO_CR=fallback to test the legacy fallback)");
+                    wardenState_ = WardenState::WAIT_CHECKS;
+                    break;
+                }
 
                 if (!isTurtle && !isClassic) {
                     // WotLK/TBC: don't respond to HASH_REQUEST without a valid CR match.

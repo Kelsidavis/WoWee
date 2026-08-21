@@ -161,6 +161,16 @@ private:
     // 0x400000 is the default PE image base for 32-bit Windows executables.
     // Warden modules are loaded as if they were PE DLLs at this base address.
     uint32_t moduleBase_ = 0x400000;       // Module base address (for emulator)
+    // Native Warden-image header fields. Private-server modules place these
+    // tables inside the mapped image rather than after the copy stream.
+    uint32_t relocOffset_ = 0;
+    uint32_t relocCount_ = 0;
+    uint32_t exportTableOffset_ = 0;
+    uint32_t exportCount_ = 0;
+    uint32_t exportBaseIndex_ = 0;
+    uint32_t importTableOffset_ = 0;
+    uint32_t importCount_ = 0;
+    uint32_t sectionCount_ = 0;
     size_t relocDataOffset_ = 0;           // Offset into decompressedData_ where relocation data starts
     WardenFuncList funcList_;              // Callback functions
     std::unique_ptr<WardenEmulator> emulator_; // Cross-platform x86 emulator
@@ -184,6 +194,7 @@ private:
     bool applyRelocations();
     bool bindAPIs();
     bool initializeModule();
+    uint32_t resolveExport(uint32_t ordinal) const;
 };
 
 
