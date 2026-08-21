@@ -1694,7 +1694,13 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             ai.descriptorSetCount = 1;
             ai.pSetLayouts = &particleTexLayout_;
             if (vkAllocateDescriptorSets(device, &ai, &gpuModel.particleTexSets[ei]) == VK_SUCCESS) {
+                // Valid, not merely non-null: descriptorInfo() returns the
+                // texture's handles as they are, so one whose upload failed
+                // writes a null view and sampler into a live descriptor and
+                // declares SHADER_READ_ONLY_OPTIMAL over it.
                 VkTexture* tex = gpuModel.particleTextures[ei];
+                if (!tex || !tex->isValid()) tex = whiteTexture_.get();
+                if (!tex || !tex->isValid()) continue;
                 VkDescriptorImageInfo imgInfo = tex->descriptorInfo();
                 VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                 write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1743,6 +1749,8 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
                 ai.pSetLayouts = &particleTexLayout_;
                 if (vkAllocateDescriptorSets(device, &ai, &gpuModel.ribbonTexSets[ri]) == VK_SUCCESS) {
                     VkTexture* tex = gpuModel.ribbonTextures[ri];
+                    if (!tex || !tex->isValid()) tex = whiteTexture_.get();
+                    if (!tex || !tex->isValid()) continue;
                     VkDescriptorImageInfo imgInfo = tex->descriptorInfo();
                     VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

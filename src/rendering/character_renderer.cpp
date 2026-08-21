@@ -2511,7 +2511,24 @@ void CharacterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet,
     const uint32_t uboStride = (sizeof(CharMaterialUBO) + materialUboAlignment_ - 1) & ~(materialUboAlignment_ - 1);
     const uint32_t ringCapacityBytes = uboStride * MATERIAL_RING_CAPACITY;
     auto getMaterialDescriptorSet = [&](VkTexture* diffuse, VkTexture* normal) -> VkDescriptorSet {
-        if (!diffuse || !normal) return VK_NULL_HANDLE;
+        // Valid, not merely non-null. descriptorInfo() hands back whatever the
+        // texture holds - VK_NULL_HANDLE for a view and a sampler that were
+        // never created - and declares SHADER_READ_ONLY_OPTIMAL either way. A
+        // draw that samples that is undefined behaviour, and on NVIDIA it
+        // surfaces as a graphics engine exception and a lost device rather
+        // than anything this client can catch.
+        //
+        // Both call sites check the diffuse and neither checks the normal, and
+        // the normal is the one that can arrive from an asynchronous generation
+        // pass or from a flat fallback whose own upload can fail under the same
+        // memory pressure that makes the texture cache start rejecting.
+        if (!diffuse || !diffuse->isValid()) diffuse = whiteTexture_.get();
+        if (!normal || !normal->isValid()) normal = flatNormalTexture_.get();
+        if (!diffuse || !diffuse->isValid() || !normal || !normal->isValid()) {
+            // Even the fallbacks are gone. Skipping the draw loses a model;
+            // binding a null view loses the device.
+            return VK_NULL_HANDLE;
+        }
         const VkDescriptorImageInfo diffuseInfo = diffuse->descriptorInfo();
         const VkDescriptorImageInfo normalInfo = normal->descriptorInfo();
         const MaterialDescriptorKey key{.diffuse = diffuseInfo.imageView, .normal = normalInfo.imageView,

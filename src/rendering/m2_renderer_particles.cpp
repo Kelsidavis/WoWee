@@ -739,7 +739,9 @@ void M2Renderer::renderM2Particles(VkCommandBuffer cmd, VkDescriptorSet perFrame
             ai.descriptorSetCount = 1;
             ai.pSetLayouts = &particleTexLayout_;
             if (vkAllocateDescriptorSets(vkCtx_->getDevice(), &ai, &texSet) == VK_SUCCESS) {
-                VkTexture* tex = group.texture ? group.texture : whiteTexture_.get();
+                VkTexture* tex = (group.texture && group.texture->isValid())
+                    ? group.texture : whiteTexture_.get();
+                if (!tex || !tex->isValid()) continue;
                 VkDescriptorImageInfo imgInfo = tex->descriptorInfo();
                 VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                 write.dstSet = texSet;
