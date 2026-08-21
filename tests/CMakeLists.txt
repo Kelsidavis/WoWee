@@ -353,6 +353,17 @@ target_link_libraries(test_inventory_slots PRIVATE catch2_main)
 add_test(NAME inventory_slots COMMAND test_inventory_slots)
 register_test_target(test_inventory_slots)
 
+# ── test_warden_reloc ────────────────────────────────────────────
+# Where a Warden relocation entry is allowed to point. The module comes from
+# the server, so both of these decide where an attacker-supplied number may be
+# written; one of them let a four-byte write land at image + 0xFFFFFFFF.
+add_executable(test_warden_reloc test_warden_reloc.cpp)
+target_include_directories(test_warden_reloc PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_warden_reloc SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
+target_link_libraries(test_warden_reloc PRIVATE catch2_main)
+add_test(NAME warden_reloc COMMAND test_warden_reloc)
+register_test_target(test_warden_reloc)
+
 # ── sweep_guard ──────────────────────────────────────────────────
 # The fast interface sweeps, run as a test so they stop depending on someone
 # remembering. Each fault they catch raises nothing, logs nothing and fails no

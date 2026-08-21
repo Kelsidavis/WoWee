@@ -995,13 +995,21 @@ bool WardenModule::applyRelocations() {
                     LOG_ERROR("WardenModule: Native absolute relocation is truncated");
                     return false;
                 }
-                currentOffset = (static_cast<uint32_t>(first) << 24) |
-                                (static_cast<uint32_t>(image[relocationPos]) << 16) |
-                                (static_cast<uint32_t>(image[relocationPos + 1]) << 8) |
-                                image[relocationPos + 2];
+                // The top bit is the form flag, not part of the offset. Kept,
+                // every absolute entry came out at or above 0x80000000, which
+                // is past the end of any image this accepts (5MB) - so the
+                // bounds check below rejected all of them and no module
+                // carrying one could ever relocate.
+                currentOffset = wardenAbsoluteRelocTarget(
+                    first, image[relocationPos], image[relocationPos + 1],
+                    image[relocationPos + 2]);
                 relocationPos += 3;
             }
-            if (currentOffset + 4 > moduleSize_) {
+            // Widened before the addition. currentOffset is uint32_t and comes
+            // from the module, which comes from the server: an entry of
+            // FF FF FF FF made it 0xFFFFFFFF, +4 wrapped to 3, the check passed
+            // and the write below landed at image + 0xFFFFFFFF.
+            if (!wardenRelocTargetFits(currentOffset, moduleSize_)) {
                 LOG_ERROR("WardenModule: Native relocation target out of bounds: ", currentOffset);
                 return false;
             }
@@ -1237,8 +1245,11 @@ uint32_t WardenModule::resolveExport(uint32_t ordinal) const {
         ordinal < exportBaseIndex_) {
         return 0;
     }
-    const uint32_t index = ordinal - exportBaseIndex_;
-    const uint32_t slot = exportTableOffset_ + index * 4u;
+    // In size_t throughout. exportCount_ and exportTableOffset_ are header
+    // fields the header check does not bound, so every one of these products
+    // and sums can wrap in 32 bits - the same fault the relocation loop had.
+    const size_t index = static_cast<size_t>(ordinal) - exportBaseIndex_;
+    const size_t slot = static_cast<size_t>(exportTableOffset_) + index * 4u;
     if (index >= exportCount_ || slot + 4 > moduleSize_) return 0;
 
     uint32_t offset = 0;

@@ -51,6 +51,26 @@ struct WardenFuncList {
  * Non-fatal verification: RSA mismatch logs warning but continues loading,
  * so private-server modules signed with custom keys still work.
  */
+/// Where an absolute relocation entry points, and whether that target admits
+/// the four-byte write the relocation makes.
+///
+/// Free functions because both were wrong inside the loop that used them and
+/// neither needs a module to be true. The first kept the form flag in the
+/// value, so every absolute entry landed at or above 0x80000000 and the second
+/// rejected all of them. The second added four to a uint32 target taken
+/// straight from module bytes, so FF FF FF FF wrapped to 3, passed, and wrote
+/// at image + 0xFFFFFFFF. Both are reachable from a hostile server.
+inline constexpr uint32_t wardenAbsoluteRelocTarget(uint8_t first, uint8_t b1,
+                                                    uint8_t b2, uint8_t b3) {
+    return (static_cast<uint32_t>(first & 0x7Fu) << 24) |
+           (static_cast<uint32_t>(b1) << 16) |
+           (static_cast<uint32_t>(b2) << 8) | b3;
+}
+
+inline constexpr bool wardenRelocTargetFits(uint32_t target, size_t moduleSize) {
+    return static_cast<size_t>(target) + 4u <= moduleSize;
+}
+
 class WardenModule {
 public:
     WardenModule();
