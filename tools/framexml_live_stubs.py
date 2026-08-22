@@ -98,36 +98,53 @@ unimplemented. GetCurrentMapDungeonLevel is zero because a map with no floors
 is on floor zero.
 """
 import re
+import sys
 from pathlib import Path
 
-ROOT = Path("/home/k/Desktop/wowee")
-XML = ROOT / "Data/interface"
+# The repository this file sits in, and the interface to read.
+#
+# ROOT was one contributor's absolute home directory, so these eight sweeps ran
+# on exactly one machine and silently read nothing anywhere else - loaded_files
+# on a directory that is not there returns an empty set, and a sweep with no
+# input reports a clean tree.
+#
+# The interface directory can be named on the command line, because the one
+# under Data/ is whichever expansion was extracted last and the question these
+# answer is usually about a particular one:
+#
+#     python3 tools/framexml_live_stubs.py ~/wow-1.12/interface
+ROOT = Path(__file__).resolve().parent.parent
+XML = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "Data/interface"
+if not XML.is_dir():
+    print(f"no interface at {XML} - name one on the command line")
+    raise SystemExit(2)
 
 STUBS = {"lua_ReturnNil", "lua_ReturnZero", "lua_ReturnFalse", "lua_ReturnNothing",
          "lua_ReturnTrue", "lua_ReturnEmptyString", "lua_ContainerNoOp",
          "lua_ContainerFalse", "lua_NoOp", "lua_Noop"}
 
-# The FrameXML files that belong to elements handed over by default.
-# Derived from the takeover file rather than written out: the elements handed
-# over by default plus the candidates tier, mapped to files through the
-# readiness tool's table, plus the shared files every panel goes through.
+# The FrameXML files that belong to a handed-over element, which is all of them.
+# Derived from the takeover file rather than written out, and mapped to files
+# through the readiness tool's table, plus the shared files every panel goes
+# through.
 #
 # It was a hand-made list and twice that was the bug - it named
 # paperdollframe.lua as "the character sheet" and missed the other four
 # subframes, and it covered only the defaults while the candidates tier was
-# what was actually on screen.
+# what was actually on screen. Then it read a defaults list and a candidates
+# tier out of the source, and both of those went with WOWEE_FRAMEXML_UI - which
+# nothing noticed, because ROOT was one machine's home directory and this sweep
+# had not run anywhere else in a long time.
 def _live_files():
     import re as _re
     tk = (ROOT / "src/ui/framexml_takeover.cpp").read_text()
-    defaults = set(_re.findall(r'"([a-z]+)"',
-        _re.search(r"return std::set<std::string>\{(.*?)\};", tk, _re.S).group(1)))
-    # The candidates tier used to add a list on top of the defaults and adds
-    # nothing now - every element is in the defaults, so the loop it was read
-    # out of is gone. Read as empty rather than crashing, which is what this
-    # did between the loop being removed and 2026-08-05: nothing runs this
-    # sweep from the build, so nothing noticed.
-    _cand_loop = _re.search(r"for \(const char\* name : \{(.*?)\}\)", tk, _re.S)
-    cand = set(_re.findall(r'"([a-z]+)"', _cand_loop.group(1))) if _cand_loop else set()
+    if "return true;" not in tk:
+        raise SystemExit("frameXmlOwns no longer answers unconditionally - this "
+                         "sweep assumes every element in the table is handed over")
+    elements = set(_re.findall(r'\{UiElement::\w+,\s*"([a-z]+)"', tk))
+    if not elements:
+        raise SystemExit("no elements found in framexml_takeover.cpp - this reads "
+                         "the element table")
     rd = (ROOT / "tools/framexml_element_readiness.py").read_text()
     # Parsed as data, not run as code. These are two plain dict literals in a
     # sibling sweep, and exec() on a slice of another file is both more than
@@ -144,7 +161,7 @@ def _live_files():
                              "framexml_element_readiness.py - this sweep reads it as one")
         ns[_name] = _ast.literal_eval(_m.group(1))
     out = {}
-    for el in defaults | cand:
+    for el in elements:
         for f in ns["ELEMENTS"].get(el, []):
             out[f] = el
         addon = ns["ADDON_ELEMENTS"].get(el)

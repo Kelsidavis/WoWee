@@ -38,8 +38,23 @@ import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 from framexml_source import without_comments_or_strings, loaded_files
 
-ROOT = Path("/home/k/Desktop/wowee")
-XML = ROOT / "Data/interface"
+# The repository this file sits in, and the interface to read.
+#
+# ROOT was one contributor's absolute home directory, so these eight sweeps ran
+# on exactly one machine and silently read nothing anywhere else - loaded_files
+# on a directory that is not there returns an empty set, and a sweep with no
+# input reports a clean tree.
+#
+# The interface directory can be named on the command line, because the one
+# under Data/ is whichever expansion was extracted last and the question these
+# answer is usually about a particular one:
+#
+#     python3 tools/framexml_reachable_globals.py ~/wow-1.12/interface
+ROOT = Path(__file__).resolve().parent.parent
+XML = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "Data/interface"
+if not XML.is_dir():
+    print(f"no interface at {XML} - name one on the command line")
+    raise SystemExit(2)
 
 # The elements handed over by default plus the candidates tier, mapped to
 # files through the readiness tool's own table, and the shared files every

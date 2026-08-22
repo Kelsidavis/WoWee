@@ -67,13 +67,29 @@ WHAT THE THIRTY-SEVEN ARE
     row into a duplicate, and nothing ties the two decisions together.
 """
 import re
+import sys
 from pathlib import Path
 
 import sys as _s; _s.path.insert(0, str(Path(__file__).resolve().parent))
 from framexml_source import loaded_files
 
-ROOT = Path("/home/k/Desktop/wowee")
-XML = ROOT / "Data/interface/framexml"
+# The repository this file sits in, and the interface to read.
+#
+# ROOT was one contributor's absolute home directory, so these eight sweeps ran
+# on exactly one machine and silently read nothing anywhere else - loaded_files
+# on a directory that is not there returns an empty set, and a sweep with no
+# input reports a clean tree.
+#
+# The interface directory can be named on the command line, because the one
+# under Data/ is whichever expansion was extracted last and the question these
+# answer is usually about a particular one:
+#
+#     python3 tools/framexml_unaccounted_frames.py ~/wow-1.12/interface
+ROOT = Path(__file__).resolve().parent.parent
+XML = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "Data/interface/framexml"
+if not XML.is_dir():
+    print(f"no interface at {XML} - name one on the command line")
+    raise SystemExit(2)
 
 src = (ROOT / "src/ui/framexml_takeover.cpp").read_text()
 accounted = set()

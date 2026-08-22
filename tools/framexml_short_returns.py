@@ -42,15 +42,31 @@ and so a fifteenth stands out.
     change nothing: the first one already tells the caller to stop.
 """
 import re
+import sys
 from pathlib import Path
 
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 from framexml_source import without_comments, loaded_files
 
-ROOT = Path("/home/k/Desktop/wowee")
+# The repository this file sits in, and the interface to read.
+#
+# ROOT was one contributor's absolute home directory, so these eight sweeps ran
+# on exactly one machine and silently read nothing anywhere else - loaded_files
+# on a directory that is not there returns an empty set, and a sweep with no
+# input reports a clean tree.
+#
+# The interface directory can be named on the command line, because the one
+# under Data/ is whichever expansion was extracted last and the question these
+# answer is usually about a particular one:
+#
+#     python3 tools/framexml_short_returns.py ~/wow-1.12/interface
+ROOT = Path(__file__).resolve().parent.parent
 ADDONS = ROOT / "src/addons"
-XML = ROOT / "Data/interface"
+XML = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "Data/interface"
+if not XML.is_dir():
+    print(f"no interface at {XML} - name one on the command line")
+    raise SystemExit(2)
 
 # name -> implementation symbol
 bound = {}
