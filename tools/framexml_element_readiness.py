@@ -265,32 +265,32 @@ ADDON_ELEMENTS = {
 # A handler body in XML is Lua, and holds calls that appear nowhere in any .lua.
 # GuildControlSetRankFlag and TakeInboxTextItem are both only ever called from
 # one, and a scan of the Lua alone reported their frames complete.
-# The element names here have to be the ones WOWEE_FRAMEXML_UI accepts, and
+# The element names here have to be the ones framexml_takeover.cpp uses, and
 # there is nothing but this check to keep them so. They drifted once: this file
 # called the vendor "merchant" after the frame, framexml_takeover.cpp calls it
-# "vendor" after the element, and the candidates list was written from a
-# reading of this report - so "merchant" went into that list, resolved to no
-# element, and the vendor window was never handed over by it. The run said so
-# every time, in one warning line among many.
+# "vendor" after the element, and a list of elements to hand over was written
+# from a reading of this report - so "merchant" went into that list, resolved
+# to no element, and the vendor window was never handed over by it. The run
+# said so every time, in one warning line among many.
 #
 # Names checked against the takeover rather than restated, because restating is
 # how the two came apart.
-def _flag_names():
+def _element_names():
     path = os.path.join(ROOT, "src", "ui", "framexml_takeover.cpp")
     with open(path, errors="ignore") as fh:
         src = fh.read()
-    # "mainmenubar" is a group covering the action bar and the strips around
-    # it, handled separately in coveredByGroup rather than in the element table.
-    return set(re.findall(r'\{UiElement::\w+,\s*"([a-z]+)"\}', src)) | {"mainmenubar"}
+    return set(re.findall(r'\{UiElement::\w+,\s*"([a-z]+)"', src))
 
 
 def check_element_names():
-    """Names in this file that WOWEE_FRAMEXML_UI would not recognise."""
-    known = _flag_names()
-    # Four are deliberately not elements: the keybinding, macro and clock
-    # panels have no counterpart this client draws, so there is nothing to hand
-    # over and nothing to suppress. They are read for gaps all the same.
-    tool_only = {"keybindings", "macro", "timemanager"}
+    """Names in this file that are not elements over in the takeover."""
+    known = _element_names()
+    # Four are deliberately not elements. The keybinding, macro and clock
+    # panels have no counterpart this client draws, so there was nothing to
+    # hand over and nothing to suppress; "mainmenubar" is a file grouping - the
+    # bar and the strips around it are four separate elements over there and
+    # one .lua/.xml pair here. All four are read for gaps all the same.
+    tool_only = {"keybindings", "macro", "timemanager", "mainmenubar"}
     return sorted((set(ELEMENTS) | set(ADDON_ELEMENTS)) - known - tool_only)
 
 
@@ -587,105 +587,25 @@ def main():
     if not resting:
         print("  (none)")
 
-    # The same list, shaped for framexml_takeover.cpp's "candidates" tier.
+    # No tier to print any more, and no element left to promote into one.
     #
-    # That tier is a hardcoded array over there and this is where its contents
-    # come from, so the two drift the moment an element goes clean and nobody
-    # looks here. Printed rather than explained: paste it over the array and
-    # the drift is gone.
-    #
-    # The defaults are left out - the tier adds to them rather than replacing
-    # them, and listing one twice reads as a mistake.
-    #
-    # Read out of framexml_takeover.cpp rather than copied. This was a copy,
-    # under a comment warning that zonetext and dialogs had joined the real set
-    # without it following - and it drifted again the moment eight elements
-    # were promoted, so the printed tier still offered four of them as
-    # candidates. A list whose whole job is to stop drift cannot be a second
-    # copy of the thing it is checking.
-    _takeover = open(os.path.join(ROOT, "src/ui/framexml_takeover.cpp"),
-                     encoding="utf-8", errors="ignore").read()
-    _block = _takeover[_takeover.index("static const auto defaults"):]
-    DEFAULTS = set(re.findall(r'"([a-z0-9]+)"', _block[:_block.index("}();")]))
-    # Settled elements belong here too. They show a count above because this
-    # cannot prove an absent feature is absent, but every name in them has been
-    # read and found unreachable, redundant, or a feature that does not exist -
-    # so nothing in them raises, which is what the tier is about.
-    #
-    # Except worldmap, which is this client's own map.
-    #
-    # questtracker was held here too, on the reading that it reaches the same
-    # map API through worldmapframe.lua and so would draw a second map. It
-    # draws no map: it calls the quest POI part of that API to place markers,
-    # and every one of those calls is answered now. Every event WatchFrame
-    # registers is fired and its whole quest-watch API is bound.
-    #
-    # questlog was here on the same reasoning and does not belong to it. It
-    # draws no map. What it did was call the world map API, which was not bound
-    # at the time - it is now, and the report finds nothing missing in
-    # questlogframe at all. Its window is gated, its suppression entry lifts
-    # itself the moment the element is owned, and the L key is routed.
-    #
-    # worldmap's other half is built now and it is still held here, because
-    # held-out means "not seen drawing" and it has not been. renderWorldMap is
-    # the only thing that feeds the map and the only thing that draws it, and
-    # it used to be skipped entirely when FrameXML owned the map - so handing
-    # it over gave no map at all rather than two, which is not what the reason
-    # above says. It now runs either way and takes FrameXML's frame being on
-    # screen as the statement that the map is wanted.
-    #
-    # Try it by name before promoting it here:
-    #   WOWEE_FRAMEXML_UI=candidates,worldmap
-    #
-    # questlog reports no missing call and no unfired event at all.
-    CLIENT_OWNS_THE_DRAWING = {"worldmap"}
-    # Held out for reasons this report cannot see, and left out of the printed
-    # list so that regenerating and pasting does not put them back. The comment
-    # in framexml_takeover.cpp explains each; briefly:
-    #
-    #   keybindings, macro, timemanager - scored because their FrameXML files
-    #                                     have no missing calls, but there is no
-    #                                     UiElement of any of those names, so
-    #                                     naming them only warns about itself
-    #
-    # This list existing at all is the point: the instruction beside the tier
-    # says regenerate and paste, and a printed list that disagrees with the
-    # source makes that instruction wrong. "keybindings" survived one such
-    # paste and warned on every candidates run until someone read the comment
-    # saying it had been removed.
-    HELD_OUT = {"keybindings", "macro", "timemanager"}
-    tier = sorted((set(ready) | set(settled))
-                  - DEFAULTS - CLIENT_OWNS_THE_DRAWING - HELD_OUT)
-    if tier:
-        print()
-        print(f'for WOWEE_FRAMEXML_UI=candidates in framexml_takeover.cpp ({len(tier)}):')
-        line = "                    "
-        for name in tier:
-            piece = f'"{name}", '
-            if len(line) + len(piece) > 78:
-                print(line.rstrip())
-                line = "                    "
-            line += piece
-        if line.strip():
-            print(line.rstrip().rstrip(","))
-    print()
-    print("To try one, name it alongside the current defaults - the environment")
-    print("replaces the list rather than adding to it:")
-    # From the same parsed set as DEFAULTS above. This line was a third copy
-    # of it, and by the time anyone read it the set had gained zonetext,
-    # dialogs and eight more - so the command it offered would have *removed*
-    # ten elements while adding one, which is the opposite of trying one out.
-    print("  WOWEE_FRAMEXML_UI=" + ",".join(sorted(DEFAULTS)) + ",<element>")
+    # This used to end by printing the contents of framexml_takeover.cpp's
+    # "candidates" array - the elements clean enough to try - and a
+    # WOWEE_FRAMEXML_UI line for trying one. Both are gone: every element is
+    # handed over unconditionally and the flag that named them has been
+    # removed. What is above is the whole report now, and it is read for gaps
+    # in an interface already in use rather than for permission to switch one
+    # on.
 
 
 if __name__ == "__main__":
-    # Before anything else, because every name below is one a person will type
-    # into WOWEE_FRAMEXML_UI or paste into the candidates list, and a name the
-    # flag does not know silently hands nothing over.
+    # Before anything else, because a name this file scores that names no
+    # element is a row of the report about nothing, and it reads exactly like
+    # a row about something.
     unknown = check_element_names()
     if unknown:
-        print("These element names are not ones WOWEE_FRAMEXML_UI accepts, so "
-              "naming them hands nothing over:")
+        print("These element names are not elements in framexml_takeover.cpp, "
+              "so nothing they are said about is about the interface:")
         for name in unknown:
             print(f"  {name}")
         print()

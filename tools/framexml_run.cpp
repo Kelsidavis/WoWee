@@ -102,11 +102,6 @@ int main(int argc, char** argv) {
     }
     const std::string assetPath = argv[1];
 
-    // FrameXML owns nothing unless it is asked to, and a harness that owns
-    // nothing takes the client's side of every handover - which is not the
-    // side being tested. Set before anything reads it.
-    wowee::core::setEnvVar("WOWEE_FRAMEXML_UI", "all", false);
-
     // The client's settings, so the panels the schema generates have values to
     // show. Without this every control was built against a nil: WoweeGetSetting
     // goes through LuaServices, nothing here set any, and all seventy-one keys

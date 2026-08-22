@@ -3699,24 +3699,18 @@ void Application::render() {
     // CreateTexture now puts something on the screen instead of talking to a
     // table of no-ops.
     //
-    // FrameXML is a different matter. Loading it builds a hundred of Blizzard's
-    // own frames at once, most of them half-supported, and putting all of them
-    // on screen buries the interface this client actually draws. So when it has
-    // been loaded, its frames are shown only for the elements someone named in
-    // WOWEE_FRAMEXML_UI; a run that loads it to exercise the parser gets the
-    // client's own interface, in the game's typefaces, and nothing else.
-    static const bool interfaceEnabled = [] {
-        const auto set = [](const char* n) {
-            const char* v = std::getenv(n);
-            return v && *v && std::string(v) != "0";
-        };
-        return !set("WOWEE_LOAD_FRAMEXML") || set("WOWEE_FRAMEXML_UI");
-    }();
-    // And only while there is a world to draw it over. This was the env flag
-    // alone, so every frame FrameXML had built stayed on screen through a
-    // logout and sat on top of character select - /logout ran, the character
-    // left the world, and the interface it had been using never went away.
-    const bool drawWidgets = interfaceEnabled && state == AppState::IN_GAME;
+    // FrameXML's frames come through the same tree, and they are the interface
+    // now rather than a second one drawn over this client's own. This used to
+    // be gated on WOWEE_FRAMEXML_UI naming at least one element, so that a run
+    // loading FrameXML only to exercise the parser kept the client's own
+    // interface; there is no longer another interface for it to keep.
+    //
+    // Only while there is a world to draw it over. That is the whole of the
+    // gate now, and it is the half that was load-bearing: without it every
+    // frame FrameXML had built stayed on screen through a logout and sat on top
+    // of character select - /logout ran, the character left the world, and the
+    // interface it had been using never went away.
+    const bool drawWidgets = state == AppState::IN_GAME;
     if (drawWidgets && addonManager_ && addonManager_->getLuaEngine() && renderer) {
         runRenderStage("addonWidgets", [&] {
             const ImGuiIO& io = ImGui::GetIO();

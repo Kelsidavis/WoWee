@@ -112,16 +112,19 @@ argument names, and `$parent` through unnamed frames.
 
 ## Replacing one element at a time
 
-`WOWEE_FRAMEXML_UI` names the parts of the interface FrameXML draws instead of
-this client. Nineteen elements: `playerframe`, `targetframe`, `petframe`,
-`focusframe`, `actionbar`, `stancebar`, `bagbar`, `micromenu`, `xpbar`,
-`repbar`, `castbar`, `minimap`, `chat`, `questtracker`, `worldmap`,
-`characterframe`, `bags`, `spellbook`, `questlog` - plus `mainmenubar`, which
-is the whole bottom of the screen at once because FrameXML draws it as one
-frame, and `all`.
+This is how the interface was replaced, and it is finished: FrameXML draws all
+fifty-two elements. `WOWEE_FRAMEXML_UI`, which named them one at a time, has
+been removed along with the thing its other setting selected - the client's own
+version of nearly every element has been deleted, so `=none` stopped meaning
+"use this client's interface" and started meaning "draw nothing".
 
-Two things have to happen for an element to change hands, and only the first
-is obvious.
+What survives in `framexml_takeover.hpp` is the accounting: the frames each
+element stands or falls on, the handful of places this client still draws into
+a frame FrameXML owns, and the net that hands an element back when FrameXML's
+version of it was never built.
+
+Two things had to happen for an element to change hands, and only the first is
+obvious. They are what the notes in that file are about.
 
 **The client stops drawing its own.** One `frameXmlOwns` check where it used to
 draw. The keybinding has to follow: each panel polls its own key from inside
@@ -179,12 +182,9 @@ move is not visible.
 Every switch below is read once, from the environment, and costs nothing when
 unset.
 
-- `WOWEE_LOAD_FRAMEXML=1` loads Blizzard's interface. Its frames are only drawn
-  for the elements named in `WOWEE_FRAMEXML_UI`, so this on its own exercises
-  the parser and leaves the client's own interface on screen.
-- `WOWEE_FRAMEXML_UI=playerframe,targetframe` hands those elements over: the
-  client stops drawing its own and FrameXML's are shown instead. `all` takes
-  everything. An unknown name is reported at startup rather than ignored.
+- `WOWEE_LOAD_FRAMEXML=0` turns Blizzard's interface off. It is loaded by
+  default and it is the interface - there is no longer a second one behind it,
+  so a run with this set has a world, a chat log in the terminal and no frames.
 - `WOWEE_FRAMEXML_EMIT_DIR=/tmp/emit` writes the Lua each XML file became, one
   file per source file. A nil global or a frame in the wrong place is nearly
   always answered by one grep through this.

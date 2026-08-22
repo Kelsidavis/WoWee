@@ -22,9 +22,8 @@ namespace {
 /// alarm - and the report is only worth reading while every line of it is
 /// real. The action bar, the stance bar and the two thin bars had it wrong for
 /// some time: action_bar_panel was deleted whole and the flag was not moved.
-/// Silent, because the report skips an owned element first and coveredByGroup
-/// owns all four through "mainmenubar" - the four names appear nowhere in the
-/// default list, which is what makes reading it by eye say otherwise.
+/// Silent, because the report skips an owned element first and every element
+/// is owned.
 ///
 /// It is also what says whether an element may have a suppression row. Hiding
 /// FrameXML's frame is only right while something else is drawing, so the two
@@ -98,419 +97,6 @@ constexpr std::array<Entry, 52> kElements{{
     {UiElement::UiErrors,     "uierrors", false},
 }};
 
-/// Parsed once. An unknown name is reported rather than dropped: a typo would
-/// otherwise read as a replacement that quietly did not happen.
-const std::set<std::string>& requested() {
-    static const std::set<std::string> names = [] {
-        std::set<std::string> out;
-        const char* raw = std::getenv("WOWEE_FRAMEXML_UI");
-
-        // What this branch is working on, handed over without being asked.
-        //
-        // Every one of these has been seen drawing correctly: the player frame
-        // with its art, portrait and bars; the minimap with the real map
-        // inside its ring; the character sheet with the model in it; the
-        // bottom bar. Requiring a flag to see them means every test run begins
-        // by remembering the flag, and a run without it silently tests the old
-        // interface instead. Naming any element in the environment replaces
-        // this list rather than adding to it, so a single element can still be
-        // looked at on its own.
-        // The set a run gets when nothing is named. All of them are on screen
-        // the whole time, which is why they were promoted first: a fault shows
-        // immediately rather than waiting for the right NPC.
-        static const auto defaults = [] {
-            return std::set<std::string>{
-                "playerframe", "targetframe", "minimap",
-                "mainmenubar", "characterframe", "bags", "castbar",
-                "spellbook", "petframe", "focusframe", "buffs", "durability",
-                "zonetext", "dialogs",
-                // Promoted once a panel that fails to build hands itself back.
-                // Until then the cost of being wrong about one of these was
-                // the whole element: this client's version hidden, FrameXML's
-                // absent, and nothing on screen. Now the worst case is a log
-                // line and the old window.
-                //
-                // These four first because they are the ones a fault shows on
-                // immediately, rather than waiting for the right NPC - the
-                // same reason the fourteen above went first.
-                //
-                //   bagbar, micromenu - the bag buttons and the micro buttons.
-                //     They sit on the main bar, which FrameXML has drawn all
-                //     along, so this finishes a bar that was half handed over.
-                //   uierrors - the red error text. Its one unfired event,
-                //     SYSMSG, has no opcode behind it anywhere; what the frame
-                //     is for is UI_ERROR_MESSAGE, raised from eighty sites.
-                //   raidwarning - both its events are fired.
-                //
-                // WOWEE_FRAMEXML_UI names the whole set, so any of these can
-                // be dropped by listing the others.
-                "bagbar", "micromenu", "uierrors", "raidwarning",
-                // The interaction loop, on the same reasoning: these are the
-                // windows a player opens dozens of times an hour, so a fault
-                // in one shows on the next corpse or the next NPC rather than
-                // waiting to be stumbled on.
-                //
-                //   loot        every corpse
-                //   gossip      every NPC with something to say
-                //   questgiver  every quest taken or handed in
-                //   partyframes every group
-                //
-                // Each is clean in the readiness report, gated where this
-                // client draws it, absent from the ungated-draw list, and has
-                // a check row whose frames the promised-frames sweep resolves.
-                "loot", "gossip", "questgiver", "partyframes",
-                // The other half of the interaction loop. Hit less often than
-                // a corpse, but every one of them daily, and each is a window
-                // whose failure is obvious the moment it is opened rather than
-                // something that degrades quietly.
-                //
-                //   vendor  every merchant
-                //   mail    every mailbox
-                //   bank    every visit
-                //   trade   every exchange with another player
-                //
-                // The unfired events on three of them are all accounted for in
-                // the readiness report: mail's two are the refund lock behind a
-                // per-item timer this client is never sent, trade's carry a
-                // single slot where this client only ever learns of a whole
-                // side, and vendor's shares a branch with PLAYER_MONEY, which
-                // is fired.
-                "vendor", "mail", "bank", "trade",
-                // The occasional windows. None is on screen often, but each
-                // opens whole or not at all, so a fault is unmistakable the
-                // first time one is reached - and none of the nine has an
-                // unfired event or an unanswered call that is not accounted
-                // for in the readiness report.
-                //
-                //   bgscore, book, gamemenu, help, readycheck,
-                //   social, stable, taxi, totems
-                //
-                // Talents is not among them: Blizzard_TalentUI is
-                // load-on-demand, so its frames do not exist until the panel
-                // is opened and the safety net cannot tell that from a failure
-                // to build.
-                "bgscore", "book", "gamemenu", "help", "readycheck",
-                "social", "stable", "taxi", "totems",
-                // The panels that arrive with an addon, now that the net can
-                // tell "nobody has opened it" from "it did not build" - the
-                // addon has loaded and the frame is still absent.
-                //
-                //   achievements auctionhouse barbershop classtrainer
-                //   guildbank inspect talents tradeskill
-                //
-                // The dungeon finder joins them without being one: LFDFrame.xml
-                // is in framexml.toc, so its panel is built at load and the net
-                // covered it all along.
-                "achievements", "auctionhouse", "barbershop", "classtrainer",
-                "guildbank", "inspect", "talents", "tradeskill",
-                "dungeonfinder",
-                // The last three, and the ones held back longest - not for
-                // readiness, but because this client draws all three well and
-                // has drawn them all along, so "builds but wrong" costs more
-                // here than anywhere else.
-                //
-                //   chat          back, and this time with the links working.
-                //                 A click is hit-tested against the link rects
-                //                 the draw pass records, the handler is looked
-                //                 for up the parent chain because FrameXML puts
-                //                 it on the chat frame rather than the font
-                //                 string, and SetItemRef and ItemRefTooltip are
-                //                 both FrameXML's own.
-                //   questlog      held back with the world map on the reading
-                //                 that it drew a second map. It draws no map.
-                //   questtracker  its two remaining names are AchievementFrame
-                //                 internals, reached only after that panel has
-                //                 been shown, which loads the addon that
-                //                 defines them.
-                //
-                // The world map is below, and it is the last one in.
-                "chat", "questlog", "questtracker",
-                // The world map, which was the last element outside the
-                // defaults and is not a replacement at all - it is a seam.
-                //
-                // The reading that held it back was that FrameXML would draw a
-                // second map over this client's own. Both do draw: FrameXML
-                // fills WorldMapDetailTile1..12 and this client's renderer
-                // loads the same twelve, from the same
-                // Interface\WorldMap\<folder>\<folder>N.blp. So the question
-                // was never whether two maps are drawn but which is seen, and
-                // the answer is in the draw lists. The widget renderer draws
-                // into ImGui's BACKGROUND list, deliberately, so this client's
-                // interface stays on top while the two coexist - and this
-                // client's map is an ImGui window. It covers FrameXML's tiles
-                // exactly where the two overlap, which is the detail frame,
-                // and application.cpp hands it that frame's rect so the
-                // overlap is exact.
-                //
-                // What that leaves is the arrangement the rect hand-off was
-                // written for: FrameXML owns the window, the chrome, the zone
-                // dropdown and the open/close, and this client owns the map
-                // surface inside it - with the party dots, taxi nodes, quest
-                // POIs and player marker it already draws, none of which are
-                // gated on ownership. game_screen_hud reads the presence of
-                // the rect as the statement that the map is wanted, in place
-                // of its own flag, and both the M key and the micro-menu
-                // button already route to ToggleFrame(WorldMapFrame).
-                //
-                // THE LAYER INVENTORY, WHICH IS WHAT THIS SEAM COSTS
-                //
-                // Everything FrameXML draws inside WorldMapDetailFrame is
-                // behind this client's map window and cannot be seen, so every
-                // one of those layers has to be drawn on this side or it does
-                // not exist. Enumerated 2026-08-05 against the frames
-                // worldmapframe.xml declares, so the next gap is a diff:
-                //
-                //   drawn here     corpse, death release, party dots, quest
-                //                  POIs, taxi nodes, rares, chests, the
-                //                  exploration mask, the player marker, the
-                //                  zone highlight - and battleground team
-                //                  positions, which were the one layer nobody
-                //                  had checked and are drawn here now.
-                //   drawn here    the battleground flag carriers, which the
-                //                  same packet as the team positions carries
-                //                  in a second block - count, then guid and
-                //                  x/y each. This note used to say no packet
-                //                  carried them; the parser reads both blocks
-                //                  and tags the second, and the map and the
-                //                  minimap colour a carrier apart from a
-                //                  team-mate by that tag. WorldMapFlag1 and 2
-                //                  are FrameXML's own frames for it and stay
-                //                  behind this client's map like the rest.
-                //   nothing to draw
-                //                  WorldMapBlobFrame, the shaded quest areas:
-                //                  this client's quest POIs are points, and a
-                //                  blob needs the polygon the server sends
-                //                  with them, which is not parsed.
-                //                  Vehicles, which are absent generally.
-                //   covered        WorldMapPing follows the player's own
-                //                  marker rather than a party ping, and this
-                //                  client draws that marker.
-                //
-                // The trap is that binding the stub looks like the fix and is
-                // not: GetNumBattlefieldPositions feeds WorldMapRaid1..40, and
-                // those frames cannot be seen from behind the map.
-                //
-                // Its two unfired events are accounted for:
-                // WORLD_MAP_NAME_UPDATE is registered with no branch to handle
-                // it, and CLOSE_WORLD_MAP is the server telling the map to
-                // shut, which nothing here sends - the key closes it through
-                // the same toggle that opens it.
-                "worldmap",
-                // The charter windows, found by reading the unaccounted-frame
-                // sweep against what this client fires rather than against
-                // what it draws. Every global the four files call is bound,
-                // including the ones a charter cannot be bought or turned in
-                // without.
-                "petition"};
-        }();
-
-        if (!raw || !*raw) {
-            out = defaults;
-            LOG_WARNING("FrameXML is drawing the branch defaults; "
-                        "set WOWEE_FRAMEXML_UI to choose, 'candidates' to add "
-                        "the ones not yet seen drawing, or 'none' for this "
-                        "client's own interface");
-            return out;
-        }
-
-        std::string value(raw);
-        size_t start = 0;
-        while (start <= value.size()) {
-            const size_t comma = value.find(',', start);
-            std::string one = value.substr(
-                start, comma == std::string::npos ? std::string::npos : comma - start);
-            const size_t b = one.find_first_not_of(" \t");
-            const size_t e = one.find_last_not_of(" \t");
-            one = (b == std::string::npos) ? std::string() : one.substr(b, e - b + 1);
-            if (!one.empty()) out.insert(one);
-            if (comma == std::string::npos) break;
-            start = comma + 1;
-        }
-
-        // "candidates" - the defaults plus every element the readiness report
-        // finds clean on both counts: every global its code calls is answered,
-        // and every event its frames register for is either sent or verified as
-        // correctly absent.
-        //
-        // Clean is not the same as seen working. These are windows that open on
-        // an interaction rather than sitting on screen, so a fault in one waits
-        // for the right NPC and then blocks that NPC - which is exactly why
-        // they are behind a word instead of in the defaults. Naming this is how
-        // a run tests the batch without typing thirty names.
-        //
-        // The list below is generated: tools/framexml_element_readiness.py
-        // prints it in this exact shape at the end of its run. Regenerate and
-        // paste rather than editing by hand, or it drifts the first time an
-        // element goes clean and nobody thinks to come here.
-        //
-        // The report leaves the four held out below out of what it prints, so
-        // a regenerate-and-paste no longer puts them back. It used to print
-        // them, which is how "keybindings" survived the edit that removed its
-        // two neighbours.
-        //
-        // "social" was held out for thirty unbound Battle.net names, on the
-        // reading that they sit behind BNFeaturesEnabled() and so are probably
-        // never reached. They do not, and the caution was right to distrust
-        // "probably": IgnoreList_Update opens with GetNumIgnores,
-        // BNGetNumBlocked and BNGetNumBlockedToons on three consecutive lines
-        // with nothing between them, so the ignore tab raised on the second of
-        // the three. FriendsFrameTooltip_Show and FriendsFriendsList_Update are
-        // unguarded the same way.
-        //
-        // All thirty are bound now, and answer what a client with no
-        // Battle.net has: no friends, no blocks, nil rows, and verbs that do
-        // nothing. tools/framexml_unbound_globals.py reports friendsframe
-        // clean, which is the check this note used to ask for.
-        //
-        // "dungeonfinder" joins them. No missing call, and four of its five
-        // unfired events are correctly absent: the source of
-        // LFG_OPEN_FROM_GOSSIP is STATUS_NEVER in AzerothCore and never sent,
-        // UPDATE_LFG_LIST belongs to the raid browser whose three search
-        // packets are read and dropped here by decision - so this client's own
-        // browser is as empty as FrameXML's would be - LFG_ROLE_UPDATE
-        // refreshes role checkboxes that are client state, and
-        // VOTE_KICK_REASON_NEEDED needs a message this client is not sent.
-        //
-        // "questtracker" joins them, and with it the last of the three held
-        // out for drawing a second map. WatchFrame draws no map: it calls the
-        // quest POI part of that API to place markers, and every one of those
-        // is answered now. Every event it registers is fired, its whole
-        // quest-watch API is bound, and its two unbound names are achievement
-        // addon internals that exist once that addon loads - the same two
-        // already settled under "achievements".
-        //
-        // "uierrors" joins them. Its one unfired event is SYSMSG, which
-        // nothing backs - no opcode here produces one. What the frame is
-        // actually for is UI_ERROR_MESSAGE, and addUIError raises that from
-        // eighty sites now that the refusals in the social, inventory, spell,
-        // quest, chat, combat and movement handlers go through it instead of
-        // writing to chat alone.
-        //
-        // "raidwarning" joins them. Three files, no missing call, no unfired
-        // event: CHAT_MSG_RAID_WARNING and CHAT_MSG_RAID_BOSS_EMOTE are both
-        // sent. It sat outside both tiers on a note saying the first was not
-        // fired - see the suppression entry for why that note was wrong.
-        //
-        // "trade" joins them. Its two unfired events are correctly unfired:
-        // TRADE_PLAYER_ITEM_CHANGED and TRADE_TARGET_ITEM_CHANGED each carry
-        // one slot, and this client never learns of one slot changing.
-        // SMSG_TRADE_STATUS_EXTENDED carries a whole side at once, TRADE_UPDATE
-        // is fired from it, and that branch calls TradeFrame_Update - a redraw
-        // of every slot. The third, TRADE_POTENTIAL_BIND_ENCHANT, has a
-        // commented-out body in FrameXML itself.
-        //
-        // "readycheck" joins them too, on a smaller footing: two files, no
-        // missing call, and READY_CHECK, READY_CHECK_CONFIRM and
-        // READY_CHECK_FINISHED are all fired. Its window is behind a gate in
-        // dialog_manager and ReadyCheckFrame is suppressed until the element is
-        // owned, so the swap is the whole change.
-        //
-        // "questlog" joins them. It was held back with the world map and the
-        // quest tracker, on the reading that handing any of the three over
-        // draws a second map over this client's own - and it draws no map. What
-        // it did was call the world map API, which was unbound then and is
-        // bound now, and the readiness report finds nothing missing in
-        // questlogframe at all. Its own window is already gated, its
-        // suppression entry lifts itself the moment the element is owned, and
-        // the L key reaches ToggleFrame(QuestLogFrame) through the route table.
-        //
-        // "keybindings", "macro" and "timemanager" also come out, for a
-        // duller reason: they are not elements. The readiness report scores
-        // them because their FrameXML files have no missing calls, but there
-        // is no UiElement of that name, so putting them here only produced
-        // three "no element called" warnings on every run that named
-        // candidates. Nothing suppresses those panels and nothing hands them
-        // over; making them real means adding an enum entry and a
-        // frameXmlOwns guard around this client's own version first.
-        //
-        // "worldmap" joins them, and it was the last element outside both
-        // tiers. It was held back on the reading that handing it over would
-        // draw a second map over this client's own, which is the same reason
-        // the quest log and the quest tracker were held and wrong for the same
-        // reason: nothing here draws a map twice. This client's map renderer is
-        // a Vulkan pass told where to be, not a picture the widget tree places,
-        // and application.cpp already hands it WorldMapDetailFrame's rect while
-        // that frame is visible. game_screen_hud takes the presence of that
-        // rect as the statement that the map is wanted, in place of its own
-        // flag, and both the M key and the micro-menu button already route to
-        // ToggleFrame(WorldMapFrame) when the element is owned.
-        //
-        // Its two unfired events are accounted for: WORLD_MAP_NAME_UPDATE is
-        // registered with no branch to handle it, and CLOSE_WORLD_MAP is the
-        // server telling the map to shut, which nothing here sends - the key
-        // closes it through the same toggle that opens it.
-        //
-        // "chat" was out for a while and is back. It had forty-eight unbound
-        // names in chatframe.lua, and unlike the Battle.net set they sat
-        // behind no feature flag - each was a slash command handler, so each
-        // was a raise the moment someone typed that command. All forty-eight
-        // are bound now: implemented where this client can do the thing,
-        // answered safely where it cannot. A safe answer makes the command do
-        // nothing, which is honest for a feature that is not there; a missing
-        // name took the chat frame down with it.
-        if (out.erase("candidates") > 0) {
-            out.insert(defaults.begin(), defaults.end());
-            // Nothing is added on top any more. bagbar, micromenu, uierrors,
-            // raidwarning and finally worldmap have all come out of here and
-            // into the defaults, so "candidates" and the defaults name the
-            // same set - every element is handed over. The word is kept
-            // because runs and notes use it, and because the next element
-            // added goes here first.
-            LOG_WARNING("FrameXML: 'candidates' is the defaults now - every "
-                        "element is handed over, so there is nothing left for "
-                        "it to add.");
-        }
-
-        if (out.count("all") == 0) {
-            for (const std::string& name : out) {
-                // "none" and "all" are answers, not element names - "none" is
-                // how a run says to use this client's own interface throughout,
-                // and reporting it as a misspelling reads as though the flag
-                // was ignored.
-                bool known = (name == "mainmenubar" || name == "none" ||
-                              name == "all");
-                for (const Entry& e : kElements) known |= (e.name == name);
-                if (!known) LOG_WARNING("WOWEE_FRAMEXML_UI: no element called '", name, "'");
-            }
-        }
-        if (!out.empty()) {
-            std::string list;
-            for (const std::string& n : out) { list += n; list += ' '; }
-            LOG_WARNING("FrameXML is drawing these instead of the client: ", list);
-        }
-        return out;
-    }();
-    return names;
-}
-
-} // namespace
-
-namespace {
-
-/// Whether a name covers this element as part of something larger.
-///
-/// The client draws its action bar, bag bar, micro menu and the two thin bars
-/// above them as separate pieces, because it built them separately. FrameXML
-/// draws all of them as MainMenuBar: one frame, one strip of art, the griffins
-/// at either end. Handing over "actionbar" alone therefore leaves the client's
-/// bag bar and micro menu sitting on top of FrameXML's, in the same place, and
-/// the result reads as one bar drawn twice rather than a replacement that half
-/// worked.
-bool coveredByGroup(const std::string& name, UiElement element) {
-    if (name != "mainmenubar") return false;
-    switch (element) {
-        case UiElement::ActionBar:
-        case UiElement::StanceBar:
-        case UiElement::BagBar:
-        case UiElement::MicroMenu:
-        case UiElement::XpBar:
-        case UiElement::RepBar:
-            return true;
-        default:
-            return false;
-    }
-}
-
 } // namespace
 
 /// Whether FrameXML was loaded at all. Owning an element it did not build
@@ -547,14 +133,7 @@ bool frameXmlOwns(UiElement element) {
     // The same for one element whose frames never arrived.
     if (frameXmlWasReleased(element)) return false;
 
-    const auto& names = requested();
-    if (names.empty() || names.count("none")) return false;
-    if (names.count("all")) return true;
-    if (names.count(std::string(uiElementName(element)))) return true;
-    for (const std::string& n : names) {
-        if (coveredByGroup(n, element)) return true;
-    }
-    return false;
+    return true;
 }
 
 namespace {
@@ -691,10 +270,10 @@ std::vector<std::string> frameXmlCandidateFrames() {
     // Derived from the check rows rather than named again here. It used to be
     // a list of its own, "so that adding a candidate is a deliberate act", and
     // it sat empty behind a comment saying everything worth swapping had been
-    // handed over - which stopped being true the moment thirty-three elements
-    // went behind WOWEE_FRAMEXML_UI=candidates. Now that every one of those has
-    // a check row, the deliberate act is writing that row, and one list cannot
-    // disagree with the other.
+    // handed over - which stopped being true the moment thirty-three more
+    // elements were. Now that every one of those has a check row, the
+    // deliberate act is writing that row, and one list cannot disagree with
+    // the other.
     std::vector<std::string> out;
     appendCandidateFrames(out);
     return out;
@@ -749,8 +328,8 @@ const Suppress kSuppress[] = {
         // itself twice while "Stormwind City" announced itself once.
         {UiElement::ZoneText,   "ZoneTextFrame SubZoneTextFrame"},
         // MinimapCluster carries the ring, the zoom buttons and the zone text,
-        // so hiding it hides the rest. WOWEE_FRAMEXML_UI=playerframe left
-        // FrameXML's minimap drawn beside this client's own.
+        // so hiding it hides the rest. Naming only the ring left FrameXML's
+        // minimap drawn beside this client's own.
         {UiElement::Minimap,    "MinimapCluster"},
     };
 }  // namespace
@@ -939,7 +518,7 @@ const Check kChecks[] = {
         {UiElement::QuestLog,     "QuestLogFrame QuestLogScrollFrame "
                                   "QuestLogDetailScrollFrame"},
 
-        // ---- The elements behind WOWEE_FRAMEXML_UI=candidates ----
+        // ---- The elements handed over last ----
         //
         // Written so the release above can see them. An element with no row
         // here is one that, if its frames never arrive, draws nothing and says

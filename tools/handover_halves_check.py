@@ -18,9 +18,9 @@ point, each for one of these two reasons.
 
 WHAT IT CHECKS
 
-Both halves, for every element named in the defaults or the candidates, and
-both of them against `clientDraws` in the element table - which is the one
-place that says whether this client still has a version of its own.
+Both halves, for every element in the table - all of them are handed over - and
+both against `clientDraws` in that table, which is the one place that says
+whether this client still has a version of its own.
 
   * a gate, unless this client draws nothing, in which case there is nothing
     to gate and the exemption is that flag rather than a list here;
@@ -29,10 +29,9 @@ place that says whether this client still has a version of its own.
     here outlives its element: once the drawing behind it is deleted, hiding
     FrameXML's frame leaves a blank where a working window would have been.
     Seventeen rows were in that state, silently, because suppression is
-    skipped for an owned element and all seventeen are owned by default - so
-    the fault could only appear in a run naming a subset, which is the only
-    thing the table is for. Found by asking why the exemption list here named
-    twelve elements the table still claimed this client drew.
+    skipped for an owned element and every element is owned. Found by asking
+    why the exemption list here named twelve elements the table still claimed
+    this client drew.
 
 WHAT IT CANNOT SEE
 
@@ -93,28 +92,24 @@ def main():
             r"frameXmlOwns\(\s*(?:ui::)?UiElement::(\w+)\s*\)",
             path.read_text(errors="ignore")))
 
-    defaults = set(re.findall(r'"(\w+)"', re.search(
-        r"return std::set<std::string>\{(.*?)\};", cpp, re.S).group(1)))
-    # "candidates" used to add a list on top of the defaults. It adds
-    # nothing now - every element is in the defaults - so the loop it was read
-    # out of is gone. Read it as empty rather than as a parse failure, but only
-    # when the word is still there: if the whole mechanism is renamed, this
-    # should go back to failing loudly.
-    if "candidates" not in cpp:
-        print("no 'candidates' tier in the takeover source - this reads it")
+    # Every element in the table, because every element is handed over. This
+    # used to read a defaults list and a candidates tier out of the source and
+    # take the union; WOWEE_FRAMEXML_UI is gone and so are both, and
+    # frameXmlOwns now answers true for anything FrameXML built. Reading the
+    # table itself is what that collapses to - and it is the stronger reading,
+    # since an element added to the table is handed over the moment it is
+    # written rather than when someone remembers a second list.
+    if "return true;" not in cpp:
+        print("frameXmlOwns no longer answers unconditionally - this assumes "
+              "every element in the table is handed over")
         return 1
-    extra = re.search(r"for \(const char\* name : \{(.*?)\}\) \{", cpp, re.S)
-    candidates = set(re.findall(r'"(\w+)"', extra.group(1))) if extra else set()
-
-    live = sorted(e for e, n in names.items()
-                  if n in defaults or n in candidates)
+    live = sorted(names)
     no_gate = [e for e in live if e not in gates and draws[e]]
     no_suppress = [e for e in live if e not in suppress and draws[e]]
     # And the other way: a row hiding FrameXML's frame with nothing behind it.
     stale_suppress = [e for e in live if e in suppress and not draws[e]]
 
-    print(f"{len(live)} elements handed over, {len(defaults)} by default and "
-          f"{len(candidates)} named by 'candidates'\n")
+    print(f"{len(live)} elements handed over, which is all of them\n")
 
     print(f"{len(no_gate)} with no frameXmlOwns gate - this client goes on "
           f"drawing when the element is handed over:")

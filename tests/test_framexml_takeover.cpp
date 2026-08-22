@@ -1,16 +1,17 @@
 // Which interface draws what, in the configuration a run actually gets.
 //
 // The transition's state is "FrameXML draws all of it", and nothing held that
-// still. It is not obvious from reading either: the default list names
-// forty-nine elements and there are fifty-two, and the other three -
-// actionbar, stancebar, xpbar, repbar - are covered by naming "mainmenubar",
-// because this client draws its bar as separate pieces where FrameXML draws
-// one strip with the griffins on the ends. So the claim rests on a list and a
-// grouping rule agreeing, in a file where either can be edited alone.
+// still. It used to rest on a list and a grouping rule agreeing - a default set
+// naming forty-nine of the fifty-two elements, with the other three reached
+// through "mainmenubar" - in a file where either could be edited alone. Both
+// are gone with WOWEE_FRAMEXML_UI, and what is left to hold still is that no
+// element falls out of the handover by some other route: the release net, or a
+// suppression row that outlived the element it was written for.
 //
-// Getting it wrong is quiet. An element that falls out of the defaults is not
-// an error: this client simply draws its own version again, correctly, and the
-// only symptom is that the interface stops being the one under test.
+// Getting it wrong is quiet, and quieter than it used to be. An element that
+// stops being owned no longer means this client draws its own version instead -
+// that version has been deleted for all but a handful - it means nothing draws
+// it at all.
 
 #include <catch_amalgamated.hpp>
 
@@ -24,12 +25,11 @@ using namespace wowee::ui;
 
 namespace {
 
-/// The environment decides this, and it is read once and cached - so it has to
-/// be cleared before the first question, not inside the first test case.
-/// Otherwise a developer who happens to be running with WOWEE_FRAMEXML_UI set
-/// gets a failure that says nothing about the code.
+/// WOWEE_LOAD_FRAMEXML still decides whether anything is owned at all, and it
+/// is read once and cached - so it has to be cleared before the first question,
+/// not inside the first test case. Otherwise a developer who happens to be
+/// running with it set to 0 gets a failure that says nothing about the code.
 const bool kCleanEnvironment = [] {
-    wowee::core::unsetEnvVar("WOWEE_FRAMEXML_UI");
     wowee::core::unsetEnvVar("WOWEE_LOAD_FRAMEXML");
     return true;
 }();
@@ -45,7 +45,7 @@ TEST_CASE("The last element is still the last one", "[takeover]") {
     REQUIRE(uiElementName(UiElement::Petition) == "petition");
 }
 
-TEST_CASE("A default run hands every element to FrameXML", "[takeover]") {
+TEST_CASE("Every element is FrameXML's", "[takeover]") {
     REQUIRE(kCleanEnvironment);
     std::string notOwned;
     int total = 0;
@@ -66,10 +66,11 @@ TEST_CASE("A default run hands every element to FrameXML", "[takeover]") {
 
 TEST_CASE("The bar's pieces are owned through the whole bar", "[takeover]") {
     REQUIRE(kCleanEnvironment);
-    // These four are not in the default list by name. They are owned because
-    // "mainmenubar" covers them, and that is the part worth stating on its own
-    // - if the grouping rule were dropped, the test above would fail and this
-    // one says why.
+    // FrameXML draws all six as one frame - MainMenuBar, one strip of art with
+    // the griffins on the ends - where this client built them as separate
+    // pieces. They were owned through a grouping rule while elements were named
+    // one at a time; the rule is gone with the naming, and this says the pieces
+    // did not go with it.
     CHECK(frameXmlOwns(UiElement::ActionBar));
     CHECK(frameXmlOwns(UiElement::StanceBar));
     CHECK(frameXmlOwns(UiElement::XpBar));

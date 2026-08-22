@@ -2,34 +2,28 @@
 
 // Which parts of the interface FrameXML has taken over from this client.
 //
-// The two interfaces draw the same things - a player frame, an action bar, a
-// minimap - and while the original is being replaced they would otherwise both
-// be on screen at once. This says which of the client's own elements to leave
-// out, one name at a time, so a replacement can be tried and backed out without
-// touching the code that draws either.
+// All of them. The two interfaces drew the same things - a player frame, an
+// action bar, a minimap - and while the replacement was in progress this said
+// which of the client's own elements to leave out, one name at a time, so that
+// each could be tried and backed out without touching the code that drew
+// either. It was set through WOWEE_FRAMEXML_UI.
 //
-// Set through the environment:
+// That option is gone, because the thing it selected between is gone: the
+// client's own version of all but a handful of these has been deleted, and
+// `WOWEE_FRAMEXML_UI=none` therefore stopped meaning "use the interface this
+// client draws" and started meaning "draw nothing at all". A screen with no
+// player frame, no bars and no bags is not a fallback, and an option whose
+// other setting is that is not a choice.
 //
-//     WOWEE_FRAMEXML_UI=playerframe,targetframe
-//     WOWEE_FRAMEXML_UI=mainmenubar
-//     WOWEE_FRAMEXML_UI=candidates
-//     WOWEE_FRAMEXML_UI=all
+// What is left of the system is the accounting: which frames each element
+// stands or falls on, which of this client's own drawing is still gated behind
+// one, and the safety net that hands an element back when FrameXML's version
+// of it was never built. The list of elements below is that record - it says
+// what has been accounted for, not what is switched on.
 //
-// "candidates" is the defaults plus every element the readiness report finds
-// clean - every global its code calls answered, every event its frames want
-// either sent or verified absent. Clean is not the same as seen working, and
-// these are windows that open on an interaction, so a fault waits for the
-// right NPC and then blocks it. That is why they are behind a word rather
-// than in the defaults, and it is the batch to run when testing them.
-//
-// "mainmenubar" is one name for the whole bottom of the screen - the action
-// bar, the stance bar, the bags, the micro menu and the two thin bars above
-// them - because FrameXML draws all of them as a single frame and handing over
-// any one of them on its own leaves the rest sitting on top of it.
-//
-// Names are matched exactly and unknown ones are reported at startup rather
-// than ignored, because a misspelling would otherwise look like a replacement
-// that silently did not happen.
+// WOWEE_LOAD_FRAMEXML=0 still turns the interface off wholesale, and with it
+// every element here: see frameXmlOwns, which answers false for all of them
+// when nothing was loaded.
 
 #include <cstdint>
 #include <functional>

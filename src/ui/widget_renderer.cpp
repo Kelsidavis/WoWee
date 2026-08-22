@@ -1148,10 +1148,9 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
 
     // Did the elements handed over actually arrive?
     //
-    // Reported without being asked for, because it only happens when someone
-    // has already said WOWEE_FRAMEXML_UI, and because the alternative is
-    // reading a screenshot for whether a frame is present, hidden, or laid out
-    // to nothing - three failures that look identical from outside and quite
+    // Reported without being asked for, because the alternative is reading a
+    // screenshot for whether a frame is present, hidden, or laid out to
+    // nothing - three failures that look identical from outside and quite
     // different here. Late enough that textures have had time to upload.
     //
     // Twice: once when the interface has finished loading, and again once the
