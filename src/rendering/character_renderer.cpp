@@ -3418,7 +3418,15 @@ void CharacterRenderer::renderShadow(VkCommandBuffer cmd, const glm::mat4& light
 }
 
 VkDescriptorSet CharacterRenderer::shadowTexDescSet(VkTexture* tex, uint32_t frameIndex) {
-    if (!tex || frameIndex >= kShadowTexPoolFrames) return shadowParams_.set;
+    // Valid, not merely non-null, for the reason in getMaterialDescriptorSet:
+    // a texture whose upload or view creation failed writes a null view and
+    // sampler into a live descriptor. The alpha-tested shadow pass samples it,
+    // which is undefined behaviour and reaches NVIDIA as a lost device.
+    //
+    // Also worth the check for the cache below, which is keyed on the view: a
+    // null one would key every failed texture to the same set.
+    if (!tex || !tex->isValid()) return shadowParams_.set;
+    if (frameIndex >= kShadowTexPoolFrames) return shadowParams_.set;
     VkDescriptorPool pool = shadowTexPool_[frameIndex];
     if (!pool) return shadowParams_.set;
 

@@ -393,7 +393,10 @@ bool TerrainRenderer::loadTerrain(const pipeline::TerrainMesh& mesh,
                 destroyChunkGPU(gpuChunk);
                 continue;
             }
-            writeMaterialDescriptors(gpuChunk.materialSet, gpuChunk);
+            if (!writeMaterialDescriptors(gpuChunk.materialSet, gpuChunk)) {
+                destroyChunkGPU(gpuChunk);
+                continue;
+            }
 
             chunks.push_back(std::move(gpuChunk));
         }
@@ -455,7 +458,13 @@ bool TerrainRenderer::loadTerrainIncremental(const pipeline::TerrainMesh& mesh,
             chunkIndex--;
             break;
         }
-        writeMaterialDescriptors(gpuChunk.materialSet, gpuChunk);
+        if (!writeMaterialDescriptors(gpuChunk.materialSet, gpuChunk)) {
+            // Not the retry above: that one is descriptor-pool pressure, which
+            // passes. This is the fallback textures being unsampleable, which
+            // does not, so the chunk is dropped rather than asked for again.
+            destroyChunkGPU(gpuChunk);
+            continue;
+        }
 
         chunks.push_back(std::move(gpuChunk));
         uploaded++;
@@ -722,15 +731,41 @@ VkDescriptorSet TerrainRenderer::allocateMaterialSet() {
     return set;
 }
 
-void TerrainRenderer::writeMaterialDescriptors(VkDescriptorSet set, const TerrainChunkGPU& chunk) {
+bool TerrainRenderer::writeMaterialDescriptors(VkDescriptorSet set, const TerrainChunkGPU& chunk) {
     VkTexture* white = whiteTexture.get();
     VkTexture* opaque = opaqueAlphaTexture.get();
 
+    // Valid, not merely non-null. descriptorInfo() returns the texture's
+    // handles as they are, so one whose upload or view creation failed writes
+    // VK_NULL_HANDLE into a live descriptor and declares
+    // SHADER_READ_ONLY_OPTIMAL over it. Sampling that is undefined behaviour
+    // and reaches an NVIDIA driver as a graphics engine exception and a lost
+    // device rather than as anything this client can catch. See #123.
+    //
+    // A chunk texture failing is ordinary - it is what the cache does under
+    // memory pressure - and the 1x1 fallbacks are what that case is for.
+    const auto sampleable = [](VkTexture* t) { return t && t->isValid(); };
+    const auto pick = [&](VkTexture* wanted, VkTexture* fallback) {
+        return sampleable(wanted) ? wanted : fallback;
+    };
+    if (!sampleable(white) || !sampleable(opaque)) {
+        // The fallbacks themselves are gone, so there is nothing safe to write.
+        // The caller drops the chunk: a hole in the ground costs a view of one
+        // tile, and a null image view costs the device.
+        static bool told = false;
+        if (!told) {
+            told = true;
+            LOG_ERROR("TerrainRenderer: the 1x1 fallback textures are not "
+                      "sampleable, so no chunk can be drawn");
+        }
+        return false;
+    }
+
     VkDescriptorImageInfo imageInfos[7];
-    imageInfos[0] = (chunk.baseTexture ? chunk.baseTexture : white)->descriptorInfo();
+    imageInfos[0] = pick(chunk.baseTexture, white)->descriptorInfo();
     for (int i = 0; i < 3; i++) {
-        imageInfos[1 + i] = (chunk.layerTextures[i] ? chunk.layerTextures[i] : white)->descriptorInfo();
-        imageInfos[4 + i] = (chunk.alphaTextures[i] ? chunk.alphaTextures[i] : opaque)->descriptorInfo();
+        imageInfos[1 + i] = pick(chunk.layerTextures[i], white)->descriptorInfo();
+        imageInfos[4 + i] = pick(chunk.alphaTextures[i], opaque)->descriptorInfo();
     }
 
     VkDescriptorBufferInfo bufInfo{};
@@ -755,6 +790,7 @@ void TerrainRenderer::writeMaterialDescriptors(VkDescriptorSet set, const Terrai
     writes[7].pBufferInfo = &bufInfo;
 
     vkUpdateDescriptorSets(vkCtx->getDevice(), 8, writes, 0, nullptr);
+    return true;
 }
 
 void TerrainRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const Camera& camera) {

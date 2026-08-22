@@ -139,8 +139,15 @@ bool Minimap::initialize(VkContext* ctx, VkDescriptorSetLayout /*perFrameLayout*
     allocInfo.descriptorSetCount = 19;
     allocInfo.pSetLayouts = layouts.data();
 
+    // Checked, not assumed. On failure allSets holds nothing this code put
+    // there, and every one of the nineteen is then written and bound - which
+    // is an invalid handle in a live descriptor rather than a minimap that
+    // does not draw.
     VkDescriptorSet allSets[19];
-    vkAllocateDescriptorSets(device, &allocInfo, allSets);
+    if (vkAllocateDescriptorSets(device, &allocInfo, allSets) != VK_SUCCESS) {
+        LOG_ERROR("Minimap: failed to allocate descriptor sets");
+        return false;
+    }
 
     for (int f = 0; f < 2; f++)
         for (int t = 0; t < 9; t++)

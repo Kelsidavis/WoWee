@@ -215,6 +215,14 @@ bool FootprintRenderer::loadFootprintData(pipeline::AssetManager* assets) {
         }
         textures_[i].createSampler(device, VK_FILTER_LINEAR, VK_FILTER_LINEAR,
                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+        // createSampler answers nothing and the image view is created without
+        // being checked either, so "uploaded" is not the same as "sampleable".
+        // Writing an unsampleable texture into a live descriptor is undefined
+        // behaviour that costs the device rather than the footprints. See #123.
+        if (!textures_[i].isValid()) {
+            LOG_WARNING("FootprintRenderer: ", path, " is not sampleable");
+            return false;
+        }
         VkDescriptorImageInfo imageInfo = textures_[i].descriptorInfo();
         VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
         write.dstSet = textureSets_[i];

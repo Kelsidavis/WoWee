@@ -811,8 +811,27 @@ WMORenderer::ModelLoadResult WMORenderer::loadModelIncremental(
 
             // Allocate and write descriptor set
             mb.materialSet = allocateMaterialSet();
+            // Valid, not merely non-null. descriptorInfo() returns the
+            // texture's handles as they are, so one whose upload or view
+            // creation failed writes VK_NULL_HANDLE into a live descriptor and
+            // declares SHADER_READ_ONLY_OPTIMAL over it - undefined behaviour
+            // that reaches an NVIDIA driver as a lost device. See #123.
+            //
+            // The set is dropped rather than written when even the fallback is
+            // unsampleable, and the render pass already skips a batch with no
+            // set: an unlit wall costs a wall, a null view costs the device.
+            const auto pick = [](VkTexture* wanted, VkTexture* fallback) -> VkTexture* {
+                if (wanted && wanted->isValid()) return wanted;
+                return (fallback && fallback->isValid()) ? fallback : nullptr;
+            };
+            VkTexture* texToUse = pick(mb.texture, whiteTexture_.get());
+            VkTexture* nhMap = pick(mb.normalHeightMap, flatNormalTexture_.get());
+            if ((!texToUse || !nhMap) && mb.materialSet) {
+                vkFreeDescriptorSets(vkCtx_->getDevice(), materialDescPool_, 1,
+                                     &mb.materialSet);
+                mb.materialSet = VK_NULL_HANDLE;
+            }
             if (mb.materialSet) {
-                VkTexture* texToUse = mb.texture ? mb.texture : whiteTexture_.get();
                 VkDescriptorImageInfo imgInfo = texToUse->descriptorInfo();
 
                 VkDescriptorBufferInfo bufInfo{};
@@ -820,7 +839,6 @@ WMORenderer::ModelLoadResult WMORenderer::loadModelIncremental(
                 bufInfo.offset = 0;
                 bufInfo.range = sizeof(WMOMaterialUBO);
 
-                VkTexture* nhMap = mb.normalHeightMap ? mb.normalHeightMap : flatNormalTexture_.get();
                 VkDescriptorImageInfo nhImgInfo = nhMap->descriptorInfo();
 
                 VkWriteDescriptorSet writes[3] = {};

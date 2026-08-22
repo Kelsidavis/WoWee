@@ -247,7 +247,20 @@ void QuestMarkerRenderer::loadTextures(pipeline::AssetManager* assetManager) {
 
     VkDevice device = vkCtx_->getDevice();
 
+    // The sets are allocated before this runs. Held aside and published only
+    // once each has been written: an allocated set that was never written is as
+    // undefined to bind as one holding a null image view, and the render pass
+    // below binds by marker type without looking - so a texture that failed to
+    // load was already being sampled from an unwritten set.
+    VkDescriptorSet allocated[3];
     for (int i = 0; i < 3; ++i) {
+        allocated[i] = texDescSets_[i];
+        texDescSets_[i] = VK_NULL_HANDLE;
+    }
+
+    for (int i = 0; i < 3; ++i) {
+        if (!allocated[i]) continue;
+
         pipeline::BLPImage blp = assetManager->loadTexture(paths[i]);
         if (!blp.isValid()) {
             LOG_WARNING("Failed to load quest marker texture: ", paths[i]);
@@ -265,18 +278,27 @@ void QuestMarkerRenderer::loadTextures(pipeline::AssetManager* assetManager) {
         textures_[i].createSampler(device, VK_FILTER_LINEAR, VK_FILTER_LINEAR,
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
+        // Uploaded is not sampleable: createSampler answers nothing and the
+        // image view is created without being checked, and a descriptor holding
+        // a null view costs the device rather than the marker. See #123.
+        if (!textures_[i].isValid()) {
+            LOG_WARNING("Quest marker texture is not sampleable: ", paths[i]);
+            continue;
+        }
+
         // Write descriptor set for this texture
         VkDescriptorImageInfo imgInfo = textures_[i].descriptorInfo();
 
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = texDescSets_[i];
+        write.dstSet = allocated[i];
         write.dstBinding = 0;
         write.descriptorCount = 1;
         write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         write.pImageInfo = &imgInfo;
 
         vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+        texDescSets_[i] = allocated[i];
 
         LOG_INFO("Loaded quest marker texture: ", paths[i]);
     }
@@ -380,6 +402,7 @@ void QuestMarkerRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSe
         model[2] = glm::vec4(cameraForward, 0.0f);
 
         // Bind material descriptor set (set 1) for this marker's texture
+        if (marker.type < 0 || marker.type >= 3 || !texDescSets_[marker.type]) continue;
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_,
             1, 1, &texDescSets_[marker.type], 0, nullptr);
 

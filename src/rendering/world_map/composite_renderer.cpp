@@ -204,6 +204,15 @@ bool CompositeRenderer::initialize(VkContext* ctx, pipeline::AssetManager* am) {
         fogTexture_->createSampler(device, VK_FILTER_NEAREST, VK_FILTER_NEAREST,
                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1.0f);
 
+        // upload and createSampler both answer nothing, and the image view is
+        // created without being checked either, so a 1x1 texture is not
+        // guaranteed sampleable just because it is tiny. Writing an
+        // unsampleable one into this set costs the device rather than the fog.
+        // See #123.
+        if (!fogTexture_->isValid()) {
+            LOG_ERROR("CompositeRenderer: the fog texture is not sampleable");
+            return false;
+        }
         VkDescriptorImageInfo fogImgInfo = fogTexture_->descriptorInfo();
         VkWriteDescriptorSet fogWrite{};
         fogWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

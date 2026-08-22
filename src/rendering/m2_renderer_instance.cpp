@@ -303,12 +303,18 @@ void M2Renderer::clear() {
             vkResetDescriptorPool(device, materialDescPool_, 0);
             // Re-allocate the glow texture descriptor set (pre-allocated during init,
             // invalidated by pool reset).
-            if (glowTexture_ && particleTexLayout_) {
+            // Cleared before the test, not inside it: the pool reset above
+            // invalidated whatever was here, so a run that does not re-allocate
+            // was leaving a dangling set behind to be bound.
+            glowTexDescSet_ = VK_NULL_HANDLE;
+            // Valid, not merely present. A texture whose upload or view
+            // creation failed writes a null view into this set, and the glow
+            // pass samples it - the same shape as the particle and ribbon sets.
+            if (glowTexture_ && glowTexture_->isValid() && particleTexLayout_) {
                 VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
                 ai.descriptorPool = materialDescPool_;
                 ai.descriptorSetCount = 1;
                 ai.pSetLayouts = &particleTexLayout_;
-                glowTexDescSet_ = VK_NULL_HANDLE;
                 if (vkAllocateDescriptorSets(device, &ai, &glowTexDescSet_) == VK_SUCCESS) {
                     VkDescriptorImageInfo imgInfo = glowTexture_->descriptorInfo();
                     VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};

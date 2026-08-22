@@ -169,7 +169,10 @@ private:
     bool isChunkVisible(const TerrainChunkGPU& chunk, const Frustum& frustum);
     void calculateBoundingSphere(TerrainChunkGPU& chunk, const pipeline::ChunkMesh& meshChunk);
     VkDescriptorSet allocateMaterialSet();
-    void writeMaterialDescriptors(VkDescriptorSet set, const TerrainChunkGPU& chunk);
+    /// False when there is nothing sampleable to write, in which case the
+    /// caller must drop the chunk: a descriptor set that was allocated and
+    /// never written is as undefined to bind as one holding a null view.
+    bool writeMaterialDescriptors(VkDescriptorSet set, const TerrainChunkGPU& chunk);
     void destroyChunkGPU(TerrainChunkGPU& chunk);
 
     /// Point a chunk's base, layer and alpha textures at the loaded ones.

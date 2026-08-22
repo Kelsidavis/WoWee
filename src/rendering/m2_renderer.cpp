@@ -1013,8 +1013,14 @@ bool M2Renderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayout
         glowTexture_ = std::make_unique<VkTexture>();
         glowTexture_->upload(*vkCtx_, px.data(), SZ, SZ, VK_FORMAT_R8G8B8A8_UNORM);
         glowTexture_->createSampler(device, VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
-        // Pre-allocate glow texture descriptor set (reused every frame)
-        if (particleTexLayout_ && materialDescPool_) {
+        // Pre-allocate glow texture descriptor set (reused every frame).
+        //
+        // Valid, not merely built: upload and createSampler both answer nothing
+        // here, and a texture missing either writes a null view and sampler
+        // into this set for the glow pass to sample. The bind site already
+        // skips a null set, so leaving it unallocated loses the glow sprites
+        // rather than the device.
+        if (glowTexture_->isValid() && particleTexLayout_ && materialDescPool_) {
             VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
             ai.descriptorPool = materialDescPool_;
             ai.descriptorSetCount = 1;
@@ -2147,8 +2153,20 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
 
         // Allocate descriptor set and write all bindings
         bgpu.materialSet = allocateMaterialSet();
+        // Valid, not merely non-null - the same shape as the particle and
+        // ribbon sets below. descriptorInfo() returns the texture's handles as
+        // they are, so one whose upload or view creation failed writes
+        // VK_NULL_HANDLE into a live descriptor and declares
+        // SHADER_READ_ONLY_OPTIMAL over it, which reaches an NVIDIA driver as a
+        // graphics engine exception and a lost device. See #123.
+        //
+        // The set is dropped when even the white fallback is unsampleable, and
+        // the render passes already skip a batch with no set: losing a batch
+        // costs part of a model, and a null image view costs the device.
+        VkTexture* batchTex = (bgpu.texture && bgpu.texture->isValid())
+            ? bgpu.texture : whiteTexture_.get();
+        if (!batchTex || !batchTex->isValid()) bgpu.materialSet = VK_NULL_HANDLE;
         if (bgpu.materialSet) {
-            VkTexture* batchTex = bgpu.texture ? bgpu.texture : whiteTexture_.get();
             VkDescriptorImageInfo imgInfo = batchTex->descriptorInfo();
 
             VkDescriptorBufferInfo matBufInfo{};

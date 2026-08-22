@@ -98,7 +98,20 @@ public:
     [[nodiscard]] uint32_t getHeight() const { return image_.extent.height; }
     [[nodiscard]] VkFormat getFormat() const { return image_.format; }
     [[nodiscard]] uint32_t getMipLevels() const { return mipLevels_; }
-    [[nodiscard]] bool isValid() const { return image_.image != VK_NULL_HANDLE && sampler_ != VK_NULL_HANDLE; }
+    /// Whether this texture can be sampled - which needs a view as well.
+    ///
+    /// The view was not checked, and it is the handle that can be missing on
+    /// its own: createImage logs "Failed to create image view" and returns the
+    /// image anyway, so a texture whose view creation failed had an image, a
+    /// sampler, and every guard in the renderer answering yes. descriptorInfo()
+    /// then wrote VK_NULL_HANDLE into a live descriptor and declared
+    /// SHADER_READ_ONLY_OPTIMAL over it, which reaches an NVIDIA driver as a
+    /// graphics engine exception and a lost device rather than as anything this
+    /// client can catch. Reported in #123.
+    [[nodiscard]] bool isValid() const {
+        return image_.image != VK_NULL_HANDLE && image_.imageView != VK_NULL_HANDLE &&
+               sampler_ != VK_NULL_HANDLE;
+    }
 
     // Write descriptor info for binding
     [[nodiscard]] VkDescriptorImageInfo descriptorInfo(VkImageLayout layout =
