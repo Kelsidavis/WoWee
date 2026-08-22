@@ -1012,6 +1012,7 @@ set(WOWEE_SOURCES
     # Addons
     src/addons/addon_manager.cpp
     src/addons/lua_engine.cpp
+    src/addons/lua_handler_globals.cpp
     src/addons/lua_unit_api.cpp
     src/addons/lua_spell_api.cpp
     src/addons/lua_inventory_api.cpp

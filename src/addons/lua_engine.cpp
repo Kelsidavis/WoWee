@@ -18,6 +18,7 @@
 #include <set>
 #include <cstdlib>
 #include "addons/lua_api_helpers.hpp"
+#include "addons/lua_handler_globals.hpp"
 #include "addons/lua_api_registrations.hpp"
 #include "addons/toc_parser.hpp"
 #include "core/window.hpp"
@@ -1043,7 +1044,7 @@ static void callScriptOnTable(lua_State* L, int tableIdx, const char* script,
     if (!lua_isfunction(L, -1)) { lua_pop(L, 2); return; }
     lua_pushvalue(L, abs);
     lua_pushnumber(L, arg);
-    if (lua_pcall(L, 2, 0, 0) != 0) {
+    if (pcallScript(L, script, 2, 0) != 0) {
         const char* err = lua_tostring(L, -1);
         LOG_ERROR("LuaEngine: ", script, " error: ", err ? err : "?");
         lua_pop(L, 1);
@@ -2898,7 +2899,7 @@ int lua_Button_Enable(lua_State* L) {
         lua_getfield(L, -1, "OnEnable");
         if (lua_isfunction(L, -1)) {
             lua_pushvalue(L, 1);
-            if (lua_pcall(L, 1, 0, 0) != 0) recordScriptError(L, "OnEnable");
+            if (pcallScript(L, "OnEnable", 1, 0) != 0) recordScriptError(L, "OnEnable");
         } else {
             lua_pop(L, 1);
         }
@@ -2915,7 +2916,7 @@ int lua_Button_Disable(lua_State* L) {
         lua_getfield(L, -1, "OnDisable");
         if (lua_isfunction(L, -1)) {
             lua_pushvalue(L, 1);
-            if (lua_pcall(L, 1, 0, 0) != 0) recordScriptError(L, "OnDisable");
+            if (pcallScript(L, "OnDisable", 1, 0) != 0) recordScriptError(L, "OnDisable");
         } else {
             lua_pop(L, 1);
         }
@@ -3001,7 +3002,7 @@ static void fireOnShowNow(lua_State* L, int frameIndex, wowee::ui::Widget* w) {
     lua_pushvalue(L, abs);                       // self
     // Errors are reported the same way every other script call reports them
     // rather than unwinding through Show.
-    if (lua_pcall(L, 1, 0, 0) != 0) {
+    if (pcallScript(L, "OnShow", 1, 0) != 0) {
         LOG_WARNING("[Lua] OnShow error: ", lua_tostring(L, -1) ? lua_tostring(L, -1) : "?");
         lua_pop(L, 1);
     }
@@ -4073,7 +4074,8 @@ int lua_StatusBar_SetValue(lua_State* L) {
             if (lua_isfunction(L, -1)) {
                 lua_pushvalue(L, 1);
                 lua_pushnumber(L, value);
-                if (lua_pcall(L, 2, 0, 0) != 0) recordScriptError(L, "OnValueChanged");
+                if (pcallScript(L, "OnValueChanged", 2, 0) != 0)
+                    recordScriptError(L, "OnValueChanged");
             } else {
                 lua_pop(L, 1);
             }
@@ -4123,7 +4125,8 @@ int lua_ColorSelect_SetColorRGB(lua_State* L) {
             lua_pushnumber(L, r);
             lua_pushnumber(L, g);
             lua_pushnumber(L, b);
-            if (lua_pcall(L, 4, 0, 0) != 0) recordScriptError(L, "OnColorSelect");
+            if (pcallScript(L, "OnColorSelect", 4, 0) != 0)
+                recordScriptError(L, "OnColorSelect");
         } else {
             lua_pop(L, 1);
         }
@@ -5012,7 +5015,7 @@ static int lua_CreateFrame(lua_State* L) {
             lua_getfield(L, -1, "OnLoad");
             if (lua_isfunction(L, -1)) {
                 lua_pushvalue(L, -3);            // the frame
-                if (lua_pcall(L, 1, 0, 0) != 0) {
+                if (pcallScript(L, "OnLoad", 1, 0) != 0) {
                     const char* oerr = lua_tostring(L, -1);
                     LOG_WARNING("CreateFrame: OnLoad failed: ", oerr ? oerr : "?");
                     // Same weight as a template that will not apply: a frame
@@ -5166,6 +5169,9 @@ void LuaEngine::registerCoreAPI() {
     lua_pushcfunction(L_, lua_wowee_setAnimOffset);
     lua_setglobal(L_, "__WoweeSetAnimOffset");
 
+    lua_pushcfunction(L_, lua_WoweeFireOnLoad);
+    lua_setglobal(L_, "__WoweeFireOnLoad");
+
     lua_pushcfunction(L_, lua_GetMouseFocus);
     lua_setglobal(L_, "GetMouseFocus");
 
@@ -5268,6 +5274,25 @@ void LuaEngine::registerCoreAPI() {
         "  atan  = function(x) return m.atan(x) * toDeg end\n"
         "  atan2 = function(y, x) return m.atan2(y, x) * toDeg end\n"
         "end\n");
+
+    // The names WoW's own Lua carried and 5.1 does not.
+    //
+    // getglobal is how an interface written before 3.0 reaches a name it has
+    // built - getglobal("PartyMemberFrame" .. i) - and 1.12's FrameXML uses it
+    // wherever this one would write _G[name]. Written to go through _G rather
+    // than rawget so that it behaves exactly like reading the global directly,
+    // missing-API fallback and all: a lookup that answers a stand-in either
+    // way is one behaviour to reason about rather than two.
+    //
+    // gfind is 5.0's name for gmatch. 5.1 renamed it and WoW's 1.12 and 2.4.3
+    // interfaces ask for the old one, on the string library and as a bare
+    // global. Defined for every interface rather than only those, because a
+    // name 5.1 dropped is a name nothing here can be shadowing.
+    bootstrap(
+        "function getglobal(name) return _G[name] end\n"
+        "function setglobal(name, value) _G[name] = value end\n"
+        "string.gfind = string.gfind or string.gmatch\n"
+        "gfind = string.gfind\n");
 
     // A constant, not a function, so the fallback's rule for SCREAMING_SNAKE
     // names leaves it nil and gametime.lua does arithmetic on nothing.
@@ -8060,7 +8085,7 @@ void LuaEngine::fireEvent(const std::string& eventName,
                         lua_pushstring(L_, eventName.c_str());
                         for (const auto& arg : args) pushEventArg(L_, arg);
                         int nargs = 2 + static_cast<int>(args.size());
-                        if (lua_pcall(L_, nargs, 0, 0) != 0) {
+                        if (pcallScript(L_, "OnEvent", nargs, 0) != 0) {
                             const char* ferr = lua_tostring(L_, -1);
                             std::string ferrStr = ferr ? ferr : "(unknown)";
                             LOG_ERROR("LuaEngine: frame OnEvent error: ", ferrStr);
@@ -8130,7 +8155,7 @@ int LuaEngine::beginFrameScript(uint32_t wid, const char* script) {
 
 void LuaEngine::finishFrameScript(uint32_t wid, const char* script,
                                   int handlerIdx, int nargs) {
-    if (lua_pcall(L_, nargs, 0, handlerIdx) != 0) {
+    if (pcallScript(L_, script, nargs, handlerIdx) != 0) {
         const char* err = lua_tostring(L_, -1);
         const std::string where = scriptOrigin(widgets_, wid, script);
         LOG_ERROR("LuaEngine: ", where, " error: ", err ? err : "?");
@@ -9143,7 +9168,7 @@ void LuaEngine::updateSizeChanges() {
                 lua_pushvalue(L_, -2);
                 lua_pushnumber(L_, w.rectW);
                 lua_pushnumber(L_, w.rectH);
-                if (lua_pcall(L_, 3, 0, 0) != 0) {
+                if (pcallScript(L_, "OnSizeChanged", 3, 0) != 0) {
                     LOG_WARNING("OnSizeChanged error: ",
                                 luaL_optstring(L_, -1, "?"));
                     lua_pop(L_, 1);
@@ -9291,7 +9316,7 @@ void LuaEngine::updateScrollRanges() {
                 lua_pushvalue(L_, -3);          // self
                 lua_pushnumber(L_, rangeX);
                 lua_pushnumber(L_, rangeY);
-                if (lua_pcall(L_, 3, 0, 0) != 0) {
+                if (pcallScript(L_, "OnScrollRangeChanged", 3, 0) != 0) {
                     const char* err = lua_tostring(L_, -1);
                     LOG_ERROR("LuaEngine: OnScrollRangeChanged error: ",
                               err ? err : "?");
@@ -10175,7 +10200,7 @@ void LuaEngine::dispatchOnUpdate(float elapsed) {
             if (lua_isfunction(L_, -1)) {
                 lua_pushvalue(L_, hIdx - 2);  // self (frame)
                 lua_pushnumber(L_, static_cast<double>(elapsed));
-                if (lua_pcall(L_, 2, 0, hIdx) != 0) {
+                if (pcallScript(L_, "OnUpdate", 2, hIdx) != 0) {
                     const char* uerr = lua_tostring(L_, -1);
                     std::string uerrStr = uerr ? uerr : "(unknown)";
                     lua_pop(L_, 1);

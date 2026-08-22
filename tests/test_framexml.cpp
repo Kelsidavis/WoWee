@@ -284,8 +284,9 @@ TEST_CASE("Scripts bind both inline bodies and named functions",
     REQUIRE(has(r.lua, "self:SetAlpha(0.5)"));
     REQUIRE(has(r.lua, ":SetScript(\"OnClick\", MyHandler)"));
     // OnLoad is expected to run once the frame is built, which is what every
-    // handler in FrameXML assumes about itself.
-    REQUIRE(has(r.lua, "GetScript(\"OnLoad\")"));
+    // handler in FrameXML assumes about itself. Through the engine, which is
+    // what puts `this` in scope for an interface written before 3.0.
+    REQUIRE(has(r.lua, "__WoweeFireOnLoad("));
 }
 
 TEST_CASE("Referenced files are reported rather than loaded", "[framexml][emit]") {
@@ -351,7 +352,7 @@ TEST_CASE("A template installs OnLoad but does not run it", "[framexml][emit]") 
     const EmitResult r = emitFrameXml(root);
 
     // Once, for the real frame - not inside the template body.
-    const std::string fire = ":GetScript(\"OnLoad\")(";
+    const std::string fire = "__WoweeFireOnLoad(";
     size_t count = 0;
     for (size_t at = r.lua.find(fire); at != std::string::npos;
          at = r.lua.find(fire, at + 1)) ++count;

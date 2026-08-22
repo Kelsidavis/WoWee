@@ -1252,8 +1252,14 @@ struct Emitter {
             line(var + ":SetMotionScriptsWhileDisabled(true)");
         }
         if (fireOnLoad) {
-            line("if " + var + ":GetScript(\"OnLoad\") then " +
-                 var + ":GetScript(\"OnLoad\")(" + var + ") end");
+            // Through the engine rather than called straight from here.
+            // An interface written before 3.0 reads the frame off the global
+            // `this` rather than off its parameter - `this:Hide()` is the first
+            // line of most OnLoad bodies in 1.12 - and that name is published
+            // by whatever dispatches a handler. Everything else is dispatched
+            // from lua_engine.cpp, which does it; this call is the one that is
+            // not, so it goes through a binding that does the same.
+            line("__WoweeFireOnLoad(" + var + ")");
         }
         if (node.attrBool("hidden")) line(var + ":Hide()");
     }

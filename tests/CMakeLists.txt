@@ -233,6 +233,24 @@ target_link_libraries(test_framexml_takeover PRIVATE catch2_main)
 add_test(NAME framexml_takeover COMMAND test_framexml_takeover)
 register_test_target(test_framexml_takeover)
 
+# ── test_lua_handler_globals ────────────────────────────────
+# The pre-3.0 handler globals, which are a pure function of the Lua stack and
+# so need no game, window or interface - while the fault they prevent is the
+# largest one this client can have: `this` nil on the first line of every
+# OnLoad in a 1.12 interface, so every frame it declares reaches the screen at
+# once and none of them where it belongs.
+add_executable(test_lua_handler_globals
+    test_lua_handler_globals.cpp
+    ${CMAKE_SOURCE_DIR}/src/addons/lua_handler_globals.cpp
+)
+target_include_directories(test_lua_handler_globals PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_lua_handler_globals SYSTEM PRIVATE
+    ${TEST_SYSTEM_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/extern/lua-5.1.5/src)
+target_link_libraries(test_lua_handler_globals PRIVATE catch2_main lua51)
+wowee_test_link_glm(test_lua_handler_globals)
+add_test(NAME lua_handler_globals COMMAND test_lua_handler_globals)
+register_test_target(test_lua_handler_globals)
+
 # ── test_lua_arg_coercion ───────────────────────────────────
 # The lenient numeric argument, which is a pure function of the Lua stack and
 # so needs no game, window or interface - while the fault it prevents is

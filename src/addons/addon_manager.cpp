@@ -1,4 +1,5 @@
 #include "addons/addon_manager.hpp"
+#include "addons/lua_handler_globals.hpp"
 #include "addons/addon_lua_snippets.hpp"
 #include "addons/lua_api_registrations.hpp"
 
@@ -570,6 +571,41 @@ bool AddonManager::loadFrameXml(const std::string& frameXmlDir) {
         LOG_WARNING("FrameXML: no manifest in ", dir.string());
         return false;
     }
+    // Which convention this interface's handlers are written against, decided
+    // before the first of them runs - an OnLoad fires during the load below,
+    // so deciding afterwards would be deciding it too late.
+    //
+    // `## Interface: 11200` is 1.12.0, `20400` is 2.4.3, `30300` is 3.3.5a.
+    // Everything before 3.0 takes no handler arguments at all and reads the
+    // frame off the global `this`, the event off `event` and the payload off
+    // `arg1`..`argN`; 3.0 replaced that with the arguments this client already
+    // passes. See LuaEngine::setLegacyHandlerGlobals.
+    //
+    // Read off the manifest rather than off the active expansion profile,
+    // because it is a fact about the files about to be loaded and the two can
+    // disagree: a Turtle install is 1.12's interface whichever profile is
+    // selected.
+    //
+    // A manifest that does not say gets the older convention. The two ways of
+    // being wrong are not the same size - publishing three globals for an
+    // interface that ignores them costs a few table writes per handler, while
+    // withholding them from one that needs them means every OnLoad in the file
+    // raises on its first line, so nothing registers for an event, nothing is
+    // positioned and nothing hides itself.
+    int interfaceVersion = 0;
+    if (const auto it = toc->directives.find("Interface");
+        it != toc->directives.end()) {
+        interfaceVersion = std::atoi(it->second.c_str());
+    }
+    const bool legacyHandlers = interfaceVersion == 0 || interfaceVersion < 30000;
+    setLegacyHandlerGlobals(legacyHandlers);
+    LOG_WARNING("FrameXML: interface ",
+                interfaceVersion == 0 ? std::string("unstated")
+                                      : std::to_string(interfaceVersion),
+                " - handlers are given ",
+                legacyHandlers ? "this, event and arg1..argN as globals"
+                               : "their arguments only");
+
     const std::string resolvedDir = dir.string();
     // Kept, because an include that names a shared template by bare name is
     // resolved against this and nothing else. Blizzard_InspectUI asks for
@@ -968,9 +1004,8 @@ bool AddonManager::loadFrameXml(const std::string& frameXmlDir) {
     //
     // ToggleGameMenu is FrameXML's own function and it shows GameMenuFrame,
     // which is suppressed - so the button did nothing at all. Replaced rather
-    // than hooked, and only while this client owns that panel: with
-    // WOWEE_FRAMEXML_UI=gamemenu the original menu is drawn and should be the
-    // one that answers.
+    // than hooked, and only while this client owns that panel: once the menu is
+    // FrameXML's, the original is drawn and should be the one that answers.
     //
     // After FrameXML has loaded, because a definition written before it would
     // simply be overwritten by uiparent.lua.

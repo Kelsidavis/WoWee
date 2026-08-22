@@ -31,6 +31,7 @@ public:
     static void setUiSoundsSuppressed(bool suppressed) { uiSoundsSuppressed_ = suppressed; }
     static bool uiSoundsSuppressed() { return uiSoundsSuppressed_; }
 
+
     LuaEngine(const LuaEngine&) = delete;
     LuaEngine& operator=(const LuaEngine&) = delete;
 
