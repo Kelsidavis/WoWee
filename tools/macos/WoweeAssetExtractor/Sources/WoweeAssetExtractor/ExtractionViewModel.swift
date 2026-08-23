@@ -85,10 +85,26 @@ final class ExtractionViewModel: ObservableObject {
 
     // MARK: - Actions
 
+    /// What VoiceOver reads for the progress bar.
+    ///
+    /// The visible label is built for a glance ("Extraction 12 000 / 431 221
+    /// fichiers"); read aloud it needs the percentage too, since a listener
+    /// cannot see where the bar sits.
+    var accessibleProgressDescription: String {
+        guard let fraction = phase.fraction else { return phaseTitle }
+        let percent = fraction.formatted(.percent.precision(.fractionLength(0)))
+        return "\(phaseTitle), \(percent)"
+    }
+
     func accept(folder: URL) {
         dataFolder = folder
         inspection = DataFolderInspection.inspect(folder)
         if stage != .running { stage = .idle }
+    }
+
+    func clearDataFolder() {
+        dataFolder = nil
+        inspection = nil
     }
 
     func chooseDataFolder() {

@@ -29,6 +29,28 @@ open build/WoweeAssetExtractor.app
 - **Avertissement d'espace disque** avant de lancer : une extraction complète
   pèse environ 18 Go.
 
+## Conformité aux Human Interface Guidelines
+
+- **Barre de menus complète.** Toute action accessible à la souris a son
+  équivalent clavier et son entrée de menu : ouvrir un dossier (⌘O), extraire
+  (⌘R), annuler (⌘.), afficher le journal (⌘L), révéler dans le Finder (⇧⌘R).
+  Les entrées s'activent et se désactivent selon l'état, et le libellé du
+  journal dit ce qu'il va faire plutôt que ce dont il parle.
+- **Fenêtre librement redimensionnable**, avec un plancher qui garde la mise en
+  page utilisable. Position et taille sont restaurées d'un lancement à l'autre.
+- **Échap annule** l'extraction ; **Entrée** déclenche l'action par défaut.
+- **Menus contextuels** sur la zone de dépôt (choisir, révéler, retirer) et sur
+  le journal (copier).
+- **Survol** distinct de l'état de dépôt sur la zone cible.
+- **VoiceOver** : la zone de dépôt est annoncée comme un seul contrôle, avec sa
+  valeur et une action ; la progression est lue avec son pourcentage, que la
+  barre seule ne dit pas à qui ne la voit pas.
+- **Réduire les animations**, **Augmenter le contraste** et **Texte en gras**
+  sont respectés — sous contraste augmenté, la bordure de la zone de dépôt
+  passe en couleur pleine, faute de quoi le seul repère de la cible disparaît.
+- **Couleurs sémantiques** uniquement, donc mode sombre correct par
+  construction.
+
 ## Comment la progression est calculée
 
 `asset_extract` annonce ses phases sur stdout. Le parseur
