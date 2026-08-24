@@ -1,4 +1,5 @@
 #include "game/warden_module.hpp"
+#include "game/jit_write.hpp"
 #include "game/warden_crypto.hpp"
 #include "auth/crypto.hpp"
 #include "core/logger.hpp"
@@ -29,6 +30,7 @@
 
 namespace wowee {
 namespace game {
+
 
 // ============================================================================
 // Thread-local pointer to the active WardenModule instance during initializeModule().
@@ -523,6 +525,8 @@ bool WardenModule::decompressZlib(const std::vector<uint8_t>& compressed,
 }
 
 bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
+    // Every store below lands in the MAP_JIT mapping; see JitWriteWindow.
+    JitWriteWindow jitWrite;
     if (exeData.size() < 4) {
         LOG_ERROR("WardenModule: Executable data too small for header");
         return false;
@@ -967,6 +971,8 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
 }
 
 bool WardenModule::applyRelocations() {
+    // Every store below lands in the MAP_JIT mapping; see JitWriteWindow.
+    JitWriteWindow jitWrite;
     if (!moduleMemory_ || moduleSize_ == 0) {
         LOG_ERROR("WardenModule: No module memory allocated for relocations");
         return false;
@@ -1067,6 +1073,8 @@ bool WardenModule::applyRelocations() {
 }
 
 bool WardenModule::bindAPIs() {
+    // Every store below lands in the MAP_JIT mapping; see JitWriteWindow.
+    JitWriteWindow jitWrite;
     if (!moduleMemory_ || moduleSize_ == 0) {
         LOG_ERROR("WardenModule: No module memory allocated for API binding");
         return false;

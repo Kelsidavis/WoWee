@@ -387,6 +387,18 @@ target_link_libraries(test_inventory_slots PRIVATE catch2_main)
 add_test(NAME inventory_slots COMMAND test_inventory_slots)
 register_test_target(test_inventory_slots)
 
+# ── test_jit_write ───────────────────────────────────────────────
+# Writing to a MAP_JIT mapping, which Apple Silicon refuses until the thread
+# asks. The Warden module image is mmap'd that way and then zeroed, and the
+# zeroing raised SIGBUS - a crash with no bad pointer in it, found by fuzzing
+# the loader with bytes a server could send.
+add_executable(test_jit_write test_jit_write.cpp)
+target_include_directories(test_jit_write PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_jit_write SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
+target_link_libraries(test_jit_write PRIVATE catch2_main)
+add_test(NAME jit_write COMMAND test_jit_write)
+register_test_target(test_jit_write)
+
 # ── test_warden_reloc ────────────────────────────────────────────
 # Where a Warden relocation entry is allowed to point. The module comes from
 # the server, so both of these decide where an attacker-supplied number may be
