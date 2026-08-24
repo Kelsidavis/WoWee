@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 @main
 struct WoweeAssetExtractorApp: App {
@@ -14,7 +15,14 @@ struct WoweeAssetExtractorApp: App {
             ContentView(showLog: $showLog)
                 .environmentObject(model)
         }
-        .defaultSize(width: 560, height: 500)
+        .defaultSize(width: 560, height: 460)
+        // Toolbar in the title bar rather than a band below it. See ContentView.
+        .windowToolbarStyle(.unified)
+        // ⌘, opens this. Wired by SwiftUI, no shortcut to declare.
+        Settings {
+            SettingsView()
+                .environmentObject(model)
+        }
         .commands {
             // This app opens no documents, so New has nothing to make.
             CommandGroup(replacing: .newItem) {
@@ -38,20 +46,23 @@ struct WoweeAssetExtractorApp: App {
 
                 Button("Annuler") { model.cancel() }
                     .keyboardShortcut(".", modifiers: .command)
-                    .disabled(model.stage != .running)
-
-                Divider()
-
-                Button("Choisir la destination…") { model.chooseOutputFolder() }
-                    .disabled(model.stage == .running)
-
-                Toggle("Vérifier les fichiers extraits", isOn: $model.verify)
-                    .disabled(model.stage == .running)
+                    .disabled(!model.stage.isRunning)
 
                 Divider()
 
                 Button("Recommencer") { model.reset() }
-                    .disabled(model.stage == .running || model.stage == .idle)
+                    .disabled(model.stage.isRunning || model.stage == .idle)
+            }
+
+            CommandGroup(replacing: .help) {
+                Button("Où trouver le dossier Data") {
+                    // Le README du dépôt, qui documente l'emplacement du
+                    // dossier Data par plateforme et par client.
+                    if let url = URL(string: "https://github.com/izo/WoWee#extraction-des-assets") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                .keyboardShortcut("?", modifiers: .command)
             }
 
             CommandGroup(after: .toolbar) {

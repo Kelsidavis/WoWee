@@ -8,8 +8,13 @@ final class ExtractionViewModel: ObservableObject {
     enum Stage: Equatable {
         case idle
         case running
-        case succeeded
-        case failed(String)
+        /// Carries the extractor's own tally, or nil when it exited clean
+        /// without printing one.
+        case succeeded(ExtractionSummary?)
+        /// Carries the advice as well as the message. See ExtractionFailure.
+        case failed(ExtractionFailure)
+
+        var isRunning: Bool { self == .running }
     }
 
     @Published var stage: Stage = .idle
@@ -22,6 +27,12 @@ final class ExtractionViewModel: ObservableObject {
     @Published var log: [String] = []
     @Published var isTargeted = false
     @Published var startedAt: Date?
+    /// How long the last run took, wall clock, kept when it ends.
+    ///
+    /// Measured here rather than read from the extractor's own timing: what
+    /// the user waited includes the archive scan and the manifest write, not
+    /// just the extraction the C++ times.
+    @Published var elapsed: Duration?
 
     private let runner = ExtractionRunner()
 
@@ -30,7 +41,7 @@ final class ExtractionViewModel: ObservableObject {
     var extractorURL: URL? { ExtractorLocation.findExtractor() }
 
     var canStart: Bool {
-        stage != .running && dataFolder != nil
+        !stage.isRunning && dataFolder != nil
             && (inspection?.looksLikeWoWData ?? false) && extractorURL != nil
     }
 
@@ -99,7 +110,7 @@ final class ExtractionViewModel: ObservableObject {
     func accept(folder: URL) {
         dataFolder = folder
         inspection = DataFolderInspection.inspect(folder)
-        if stage != .running { stage = .idle }
+        if !stage.isRunning { stage = .idle }
     }
 
     func clearDataFolder() {
@@ -171,11 +182,14 @@ final class ExtractionViewModel: ObservableObject {
             },
             onFinish: { [weak self] result in
                 guard let self else { return }
+                if let startedAt = self.startedAt {
+                    self.elapsed = .seconds(Date().timeIntervalSince(startedAt))
+                }
                 switch result {
-                case .success:
-                    self.stage = .succeeded
+                case let .success(summary):
+                    self.stage = .succeeded(summary)
                 case let .failure(error):
-                    self.stage = .failed(error.errorDescription ?? "Échec de l'extraction.")
+                    self.stage = .failed(ExtractionFailure(error))
                 }
             }
         )
@@ -190,6 +204,7 @@ final class ExtractionViewModel: ObservableObject {
         phase = .starting
         log.removeAll()
         startedAt = nil
+        elapsed = nil
     }
 
     func revealOutput() {

@@ -96,6 +96,31 @@ public enum ExtractionError: LocalizedError {
     }
 }
 
+/// An error, together with the advice that goes with it.
+///
+/// `ExtractionError` has carried a `recoverySuggestion` since the start, and
+/// nothing ever showed it: the view model kept `errorDescription` alone, so
+/// "Placez cette application à côté de Wowee.app" - the one sentence that says
+/// what to DO about the most common failure - was computed and dropped on
+/// every run. Pairing them here makes it impossible to keep only half.
+public struct ExtractionFailure: Equatable, Sendable {
+    /// What went wrong, in one line.
+    public let message: String
+    /// What to do about it. Never empty in practice, but optional because
+    /// LocalizedError says it may be.
+    public let suggestion: String?
+
+    public init(message: String, suggestion: String?) {
+        self.message = message
+        self.suggestion = suggestion
+    }
+
+    public init(_ error: ExtractionError) {
+        self.message = error.errorDescription ?? "Échec de l'extraction."
+        self.suggestion = error.recoverySuggestion
+    }
+}
+
 /// Runs `asset_extract` and reports where it is.
 ///
 /// Deliberately not an ObservableObject: the UI owns the observable state and
@@ -171,7 +196,7 @@ public final class ExtractionRunner: @unchecked Sendable {
         extractor: URL,
         onPhase: @escaping (ExtractionPhase) -> Void,
         onLine: @escaping (String) -> Void,
-        onFinish: @escaping (Result<Void, ExtractionError>) -> Void
+        onFinish: @escaping (Result<ExtractionSummary?, ExtractionError>) -> Void
     ) {
         let parser = ExtractionOutputParser()
         let process = Process()
@@ -218,7 +243,11 @@ public final class ExtractionRunner: @unchecked Sendable {
                     onFinish(.failure(.failed(exitCode: -1, tail: "Extraction annulée.")))
                 } else if finished.terminationStatus == 0 {
                     onPhase(.finished)
-                    onFinish(.success(()))
+                    // nil when the extractor exited zero without printing its
+                    // closing tally - an older build, or a run with nothing to
+                    // do. The success screen then shows no figures rather than
+                    // inventing some.
+                    onFinish(.success(parser.summary))
                 } else {
                     let tail = recentLines.joined()
                     onPhase(.failed(tail))

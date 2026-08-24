@@ -23,7 +23,9 @@ open build/WoweeAssetExtractor.app
   réelle de `asset_extract` — pas un défilement décoratif.
 - **Estimation du temps restant**, calculée sur le débit observé, affichée
   seulement pendant l'extraction où elle a un sens.
-- **Choix de l'extension** (auto-détection par défaut) et de la destination.
+- **Choix de l'extension** (auto-détection par défaut), de la destination et de
+  la vérification CRC32, dans la fenêtre Réglages (⌘,). La fenêtre principale en
+  garde un rappel d'une ligne : on ne lance pas 18 Go sans voir où ça atterrit.
 - **Annulation** à tout moment, **journal** dépliable, et révélation du résultat
   dans le Finder à la fin.
 - **Avertissement d'espace disque** avant de lancer : une extraction complète
@@ -33,7 +35,10 @@ open build/WoweeAssetExtractor.app
 
 - **Barre de menus complète.** Toute action accessible à la souris a son
   équivalent clavier et son entrée de menu : ouvrir un dossier (⌘O), extraire
-  (⌘R), annuler (⌘.), afficher le journal (⌘L), révéler dans le Finder (⇧⌘R).
+  (⌘R), annuler (⌘.), afficher le journal (⌘L), révéler dans le Finder (⇧⌘R),
+  réglages (⌘,), aide (⌘?).
+- **Barre d'outils unifiée** dans la barre de titre, plutôt qu'un bandeau maison
+  en dessous.
   Les entrées s'activent et se désactivent selon l'état, et le libellé du
   journal dit ce qu'il va faire plutôt que ce dont il parle.
 - **Fenêtre librement redimensionnable**, avec un plancher qui garde la mise en
@@ -48,8 +53,15 @@ open build/WoweeAssetExtractor.app
 - **Réduire les animations**, **Augmenter le contraste** et **Texte en gras**
   sont respectés — sous contraste augmenté, la bordure de la zone de dépôt
   passe en couleur pleine, faute de quoi le seul repère de la cible disparaît.
-- **Couleurs sémantiques** uniquement, donc mode sombre correct par
-  construction.
+- **Contrôles système**, jamais réimplémentés. Un `ButtonStyle` maison est un
+  engagement à redessiner le survol, l'état pressé et l'anneau de focus ; la
+  première version de cette fenêtre en avait un et n'en tenait aucun. Le laiton
+  arrive par `.tint()` sur le bouton par défaut, ce qui laisse au Picker et à la
+  case à cocher l'accent que l'utilisateur a choisi dans les Réglages Système.
+- **Les deux apparences.** La palette suit le thème système : parchemin et
+  laiton foncé en clair, charbon et laiton en sombre. Chaque couleur est
+  mesurée, pas choisie — 4,5:1 pour le texte, 3:1 pour ce qui porte du sens
+  sans mots, dans les deux cas.
 
 ## Comment la progression est calculée
 
@@ -97,7 +109,7 @@ Trois écarts sont volontaires, chacun corrigeant un comportement relevé dans
 
 ```bash
 swift build     # compile
-swift test      # 21 tests, sans fenêtre
+swift test      # 31 tests, sans fenêtre
 ```
 
 Le code est séparé en deux cibles à dessein : `ExtractorKit` contient tout ce
@@ -105,10 +117,46 @@ qui se teste sans interface (localisation du binaire, parsing, inspection d'un
 dossier, semis des profils), et `WoweeAssetExtractor` n'est que la coquille
 SwiftUI autour.
 
-## Signature
+Pour travailler dans Xcode, [`../WoweeAssetExtractorApp`](../WoweeAssetExtractorApp)
+engendre un projet qui référence ces sources **en place** — pas de copie à garder
+en phase, et `swift build` continue de voir les mêmes fichiers.
 
-`make_app.sh` signe en ad-hoc par défaut, ce qui suffit en local. Pour une
-distribution :
+## L'écran de fin, et celui d'échec
+
+Ce que l'extracteur imprime en se fermant (`extractor.cpp:874`) est le
+récapitulatif de fin :
+
+    Extracted 431221 files (17845 MB), 12 skipped, 3 failed
+
+Rien n'est remesuré côté Swift — peser 400 000 fichiers ou relire un manifeste
+de 20 Mo coûterait des secondes pour un nombre déjà écrit. Le piège est que la
+ligne de progression commence par les deux mêmes mots ; le discriminant est le
+slash, et c'est le premier cas couvert par les tests. Le compteur d'échecs est
+la raison d'afficher tout cela : un run qui finit vert en ayant raté trois mille
+fichiers est exactement ce qu'un écran de fin doit rattraper.
+
+L'écran d'échec, lui, montre **le conseil d'abord** et la trace technique
+ensuite. `ExtractionError` calculait une `recoverySuggestion` depuis le premier
+jour — « Placez cette application à côté de Wowee.app » — que la vue n'affichait
+jamais : le view model ne gardait que `errorDescription`. `ExtractionFailure`
+porte désormais les deux, et un test verrouille le fait que le conseil arrive
+jusqu'à l'écran.
+
+## Icône et signature
+
+L'icône est construite à partir de `assets/Wowee.png` — la même source que la
+marque affichée dans la fenêtre — par `../create_icns.sh`, à chaque
+`make_app.sh` et à chaque build Xcode (de façon incrémentale). Aucun `.icns`
+n'est versionné : ce serait une seconde copie à garder en phase avec la
+première.
+
+`make_app.sh` signe en ad-hoc par défaut, ce qui suffit en local. La signature
+va **de l'intérieur vers l'extérieur** : le bundle de ressources que SwiftPM
+produit à côté du binaire est signé avant le `.app` qui le contient, faute de
+quoi il invalide le sceau du conteneur et `codesign --verify --strict` échoue
+sur une application qui paraît saine jusqu'à ce que Gatekeeper la regarde.
+
+Pour une distribution :
 
 ```bash
 ./make_app.sh --identity "Developer ID Application: … (TEAMID)" --icon path/to/AppIcon.icns

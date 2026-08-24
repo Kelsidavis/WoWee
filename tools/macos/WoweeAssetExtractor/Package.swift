@@ -13,7 +13,11 @@ let package = Package(
         .target(name: "ExtractorKit"),
         .executableTarget(
             name: "WoweeAssetExtractor",
-            dependencies: ["ExtractorKit"]
+            dependencies: ["ExtractorKit"],
+            // The app mark, downsampled from assets/Wowee.png. Carried as a
+            // resource rather than read from the repo at runtime: the app is
+            // built into a bundle that ships on its own.
+            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "ExtractorKitTests",

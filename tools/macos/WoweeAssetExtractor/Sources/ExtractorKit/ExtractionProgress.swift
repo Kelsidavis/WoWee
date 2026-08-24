@@ -79,6 +79,10 @@ public final class ExtractionOutputParser {
 
     public private(set) var lastKnownPhase: ExtractionPhase = .starting
 
+    /// The tally the extractor prints as it closes, when it got that far.
+    /// See ExtractionSummary.
+    public private(set) var summary: ExtractionSummary?
+
     public init() {}
 
     /// Feed a chunk of stdout. Returns every complete line it contained, in
@@ -166,6 +170,14 @@ public final class ExtractionOutputParser {
         // no slash and must not be read as a count of one.
         if line.hasPrefix("Extracted "), let (done, total) = Self.ratio(in: line) {
             lastKnownPhase = .extracting(done: done, total: total)
+            return
+        }
+
+        // "Extracted 431221 files (17845 MB), 12 skipped, 3 failed" -
+        // extractor.cpp:874. Tested after the ratio above, which is what tells
+        // the two "Extracted " lines apart.
+        if let tally = ExtractionSummary.parse(line) {
+            summary = tally
             return
         }
 
