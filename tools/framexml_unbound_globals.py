@@ -88,7 +88,13 @@ from framexml_source import without_comments_or_strings, loaded_files
 #
 #     python3 tools/framexml_unbound_globals.py ~/wow-1.12/interface
 ROOT = Path(__file__).resolve().parent.parent
-XML = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "Data/interface"
+# --all prints every name in the second list rather than the first 25. The
+# truncated form is the one to read while working; the whole list is what a
+# report from someone else's interface needs to carry, and there was no way to
+# ask for it - the cap was a literal, so the other 71 names could not be sent.
+SHOW_ALL = "--all" in sys.argv[1:]
+_paths = [a for a in sys.argv[1:] if not a.startswith("-")]
+XML = Path(_paths[0]) if _paths else ROOT / "Data/interface"
 if not XML.is_dir():
     print(f"no interface at {XML} - name one on the command line")
     raise SystemExit(2)
@@ -216,7 +222,8 @@ if not live:
 rest = {n: f for n, f in missing.items() if n not in autorun_hits}
 print(f"\n{len(rest)} reached only from something a player has to do first "
       f"(a dialog's accept, a menu click), or not reached at all:\n")
-for n in sorted(rest, key=lambda k: (-len(rest[k]), k))[:25]:
+shown = sorted(rest, key=lambda k: (-len(rest[k]), k))
+for n in (shown if SHOW_ALL else shown[:25]):
     print(f"  {n:<36} {', '.join(sorted(rest[n])[:3])}")
-if len(rest) > 25:
-    print(f"  ... and {len(rest) - 25} more")
+if not SHOW_ALL and len(rest) > 25:
+    print(f"  ... and {len(rest) - 25} more - re-run with --all for the rest")
