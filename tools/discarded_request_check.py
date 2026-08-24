@@ -66,6 +66,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
+import os
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -134,13 +135,24 @@ def server_builds(server_path):
     return " ".join(text)
 
 
+# Where the server source lives is the machine's business rather than this
+# file's. WOWEE_SERVER_SRC names the root of an AzerothCore checkout; --server
+# still overrides it outright. This carried one contributor's home directory
+# until now, so the sweep ran on exactly one machine and skipped silently on
+# every other.
+def _serverDefault(*parts):
+    root = os.environ.get("WOWEE_SERVER_SRC", "").strip()
+    return str(Path(root).joinpath(*parts)) if root else ""
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--server", default="/home/k/azerothcore-wotlk/src/server"
-                                        "/game/Server/Protocol/Opcodes.cpp")
+    ap.add_argument("--server", default=_serverDefault(
+        "src/server/game/Server/Protocol/Opcodes.cpp"))
     args = ap.parse_args()
     if not Path(args.server).is_file():
-        print(f"server opcode table not found at {args.server}")
+        print(f"server opcode table not found at {args.server or '<unset>'} - set WOWEE_SERVER_SRC to an "
+              "AzerothCore checkout, or pass --server")
         return 0
 
     handlers = server_handlers(args.server)

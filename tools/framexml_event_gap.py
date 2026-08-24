@@ -32,7 +32,7 @@ TWO THINGS THIS CANNOT DECIDE
   belonged, so the gossip frame opened over the quest list. Read the handler.
 
 * **Check whether the server sends the message, by finding where it builds it.**
-  The source is on this machine - /home/k/azerothcore-wotlk - so grep for
+  The source is a separate checkout - WOWEE_SERVER_SRC says where - so grep for
   `WorldPacket data(SMSG_...)` in src/server/game.
 
   Do *not* use the STATUS_NEVER field in Opcodes.cpp for this. It reads like a

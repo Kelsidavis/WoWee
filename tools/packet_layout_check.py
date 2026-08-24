@@ -95,6 +95,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
+import os
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -364,12 +365,27 @@ def client_layouts():
     return out
 
 
+# Where the server source lives is the machine's business rather than this
+# file's. WOWEE_SERVER_SRC names the root of an AzerothCore checkout; --server
+# still overrides it outright. This carried one contributor's home directory
+# until now, so the sweep ran on exactly one machine and skipped silently on
+# every other.
+def _serverDefault(*parts):
+    root = os.environ.get("WOWEE_SERVER_SRC", "").strip()
+    return str(Path(root).joinpath(*parts)) if root else ""
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--server", default="/home/k/azerothcore-wotlk/src/server/game")
+    ap.add_argument("--server", default=_serverDefault("src/server/game"))
     args = ap.parse_args()
-    if not Path(args.server).is_dir():
-        print(f"server source not found at {args.server}")
+    # An empty path is not the current directory. Path("").is_dir() is
+    # True, so an unset variable otherwise ran the whole sweep against the
+    # tree it was launched from and reported nothing in both - which reads
+    # exactly like a clean run.
+    if not args.server or not Path(args.server).is_dir():
+        print(f"server source not found at {args.server or '<unset>'} - set WOWEE_SERVER_SRC to an "
+              "AzerothCore checkout, or pass --server")
         return 1
 
     server = server_layouts(args.server)

@@ -1156,12 +1156,17 @@ SENTENCES = [
 #
 # Skipped and said so, which is what the framexml_run checks below already do.
 # A guard that cannot see its subject must say so rather than pass or fail.
+_SERVER_SRC = os.environ.get("WOWEE_SERVER_SRC", "").strip()
+
 DATA_INPUTS = {
     "Data/interface": ROOT / "Data/interface",
     "Data/db": ROOT / "Data/db",
     # The server source these compare against is a separate local clone, so it
-    # is absent everywhere except a developer machine that has one.
-    "azerothcore": pathlib.Path("/home/k/azerothcore-wotlk"),
+    # is absent everywhere except a machine that has one. WOWEE_SERVER_SRC says
+    # where; unset means the sweep has nothing to read and is skipped rather
+    # than failed. This named one contributor's home directory until now, which
+    # meant a clone anywhere else was skipped as if it were not there.
+    "WOWEE_SERVER_SRC": (pathlib.Path(_SERVER_SRC) if _SERVER_SRC else None),
 }
 
 
@@ -1172,7 +1177,9 @@ def missing_input(tool):
     except OSError:
         return None
     for path, directory in DATA_INPUTS.items():
-        if path in source and not directory.is_dir():
+        # None is an input whose location was never given, which is missing in
+        # the same way a directory that is not there is missing.
+        if path in source and (directory is None or not directory.is_dir()):
             return path
     # The headless runner is not part of the default build, so a sweep that
     # drives it has nothing to drive until someone asks for that target. The
