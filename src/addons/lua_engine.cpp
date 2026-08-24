@@ -3761,6 +3761,49 @@ int lua_Frame_SetDisabledFontObject(lua_State* L) {
     return 0;
 }
 
+/// The four components of a state colour, as SetTextColor takes them.
+///
+/// Missing components read as white, which is what SetTextColor does with no
+/// arguments - a three-argument call is a colour with no alpha, not a colour
+/// that is transparent.
+static void applyStateComponents(lua_State* L, float out[4], bool& flag) {
+    for (int i = 0; i < 4; ++i) {
+        out[i] = static_cast<float>(luaL_optnumber(L, 2 + i, 1.0));
+    }
+    flag = true;
+}
+
+/// Button:SetDisabledTextColor(r, g, b, a) - the label's colour while the
+/// button is disabled, given as components rather than as a font object.
+///
+/// The pair to SetDisabledFontObject, which reaches the same two fields by
+/// reading those components out of a font object's table. Only the font-object
+/// half was bound, and the components half is the one uidropdownmenu.lua uses
+/// to grey an entry - on the button every dropdown in the interface is built
+/// from. So UIDropDownMenu_AddButton raised on the first disabled entry it was
+/// given, and raising while a file is being read takes the whole file with it:
+/// the video options and the interface options both died there on a 1.12
+/// interface, and no dropdown that names a disabled entry could be built.
+int lua_Frame_SetDisabledTextColor(lua_State* L) {
+    if (auto* w = widgetOf(L, 1)) {
+        applyStateComponents(L, w->disabledColor, w->hasDisabledColor);
+    }
+    return 0;
+}
+
+/// Button:SetHighlightTextColor(r, g, b, a) - the same for the hover colour.
+///
+/// Bound with its sibling rather than after the next report. The two are one
+/// mechanism, they are declared together everywhere they are documented, and
+/// the cost of the missing one is not a wrong colour but the file it is called
+/// from.
+int lua_Frame_SetHighlightTextColor(lua_State* L) {
+    if (auto* w = widgetOf(L, 1)) {
+        applyStateComponents(L, w->highlightColor, w->hasHighlightColor);
+    }
+    return 0;
+}
+
 int lua_Frame_SetPushedTextOffset(lua_State* L) {
     if (auto* w = widgetOf(L, 1)) {
         w->pushedTextOffsetX = static_cast<float>(luaL_optnumber(L, 2, 0.0));
@@ -5489,6 +5532,8 @@ void LuaEngine::registerCoreAPI() {
         {"SetTextFontObject",     lua_Frame_SetNormalFontObject},
         {"SetHighlightFontObject", lua_Frame_SetHighlightFontObject},
         {"SetDisabledFontObject",  lua_Frame_SetDisabledFontObject},
+        {"SetDisabledTextColor",   lua_Frame_SetDisabledTextColor},
+        {"SetHighlightTextColor",  lua_Frame_SetHighlightTextColor},
         {"SetPushedTextOffset",   lua_Frame_SetPushedTextOffset},
         {"GetPushedTextOffset",   lua_Frame_GetPushedTextOffset},
         {"SetHitRectInsets",      lua_Frame_SetHitRectInsets},
