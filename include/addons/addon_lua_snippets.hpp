@@ -226,6 +226,33 @@ local function addHeading(layout, text)
     rule:SetPoint("TOPLEFT", x, y - 22)
 end
 
+-- A region the control's template was expected to declare, or nothing.
+--
+-- These controls inherit WotLK's option templates, which declare $parentText
+-- and, on a slider, $parentLow and $parentHigh. A 1.12 interface loads no
+-- OptionsPanelTemplates.xml at all, so CreateFrame finds no template, applies
+-- nothing, and none of those names is ever created.
+--
+-- rawget, so every key answers the same way. Through _G the answer depends on
+-- whether the name happens to contain a digit: the missing-global fallback
+-- hands back a silent no-op for most of them and a plain nil for those, since
+-- a digit means an instance rather than an API name. So sixteen of these
+-- labels were quietly set on a stand-in and never appeared, while showbar2 -
+-- one setting, named for the bar it shows - raised instead, and raising here
+-- happens inside buildPanel, which lost the client's whole options category.
+local function templateRegion(name, suffix)
+    return rawget(_G, name .. suffix)
+end
+
+-- A label of our own, for where the template gave none. Anchored to the
+-- control rather than to the column so it lands where the template's would
+-- have, and created on the panel so it is torn down with everything else.
+local function ownLabel(panel, control, font, point, relPoint, ox, oy)
+    local label = panel:CreateFontString(nil, "ARTWORK", font)
+    label:SetPoint(point, control, relPoint, ox, oy)
+    return label
+end
+
 -- The three controls. Each answers a read function and a write function, so
 -- one refresh walks all of them without caring which kind it is holding.
 
@@ -235,7 +262,9 @@ local function addCheckButton(layout, panel, setting, onChanged)
     local button = CreateFrame("CheckButton", name, panel,
                                "InterfaceOptionsCheckButtonTemplate")
     button:SetPoint("TOPLEFT", x, y)
-    _G[name .. "Text"]:SetText(setting.label)
+    local label = templateRegion(name, "Text")
+                  or ownLabel(panel, button, "GameFontHighlight", "LEFT", "RIGHT", 2, 1)
+    label:SetText(setting.label)
     button:SetScript("OnClick", function(self)
         WoweeSetSetting(setting.key, self:GetChecked() and "1" or "0")
         -- Ticking one of these can be what makes another control live -
@@ -249,7 +278,7 @@ local function addCheckButton(layout, panel, setting, onChanged)
     return {
         read = function()
             button:SetChecked(WoweeGetSetting(setting.key) == "1")
-            setEnabled(button, _G[name .. "Text"], isEnabled(setting))
+            setEnabled(button, label, isEnabled(setting))
         end,
         write = function(value) WoweeSetSetting(setting.key, value) end,
     }
@@ -263,14 +292,23 @@ local function addSlider(layout, panel, setting)
     slider:SetWidth(layout.columnWidth - 20)
     slider:SetMinMaxValues(setting.min, setting.max)
     slider:SetValueStep(setting.step)
-    _G[name .. "Low"]:SetText(num(setting.min))
-    _G[name .. "High"]:SetText(num(setting.max))
+    local low = templateRegion(name, "Low")
+                or ownLabel(panel, slider, "GameFontHighlightSmall",
+                            "TOPLEFT", "BOTTOMLEFT", 0, 2)
+    local high = templateRegion(name, "High")
+                 or ownLabel(panel, slider, "GameFontHighlightSmall",
+                             "TOPRIGHT", "BOTTOMRIGHT", 0, 2)
+    low:SetText(num(setting.min))
+    high:SetText(num(setting.max))
+    local valueText = templateRegion(name, "Text")
+                      or ownLabel(panel, slider, "GameFontHighlight",
+                                  "BOTTOMLEFT", "TOPLEFT", 0, 2)
 
     -- The value belongs beside the name rather than under the thumb: the
     -- template has nowhere to put a moving label, and a slider whose number is
     -- only in a tooltip is a slider nobody can set to a particular value.
     local function showValue(value)
-        _G[name .. "Text"]:SetText(setting.label .. ":  " .. num(value))
+        valueText:SetText(setting.label .. ":  " .. num(value))
     end
     slider:SetScript("OnValueChanged", function(self, value)
         showValue(value)
@@ -283,7 +321,7 @@ local function addSlider(layout, panel, setting)
             local value = tonumber(WoweeGetSetting(setting.key)) or setting.min
             slider:SetValue(value)
             showValue(value)
-            setEnabled(slider, _G[name .. "Text"], isEnabled(setting))
+            setEnabled(slider, valueText, isEnabled(setting))
         end,
         write = function(value) WoweeSetSetting(setting.key, value) end,
     }

@@ -5037,6 +5037,35 @@ static int lua_CreateFrame(lua_State* L) {
                             lua_pop(L, 1);               // error
                         }
                     } else {
+                        // A template this interface does not define. The XML
+                        // path says so - the emitter writes an else branch
+                        // calling __WoweeMissingTemplate - and this path, the
+                        // one CreateFrame takes at runtime, said nothing at
+                        // all: the frame came back built, unconfigured and
+                        // without the children the template declares, and the
+                        // first thing to read one of those children by name
+                        // died on a nil far from here.
+                        //
+                        // That is how the client's own options panel is lost
+                        // on a 1.12 interface. It asks for
+                        // InterfaceOptionsCheckButtonTemplate, which is
+                        // WotLK's; vanilla loads no OptionsPanelTemplates.xml
+                        // at all, so nothing applied, _G[name .. "Text"] was
+                        // never created, and the whole category failed to
+                        // register with one Lua error naming a line in a
+                        // string.
+                        //
+                        // Once per name: a template that is missing is missing
+                        // for every frame that inherits it, and one of those
+                        // loops wrote the same line 675,000 times.
+                        static std::set<std::string> missingReported;
+                        if (missingReported.insert(one).second) {
+                            LOG_WARNING("CreateFrame: template '", one,
+                                        "' is not defined by this interface - the "
+                                        "frame is built without it, and anything "
+                                        "reading a child it declares will find "
+                                        "nothing");
+                        }
                         lua_pop(L, 1);                   // not a function
                     }
                 }
