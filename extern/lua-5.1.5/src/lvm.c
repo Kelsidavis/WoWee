@@ -680,11 +680,45 @@ void luaV_execute (lua_State *L, int nexeccalls) {
       }
       case OP_TFORLOOP: {
         StkId cb = ra + 3;  /* call base */
-        setobjs2s(L, cb+2, ra+2);
-        setobjs2s(L, cb+1, ra+1);
-        setobjs2s(L, cb, ra);
-        L->top = cb+3;  /* func. + 2 args (state and index) */
-        Protect(luaD_call(L, cb, GETARG_C(i)));
+        /* WOWEE: `for k,v in t do` over a plain table - the Lua 5.0 form.
+        ** 5.1 calls whatever the expression produced, and a table is not
+        ** callable, so every such loop raises "attempt to call a table
+        ** value" and takes its whole file down with it. World of Warcraft
+        ** 1.12's FrameXML is 5.0 source and uses it throughout: it is what
+        ** UnitPopup_HideButtons, UIParent_ManageFramePositions and
+        ** ChatFrame_OnLoad each die on, and with them the player, target,
+        ** party, chat and world state frames.
+        **
+        ** Iterating with next is what 5.0 did. A table carrying __call is
+        ** still called, so an iterator object written for 5.1 is untouched,
+        ** and every other type reaches luaD_call and errors as before. This
+        ** only rescues a case that could not previously run at all.
+        */
+        if (ttistable(ra) && fasttm(L, hvalue(ra)->metatable, TM_CALL) == NULL) {
+          int nvars = GETARG_C(i);
+          int n;
+          /* next() writes a key and a value, and a loop naming one variable
+          ** reserves one register. Ask for the pair before writing it. */
+          Protect(luaD_checkstack(L, 2));
+          ra = RA(i);  /* the stack may have been reallocated */
+          cb = ra + 3;
+          setobjs2s(L, cb, ra+2);  /* seed next() with the control variable */
+          L->top = cb + 2;
+          if (luaH_next(L, hvalue(ra), cb)) {
+            /* A loop naming more variables than next answers gets nil for
+            ** the rest, which is what the call form hands back. */
+            for (n = 2; n < nvars; n++) setnilvalue(cb + n);
+          }
+          else
+            setnilvalue(cb);  /* exhausted: end the loop below */
+        }
+        else {
+          setobjs2s(L, cb+2, ra+2);
+          setobjs2s(L, cb+1, ra+1);
+          setobjs2s(L, cb, ra);
+          L->top = cb+3;  /* func. + 2 args (state and index) */
+          Protect(luaD_call(L, cb, GETARG_C(i)));
+        }
         L->top = L->ci->top;
         cb = RA(i) + 3;  /* previous call may change the stack */
         if (!ttisnil(cb)) {  /* continue loop? */
