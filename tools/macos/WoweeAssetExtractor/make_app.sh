@@ -54,6 +54,20 @@ rm -rf "${APP}"
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources"
 cp "${BINARY}" "${APP}/Contents/MacOS/${APP_NAME}"
 
+# SwiftPM puts a target's resources in a bundle NEXT TO the binary, not inside
+# it, and Bundle.module looks for it beside the executable. Copying the binary
+# alone therefore produces an app that launches and draws no app mark - and
+# says nothing about why. So the bundle travels with it.
+# Contents/Resources, not next to the binary: Bundle.module looks in
+# Bundle.main.resourceURL among its candidates, and that is also the only
+# place codesign accepts a nested bundle without complaint.
+BIN_DIR="$(dirname "${BINARY}")"
+for RESOURCE_BUNDLE in "${BIN_DIR}"/*.bundle; do
+    [ -d "${RESOURCE_BUNDLE}" ] || continue
+    echo "==> Resources: $(basename "${RESOURCE_BUNDLE}")"
+    cp -R "${RESOURCE_BUNDLE}" "${APP}/Contents/Resources/"
+done
+
 # LSMinimumSystemVersion matches the release workflow's own floor so this app
 # does not refuse to launch on a Mac that Wowee.app itself supports.
 cat > "${APP}/Contents/Info.plist" <<PLIST
@@ -80,17 +94,50 @@ cat > "${APP}/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# The app mark, built from the same PNG the window header shows.
+#
+# It was optional before and nobody ever passed --icon, so every build came out
+# with the generic blank-page icon in the Dock - on an app whose whole visual
+# direction is its own icon. Default to the repo's own asset instead, and keep
+# --icon as the override.
+if [ -z "${ICON}" ]; then
+    REPO_ROOT="$(cd ../../.. && pwd)"
+    DEFAULT_MARK="${REPO_ROOT}/assets/Wowee.png"
+    if [ -f "${DEFAULT_MARK}" ] && [ -x ../create_icns.sh ]; then
+        GENERATED_ICNS="$(mktemp -d)/AppIcon.icns"
+        if ../create_icns.sh "${DEFAULT_MARK}" "${GENERATED_ICNS}" >/dev/null 2>&1; then
+            ICON="${GENERATED_ICNS}"
+            echo "==> Icon: built from assets/Wowee.png"
+        else
+            echo "==> Icon: skipped (iconutil failed)" >&2
+        fi
+    fi
+fi
+
 if [ -n "${ICON}" ] && [ -f "${ICON}" ]; then
     cp "${ICON}" "${APP}/Contents/Resources/AppIcon.icns"
-    echo "==> Icon: ${ICON}"
+    [ "${ICON}" = "${GENERATED_ICNS:-}" ] || echo "==> Icon: ${ICON}"
+else
+    echo "==> No icon: the app will show the generic one" >&2
 fi
 
 echo "==> Signing (${IDENTITY})"
-if [ "${IDENTITY}" = "-" ]; then
-    codesign --force --sign - "${APP}"
-else
-    codesign --force --sign "${IDENTITY}" --options runtime --timestamp "${APP}"
-fi
+# Inside out. A nested bundle signed after its container invalidates the
+# container's seal, and `codesign --verify --strict` then fails on an app that
+# looks perfectly fine until Gatekeeper sees it.
+sign_one() {
+    if [ "${IDENTITY}" = "-" ]; then
+        codesign --force --sign - "$1"
+    else
+        codesign --force --sign "${IDENTITY}" --options runtime --timestamp "$1"
+    fi
+}
+
+for NESTED in "${APP}/Contents/Resources"/*.bundle; do
+    [ -d "${NESTED}" ] || continue
+    sign_one "${NESTED}"
+done
+sign_one "${APP}"
 codesign --verify --strict --verbose=2 "${APP}"
 
 echo ""
