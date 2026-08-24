@@ -516,6 +516,9 @@ void EntityController::syncPreWotlkAurasFromFields(const std::shared_ptr<Entity>
         LOG_WARNING("player auras on first rebuild: ", owner_.getPlayerAuras().size());
     }
     pendingEvents_.emit("UNIT_AURA", {"player"});
+    // The 1.12 name for the same news, carrying no unit - which is how a
+    // vanilla interface hears that its buffs changed at all.
+    pendingEvents_.emit("PLAYER_AURAS_CHANGED", {});
     owner_.announceCompanionChange();
     // Tracking is one of these auras, and the minimap's tracking icon is drawn
     // from whichever tracking spell is active - GetTrackingTexture walks the

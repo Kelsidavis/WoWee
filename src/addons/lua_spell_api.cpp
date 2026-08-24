@@ -298,6 +298,132 @@ static int lua_UnitAura(lua_State* L, bool wantBuff) {
     return 1;
 }
 
+// ── The 1.12 buff API ───────────────────────────────────────────────────────
+//
+// A vanilla interface does not call UnitBuff. It asks for a *slot* and then
+// asks that slot four more questions, which is a different shape: UnitBuff
+// answers a name and counts into a filtered list, and these answer an opaque
+// number the caller hands straight back to the rest of them.
+//
+// buffframe.lua walks slots upward until it is told there is nothing there,
+// and the terminator is -1 rather than nil. Unbound, GetPlayerBuff answered
+// nil through the missing-API fallback, so `if buffIndex < 0` compared nil
+// with a number on the first line of BuffButton_Update. That raised while the
+// file was being read, which loses the file whole: no buff has ever appeared
+// on a 1.12 interface, and BuffFrame.xml never built.
+
+/// The player's aura in a slot, or nullptr for an empty or out-of-range one.
+///
+/// The slot is the index into the player's own aura array rather than a
+/// position in a filtered list, so it stays meaningful after the caller has
+/// stopped filtering - which is the whole point of handing it back.
+static const game::AuraSlot* playerAuraAt(game::GameHandler* gh, int slot) {
+    if (!gh || slot < 0) return nullptr;
+    const auto& auras = gh->getPlayerAuras();
+    if (static_cast<size_t>(slot) >= auras.size()) return nullptr;
+    const game::AuraSlot& aura = auras[static_cast<size_t>(slot)];
+    return aura.isEmpty() ? nullptr : &aura;
+}
+
+/// Whether a filter asks for debuffs. 1.12 spells that "HARMFUL"; the other
+/// words it can carry - PASSIVE, CANCELABLE - do not change which half is
+/// wanted, so they are not read.
+static bool filterWantsHarmful(const char* filter) {
+    if (!filter) return false;
+    std::string upper(filter);
+    for (char& c : upper) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    return upper.find("HARMFUL") != std::string::npos;
+}
+
+/// Milliseconds on the same clock AuraSlot::receivedAtMs was stamped from.
+static uint64_t auraNowMs() {
+    return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count());
+}
+
+// GetPlayerBuff(index, filter) -> slot, untilCancelled
+//
+// index counts from zero, which is how buffframe.lua asks.
+static int lua_GetPlayerBuff(lua_State* L) {
+    auto* gh = getGameHandler(L);
+    const int wanted = static_cast<int>(luaL_optnumber(L, 1, 0));
+    const bool harmful = filterWantsHarmful(luaL_optstring(L, 2, "HELPFUL"));
+    if (gh && wanted >= 0) {
+        const auto& auras = gh->getPlayerAuras();
+        int seen = 0;
+        for (size_t i = 0; i < auras.size(); ++i) {
+            const game::AuraSlot& aura = auras[i];
+            if (aura.isEmpty()) continue;
+            const bool isDebuff = (aura.flags & 0x80) != 0;
+            if (isDebuff != harmful) continue;
+            if (seen++ != wanted) continue;
+            lua_pushnumber(L, static_cast<double>(i));
+            // A buff with no duration is one the player dismisses rather than
+            // waits out, and the interface draws it without a timer.
+            lua_pushnumber(L, aura.durationMs > 0 ? 0 : 1);
+            return 2;
+        }
+    }
+    // -1, never nil. The caller compares this with a number before it does
+    // anything else, so nil here is an error rather than an empty slot.
+    lua_pushnumber(L, -1);
+    lua_pushnil(L);
+    return 2;
+}
+
+// GetPlayerBuffTexture(slot) -> texture
+static int lua_GetPlayerBuffTexture(lua_State* L) {
+    auto* gh = getGameHandler(L);
+    const auto* aura = playerAuraAt(gh, static_cast<int>(luaL_optnumber(L, 1, -1)));
+    if (!aura) return luaReturnNil(L);
+    const std::string icon = gh->getSpellIconPath(aura->spellId);
+    if (icon.empty()) return luaReturnNil(L);
+    lua_pushstring(L, icon.c_str());
+    return 1;
+}
+
+// GetPlayerBuffTimeLeft(slot) -> seconds
+static int lua_GetPlayerBuffTimeLeft(lua_State* L) {
+    auto* gh = getGameHandler(L);
+    const auto* aura = playerAuraAt(gh, static_cast<int>(luaL_optnumber(L, 1, -1)));
+    // Zero rather than nil: buffframe.lua divides and compares this, and a
+    // permanent aura is honestly zero time left rather than an absent answer.
+    if (!aura || aura->durationMs <= 0) { lua_pushnumber(L, 0); return 1; }
+    lua_pushnumber(L, aura->getRemainingMs(auraNowMs()) / 1000.0);
+    return 1;
+}
+
+// GetPlayerBuffApplications(slot) -> count
+static int lua_GetPlayerBuffApplications(lua_State* L) {
+    auto* gh = getGameHandler(L);
+    const auto* aura = playerAuraAt(gh, static_cast<int>(luaL_optnumber(L, 1, -1)));
+    lua_pushnumber(L, aura ? aura->charges : 0);
+    return 1;
+}
+
+// GetPlayerBuffDispelType(slot) -> "Magic" | "Curse" | "Disease" | "Poison"
+static int lua_GetPlayerBuffDispelType(lua_State* L) {
+    auto* gh = getGameHandler(L);
+    const auto* aura = playerAuraAt(gh, static_cast<int>(luaL_optnumber(L, 1, -1)));
+    if (!aura) return luaReturnNil(L);
+    switch (gh->getSpellDispelType(aura->spellId)) {
+        case 1:  lua_pushstring(L, "Magic");   return 1;
+        case 2:  lua_pushstring(L, "Curse");   return 1;
+        case 3:  lua_pushstring(L, "Disease"); return 1;
+        case 4:  lua_pushstring(L, "Poison");  return 1;
+        default: break;
+    }
+    return luaReturnNil(L);
+}
+
+// CancelPlayerBuff(slot)
+static int lua_CancelPlayerBuff(lua_State* L) {
+    auto* gh = getGameHandler(L);
+    const auto* aura = playerAuraAt(gh, static_cast<int>(luaL_optnumber(L, 1, -1)));
+    if (aura) gh->cancelAura(aura->spellId);
+    return 0;
+}
+
 static int lua_UnitBuff(lua_State* L) { return lua_UnitAura(L, true); }
 static int lua_UnitDebuff(lua_State* L) { return lua_UnitAura(L, false); }
 
@@ -1096,6 +1222,14 @@ void registerSpellLuaAPI(lua_State* L) {
                 {"UnitBuff",          lua_UnitBuff},
                 {"UnitDebuff",        lua_UnitDebuff},
                 {"UnitAura",          lua_UnitAuraGeneric},
+                // The 1.12 names. A vanilla interface reads its buffs through
+                // these and through nothing else.
+                {"GetPlayerBuff",             lua_GetPlayerBuff},
+                {"GetPlayerBuffTexture",      lua_GetPlayerBuffTexture},
+                {"GetPlayerBuffTimeLeft",     lua_GetPlayerBuffTimeLeft},
+                {"GetPlayerBuffApplications", lua_GetPlayerBuffApplications},
+                {"GetPlayerBuffDispelType",   lua_GetPlayerBuffDispelType},
+                {"CancelPlayerBuff",          lua_CancelPlayerBuff},
                 {"UnitCastingInfo",   lua_UnitCastingInfo},
                 {"UnitChannelInfo",   lua_UnitChannelInfo},
                 {"CastSpellByName",   lua_CastSpellByName},

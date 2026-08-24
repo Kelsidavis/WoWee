@@ -2370,7 +2370,11 @@ void SocialHandler::handlePartyMemberStats(network::Packet& packet, bool isFull)
         if (!unitId.empty()) {
             if (updateFlags & (0x0002 | 0x0004)) owner_.addonEventCallbackRef()("UNIT_HEALTH", {unitId});
             if (updateFlags & (0x0010 | 0x0020)) owner_.addonEventCallbackRef()("UNIT_POWER", {unitId});
-            if (updateFlags & 0x0200) owner_.addonEventCallbackRef()("UNIT_AURA", {unitId});
+            if (updateFlags & 0x0200) {
+                owner_.addonEventCallbackRef()("UNIT_AURA", {unitId});
+                // The 1.12 name, which carries no unit.
+                if (unitId == "player") owner_.addonEventCallbackRef()("PLAYER_AURAS_CHANGED", {});
+            }
         }
         // Fired without arguments, as the retail client does - the interface
         // re-reads the whole roster rather than acting on one member. Not

@@ -2336,6 +2336,12 @@ void SpellHandler::handleAuraUpdate(network::Packet& packet, bool isAll) {
             else if (data.guid == owner_.petGuidRef()) unitId = "pet";
             if (!unitId.empty()) {
                 owner_.addonEventCallbackRef()("UNIT_AURA", {unitId});
+                // A 1.12 interface listens for this rather than for
+                // UNIT_AURA, and it carries no unit: buffframe.lua
+                // re-reads the player's whole list when it arrives.
+                if (unitId == "player") {
+                    owner_.addonEventCallbackRef()("PLAYER_AURAS_CHANGED", {});
+                }
             }
             // Outside that, and indented to say so. It reads the same name and
             // tests it again, so the behaviour is unchanged - but it was
@@ -4491,6 +4497,9 @@ void SpellHandler::handleExtraAuraInfo(network::Packet& packet, bool isInit) {
         else if (auraTargetGuid == owner_.focusGuidRef()) unitId = "focus";
         else if (auraTargetGuid == owner_.petGuidRef()) unitId = "pet";
         if (!unitId.empty()) owner_.addonEventCallbackRef()("UNIT_AURA", {unitId});
+        // The 1.12 name, which carries no unit. See the note at the
+        // site that fires it with a comment in full.
+        if (unitId == "player") owner_.addonEventCallbackRef()("PLAYER_AURAS_CHANGED", {});
         // Whether a companion is out is an aura on the player, so the tab's
         // "active" mark moves with one.
         if (unitId == "player") owner_.announceCompanionChange();
@@ -4964,6 +4973,9 @@ void SpellHandler::handleClearExtraAuraInfo(network::Packet& packet) {
             else if (clearGuid == owner_.focusGuidRef()) unitId = "focus";
             else if (clearGuid == owner_.petGuidRef()) unitId = "pet";
             if (!unitId.empty()) owner_.addonEventCallbackRef()("UNIT_AURA", {unitId});
+            // The 1.12 name, which carries no unit. See the note at the
+            // site that fires it with a comment in full.
+            if (unitId == "player") owner_.addonEventCallbackRef()("PLAYER_AURAS_CHANGED", {});
         }
         if (clearGuid == owner_.getPlayerGuid()) {
             refreshRestorationFromPlayerAuras();
