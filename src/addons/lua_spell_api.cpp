@@ -1246,6 +1246,11 @@ void registerSpellLuaAPI(lua_State* L) {
                 {"SetMultiCastSpell", lua_SetMultiCastSpell},
                 {"CastSpell",         lua_CastSpell},
                 {"IsPassiveSpell",    lua_IsPassiveSpell},
+                // 1.12's name for the same question - renamed at 2.0, and
+                // spellbookframe.lua calls it twice from
+                // SpellButton_UpdateButton, which runs every time the book is
+                // drawn. Unbound, opening the spellbook raised.
+                {"IsSpellPassive",    lua_IsPassiveSpell},
                 {"IsSelectedSpell",   lua_IsSelectedSpell},
                 {"GetSpellAutocast",  lua_GetSpellAutocast},
                 {"GetKnownSlotFromHighestRankSlot", lua_GetKnownSlotFromHighestRankSlot},

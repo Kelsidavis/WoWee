@@ -2,6 +2,7 @@
 // Extracted from lua_engine.cpp as part of §5.1 (Tame LuaEngine).
 #include "game/item_text.hpp"
 #include "addons/lua_api_helpers.hpp"
+#include "addons/lua_engine.hpp"
 #include "game/inventory_slots.hpp"
 #include "game/game_utils.hpp"
 #include "game/auction_filters.hpp"
@@ -95,6 +96,25 @@ static int lua_GetMoney(lua_State* L) {
 /// ordering, which is neither the equipment slot order nor a contiguous run
 /// of it: head, shoulders, chest, waist, legs, feet, wrists, hands, then the
 /// three weapon slots.
+/// UpdateInventoryAlertStatus() - recompute the durability alerts.
+///
+/// 1.12's name for the client-side refresh, and durabilityframe.lua calls it
+/// from DurabilityFrame_OnUpdate when an enchant timer runs out. Unbound, that
+/// raised inside an OnUpdate - the worst place for it, because the frame is
+/// asked again on the very next frame.
+///
+/// The durability itself is already tracked and already read through
+/// GetInventoryAlertStatus, so there is nothing here to recompute: what the
+/// caller wants is for the frame to look again. Firing the event the real one
+/// fires is the whole of it.
+static int lua_UpdateInventoryAlertStatus(lua_State* L) {
+    lua_getfield(L, LUA_REGISTRYINDEX, "wowee_lua_engine");
+    auto* engine = static_cast<LuaEngine*>(lua_touserdata(L, -1));
+    lua_pop(L, 1);
+    if (engine) engine->fireEvent("UPDATE_INVENTORY_ALERTS", {});
+    return 0;
+}
+
 static int lua_GetInventoryAlertStatus(lua_State* L) {
     auto* gh = getGameHandler(L);
     const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
@@ -3235,6 +3255,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 {"GetBankSlotCost",        lua_GetBankSlotCost},
                 {"GetNumBankSlots",        lua_GetNumBankSlots},
                 {"GetInventoryAlertStatus",   lua_GetInventoryAlertStatus},
+                {"UpdateInventoryAlertStatus", lua_UpdateInventoryAlertStatus},
                 {"GetContainerItemQuestInfo", lua_GetContainerItemQuestInfo},
                 {"KeyRingButtonIDToInvSlotID", lua_KeyRingButtonIDToInvSlotID},
                 {"SetPortraitToTexture",  lua_SetPortraitToTexture},
