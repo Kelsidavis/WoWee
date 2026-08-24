@@ -1265,6 +1265,13 @@ end
 inline constexpr const char* kUiScaleConfirmLua = R"LUA(
 local kRevertSeconds = 15
 
+-- FrameXML owns this table. This snippet runs whenever the interface was
+-- *asked* for rather than when it actually arrived, so a data tree with no
+-- interface directory reaches here with nothing defined - and indexing a table
+-- that is not there raises on the first statement, taking the two hooks below
+-- it with it. Everything else here already guards; this did not.
+StaticPopupDialogs = StaticPopupDialogs or {}
+
 StaticPopupDialogs["WOWEE_CONFIRM_UI_SCALE"] = {
     text = "Keep this interface scale?",
     button1 = KEEP_THIS_CHANGE or "Keep",
