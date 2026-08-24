@@ -345,7 +345,16 @@ local function addDropdown(layout, panel, setting, onChanged)
     -- checkboxes above it.
     local dropdown = CreateFrame("Frame", name, panel, "UIDropDownMenuTemplate")
     dropdown:SetPoint("TOPLEFT", x - 14, y - 16)
-    UIDropDownMenu_SetWidth(dropdown, layout.columnWidth - 60)
+    -- UIDropDownMenu_SetWidth swapped its arguments at 2.0: 1.12 takes
+    -- (width, frame) and everything after takes (frame, width). Called the
+    -- later way on a 1.12 interface, the frame arrives as a width and the
+    -- number as the frame - and uidropdownmenu.lua then indexes the number,
+    -- which raised there and lost this panel with it.
+    if (__WoweeInterfaceVersion or 0) >= 20000 then
+        UIDropDownMenu_SetWidth(dropdown, layout.columnWidth - 60)
+    else
+        UIDropDownMenu_SetWidth(layout.columnWidth - 60, dropdown)
+    end
 
     local function selected()
         return math.floor(tonumber(WoweeGetSetting(setting.key)) or 0) + 1

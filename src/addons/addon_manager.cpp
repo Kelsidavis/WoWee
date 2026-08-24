@@ -599,6 +599,17 @@ bool AddonManager::loadFrameXml(const std::string& frameXmlDir) {
     }
     const bool legacyHandlers = interfaceVersion == 0 || interfaceVersion < 30000;
     setLegacyHandlerGlobals(legacyHandlers);
+    // Published, because some of FrameXML's own signatures changed between
+    // expansions and the snippets this client runs against them have to pick.
+    // UIDropDownMenu_SetWidth is the one that bit: 1.12 takes (width, frame)
+    // and 2.0 onward takes (frame, width), so calling it the later way on a
+    // 1.12 interface hands the frame in as a width and the number in as the
+    // frame, and the function indexes the number.
+    //
+    // Zero for an interface that states no version, which is the same thing
+    // legacyHandlers treats as old.
+    luaEngine_.executeString("__WoweeInterfaceVersion = " +
+                             std::to_string(interfaceVersion));
     LOG_WARNING("FrameXML: interface ",
                 interfaceVersion == 0 ? std::string("unstated")
                                       : std::to_string(interfaceVersion),
