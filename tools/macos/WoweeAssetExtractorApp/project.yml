@@ -1,0 +1,143 @@
+# Projet Xcode pour l'extracteur d'assets, engendre par XcodeGen.
+#
+# Les sources ne vivent PAS ici : elles restent dans le paquet SwiftPM voisin
+# (`../WoweeAssetExtractor`), et ce projet les reference en place. Le paquet
+# reste donc la seule copie du code, et `swift build` / `swift test` continuent
+# de fonctionner sans Xcode - ce que fait la CI.
+#
+#     xcodegen generate      # regenere WoweeAssetExtractor.xcodeproj
+#     open WoweeAssetExtractor.xcodeproj
+#
+# Le .xcodeproj lui-meme n'est pas versionne : il se regenere en une commande,
+# et un pbxproj commite entre en conflit des que deux branches touchent aux
+# fichiers. C'est ce project.yml qui est la source de verite.
+name: WoweeAssetExtractor
+
+options:
+  bundleIdPrefix: com.wowee
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+  minimumXcodeGenVersion: "2.35.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1.0.0"
+    # Signature ad-hoc, comme `make_app.sh` : suffisante pour lancer en local,
+    # et surtout sans equipe de developpement a renseigner pour builder.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: ""
+
+targets:
+  # Tout ce qui se teste sans fenetre. Bibliotheque statique et non framework :
+  # rien a embarquer dans le bundle, et `@testable import` fonctionne pareil.
+  ExtractorKit:
+    type: library.static
+    platform: macOS
+    sources:
+      - path: ../WoweeAssetExtractor/Sources/ExtractorKit
+        name: ExtractorKit
+
+  WoweeAssetExtractor:
+    type: application
+    platform: macOS
+    sources:
+      - path: ../WoweeAssetExtractor/Sources/WoweeAssetExtractor
+        name: WoweeAssetExtractor
+        excludes:
+          - Resources/**
+      # Copiees dans le bundle plutot que compilees. SwiftPM synthetise
+      # Bundle.module pour la meme chose ; ici elles atterrissent dans le
+      # bundle principal, ce dont Bundle.assets tient compte.
+      - path: ../WoweeAssetExtractor/Sources/WoweeAssetExtractor/Resources
+        name: Resources
+        buildPhase: resources
+    dependencies:
+      - target: ExtractorKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wowee.asset-extractor-ui
+        PRODUCT_NAME: WoweeAssetExtractor
+        # Pas de bac a sable : l'application lit un dossier arbitraire choisi
+        # par l'utilisateur et ecrit dans ~/Library/Application Support/Wowee.
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: NO
+    info:
+      path: Info.plist
+      properties:
+        CFBundleName: WoweeAssetExtractor
+        CFBundleDisplayName: Extracteur d'assets WoWee
+        CFBundlePackageType: APPL
+        CFBundleIconFile: AppIcon
+        NSHighResolutionCapable: true
+        # Une fenetre, pas un agent. L'applet AppleScript livree met
+        # LSUIElement et n'a donc nulle part ou afficher un echec ; celle-ci
+        # est une application normale precisement pour pouvoir le faire.
+        LSUIElement: false
+
+    # L'icone est construite a partir de assets/Wowee.png, la meme source que
+    # l'en-tete de la fenetre, plutot que commitee en .icns. Un binaire de plus
+    # dans l'arbre serait une seconde copie a garder en phase avec la premiere.
+    #
+    # En phase POST-build : un pre-build qui produirait un fichier reference
+    # comme ressource obligerait ce fichier a exister avant le premier build,
+    # ce qui casse un clone neuf.
+    postCompileScripts:
+      - name: App icon
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          MARK="${SRCROOT}/../../../assets/Wowee.png"
+          MAKER="${SRCROOT}/../create_icns.sh"
+          DEST="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources"
+          if [ ! -f "${MARK}" ] || [ ! -x "${MAKER}" ]; then
+            echo "warning: assets/Wowee.png introuvable, icone generique"
+            exit 0
+          fi
+          mkdir -p "${DEST}"
+          # iconutil sur dix tailles coute quelques secondes ; les depenser a
+          # chaque build pour un fichier qui ne change jamais est du temps
+          # perdu a chaque ⌘R.
+          if [ -f "${DEST}/AppIcon.icns" ] && [ "${DEST}/AppIcon.icns" -nt "${MARK}" ]; then
+            echo "note: icone a jour"
+            exit 0
+          fi
+          "${MAKER}" "${MARK}" "${DEST}/AppIcon.icns"
+
+  ExtractorKitTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: ../WoweeAssetExtractor/Tests/ExtractorKitTests
+        name: ExtractorKitTests
+    dependencies:
+      - target: ExtractorKit
+    settings:
+      base:
+        # Un bundle de tests se signe, et se signer exige un Info.plist. Sans
+        # cette ligne le build echoue avant d'avoir lance un seul test.
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  WoweeAssetExtractor:
+    build:
+      targets:
+        WoweeAssetExtractor: all
+        ExtractorKitTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - ExtractorKitTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
