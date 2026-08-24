@@ -812,6 +812,13 @@ wowee_add_packet_test(test_guild_roster_layout)
 # in the rest of the packet layer through their shared base.
 wowee_add_packet_test(test_char_enum_layout)
 
+# ── test_loot_response_packet ─────────────────────────────────────────
+# The quest-item section is WotLK's, and whether the parser looks for it comes
+# from this client's configured expansion rather than from the realm. A
+# mismatch used to lose the whole response - regular items included - so a
+# chest opened and no window came up.
+wowee_add_packet_test(test_loot_response_packet)
+
 # ── test_battlefield_status_packet ─────────────────────────────────────
 # SMSG_BATTLEFIELD_STATUS, whose header was read two bytes short.
 wowee_add_packet_test(test_battlefield_status_packet)

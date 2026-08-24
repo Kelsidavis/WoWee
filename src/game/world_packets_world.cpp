@@ -591,7 +591,13 @@ bool LootResponseParser::parse(network::Packet& packet, LootResponseData& data, 
     // Short failure packet - no gold/item data follows.
     avail = packet.getRemainingSize();
     if (avail < 5) {
-        LOG_DEBUG("LootResponseParser: lootType=", static_cast<int>(data.lootType), " (empty/failure response)");
+        // At warning, because this is the realm declining to open the loot and
+        // it is the answer to "I clicked the chest and nothing happened". The
+        // caller's own line is never reached from here, so without this the
+        // refusal and a response that never arrived look identical in a log.
+        LOG_WARNING("LootResponseParser: lootType=", static_cast<int>(data.lootType),
+                    " with no loot behind it - the realm answered the use and"
+                    " offered nothing, so no window opens");
         return false;
     }
 
@@ -629,14 +635,33 @@ bool LootResponseParser::parse(network::Packet& packet, LootResponseData& data, 
         return false;
     }
 
-    // Quest item section only present in WotLK 3.3.5a
+    // Quest item section only present in WotLK 3.3.5a.
+    //
+    // Whether it is there is decided by the expansion this client is configured
+    // for, not by the realm, and those two can disagree - a 3.3.5 profile
+    // pointed at a 1.12 realm reads the byte after the regular items as a quest
+    // count when it is not one, and a bogus count means a list that cannot
+    // parse. That used to lose the whole response, regular items and all: the
+    // loot window never opened and the only trace was one warning about a
+    // section the realm never sent.
+    //
+    // So the optional section is parsed into its own list and merged only if it
+    // parses whole. Failing it costs the quest items on a realm that really
+    // sent some, and keeps the ordinary loot either way, which is the better
+    // side to be wrong on.
     uint8_t questItemCount = 0;
     if (isWotlkFormat && packet.hasRemaining(1)) {
+        const size_t regularItems = data.items.size();
         questItemCount = packet.readUInt8();
-        data.items.reserve(data.items.size() + questItemCount);
+        data.items.reserve(regularItems + questItemCount);
         if (!parseLootItemList(questItemCount, true)) {
-            LOG_WARNING("LootResponseParser: truncated quest item list");
-            return false;
+            LOG_WARNING("LootResponseParser: the quest item section does not parse"
+                        " (asked for ", static_cast<int>(questItemCount),
+                        " items) - keeping the ", regularItems,
+                        " regular item(s). A realm older than the expansion this"
+                        " client is set to sends no such section.");
+            data.items.resize(regularItems);
+            questItemCount = 0;
         }
     }
 
