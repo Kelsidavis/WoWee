@@ -190,8 +190,15 @@ def main():
     # chat window once, FrameXML draws it now, and the two numbers outlived it.
     # 118 until bank_combine_bags went with this client's bank window, which
     # was the only thing that read it.
-    if len(wanted) < 117:
-        print(f"\n{len(wanted)} values were moved where 117 were expected - a key "
+    # 117 until the quest tracker was handed to FrameXML and its six keys went
+    # with the window - quest_tracker_w, _h, _y, _right_offset, _filter and
+    # _collapsed, removed on purpose in 34d03702f. Three of them were values
+    # this check moves. It did not catch the drop at the time because it needs
+    # an extracted interface to write a file at all, and nothing that runs
+    # automatically has one - so this pin went unchecked from that commit until
+    # a run with a real Data/interface.
+    if len(wanted) < 114:
+        print(f"\n{len(wanted)} values were moved where 114 were expected - a key "
               "has stopped being written to the file, so nothing here is checking "
               "it any more.")
         return 1
