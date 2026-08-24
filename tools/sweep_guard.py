@@ -845,8 +845,30 @@ CHECKS = [
     ("framexml_key_returns.py",
      r"^(\d+) binding return\(s\) of the wrong kind for the table they index", 0,
      "bindings answering the wrong kind of key for the table it indexes"),
+    # 37 until the interface became FrameXML's rather than one of two, in
+    # 17f14e941. This sweep greps framexml_takeover.cpp for frame names, and
+    # that commit deleted the defaults list, the candidates tier and every
+    # suppression row - on purpose, because a suppression row outlives its
+    # element and hiding FrameXML's frame after the client's own drawing is
+    # gone leaves a blank. Thirty-four names went out of the file with them:
+    # the bags, the party frames, the static popups, the raid warning, the
+    # world state frames, the quest log detail, the dungeon finder popups and
+    # the micro menu buttons. Measured, not assumed - the v3.1.7 table against
+    # this same interface answers 39.
+    #
+    # None of the thirty-four can be the fault this looks for. That fault is a
+    # frame on screen twice, which needs this client to draw its own copy, and
+    # for every one of them that copy was deleted in the same release.
+    #
+    # The C++ side already gets this right: the runtime report skips an element
+    # whose clientDraws is false (framexml_takeover.cpp:394, "FrameXML's is the
+    # only one there is"). This sweep cannot, because the rows that mapped a
+    # frame name to its element are the rows that were removed - so it now
+    # counts names that were taken out deliberately, and the honest reading of
+    # the number is "names not written in that file" rather than "nobody has
+    # decided". The runtime report is the one to trust for this class now.
     ("framexml_unaccounted_frames.py",
-     r"^\d+ top-level frames, (\d+) unaccounted", 37,
+     r"^\d+ top-level frames, (\d+) unaccounted", 73,
      "FrameXML frames neither handed over nor suppressed"),
     # The blind spot both widget-method sweeps had: they count the no-op
     # allowlist as answered, which is right for "does the call raise here" and
