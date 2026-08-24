@@ -85,6 +85,36 @@ TEST_CASE("A frame emits CreateFrame with its type and parent", "[framexml][emit
     REQUIRE(has(r.lua, "CreateFrame(\"Button\", \"MyButton\", UIParent)"));
 }
 
+TEST_CASE("hidden=\"true\" is applied before the children exist", "[framexml][emit]") {
+    // The attribute is the frame's state from the moment it exists, not
+    // something done to it once built. Emitted last, a frame the interface
+    // declares hidden was visible for the whole of its own construction - and
+    // FrameXML guards on exactly that. SpellButton_UpdateButton opens with
+    // `if ( not this:IsVisible() ) then return end`, and the spell buttons are
+    // built and fired before SpellBookFrame_OnLoad has run: on the real client
+    // the guard holds, here it did not, and the button ran on into a page
+    // number table that the parent's OnLoad fills a step later. That nil
+    // arithmetic took spellbookframe.xml down whole on a 1.12 interface.
+    XmlNode root = parseOrFail(
+        "<Ui><Frame name=\"Outer\" hidden=\"true\" parent=\"UIParent\">"
+        "<Frames><Frame name=\"Inner\"/></Frames>"
+        "</Frame></Ui>");
+    const EmitResult r = emitFrameXml(root);
+
+    const size_t hide = r.lua.find(":Hide()");
+    const size_t inner = r.lua.find("\"Inner\"");
+    REQUIRE(hide != std::string::npos);
+    REQUIRE(inner != std::string::npos);
+    CHECK(hide < inner);
+}
+
+TEST_CASE("a frame with no hidden attribute is not hidden", "[framexml][emit]") {
+    XmlNode root = parseOrFail(
+        "<Ui><Frame name=\"Plain\" parent=\"UIParent\"/></Ui>");
+    const EmitResult r = emitFrameXml(root);
+    CHECK(r.lua.find(":Hide()") == std::string::npos);
+}
+
 // ── The real files ──────────────────────────────────────────────────────────
 //
 // The cases above emit XML written for them, which proves the emitter handles a

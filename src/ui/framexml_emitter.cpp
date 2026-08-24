@@ -669,6 +669,27 @@ struct Emitter {
         // the unnamed frame for its name gave nil, so the region was called
         // "Name" and the lookup that wanted it found nothing.
         const std::string anchor = nameVar.empty() ? var : nameVar;
+
+        // hidden="true" is the frame's state from the moment it exists, not
+        // something done to it once it is built. This ran last - after the
+        // children were created, after every OnLoad had fired - so a frame the
+        // interface declares hidden was *visible* for the whole of its own
+        // construction.
+        //
+        // FrameXML guards on exactly that. SpellButton_UpdateButton opens with
+        // `if ( not this:IsVisible() ) then return end`, and the spell buttons
+        // are built and fired before SpellBookFrame_OnLoad has run - so on the
+        // real client the guard holds and the early call does nothing. Here it
+        // did not hold: the button read as visible, ran on, and asked
+        // SpellBook_GetSpellID for a page number out of a table that
+        // SpellBookFrame_OnLoad fills a step later. That is a nil arithmetic
+        // that takes spellbookframe.xml down whole on a 1.12 interface.
+        //
+        // Hiding first also lets an OnLoad that shows its own frame win, which
+        // is what the real client does and what hiding afterwards silently
+        // undid.
+        if (node.attrBool("hidden")) line(var + ":Hide()");
+
         if (const XmlNode* size = node.child("Size")) {
             float w = 0, h = 0;
             if (readDimension(*size, w, h))
@@ -1261,7 +1282,6 @@ struct Emitter {
             // not, so it goes through a binding that does the same.
             line("__WoweeFireOnLoad(" + var + ")");
         }
-        if (node.attrBool("hidden")) line(var + ":Hide()");
     }
 };
 
