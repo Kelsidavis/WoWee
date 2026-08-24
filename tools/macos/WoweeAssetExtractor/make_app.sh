@@ -133,9 +133,31 @@ sign_one() {
     fi
 }
 
+# What SwiftPM emits here depends on the toolchain, and codesign is strict
+# about the difference:
+#
+#   Swift 6.4    <name>.bundle/Contents/Info.plist  + Contents/Resources/
+#   Swift 6.3.3  <name>.bundle/AppMark.png          - flat, no plist at all
+#   iOS-style    <name>.bundle/Info.plist
+#
+# `codesign` refuses the flat one with "bundle format unrecognized, invalid,
+# or unsuitable" and exits 1, which fails the whole script (reported on
+# Swift 6.3.3 / macOS 26 in PR #127).
+#
+# So the loop signs only what is recognisably a bundle, and both plist
+# locations have to be tested: guarding on the top-level one alone would skip
+# the Swift 6.4 layout too, silently leaving a bundle unsigned on a toolchain
+# where signing it works today.
+#
+# Skipping costs nothing. A resource-only bundle holds no Mach-O, so it
+# carries no signature of its own and is sealed by the app's.
 for NESTED in "${APP}/Contents/Resources"/*.bundle; do
     [ -d "${NESTED}" ] || continue
-    sign_one "${NESTED}"
+    if [ -f "${NESTED}/Contents/Info.plist" ] || [ -f "${NESTED}/Info.plist" ]; then
+        sign_one "${NESTED}"
+    else
+        echo "==> Resources: $(basename "${NESTED}") is flat, sealed by the app"
+    fi
 done
 sign_one "${APP}"
 codesign --verify --strict --verbose=2 "${APP}"
