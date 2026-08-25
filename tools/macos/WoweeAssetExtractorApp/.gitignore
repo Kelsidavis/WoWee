@@ -1,0 +1,12 @@
+# Engendre par `xcodegen generate` a partir de project.yml, qui est la source
+# de verite. Le commiter n'apporterait qu'un pbxproj illisible et un conflit
+# de merge des que deux branches touchent aux fichiers.
+WoweeAssetExtractor.xcodeproj/
+
+# Engendre aussi, a partir du bloc `info:` de project.yml.
+Info.plist
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
