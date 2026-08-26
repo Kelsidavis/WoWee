@@ -1835,7 +1835,14 @@ static int lua_UseContainerItem(lua_State* L) {
     //
     // A lockbox and its kind have no equip slot, so they still open; a bag has
     // one, so it goes into a bag slot the way it should.
-    const bool equippable = info && info->valid && info->inventoryType != 0;
+    //
+    // Never a quest item, whatever INVTYPE it carries - and some carry one.
+    // A right-click on one of those sent CMSG_AUTOEQUIP_ITEM and the realm
+    // answered ERR_NOT_EQUIPPABLE, so the item could not be used at all and the
+    // only sign of why was an error about equipping something nobody had asked
+    // to equip. Class 12 is the quest item and there is no equipment in it.
+    const bool equippable = info && info->valid && info->inventoryType != 0 &&
+                            info->itemClass != game::ITEM_CLASS_QUEST;
 
     // An item that begins a quest offers it, and that is not a use at all.
     // AzerothCore starts an item quest from CMSG_QUESTGIVER_QUERY_QUEST naming

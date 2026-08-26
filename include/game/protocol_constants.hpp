@@ -61,6 +61,9 @@ constexpr uint32_t ITEM_ID_HEARTHSTONE = 6948;
 constexpr uint32_t ITEM_CLASS_CONSUMABLE = 0;
 constexpr uint32_t ITEM_SUBCLASS_SCROLL  = 4;
 constexpr uint32_t ITEM_SUBCLASS_BANDAGE = 7;
+/// Class 12 is the quest item. It is never equipment, whatever its INVTYPE
+/// says - and some of them do carry one.
+constexpr uint32_t ITEM_CLASS_QUEST      = 12;
 
 // ---------------------------------------------------------------------------
 // Class IDs
