@@ -1160,6 +1160,42 @@ bool AddonManager::loadFrameXml(const std::string& frameXmlDir) {
         "  end\n"
         "end\n");
 
+    // The browse tab's column headers, which sort nothing on a single page.
+    //
+    // Clicking one calls AuctionFrameBrowse_Search rather than
+    // SortAuctionApplySort - the browse list is meant to be reordered by the
+    // realm and re-sent, and the ordering does travel with the query. But
+    // AzerothCore only sorts when the result runs past one page, so a search
+    // returning fifty rows or fewer comes back in the order the realm walked
+    // its map however the headers are clicked, and every click looked inert.
+    //
+    // Sorted here instead, immediately before the rows are drawn. The keys are
+    // the ones the header click already set, the sort is stable, and a page the
+    // realm ordered is left as it is - so this corrects the case the realm
+    // skipped and changes nothing in the case it did not.
+    //
+    // Wrapped rather than replaced: the body of that function is FrameXML's and
+    // this has no business being a copy of it.
+    //
+    // On ADDON_LOADED, because Blizzard_AuctionUI is load-on-demand and none of
+    // its functions exist until the player talks to an auctioneer - a wrapper
+    // written now would find nothing to wrap and fail quietly.
+    luaEngine_.executeString(
+        "do\n"
+        "  local f = CreateFrame('Frame')\n"
+        "  f:RegisterEvent('ADDON_LOADED')\n"
+        "  f:SetScript('OnEvent', function(self, event, name)\n"
+        "    if name ~= 'Blizzard_AuctionUI' then return end\n"
+        "    self:UnregisterEvent('ADDON_LOADED')\n"
+        "    if not AuctionFrameBrowse_Update or not SortAuctionApplySort then return end\n"
+        "    local inner = AuctionFrameBrowse_Update\n"
+        "    AuctionFrameBrowse_Update = function(...)\n"
+        "      SortAuctionApplySort('list')\n"
+        "      return inner(...)\n"
+        "    end\n"
+        "  end)\n"
+        "end\n");
+
     // Let the bag windows and the character sheet be dragged around.
     //
     // A deliberate departure from 3.3.5, where neither can be moved: the bags
