@@ -23,6 +23,12 @@ struct WeaponLoadout {
     bool isFist     = false;  // Fist weapon
     bool isDagger   = false;  // Dagger (uses pierce variants)
     bool hasOffHand = false;  // Has off-hand weapon (dual wield)
+    // The off-hand weapon's own kind. isFist and isDagger above are the main
+    // hand's, and the off-hand swing was picked from those - so a sword and a
+    // dagger swung the dagger's pierce animation with the sword, and the
+    // sword's with the dagger, whichever way round they were equipped.
+    bool offHandIsFist   = false;
+    bool offHandIsDagger = false;
     bool hasShield  = false;  // Has shield equipped (for SHIELD_BASH)
     RangedWeaponType rangedType = RangedWeaponType::NONE;
 };

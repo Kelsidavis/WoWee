@@ -300,12 +300,16 @@ void AnimationController::triggerMeleeSwing() {
 
 void AnimationController::setEquippedWeaponType(uint32_t inventoryType, bool is2HLoose,
                                                  bool isFist, bool isDagger,
-                                                 bool hasOffHand, bool hasShield) {
+                                                 bool hasOffHand, bool hasShield,
+                                                 bool offHandIsFist,
+                                                 bool offHandIsDagger) {
     weaponLoadout_.inventoryType = inventoryType;
     weaponLoadout_.is2HLoose = is2HLoose;
     weaponLoadout_.isFist = isFist;
     weaponLoadout_.isDagger = isDagger;
     weaponLoadout_.hasOffHand = hasOffHand;
+    weaponLoadout_.offHandIsFist = offHandIsFist;
+    weaponLoadout_.offHandIsDagger = offHandIsDagger;
     weaponLoadout_.hasShield = hasShield;
     meleeAnimId_ = 0;  // Force re-resolve on next swing
     characterAnimator_.setEquippedWeaponType(weaponLoadout_);
@@ -483,9 +487,10 @@ uint32_t AnimationController::resolveMeleeAnimId() {
     meleeOffHandTurn_ = weaponLoadout_.hasOffHand ? !meleeOffHandTurn_ : false;
 
     if (useOffHand) {
-        if (weaponLoadout_.isFist) {
+        // The off-hand weapon's kind, not the main hand's.
+        if (weaponLoadout_.offHandIsFist) {
             chain = anim::meleeAnimChain(MeleeChain::OffHandFist);
-        } else if (weaponLoadout_.isDagger) {
+        } else if (weaponLoadout_.offHandIsDagger) {
             chain = anim::meleeAnimChain(MeleeChain::OffHandPierce);
         } else if (weaponLoadout_.inventoryType == game::InvType::NON_EQUIP) {
             chain = anim::meleeAnimChain(MeleeChain::OffHandUnarmed);

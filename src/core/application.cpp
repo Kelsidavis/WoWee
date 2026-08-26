@@ -3307,7 +3307,7 @@ void Application::updateInGame(float deltaTime, const char*& updateCheckpoint) {
         const auto& offHand = inventory.getEquipSlot(game::EquipSlot::OFF_HAND);
         const auto& ranged = inventory.getEquipSlot(game::EquipSlot::RANGED);
         const bool hasOffHandWeapon = !offHand.empty() &&
-            offHand.item.inventoryType == game::InvType::ONE_HAND;
+            game::isOffHandWeaponInventoryType(offHand.item.inventoryType);
         const bool hasRangedWeapon = !ranged.empty() &&
             (ranged.item.inventoryType == game::InvType::RANGED_BOW ||
              ranged.item.inventoryType == game::InvType::RANGED_GUN ||

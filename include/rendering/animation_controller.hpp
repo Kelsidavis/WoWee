@@ -89,9 +89,13 @@ public:
     void triggerMeleeSwing();
     /// inventoryType: WoW inventory type (0=unarmed, 13=1H, 17=2H, 21=main-hand, …)
     /// is2HLoose: true for polearms/staves (use ATTACK_2H_LOOSE instead of ATTACK_2H)
+    /// isFist/isDagger describe the main hand; offHandIsFist/offHandIsDagger
+    /// describe the off-hand weapon, which picks the off-hand swing.
     void setEquippedWeaponType(uint32_t inventoryType, bool is2HLoose = false,
                                bool isFist = false, bool isDagger = false,
-                               bool hasOffHand = false, bool hasShield = false);
+                               bool hasOffHand = false, bool hasShield = false,
+                               bool offHandIsFist = false,
+                               bool offHandIsDagger = false);
     /// Play a special attack animation for a melee ability (spellId → SPECIAL_1H/2H/SHIELD_BASH/WHIRLWIND)
     void triggerSpecialAttack(uint32_t spellId);
 

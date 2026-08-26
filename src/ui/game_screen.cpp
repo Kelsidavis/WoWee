@@ -761,10 +761,11 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                 bool isFist = (mh.item.subclassName == "Fist Weapon");
                 bool isDagger = (mh.item.subclassName == "Dagger");
                 bool hasOffHand = !oh.empty() &&
-                    (oh.item.inventoryType == game::InvType::ONE_HAND ||
-                     oh.item.subclassName == "Fist Weapon");
+                    game::isOffHandWeaponInventoryType(oh.item.inventoryType);
                 bool hasShield = !oh.empty() && oh.item.inventoryType == game::InvType::SHIELD;
-                if (auto* ac = r->getAnimationController()) ac->setEquippedWeaponType(mh.item.inventoryType, is2HLoose, isFist, isDagger, hasOffHand, hasShield);
+                bool offHandIsFist = hasOffHand && oh.item.subclassName == "Fist Weapon";
+                bool offHandIsDagger = hasOffHand && oh.item.subclassName == "Dagger";
+                if (auto* ac = r->getAnimationController()) ac->setEquippedWeaponType(mh.item.inventoryType, is2HLoose, isFist, isDagger, hasOffHand, hasShield, offHandIsFist, offHandIsDagger);
             }
             // Detect ranged weapon type from RANGED slot
             const auto& rangedSlot = gameHandler.getInventory().getEquipSlot(game::EquipSlot::RANGED);

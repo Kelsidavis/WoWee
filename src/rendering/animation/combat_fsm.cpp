@@ -363,8 +363,9 @@ AnimOutput CombatFSM::resolve(const Input& in, const AnimCapabilitySet& caps,
                 offHandTurn_ = loadout.hasOffHand ? !offHandTurn_ : false;
 
                 if (useOffHand) {
-                    if (loadout.isFist) animId = caps.resolvedMeleeOffHandFist;
-                    else if (loadout.isDagger) animId = caps.resolvedMeleeOffHandPierce;
+                    // The off-hand weapon's kind, not the main hand's.
+                    if (loadout.offHandIsFist) animId = caps.resolvedMeleeOffHandFist;
+                    else if (loadout.offHandIsDagger) animId = caps.resolvedMeleeOffHandPierce;
                     else if (loadout.inventoryType == game::InvType::NON_EQUIP) animId = caps.resolvedMeleeOffHandUnarmed;
                     else animId = caps.resolvedMeleeOffHand;
                 } else if (loadout.isFist) {
