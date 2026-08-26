@@ -2468,6 +2468,18 @@ struct AuctionSellSlot {
 };
 static AuctionSellSlot& auctionSellSlot() { static AuctionSellSlot s; return s; }
 
+/// Say the sell slot changed.
+///
+/// AuctionSellItemButton_OnEvent is the only thing that draws that slot, and it
+/// runs on this event alone: it sets the button's texture, its name, and the
+/// stackCount and totalCount fields. Nothing fired it, so an item dropped on
+/// the slot was held here and never appeared - and Create Auction stayed
+/// greyed out, because ValidateAuction reads those same two fields and reads
+/// nil as zero.
+static void fireAuctionSellUpdate(game::GameHandler* gh) {
+    if (gh) gh->fireAddonEvent("NEW_AUCTION_UPDATE", {});
+}
+
 /// The item a wire (container, slot) pair names, and its guid. Null when the
 /// pair names nothing this client is holding.
 static const game::ItemSlot* auctionSellItemSlot(game::GameHandler* gh,
@@ -4220,6 +4232,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 luaL_optnumber(L, 4, item->item.stackCount ? item->item.stackCount : 1));
             gh->auctionSellItemByGuid(guid, stack, bid, buy, dur);
             auctionSellSlot() = AuctionSellSlot{};
+            fireAuctionSellUpdate(gh);
             return 0;
         }},
                 // The sell slot: the item the player dropped on it, held here
@@ -4236,6 +4249,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             if (!wowee::ui::frameXmlCursorWireSlot(bag, slot)) {
                 // Nothing carried: a click takes the item back out.
                 auctionSellSlot() = AuctionSellSlot{};
+                fireAuctionSellUpdate(getGameHandler(L));
                 return 0;
             }
             auto* gh = getGameHandler(L);
@@ -4249,11 +4263,12 @@ void registerInventoryLuaAPI(lua_State* L) {
                 return 0;
             }
             wowee::ui::frameXmlPutCursorDown();
+            fireAuctionSellUpdate(gh);
             return 0;
         }},
                 {"CancelSell", [](lua_State* L) -> int {
             auctionSellSlot() = AuctionSellSlot{};
-            (void)L;
+            fireAuctionSellUpdate(getGameHandler(L));
             return 0;
         }},
                 {"GetAuctionSellItemInfo", [](lua_State* L) -> int {
