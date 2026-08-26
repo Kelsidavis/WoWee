@@ -91,6 +91,14 @@ int cursorEquipSlot() {
     return (s_cursorType == CursorType::ITEM && s_cursorBag == -1) ? s_cursorSlot : 0;
 }
 
+bool cursorItemCameFromInventory() {
+    // The same test cursorWireSlot makes before it will name a source, because
+    // it is the same question: an item the wire can point at is an item that
+    // can be destroyed.
+    return s_cursorType == CursorType::ITEM &&
+           game::slots::cursorSourceIsInventory(s_cursorBag);
+}
+
 /// PickupPetAction(slot) - pick a pet ability up off the pet bar.
 ///
 /// Defined and does nothing. The cursor here holds spells, items, actions and

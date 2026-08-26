@@ -9889,7 +9889,18 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
                         const auto* under = hit ? widgets_.get(hit) : nullptr;
                         const bool onWorld = !under || under->name == "UIParent" ||
                                              under->name == "WorldFrame";
-                        if (onWorld) {
+                        // An item out of a bag or off the paperdoll is not put
+                        // down here. Letting one of those go over the world is
+                        // how it is destroyed, and the delete confirmation is
+                        // raised for it once this dispatch returns - by reading
+                        // the cursor. Clearing it first is the whole of
+                        // "dragging a quest item onto the ground does nothing":
+                        // the prompt looked, found an empty cursor, and asked
+                        // about nothing, and the next bag update put the item
+                        // back. An item off an action bar has no such prompt -
+                        // the bar held a reference, not the item - so it still
+                        // clears here, which is what takes it off the bar.
+                        if (onWorld && !cursorItemCameFromInventory()) {
                             lua_getglobal(L_, "ClearCursor");
                             if (lua_isfunction(L_, -1)) {
                                 if (lua_pcall(L_, 0, 0, 0) != 0) lua_pop(L_, 1);

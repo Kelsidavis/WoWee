@@ -848,6 +848,17 @@ void setCursorMoney(lua_State* L, uint64_t copper);
 /// came from a bag or nothing is held. One-based, as FrameXML numbers slots.
 int cursorEquipSlot();
 
+/// Whether the cursor is carrying an item that came out of the player's own
+/// inventory - a bag slot or a worn slot - rather than off an action bar.
+///
+/// The two are let go over the world for opposite reasons. An item on a bar is
+/// a reference to one, so dropping it there takes it off the bar and the cursor
+/// is simply put down; an item out of a bag is the item, and letting it go over
+/// the world is how it is destroyed. Only the second raises the delete prompt,
+/// and the prompt reads the cursor - so the drag has to end with the item still
+/// on it.
+bool cursorItemCameFromInventory();
+
 /// Put a vendor's list entry on the cursor, which is what a left-click in
 /// FrameXML's merchant window does. Buying happens when it is dropped.
 void pickupMerchantItem(lua_State* L, int index);
