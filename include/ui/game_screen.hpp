@@ -354,6 +354,9 @@ private:
     std::unordered_map<uint32_t, uint32_t> spellIconIds_;
     bool spellIconDbLoaded_ = false;
     VkDescriptorSet getSpellIcon(uint32_t spellId, pipeline::AssetManager* am);
+    /// The vendor cursor, drawn in place of the pointer. True when it drew, so
+    /// the caller knows not to also ask for the hand.
+    bool drawVendorCursor(game::GameHandler& gameHandler, const ui::ScenePick& pick);
 
     // Minimap quest-objective cache, rebuilt only when tracked quest progress changes.
     uint64_t minimapQuestCacheSignature_ = 0;

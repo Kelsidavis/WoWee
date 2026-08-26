@@ -7,6 +7,7 @@
 #include "ui/scene_pick.hpp"
 #include "ui/ui_colors.hpp"
 #include "ui/ui_helpers.hpp"
+#include "ui/ui_texture_load.hpp"
 #include "rendering/vk_context.hpp"
 #include "core/application.hpp"
 #include "core/appearance_composer.hpp"
@@ -1063,6 +1064,47 @@ void GameScreen::renderPlayerInfo(game::GameHandler& gameHandler) {
     ImGui::End();
 }
 
+/// Interface\\Cursor\\Buy.blp under the pointer while it is over a vendor.
+///
+/// Every interactable answered the same hand cursor, so a merchant looked like
+/// a door: what a unit is for is known before it is clicked, and the real
+/// client says so with the art. The bag is the one WoW uses for a vendor.
+///
+/// False when the unit is not a vendor to trade with, and the caller falls back
+/// to the hand. A hostile is not one - it is the attack cursor's business - and
+/// neither is a corpse, which is loot.
+bool GameScreen::drawVendorCursor(game::GameHandler& gameHandler,
+                                  const ui::ScenePick& pick) {
+    const uint64_t guid = pick.closestGuid;
+    if (guid == 0 || guid == pick.hostileUnitGuid || guid == pick.deadUnitGuid) {
+        return false;
+    }
+    auto entity = gameHandler.getEntityManager().getEntity(guid);
+    if (!entity || entity->getType() != game::ObjectType::UNIT) return false;
+    auto unit = std::static_pointer_cast<game::Unit>(entity);
+    if ((unit->getNpcFlags() & game::NPC_FLAG_VENDOR) == 0) return false;
+
+    // Only a successful upload is cached, so a transient descriptor-pool
+    // failure is retried rather than leaving the cursor plain for good.
+    static VkDescriptorSet cursorTex = VK_NULL_HANDLE;
+    if (!cursorTex) {
+        cursorTex = ui::uploadUiTextureFromBlp(
+            services_.assetManager, "Interface\\Cursor\\Buy.blp", services_.window);
+    }
+    if (!cursorTex) return false;
+
+    // Drawn in place of the pointer rather than beside it, which is what a
+    // cursor is - so the arrow goes for as long as the bag is up. The tip sits
+    // at the mouse position, the way the art is authored.
+    ImGui::SetMouseCursor(ImGuiMouseCursor_None);
+    const ImVec2 at = ImGui::GetIO().MousePos;
+    constexpr float kSize = 32.0f;
+    ImGui::GetForegroundDrawList()->AddImage(
+        (ImTextureID)(uintptr_t)cursorTex, at,
+        ImVec2(at.x + kSize, at.y + kSize));
+    return true;
+}
+
 void GameScreen::renderEntityList(game::GameHandler& gameHandler) {
     ImGui::SetNextWindowSize(ImVec2(500, 400), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImVec2(10, 290), ImGuiCond_FirstUseEver);
@@ -1590,7 +1632,9 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
             const ui::ScenePick hoverPick =
                 ui::pickScene(gameHandler, ray, ui::ScenePickParams{});
             if (hoverPick.closestGuid != 0) {
-                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                if (!drawVendorCursor(gameHandler, hoverPick)) {
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                }
             }
         }
     }
