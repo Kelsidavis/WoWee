@@ -262,6 +262,10 @@ bool Application::initialize() {
     // flight. Here the renderer has drawn nothing yet and there is nothing for
     // the rebuild to disturb.
     uiManager->getGameScreen().applySavedAntiAliasing(renderer.get());
+    // And the window's own two, for the same reason and at the same moment:
+    // nothing has been drawn, so entering fullscreen here costs no visible
+    // change of mode.
+    uiManager->getGameScreen().applySavedDisplayMode(window.get());
 
     // Create subsystems
     authHandler = std::make_unique<auth::AuthHandler>();

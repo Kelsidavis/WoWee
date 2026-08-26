@@ -123,6 +123,24 @@ void GameScreen::applySavedAntiAliasing(rendering::Renderer* renderer) {
     renderer->setMsaaSamples(msaaSamplesForChoice(settingsPanel_.pendingAntiAliasing));
 }
 
+void GameScreen::applySavedDisplayMode(core::Window* window) {
+    if (!window) return;
+    // Saved on every change and read back by the panel, and applied by nobody
+    // at startup: the window is built from a WindowConfig with the field left
+    // at its default, so every session began windowed however it was left.
+    //
+    // Resolution is deliberately not set with it. This is a desktop
+    // fullscreen - Window::applyResolution keeps the desktop mode for one -
+    // and the panel's width and height are not saved at all, so they still
+    // hold their 1920x1080 defaults this early and would be a guess rather
+    // than a setting.
+    //
+    // Vsync goes the same way for the same reason: saved, and the config it
+    // would be read into is written by hand above the window.
+    window->setFullscreen(settingsPanel_.pendingFullscreen);
+    window->setVsync(settingsPanel_.pendingVsync);
+}
+
 // Set UI services and propagate to child components
 
 namespace {

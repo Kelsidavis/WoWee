@@ -22,8 +22,10 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "ui/scene_pick.hpp"
+
 namespace wowee {
-namespace core { class AppearanceComposer; }
+namespace core { class AppearanceComposer; class Window; }
 namespace pipeline { class AssetManager; }
 namespace rendering { class Renderer; }
 namespace ui {
@@ -110,6 +112,9 @@ public:
     /// the session, with a world loaded and uploads in flight, rather than
     /// against a renderer that has drawn nothing yet.
     void applySavedAntiAliasing(rendering::Renderer* renderer);
+    /// The saved windowed/fullscreen choice and vsync, applied before the
+    /// first frame. Neither reaches the WindowConfig the window is built from.
+    void applySavedDisplayMode(core::Window* window);
 
     GameScreen();
 
