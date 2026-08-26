@@ -224,7 +224,11 @@ public:
     /// Use a key from the keyring. Its own entry point because the keyring is
     /// addressed by a wire slot of its own past the bags, and useItemBySlot
     /// bounds-checks against the backpack and would silently do nothing.
-    void useKeyringItem(int index, bool confirmed = false);
+    void useKeyringItem(int index, bool confirmed = false, uint64_t unitTarget = 0);
+    /// Use something already worn - a trinket, or anything else with an on-use.
+    /// Addressed by its equipment slot, which is its own wire slot below the
+    /// backpack's.
+    void useEquippedItem(int equipSlot, bool confirmed = false, uint64_t unitTarget = 0);
     void useItemInBag(int bagIndex, int slotIndex, bool confirmed = false,
                       uint64_t unitTarget = 0);
 

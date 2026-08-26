@@ -2009,7 +2009,21 @@ void InventoryHandler::useItemBySlot(int backpackIndex, bool confirmed,
                     itemGuid, slot.item, confirmed, unitTarget);
 }
 
-void InventoryHandler::useKeyringItem(int index, bool confirmed) {
+void InventoryHandler::useEquippedItem(int equipSlot, bool confirmed,
+                                      uint64_t unitTarget) {
+    if (equipSlot < 0 || equipSlot >= Inventory::NUM_EQUIP_SLOTS) return;
+    const auto& slot =
+        owner_.inventoryRef().getEquipSlot(static_cast<EquipSlot>(equipSlot));
+    if (slot.empty()) return;
+    uint64_t itemGuid = owner_.equipSlotGuidsRef()[static_cast<size_t>(equipSlot)];
+    if (itemGuid == 0) itemGuid = owner_.resolveOnlineItemGuid(slot.item.itemId);
+    // The worn slots are the first wire slots there are, so the index is the
+    // slot: no offset the way the backpack needs one.
+    dispatchUseItem(0xFF, static_cast<uint8_t>(equipSlot), itemGuid, slot.item,
+                    confirmed, unitTarget);
+}
+
+void InventoryHandler::useKeyringItem(int index, bool confirmed, uint64_t unitTarget) {
     if (index < 0 || index >= Inventory::KEYRING_SLOTS) return;
     const auto& slot = owner_.inventoryRef().getKeyringSlot(index);
     if (slot.empty()) return;
@@ -2018,7 +2032,7 @@ void InventoryHandler::useKeyringItem(int index, bool confirmed) {
     uint64_t itemGuid = slot.item.guid;
     if (itemGuid == 0) itemGuid = owner_.resolveOnlineItemGuid(slot.item.itemId);
     dispatchUseItem(0xFF, static_cast<uint8_t>(slots::keyringWireSlot(index)),
-                    itemGuid, slot.item, confirmed);
+                    itemGuid, slot.item, confirmed, unitTarget);
 }
 
 void InventoryHandler::useItemInBag(int bagIndex, int slotIndex, bool confirmed,
@@ -2364,7 +2378,35 @@ void InventoryHandler::useItemById(uint32_t itemId, uint64_t unitTarget) {
             }
         }
     }
-    LOG_WARNING("useItemById: itemId=", itemId, " not found in inventory");
+    // The keyring and the worn slots, which this searched neither of.
+    //
+    // A key lives nowhere else, so a macro or an action-bar slot naming one
+    // could never find it. The worn slots are worse than an omission: /use
+    // with an equipment slot number reads that slot's item id and hands it
+    // straight to this, so the one call site written for equipped items was
+    // the one that could not work at all.
+    //
+    // Last, so nothing that already resolved changes where it resolves to. A
+    // trinket carried in a bag and a second one worn keep answering the bag.
+    for (int i = 0; i < owner_.inventoryRef().getKeyringSize(); i++) {
+        const auto& slot = owner_.inventoryRef().getKeyringSlot(i);
+        if (!slot.empty() && slot.item.itemId == itemId) {
+            LOG_DEBUG("useItemById: found itemId=", itemId, " in keyring slot ", i);
+            useKeyringItem(i, false, unitTarget);
+            return;
+        }
+    }
+    for (int i = 0; i < Inventory::NUM_EQUIP_SLOTS; i++) {
+        const auto& slot =
+            owner_.inventoryRef().getEquipSlot(static_cast<EquipSlot>(i));
+        if (!slot.empty() && slot.item.itemId == itemId) {
+            LOG_DEBUG("useItemById: found itemId=", itemId, " equipped in slot ", i);
+            useEquippedItem(i, false, unitTarget);
+            return;
+        }
+    }
+    LOG_WARNING("useItemById: itemId=", itemId,
+                " not found in the bags, the keyring or the worn slots");
 }
 
 void InventoryHandler::handleListInventory(network::Packet& packet) {
