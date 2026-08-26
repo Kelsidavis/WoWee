@@ -2571,8 +2571,21 @@ static void appendRandomSuffix(wowee::ui::Widget* w, game::GameHandler* gh,
     for (const auto& b : gh->getRandomStatBonuses(item.randomPropertyId,
                                                   item.suffixFactor)) {
         if (b.value == 0) continue;
-        const char* statName = game::itemStatName(b.statType);
-        if (!statName) continue;
+        // itemModStatName, not itemStatName: the second is for a query
+        // response's extra stats and answers nothing for the five primaries,
+        // which is every stat the animal suffixes roll.
+        const char* statName = game::itemModStatName(b.statType);
+        if (!statName) {
+            // Once per type. A stat with no name is dropped from the tooltip,
+            // and a suffix that rolled one looks exactly like a suffix that
+            // rolled nothing.
+            static std::set<uint32_t> unnamed;
+            if (unnamed.insert(b.statType).second) {
+                LOG_WARNING("Random suffix: ITEM_MOD ", b.statType,
+                            " has no name, so it is left off the tooltip");
+            }
+            continue;
+        }
         char buf[96];
         std::snprintf(buf, sizeof(buf), "%+d %s", b.value, statName);
         wowee::ui::Widget::TooltipLine line;

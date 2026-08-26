@@ -835,6 +835,12 @@ wowee_add_packet_test(test_learn_talent_packet)
 # The socket block of the item query, which the layout sweep cannot reach.
 wowee_add_packet_test(test_item_query_sockets)
 
+# ── test_item_stat_names ────────────────────────────────────
+# Which of the two stat-name tables answers for the five primaries. A random
+# suffix rolls raw ITEM_MOD types and was reading the table that names only the
+# extras, so every animal suffix listed no stats at all.
+wowee_add_test(test_item_stat_names SOURCES test_item_stat_names.cpp)
+
 # ── test_mail_packets ───────────────────────────────────────
 wowee_add_packet_test(test_mail_packets)
 

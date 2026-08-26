@@ -120,6 +120,29 @@ inline const char* itemStatName(uint32_t statType) {
     }
 }
 
+/// The name of any ITEM_MOD stat type, the five primaries included.
+///
+/// itemStatName answers for the extra stats alone, and leaves Strength through
+/// Spirit out on purpose: a query response carries those in fields of their own
+/// and the tooltips print them from there, so naming them again would list each
+/// one twice.
+///
+/// A random suffix has no such fields. It rolls raw ITEM_MOD types, and the
+/// five it leaves out are exactly what the animal suffixes are made of - "of
+/// the Boar" is Strength and Spirit, "of the Tiger" is Agility and Strength -
+/// so every one of them came out with a name and no stats at all, while "of
+/// Spell Power" and the rating suffixes listed theirs.
+inline const char* itemModStatName(uint32_t statType) {
+    switch (statType) {
+        case 3: return "Agility";
+        case 4: return "Strength";
+        case 5: return "Intellect";
+        case 6: return "Spirit";
+        case 7: return "Stamina";
+        default: return itemStatName(statType);
+    }
+}
+
 
 /// What resistance school `index` is, 0..5, as an item line reads it.
 ///
