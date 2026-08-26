@@ -537,6 +537,7 @@ void CompositeRenderer::compositePass(VkCommandBuffer cmd,
 
     compositeTarget->endPass(cmd);
     compositedIdx_ = zoneIdx;
+    everComposited_ = true;
 }
 
 } // namespace world_map

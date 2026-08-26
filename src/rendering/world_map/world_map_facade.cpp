@@ -944,11 +944,26 @@ void WorldMapFacade::Impl::renderImGuiOverlay(const glm::vec3& playerRenderPos,
         displayW = contentSize.x;
         displayH = contentSize.y;
         // Show only the visible 1002×668 content region of the 1024×768 FBO.
-        ImGui::Image(
-            reinterpret_cast<ImTextureID>(compositor.displayDescriptorSet()),
-            ImVec2(displayW, displayH),
-            ImVec2(0, 0), ImVec2(CompositeRenderer::MAP_U_MAX,
-                                 CompositeRenderer::MAP_V_MAX));
+        //
+        // Not before the first composite has run. The image is created and
+        // never written until then, so opening the map sampled whatever its
+        // memory happened to hold for the one frame between the window
+        // appearing and the pass that fills it - which is the magenta flash.
+        // A zone change is not this case: invalidateComposite() only says the
+        // picture is stale, and a stale map for one frame is the right thing
+        // to show.
+        if (compositor.everComposited()) {
+            ImGui::Image(
+                reinterpret_cast<ImTextureID>(compositor.displayDescriptorSet()),
+                ImVec2(displayW, displayH),
+                ImVec2(0, 0), ImVec2(CompositeRenderer::MAP_U_MAX,
+                                     CompositeRenderer::MAP_V_MAX));
+        } else {
+            // The colour the composite pass clears to, so the first frame is
+            // the map's own background rather than a hole.
+            ImGui::Dummy(ImVec2(displayW, displayH));
+            drawList->AddRectFilled(imgMin, imgMax, IM_COL32(13, 20, 31, 255));
+        }
 
         // Transition fade overlay
         const auto& trans = viewState.transition();

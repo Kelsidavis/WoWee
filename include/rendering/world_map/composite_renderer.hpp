@@ -75,6 +75,13 @@ public:
 
     /// Index of the zone currently composited (-1 if none).
     [[nodiscard]] int compositedIdx() const { return compositedIdx_; }
+    /// Whether the composite image has ever been rendered into.
+    ///
+    /// Distinct from compositedIdx(), which says whether it is *current*:
+    /// invalidateComposite() clears that on every zone change while the image
+    /// still holds a perfectly good picture. Only the first use is the one
+    /// where its contents are undefined.
+    [[nodiscard]] bool everComposited() const { return everComposited_; }
 
     /// Reset composited index to force re-composite.
     void invalidateComposite() { compositedIdx_ = -1; }
@@ -132,6 +139,7 @@ private:
     std::vector<std::unique_ptr<VkTexture>> zoneTextures;
 
     int compositedIdx_ = -1;
+    bool everComposited_ = false;
     int pendingCompositeIdx_ = -1;
 
     // Per-zone tile texture pointers (indexed by zone, then by tile slot)
