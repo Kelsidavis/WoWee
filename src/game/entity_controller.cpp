@@ -1446,6 +1446,32 @@ bool EntityController::applyPlayerStatFields(const FlatFieldMap& fields,
               owner_.isRestingRef() = nowResting;
               pendingEvents_.emit("PLAYER_UPDATE_RESTING", {});
           }
+          // The helm and cloak switches, which the realm keeps and this client
+          // never read back. Both are set by CMSG_SHOWING_HELM/CLOAK and come
+          // home in PLAYER_FLAGS, so the realm had them right the whole time -
+          // helmVisible_ simply started true every session and was written by
+          // nothing but the toggle. Hide the helm, log out, and it was back.
+          //
+          // On create as well as on change, for the reason resting is: the
+          // flags arrive with the player and there is no later transition.
+          //
+          // The flag says *hide*, so it is inverted here.
+          {
+            constexpr uint32_t PLAYER_FLAGS_HIDE_HELM  = 0x00000400;
+            constexpr uint32_t PLAYER_FLAGS_HIDE_CLOAK = 0x00000800;
+            const bool helm  = (val & PLAYER_FLAGS_HIDE_HELM) == 0;
+            const bool cloak = (val & PLAYER_FLAGS_HIDE_CLOAK) == 0;
+            if (helm != owner_.helmVisibleRef() || cloak != owner_.cloakVisibleRef()) {
+                owner_.helmVisibleRef() = helm;
+                owner_.cloakVisibleRef() = cloak;
+                // The same rebuild the toggle asks for: the flag on its own
+                // changes nothing on screen, and the hair under a helm has to
+                // come back with it.
+                owner_.markOnlineEquipmentDirty();
+                LOG_INFO("PLAYER_FLAGS: helm ", helm ? "shown" : "hidden",
+                         ", cloak ", cloak ? "shown" : "hidden");
+            }
+          }
           {
             // Not gated on !isCreate, and that is the whole of a bug: logging
             // in already dead delivers the player as a CREATE block, so the
