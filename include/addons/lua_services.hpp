@@ -170,7 +170,11 @@ struct LuaServices {
     /// continent itself and continent zero is the world.
     std::function<std::vector<std::string>()> getMapContinentNames;
     std::function<std::vector<std::string>(int)> getMapZoneNames;
-    std::function<void(int, int)> setMapByIndex;
+    /// False when the map refused the pair - an unknown continent, or a zone
+    /// row past the end of that continent's list. The caller discarded this,
+    /// so a dropdown pick the map could not honour looked exactly like one it
+    /// had.
+    std::function<bool(int, int)> setMapByIndex;
     /// What is shown now, in those same indices, and whether there is a level
     /// above it. The button that asks the last of these was disabled always.
     std::function<int()> getMapContinentIndex;

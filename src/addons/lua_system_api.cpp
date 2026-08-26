@@ -1963,7 +1963,24 @@ static int lua_GetCurrentMapContinent(lua_State* L) {
     // from while the map stayed where it was.
     if (auto* svc = getLuaServices(L)) {
         if (svc->getMapContinentIndex) {
-            lua_pushnumber(L, svc->getMapContinentIndex());
+            const int shown = svc->getMapContinentIndex();
+            // Said once per disagreement, because this one is asked from
+            // WorldMapFrame_OnUpdate and a line per frame is not a report.
+            //
+            // Zero from the map means WORLD or COSMIC level, and both
+            // dropdowns answer it with UIDropDownMenu_ClearAll - so a pick
+            // that moved the number here but did not move the map leaves the
+            // dropdown blank, which reads as the dropdown not working.
+            static int lastReported = -1;
+            if (shown == 0 && s_mapContinent != 0 && lastReported != s_mapContinent) {
+                lastReported = s_mapContinent;
+                LOG_WARNING("GetCurrentMapContinent: asked for continent ",
+                            s_mapContinent, " and the map is showing none, so"
+                            " both dropdowns clear themselves");
+            } else if (shown != 0) {
+                lastReported = -1;
+            }
+            lua_pushnumber(L, shown);
             return 1;
         }
     }
@@ -2004,8 +2021,20 @@ static int lua_SetMapZoom(lua_State* L) {
     // through here - the zone dropdown, the continent dropdown, and four of
     // the zoom-out button's six branches - so none of them changed what was
     // drawn.
+    // At warning when the map turns the pair down, because every symptom of
+    // that is a non-event: the dropdown keeps the row it was clicked on, the
+    // map stays where it was, and nothing is written down. An unknown
+    // continent and a zone row past the end of that continent's list are the
+    // two ways in, and they are the two the dropdowns can produce.
     if (auto* svc = getLuaServices(L)) {
-        if (svc->setMapByIndex) svc->setMapByIndex(s_mapContinent, s_mapZone);
+        if (!svc->setMapByIndex) {
+            LOG_WARNING("SetMapZoom(", s_mapContinent, ", ", s_mapZone,
+                        "): no map to tell - the view number moved and nothing"
+                        " drew from it");
+        } else if (!svc->setMapByIndex(s_mapContinent, s_mapZone)) {
+            LOG_WARNING("SetMapZoom(", s_mapContinent, ", ", s_mapZone,
+                        "): the map refused the pair, so it stays where it was");
+        }
     }
     fireWorldMapUpdate(L);
     return 0;
@@ -2038,7 +2067,12 @@ static int lua_GetMapContinents(lua_State* L) {
 // zones out of dozens and choosing one of them did nothing anyway.
 static int lua_GetMapZones(lua_State* L) {
     const int cont = static_cast<int>(luaL_checknumber(L, 1));
-    if (auto* svc = getLuaServices(L)) {
+    auto* zonesSvc = getLuaServices(L);
+    if (!zonesSvc || !zonesSvc->getMapZoneNames) {
+        LOG_WARNING("GetMapZones(", cont, "): no map to ask, so the zone"
+                    " dropdown is built empty");
+    }
+    if (auto* svc = zonesSvc) {
         if (svc->getMapZoneNames) {
             const auto names = svc->getMapZoneNames(cont);
             // Lua promises a C function twenty free slots and no more. Four
@@ -2046,7 +2080,18 @@ static int lua_GetMapZones(lua_State* L) {
             // list is dozens, and pushing them unasked writes past the stack.
             if (!names.empty() &&
                 !lua_checkstack(L, static_cast<int>(names.size()))) {
+                LOG_WARNING("GetMapZones(", cont, "): no room on the Lua stack"
+                            " for ", names.size(), " zones, so the dropdown is"
+                            " built empty");
                 return 0;
+            }
+            // An empty list is a blank zone dropdown and no other trace. The
+            // continent may be one this client has no zone data for, or the
+            // map data may not be loaded yet - either way the dropdown that
+            // opens is the same empty one.
+            if (names.empty()) {
+                LOG_WARNING("GetMapZones(", cont, "): the map lists no zones on"
+                            " that continent, so the zone dropdown is empty");
             }
             for (const auto& n : names) lua_pushstring(L, n.c_str());
             return static_cast<int>(names.size());

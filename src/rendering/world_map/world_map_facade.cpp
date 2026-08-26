@@ -120,6 +120,7 @@ struct WorldMapFacade::Impl {
     // that works it out is the one the first open already runs - so this
     // re-enters that rather than keeping a second copy of it here.
     bool recenterOnPlayer = false;
+    bool viewChanged = false;
 
     DataRepository data;
     ViewStateMachine viewState;
@@ -501,6 +502,17 @@ void WorldMapFacade::render(const glm::vec3& playerRenderPos,
             d.viewState.setCurrentZoneIdx(d.viewState.continentIdx());
             d.viewState.setLevel(ViewLevel::CONTINENT);
         }
+        // The view has only now become the player's zone, and the interface
+        // asked before it did.
+        //
+        // SetMapToCurrentZone runs on every open and fires WORLD_MAP_UPDATE on
+        // the spot, which is when both dropdowns rebuild themselves. All this
+        // call does here is raise the recenter flag - the move happens in this
+        // block, one frame later - so GetCurrentMapContinent answered 0 while
+        // the dropdowns were being built, and 0 is what makes watchframe's
+        // ClearAll branch run and GetMapZones(0) return an empty list. Both
+        // came up blank and stayed blank, because nothing asked again.
+        d.viewChanged = true;
     }
 
     // Process input
@@ -1558,6 +1570,12 @@ int WorldMapFacade::currentZoneIndex() const {
         if (rows[i].second == zoneIdx) return static_cast<int>(i) + 1;
     }
     return 0;
+}
+
+bool WorldMapFacade::takeViewChanged() {
+    const bool was = impl_->viewChanged;
+    impl_->viewChanged = false;
+    return was;
 }
 
 void WorldMapFacade::showPlayerZone() {

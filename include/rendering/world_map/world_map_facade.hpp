@@ -145,6 +145,14 @@ public:
     /// The continents, in the order 3.3.5 indexes them: Kalimdor, Eastern
     /// Kingdoms, Outland, Northrend. Fixed rather than discovered, because the
     /// index is what the interface passes back and addons hard-code it.
+    /// Whether the map moved itself since this was last asked, and clears it.
+    ///
+    /// The interface rebuilds its two dropdowns on WORLD_MAP_UPDATE, and the
+    /// only move it cannot predict is the one this class makes on its own -
+    /// settling on the player's zone a frame after being asked to. Polled
+    /// where the frame rect is read, and answered with the event.
+    [[nodiscard]] bool takeViewChanged();
+
     [[nodiscard]] std::vector<std::string> continentNames() const;
 
     /// The zones on that continent by their display names, alphabetically.
