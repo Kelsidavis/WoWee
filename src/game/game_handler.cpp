@@ -141,9 +141,12 @@ bool GameHandler::connect(const std::string& host,
     this->build = build;
     this->realmId_ = realmId;
 
-    // Diagnostic: dump session key for AUTH_REJECT debugging
-    LOG_INFO("GameHandler session key (", sessionKey.size(), "): ",
-             core::toHexString(sessionKey.data(), sessionKey.size()));
+    // The session key is the shared secret the world handshake proves knowledge
+    // of and the header cipher is keyed from: anyone holding these 40 bytes can
+    // authenticate as this account and decrypt its traffic. It must never reach
+    // a log, which is a file users are routinely asked to attach to a bug
+    // report. Its length is the only part of it that diagnoses anything.
+    LOG_INFO("GameHandler session key received (", sessionKey.size(), " bytes)");
     // Generate random client seed
     this->clientSeed = generateClientSeed();
     LOG_DEBUG("Generated client seed: 0x", std::hex, clientSeed, std::dec);
