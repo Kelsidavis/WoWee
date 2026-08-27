@@ -1,4 +1,5 @@
 #include "pipeline/asset_manager.hpp"
+#include "pipeline/base_fallback.hpp"
 #include "core/logger.hpp"
 #include "core/memory_monitor.hpp"
 #include "core/profiler.hpp"
@@ -179,7 +180,10 @@ std::string AssetManager::resolveFile(const std::string& normalizedPath) const {
     // holds DBC overrides), retry against the base extraction.
     if (!baseFallbackDataPath_.empty()) {
         std::string baseFallbackPath = baseFallbackManifest_.resolveFilesystemPath(normalizedPath);
-        if (!baseFallbackPath.empty()) return baseFallbackPath;
+        if (!baseFallbackPath.empty()) {
+            baseFallbackHits_.fetch_add(1, std::memory_order_relaxed);
+            return baseFallbackPath;
+        }
     }
 
     // Last resort: some files (e.g. DBFilesClient\TransportAnimation.dbc) can end up
@@ -196,19 +200,65 @@ std::string AssetManager::resolveFile(const std::string& normalizedPath) const {
     return {};
 }
 
-void AssetManager::setBaseFallbackPath(const std::string& basePath) {
-    if (basePath.empty() || basePath == dataPath) return;  // nothing to do
+bool AssetManager::setBaseFallbackPath(const std::string& basePath,
+                                       const std::string& expansionId) {
+    if (baseFallbackHits_.load(std::memory_order_relaxed) > 0) {
+        // Said on the way out rather than per lookup. Next to a warning about
+        // an unlabelled or forced base, this is how much of what was on screen
+        // came from it.
+        LOG_INFO("AssetManager: previous base fallback '", baseFallbackDataPath_,
+                 "' answered ", baseFallbackHits_.load(std::memory_order_relaxed),
+                 " lookups");
+    }
+    baseFallbackDataPath_.clear();
+    baseFallbackHits_.store(0, std::memory_order_relaxed);
+    if (basePath.empty() || basePath == dataPath) return false;  // nothing to do
     std::string manifestPath = basePath + "/manifest.json";
     if (!std::filesystem::exists(manifestPath)) {
         LOG_DEBUG("AssetManager: base fallback manifest not found at ", manifestPath,
                   " - fallback disabled");
-        return;
+        return false;
     }
-    if (baseFallbackManifest_.load(manifestPath)) {
-        baseFallbackDataPath_ = basePath;
-        LOG_INFO("AssetManager: base fallback path set to '", basePath,
-                 "' (", baseFallbackManifest_.getEntryCount(), " files)");
+    if (!baseFallbackManifest_.load(manifestPath)) return false;
+
+    const std::string& baseExpansion = baseFallbackManifest_.getExpansion();
+    const char* forcedEnv = std::getenv("WOWEE_ASSET_BASE_FALLBACK");
+    const bool forced = forcedEnv && forcedEnv[0] == '1';
+
+    switch (decideBaseFallback(baseExpansion, expansionId, forced)) {
+        case BaseFallbackDecision::Use:
+            break;
+        case BaseFallbackDecision::UseUnlabelled:
+            // Nothing can be concluded, so it is used and said: an unlabelled
+            // tree is how the wrong client's assets reach the screen without
+            // anybody having chosen that.
+            LOG_WARNING("AssetManager: base fallback '", basePath,
+                        "' does not record which client it was extracted from, so it "
+                        "cannot be checked against '", expansionId,
+                        "'. Re-extract to label it. Files it holds and '", expansionId,
+                        "' does not will be used as they are");
+            break;
+        case BaseFallbackDecision::Refuse:
+            LOG_ERROR("AssetManager: base fallback '", basePath, "' was extracted from '",
+                      baseExpansion, "' and the client is running '", expansionId,
+                      "'. Refusing it: every file '", expansionId,
+                      "' does not cover would otherwise be drawn from '", baseExpansion,
+                      "' with nothing to say so. Extract '", expansionId,
+                      "' into its own data root, or set WOWEE_ASSET_BASE_FALLBACK=1 "
+                      "to use it anyway");
+            return false;
+        case BaseFallbackDecision::UseForced:
+            LOG_WARNING("AssetManager: using base fallback '", basePath, "' from '",
+                        baseExpansion, "' while running '", expansionId,
+                        "' because WOWEE_ASSET_BASE_FALLBACK=1");
+            break;
     }
+
+    baseFallbackDataPath_ = basePath;
+    LOG_INFO("AssetManager: base fallback path set to '", basePath, "' (",
+             baseFallbackManifest_.getEntryCount(), " files, expansion '",
+             baseExpansion.empty() ? std::string("unrecorded") : baseExpansion, "')");
+    return true;
 }
 
 BLPImage AssetManager::loadTexture(const std::string& path, bool keepCompressed) {

@@ -340,6 +340,7 @@ int main(int argc, char** argv) {
     wowee::game::ExpansionRegistry assetExpansions;
     std::string primaryAssetPath = assetPath;
     std::string assetFallbackPath;
+    std::string assetExpansionId;
     if (assetExpansions.initialize(assetPath) > 0) {
         if (const auto* active = assetExpansions.getActive()) {
             const std::string expansionManifest = active->dataPath + "/manifest.json";
@@ -348,6 +349,7 @@ int main(int argc, char** argv) {
                 active->dataPath != assetPath) {
                 primaryAssetPath = active->dataPath;
                 assetFallbackPath = assetPath;
+                assetExpansionId = active->id;
             }
         }
     }
@@ -355,7 +357,8 @@ int main(int argc, char** argv) {
     wowee::pipeline::AssetManager assets;
     // Before initialize, exactly as application.cpp does it - the fallback
     // manifest is loaded here and initialize does not clear it.
-    if (!assetFallbackPath.empty()) assets.setBaseFallbackPath(assetFallbackPath);
+    if (!assetFallbackPath.empty())
+        assets.setBaseFallbackPath(assetFallbackPath, assetExpansionId);
     const bool haveAssets = assets.initialize(primaryAssetPath);
     if (!haveAssets) {
         std::printf("== assets: none at %s; texture sizes are unavailable\n",

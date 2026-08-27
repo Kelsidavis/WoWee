@@ -35,6 +35,7 @@ struct ManifestSax {
 
     int version = 0;
     std::string basePath;
+    std::string expansion;
     std::unordered_map<std::string, AssetManifest::Entry>* entries = nullptr;
 
     // Where the parser is: 1 is the root object, 2 the entries map, 3 one
@@ -76,6 +77,7 @@ struct ManifestSax {
 
     bool string(string_t& v) {
         if (depth == 1 && rootKey == "basePath") basePath = v;
+        else if (depth == 1 && rootKey == "expansion") expansion = v;
         else if (depth == 3) {
             if (valueKey == "p") entry.filesystemPath = v;
             else if (valueKey == "h") {
@@ -117,6 +119,7 @@ bool AssetManifest::load(const std::string& manifestPath) {
 
     loaded_ = false;
     basePath_.clear();
+    expansion_.clear();
     manifestDir_.clear();
     entries_.clear();
 
@@ -137,6 +140,7 @@ bool AssetManifest::load(const std::string& manifestPath) {
         return false;
     }
 
+    expansion_ = sax.expansion;
     basePath_ = sax.basePath.empty() ? "assets" : sax.basePath;
     manifestDir_ = std::filesystem::path(manifestPath).parent_path().string();
 

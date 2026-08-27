@@ -315,10 +315,12 @@ bool Application::initialize() {
             if (std::filesystem::exists(expansionManifest)) {
                 assetPath = profile->dataPath;
                 LOG_INFO("Using expansion-specific asset path: ", assetPath);
-                // Register base Data/ as fallback so world terrain files are found
-                // even when the expansion path only contains DBC overrides.
+                // Register base Data/ as fallback so world terrain files are
+                // found even when the expansion path only contains overrides.
+                // Named, so a base extracted from another client is refused
+                // rather than quietly answering for this one.
                 if (assetPath != dataPath) {
-                    assetManager->setBaseFallbackPath(dataPath);
+                    assetManager->setBaseFallbackPath(dataPath, profile->id);
                 }
             }
         }
@@ -2074,7 +2076,7 @@ void Application::reloadExpansionData() {
         if (desiredAssetPath != assetManager->getDataPath() &&
             assetManager->switchDataPath(desiredAssetPath) &&
             desiredAssetPath != baseDataPath) {
-            assetManager->setBaseFallbackPath(baseDataPath);
+            assetManager->setBaseFallbackPath(baseDataPath, assetProfile->id);
         }
         LOG_INFO("Protocol profile '", profile->id, "' using asset source '",
                  useLegacyAssets ? std::string("legacy") : assetProfile->id, "'");

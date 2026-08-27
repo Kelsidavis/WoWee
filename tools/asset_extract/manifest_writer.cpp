@@ -13,6 +13,7 @@ uint32_t ManifestWriter::computeCRC32(const uint8_t* data, size_t size) {
 
 bool ManifestWriter::write(const std::string& outputPath,
                            const std::string& basePath,
+                           const std::string& expansion,
                            const std::vector<FileEntry>& entries) {
     // Write JSON manually to avoid pulling nlohmann/json into the tool
     // (though it would also work fine). This keeps the tool dependency-light.
@@ -24,6 +25,9 @@ bool ManifestWriter::write(const std::string& outputPath,
     file << "{\n";
     file << "  \"version\": 1,\n";
     file << "  \"basePath\": \"" << basePath << "\",\n";
+    // Readers written before this field ignore it, so no version bump.
+    if (!expansion.empty())
+        file << "  \"expansion\": \"" << expansion << "\",\n";
     file << "  \"fileCount\": " << entries.size() << ",\n";
     file << "  \"entries\": {\n";
 

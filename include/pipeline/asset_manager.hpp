@@ -73,13 +73,40 @@ public:
     void setExpansionDataPath(const std::string& path);
 
     /**
-     * Set a base data path to fall back to when the primary manifest
-     * does not contain a requested file.  Call this when the primary
-     * dataPath is an expansion-specific subset (e.g. Data/expansions/vanilla/)
-     * that only holds DBC overrides, not the full world asset set.
-     * @param basePath  Path to the base extraction (Data/) that has a manifest.json
+     * Set a base data path to fall back to when the primary manifest does not
+     * contain a requested file. Call this when the primary dataPath is an
+     * expansion-specific subset (e.g. Data/expansions/wotlk/) that only holds
+     * overrides rather than the full world asset set.
+     *
+     * The fallback is how a thin expansion tree works at all: the wotlk tree
+     * here holds 18,943 files against the base tree's 199,468, so nine assets
+     * in ten are answered by the base. It is also how one expansion's assets
+     * come to stand in for another's, because it is resolved per file with no
+     * check on where the file came from, and a borrowed file is not an error
+     * anywhere. Cataclysm is the case that makes this visible rather than
+     * merely wrong: its Azeroth is the sundered one, so a tile it does not
+     * cover is drawn as the old world and nothing says so.
+     *
+     * So the two trees are compared. A base extracted from a different client
+     * than the one being run is refused, and named, rather than used. A base
+     * whose manifest predates the `expansion` field cannot be compared, so it
+     * is used and said once. WOWEE_ASSET_BASE_FALLBACK=1 forces a refused one
+     * back on for whoever is deliberately mixing trees.
+     *
+     * @param basePath   Path to the base extraction (Data/) with a manifest.json
+     * @param expansionId The expansion actually being run, to compare against
+     * @return whether the fallback is now armed
      */
-    void setBaseFallbackPath(const std::string& basePath);
+    bool setBaseFallbackPath(const std::string& basePath,
+                             const std::string& expansionId);
+
+    /// How many lookups have been answered by the base fallback rather than by
+    /// the expansion's own tree. Nine in ten is normal for a thin expansion
+    /// tree and says nothing on its own; it is the count next to a mismatch
+    /// that says how much of what is on screen came from the wrong client.
+    [[nodiscard]] uint64_t getBaseFallbackHits() const {
+        return baseFallbackHits_.load(std::memory_order_relaxed);
+    }
 
     /**
      * Load a DBC file
@@ -165,6 +192,11 @@ private:
     // Populated by setBaseFallbackPath(); ignored if baseFallbackDataPath_ is empty.
     std::string    baseFallbackDataPath_;
     AssetManifest  baseFallbackManifest_;
+    // Counted from resolveAssetPath, which is const and takes no lock while
+    // several threads stream assets through it, so relaxed atomic rather than
+    // a plain mutable: nothing orders against this and a torn count would be
+    // a data race for a diagnostic.
+    mutable std::atomic<uint64_t> baseFallbackHits_{0};
 
     // (resolveFile moved to public - declaration above.)
 

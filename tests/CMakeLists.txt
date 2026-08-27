@@ -725,6 +725,17 @@ wowee_add_test(test_spatial_grid
     SOURCES test_spatial_grid.cpp
             ${TEST_COMMON_SOURCES})
 
+# ── test_base_fallback ─────────────────────────────────────────────────
+# Whether one client's asset tree may answer for another's missing files.
+add_executable(test_base_fallback
+    test_base_fallback.cpp
+    ${TEST_COMMON_SOURCES})
+target_include_directories(test_base_fallback PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_base_fallback SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
+target_link_libraries(test_base_fallback PRIVATE catch2_main)
+add_test(NAME base_fallback COMMAND test_base_fallback)
+register_test_target(test_base_fallback)
+
 # ── test_asset_manifest_load ───────────────────────────────────────────
 # The 32 MB asset manifest, pinned so a change to how it is read cannot change
 # what it read. Skips when Data/manifest.json is not in the checkout.

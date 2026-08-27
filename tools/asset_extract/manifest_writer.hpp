@@ -23,11 +23,16 @@ public:
      * Write manifest.json
      * @param outputPath Full path to manifest.json
      * @param basePath Value for basePath field (e.g., "assets")
+     * @param expansion Which client this was extracted from, e.g. "wotlk".
+     *        The client compares it against the expansion it is running before
+     *        letting one asset tree stand in for another's missing files, so
+     *        an empty value means it cannot tell and has to assume the best.
      * @param entries All extracted file entries
      * @return true on success
      */
     static bool write(const std::string& outputPath,
                       const std::string& basePath,
+                      const std::string& expansion,
                       const std::vector<FileEntry>& entries);
 
     /**

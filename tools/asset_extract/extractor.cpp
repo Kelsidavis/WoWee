@@ -915,7 +915,7 @@ bool Extractor::run(const Options& opts) {
               });
 
     // basePath is "." since manifest sits inside the output directory
-    if (!ManifestWriter::write(manifestPath.string(), ".", manifestEntries)) {
+    if (!ManifestWriter::write(manifestPath.string(), ".", opts.expansion, manifestEntries)) {
         std::cerr << "Failed to write manifest: " << manifestPath << "\n";
         return false;
     }

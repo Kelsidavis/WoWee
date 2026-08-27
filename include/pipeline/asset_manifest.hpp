@@ -53,6 +53,11 @@ public:
      */
     [[nodiscard]] const std::string& getBasePath() const { return basePath_; }
 
+    /// Which client this tree was extracted from, e.g. "wotlk". Empty when the
+    /// manifest predates the field, which is not the same as "no expansion":
+    /// it means the answer is unknown and nothing may be concluded from it.
+    [[nodiscard]] const std::string& getExpansion() const { return expansion_; }
+
     /**
      * Get total number of entries
      */
@@ -71,6 +76,7 @@ public:
 private:
     bool loaded_ = false;
     std::string basePath_;           // Root directory for extracted assets
+    std::string expansion_;          // Expansion this tree came from, empty if unrecorded
     std::string manifestDir_;        // Directory containing manifest.json
     std::unordered_map<std::string, Entry> entries_;
 };

@@ -17,6 +17,7 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <map>
 #include <string>
 
@@ -97,4 +98,53 @@ TEST_CASE("the asset manifest loads every entry unchanged", "[manifest]") {
     INFO("digest over all entries in key order");
     // The value below was computed in Python over the same bytes.
     CHECK(digestOf(manifest) == "a8cb5426eef0c923");
+}
+
+// --- Provenance -----------------------------------------------------------
+//
+// Which client a tree was extracted from, so the client can refuse to let one
+// expansion's assets answer for another's missing files. See
+// include/pipeline/base_fallback.hpp for what is done with it.
+
+namespace {
+
+/// A manifest with one entry, optionally carrying an expansion.
+std::string tinyManifest(const std::string& expansionLine) {
+    return std::string("{\n  \"version\": 1,\n  \"basePath\": \".\",\n")
+         + expansionLine
+         + "  \"fileCount\": 1,\n"
+           "  \"entries\": {\n"
+           "    \"world\\\\foo.blp\": {\"p\": \"world/foo.blp\", \"s\": 4, \"h\": \"0000000a\"}\n"
+           "  }\n}\n";
+}
+
+std::filesystem::path writeTemp(const std::string& name, const std::string& body) {
+    auto path = std::filesystem::temp_directory_path() / name;
+    std::ofstream out(path);
+    out << body;
+    return path;
+}
+
+}  // namespace
+
+TEST_CASE("a manifest records which client it came from", "[manifest]") {
+    const auto path = writeTemp("wowee_manifest_expansion.json",
+                                tinyManifest("  \"expansion\": \"cata\",\n"));
+    AssetManifest manifest;
+    REQUIRE(manifest.load(path.string()));
+    CHECK(manifest.getExpansion() == "cata");
+    CHECK(manifest.getEntryCount() == 1);
+    std::filesystem::remove(path);
+}
+
+TEST_CASE("a manifest written before the field still loads", "[manifest]") {
+    // Every existing install. The field is absent rather than empty, and the
+    // reader has to answer "unknown" rather than fail, because refusing these
+    // would break every tree extracted before today.
+    const auto path = writeTemp("wowee_manifest_no_expansion.json", tinyManifest(""));
+    AssetManifest manifest;
+    REQUIRE(manifest.load(path.string()));
+    CHECK(manifest.getExpansion().empty());
+    CHECK(manifest.getEntryCount() == 1);
+    std::filesystem::remove(path);
 }
