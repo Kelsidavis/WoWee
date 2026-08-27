@@ -2646,8 +2646,19 @@ void CameraController::update(float deltaTime) {
             movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_JUMP));
         }
 
-        // Fall landing
-        if (wasFalling && grounded) {
+        // Fall landing, for a fall that actually happened.
+        //
+        // A bump at riding speed breaks ground contact for a frame, and the
+        // frame after it this read as a landing: the packet went out, and
+        // every client in range played the landing animation on the mount.
+        // Crossing open ground did that several times a second, which is what
+        // other players see as a mount behaving erratically.
+        //
+        // Long enough to be a fall rather than a step. Well under the shortest
+        // real drop - a jump is airborne for about a second - so nothing a
+        // player would call a fall is lost.
+        constexpr float kFallReportSeconds = 0.15f;
+        if (wasFalling && grounded && airborneSeconds_ >= kFallReportSeconds) {
             movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_FALL_LAND));
         }
     }
@@ -2706,6 +2717,9 @@ void CameraController::update(float deltaTime) {
     wasTurningRight = nowTurnRight;
     wasJumping = nowJump;
     wasFalling = !grounded && verticalVelocity <= 0.0f;
+    // Counted while airborne and zeroed the moment the ground is back, so the
+    // landing test above reads the length of the fall that just ended.
+    airborneSeconds_ = grounded ? 0.0f : (airborneSeconds_ + deltaTime);
 
     // R key is now handled above with chat safeguard (WantTextInput check)
 

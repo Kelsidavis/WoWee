@@ -512,6 +512,14 @@ private:
     bool wasTurningRight = false;
     bool wasJumping = false;
     bool wasFalling = false;
+    /// How long the player has been off the ground and moving downward.
+    ///
+    /// A landing is only worth telling the server about if there was a fall.
+    /// Riding over uneven ground breaks contact for a frame at a time, and each
+    /// of those used to send MSG_MOVE_FALL_LAND - which every other client in
+    /// range plays as a landing, so a mounted player crossing a field looked to
+    /// everyone else like one landing over and over.
+    float airborneSeconds_ = 0.0f;
     bool wasAscending_ = false;   // Space held while flyingActive_
     bool wasDescending_ = false;  // X held while flyingActive_
     /// True while the tile under a position has not finished streaming, which
