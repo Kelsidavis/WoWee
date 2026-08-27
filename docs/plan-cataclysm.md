@@ -1,8 +1,10 @@
 # Cataclysm Support Plan
 
-**Status:** started, at the two steps that need no server. The bit primitive of step 2 is in
-`network::Packet` with 13 cases over it, and the trap in section 5 is closed. Everything after that
-waits on a running 4.3.4 core, and this document still does not authorise it.
+**Status:** steps 1 to 3 in progress. A 4.3.4.15595 core runs at `/media/k/vbox/wowee-cata`
+(The-Cataclysm-Preservation-Project, since upstream deleted its 4.3.4 branch). The bit primitive is
+in `network::Packet`, the trap in section 5 is closed, and the 109 per-opcode movement layouts are
+derived from that core and executed by a table-driven reader. Update-object is next, and the gate in
+section 6 has not been reached.
 **Target:** 4.3.4 build 15595, which is where the private-server cores settled.
 **Constraint set by the project:** the same one every other expansion works under. The player
 extracts from their own client, the release ships no data, and the wire format is derived from a
@@ -127,6 +129,19 @@ The point of this ordering is to reach the decision early and cheaply.
    off a core rather than recalled, and the helpers take them as arguments so that stays true.
 3. **Movement and update-object only.** A `CataPacketParsers` that logs in, receives the player,
    and moves. Everything else may fail.
+
+   Movement is read. The core keeps each opcode's layout as an array of
+   `MovementStatusElements` in `MovementStructures.cpp`, and there are 109 of them with no pattern
+   between: `MSG_MOVE_START_FORWARD` writes position Y, Z, X then guid mask bits 5, 2, 0, while
+   `MSG_MOVE_HEARTBEAT` writes Z, X, Y then pitch, timestamp and fall bits. `tools/derive_cata_movement.py`
+   parses them into `Data/expansions/cata/movement_sequences.json` and `src/game/cata_movement.cpp`
+   executes that, which is how the core does it and for the same reason.
+
+   Two things came off the core that no amount of care would have produced from memory. The presence
+   bits for movement flags, flags2, timestamp, orientation, pitch and spline elevation are
+   **inverted**, so a set bit means the field is absent, while the transport, fall and vehicle bits
+   are not. And eleven layouts carry `MSEFlushBits`, all of them SMSG, which is why the core's own
+   reader has no case for it: the server writes those and never reads one.
 4. **Stop and look.** This is the gate. If steps 2 and 3 came in near the estimate the rest is
    ordinary work; if they did not, nothing further is worth starting.
 5. Asset extraction: archive list, split ADTs, the new MCNK sub-chunks, WDB2.

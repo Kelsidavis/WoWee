@@ -645,6 +645,7 @@ set(WOWEE_SOURCES
     src/game/entity_controller.cpp
     src/game/warden_handler.cpp
     src/game/warden_crypto.cpp
+    src/game/cata_movement.cpp
     src/game/warden_module.cpp
     src/game/warden_emulator.cpp
     src/game/warden_memory.cpp

@@ -109,6 +109,20 @@ wowee_[0-9][0-9][0-9][0-9]
 Data/*
 !Data/opcodes
 
+# A profile is configuration, not an asset: the four JSONs an expansion is
+# defined by are tracked, and everything else that lands in its directory is
+# extracted and is not. The four existing profiles predate the Data/* rule and
+# stayed tracked by being tracked already; a fifth needs saying.
+!Data/expansions/
+Data/expansions/*
+!Data/expansions/*/
+Data/expansions/*/*
+!Data/expansions/*/expansion.json
+!Data/expansions/*/opcodes.json
+!Data/expansions/*/update_fields.json
+!Data/expansions/*/dbc_layouts.json
+!Data/expansions/*/movement_sequences.json
+
 ingest/
 
 # Asset archives dropped at the repo root rather than into ingest/. An MPQ is

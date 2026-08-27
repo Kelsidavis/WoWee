@@ -725,6 +725,22 @@ wowee_add_test(test_spatial_grid
     SOURCES test_spatial_grid.cpp
             ${TEST_COMMON_SOURCES})
 
+# ── test_cata_movement ─────────────────────────────────────────────────
+# The 109 Cataclysm movement layouts derived from a 4.3.4 core, and the reader
+# that executes them. Runs from the source dir for the derived JSON.
+add_executable(test_cata_movement
+    test_cata_movement.cpp
+    ${TEST_COMMON_SOURCES}
+    ${CMAKE_SOURCE_DIR}/src/game/cata_movement.cpp
+    ${CMAKE_SOURCE_DIR}/src/network/packet.cpp)
+target_include_directories(test_cata_movement PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_cata_movement SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
+target_link_libraries(test_cata_movement PRIVATE catch2_main)
+wowee_test_link_glm(test_cata_movement)
+add_test(NAME cata_movement COMMAND test_cata_movement
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+register_test_target(test_cata_movement)
+
 # ── test_base_fallback ─────────────────────────────────────────────────
 # Whether one client's asset tree may answer for another's missing files.
 add_executable(test_base_fallback
