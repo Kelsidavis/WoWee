@@ -328,6 +328,16 @@ struct Emitter {
         }
         if (const XmlNode* anchors = node.child("Anchors"))
             emitAnchors(*anchors, var, parentVar, parentName);
+        // A texture may animate itself. See emitAnimations: the achievement
+        // banner's glow and shine are textures with an animIn of their own, and
+        // losing them took the banner's whole fade-out with them.
+        //
+        // $parent inside those is the region, not the frame holding it - the
+        // glow's group is AchievementAlertFrame1GlowAnimIn - so the name the
+        // substitution is made against is the region's own.
+        const std::string regionName =
+            substituteParent(node.attrOr("name", ""), parentName);
+        emitAnimations(node, var, regionName.empty() ? parentName : regionName);
     }
 
     /// A virtual Texture or FontString: recorded, not built, and replayed onto
@@ -390,6 +400,83 @@ struct Emitter {
             const std::string regionVar =
                 emitRegion(*child, var, name, slot.layer, slot.isTexture);
             line(var + ":" + slot.setter + "(" + regionVar + ")");
+        }
+    }
+
+    /// <Animations> - one or more <AnimationGroup>, each holding <Alpha>,
+    /// <Translation> and friends.
+    ///
+    /// Asked of regions as well as of frames, because a Texture may declare
+    /// one. The achievement banner is what that costs: its glow and its shine
+    /// are textures with an animIn of their own, and AlertFrame_AnimateIn plays
+    /// all three in a row - so with the texture groups dropped, the second call
+    /// raised on a nil and everything after it was lost, including the
+    /// waitAndAnimOut that hides the banner. It appeared and stayed for the
+    /// rest of the session.
+    void emitAnimations(const XmlNode& node, const std::string& var,
+                        const std::string& name) {
+        // <Animations> - one or more <AnimationGroup>, each holding <Alpha>,
+        // <Translation> and friends. The group is a Lua object rather than a
+        // widget, so this emits the calls a script would make.
+        for (const XmlNode& anims : node.children) {
+            if (anims.name != "Animations") continue;
+            for (const XmlNode& group : anims.children) {
+                if (group.name != "AnimationGroup") continue;
+                const std::string gvar = nextVar();
+                const std::string gname = substituteParent(
+                    group.attrOr("name", ""), name);
+                line(gvar + " = " + var + ":CreateAnimationGroup(" +
+                     (gname.empty() ? "nil" : quote(gname)) + ")");
+                if (const std::string* loop = group.attr("looping")) {
+                    line(gvar + ":SetLooping(" + quote(*loop) + ")");
+                }
+                if (const std::string* pk = group.attr("parentKey")) {
+                    line(var + "." + *pk + " = " + gvar);
+                }
+                for (const XmlNode& gs : group.children) {
+                    if (gs.name == "Scripts") emitScripts(gs, gvar);
+                }
+                for (const XmlNode& a : group.children) {
+                    if (a.name != "Alpha" && a.name != "Translation" &&
+                        a.name != "Scale" && a.name != "Rotation" &&
+                        a.name != "Animation") {
+                        continue;
+                    }
+                    const std::string avar = nextVar();
+                    const std::string aname = substituteParent(
+                        a.attrOr("name", ""), name);
+                    line(avar + " = " + gvar + ":CreateAnimation(" +
+                         quote(a.name == "Animation" ? "Alpha" : a.name) +
+                         (aname.empty() ? "" : ", " + quote(aname)) + ")");
+                    if (const std::string* d = a.attr("duration"))
+                        line(avar + ":SetDuration(" + *d + ")");
+                    if (const std::string* o = a.attr("order"))
+                        line(avar + ":SetOrder(" + *o + ")");
+                    if (const std::string* sd = a.attr("startDelay"))
+                        line(avar + ":SetStartDelay(" + *sd + ")");
+                    if (const std::string* c = a.attr("change"))
+                        line(avar + ":SetChange(" + *c + ")");
+                    if (a.attr("offsetX") || a.attr("offsetY")) {
+                        line(avar + ":SetOffset(" + a.attrOr("offsetX", "0") +
+                             ", " + a.attrOr("offsetY", "0") + ")");
+                    }
+                    // On the group, which is the animation's parent. This
+                    // wrote it on the frame, so alertframes.xml's
+                    // `frame.waitAndAnimOut.animOut:SetStartDelay(4.05)` found
+                    // a nil and raised - taking the Play() on the line after it
+                    // with it, which is the call that hides the banner.
+                    if (const std::string* pk = a.attr("parentKey"))
+                        line(gvar + "." + *pk + " = " + avar);
+                    // An animation's own <Scripts>. Dropping these cost the
+                    // alert banners: alertframes.xml hangs
+                    // `self:GetRegionParent():Hide()` off the fade's
+                    // OnFinished, so without it an achievement banner faded to
+                    // nothing and stayed there.
+                    for (const XmlNode& sc : a.children) {
+                        if (sc.name == "Scripts") emitScripts(sc, avar);
+                    }
+                }
+            }
         }
     }
 
@@ -968,64 +1055,8 @@ struct Emitter {
                 }
             }
         }
-        // <Animations> - one or more <AnimationGroup>, each holding <Alpha>,
-        // <Translation> and friends. The group is a Lua object rather than a
-        // widget, so this emits the calls a script would make.
-        for (const XmlNode& anims : node.children) {
-            if (anims.name != "Animations") continue;
-            for (const XmlNode& group : anims.children) {
-                if (group.name != "AnimationGroup") continue;
-                const std::string gvar = nextVar();
-                const std::string gname = substituteParent(
-                    group.attrOr("name", ""), name);
-                line(gvar + " = " + var + ":CreateAnimationGroup(" +
-                     (gname.empty() ? "nil" : quote(gname)) + ")");
-                if (const std::string* loop = group.attr("looping")) {
-                    line(gvar + ":SetLooping(" + quote(*loop) + ")");
-                }
-                if (const std::string* pk = group.attr("parentKey")) {
-                    line(var + "." + *pk + " = " + gvar);
-                }
-                for (const XmlNode& gs : group.children) {
-                    if (gs.name == "Scripts") emitScripts(gs, gvar);
-                }
-                for (const XmlNode& a : group.children) {
-                    if (a.name != "Alpha" && a.name != "Translation" &&
-                        a.name != "Scale" && a.name != "Rotation" &&
-                        a.name != "Animation") {
-                        continue;
-                    }
-                    const std::string avar = nextVar();
-                    const std::string aname = substituteParent(
-                        a.attrOr("name", ""), name);
-                    line(avar + " = " + gvar + ":CreateAnimation(" +
-                         quote(a.name == "Animation" ? "Alpha" : a.name) +
-                         (aname.empty() ? "" : ", " + quote(aname)) + ")");
-                    if (const std::string* d = a.attr("duration"))
-                        line(avar + ":SetDuration(" + *d + ")");
-                    if (const std::string* o = a.attr("order"))
-                        line(avar + ":SetOrder(" + *o + ")");
-                    if (const std::string* sd = a.attr("startDelay"))
-                        line(avar + ":SetStartDelay(" + *sd + ")");
-                    if (const std::string* c = a.attr("change"))
-                        line(avar + ":SetChange(" + *c + ")");
-                    if (a.attr("offsetX") || a.attr("offsetY")) {
-                        line(avar + ":SetOffset(" + a.attrOr("offsetX", "0") +
-                             ", " + a.attrOr("offsetY", "0") + ")");
-                    }
-                    if (const std::string* pk = a.attr("parentKey"))
-                        line(var + "." + *pk + " = " + avar);
-                    // An animation's own <Scripts>. Dropping these cost the
-                    // alert banners: alertframes.xml hangs
-                    // `self:GetRegionParent():Hide()` off the fade's
-                    // OnFinished, so without it an achievement banner faded to
-                    // nothing and stayed there.
-                    for (const XmlNode& sc : a.children) {
-                        if (sc.name == "Scripts") emitScripts(sc, avar);
-                    }
-                }
-            }
-        }
+        emitAnimations(node, var, name);
+
         // <NormalFont style="GameFontNormal"/> - the font a button's label is
         // drawn in. Only the normal one: this renderer does not draw a button's
         // text differently when it is highlighted or disabled, so emitting the

@@ -144,6 +144,48 @@ XmlNode parseShippedFile(const std::string& name) {
 }
 }  // namespace
 
+// The achievement banner is what these two cost. AlertFrame_AnimateIn plays the
+// frame's animIn, then the glow's and the shine's - which are declared on the
+// *textures* - and then plays waitAndAnimOut, whose animOut it reaches through
+// the group. Losing either meant the third and fourth lines never ran: the
+// banner appeared, the fade that hides it was never started, and it sat there
+// for the rest of the session. Nothing raised where anyone could see it.
+TEST_CASE("a texture may animate itself", "[framexml][emit]") {
+    XmlNode root = parseOrFail(
+        "<Ui><Frame name='Alert'><Layers><Layer level='OVERLAY'>"
+        "<Texture name='$parentGlow' parentKey='glow'>"
+        "<Animations><AnimationGroup name='$parentAnimIn' parentKey='animIn'>"
+        "<Alpha change='1' duration='0.2' order='1'/>"
+        "</AnimationGroup></Animations>"
+        "</Texture></Layer></Layers></Frame></Ui>");
+    const std::string lua = emitFrameXml(root).lua;
+    INFO(lua);
+    // The group is created on the texture, not on the frame that holds it.
+    CHECK(has(lua, ":CreateAnimationGroup(\"AlertGlowAnimIn\")"));
+    CHECK(has(lua, ".animIn = "));
+    CHECK(has(lua, ":SetDuration(0.2)"));
+}
+
+TEST_CASE("an animation's parentKey goes on its group", "[framexml][emit]") {
+    XmlNode root = parseOrFail(
+        "<Ui><Frame name='Alert'><Animations>"
+        "<AnimationGroup name='$parentWaitAndAnimOut' parentKey='waitAndAnimOut'>"
+        "<Alpha startDelay='4.05' change='-1' duration='1.5' parentKey='animOut'/>"
+        "</AnimationGroup></Animations></Frame></Ui>");
+    const std::string lua = emitFrameXml(root).lua;
+    INFO(lua);
+    // The group hangs off the frame and the animation off the group, which is
+    // how alertframes.lua reaches it: frame.waitAndAnimOut.animOut.
+    const size_t group = lua.find(" = __w[1]:CreateAnimationGroup(");
+    REQUIRE(group != std::string::npos);
+    const std::string gvar = lua.substr(lua.rfind('\n', group) + 1,
+                                        group - lua.rfind('\n', group) - 1);
+    CHECK(has(lua, "__w[1].waitAndAnimOut = " + gvar));
+    CHECK(has(lua, gvar + ".animOut = "));
+    CHECK_FALSE(has(lua, "__w[1].animOut = "));
+    CHECK(has(lua, ":SetStartDelay(4.05)"));
+}
+
 TEST_CASE("characterframe.xml builds the frame the C key opens",
           "[framexml][emit][shipped]") {
     XmlNode root = parseShippedFile("characterframe.xml");

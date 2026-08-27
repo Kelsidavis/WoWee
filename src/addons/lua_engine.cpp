@@ -3681,6 +3681,20 @@ void installRegionMethods(lua_State* L, bool isTexture, bool isFontString) {
     set("GetObjectType", lua_Region_GetObjectType);
     set("IsObjectType", lua_Region_IsObjectType);
     set("GetNumPoints", lua_Region_GetNumPoints);
+    // A region may animate itself - the achievement banner's glow and shine
+    // are textures with an animIn of their own. These live on the frame
+    // metatable as Lua functions; a region keeps its methods on itself, so
+    // they are copied off the globals the animation bootstrap published. Absent
+    // before the bootstrap has run, which is only true of regions built during
+    // engine start-up, and those declare no animations.
+    for (const char* name : {"CreateAnimationGroup", "StopAnimating"}) {
+        lua_getglobal(L, (std::string("__Wowee") +
+                          (std::strcmp(name, "StopAnimating") == 0
+                               ? "StopAnimating"
+                               : "CreateAnimationGroup")).c_str());
+        if (lua_isfunction(L, -1)) lua_setfield(L, -2, name);
+        else                       lua_pop(L, 1);
+    }
     set("GetScale", lua_Region_GetScale);
     set("SetScale", lua_Region_SetScale);
     set("GetEffectiveScale", lua_Region_GetEffectiveScale);
@@ -5950,19 +5964,30 @@ void LuaEngine::registerCoreAPI() {
         // whenever a glyph slot empties, which is every time the glyph tab is
         // opened on a character with a free socket. Missing, that raised and
         // took GlyphFrame_UpdateGlyphSlot with it.
-        "function mt:StopAnimating()\n"
+        "function __WoweeStopAnimating(self)\n"
         "    if self.__animGroups then\n"
         "        for _, g in ipairs(self.__animGroups) do g:Stop() end\n"
         "    end\n"
         "end\n"
+        "mt.StopAnimating = __WoweeStopAnimating\n"
 
-        "function mt:CreateAnimationGroup(name)\n"
+        // A texture animates itself as readily as a frame does, so this is a
+        // plain function both get rather than a frame method. The achievement
+        // banner's glow and shine each declare an animIn on the *texture*, and
+        // AlertFrame_AnimateIn plays the frame's and both of theirs one after
+        // another - so a region without this raised on the second call and lost
+        // every line after it, the fade-out that hides the banner included.
+        //
+        // Regions carry their methods on themselves rather than on a shared
+        // metatable, so installRegionMethods copies these two off the globals.
+        "function __WoweeCreateAnimationGroup(self, name)\n"
         "    local g = setmetatable({parent = self, animations = {}}, groupMeta)\n"
         "    if name then _G[name] = g end\n"
         "    self.__animGroups = self.__animGroups or {}\n"
         "    table.insert(self.__animGroups, g)\n"
         "    return g\n"
         "end\n"
+        "mt.CreateAnimationGroup = __WoweeCreateAnimationGroup\n"
 
         // Advanced once a frame from dispatchOnUpdate.
         "function __WoweeTickAnimations(elapsed)\n"
