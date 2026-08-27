@@ -1683,7 +1683,19 @@ int lua_Tooltip_SetOwner(lua_State* L) {
 /// shared SetText can hand off and stop.
 int lua_Tooltip_SetText(lua_State* L) {
     auto* w = widgetOf(L, 1);
-    if (!w || !w->isTooltip) { lua_pushboolean(L, 0); return 1; }
+    // A GameTooltip is one before anything has been put in it.
+    //
+    // isTooltip was set by the fillers alone - AddLine, SetOwner, each
+    // SetSomething - so a tooltip that had never been filled refused its own
+    // SetText, and the frame metatable then took that "no" as "this is not a
+    // tooltip" and stored the words where a button keeps its label. The first
+    // line of every tooltip is a SetText, which is the title: the name of the
+    // buff, the item, the spell. Once anything had AddLine'd on that widget it
+    // worked for the rest of the session, so what it looked like was a
+    // tooltip that sometimes had no title.
+    const bool isTooltipFrame = w && (w->isTooltip || w->objectType == "GameTooltip");
+    if (!isTooltipFrame) { lua_pushboolean(L, 0); return 1; }
+    w->isTooltip = true;
     w->tooltipLines.clear();
     wowee::ui::Widget::TooltipLine line;
     line.left = luaL_optstring(L, 2, "");
@@ -7147,19 +7159,34 @@ void LuaEngine::registerCoreAPI() {
         "    if harmful then self:SetText(name, 1, 0, 0) else self:SetText(name, 1, 1, 1) end\n"
         "    if debuffType then self:AddLine(debuffType, 0.5, 0.5, 0.5) end\n"
         "    if count and count > 1 then self:AddLine(count .. ' stacks', 1, 1, 1) end\n"
+        // What the aura actually does, which is the whole reason a buff is
+        // worth hovering. The tooltip gave its name, its stacks and its time
+        // left and never said that Power Word: Fortitude increases Stamina by
+        // 165 - so nothing on the buff bar described its own effect.
+        //
+        // Above the time remaining, as WoW orders it: the description belongs
+        // to the aura and the countdown to this moment.
+        "    local desc = GetSpellDescription and spellId and GetSpellDescription(spellId)\n"
+        "    if desc and desc ~= '' then self:AddLine(desc, 1, 0.82, 0, 1) end\n"
         "    if duration and duration > 0 and expTime then\n"
         "        self:AddLine(string.format('%.0f sec remaining', expTime - GetTime()), 1, 1, 1)\n"
         "    end\n"
         "    self.__spellId = spellId\n"
         "end\n"
+        // Through SetUnitAura rather than beside it. This had the name and the
+        // dispel type and nothing else - no stacks, no time left, no
+        // description - so a debuff tooltip said strictly less than a buff's,
+        // and any line added to one had to be remembered for the other.
         "function __WoweeFrameMT:SetUnitDebuff(unit, index, filter)\n"
-        "    self:ClearLines()\n"
-        "    local name, rank, icon, count, debuffType, duration, expTime, caster, steal, consolidate, spellId = UnitDebuff(unit, index, filter)\n"
-        "    if name then\n"
-        "        self:SetText(name, 1, 0, 0)\n"
-        "        if debuffType then self:AddLine(debuffType, 0.5, 0.5, 0.5) end\n"
-        "        self.__spellId = spellId\n"
+        // HARMFUL is what makes UnitAura count debuffs rather than buffs, and
+        // a caller's own filter - 'RAID' from the raid frames - has to keep it
+        // rather than replace it.
+        "    if filter and filter ~= '' then\n"
+        "        if not string.find(filter, 'HARMFUL') then filter = filter .. '|HARMFUL' end\n"
+        "    else\n"
+        "        filter = 'HARMFUL'\n"
         "    end\n"
+        "    return self:SetUnitAura(unit, index, filter)\n"
         "end\n"
         // Shared item tooltip builder using GetItemInfo return values
         "function _WoweePopulateItemTooltip(self, itemId)\n"
