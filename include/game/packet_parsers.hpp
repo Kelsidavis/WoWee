@@ -555,13 +555,23 @@ public:
 };
 
 /**
- * Factory function to create the right parser set for an expansion.
+ * The parser set for an expansion id, or null if there is not one.
+ *
+ * Null rather than a WotLK fallback. This used to end in WotLK's parsers for
+ * every id it did not recognise, so a profile whose wire format is not WotLK's
+ * would authenticate, log in, and then misparse movement and update-object
+ * rather than failing where the gap actually is. An expansion is a parser set
+ * as much as it is a data directory, and this is the one place that says so.
+ *
+ * The caller decides what to do about it, because deciding here would mean
+ * logging, and this header is pure enough that ten standalone tests include it.
  */
 inline std::unique_ptr<PacketParsers> createPacketParsers(const std::string& expansionId) {
     if (expansionId == "classic") return std::make_unique<ClassicPacketParsers>();
     if (expansionId == "turtle") return std::make_unique<TurtlePacketParsers>();
     if (expansionId == "tbc") return std::make_unique<TbcPacketParsers>();
-    return std::make_unique<WotlkPacketParsers>();
+    if (expansionId == "wotlk") return std::make_unique<WotlkPacketParsers>();
+    return nullptr;
 }
 
 } // namespace game

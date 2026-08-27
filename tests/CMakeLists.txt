@@ -558,6 +558,18 @@ target_link_libraries(test_packet PRIVATE catch2_main)
 add_test(NAME packet COMMAND test_packet)
 register_test_target(test_packet)
 
+# ── test_bit_packet ──────────────────────────────────────────
+add_executable(test_bit_packet
+    test_bit_packet.cpp
+    ${TEST_COMMON_SOURCES}
+    ${CMAKE_SOURCE_DIR}/src/network/packet.cpp
+)
+target_include_directories(test_bit_packet PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_bit_packet SYSTEM PRIVATE ${TEST_SYSTEM_INCLUDE_DIRS})
+target_link_libraries(test_bit_packet PRIVATE catch2_main)
+add_test(NAME bit_packet COMMAND test_bit_packet)
+register_test_target(test_bit_packet)
+
 # ── test_srp ─────────────────────────────────────────────────
 add_executable(test_srp
     test_srp.cpp

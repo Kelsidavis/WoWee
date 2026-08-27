@@ -2023,7 +2023,18 @@ void Application::loadExpansionTables(const game::ExpansionProfile& profile) {
     }
     game::setActiveUpdateFieldTable(&gameHandler->getUpdateFieldTable());
 
-    gameHandler->setPacketParsers(game::createPacketParsers(profile.id));
+    // An id with no parser set is a profile this build cannot read the wire
+    // for. It still runs, on WotLK's parsers, because refusing to start would
+    // break a realm running a hand-written profile that happens to be close
+    // enough - but it says so, which is the half that was missing.
+    auto packetParsers = game::createPacketParsers(profile.id);
+    if (!packetParsers) {
+        LOG_ERROR("No packet parsers for expansion '", profile.id,
+                  "'. Falling back to WotLK, which will misparse movement and "
+                  "update-object against any realm that is not 3.3.5a");
+        packetParsers = std::make_unique<game::WotlkPacketParsers>();
+    }
+    gameHandler->setPacketParsers(std::move(packetParsers));
 
     if (dbcLayout_) {
         const std::string dbcLayoutsPath = profile.dataPath + "/dbc_layouts.json";

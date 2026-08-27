@@ -16,15 +16,18 @@ Packet::Packet(uint16_t opcode, std::vector<uint8_t>&& data)
     : opcode(opcode), data(std::move(data)) {}
 
 void Packet::writeUInt8(uint8_t value) {
+    flushBits();
     data.push_back(value);
 }
 
 void Packet::writeUInt16(uint16_t value) {
+    flushBits();
     data.push_back(value & 0xFF);
     data.push_back((value >> 8) & 0xFF);
 }
 
 void Packet::writeUInt32(uint32_t value) {
+    flushBits();
     data.push_back(value & 0xFF);
     data.push_back((value >> 8) & 0xFF);
     data.push_back((value >> 16) & 0xFF);
@@ -41,6 +44,7 @@ void Packet::writeFloat(float value) {
 }
 
 void Packet::writeString(const std::string& value) {
+    flushBits();
     for (char c : value) {
         data.push_back(static_cast<uint8_t>(c));
     }
@@ -48,10 +52,12 @@ void Packet::writeString(const std::string& value) {
 }
 
 void Packet::writeBytes(const uint8_t* bytes, size_t length) {
+    flushBits();
     data.insert(data.end(), bytes, bytes + length);
 }
 
 uint8_t Packet::readUInt8() {
+    resetBitReader();
     if (readPos >= data.size()) return 0;
     return data[readPos++];
 }
@@ -110,6 +116,7 @@ void Packet::writePackedGuid(uint64_t guid) {
 }
 
 std::string Packet::readString() {
+    resetBitReader();
     std::string result;
     while (readPos < data.size()) {
         uint8_t c = data[readPos++];
@@ -134,6 +141,107 @@ bool Packet::readSizedString(std::string& out, uint32_t maxLength) {
     // back off.
     if (!out.empty() && out.back() == '\0') out.pop_back();
     return true;
+}
+
+
+// ---------------------------------------------------------------------------
+// Bit-level access. See the contract on packet.hpp.
+// ---------------------------------------------------------------------------
+
+void Packet::writeBit(bool value) {
+    --writeBitPos;
+    if (value) writeBitValue |= static_cast<uint8_t>(1u << writeBitPos);
+    if (writeBitPos == 0) {
+        // Emitted directly rather than through writeUInt8, which would flush
+        // this byte a second time.
+        data.push_back(writeBitValue);
+        writeBitValue = 0;
+        writeBitPos = 8;
+    }
+}
+
+void Packet::writeBits(uint64_t value, int count) {
+    if (count < 1 || count > 64) return;
+    for (int i = count - 1; i >= 0; --i)
+        writeBit(((value >> i) & 1u) != 0);
+}
+
+void Packet::flushBits() {
+    if (writeBitPos == 8) return;
+    const uint8_t pending = writeBitValue;
+    writeBitValue = 0;
+    writeBitPos = 8;
+    data.push_back(pending);
+}
+
+bool Packet::readBit() {
+    if (readBitPos == 8) {
+        if (readPos >= data.size()) return false;
+        readBitValue = data[readPos++];
+        readBitPos = 0;
+    }
+    const bool value = ((readBitValue >> (7 - readBitPos)) & 1u) != 0;
+    ++readBitPos;
+    return value;
+}
+
+uint64_t Packet::readBits(int count) {
+    if (count < 1 || count > 64) return 0;
+    uint64_t value = 0;
+    for (int i = count - 1; i >= 0; --i)
+        if (readBit()) value |= (static_cast<uint64_t>(1) << i);
+    return value;
+}
+
+void Packet::resetBitReader() {
+    // Guarded so the byte readers, which call this on every field of every
+    // packet, pay a compare rather than two stores.
+    if (readBitPos == 8) return;
+    readBitValue = 0;
+    readBitPos = 8;
+}
+
+void Packet::writeGuidMask(uint64_t guid, const uint8_t* order, size_t count) {
+    for (size_t i = 0; i < count; ++i) {
+        const uint8_t index = order[i];
+        if (index >= 8) continue;
+        writeBit(((guid >> (index * 8)) & 0xFFu) != 0);
+    }
+}
+
+void Packet::writeGuidBytes(uint64_t guid, const uint8_t* order, size_t count) {
+    for (size_t i = 0; i < count; ++i) {
+        const uint8_t index = order[i];
+        if (index >= 8) continue;
+        const uint8_t byte = static_cast<uint8_t>((guid >> (index * 8)) & 0xFFu);
+        // The byte travels XOR'd with 1, and a zero byte does not travel at
+        // all - the mask bit already said so.
+        if (byte != 0) writeUInt8(static_cast<uint8_t>(byte ^ 1u));
+    }
+}
+
+void Packet::readGuidMask(GuidBytes& guid, const uint8_t* order, size_t count) {
+    for (size_t i = 0; i < count; ++i) {
+        const uint8_t index = order[i];
+        if (index >= 8) continue;
+        guid[index] = readBit() ? 1u : 0u;
+    }
+}
+
+void Packet::readGuidBytes(GuidBytes& guid, const uint8_t* order, size_t count) {
+    for (size_t i = 0; i < count; ++i) {
+        const uint8_t index = order[i];
+        if (index >= 8) continue;
+        // A mask entry of 1 means a byte follows; XOR undoes the writer's.
+        if (guid[index] != 0) guid[index] ^= readUInt8();
+    }
+}
+
+uint64_t Packet::guidFromBytes(const GuidBytes& guid) {
+    uint64_t value = 0;
+    for (size_t i = 0; i < guid.size(); ++i)
+        value |= static_cast<uint64_t>(guid[i]) << (i * 8);
+    return value;
 }
 
 } // namespace network

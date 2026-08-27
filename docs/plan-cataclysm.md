@@ -1,7 +1,8 @@
 # Cataclysm Support Plan
 
-**Status:** not started. This document exists to answer "what would it take" with numbers instead
-of a guess. It does not authorise the work.
+**Status:** started, at the two steps that need no server. The bit primitive of step 2 is in
+`network::Packet` with 13 cases over it, and the trap in section 5 is closed. Everything after that
+waits on a running 4.3.4 core, and this document still does not authorise it.
 **Target:** 4.3.4 build 15595, which is where the private-server cores settled.
 **Constraint set by the project:** the same one every other expansion works under. The player
 extracts from their own client, the release ships no data, and the wire format is derived from a
@@ -99,18 +100,17 @@ and classic 51 MB.
 
 ---
 
-## 5. A trap already in the tree
+## 5. A trap already in the tree, now closed
 
-`include/game/packet_parsers.hpp:564` ends the factory with:
+`createPacketParsers` in `include/game/packet_parsers.hpp` used to end with a bare
+`return std::make_unique<WotlkPacketParsers>();`, so any expansion id it did not recognise got
+WotLK's parsers. Dropping a `Data/expansions/cata/` directory in would have come up, logged in, and
+misparsed in the paths that matter rather than failing where the gap is.
 
-```cpp
-return std::make_unique<WotlkPacketParsers>();
-```
-
-Any expansion id it does not recognise gets WotLK's parsers. Dropping a `Data/expansions/cata/`
-directory in today would therefore come up, log in, and misparse in the paths that matter, rather
-than failing where the gap is. Whatever else happens, that fallback should become an explicit list
-before a fourth profile id exists on disk.
+It now lists `wotlk` explicitly and answers null otherwise. The header stays free of a logger,
+because ten standalone tests include it, so the decision is at the call site in
+`src/core/application.cpp`: null is reported and then falls back to WotLK anyway, which keeps a
+hand-written profile working while saying what it is running on.
 
 ---
 
@@ -120,8 +120,11 @@ The point of this ordering is to reach the decision early and cheaply.
 
 1. **Stand up a 4.3.4 core.** Nothing below can be checked without one. If this step does not
    finish, neither does the port.
-2. **Bit reader and writer on `network::Packet`,** with the per-opcode GUID order table beside it,
-   and standalone tests over captures. No client changes yet.
+2. **Bit reader and writer on `network::Packet`.** Done. `writeBit`/`readBit`, `writeBits`/
+   `readBits`, and GUID mask and byte passes that take the order as a parameter, in
+   `include/network/packet.hpp` and `src/network/packet.cpp`, covered by `tests/test_bit_packet.cpp`.
+   The per-opcode order tables are deliberately *not* here: they are the part that has to be read
+   off a core rather than recalled, and the helpers take them as arguments so that stays true.
 3. **Movement and update-object only.** A `CataPacketParsers` that logs in, receives the player,
    and moves. Everything else may fail.
 4. **Stop and look.** This is the gate. If steps 2 and 3 came in near the estimate the rest is
