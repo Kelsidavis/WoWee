@@ -6610,6 +6610,10 @@ void LuaEngine::registerCoreAPI() {
     // emitted by the FrameXML loader and meet here.
     bootstrap(
         "__WoweeTemplates = {}\n"
+        // What kind of frame each template makes, so an element written
+        // as a template's own name - <LootButton name="LootButton1"/> -
+        // can be created as one. See the emitter's virtual-frame path.
+        "__WoweeTemplateTypes = {}\n"
         "local reported = {}\n"
         "function __WoweeMissingTemplate(name)\n"
         "  if reported[name] then return end\n"

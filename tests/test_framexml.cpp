@@ -186,6 +186,42 @@ TEST_CASE("an animation's parentKey goes on its group", "[framexml][emit]") {
     CHECK(has(lua, ":SetStartDelay(4.05)"));
 }
 
+// A virtual frame's name may be written as an element. Turtle's LootFrame.xml
+// declares <Button name="LootButton" virtual="true"> and then writes
+// <LootButton name="LootButton1"/>, which the real client accepts. This
+// reported an unknown type and built nothing inside it, so the loot window came
+// up with no buttons - reported as issue 132.
+TEST_CASE("a template's name may be used as an element", "[framexml][emit]") {
+    XmlNode root = parseOrFail(
+        "<Ui>"
+        "<Button name='LootButton' virtual='true'><Size><AbsDimension x='10' y='10'/></Size></Button>"
+        "<LootButton name='LootButton1' id='1'/>"
+        "</Ui>");
+    const EmitResult r = emitFrameXml(root);
+    INFO(r.lua);
+    // The template records what kind of frame it makes...
+    CHECK(has(r.lua, "__WoweeTemplateTypes[\"LootButton\"] = \"Button\""));
+    // ...and the element is created as that kind and inherits it.
+    CHECK(has(r.lua, "CreateFrame((__WoweeTemplateTypes[\"LootButton\"] or \"Frame\")"));
+    CHECK(has(r.lua, "__WoweeTemplates[\"LootButton\"]("));
+    CHECK(has(r.lua, ":SetID(1)"));
+    // And with the template declared in the same file it is not reported: the
+    // emitter can see it is a template rather than a typo.
+    for (const std::string& w : r.warnings) {
+        CHECK(w.find("LootButton") == std::string::npos);
+    }
+}
+
+TEST_CASE("an unknown element with no name is still reported", "[framexml][emit]") {
+    XmlNode root = parseOrFail("<Ui><Nonsense><Frame name='Inner'/></Nonsense></Ui>");
+    const EmitResult r = emitFrameXml(root);
+    bool said = false;
+    for (const std::string& w : r.warnings) {
+        if (w.find("Nonsense") != std::string::npos) said = true;
+    }
+    CHECK(said);
+}
+
 TEST_CASE("characterframe.xml builds the frame the C key opens",
           "[framexml][emit][shipped]") {
     XmlNode root = parseShippedFile("characterframe.xml");

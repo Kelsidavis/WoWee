@@ -1312,15 +1312,42 @@ bool AddonManager::loadXmlFile(const std::string& path, int depth) {
     // A file is only as loadable as what it pulls in, so the reason kept here is
     // the first real one - the include or script that actually broke - rather
     // than the name of whichever file happened to reference it.
+    // Which element named the file does not decide how to read it - the
+    // extension does.
+    //
+    // Turtle's OptionsFrame.xml pulls its two Lua files in with <Include>, and
+    // this handed them to the XML parser: "expected an element" on
+    // Options\Options.lua and Options\Functions.lua, and with them the whole
+    // options framework - OptionsFrame_AddCategory, every panel that registers
+    // one, and a run of names reading as missing somewhere else entirely. The
+    // real client reads an include by what the file is.
+    const auto isLua = [](const std::string& name) {
+        return name.size() > 4 &&
+               (name.compare(name.size() - 4, 4, ".lua") == 0 ||
+                name.compare(name.size() - 4, 4, ".LUA") == 0);
+    };
     for (const auto& inc : emitted.includeFiles) {
-        if (!loadXmlFile(sibling(inc).string(), depth + 1)) {
-            if (ok) lastXmlError_ = "include " + inc + ": " + lastXmlError_;
+        const bool loaded = isLua(inc)
+            ? luaEngine_.executeFile(sibling(inc).string())
+            : loadXmlFile(sibling(inc).string(), depth + 1);
+        if (!loaded) {
+            if (ok) {
+                lastXmlError_ = "include " + inc + ": " +
+                                (isLua(inc) ? luaEngine_.lastError() : lastXmlError_);
+            }
             ok = false;
         }
     }
     for (const auto& script : emitted.scriptFiles) {
-        if (!luaEngine_.executeFile(sibling(script).string())) {
-            if (ok) lastXmlError_ = "script " + script + ": " + luaEngine_.lastError();
+        // And the other way round, for the same reason.
+        const bool loaded = isLua(script)
+            ? luaEngine_.executeFile(sibling(script).string())
+            : loadXmlFile(sibling(script).string(), depth + 1);
+        if (!loaded) {
+            if (ok) {
+                lastXmlError_ = "script " + script + ": " +
+                                (isLua(script) ? luaEngine_.lastError() : lastXmlError_);
+            }
             LOG_ERROR("AddonManager: ", path, " referenced ", script, " which failed");
             ok = false;
         }

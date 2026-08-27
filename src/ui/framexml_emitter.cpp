@@ -4,6 +4,7 @@
 #include "ui/xml_parser.hpp"
 
 #include <algorithm>
+#include <set>
 #include <sstream>
 
 namespace wowee {
@@ -146,6 +147,11 @@ std::string scriptPrelude(const std::string& script) {
 
 struct Emitter {
     EmitResult result;
+    /// Virtual frames declared in this file, so an element written as one of
+    /// their names is known to be a template rather than a typo. A template
+    /// from another file is not in here and still reports itself - the frame is
+    /// built either way, and the report is what says the name was a guess.
+    std::set<std::string> virtualFrames;
     int temp = 0;
     /// True while emitting a template body. Inside one the owning frame is not
     /// known until the template is replayed, so $parent has to be resolved then
@@ -721,6 +727,15 @@ struct Emitter {
             // for at replay time.
             inner.emitFrameBody(node, "self", name, "self:GetParent()",
                                 std::string(), /*fireOnLoad=*/false);
+            // What kind of frame the template makes, so an element written as
+            // the template's own name can be built as one. Turtle's
+            // LootFrame.xml declares <Button name="LootButton" virtual="true">
+            // and then writes <LootButton name="LootButton1"/>, which is a
+            // shape the real client accepts and this emitter had no answer for
+            // - the element was unknown, nothing inside it was built, and the
+            // loot window came up with no buttons in it.
+            virtualFrames.insert(name);
+            line("__WoweeTemplateTypes[" + quote(name) + "] = " + quote(node.name));
             line("__WoweeTemplates[" + quote(name) + "] = function(self)");
             line("local __w = {}");
             // Whether this frame arrived with a parent, read before any
@@ -791,7 +806,15 @@ struct Emitter {
         // Baking the literal instead named every scroll bar after the template,
         // so the _G[self:GetName().."ScrollBar"] its own handlers look up never
         // existed - which is what took down most of FrameXML.
-        line(var + " = CreateFrame(" + quote(node.name) + ", " +
+        // A known element names its own type; anything else is a template's
+        // name, and the type is whatever that template was declared as. Read at
+        // runtime because the template may live in a file loaded before this
+        // one and the emitter sees one file at a time.
+        const std::string typeArg =
+            isFrameElement(node.name)
+                ? quote(node.name)
+                : "(__WoweeTemplateTypes[" + quote(node.name) + "] or \"Frame\")";
+        line(var + " = CreateFrame(" + typeArg + ", " +
              nameArg(rawName, parentName, parentArg) + ", " + parentArg + ")");
 
         // Identity before anything is built on top of it. FrameXML makes names
@@ -805,6 +828,14 @@ struct Emitter {
         // Before the template applies, so a template body that reaches back
         // through its parent for a sibling finds it already bound.
         emitParentKey(node, var, parentArg);
+        // The element's own name is the first template it inherits. Missing is
+        // reported the same way a named inherits= is, so an element that is
+        // genuinely nothing still says so.
+        if (!isFrameElement(node.name)) {
+            line("if __WoweeTemplates[" + quote(node.name) + "] then __WoweeTemplates[" +
+                 quote(node.name) + "](" + var + ") else __WoweeMissingTemplate(" +
+                 quote(node.name) + ") end");
+        }
         emitInherits(node, var);
         emitFrameBody(node, var, name.empty() ? parentName : name, parentArg,
                       parentName, /*fireOnLoad=*/true,
@@ -1355,7 +1386,12 @@ struct Emitter {
         }
         if (const XmlNode* frames = node.child("Frames")) {
             for (const XmlNode& child : frames->children) {
-                if (isFrameElement(child.name)) emitFrame(child, var, name, anchor);
+                // A named element that is not a known type is a template's own
+                // name used as an element - see emitFrame. Unnamed and unknown
+                // is nothing this can build, and is left to the warning below.
+                if (isFrameElement(child.name) || child.attr("name")) {
+                    emitFrame(child, var, name, anchor);
+                }
             }
         }
         // Scripts last: OnLoad runs against a frame that is already built, which
@@ -1541,6 +1577,21 @@ EmitResult emitFrameXml(const XmlNode& rootIn) {
                 e.result.warnings.push_back("<" + node.name + "> outside a frame "
                                             "has nothing to belong to");
             }
+        } else if (node.attr("name")) {
+            // A template's own name used as an element. Turtle's LootFrame.xml
+            // writes <LootButton name="LootButton1"/> against a virtual
+            // <Button name="LootButton">, which the real client accepts and
+            // this reported as an unknown type - so the loot window was built
+            // with no buttons in it. emitFrame reads the type off the template
+            // and applies it; a name that turns out to be no template at all
+            // still reports itself, from __WoweeMissingTemplate.
+            if (!e.virtualFrames.count(node.name)) {
+                e.result.warnings.push_back(
+                    "<" + node.name + "> is not a frame type and no template of "
+                    "that name is declared here - it is built from one if some "
+                    "other file declares it, and from nothing if none does");
+            }
+            e.emitFrame(node, "", "");
         } else if (node.name == "Bindings" || node.name == "Binding" ||
                    node.name == "ModifiedClick") {
             // Key bindings, not frames. Nothing is drawn for them and nothing
