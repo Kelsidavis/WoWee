@@ -3540,7 +3540,19 @@ int lua_FontString_SetTextHeight(lua_State* L) {
     return 0;
 }
 int lua_FontString_SetFontObject(lua_State* L) {
-    applyFontObject(L, 2, widgetOf(L, 1));
+    // On a button this is the label's font, the same redirect SetTextColor
+    // makes; on an edit box or a message frame there is no label and the font
+    // belongs to the frame itself, which is what draws the text.
+    auto* tree = wowee::addons::getWidgetTree(L);
+    wowee::ui::Widget* w = widgetOf(L, 1);
+    if (w && w->kind != wowee::ui::WidgetKind::FontString && tree) {
+        lua_getfield(L, 1, "__fontString");
+        if (lua_istable(L, -1)) {
+            if (auto* fs = tree->get(widgetIdOf(L, lua_gettop(L)))) w = fs;
+        }
+        lua_pop(L, 1);
+    }
+    applyFontObject(L, 2, w);
     return 0;
 }
 
@@ -5571,6 +5583,19 @@ void LuaEngine::registerCoreAPI() {
         {"IsMouseEnabled",  lua_Frame_IsMouseEnabled},
         {"SetNormalFontObject",   lua_Frame_SetNormalFontObject},
         {"SetTextColor",          lua_FontString_SetTextColor},
+        // A frame can be a font instance in its own right. An EditBox, a
+        // MessageFrame and a SimpleHTML all draw text of their own, and the
+        // XML says how by putting a <FontString> straight inside the frame -
+        // 39 of them do, InputBoxTemplate and the chat window among them.
+        // These were the no-ops that emitted onto nothing, so every input box
+        // in the interface drew in the default face at the default size with
+        // no shadow rather than in ARIALN at fourteen with one.
+        {"SetFontObject",         lua_FontString_SetFontObject},
+        {"SetTextHeight",         lua_FontString_SetTextHeight},
+        {"SetShadowOffset",       lua_FontString_SetShadowOffset},
+        {"SetShadowColor",        lua_FontString_SetShadowColor},
+        {"SetJustifyH",           lua_FontString_SetJustifyH},
+        {"SetJustifyV",           lua_FontString_SetJustifyV},
         {"SetTextFontObject",     lua_Frame_SetNormalFontObject},
         {"SetHighlightFontObject", lua_Frame_SetHighlightFontObject},
         {"SetDisabledFontObject",  lua_Frame_SetDisabledFontObject},
@@ -6318,12 +6343,15 @@ void LuaEngine::registerCoreAPI() {
         "SetCursorPosition=1,SetDesaturated=1,SetDisabledCheckedTexture=1,\n"
         "SetDisabledFontObject=1,SetDisabledTexture=1,SetDrawLayer=1,\n"
         "SetFacing=1,SetFillAlpha=1,SetFillTexture=1,SetFocus=1,\n"
-        "SetFontObject=1,SetFontString=1,SetFormattedText=1,SetFrameLevel=1,\n"
+        // SetFontObject is a real binding now, applied after this set.
+        "SetFontString=1,SetFormattedText=1,SetFrameLevel=1,\n"
         "SetFrameRate=1,SetFrameStrata=1,SetHeight=1,SetHighlightFontObject=1,\n"
         "SetHighlightTexture=1,SetHitRectInsets=1,SetHorizontalScroll=1,\n"
         // SetHyperlinksEnabled is a real binding now, applied after this set.
         "SetHyperlinkCompareItem=1,SetID=1,\n"
-        "SetInventoryItem=1,SetJustifyH=1,SetJustifyV=1,\n"
+        // SetJustifyH and SetJustifyV are real bindings now, applied after
+        // this set.
+        "SetInventoryItem=1,\n"
         "SetLight=1,SetMaxBytes=1,\n"
         "SetMaxLetters=1,\n"
         "SetMinMaxValues=1,SetModel=1,SetModelScale=1,\n"
@@ -6334,7 +6362,8 @@ void LuaEngine::registerCoreAPI() {
 
         "SetRotation=1,SetScale=1,SetScript=1,\n"
         "SetScrollChild=1,SetSelection=1,SetSequence=1,\n"
-        "SetSequenceTime=1,SetShadowOffset=1,SetShown=1,SetSize=1,\n"
+        // SetShadowOffset is a real binding now, applied after this set.
+        "SetSequenceTime=1,SetShown=1,SetSize=1,\n"
         "SetSpacing=1,SetSpell=1,SetSpellByID=1,SetStartDelay=1,SetStatusBarColor=1,\n"
         // Tooltip setters for things this client cannot describe yet. They
         // belong here rather than nowhere: a name the metatable does not answer

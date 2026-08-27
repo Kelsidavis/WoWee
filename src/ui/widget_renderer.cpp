@@ -1964,6 +1964,19 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                     // the cursor then moves past all of them.
                     const size_t rows = lineCount(m.text);
                     const float top = y - static_cast<float>(rows - 1) * lineH;
+                    // Under the line, the same single offset copy a font
+                    // string draws. ChatFontNormal declares one; this surface
+                    // ignored it, which is what left chat pale over bright
+                    // ground. No link rects filed for it - the pass above owns
+                    // those, and filing them twice would double every click.
+                    if (w->hasShadow) {
+                        float sc[4] = {w->shadowColor[0], w->shadowColor[1],
+                                       w->shadowColor[2], w->shadowColor[3]};
+                        drawMarkupText(dl, font, size,
+                                       ImVec2(x0 + w->shadowX * s, top - w->shadowY * s),
+                                       packColor(sc, w->alpha * w->shadowColor[3]),
+                                       w->alpha, m.text, wrapW, false, nullptr, true);
+                    }
                     drawMarkupText(dl, font, size, ImVec2(x0, top),
                                    packColor(rgba, w->alpha), w->alpha, m.text,
                                    wrapW, false, nullptr, false, &tree, w->id);
@@ -2021,6 +2034,21 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                 const float ty = boxTop + ((boxBottom - boxTop) - size) * 0.5f;
                 const float pad = w->textInsetLeft * s;
                 if (!w->editText.empty()) {
+                    // The shadow first, under the words, as a font string's
+                    // is. ChatFontNormal declares one and every edit box in
+                    // the interface inherits it, and this path drew none - so
+                    // what the player typed was thin pale ARIALN over the
+                    // world with nothing behind it to lift it off.
+                    if (w->hasShadow) {
+                        float sc[4] = {w->shadowColor[0], w->shadowColor[1],
+                                       w->shadowColor[2], w->shadowColor[3]};
+                        drawMarkupText(dl, font, size,
+                                       ImVec2(x0 + pad + w->shadowX * s,
+                                              ty - w->shadowY * s),
+                                       packColor(sc, w->alpha * w->shadowColor[3]),
+                                       w->alpha, w->editText, 0.0f, false,
+                                       nullptr, true);
+                    }
                     // Through the markup parser like everything else. An edit
                     // box holds what the player typed, which used to mean plain
                     // words - but shift-clicking a link puts the whole

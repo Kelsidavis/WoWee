@@ -393,6 +393,77 @@ struct Emitter {
         }
     }
 
+    /// A <FontString> written straight inside a frame, rather than in a Layer.
+    ///
+    /// That is not a region the frame holds - it is the frame's own font: the
+    /// face, size, colour and shadow its text is drawn in. Every EditBox in the
+    /// interface says so this way, InputBoxTemplate included, and so do the
+    /// chat window and UIErrorsFrame.
+    ///
+    /// Thirty-nine of them, and all thirty-nine were dropped: the walk above
+    /// only looks inside <Layers>, and nothing else claimed the element. So the
+    /// chat box drew what you typed in FRIZQT at twelve with no shadow, where
+    /// ChatFontNormal is ARIALN at fourteen with a black one - thin, unshadowed
+    /// pale text over the world, which is what "hard to read" is.
+    ///
+    /// The font instance only. A <Size> or <Anchors> here belongs to a region
+    /// this frame does not have, and applying either would resize or move the
+    /// frame itself.
+    void emitFontInstance(const XmlNode& node, const std::string& var) {
+        if (const std::string* inh = node.attr("inherits"); inh && !inh->empty()) {
+            // Ambiguous the same way a region's is: nearly always a font
+            // object, occasionally a virtual FontString. Asked at runtime.
+            line("if __WoweeTemplates[" + quote(*inh) + "] then __WoweeTemplates[" +
+                 quote(*inh) + "](" + var + ") else " + var +
+                 ":SetFontObject(" + quote(*inh) + ") end");
+        }
+        float height = 0.0f;
+        if (const XmlNode* fh = node.child("FontHeight")) {
+            if (const XmlNode* abs = fh->child("AbsValue")) height = abs->attrFloat("val", 0.0f);
+            else                                           height = fh->attrFloat("val", 0.0f);
+        }
+        const std::string* face = node.attr("font");
+        const std::string* outline = node.attr("outline");
+        if (face || outline) {
+            // SetFont takes all three together, so what this node does not
+            // state is left to what it inherited - nil rather than a default.
+            line(var + ":SetFont(" + (face ? quote(*face) : std::string("nil")) + ", " +
+                 (height > 0.0f ? std::to_string(height) : std::string("nil")) + ", " +
+                 (outline ? quote(*outline) : std::string("nil")) + ")");
+        } else if (height > 0.0f) {
+            line(var + ":SetTextHeight(" + std::to_string(height) + ")");
+        }
+        if (const XmlNode* col = node.child("Color")) {
+            line(var + ":SetTextColor(" +
+                 std::to_string(col->attrFloat("r", 1.0f)) + ", " +
+                 std::to_string(col->attrFloat("g", 1.0f)) + ", " +
+                 std::to_string(col->attrFloat("b", 1.0f)) + ", " +
+                 std::to_string(col->attrFloat("a", 1.0f)) + ")");
+        }
+        if (const XmlNode* sh = node.child("Shadow")) {
+            float sx = 1.0f, sy = -1.0f;
+            if (const XmlNode* off = sh->child("Offset")) {
+                if (const XmlNode* abs = off->child("AbsDimension")) {
+                    sx = abs->attrFloat("x", 1.0f);
+                    sy = abs->attrFloat("y", -1.0f);
+                }
+            }
+            line(var + ":SetShadowOffset(" + std::to_string(sx) + ", " +
+                 std::to_string(sy) + ")");
+            if (const XmlNode* sc = sh->child("Color")) {
+                line(var + ":SetShadowColor(" +
+                     std::to_string(sc->attrFloat("r", 0.0f)) + ", " +
+                     std::to_string(sc->attrFloat("g", 0.0f)) + ", " +
+                     std::to_string(sc->attrFloat("b", 0.0f)) + ", " +
+                     std::to_string(sc->attrFloat("a", 1.0f)) + ")");
+            }
+        }
+        if (const std::string* j = node.attr("justifyH"))
+            line(var + ":SetJustifyH(" + quote(*j) + ")");
+        if (const std::string* jv = node.attr("justifyV"))
+            line(var + ":SetJustifyV(" + quote(*jv) + ")");
+    }
+
     void emitAnchors(const XmlNode& anchors, const std::string& var,
                      const std::string& parentVar,
                      const std::string& parentNameForAnchors = std::string()) {
@@ -1228,6 +1299,11 @@ struct Emitter {
                                    region.name == "Texture", anchor);
                 }
             }
+        }
+        // The frame's own font, which is a <FontString> child of the frame
+        // itself rather than one inside a Layer. See emitFontInstance.
+        for (const XmlNode& child : node.children) {
+            if (child.name == "FontString") emitFontInstance(child, var);
         }
         // Before Frames and Scripts, so a child anchoring to $parentNormalTexture
         // and an OnLoad reading its own label both find something there.
