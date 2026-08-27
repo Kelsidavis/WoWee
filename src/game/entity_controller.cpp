@@ -1666,7 +1666,8 @@ void EntityController::dispatchEntitySpawn(uint64_t guid, ObjectType objectType,
         owner_.npcDeathCallbackRef()(guid);
     }
     // Query quest giver status for NPCs with questgiver flag (0x02)
-    if (objectType == ObjectType::UNIT && (unit->getNpcFlags() & 0x02) && owner_.getSocket()) {
+    if (objectType == ObjectType::UNIT && (unit->getNpcFlags() & NPC_FLAG_QUESTGIVER) &&
+        owner_.getSocket()) {
         network::Packet qsPkt(wireOpcode(Opcode::CMSG_QUESTGIVER_STATUS_QUERY));
         qsPkt.writeUInt64(guid);
         owner_.getSocket()->send(qsPkt);

@@ -142,7 +142,7 @@ void QuestHandler::sendQuestGiverStatusQueries() {
     for (const auto& [guid, entity] : owner_.getEntityManager().getEntities()) {
         if (entity->getType() != ObjectType::UNIT) continue;
         auto unit = std::static_pointer_cast<Unit>(entity);
-        if (unit->getNpcFlags() & 0x02) { // UNIT_NPC_FLAG_QUESTGIVER
+        if (unit->getNpcFlags() & NPC_FLAG_QUESTGIVER) {
             network::Packet qsPkt(wireOpcode(Opcode::CMSG_QUESTGIVER_STATUS_QUERY));
             qsPkt.writeUInt64(guid);
             owner_.getSocket()->send(qsPkt);
@@ -1694,7 +1694,7 @@ void QuestHandler::abandonQuest(uint32_t questId) {
         for (const auto& [guid, entity] : owner_.getEntityManager().getEntities()) {
             if (entity->getType() != ObjectType::UNIT) continue;
             auto unit = std::static_pointer_cast<Unit>(entity);
-            if (unit->getNpcFlags() & 0x02) {
+            if (unit->getNpcFlags() & NPC_FLAG_QUESTGIVER) {
                 network::Packet qsPkt(wireOpcode(Opcode::CMSG_QUESTGIVER_STATUS_QUERY));
                 qsPkt.writeUInt64(guid);
                 owner_.getSocket()->send(qsPkt);

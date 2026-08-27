@@ -1089,7 +1089,7 @@ bool GameScreen::drawVendorCursor(game::GameHandler& gameHandler,
     auto entity = gameHandler.getEntityManager().getEntity(guid);
     if (!entity || entity->getType() != game::ObjectType::UNIT) return false;
     auto unit = std::static_pointer_cast<game::Unit>(entity);
-    if ((unit->getNpcFlags() & game::NPC_FLAG_VENDOR) == 0) return false;
+    if ((unit->getNpcFlags() & game::NPC_FLAG_ANY_VENDOR) == 0) return false;
 
     // Only a successful upload is cached, so a transient descriptor-pool
     // failure is retried rather than leaving the cursor plain for good.

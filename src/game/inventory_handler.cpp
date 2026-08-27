@@ -2424,7 +2424,7 @@ void InventoryHandler::handleListInventory(network::Packet& packet) {
     // UNIT_NPC_FLAG_REPAIR = 0x1000.
     if (!currentVendorItems_.canRepair && currentVendorItems_.vendorGuid != 0) {
         if (auto* unit = owner_.getUnitByGuid(currentVendorItems_.vendorGuid)) {
-            if (unit->getNpcFlags() & 0x1000) {
+            if (unit->getNpcFlags() & NPC_FLAG_REPAIR) {
                 currentVendorItems_.canRepair = true;
             }
         }

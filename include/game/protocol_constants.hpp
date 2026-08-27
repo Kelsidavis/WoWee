@@ -39,10 +39,33 @@ constexpr uint8_t UNIT_VIS_FLAG_CREEP = 0x02;
 // NPC flags (UNIT_NPC_FLAGS - index 82 in UnitFields for 3.3.5a;
 // 147 in Classic/Turtle. Bitmask values below are stable across expansions.)
 // ---------------------------------------------------------------------------
-constexpr uint32_t NPC_FLAG_VENDOR        = 0x00000004;
-constexpr uint32_t NPC_FLAG_FLIGHT_MASTER = 0x00002000;
-constexpr uint32_t NPC_FLAG_SPIRIT_GUIDE  = 0x00004000;
-constexpr uint32_t NPC_FLAG_SPIRIT_HEALER = 0x00008000;
+// The bits are a run: gossip, questgiver, two unused, three trainers, then the
+// five vendors, repair, the flight master and the two spirits. 0x04 is one of
+// the two nothing sets, which is what NPC_FLAG_VENDOR was - so no unit in the
+// game ever answered it and the vendor cursor never drew.
+constexpr uint32_t NPC_FLAG_GOSSIP         = 0x00000001;
+constexpr uint32_t NPC_FLAG_QUESTGIVER     = 0x00000002;
+constexpr uint32_t NPC_FLAG_TRAINER        = 0x00000010;
+constexpr uint32_t NPC_FLAG_VENDOR         = 0x00000080;
+constexpr uint32_t NPC_FLAG_VENDOR_AMMO    = 0x00000100;
+constexpr uint32_t NPC_FLAG_VENDOR_FOOD    = 0x00000200;
+constexpr uint32_t NPC_FLAG_VENDOR_POISON  = 0x00000400;
+constexpr uint32_t NPC_FLAG_VENDOR_REAGENT = 0x00000800;
+/// Anything with something to sell. A food or reagent seller usually carries
+/// the plain vendor bit as well, and a few carry only their own.
+constexpr uint32_t NPC_FLAG_ANY_VENDOR =
+    NPC_FLAG_VENDOR | NPC_FLAG_VENDOR_AMMO | NPC_FLAG_VENDOR_FOOD |
+    NPC_FLAG_VENDOR_POISON | NPC_FLAG_VENDOR_REAGENT;
+constexpr uint32_t NPC_FLAG_REPAIR         = 0x00001000;
+constexpr uint32_t NPC_FLAG_FLIGHT_MASTER  = 0x00002000;
+// The healer comes before the guide. These two were the other way round; every
+// caller tests them as a pair, so the swap changed no behaviour and would have
+// waited for whoever first asked about one of them alone.
+constexpr uint32_t NPC_FLAG_SPIRIT_HEALER  = 0x00004000;
+constexpr uint32_t NPC_FLAG_SPIRIT_GUIDE   = 0x00008000;
+constexpr uint32_t NPC_FLAG_INNKEEPER      = 0x00010000;
+constexpr uint32_t NPC_FLAG_BANKER         = 0x00020000;
+constexpr uint32_t NPC_FLAG_AUCTIONEER     = 0x00200000;
 
 // ---------------------------------------------------------------------------
 // Default action-bar spell IDs

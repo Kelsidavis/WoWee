@@ -1224,6 +1224,12 @@ target_link_libraries(test_font_em_scale PRIVATE catch2_main imgui)
 add_test(NAME font_em_scale COMMAND test_font_em_scale)
 register_test_target(test_font_em_scale)
 
+# ── test_npc_flags ───────────────────────────────────────────
+# UNIT_NPC_FLAGS bit by bit. A wrong one is invisible - the mask just always
+# answers no - and NPC_FLAG_VENDOR was 0x04, a bit nothing sets, so no merchant
+# ever read as one.
+wowee_add_test(test_npc_flags SOURCES test_npc_flags.cpp)
+
 # ── test_scene_pick ──────────────────────────────────────────
 # Which of ScenePick's answers a caller wants. closestGuid and resolve()
 # disagree exactly where a wide object stands beside an NPC, which is where the
