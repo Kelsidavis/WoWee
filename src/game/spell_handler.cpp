@@ -1027,6 +1027,27 @@ void SpellHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
         owner_.sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
     }
 
+    // A spell that needs an enemy, with nothing selected, is refused here - it
+    // is not sent at whatever the packet would make of an empty target.
+    //
+    // An empty SpellCastTargets is TARGET_FLAG_SELF, and the server reads that
+    // as "the caster is the target": it fills the unit target in with the
+    // caster and casts the spell on them. So a hunter with no target who
+    // pressed a shot shot themselves, and kept doing it until they died.
+    //
+    // selfCast and fishingCast clear the target deliberately and are the cases
+    // TARGET_FLAG_SELF is actually for, so they are not caught by this; a
+    // friendly spell has already fallen back to the caster above when the
+    // player has auto self-cast on, and is left to the server when they do not.
+    if (target == 0 && !selfCast && !fishingCast &&
+        spellclass::requiresHostileTarget(getSpellImplicitTargetA(spellId))) {
+        owner_.raiseUiError("You have no target.");
+        LOG_WARNING("Cast refused: spell ", spellId,
+                    " needs a hostile target and nothing is selected - sending it"
+                    " with an empty target would have aimed it at the caster");
+        return;
+    }
+
     auto packet = owner_.getPacketParsers()
         ? owner_.getPacketParsers()->buildCastSpell(spellId, target, ++castCount_)
         : CastSpellPacket::build(spellId, target, ++castCount_);

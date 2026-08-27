@@ -68,6 +68,16 @@ inline bool requiresFriendlyTarget(uint32_t implicitTargetA) {
            implicitTargetA == kImplicitTargetRaid;
 }
 
+/// Whether a spell has to be aimed at a hostile unit, so that casting it with
+/// nothing selected is an error rather than something to guess a target for.
+///
+/// There is no safe guess. An empty SpellCastTargets is TARGET_FLAG_SELF on the
+/// wire, and the server reads that as "the caster is the target" - so a shot
+/// sent with no target is a shot the server aims at the hunter who fired it.
+inline bool requiresHostileTarget(uint32_t implicitTargetA) {
+    return implicitTargetA == kImplicitTargetEnemy;
+}
+
 /// Legacy client IDs for the three repeating ranged weapon attacks.
 ///
 /// Their Spell.dbc rows carry a dummy one-point rage cost even for classes that do
