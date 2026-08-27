@@ -324,6 +324,29 @@ TEST_CASE("hostile-target spells are the ones that must not be sent unaimed",
         CHECK_FALSE(requiresHostileTarget(63));
     }
 
+    SECTION("nothing a player casts on themselves reads as hostile") {
+        // Measured over the shipped Spell.dbc, because the worry this answers
+        // is that refusing an unaimed hostile spell also refuses a buff or a
+        // self-heal. It cannot: none of them is 6.
+        //
+        //   Mark of the Wild 1126, Flash Heal 2061, Renew 139,
+        //   Rejuvenation 774, Power Word: Fortitude 1243, Healing Touch 5185,
+        //   Arcane Intellect 1459, Blessing of Might 19740, Holy Light 635,
+        //   Lay on Hands 633, Power Word: Shield 17          all read 21
+        //   Aspect of the Hawk 13165, Inner Fire 588,
+        //   Trueshot Aura 19506, Feign Death 5384             all read 1
+        //   Mend Pet 136                                          reads 5
+        //   Battle Shout 2048                                    reads 56
+        //
+        // against the shots that started this:
+        //   Arcane Shot 3044, Steady Shot 34120, Auto Shot 75,
+        //   Serpent Sting 1978, Hunter's Mark 1130             all read 6
+        for (uint32_t friendlyAim : {1u, 5u, 21u, 35u, 45u, 56u, 57u, 63u}) {
+            CHECK_FALSE(requiresHostileTarget(friendlyAim));
+        }
+        CHECK(requiresHostileTarget(6));
+    }
+
     SECTION("the two rules never both fire") {
         for (uint32_t t = 0; t < 128; ++t) {
             CHECK_FALSE((requiresFriendlyTarget(t) && requiresHostileTarget(t)));
