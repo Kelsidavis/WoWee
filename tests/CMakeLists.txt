@@ -808,6 +808,12 @@ wowee_add_packet_test(test_prewotlk_build_packets)
 # readers were merged. Same link set as test_char_enum_layout.
 wowee_add_packet_test(test_item_query_layout)
 
+# ── test_guild_bank_list ───────────────────────────────────────────────
+# SMSG_GUILD_BANK_LIST, whose tab-name block is optional and was gated on the
+# wrong condition - so a tab query that answered with the names attached had
+# every field after them read a block early, and the vault drew empty.
+wowee_add_packet_test(test_guild_bank_list)
+
 # ── test_gameobject_query_layout ───────────────────────────────────────
 # SMSG_GAMEOBJECT_QUERY_RESPONSE, parsed three times, differing only in how
 # many strings sit before the twenty-four data fields.

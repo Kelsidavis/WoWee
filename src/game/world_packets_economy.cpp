@@ -398,7 +398,11 @@ network::Packet AutoStoreBankItemPacket::build(uint8_t srcBag, uint8_t srcSlot) 
 network::Packet GuildBankerActivatePacket::build(uint64_t guid) {
     network::Packet p(wireOpcode(Opcode::CMSG_GUILD_BANKER_ACTIVATE));
     p.writeUInt64(guid);
-    p.writeUInt8(0);  // full slots update
+    // sendAllSlots, and it has to be one. The server passes this straight to
+    // SendBankList as "with content": a zero asks for the tab names and no
+    // items at all. This said zero while its comment said "full slots update",
+    // so opening the vault fetched a list of tabs with nothing in them.
+    p.writeUInt8(1);
     return p;
 }
 
@@ -492,12 +496,18 @@ bool GuildBankListParser::parse(network::Packet& packet, GuildBankData& data) {
     data.tabId = packet.readUInt8();
     data.withdrawAmount = static_cast<int32_t>(packet.readUInt32());
     uint8_t fullUpdate = packet.readUInt8();
+    data.tabsIncluded = (fullUpdate != 0);
 
-    // Tab zero only. GuildBankQueryResults::Write sends the tab list under
-    // `if (!Tab && FullUpdate)`, so a full update of any other tab carries no
-    // names - and reading a count there took the item count as a tab count and
-    // the items as tab names.
-    if (fullUpdate && data.tabId == 0) {
+    // The flag alone decides it. GuildBankQueryResults::Write - which does gate
+    // the tab list on `!Tab && FullUpdate` - is Cataclysm's packet; 3.3.5 and
+    // 2.4.3 send it from Guild::SendBankList under `withTabInfo` and nothing
+    // else, whichever tab the list describes.
+    //
+    // The extra test cost the tabs on any server that answers a tab query with
+    // the names attached: the block is on the wire, this skipped it, and every
+    // field after it was then read one block early - the item count out of the
+    // tab count, the items out of the names.
+    if (fullUpdate) {
         if (!packet.hasRemaining(1)) {
             LOG_WARNING("GuildBankListParser: truncated before tabCount");
             data.tabs.clear();

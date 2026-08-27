@@ -3133,6 +3133,10 @@ struct GuildBankData {
     int32_t withdrawAmount = -1;  // -1 = unlimited
     std::vector<GuildBankTab> tabs;  // Only populated on fullUpdate
     std::vector<GuildBankItemSlot> tabItems;  // Current tab items
+    /// Whether the list just parsed carried the tab names, which is what the
+    /// panel's GUILDBANK_UPDATE_TABS means. A slots-only update leaves `tabs`
+    /// as it found them, so their contents cannot answer this.
+    bool tabsIncluded = false;
 };
 
 /** CMSG_GUILD_BANKER_ACTIVATE packet builder */

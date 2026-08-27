@@ -3246,7 +3246,12 @@ void InventoryHandler::closeGuildBank() {
 
 void InventoryHandler::queryGuildBankTab(uint8_t tabId) {
     if (owner_.getState() != WorldState::IN_WORLD || !owner_.getSocket() || guildBankerGuid_ == 0) return;
-    auto packet = GuildBankQueryTabPacket::build(guildBankerGuid_, tabId, false);
+    // Asking for the full tab, not a slot refresh. The byte reaches
+    // SendBankList as "with content" on the cores that read it, so a false here
+    // asked the server for a tab and told it not to send what is in it. This
+    // client keeps no cached tab to refresh, so there is nothing a partial
+    // update could be for.
+    auto packet = GuildBankQueryTabPacket::build(guildBankerGuid_, tabId, true);
     owner_.getSocket()->send(packet);
 }
 
@@ -3348,7 +3353,25 @@ void InventoryHandler::handleGuildBankList(network::Packet& packet) {
     // player is actually viewing (clicking a tab only sends a query - it never
     // updated the active tab, so operations defaulted to tab 0).
     guildBankActiveTab_ = guildBankData_.tabId;
-    if (owner_.addonEventCallbackRef()) owner_.addonEventCallbackRef()("GUILDBANKBAGSLOTS_CHANGED", {});
+    if (owner_.addonEventCallbackRef()) {
+        // The three the panel listens for and this fired none of.
+        //
+        // GUILDBANK_UPDATE_TABS is the one that runs
+        // GuildBankFrame_SelectAvailableTab, which is what picks a tab the
+        // player may look in and draws it - without it the frame kept whatever
+        // tab it had and never chose one. Only when a tab list actually
+        // arrived: the event means the set of tabs changed, and a slot refresh
+        // does not change it.
+        if (guildBankData_.tabsIncluded && !guildBankData_.tabs.empty()) {
+            owner_.addonEventCallbackRef()("GUILDBANK_UPDATE_TABS", {});
+        }
+        owner_.addonEventCallbackRef()("GUILDBANKBAGSLOTS_CHANGED", {});
+        // The money line and the withdraw allowance, which are read from
+        // GetGuildBankMoney and GetGuildBankWithdrawMoney and were never asked
+        // for again after the frame first drew.
+        owner_.addonEventCallbackRef()("GUILDBANK_UPDATE_MONEY", {});
+        owner_.addonEventCallbackRef()("GUILDBANK_UPDATE_WITHDRAWMONEY", {});
+    }
     for (const auto& tab : guildBankData_.tabs) {
         for (const auto& item : tab.items) {
             if (item.itemEntry != 0) owner_.ensureItemInfo(item.itemEntry);
