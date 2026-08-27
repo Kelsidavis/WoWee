@@ -3285,12 +3285,42 @@ void MovementHandler::checkAreaTriggers() {
             const float extent = (at.radius > 0.0f)
                 ? at.radius
                 : std::max(at.boxLength, at.boxWidth) * 0.5f;
-            if (extent > 0.0f && flat <= extent) {
+            // Walked past, not stood on. The margin used to be zero - the
+            // player had to be inside the trigger's own flat extent for this
+            // to say anything - and a portal box is three yards across, so
+            // "I walked into it and nothing happened" was never the case this
+            // reported. A few yards either side is what walking through one
+            // looks like when the test refuses it.
+            constexpr float kNearMissMargin = 5.0f;
+            if (extent > 0.0f && flat <= extent + kNearMissMargin) {
                 nearMissLogged_.insert(at.id);
-                LOG_WARNING("AreaTrigger near miss: AT", at.id,
-                            " flat=", flat, " within extent=", extent,
-                            " but dz=", dz,
-                            " (player z=", checkedPz, ", trigger z=", at.z, ")");
+                if (at.radius > 0.0f) {
+                    LOG_WARNING("AreaTrigger near miss: AT", at.id,
+                                " sphere r=", at.radius,
+                                " flat=", flat, " dz=", dz,
+                                " dist=", std::sqrt(dx * dx + dy * dy + dz * dz),
+                                " (player=(", checkedPx, ", ", checkedPy, ", ", checkedPz,
+                                ") trigger=(", at.x, ", ", at.y, ", ", at.z, "))");
+                } else {
+                    // The same rotation the test itself makes, so the numbers
+                    // printed are the ones it compared: which of the three
+                    // axes refused it, and by how much.
+                    const float serverDx = checkedPy - at.y;
+                    const float serverDy = checkedPx - at.x;
+                    const float cosYaw = std::cos(-at.boxYaw);
+                    const float sinYaw = std::sin(-at.boxYaw);
+                    const float localX = serverDx * cosYaw - serverDy * sinYaw;
+                    const float localY = serverDx * sinYaw + serverDy * cosYaw;
+                    LOG_WARNING("AreaTrigger near miss: AT", at.id,
+                                " box=(", at.boxLength, ", ", at.boxWidth, ", ", at.boxHeight,
+                                ") yaw=", at.boxYaw,
+                                " |local|=(", std::abs(localX), ", ", std::abs(localY),
+                                ", ", std::abs(dz), ")",
+                                " half=(", at.boxLength * 0.5f, ", ", at.boxWidth * 0.5f,
+                                ", ", at.boxHeight * 0.5f, ")",
+                                " (player=(", checkedPx, ", ", checkedPy, ", ", checkedPz,
+                                ") trigger=(", at.x, ", ", at.y, ", ", at.z, "))");
+                }
             }
         }
 
@@ -3323,8 +3353,16 @@ void MovementHandler::checkAreaTriggers() {
                     // Do not mark ordinary cooldown-suppressed triggers active.
                     // If the player walks into a trigger during the cooldown,
                     // it should fire once the grace window ends.
-                    LOG_DEBUG("AreaTrigger cooldown suppressed: AT", at.id,
-                              " cooldown=", owner_.areaTriggerCooldownRef());
+                    //
+                    // Said out loud rather than at debug level. From the chair
+                    // a suppressed portal and a portal that does not work are
+                    // the same thing - the player walks in and nothing
+                    // happens - and the window is ten seconds, which is long
+                    // enough to walk into one after arriving.
+                    LOG_WARNING("AreaTrigger cooldown suppressed: AT", at.id,
+                                " cooldown=", owner_.areaTriggerCooldownRef(),
+                                "s left - the player is inside it and it will "
+                                "not fire until they leave and re-enter");
                 } else {
                     owner_.activeAreaTriggersRef().insert(at.id);
                 }
