@@ -1075,7 +1075,14 @@ void GameScreen::renderPlayerInfo(game::GameHandler& gameHandler) {
 /// neither is a corpse, which is loot.
 bool GameScreen::drawVendorCursor(game::GameHandler& gameHandler,
                                   const ui::ScenePick& pick) {
-    const uint64_t guid = pick.closestGuid;
+    // resolve(), not closestGuid. closestGuid is whatever the ray touched
+    // nearest of anything pickable - and a game object's fallback sphere is 2.5
+    // yards against a unit's 1.8, so the rug, the stall or the chair a merchant
+    // stands on was usually nearer than the merchant. resolve() is what a click
+    // acts on, which is the whole reason the hover uses the click's picker:
+    // asking it a different question put the two back into disagreement, and
+    // the vendor cursor lost every argument to the scenery around the vendor.
+    const uint64_t guid = pick.resolve();
     if (guid == 0 || guid == pick.hostileUnitGuid || guid == pick.deadUnitGuid) {
         return false;
     }
@@ -1088,8 +1095,21 @@ bool GameScreen::drawVendorCursor(game::GameHandler& gameHandler,
     // failure is retried rather than leaving the cursor plain for good.
     static VkDescriptorSet cursorTex = VK_NULL_HANDLE;
     if (!cursorTex) {
+        ui::UiTextureLoad why = ui::UiTextureLoad::Ok;
         cursorTex = ui::uploadUiTextureFromBlp(
-            services_.assetManager, "Interface\\Cursor\\Buy.blp", services_.window);
+            services_.assetManager, "Interface\\Cursor\\Buy.blp", services_.window, &why);
+        // Said once. A cursor that will not load and a unit that is not a
+        // vendor both end as the plain hand, and from the chair they are the
+        // same thing - so the one that is a fault has to name itself.
+        if (!cursorTex) {
+            static bool said = false;
+            if (!said) {
+                said = true;
+                LOG_WARNING("Vendor cursor: Interface\\Cursor\\Buy.blp did not load (",
+                            static_cast<int>(why),
+                            ") - the pointer stays the plain hand over merchants");
+            }
+        }
     }
     if (!cursorTex) return false;
 

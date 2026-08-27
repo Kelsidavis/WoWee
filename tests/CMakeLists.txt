@@ -1224,6 +1224,12 @@ target_link_libraries(test_font_em_scale PRIVATE catch2_main imgui)
 add_test(NAME font_em_scale COMMAND test_font_em_scale)
 register_test_target(test_font_em_scale)
 
+# ── test_scene_pick ──────────────────────────────────────────
+# Which of ScenePick's answers a caller wants. closestGuid and resolve()
+# disagree exactly where a wide object stands beside an NPC, which is where the
+# vendor cursor was asking the wrong one.
+wowee_add_test(test_scene_pick SOURCES test_scene_pick.cpp)
+
 # ── test_plural_escape ───────────────────────────────────────
 # WoW's |4singular:plural; escape, which nothing resolved - so the logout
 # prompt read "5 |4Second:Seconds; until logout" and seventy-four other

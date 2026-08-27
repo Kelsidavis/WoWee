@@ -30,18 +30,6 @@ bool isDeadUnit(const std::shared_ptr<game::Entity>& entity) {
 
 } // namespace
 
-uint64_t ScenePick::resolve() const {
-    // A unit wins over a game object unless the object's centre is clearly in
-    // front of the unit's.
-    constexpr float kUnitOverGoBias = 2.0f;
-    const uint64_t unit = unitGuid();
-    if (unit != 0 && (objectGuid == 0 || unitCenterT() <= objectCenterT + kUnitOverGoBias)) {
-        return hostileUnitGuid != 0 ? hostileUnitGuid : unit;
-    }
-    if (objectGuid != 0) return objectGuid;
-    return 0;
-}
-
 ScenePick pickScene(game::GameHandler& gameHandler,
                     const rendering::Ray& ray,
                     const ScenePickParams& params,

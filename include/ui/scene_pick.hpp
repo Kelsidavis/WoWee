@@ -88,7 +88,28 @@ struct ScenePick {
     /// Resolve to the one thing under the cursor: a unit unless an object's
     /// centre is clearly in front of it, so a creature is never lost to a
     /// decorative or backing object behind it. A hostile keeps its priority.
-    [[nodiscard]] uint64_t resolve() const;
+    ///
+    /// This and not closestGuid is what a caller wants. closestGuid is the
+    /// nearest *entry point* of anything pickable, and a game object's sphere
+    /// is 2.5 yards against a unit's 1.8 - so a wide object beside an NPC is
+    /// entered first even when the NPC is nearer, and answers closestGuid while
+    /// a click still lands on the NPC. kMaxGameObjectPickRadius exists for that
+    /// same reason. Every affordance drawn for what a click would do has to ask
+    /// this one.
+    ///
+    /// Inline so the rule can be tested without linking the picker's traversal,
+    /// which needs the whole client behind it.
+    [[nodiscard]] uint64_t resolve() const {
+        // A unit wins over a game object unless the object's centre is clearly
+        // in front of the unit's.
+        constexpr float kUnitOverGoBias = 2.0f;
+        const uint64_t unit = unitGuid();
+        if (unit != 0 && (objectGuid == 0 || unitCenterT() <= objectCenterT + kUnitOverGoBias)) {
+            return hostileUnitGuid != 0 ? hostileUnitGuid : unit;
+        }
+        if (objectGuid != 0) return objectGuid;
+        return 0;
+    }
 };
 
 /// Called for every entity the ray hits, so a caller can gather what only it
