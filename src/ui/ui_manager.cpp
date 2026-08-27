@@ -271,9 +271,15 @@ void UIManager::loadInterfaceFont(const std::string& dataRoot,
     // each stroke over fewer pixels, which reads as faint rather than small.
     // Brightening the rasterized coverage puts the weight back; it is what
     // ImGui offers for exactly this and costs nothing at draw time.
-    auto interfaceFontConfig = [] {
+    // ExtraSizeScale is what makes a height mean the same thing here as it does
+    // in FrameXML: an em, not the ascender-to-descender span ImGui would fit
+    // into it. See fontEmSizeScale - without it every label in the interface is
+    // drawn at 82% of its size and everything anchored to a caption's right
+    // edge lands short.
+    auto interfaceFontConfig = [](float emScale) {
         ImFontConfig cfg;
         cfg.RasterizerMultiply = 1.35f;
+        cfg.ExtraSizeScale = emScale;
         return cfg;
     };
 
@@ -283,7 +289,8 @@ void UIManager::loadInterfaceFont(const std::string& dataRoot,
         if (data.empty()) return nullptr;
         void* owned = IM_ALLOC(data.size());
         std::memcpy(owned, data.data(), data.size());
-        ImFontConfig cfg = interfaceFontConfig();
+        ImFontConfig cfg = interfaceFontConfig(
+            fontEmSizeScale(data.data(), data.size()));
         cfg.FontDataOwnedByAtlas = true;
         return io.Fonts->AddFontFromMemoryTTF(owned, static_cast<int>(data.size()),
                                               size, &cfg);
@@ -293,7 +300,8 @@ void UIManager::loadInterfaceFont(const std::string& dataRoot,
     if (frizqt.empty() && addFromArchive("FRIZQT__.TTF", kClientSize)) {
         LOG_INFO("Interface font read from the archives rather than from disk");
     } else if (!frizqt.empty()) {
-        ImFontConfig clientCfg = interfaceFontConfig();
+        ImFontConfig clientCfg =
+            interfaceFontConfig(fontEmSizeScaleOfFile(frizqt.string()));
         if (!io.Fonts->AddFontFromFileTTF(frizqt.string().c_str(), kClientSize,
                                           &clientCfg)) {
             // Found and refused is a different problem from not found, and
@@ -316,7 +324,10 @@ void UIManager::loadInterfaceFont(const std::string& dataRoot,
     int loaded = 0;
     for (const char* name : faces) {
         const fs::path file = resolve(name);
-        ImFontConfig faceCfg = interfaceFontConfig();
+        ImFontConfig faceCfg =
+            interfaceFontConfig(file.empty()
+                                    ? 1.0f
+                                    : fontEmSizeScaleOfFile(file.string()));
         ImFont* f = file.empty()
             ? nullptr
             : io.Fonts->AddFontFromFileTTF(file.string().c_str(), kAtlasSize,

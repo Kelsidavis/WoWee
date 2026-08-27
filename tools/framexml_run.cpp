@@ -291,11 +291,19 @@ int main(int argc, char** argv) {
         // laid out at all", not close enough to answer "do these two overlap",
         // which is the question that comes up about anything positioned
         // against a caption's right edge.
+        //
+        // Loaded the way the client loads them, ExtraSizeScale included. A
+        // height means an em in FrameXML and an ascender-to-descender span to
+        // ImGui, and a harness that did not apply the same correction would
+        // measure every caption 18% narrow - which is precisely the width the
+        // overlap question turns on.
         int faces = 0;
         for (const char* name : {"frizqt__.ttf", "morpheus.ttf", "skurri.ttf",
                                  "arialn.ttf", "friends.ttf"}) {
             const std::string file = assetPath + "/misc/fonts/" + name;
-            if (ImFont* f = io.Fonts->AddFontFromFileTTF(file.c_str(), 16.0f)) {
+            ImFontConfig cfg;
+            cfg.ExtraSizeScale = wowee::ui::fontEmSizeScaleOfFile(file);
+            if (ImFont* f = io.Fonts->AddFontFromFileTTF(file.c_str(), 16.0f, &cfg)) {
                 wowee::ui::registerInterfaceFace(name, f);
                 ++faces;
             }

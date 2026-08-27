@@ -8,6 +8,7 @@
 // first frame, because the glyph atlas is built then and cannot take another
 // afterwards without being torn down.
 
+#include <cstddef>
 #include <string>
 
 struct ImFont;
@@ -42,5 +43,29 @@ ImFont* interfaceFaceOrDefault(const std::string& fontFace);
 
 /// The point size a widget draws at, given the height it asked for.
 float interfaceFontSize(float fontHeight);
+
+/// What ImGui's rasterizer scale has to be multiplied by so a face asked for at
+/// height N draws with its EM square N pixels tall.
+///
+/// FrameXML's <FontHeight> is an em size, the way every traditional font API
+/// and CSS mean "font size": ten means the em square is ten pixels. ImGui asks
+/// stb_truetype for stbtt_ScaleForPixelHeight instead, which fits the whole
+/// ascender-to-descender span into those ten pixels - stb's own header calls
+/// the other one "probably what traditional APIs compute". FRIZQT__ spans 1215
+/// units of a 1000-unit em, so every label in the interface was drawn and
+/// measured at 82.3% of the size WoW draws it.
+///
+/// Smaller text is the visible half. The other half is that anything positioned
+/// against a caption's right edge lands short by 18% of that caption's width,
+/// and the interface anchors a great deal that way: the auction house's rarity
+/// dropdown hangs off "Level Range" and came to rest on top of the level boxes.
+///
+/// One (ascent - descent) / unitsPerEm, read off the file's own head and hhea
+/// tables. Faces differ, so it is asked per face rather than written down.
+/// Answers 1 for anything it cannot parse, which leaves ImGui's own scaling.
+float fontEmSizeScale(const void* ttfData, size_t byteCount);
+
+/// The same, for a face still on disk. Answers 1 if the file cannot be read.
+float fontEmSizeScaleOfFile(const std::string& path);
 
 } // namespace wowee::ui

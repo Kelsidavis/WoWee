@@ -1174,6 +1174,23 @@ target_link_libraries(test_chat_markup_parser PRIVATE catch2_main)
 add_test(NAME chat_markup_parser COMMAND test_chat_markup_parser)
 register_test_target(test_chat_markup_parser)
 
+# ── test_font_em_scale ───────────────────────────────────────
+# The head/hhea read that makes a font height mean an em, as FrameXML means it,
+# rather than the ascender-to-descender span ImGui fits into it. Absolute byte
+# offsets into a file this client did not write, so they are pinned.
+add_executable(test_font_em_scale
+    test_font_em_scale.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/interface_fonts.cpp
+)
+target_include_directories(test_font_em_scale PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_font_em_scale SYSTEM PRIVATE
+    ${TEST_SYSTEM_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/extern/imgui
+)
+target_link_libraries(test_font_em_scale PRIVATE catch2_main imgui)
+add_test(NAME font_em_scale COMMAND test_font_em_scale)
+register_test_target(test_font_em_scale)
+
 # ── test_plural_escape ───────────────────────────────────────
 # WoW's |4singular:plural; escape, which nothing resolved - so the logout
 # prompt read "5 |4Second:Seconds; until logout" and seventy-four other
