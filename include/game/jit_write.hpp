@@ -8,12 +8,23 @@
 // pointer anywhere in it, which is why it surfaces as a fault inside memset
 // rather than as anything to do with the caller.
 //
-// Everywhere else this is nothing: x86-64 macOS needs no such call, and no
-// other platform has MAP_JIT at all.
+// Everywhere else this is nothing: x86-64 macOS needs no such call, no other
+// platform has MAP_JIT at all, and an emulated build never maps one.
 
 #include <cstddef>
 
-#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
+// Whether an executable image is mapped MAP_JIT here. Apple's hardened runtime
+// refuses an anonymous PROT_EXEC mapping without it; an emulated build copies
+// the image into the emulator instead of running it, so it never asks for
+// PROT_EXEC and never wants MAP_JIT. Both the mapping and the window below read
+// this one answer, because a window opened over memory that is not MAP_JIT
+// calls a JIT API this process was never entitled to use, and that call traps
+// the process rather than returning a failure.
+#if defined(__APPLE__) && !defined(HAVE_UNICORN)
+    #define WOWEE_MAP_JIT 1
+#endif
+
+#if defined(WOWEE_MAP_JIT) && (defined(__aarch64__) || defined(__arm64__))
     #include <pthread.h>
     #define WOWEE_JIT_WRITE_PROTECT 1
 #endif

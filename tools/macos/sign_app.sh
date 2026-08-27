@@ -1,8 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
-APP_PATH="${1:?usage: sign_app.sh <app> [identity]}"
+APP_PATH="${1:?usage: sign_app.sh <app> [identity] [entitlements]}"
 IDENTITY="${2:--}"
+ENTITLEMENTS="${3:-}"
+
+if [ -n "${ENTITLEMENTS}" ] && [ ! -f "${ENTITLEMENTS}" ]; then
+    echo "ERROR: entitlements file not found: ${ENTITLEMENTS}" >&2
+    exit 1
+fi
 
 # Homebrew bottles and downloaded resources can carry read-only modes or
 # provenance/quarantine attributes. Both interfere with deterministic bundle
@@ -32,5 +38,17 @@ while IFS= read -r -d '' component; do
     fi
 done < <(find "${APP_PATH}/Contents" -type f -print0)
 
-codesign --force --sign "${IDENTITY}" \
-    --options runtime --timestamp "${APP_PATH}"
+# Entitlements belong on the outer signature and nowhere else: it is the one
+# that seals the main executable, and that executable is the process whose
+# capabilities are being asked for. The nested dylibs above never call for any
+# of them.
+#
+# Spelled as two calls rather than one with an argument array, because macOS
+# ships bash 3.2, where an empty array expanded under `set -u` is an error.
+if [ -n "${ENTITLEMENTS}" ]; then
+    codesign --force --sign "${IDENTITY}" --entitlements "${ENTITLEMENTS}" \
+        --options runtime --timestamp "${APP_PATH}"
+else
+    codesign --force --sign "${IDENTITY}" \
+        --options runtime --timestamp "${APP_PATH}"
+fi

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Warden ships its module as code, and the client maps that module
+         PROT_EXEC to run it. Under the hardened runtime an anonymous
+         executable mapping needs MAP_JIT, MAP_JIT needs this entitlement, and
+         pthread_jit_write_protect_np traps the process rather than returning
+         an error when it is absent. See include/game/jit_write.hpp. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+</dict>
+</plist>

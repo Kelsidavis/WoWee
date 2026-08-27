@@ -82,6 +82,24 @@ TEST_CASE("the window nests without re-arming early", "[jit]") {
 
 #endif  // !_WIN32 && MAP_JIT
 
+TEST_CASE("the window follows the mapping, not the platform", "[jit]") {
+    // The window costs nothing where it is needed and takes the process out
+    // where it is not: pthread_jit_write_protect_np answers a process without
+    // com.apple.security.cs.allow-jit by trapping, not by failing. So it must
+    // open only where the image is actually mapped MAP_JIT.
+    //
+    // 3.1.9 crashed every arm64 Mac at login on exactly that gap. The window
+    // was gated on arm64 macOS while the mapping was gated on macOS *and* no
+    // Unicorn, and the release build has Unicorn: no MAP_JIT page existed, and
+    // the first Warden module the server sent trapped in the constructor.
+    // Reported in #131. Both read WOWEE_MAP_JIT now.
+#ifdef WOWEE_MAP_JIT
+    SUCCEED("the module image is mapped MAP_JIT here");
+#else
+    CHECK_FALSE(JitWriteWindow::required());
+#endif
+}
+
 TEST_CASE("the window closes back to none", "[jit]") {
     // Whatever the platform, a balanced set of windows leaves none open. On
     // anything but arm64 macOS this is all the class does.

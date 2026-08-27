@@ -286,9 +286,11 @@ jobs:
         if [ "${MACOS_SIGNING_ENABLED}" = "true" ]; then
           IDENTITY="${APPLE_SIGNING_IDENTITY}"
         fi
-        bash tools/macos/sign_app.sh Wowee.app "${IDENTITY}"
+        bash tools/macos/sign_app.sh Wowee.app "${IDENTITY}" \
+          tools/macos/wowee.entitlements
         bash tools/macos/sign_app.sh "Wowee Asset Extractor.app" "${IDENTITY}"
-        bash tools/macos/verify_signature.sh Wowee.app "${IDENTITY}"
+        bash tools/macos/verify_signature.sh Wowee.app "${IDENTITY}" \
+          com.apple.security.cs.allow-jit
         bash tools/macos/verify_signature.sh \
           "Wowee Asset Extractor.app" "${IDENTITY}"
 

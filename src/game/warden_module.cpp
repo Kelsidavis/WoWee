@@ -609,7 +609,7 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
                     #ifdef HAVE_UNICORN
                     const int mmapProt = PROT_READ | PROT_WRITE;
                     const int mmapFlags = MAP_PRIVATE | MAP_ANONYMOUS;
-                    #elif defined(__APPLE__)
+                    #elif defined(WOWEE_MAP_JIT)
                     const int mmapProt = PROT_READ | PROT_WRITE | PROT_EXEC;
                     const int mmapFlags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_JIT;
                     #else
@@ -682,7 +682,7 @@ bool WardenModule::parseExecutableFormat(const std::vector<uint8_t>& exeData) {
         #ifdef HAVE_UNICORN
             int mmapProt  = PROT_READ | PROT_WRITE;
             int mmapFlags = MAP_PRIVATE | MAP_ANONYMOUS;
-        #elif defined(__APPLE__)
+        #elif defined(WOWEE_MAP_JIT)
             int mmapProt  = PROT_READ | PROT_WRITE | PROT_EXEC;
             int mmapFlags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_JIT;
         #else
