@@ -138,6 +138,14 @@ std::array<uint8_t, 19> inferredVisibleInventoryTypes() {
 /// measured over the shipped file it is zero for every bandage rank, so a
 /// client that asks it is told no spell ever needs a target. What carries it
 /// is EffectImplicitTargetA, which reads 21 - ally - for those same spells.
+///
+/// Look those spells up by id and not by name. Spell.dbc holds two rows per
+/// bandage: the tradeskill recipe that makes one is called "Runecloth Bandage"
+/// and reads effect 24, CREATE_ITEM, aimed at the caster - while the spell the
+/// item actually casts is one of the twelve called "First Aid" (746, 1159,
+/// 3267, 3268, 7926, 7927, 10838, 10839, 18608, 18610, 27030, 27031), effect 6
+/// aimed at an ally. Reading the recipe instead says a bandage lands on the
+/// caster and can never be used on anyone else, which is not true of either row.
 bool spellNeedsAUnit(uint32_t implicitTargetA) {
     // Every friendly aim, not just 21: a scroll or a bandage whose spell reads
     // 45 or 57 needs somebody picked exactly as one reading 21 does, and asking
