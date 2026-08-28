@@ -3004,6 +3004,20 @@ static bool ancestorsShown(lua_State* L, const wowee::ui::Widget* w) {
     return true;
 }
 
+/// Whether a script of this name is hooked to the frame at `frameIndex`.
+///
+/// The frame table is to hand here, so this reads it directly rather than
+/// going round by widget id the way LuaEngine::frameHasScript has to.
+static bool frameScriptSet(lua_State* L, int frameIndex, const char* name) {
+    const int abs = frameIndex > 0 ? frameIndex : lua_gettop(L) + frameIndex + 1;
+    lua_getfield(L, abs, "__scripts");
+    if (!lua_istable(L, -1)) { lua_pop(L, 1); return false; }
+    lua_getfield(L, -1, name);
+    const bool has = lua_isfunction(L, -1);
+    lua_pop(L, 2);
+    return has;
+}
+
 /// Run a frame's OnShow now, from inside Show().
 ///
 /// The visibility pass that normally fires it runs once a frame, and that is
@@ -3094,7 +3108,17 @@ int lua_Region_Hide(lua_State* L) {
     // The vendor and guild bank no longer take the reopen path - see
     // openBagsForTrading - so what is left exposed is the bag keybind.
     if (auto* w = widgetOf(L, 1)) {
-        if (w->shown && w->shownToggles < 200) ++w->shownToggles;
+        // Counted only where a handler is owed. A frame hidden before anything
+        // was hooked to it owes nothing, and the real client runs nothing
+        // there either. Turtle's transmog timer is CreateFrame, Hide, and only
+        // then SetScript for OnShow, OnHide and OnUpdate: counting that Hide
+        // made the Show which follows the second toggle, Show defers OnShow to
+        // updateVisibility on a second toggle, and updateVisibility fires none
+        // for a frame with no anchors. So the timer ran its OnUpdate against
+        // the startTime its OnShow was going to set. Reported in #132.
+        if (w->shown && frameScriptSet(L, 1, "OnHide") && w->shownToggles < 200) {
+            ++w->shownToggles;
+        }
         w->shown = false;
     }
     lua_pushboolean(L, 0); lua_setfield(L, 1, "__visible");
@@ -9451,11 +9475,19 @@ void LuaEngine::updateVisibility() {
             // its XML gave it: outside the scroll frame that clips it, drawn
             // and clipped away. A blank parchment with working buttons.
             //
-            // Only for a frame that is on screen at the end of it. A pair of
-            // calls on something that cannot be drawn is not a rebuild anyone
-            // can see, and waking those handlers is the risk this pass was
-            // written to avoid.
-            if (toggles < 2 || !w->visible) continue;
+            // Only for a frame that is running at the end of it - the chain,
+            // and not `visible` as the rest of this pass reads. `visible`
+            // additionally wants somewhere to be drawn, and a driver frame has
+            // nowhere: no anchors, nothing on screen, an OnUpdate and a pair of
+            // handlers to arm it. The OnUpdate pump runs those off the chain
+            // already, so reading their OnShow off `visible` left the two
+            // passes disagreeing about whether the same frame was running, and
+            // the handler that sets up what the OnUpdate reads never fired.
+            //
+            // The risk this guard was written for is unaffected: a frame Lua
+            // never touched cannot reach two toggles, so nothing wakes here
+            // that the interface did not explicitly hide and show again.
+            if (toggles < 2 || !w->visibleChain) continue;
             callFrameScript(id, "OnHide");
             callFrameScript(id, "OnShow");
             // Deliberately both, and in the order they happened. OnHide is
