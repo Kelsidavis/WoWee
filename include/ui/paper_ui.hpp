@@ -213,6 +213,9 @@ public:
     /// sizes itself to its status message before it lays out the rows below.
     [[nodiscard]] float wrappedHeight(float width, const char* s, float size) const;
     [[nodiscard]] float textWidth(const char* s, float size, bool titleFace = false) const;
+    /// How far the ink reaches below the top of a line drawn at this size -
+    /// ascent to descent, which is taller than the em the size names.
+    [[nodiscard]] float inkHeight(float size, bool titleFace = false) const;
     [[nodiscard]] float lineHeight(float size, bool titleFace = false) const;
 
     /// A line with a hand's waver in it. `seed` fixes the waver, so the same

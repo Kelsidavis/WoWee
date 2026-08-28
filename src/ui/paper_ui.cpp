@@ -316,6 +316,25 @@ float PaperUI::textWidth(const char* s, float size, bool titleFace) const {
 
 float PaperUI::lineHeight(float size, bool) const { return size * 1.28f; }
 
+/// How far the ink reaches below the top of a line drawn at `size`.
+///
+/// A size is an em, which is not what the glyphs occupy: FRIZQT spans 1215
+/// units of a 1000-unit em and Morpheus more still, and the atlas is rasterized
+/// with that correction so the face draws at its true proportions. So a rule
+/// placed one size below the top of a title sits inside the title's own
+/// descenders rather than under them - which is where the red line under every
+/// heading on the login screens went when the correction arrived.
+///
+/// Ascent to descent off the baked face, which carries the correction, with the
+/// em as the answer for a face that has not baked.
+float PaperUI::inkHeight(float size, bool titleFace) const {
+    ImFont* f = face(titleFace);
+    if (!f) return size;
+    ImFontBaked* baked = f->GetFontBaked(size);
+    if (!baked || baked->Size <= 0.0f) return size;
+    return (baked->Ascent - baked->Descent) * (size / baked->Size);
+}
+
 void PaperUI::text(ImVec2 at, const char* s, float size, ImU32 col, bool titleFace) {
     if (!s || !*s) return;
     dl_->AddText(face(titleFace), size, at, col, s);

@@ -139,13 +139,13 @@ void CharacterScreen::render(game::GameHandler& gameHandler) {
     ui_.text(col.at(), "Choose a Hero", titleSize, theme.ink, /*titleFace=*/true);
     {
         const float w = ui_.textWidth("Choose a Hero", titleSize, true);
-        const float y = col.y + titleSize;
+        const float y = col.y + ui_.inkHeight(titleSize, true);
         ui_.squiggle(ImVec2(col.x0, y), ImVec2(col.x0 + w * 1.04f, y), theme.crayonRed,
                      px(2.0f), 0x4417u);
     }
     ui_.textRight(col.x1, col.y + titleSize * 0.55f, "Or make a new one.", smallSize,
                   theme.pencil);
-    col.gap(titleSize + px(18));
+    col.gap(ui_.inkHeight(titleSize, true) + px(18));
 
     if (!statusMessage.empty()) {
         const float h = ui_.wrappedHeight(col.width(), statusMessage.c_str(), smallSize);

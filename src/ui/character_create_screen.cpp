@@ -452,13 +452,13 @@ void CharacterCreateScreen::render(game::GameHandler& /*gameHandler*/) {
     ui_.text(page.at(), "Create a Hero", titleSize, theme.ink, /*titleFace=*/true);
     {
         const float w = ui_.textWidth("Create a Hero", titleSize, true);
-        const float y = page.y + titleSize;
+        const float y = page.y + ui_.inkHeight(titleSize, true);
         ui_.squiggle(ImVec2(page.x0, y), ImVec2(page.x0 + w * 1.04f, y), theme.crayonRed,
                      px(2.0f), 0x7731u);
     }
     ui_.textRight(page.x1, page.y + titleSize * 0.55f, "Who are you going to be?", smallSize,
                   theme.pencil);
-    page.gap(titleSize + px(18));
+    page.gap(ui_.inkHeight(titleSize, true) + px(18));
 
     // ---- three columns ----------------------------------------------------
     const float footerH = px(kButtonH) + ui_.lineHeight(smallSize) + px(20);

@@ -476,7 +476,9 @@ void AuthScreen::renderCard(auth::AuthHandler& authHandler, float screenW, float
         const float titleSize = px(kTitleSize);
         ui_.textCentered(centreX, col.y, "WoWee", titleSize, theme.ink, /*titleFace=*/true);
         const float titleW = ui_.textWidth("WoWee", titleSize, true);
-        const float underlineY = col.y + titleSize * 1.02f;
+        // Below the title's own descenders, which is further down than the
+        // size names: a size is an em and the face draws taller than one.
+        const float underlineY = col.y + ui_.inkHeight(titleSize, true) * 1.02f;
         ui_.squiggle(ImVec2(centreX - titleW * 0.62f, underlineY),
                      ImVec2(centreX + titleW * 0.62f, underlineY),
                      theme.crayonRed, px(2.0f), 0x51A1u);
