@@ -6713,6 +6713,35 @@ void LuaEngine::registerCoreAPI() {
         "  __WoweeLogWarning('missing XML template: ' .. tostring(name))\n"
         "end\n");
 
+    // "Disenchanting X will destroy it", which the real client does not ask and
+    // this one does: the item is gone and there is no undoing it. Raised from
+    // completeItemUseOnItem, which parks the cast until the answer comes back.
+    //
+    // The dialog is written at the moment it is shown rather than here, because
+    // staticpopup.lua assigns StaticPopupDialogs itself and loads long after
+    // this. The interface's own strings first - 3.3.5 has one that names
+    // disenchanting, 1.12 has the destroy line every client has - so it reads
+    // in the player's language wherever it can.
+    bootstrap(
+        "local destroyFrame = CreateFrame('Frame', '__WoweeDisenchantConfirm')\n"
+        "destroyFrame:RegisterEvent('WOWEE_DISENCHANT_CONFIRM')\n"
+        "destroyFrame:SetScript('OnEvent', function(self, event, itemName)\n"
+        "    local name = itemName or arg1 or 'that item'\n"
+        "    if not StaticPopupDialogs then return end\n"
+        "    local text = LOOT_NO_DROP_DISENCHANT and format(LOOT_NO_DROP_DISENCHANT, name)\n"
+        "    if not text then\n"
+        "        text = DELETE_ITEM and format(DELETE_ITEM, name)\n"
+        "    end\n"
+        "    StaticPopupDialogs['WOWEE_DISENCHANT_CONFIRM'] = {\n"
+        "        text = text or ('Disenchant ' .. name .. '?'),\n"
+        "        button1 = YES or OKAY or 'Yes', button2 = NO or CANCEL or 'No',\n"
+        "        OnAccept = function() __WoweeConfirmItemSpell() end,\n"
+        "        timeout = 0, exclusive = 1, showAlert = 1, hideOnEscape = 1,\n"
+        "    }\n"
+        "    StaticPopup_Show('WOWEE_DISENCHANT_CONFIRM')\n"
+        "end)\n"
+        "destroyFrame:Hide()\n");
+
     // C_Timer implementation via Lua (uses OnUpdate internally)
     bootstrap(
         "C_Timer = {}\n"

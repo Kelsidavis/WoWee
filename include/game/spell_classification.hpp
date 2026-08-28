@@ -142,6 +142,42 @@ inline bool hasInebriateEffect(const uint32_t* effectIds, size_t count) {
     return false;
 }
 
+/// Whether a spell takes apart the item it is cast on rather than changing it.
+///
+/// Disenchant, prospecting and milling give materials back and consume what
+/// they were aimed at. Nothing is enchanted and nothing is bound, so none of
+/// the enchant warnings belongs in front of one - "Enchanting this item will
+/// bind it to you" in front of a disenchant asks about binding an item that is
+/// about to be dust.
+///
+/// Effect ids read off the client's own Spell.dbc rather than recalled: 13262
+/// Disenchant is 99 in 1.12 and in 3.3.5, 31252 Prospecting is 127 and 51005
+/// Milling is 158.
+inline bool destroysTargetItem(const uint32_t* effectIds, size_t count) {
+    constexpr uint32_t kSpellEffectDisenchant  = 99;
+    constexpr uint32_t kSpellEffectProspecting = 127;
+    constexpr uint32_t kSpellEffectMilling     = 158;
+    if (!effectIds) return false;
+    for (size_t i = 0; i < count; ++i) {
+        if (effectIds[i] == kSpellEffectDisenchant ||
+            effectIds[i] == kSpellEffectProspecting ||
+            effectIds[i] == kSpellEffectMilling) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/// Disenchant in particular, which is the one this client asks about first.
+inline bool hasDisenchantEffect(const uint32_t* effectIds, size_t count) {
+    constexpr uint32_t kSpellEffectDisenchant = 99;
+    if (!effectIds) return false;
+    for (size_t i = 0; i < count; ++i) {
+        if (effectIds[i] == kSpellEffectDisenchant) return true;
+    }
+    return false;
+}
+
 /// Spell.dbc stores the rank as a display string ("Rank 3"). Rankless spells sort as 0.
 inline int rankValue(const std::string& rank) {
     int value = 0;

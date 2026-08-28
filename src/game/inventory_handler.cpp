@@ -1944,13 +1944,47 @@ void InventoryHandler::completeItemUseOnItem(uint64_t targetItemGuid, bool confi
         return;
     }
 
+    // A spell that takes the item apart rather than changing it - disenchant,
+    // prospecting, milling. Neither enchant warning applies to one: nothing is
+    // enchanted, and an enchant already on the item goes with it. Both were
+    // asked anyway, so disenchanting a bind-on-equip item put "Enchanting this
+    // item will bind it to you" in front of a cast that turns it into dust.
+    bool destroysTarget = false;
+    bool isDisenchant = false;
+    if (pending.fromSpell) {
+        const auto& cache = owner_.spellNameCacheRef();
+        if (auto it = cache.find(pending.spellId); it != cache.end()) {
+            destroysTarget = spellclass::destroysTargetItem(it->second.effectIds, 3);
+            isDisenchant = spellclass::hasDisenchantEffect(it->second.effectIds, 3);
+        }
+    }
+
+    // What it does ask instead, for a disenchant: the item is gone and there is
+    // no undoing it. The real client asks nothing here, and prospecting and
+    // milling keep that - they are spent five at a time from a stack, and a
+    // dialog for each would be in the way of the profession rather than a
+    // guard on it.
+    if (destroysTarget && isDisenchant && !confirmed) {
+        const uint32_t targetEntry = owner_.getItemEntryByGuid(targetItemGuid);
+        const auto* targetInfo = targetEntry ? owner_.getItemInfo(targetEntry) : nullptr;
+        pendingItemTarget_.reset();
+        pendingEnchant_ = PendingEnchant{.active = true, .targetItemGuid = targetItemGuid, .request = pending};
+        if (owner_.addonEventCallbackRef()) {
+            owner_.addonEventCallbackRef()(
+                "WOWEE_DISENCHANT_CONFIRM",
+                {targetInfo && !targetInfo->name.empty() ? targetInfo->name
+                                                         : std::string("that item")});
+        }
+        return;
+    }
+
     // Something permanent is already on it, and applying this destroys it.
     //
     // Only the permanent slot. A weapon carrying a sharpening stone is not
     // warned about, because the temporary slot is minutes of a stone rather
     // than an enchanter, and naming a permanent enchant that is not being
     // replaced would be a warning about the wrong thing.
-    if (!confirmed) {
+    if (!confirmed && !destroysTarget) {
         // Enchanting an unbound item binds it. Same family as the equip, use
         // and loot warnings, and the one of the five that was missed: the
         // interface has raised BIND_ENCHANT for it all along and nothing ever

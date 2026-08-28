@@ -3575,6 +3575,18 @@ void registerInventoryLuaAPI(lua_State* L) {
             if (auto* gh = getGameHandler(L)) gh->replaceEnchant();
             return 0;
         }},
+                // The Okay on "Disenchanting X will destroy it", which is this
+                // client's own dialog - the real client asks nothing there, and
+                // the question it was asking instead was about binding an item
+                // that is about to be dust. Under the internal prefix because
+                // no interface has ever called it and none should.
+                //
+                // The same parked cast the two enchant prompts answer: only one
+                // item spell can be waiting on a target.
+                {"__WoweeConfirmItemSpell", [](lua_State* L) -> int {
+            if (auto* gh = getGameHandler(L)) gh->replaceEnchant();
+            return 0;
+        }},
                 // RespondMailLockSendItem(slot, keep) - the answer to "this
                 // item can still be handed back; posting it ends that". Keep
                 // it attached, or take it off again.
