@@ -7108,6 +7108,27 @@ void LuaEngine::registerCoreAPI() {
         "        self:AddLine(string.format('%.0f sec remaining', duration), 1, 1, 1)\n"
         "    end\n"
         "end\n"
+        // What the minimap's tracking button is showing. 1.12's Minimap.xml
+        // opens the tracking frame's OnEnter with SetOwner and this, and it was
+        // in neither the method table nor the no-op allowlist - so the lookup
+        // answered nil, the call raised, and the OnEnter it was the second line
+        // of took the tooltip's owner with it. Reported in #132.
+        //
+        // The spell's own tooltip where SetSpellByID can render one, because
+        // "Track Humanoids" is a title without the line under it saying what
+        // that does. The id comes from this client rather than from
+        // GetTrackingInfo, whose fifth value is 4.x's own.
+        "function __WoweeFrameMT:SetTrackingSpell()\n"
+        "    self:ClearLines()\n"
+        "    local spellId = __WoweeActiveTrackingSpell()\n"
+        "    if spellId and self.SetSpellByID then\n"
+        "        return self:SetSpellByID(spellId)\n"
+        "    end\n"
+        "    for i = 1, GetNumTrackingTypes() do\n"
+        "        local name, _, active = GetTrackingInfo(i)\n"
+        "        if active and name then return self:SetText(name, 1, 1, 1) end\n"
+        "    end\n"
+        "end\n"
         "function __WoweeFrameMT:SetTrainerService(index)\n"
         "    self:ClearLines()\n"
         "    if not index then return end\n"

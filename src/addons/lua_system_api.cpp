@@ -2288,6 +2288,19 @@ static int lua_GetTrackingTexture(lua_State* L) {
         const std::string icon = gh->getSpellIconPath(sid);
         if (!icon.empty()) { lua_pushstring(L, icon.c_str()); return 1; }
     }
+    // Nothing tracked, and what a stock client shows for that is not the same
+    // picture in every expansion. 3.x has a button whose art is empty in the
+    // XML and a magnifying glass to fill it with. 1.12 has neither: its
+    // Minimap.xml hides the tracking frame outright when this answers nil, and
+    // the 1.12 archives carry no Interface\Minimap\Tracking folder at all -
+    // interface.MPQ, patch.MPQ and patch-2.MPQ hold nothing under that path. So
+    // on turtle the answer named a file that does not exist, and the frame was
+    // shown with an empty icon in it rather than hidden.
+    //
+    // Only 1.12 changes. The tracking dropdown and its None entry are 2.x's and
+    // nothing here has been checked against a 2.4.3 tree, so every other
+    // interface keeps the answer it already had.
+    if (interfaceVersion(L) < 20000) return luaReturnNil(L);
     lua_pushstring(L, "Interface\\Minimap\\Tracking\\None");
     return 1;
 }
@@ -2302,6 +2315,12 @@ static int lua_GetNumTrackingTypes(lua_State* L) {
 ///
 /// "spell" for the category, because these are spell icons and the menu uses
 /// that to crop the icon's border - the same trim the action bar gives them.
+///
+/// Four values and not five. The spell id would have been useful to
+/// GameTooltip:SetTrackingSpell and belongs in none of them: 4.x defines a
+/// fifth of its own - whether the entry nests under the one above it - and a
+/// number in that position would be read as that. __WoweeActiveTrackingSpell
+/// carries it instead, under a name no interface will ever call.
 static int lua_GetTrackingInfo(lua_State* L) {
     auto* gh = getGameHandler(L);
     const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
@@ -2313,6 +2332,21 @@ static int lua_GetTrackingInfo(lua_State* L) {
     lua_pushboolean(L, trackingActive(gh, sid) ? 1 : 0);
     lua_pushstring(L, "spell");
     return 4;
+}
+
+/// __WoweeActiveTrackingSpell() → the spell id of the tracking now running.
+///
+/// This client's own and not an interface function: GameTooltip:SetTrackingSpell
+/// needs the id to render the spell's own tooltip, and every real API that
+/// could have carried it is a shape some expansion has already defined.
+static int lua_ActiveTrackingSpell(lua_State* L) {
+    auto* gh = getGameHandler(L);
+    for (uint32_t sid : trackingSpells(gh)) {
+        if (!trackingActive(gh, sid)) continue;
+        lua_pushnumber(L, static_cast<lua_Number>(sid));
+        return 1;
+    }
+    return luaReturnNil(L);
 }
 
 /// SetTracking(index) - casting the spell is how tracking is turned on; there
@@ -6433,6 +6467,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 {"GetTrackingTexture",  lua_GetTrackingTexture},
                 {"GetNumTrackingTypes", lua_GetNumTrackingTypes},
                 {"GetTrackingInfo",     lua_GetTrackingInfo},
+                {"__WoweeActiveTrackingSpell", lua_ActiveTrackingSpell},
                 {"SetTracking",         lua_SetTracking},
                 {"GetZoneText",          lua_GetZoneText},
                 {"GetRealZoneText",      lua_GetZoneText},
