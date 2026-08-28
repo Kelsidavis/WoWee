@@ -2164,6 +2164,14 @@ void registerSocialLuaAPI(lua_State* L) {
                 // Vehicles are not modelled in the raid frames.
                 {"UnitTargetsVehicleInRaidUI", luaReturnFalse},
                 {"GetNumLanguages",   lua_GetNumLanguages},
+                // The 1.12 client's own spelling, and not a typo on this side:
+                // stock ChatFrame.lua opens LanguageMenu_LoadLanguages with
+                // `local numLanguages = GetNumLaguages();`, so the client it
+                // was written against must answer to that name. Missing, the
+                // no-op fallback answered something that is not a number and
+                // the next line - `for i = 1, numLanguages` - raised, leaving
+                // the language menu empty. Reported in #132.
+                {"GetNumLaguages",    lua_GetNumLanguages},
                 {"GetLanguageByIndex", lua_GetLanguageByIndex},
                 {"SendChatMessage",   lua_SendChatMessage},
                 {"SendAddonMessage",  lua_SendAddonMessage},
