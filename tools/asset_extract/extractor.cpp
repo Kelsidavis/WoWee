@@ -968,7 +968,13 @@ bool Extractor::run(const Options& opts) {
 
     if (opts.generateDbcCsv) {
         std::cout << "Converting selected DBCs to CSV for committing...\n";
-        const std::string dbcDir = effectiveOutputDir + "/db";
+        // Where extraction actually put them. This read <out>/db, which is
+        // where the CSVs are written to, not where the DBCs came out - so
+        // every name reported "Missing extracted DBC" and the conversion did
+        // nothing at all. PathMapper lowercases every output path, so the file
+        // is dbfilesclient/spell.dbc; the mixed-case name is tried after it for
+        // a tree some other tool extracted. Reported in #132.
+        const std::string dbcDir = effectiveOutputDir + "/dbfilesclient";
         const std::string csvExpansion = opts.expansion;
         const std::string csvDir = !opts.dbcCsvOutputDir.empty()
             ? opts.dbcCsvOutputDir
@@ -976,7 +982,11 @@ bool Extractor::run(const Options& opts) {
 
         uint32_t ok = 0, fail = 0, missing = 0;
         for (const auto& base : getUsedDbcNamesForExpansion(opts.expansion)) {
-            const std::string in = dbcDir + "/" + base + ".dbc";
+            std::string lower = base;
+            std::transform(lower.begin(), lower.end(), lower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            std::string in = dbcDir + "/" + lower + ".dbc";
+            if (!fs::exists(in)) in = dbcDir + "/" + base + ".dbc";
             const std::string out = csvDir + "/" + base + ".csv";
             if (!fs::exists(in)) {
                 std::cerr << "  Missing extracted DBC: " << in << "\n";
