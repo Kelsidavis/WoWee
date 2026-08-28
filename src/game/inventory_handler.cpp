@@ -3283,6 +3283,15 @@ void InventoryHandler::handleBuyBankSlotResult(network::Packet& packet) {
 // ============================================================
 
 void InventoryHandler::openGuildBank(uint64_t guid) {
+    // A vault belongs to a guild, and a player in none has nothing to open. The
+    // server answers CMSG_GUILD_BANKER_ACTIVATE from a guildless player with an
+    // error and sends no bank list, so the window this raised at the moment the
+    // object was clicked had nothing behind it and never would: tabs to click,
+    // no contents, and no way to tell that from a vault that had not loaded yet.
+    if (!owner_.isInGuild()) {
+        owner_.raiseUiError("You are not in a guild.");
+        return;
+    }
     guildBankerGuid_ = guid;
     guildBankOpen_ = true;
     guildBankActiveTab_ = 0;
