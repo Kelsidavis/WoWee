@@ -1303,6 +1303,18 @@ bool AddonManager::loadXmlFile(const std::string& path, int depth) {
                 return p;
             }
         }
+        // Neither place has it under any spelling, which is a different thing
+        // from the open failing - "cannot open" reads as a permission or a
+        // lock, and this is a file that is not in the install. Turtle's
+        // StaticPopup.xml asks for StaticPopup.lua and one report's extraction
+        // did not contain it: every static popup in the game was dead, and
+        // WorldFrame's OnUpdate with them, because STATICPOPUP_NUMDIALOGS is
+        // declared in that file. Said here, where both searched places are
+        // still to hand.
+        LOG_WARNING("AddonManager: no file named ", rawName, " beside ",
+                    fs::path(path).filename().string(), " (looked in ", dir.string(),
+                    base.empty() ? std::string() : " and in " + base.string(),
+                    ") - it is missing from this install");
         return dir / name;
     };
 
