@@ -234,7 +234,13 @@ void EntitySpawner::spawnOnlinePlayer(uint64_t guid,
         if (!sections.exactFace) {
             LOG_WARNING("spawnOnlinePlayer: no DBC face match for face=",
                         static_cast<int>(look.faceId), " skin=", static_cast<int>(look.skinId),
-                        " race=", raceId, " sex=", genderId,
+                        // Cast, because both are uint8_t and the stream writes
+                        // one as a character: race 9 came out as a tab and sex
+                        // 0 as a NUL, which is unreadable and puts a NUL in the
+                        // log file - grep then takes the whole log for binary
+                        // and prints nothing at all for any pattern in it.
+                        " race=", static_cast<int>(raceId),
+                        " sex=", static_cast<int>(genderId),
                         sections.haveFace ? " - using the nearest face instead"
                                           : " - this player will render with no face");
         }
