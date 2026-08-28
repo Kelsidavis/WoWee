@@ -701,6 +701,25 @@ struct Emitter {
         }
     }
 
+    /// The frame type an element makes, as an expression.
+    ///
+    /// A known element names its own type. Anything else is a name the schema
+    /// never defined, and the real client reads the type off what the element
+    /// inherits: 1.12's LootFrame.xml writes <LootButton name="LootButtonTemplate"
+    /// inherits="ItemButtonTemplate" virtual="true"> and then <LootButton
+    /// name="LootButton1" inherits="LootButtonTemplate">, and every one of those
+    /// is a Button because ItemButtonTemplate is one. Built as a Frame instead,
+    /// the template's own RegisterForClicks and OnClick have nothing to act on
+    /// and the loot window's rows do not answer a click.
+    ///
+    /// Resolved at runtime, and through the whole chain, because a template may
+    /// be declared in another file and this emitter sees one file at a time.
+    std::string frameTypeArg(const XmlNode& node) const {
+        if (isFrameElement(node.name)) return quote(node.name);
+        return "__WoweeFrameType(" + quote(node.name) + ", " +
+               quote(node.attrOr("inherits", "")) + ")";
+    }
+
     /// Returns the variable holding the new frame, or empty for a virtual
     /// one, so a caller that must hand it on - a scroll frame to its child -
     /// can name it.
@@ -728,14 +747,22 @@ struct Emitter {
             inner.emitFrameBody(node, "self", name, "self:GetParent()",
                                 std::string(), /*fireOnLoad=*/false);
             // What kind of frame the template makes, so an element written as
-            // the template's own name can be built as one. Turtle's
-            // LootFrame.xml declares <Button name="LootButton" virtual="true">
-            // and then writes <LootButton name="LootButton1"/>, which is a
-            // shape the real client accepts and this emitter had no answer for
-            // - the element was unknown, nothing inside it was built, and the
-            // loot window came up with no buttons in it.
+            // the template's own name can be built as one - and so a template
+            // whose own element is not a frame type passes the question on to
+            // what it inherits. LootButtonTemplate is declared <LootButton>,
+            // which is nothing, and is a Button because it inherits one.
+            //
+            // A resolved type where the element states it, and the chain to
+            // follow where it does not: the chain is walked when a frame is
+            // created rather than now, so a template declared after this one
+            // still answers.
             virtualFrames.insert(name);
-            line("__WoweeTemplateTypes[" + quote(name) + "] = " + quote(node.name));
+            if (isFrameElement(node.name)) {
+                line("__WoweeTemplateTypes[" + quote(name) + "] = " + quote(node.name));
+            } else {
+                line("__WoweeTemplateInherits[" + quote(name) + "] = " +
+                     quote(node.name + "," + node.attrOr("inherits", "")));
+            }
             line("__WoweeTemplates[" + quote(name) + "] = function(self)");
             line("local __w = {}");
             // Whether this frame arrived with a parent, read before any
@@ -806,15 +833,7 @@ struct Emitter {
         // Baking the literal instead named every scroll bar after the template,
         // so the _G[self:GetName().."ScrollBar"] its own handlers look up never
         // existed - which is what took down most of FrameXML.
-        // A known element names its own type; anything else is a template's
-        // name, and the type is whatever that template was declared as. Read at
-        // runtime because the template may live in a file loaded before this
-        // one and the emitter sees one file at a time.
-        const std::string typeArg =
-            isFrameElement(node.name)
-                ? quote(node.name)
-                : "(__WoweeTemplateTypes[" + quote(node.name) + "] or \"Frame\")";
-        line(var + " = CreateFrame(" + typeArg + ", " +
+        line(var + " = CreateFrame(" + frameTypeArg(node) + ", " +
              nameArg(rawName, parentName, parentArg) + ", " + parentArg + ")");
 
         // Identity before anything is built on top of it. FrameXML makes names
@@ -828,13 +847,19 @@ struct Emitter {
         // Before the template applies, so a template body that reaches back
         // through its parent for a sibling finds it already bound.
         emitParentKey(node, var, parentArg);
-        // The element's own name is the first template it inherits. Missing is
-        // reported the same way a named inherits= is, so an element that is
-        // genuinely nothing still says so.
+        // The element's own name is the first template it inherits, where one
+        // of that name exists. Reported missing only when the element has no
+        // inherits= of its own: <LootButton name="LootButton1"
+        // inherits="LootButtonTemplate"> names no template with its element and
+        // is not meant to - the name is the type, and the type came from what
+        // it inherits. An element that names nothing at all still says so.
         if (!isFrameElement(node.name)) {
-            line("if __WoweeTemplates[" + quote(node.name) + "] then __WoweeTemplates[" +
-                 quote(node.name) + "](" + var + ") else __WoweeMissingTemplate(" +
-                 quote(node.name) + ") end");
+            const std::string apply = "__WoweeTemplates[" + quote(node.name) + "](" + var + ")";
+            line("if __WoweeTemplates[" + quote(node.name) + "] then " + apply +
+                 (node.attr("inherits")
+                      ? std::string()
+                      : " else __WoweeMissingTemplate(" + quote(node.name) + ")") +
+                 " end");
         }
         emitInherits(node, var);
         emitFrameBody(node, var, name.empty() ? parentName : name, parentArg,
@@ -1578,14 +1603,20 @@ EmitResult emitFrameXml(const XmlNode& rootIn) {
                                             "has nothing to belong to");
             }
         } else if (node.attr("name")) {
-            // A template's own name used as an element. Turtle's LootFrame.xml
-            // writes <LootButton name="LootButton1"/> against a virtual
-            // <Button name="LootButton">, which the real client accepts and
-            // this reported as an unknown type - so the loot window was built
-            // with no buttons in it. emitFrame reads the type off the template
-            // and applies it; a name that turns out to be no template at all
-            // still reports itself, from __WoweeMissingTemplate.
-            if (!e.virtualFrames.count(node.name)) {
+            // An element the schema does not define, which the real client
+            // accepts and reads a type off. 1.12's LootFrame.xml is all of
+            // them: <LootButton name="LootButtonTemplate"
+            // inherits="ItemButtonTemplate" virtual="true"> and then
+            // <LootButton name="LootButton1" inherits="LootButtonTemplate">.
+            // This reported an unknown type and built nothing inside it, so the
+            // loot window had no buttons in it. emitFrame takes the type from
+            // the element's own name where that names a template, and from what
+            // it inherits otherwise.
+            //
+            // Only an element that names neither is reported: with an inherits=
+            // there is a type to find and a body to apply, and nothing about the
+            // element is a guess.
+            if (!e.virtualFrames.count(node.name) && !node.attr("inherits")) {
                 e.result.warnings.push_back(
                     "<" + node.name + "> is not a frame type and no template of "
                     "that name is declared here - it is built from one if some "

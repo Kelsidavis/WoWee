@@ -6614,6 +6614,42 @@ void LuaEngine::registerCoreAPI() {
         // as a template's own name - <LootButton name="LootButton1"/> -
         // can be created as one. See the emitter's virtual-frame path.
         "__WoweeTemplateTypes = {}\n"
+        // And, for a template whose own element is no frame type either, the
+        // names to ask instead: its element and its inherits=, in that order.
+        // 1.12's <LootButton name="LootButtonTemplate"
+        // inherits="ItemButtonTemplate" virtual="true"> knows what it makes
+        // only by way of ItemButtonTemplate, which is a Button.
+        "__WoweeTemplateInherits = {}\n"
+        // Walked when a frame is created rather than when the template is
+        // declared, so a template declared in a file loaded later still
+        // answers. Depth-limited because a chain may name itself, directly or
+        // round a ring, and that must not be what takes the interface down.
+        "local function __WoweeTypeOf(name, depth)\n"
+        "  if not name or name == '' or depth > 8 then return nil end\n"
+        "  local t = __WoweeTemplateTypes[name]\n"
+        "  if t then return t end\n"
+        "  local inh = __WoweeTemplateInherits[name]\n"
+        "  if not inh then return nil end\n"
+        "  for one in string.gmatch(inh, '[^,%s]+') do\n"
+        "    t = __WoweeTypeOf(one, depth + 1)\n"
+        "    if t then return t end\n"
+        "  end\n"
+        "  return nil\n"
+        "end\n"
+        // The type an element makes: its own name where that names a template,
+        // and what it inherits otherwise. A frame is the answer of last resort
+        // - an element naming nothing this client ever saw is still built,
+        // without whatever a Button would have given it, which is what the
+        // missing-template report beside it describes.
+        "function __WoweeFrameType(element, inherits)\n"
+        "  local t = __WoweeTypeOf(element, 0)\n"
+        "  if t then return t end\n"
+        "  for one in string.gmatch(inherits or '', '[^,%s]+') do\n"
+        "    t = __WoweeTypeOf(one, 0)\n"
+        "    if t then return t end\n"
+        "  end\n"
+        "  return 'Frame'\n"
+        "end\n"
         "local reported = {}\n"
         "function __WoweeMissingTemplate(name)\n"
         "  if reported[name] then return end\n"

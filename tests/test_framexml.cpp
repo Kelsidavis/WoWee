@@ -186,11 +186,8 @@ TEST_CASE("an animation's parentKey goes on its group", "[framexml][emit]") {
     CHECK(has(lua, ":SetStartDelay(4.05)"));
 }
 
-// A virtual frame's name may be written as an element. Turtle's LootFrame.xml
-// declares <Button name="LootButton" virtual="true"> and then writes
-// <LootButton name="LootButton1"/>, which the real client accepts. This
-// reported an unknown type and built nothing inside it, so the loot window came
-// up with no buttons - reported as issue 132.
+// A virtual frame's name may be written as an element, and the type comes from
+// whatever the element inherits - reported as issue 132.
 TEST_CASE("a template's name may be used as an element", "[framexml][emit]") {
     XmlNode root = parseOrFail(
         "<Ui>"
@@ -202,11 +199,47 @@ TEST_CASE("a template's name may be used as an element", "[framexml][emit]") {
     // The template records what kind of frame it makes...
     CHECK(has(r.lua, "__WoweeTemplateTypes[\"LootButton\"] = \"Button\""));
     // ...and the element is created as that kind and inherits it.
-    CHECK(has(r.lua, "CreateFrame((__WoweeTemplateTypes[\"LootButton\"] or \"Frame\")"));
+    CHECK(has(r.lua, "CreateFrame(__WoweeFrameType(\"LootButton\", \"\")"));
     CHECK(has(r.lua, "__WoweeTemplates[\"LootButton\"]("));
     CHECK(has(r.lua, ":SetID(1)"));
     // And with the template declared in the same file it is not reported: the
     // emitter can see it is a template rather than a typo.
+    for (const std::string& w : r.warnings) {
+        CHECK(w.find("LootButton") == std::string::npos);
+    }
+}
+
+// The shape 1.12 actually ships, which is not the one above: nothing declares
+// <LootButton> at all. The element is a name the schema never defined, both
+// times it is written, and every frame it makes is a Button because
+// ItemButtonTemplate is one. Built as a Frame instead - which is what the first
+// fix for this did - LootButtonTemplate's own RegisterForClicks and OnClick
+// have nothing to act on and a loot row does not answer a click.
+TEST_CASE("an unknown element takes the type of what it inherits",
+          "[framexml][emit]") {
+    XmlNode root = parseOrFail(
+        "<Ui>"
+        "<LootButton name='LootButtonTemplate' inherits='ItemButtonTemplate' virtual='true'>"
+        "<Scripts><OnClick>LootFrameItem_OnClick(arg1);</OnClick></Scripts>"
+        "</LootButton>"
+        "<Frame name='LootFrame'><Frames>"
+        "<LootButton name='LootButton1' inherits='LootButtonTemplate' id='1'/>"
+        "</Frames></Frame>"
+        "</Ui>");
+    const EmitResult r = emitFrameXml(root);
+    INFO(r.lua);
+    // The template cannot say what it makes, so it says where to ask - its own
+    // element first, then what it inherits.
+    CHECK(has(r.lua, "__WoweeTemplateInherits[\"LootButtonTemplate\"] = "
+                     "\"LootButton,ItemButtonTemplate\""));
+    // And the frame asks, at creation, so a template declared in a file loaded
+    // after this one still answers.
+    CHECK(has(r.lua, "CreateFrame(__WoweeFrameType(\"LootButton\", "
+                     "\"LootButtonTemplate\"), \"LootButton1\""));
+    CHECK(has(r.lua, "__WoweeTemplates[\"LootButtonTemplate\"]("));
+    // Nothing here is a guess: the element has an inherits= to be built from,
+    // so neither half reports a template of the element's own name as missing.
+    CHECK_FALSE(has(r.lua, "__WoweeMissingTemplate(\"LootButton\")"));
     for (const std::string& w : r.warnings) {
         CHECK(w.find("LootButton") == std::string::npos);
     }
