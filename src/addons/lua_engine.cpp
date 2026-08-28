@@ -2636,13 +2636,16 @@ int lua_Tooltip_SetInventoryItem(lua_State* L) {
     auto* w = widgetOf(L, 1);
     auto* gh = wowee::addons::getGameHandler(L);
     const int slot = static_cast<int>(luaL_optnumber(L, 3, 0));
-    if (!w || !gh || slot < 1 || slot > 19) { lua_pushboolean(L, 0); return 1; }
+    if (!w || !gh || slot < 1) { lua_pushboolean(L, 0); return 1; }
 
     // The unit argument was ignored, so every slot of the inspect paperdoll
     // showed whatever the player themselves had in that slot - the wrong item
     // rather than none, which is the harder kind to notice.
     std::string uid(luaL_optstring(L, 2, "player"));
     wowee::addons::toLowerInPlace(uid);
+    // Another player is only ever inspected as equipment, and the cache behind
+    // it is one entry per equipment slot.
+    if (uid != "player" && slot > 19) { lua_pushboolean(L, 0); return 1; }
     if (uid != "player") {
         const uint64_t guid = wowee::addons::resolveUnitGuid(gh, uid);
         auto& cache = gh->inspectedPlayerItemEntriesRef();
@@ -2652,7 +2655,16 @@ int lua_Tooltip_SetInventoryItem(lua_State* L) {
         return 1;
     }
 
-    const auto& s = gh->getInventory().getEquipSlot(static_cast<game::EquipSlot>(slot - 1));
+    // Every slot this numbering reaches, not equipment alone. bankframe.lua
+    // hovers with GameTooltip:SetInventoryItem("player", self:GetInventorySlot()),
+    // and a bank slot's id lands at forty and up - so a bound of nineteen
+    // refused all twenty-eight and the bank had no tooltips at all. Its bag row
+    // looked like it worked and did not: a bag button falls back to
+    // GameTooltip:SetText(self.tooltipText) when this answers false, which is
+    // the "Bank Bag" line, not the bag's own tooltip.
+    const game::ItemSlot* sp = wowee::addons::inventorySlotItem(gh->getInventory(), slot);
+    if (!sp) { lua_pushboolean(L, 0); return 1; }
+    const auto& s = *sp;
     if (s.empty()) { lua_pushboolean(L, 0); return 1; }
     // Through the fuller builder, with the slot's own copy of the item as the
     // floor: the slot knows the name and quality even for an entry no
@@ -2666,7 +2678,11 @@ int lua_Tooltip_SetInventoryItem(lua_State* L) {
         // has named the suffix itself.
         appendRandomSuffix(w, gh, s.item);
     }
-    appendEnchantLines(w, gh, gh->getEquipSlotGuid(slot - 1));
+    // Equipment only: the guid list behind it is one per equipped slot, and a
+    // bank slot's id would read off the end of it.
+    if (slot <= static_cast<int>(game::EquipSlot::NUM_SLOTS)) {
+        appendEnchantLines(w, gh, gh->getEquipSlotGuid(slot - 1));
+    }
     lua_pushboolean(L, 1);
     return 1;
 }
