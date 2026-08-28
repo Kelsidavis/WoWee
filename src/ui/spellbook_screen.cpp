@@ -164,11 +164,19 @@ void SpellbookScreen::loadSpellDBC(pipeline::AssetManager* assetManager) {
         try { casterAuraStateField = (*spellL)["CasterAuraState"]; } catch (...) {}
         try { casterAuraStateNotField = (*spellL)["CasterAuraStateNot"]; } catch (...) {}
         // Try SchoolMask (TBC/WotLK bitmask) then SchoolEnum (Classic/Turtle 0-6 value)
-        schoolField_  = UINT32_MAX;
+        //
+        // Asked for rather than read, so a 1.12 layout is not reported as
+        // missing SchoolMask: it never had the column, and the warning that
+        // came of it told people with a perfectly good extraction to go and
+        // re-extract. Neither name is a real gap and still says so.
+        schoolField_  = spellL->tryField("SchoolMask");
         isSchoolEnum_ = false;
-        try { schoolField_ = (*spellL)["SchoolMask"]; } catch (...) {}
         if (schoolField_ == UINT32_MAX) {
-            try { schoolField_ = (*spellL)["SchoolEnum"]; isSchoolEnum_ = true; } catch (...) {}
+            schoolField_ = spellL->tryField("SchoolEnum");
+            isSchoolEnum_ = schoolField_ != UINT32_MAX;
+        }
+        if (schoolField_ == UINT32_MAX) {
+            pipeline::noteMissingLayoutField("Spell", "SchoolMask or SchoolEnum");
         }
         tryLoad((*spellL)["ID"], (*spellL)["Attributes"], (*spellL)["IconID"],
                 (*spellL)["Name"], (*spellL)["Rank"], tooltipField, descriptionField,
