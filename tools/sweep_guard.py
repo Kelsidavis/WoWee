@@ -931,11 +931,18 @@ CHECKS = [
     # correct and only unrecorded. The state arm is the one worth reading -
     # a lookup that missed is what a player walks into, where an argument
     # bound is the interface's to keep.
+    #
+    # One unit moved from the argument arm to the state arm on 2026-08-28 and
+    # the totals are unchanged: PutItemInBag learned the bank's bag row, and its
+    # guard went from `inventoryId < 20 || inventoryId > 23` to a pair of named
+    # bools. The refusal is the same one and is still argument-bound - the id
+    # comes from the interface - but the arms are told apart by whether the
+    # condition contains a comparison, and a named bool has none.
     ("silent_refusal_check.py",
-     r"^(\d+) state or lookup refusal", 21,
+     r"^(\d+) state or lookup refusal", 22,
      "action bindings that refuse on missing state and say nothing"),
     ("silent_refusal_check.py",
-     r"^(\d+) argument-bound refusal", 28,
+     r"^(\d+) argument-bound refusal", 27,
      "action bindings that refuse an out-of-range argument and say nothing"),
     # Zero, and it stays there: a refusal with a line already written is one
     # word from being useful, so there is no reason to carry any.

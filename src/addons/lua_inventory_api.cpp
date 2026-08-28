@@ -988,10 +988,19 @@ static int lua_BankButtonIDToInvSlotID(lua_State* L) {
     // the sum rather than as sixty-seven so the arithmetic is visible.
     const int buttonId = static_cast<int>(luaL_checknumber(L, 1));
     const bool isBag = lua_toboolean(L, 2) != 0;
-    // The buttons count from one and so do inventory slots, so the nth button
-    // is the (n-1)th wire slot, crossed back into the interface's numbering.
-    const int wire = isBag ? game::slots::bankBagWireSlot(buttonId - 1)
-                           : game::slots::bankGeneralWireSlot(buttonId - 1);
+    // The general buttons count from one, so the nth is the (n-1)th wire slot.
+    //
+    // A bag button does not. Its id is the container number the interface gives
+    // that bank bag - five through eleven, following the four worn bags - and
+    // bankframe.lua says so itself: it greys out an unbought slot by testing
+    // (button:GetID() - 4) > GetNumBankSlots(). Counting it from one put the
+    // whole bag row four slots along, so the first four buttons addressed the
+    // last three bank bags and then ran off the end: a bag sitting in the first
+    // slot had no button showing its icon, and dropping one on a button aimed
+    // at a slot that was not the one under the cursor.
+    const int wire = isBag
+        ? game::slots::bankBagWireSlot(buttonId - (game::slots::kWornBagCount + 1))
+        : game::slots::bankGeneralWireSlot(buttonId - 1);
     lua_pushnumber(L, game::slots::toInventorySlot(wire));
     return 1;
 }
@@ -2750,11 +2759,20 @@ static int lua_PutItemInBag(lua_State* L) {
     auto* gh = getGameHandler(L);
     const int inventoryId = static_cast<int>(luaL_optnumber(L, 1, 0));
     uint8_t srcBag = 0, srcSlot = 0;
-    if (!gh || inventoryId < 20 || inventoryId > 23 || !heldWireSlot(srcBag, srcSlot)) {
+    // The bank's bag row as well as the worn one. BankFrameItemButtonBag_OnClick
+    // opens with PutItemInBag(self:GetInventorySlot()) and falls through to
+    // ToggleBag when it answers false, so a bank bag slot refused here meant a
+    // bag on the cursor clicked onto one did nothing but open whatever was
+    // already in it. The drag path handled them all along; the click did not.
+    const int wornIndex = inventoryId - 20;                                    // 0-3
+    const int bankIndex = inventoryId - game::slots::kFirstBankBagInventorySlot;  // 0-6
+    const bool isWorn = wornIndex >= 0 && wornIndex < game::Inventory::NUM_BAG_SLOTS;
+    const bool isBank = bankIndex >= 0 && bankIndex < game::Inventory::BANK_BAG_SLOTS;
+    if (!gh || (!isWorn && !isBank) || !heldWireSlot(srcBag, srcSlot)) {
         lua_pushboolean(L, 0);
         return 1;
     }
-    const int bagIndex = inventoryId - 20;          // 0-3
+    const int bagIndex = isWorn ? wornIndex : bankIndex;
     const auto& inv = gh->getInventory();
 
     // A bag dropped on a bag slot changes places with what is worn there, it
@@ -2763,8 +2781,11 @@ static int lua_PutItemInBag(lua_State* L) {
     // with another was not expressible: the only outcomes were equipping into
     // an empty slot or being swallowed by a full one.
     const auto& cursor = cursorItemSlot();
+    // Both ends worn: that pair has its own verb, which moves the bags locally
+    // as well as sending the swap. A worn bag onto a bank slot, or either way
+    // round with the bank, is the ordinary item move below.
     const bool holdingWornBag = cursor.equipped && cursor.slot >= 20 && cursor.slot <= 23;
-    if (holdingWornBag) {
+    if (holdingWornBag && isWorn) {
         const int fromIndex = cursor.slot - 20;
         if (fromIndex != bagIndex) {
             gh->swapBagSlots(fromIndex, bagIndex);
@@ -2775,7 +2796,7 @@ static int lua_PutItemInBag(lua_State* L) {
         return 1;
     }
 
-    const int size = inv.getBagSize(bagIndex);
+    const int size = isWorn ? inv.getBagSize(bagIndex) : inv.getBankBagSize(bagIndex);
     // An empty bag slot equips the held bag rather than swallowing it.
     //
     // getBagSize is zero when nothing is worn in this slot, so the loop below
@@ -2793,9 +2814,13 @@ static int lua_PutItemInBag(lua_State* L) {
         return 1;
     }
     for (int i = 0; i < size; ++i) {
-        if (!inv.getBagSlot(bagIndex, i).empty()) continue;
+        const auto& target = isWorn ? inv.getBagSlot(bagIndex, i)
+                                    : inv.getBankBagSlot(bagIndex, i);
+        if (!target.empty()) continue;
+        const int container = isWorn ? game::slots::wornBagContainer(bagIndex)
+                                     : game::slots::bankBagContainer(bagIndex);
         gh->swapContainerItems(srcBag, srcSlot,
-                               static_cast<uint8_t>(game::slots::wornBagContainer(bagIndex)),
+                               static_cast<uint8_t>(container),
                                static_cast<uint8_t>(i));
         cursorItemSlot() = {};
         wowee::ui::frameXmlSetCursorItem(std::string());
