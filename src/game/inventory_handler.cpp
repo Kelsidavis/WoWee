@@ -2333,6 +2333,24 @@ void InventoryHandler::swapBagSlots(int srcBagIndex, int dstBagIndex) {
     owner_.inventoryRef().setEquipSlot(dstEquip, srcItem);
     owner_.inventoryRef().swapBagContents(srcBagIndex, dstBagIndex);
 
+    // A bag that moved takes its window with it, which is what the real client
+    // does and what ContainerFrame_OnEvent is written for: BAG_CLOSED carrying
+    // the bag's number hides that frame. Nothing was said here at all, so a bag
+    // rearranged on the bar while its window was open left the window standing
+    // over contents that had moved to the other bag - and clicking a slot in it
+    // acted on the container the frame still named. Closing both and reopening
+    // was the only way to move anything again.
+    //
+    // The interface numbers a worn bag from one; these indices count from zero.
+    auto& fire = owner_.addonEventCallbackRef();
+    if (fire) {
+        fire("BAG_CLOSED", {std::to_string(srcBagIndex + 1)});
+        fire("BAG_CLOSED", {std::to_string(dstBagIndex + 1)});
+    }
+    // And the bar itself, plus every frame that draws from a bag: the two have
+    // exchanged contents whether or not either was open.
+    fireBagUpdates();
+
     if (owner_.getSocket() && owner_.getSocket()->isConnected()) {
         uint8_t srcSlot = static_cast<uint8_t>(Inventory::FIRST_BAG_EQUIP_SLOT + srcBagIndex);
         uint8_t dstSlot = static_cast<uint8_t>(Inventory::FIRST_BAG_EQUIP_SLOT + dstBagIndex);
