@@ -449,7 +449,14 @@ void AuthScreen::renderCard(auth::AuthHandler& authHandler, float screenW, float
         if (codeInAdvanced) advancedH += fieldRow + px(kRowGap);
     }
 
-    float contentH = px(kTitleSize) * 1.02f + px(18);        // title and its underline
+    // The title, its rule and the gap under it, measured once and laid out from
+    // the same number below. Measuring it as the em while drawing it as the
+    // ink left the card short by a third of a title's height, and everything
+    // that sits at the bottom of it - the graphics button, the close button -
+    // was drawn over the sheet's own bottom edge.
+    const float titleBlockH = ui_.inkHeight(px(kTitleSize), true) * 1.02f + px(18);
+
+    float contentH = titleBlockH;                            // title and its underline
     contentH += fieldRow + px(kRowGap);                      // account
     contentH += fieldRow + px(kRowGap);                      // password
     if (codeInMain) contentH += fieldRow + px(kRowGap);
@@ -474,15 +481,17 @@ void AuthScreen::renderCard(auth::AuthHandler& authHandler, float screenW, float
     // ---- title ----------------------------------------------------------
     {
         const float titleSize = px(kTitleSize);
-        ui_.textCentered(centreX, col.y, "WoWee", titleSize, theme.ink, /*titleFace=*/true);
+        const float top = col.y;
+        ui_.textCentered(centreX, top, "WoWee", titleSize, theme.ink, /*titleFace=*/true);
         const float titleW = ui_.textWidth("WoWee", titleSize, true);
         // Below the title's own descenders, which is further down than the
         // size names: a size is an em and the face draws taller than one.
-        const float underlineY = col.y + ui_.inkHeight(titleSize, true) * 1.02f;
+        const float underlineY = top + ui_.inkHeight(titleSize, true) * 1.02f;
         ui_.squiggle(ImVec2(centreX - titleW * 0.62f, underlineY),
                      ImVec2(centreX + titleW * 0.62f, underlineY),
                      theme.crayonRed, px(2.0f), 0x51A1u);
-        col.y = underlineY + px(18);
+        // The height the card was measured with, so the two cannot drift.
+        col.y = top + titleBlockH;
     }
 
     // ---- credentials ----------------------------------------------------
