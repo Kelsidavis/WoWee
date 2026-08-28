@@ -53,6 +53,26 @@ inline void toLowerInPlace(std::string& s) {
     for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 }
 
+/// Which interface is loaded, as its manifest's `## Interface:` number - 11200
+/// for 1.12, 20400 for 2.4.3, 30300 for 3.3.5a, 40300 for 4.3.4 - or 0 where
+/// none said.
+///
+/// Published by the FrameXML loader before the first file is read, because
+/// some of what this client answers has to differ by expansion and the answer
+/// is needed while a handler is running. An API whose shape changed between
+/// expansions is the case this exists for: answering one interface's shape to
+/// another's files is a raise inside a handler, and the half of the handler
+/// after it never runs.
+///
+/// Zero reads as the oldest, which is what the loader does with a manifest
+/// that states no version.
+inline int interfaceVersion(lua_State* L) {
+    lua_getglobal(L, "__WoweeInterfaceVersion");
+    const int v = lua_isnumber(L, -1) ? static_cast<int>(lua_tonumber(L, -1)) : 0;
+    lua_pop(L, 1);
+    return v;
+}
+
 // ---- Lua return helpers - used 200+ times as guard/fallback returns ----
 inline int luaReturnNil(lua_State* L)  { lua_pushnil(L); return 1; }
 inline int luaReturnZero(lua_State* L) { lua_pushnumber(L, 0); return 1; }

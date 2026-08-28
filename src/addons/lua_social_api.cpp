@@ -1955,24 +1955,40 @@ void registerSocialLuaAPI(lua_State* L) {
             lua_pushstring(L, name);
             return 2;
         }},
-                // GetChannelList() → id, name, disabled, repeated per channel.
+                // GetChannelList() → id, name per channel, and a disabled
+                // flag with them from 4.0 on.
+                //
+                // Three was answered to every interface, and 1.12 through
+                // 3.3.5 all read two at a time - so the flag was taken for the
+                // next channel's id. 1.12's FCFDropDown_LoadChannels is
+                // `for i=1, arg.n, 2` and writes `info.value = "CHANNEL"..arg[i]`;
+                // 3.3.5's CreateChatChannelList is that same loop written with
+                // select. From the second channel on, both concatenated a
+                // boolean and took the handler down with them: the chat menu's
+                // channel list on turtle, and the chat config panel's on wotlk.
+                //
+                // The flag is 4.x's, so 4.x keeps it. Nothing here has been
+                // read against a 4.3.4 interface and the answer it already had
+                // is the one it should keep until something has.
                 {"GetChannelList", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             if (!gh) return 0;
             const auto& joined = gh->getJoinedChannels();
-            // Three values per channel against Lua's guaranteed twenty free
-            // slots, so seven channels already runs past the end - and the
-            // default set plus a couple of custom ones is more than that.
+            const int per = interfaceVersion(L) >= 40000 ? 3 : 2;
+            // Lua guarantees a C function twenty free slots and no more, so
+            // seven channels ran past the end of three-value answers and ten
+            // runs past it for two - and the default set plus a couple of
+            // custom ones is more than either.
             if (!joined.empty() &&
-                !lua_checkstack(L, static_cast<int>(joined.size() * 3))) {
+                !lua_checkstack(L, static_cast<int>(joined.size()) * per)) {
                 return 0;
             }
             for (size_t i = 0; i < joined.size(); ++i) {
                 lua_pushnumber(L, static_cast<lua_Number>(i + 1));
                 lua_pushstring(L, joined[i].c_str());
-                lua_pushboolean(L, 0);   // disabled
+                if (per == 3) lua_pushboolean(L, 0);   // disabled
             }
-            return static_cast<int>(joined.size() * 3);
+            return static_cast<int>(joined.size()) * per;
         }},
                 // Channel moderation is not modelled, so the player owns none.
                 // IsDisplayChannelOwner lives in lua_system_api.cpp, beside
