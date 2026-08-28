@@ -4503,6 +4503,17 @@ int lua_EditBox_SetMaxLetters(lua_State* L) {
         w->editMaxLetters = static_cast<int>(luaL_optnumber(L, 2, 0));
     return 0;
 }
+/// GetMaxLetters() - the limit set on the box, or 0 for none.
+///
+/// The setter has been here since the box was written and the getter was not,
+/// so a handler asking what its own limit is called a nil and took the rest of
+/// itself with it. Turtle's options search box does exactly that from
+/// OnTextChanged. Reported in #132.
+int lua_EditBox_GetMaxLetters(lua_State* L) {
+    auto* w = widgetOf(L, 1);
+    lua_pushnumber(L, w ? static_cast<lua_Number>(w->editMaxLetters) : 0.0);
+    return 1;
+}
 int lua_EditBox_SetNumeric(lua_State* L) {
     if (auto* w = widgetOf(L, 1)) w->editNumeric = lua_toboolean(L, 2) != 0;
     return 0;
@@ -5701,6 +5712,8 @@ void LuaEngine::registerCoreAPI() {
         // than the distinction: an edit box that answers nothing for its limit
         // is one FrameXML will not stop typing into.
         {"SetMaxBytes",          lua_EditBox_SetMaxLetters},
+        {"GetMaxLetters",        lua_EditBox_GetMaxLetters},
+        {"GetMaxBytes",          lua_EditBox_GetMaxLetters},
         {"SetTextInsets",        lua_EditBox_SetTextInsets},
         {"SetPadding",           lua_MessageFrame_SetPadding},
         {"GetPadding",           lua_MessageFrame_GetPadding},
