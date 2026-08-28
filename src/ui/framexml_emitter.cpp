@@ -728,7 +728,16 @@ struct Emitter {
                           const std::string& nameVar = std::string()) {
         const std::string rawName = node.attrOr("name", "");
         const std::string name = substituteParent(rawName, parentName);
-        const bool isVirtual = node.attrBool("virtual");
+        // A template is declared at the top of a file. virtual= on a frame
+        // inside another frame's <Frames> is a mistake, and the real client
+        // treats it as one - it builds the frame, because a nested element has
+        // a parent and a parent is what an instance has. Three frames in 3.3.5
+        // are written that way and three in 1.12, all of them real:
+        // BankFramePurchaseButton, which is the button that buys a bank bag
+        // slot and could not be clicked because it did not exist;
+        // GuildFrameLFGButton and WhoFrameLFGButton; and MovieProgressBar,
+        // which movierecordingprogress.lua drives by name.
+        const bool isVirtual = node.attrBool("virtual") && parentVar.empty();
 
         if (isVirtual) {
             // A template is not built now. It is recorded so a later inherits=

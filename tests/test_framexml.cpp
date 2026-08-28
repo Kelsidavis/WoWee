@@ -245,6 +245,34 @@ TEST_CASE("an unknown element takes the type of what it inherits",
     }
 }
 
+// virtual= is a top-level declaration. On a frame inside another frame's
+// <Frames> it is a mistake, and the real client builds the frame anyway - three
+// in 3.3.5 are written that way and three in 1.12, all of them real frames the
+// interface then drives by name. BankFramePurchaseButton is the one that shows:
+// it is the button that buys a bank bag slot, and it did not exist.
+TEST_CASE("virtual on a nested frame is not a template", "[framexml][emit]") {
+    XmlNode root = parseOrFail(
+        "<Ui>"
+        "<Frame name='BankFramePurchaseInfo'><Frames>"
+        "<Button name='BankFramePurchaseButton' virtual='true'/>"
+        "</Frames></Frame>"
+        "</Ui>");
+    const EmitResult r = emitFrameXml(root);
+    INFO(r.lua);
+    CHECK(has(r.lua, "CreateFrame(\"Button\", \"BankFramePurchaseButton\""));
+    CHECK_FALSE(has(r.lua, "__WoweeTemplates[\"BankFramePurchaseButton\"] ="));
+}
+
+// And at the top of a file it still is one.
+TEST_CASE("virtual at the top level is a template", "[framexml][emit]") {
+    XmlNode root = parseOrFail(
+        "<Ui><Button name='UIPanelButtonTemplate' virtual='true'/></Ui>");
+    const EmitResult r = emitFrameXml(root);
+    INFO(r.lua);
+    CHECK(has(r.lua, "__WoweeTemplates[\"UIPanelButtonTemplate\"] ="));
+    CHECK_FALSE(has(r.lua, "CreateFrame(\"Button\", \"UIPanelButtonTemplate\""));
+}
+
 TEST_CASE("an unknown element with no name is still reported", "[framexml][emit]") {
     XmlNode root = parseOrFail("<Ui><Nonsense><Frame name='Inner'/></Nonsense></Ui>");
     const EmitResult r = emitFrameXml(root);
