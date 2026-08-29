@@ -1188,7 +1188,16 @@ void SocialHandler::handleInspectResults(network::Packet& packet) {
 
     size_t bytesLeft = packet.getRemainingSize();
     if (bytesLeft < 6) {
-        LOG_WARNING("SMSG_TALENTS_INFO: too short after guid, ", bytesLeft, " bytes");
+        // Before WotLK the guid is the whole answer - a 1.12 realm sends eight
+        // bytes and nothing after them, which is the shape and not a
+        // truncation. Reported as one, every inspect on turtle wrote a warning
+        // into a log that is read for faults.
+        if (talentTbc) {
+            LOG_INFO("Inspect: this realm answers with the guid alone, so there "
+                     "are no talents to show");
+        } else {
+            LOG_WARNING("SMSG_TALENTS_INFO: too short after guid, ", bytesLeft, " bytes");
+        }
         auto entity = owner_.getEntityManager().getEntity(guid);
         std::string name = "Target";
         if (entity) {
