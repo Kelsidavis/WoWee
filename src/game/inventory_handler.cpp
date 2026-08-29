@@ -1970,6 +1970,30 @@ void InventoryHandler::completeItemUseOnItem(uint64_t targetItemGuid, bool confi
     if (destroysTarget && isDisenchant && !confirmed) {
         const uint32_t targetEntry = owner_.getItemEntryByGuid(targetItemGuid);
         const auto* targetInfo = targetEntry ? owner_.getItemInfo(targetEntry) : nullptr;
+
+        // Only what can actually be taken apart. Disenchanting is uncommon and
+        // better weapons and armour and nothing else, and the server answers
+        // anything else with SPELL_FAILED_CANT_BE_DISENCHANTED - so asking
+        // "shall I destroy this?" about a bag or a potion is a question with no
+        // outcome behind it, and an alarming one to be asked while moving
+        // things around a bank.
+        //
+        // The pending target stays armed, which is what the real client does:
+        // the cursor is still waiting for something it can be used on, and the
+        // way out of it is escape or the right button.
+        constexpr uint32_t kItemClassWeapon = 2;
+        constexpr uint32_t kItemClassArmor  = 4;
+        constexpr uint32_t kQualityUncommon = 2;
+        const bool canDisenchant =
+            targetInfo && targetInfo->valid &&
+            targetInfo->quality >= kQualityUncommon &&
+            (targetInfo->itemClass == kItemClassWeapon ||
+             targetInfo->itemClass == kItemClassArmor);
+        if (!canDisenchant) {
+            owner_.raiseUiError("Item cannot be disenchanted");
+            return;
+        }
+
         pendingItemTarget_.reset();
         pendingEnchant_ = PendingEnchant{.active = true, .targetItemGuid = targetItemGuid, .request = pending};
         if (owner_.addonEventCallbackRef()) {
