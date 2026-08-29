@@ -7384,6 +7384,9 @@ void LuaEngine::registerCoreAPI() {
         "       and GetCVar('showItemLevel') == '1' then\n"
         "        self:AddLine('Item Level '..iLevel, 1, 0.82, 0)\n"
         "    end\n"
+        // Read here rather than below the class line, because what a bag says
+        // about itself takes the place of that line.
+        "    local data = _GetItemTooltipData(itemId)\n"
         "    -- Equip slot and subclass on same line\n"
         "    if equipSlot and equipSlot ~= '' then\n"
         "        local slotNames = {INVTYPE_HEAD='Head',INVTYPE_NECK='Neck',INVTYPE_SHOULDER='Shoulder',\n"
@@ -7398,11 +7401,18 @@ void LuaEngine::registerCoreAPI() {
         "        if slotText ~= '' or subText ~= '' then\n"
         "            self:AddDoubleLine(slotText, subText, 1,1,1, 1,1,1)\n"
         "        end\n"
+        // A bag says how much it holds, which is what the class line would
+        // otherwise be spent on: "16 Slot Bag" rather than "Container". The
+        // subclass names the kind, so a quiver and an ammo pouch read as
+        // themselves.
+        "    elseif data and data.containerSlots then\n"
+        "        local kind = (subclass and subclass ~= '') and subclass or (class or 'Bag')\n"
+        "        self:AddLine(format(CONTAINER_SLOTS or '%d Slot %s', data.containerSlots, kind),\n"
+        "                     1, 1, 1)\n"
         "    elseif class and class ~= '' then\n"
         "        self:AddLine(class, 1, 1, 1)\n"
         "    end\n"
         "    -- Fetch detailed stats from C side\n"
-        "    local data = _GetItemTooltipData(itemId)\n"
         "    if data then\n"
         "        -- Bind type\n"
         "        if data.isHeroic then self:AddLine('Heroic', 0, 1, 0) end\n"

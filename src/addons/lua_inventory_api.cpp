@@ -2016,6 +2016,14 @@ static int lua_GetItemTooltipData(lua_State* L) {
     }
 
     lua_newtable(L);
+    // How many slots a bag has, which is the whole of what its tooltip says
+    // about it. The real client prints CONTAINER_SLOTS - "%d Slot %s" - from
+    // its own tooltip builder, and this one had no way to reach the number, so
+    // every bag in the game described itself as "Container" and nothing else.
+    if (info->containerSlots > 0) {
+        lua_pushnumber(L, info->containerSlots);
+        lua_setfield(L, -2, "containerSlots");
+    }
     // Unique / Heroic flags
     if (info->maxCount == 1) { lua_pushboolean(L, 1); lua_setfield(L, -2, "isUnique"); }
     if (info->itemFlags & 0x8) { lua_pushboolean(L, 1); lua_setfield(L, -2, "isHeroic"); }
