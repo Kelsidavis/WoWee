@@ -2659,6 +2659,20 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
         if (submitResult == VK_ERROR_DEVICE_LOST) {
             deviceLost_ = true;
         }
+        // And no present. renderSem is signalled by the submission that just
+        // failed, so presenting on it queues a wait that nothing will ever
+        // satisfy - the same trap the timeline value above is withheld to
+        // avoid, one semaphore further along. A driver answers that with a
+        // hang or a second error, either of which buries the real one.
+        //
+        // Rebuild instead: recreateSwapchain() waits the device idle and
+        // remakes every semaphore unsignalled, which is the only way back from
+        // here that does not carry the broken sync state forward. The frame
+        // slot still advances so the next beginFrame does not wait on this
+        // one's unsignalled timeline value.
+        swapchainDirty = true;
+        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+        return;
     }
 
     VkPresentInfoKHR presentInfo{};
