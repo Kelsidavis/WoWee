@@ -775,16 +775,23 @@ static bool cursorWireSlot(uint8_t& bag, uint8_t& slot) {
     // below, because everything negative was the paperdoll - see
     // kCursorNoSource for what that cost.
     if (!game::slots::cursorSourceIsInventory(s_cursorBag)) return false;
-    if (s_cursorBag < 0) {                    // an equipped item
+
+    // Minus one is two different places. The paperdoll picks an item up with
+    // it, and the interface numbers the bank's own slots BANK_CONTAINER, which
+    // is also minus one - so an item lifted out of the bank read as a worn one,
+    // and the move that followed named an equipment slot: bank slot five went
+    // out as equipment slot four. The flag the cursor already carries is the
+    // only thing that tells the two apart, and it was not being read.
+    if (cursorItemSlot().equipped) {
         bag = 0xFF;
         slot = static_cast<uint8_t>(s_cursorSlot - 1);
-    } else if (s_cursorBag == 0) {            // the backpack
-        bag = 0xFF;
-        slot = static_cast<uint8_t>(game::slots::backpackWireSlot(s_cursorSlot - 1));
-    } else {                                   // one of the four worn bags
-        bag = static_cast<uint8_t>(game::slots::wornBagContainer(s_cursorBag - 1));
-        slot = static_cast<uint8_t>(s_cursorSlot - 1);
+        return true;
     }
+    // Everything else through the shared pair, which knows the backpack, the
+    // keyring, the bank, its bags and the worn bags. Written out here it knew
+    // three of them.
+    bag = containerWireBag(s_cursorBag);
+    slot = containerWireSlot(s_cursorBag, s_cursorSlot);
     return true;
 }
 
@@ -1046,7 +1053,12 @@ static int lua_PickupContainerItem(lua_State* L) {
                     " slot ", slot, " (wire ", (int)dstBag, "/", (int)dstSlot, ")");
         // Back where it came from: put it down rather than asking the server to
         // swap a slot with itself.
-        if (s_cursorBag == bag && s_cursorSlot == slot) {
+        //
+        // The equipped flag counts here too, for the same reason it counts
+        // above: a worn item on the cursor carries bag minus one, and so does
+        // the bank, so dropping the helm on bank slot one read as putting it
+        // back where it came from and quietly did nothing.
+        if (s_cursorBag == bag && s_cursorSlot == slot && !cursorItemSlot().equipped) {
             const int sameBag = bag, sameSlot = slot;
             clearCursorItem(L);
             gh->fireAddonEvent("ITEM_LOCK_CHANGED",
