@@ -244,3 +244,63 @@ TEST_CASE("Addon chat is identified before it reaches visible whisper history", 
         REQUIRE_FALSE(packet.hasData());
     }
 }
+
+// A monster line addressed to something that is neither a player nor a pet
+// carries the target's name, which we skip past. The length that says how far
+// to skip comes from the server, and it was taken on trust.
+TEST_CASE("A monster chat line cannot skip past the end of its own packet", "[chat]") {
+    constexpr uint64_t kSenderGuid = 0x0042ull;
+    // A creature GUID: not a player (high 0x0000), not a pet (0xF040/0xF014),
+    // which is what sends the parser looking for a receiver name at all.
+    constexpr uint64_t kCreatureGuid = 0xF130000000001234ull;
+    const std::string sender = "Gazlowe";
+    const std::string message = "Get that shipment moving!";
+
+    auto build = [&](uint32_t recvNameLen, const std::string& recvName) {
+        wowee::network::Packet packet(0);
+        packet.writeUInt8(static_cast<uint8_t>(ChatType::MONSTER_SAY));
+        packet.writeUInt32(static_cast<uint32_t>(ChatLanguage::UNIVERSAL));
+        packet.writeUInt64(kSenderGuid);
+        packet.writeUInt32(0);
+        packet.writeUInt32(static_cast<uint32_t>(sender.size() + 1));
+        packet.writeString(sender);
+        packet.writeUInt64(kCreatureGuid);
+        packet.writeUInt32(recvNameLen);
+        if (!recvName.empty()) packet.writeString(recvName);
+        packet.writeUInt32(static_cast<uint32_t>(message.size() + 1));
+        packet.writeString(message);
+        packet.writeUInt8(0);
+        return packet;
+    };
+
+    SECTION("an honest one parses, with the name skipped") {
+        const std::string target = "Sputtervalve";
+        auto packet = build(static_cast<uint32_t>(target.size() + 1), target);
+        MessageChatData parsed;
+        REQUIRE(MessageChatParser::parse(packet, parsed));
+        REQUIRE(parsed.senderName == sender);
+        REQUIRE(parsed.receiverGuid == kCreatureGuid);
+        REQUIRE(parsed.message == message);
+    }
+
+    SECTION("an absurd length is refused") {
+        // This one was already refused, but by accident: the old code skipped
+        // nothing at all for a length of 256 or more, so the message length
+        // below read the first bytes of the name instead and came out too
+        // large. Kept as a test because the refusal is now deliberate.
+        auto packet = build(0xFFFFu, "");
+        MessageChatData parsed;
+        REQUIRE_FALSE(MessageChatParser::parse(packet, parsed));
+    }
+
+    SECTION("and so is one that merely overruns the remaining bytes") {
+        // This is the one that got through. A length under 256 was skipped on
+        // trust, setReadPos walked off the end, the message length then read a
+        // clamped zero, and that zero passed its own bounds test - so the
+        // interface was handed an empty monster line no server had sent.
+        const std::string target = "Sputtervalve";
+        auto packet = build(static_cast<uint32_t>(target.size() + 40), target);
+        MessageChatData parsed;
+        REQUIRE_FALSE(MessageChatParser::parse(packet, parsed));
+    }
+}
