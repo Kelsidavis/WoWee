@@ -887,15 +887,13 @@ bool boughtHeldMerchantItem(lua_State* L) {
 static void pickupFromContainerSlot(lua_State* L, game::GameHandler* gh,
                                     int bag, int slot) {
     const auto& inv = gh->getInventory();
-    const game::ItemSlot* itemSlot = nullptr;
-    if (bag == 0 && slot >= 1 && slot <= inv.getBackpackSize()) {
-        itemSlot = &inv.getBackpackSlot(slot - 1);
-    } else if (bag >= 1 && bag <= 4) {
-        int bagSize = inv.getBagSize(bag - 1);
-        if (slot >= 1 && slot <= bagSize) {
-            itemSlot = &inv.getBagSlot(bag - 1, slot - 1);
-        }
-    }
+    // Every container this numbering reaches, not the backpack and the four
+    // worn bags alone: the bank's own slots are container -1 and its bags are
+    // 5 through 11, and bankframe.lua picks an item up with
+    // PickupContainerItem(BANK_CONTAINER, self:GetID()). Missing them, the bank
+    // answered "nothing there to pick up" for every square that had something
+    // in it.
+    const game::ItemSlot* itemSlot = containerItemSlot(inv, bag, slot);
     if (itemSlot && !itemSlot->empty()) {
         setCursorType(L, CursorType::ITEM);
         s_cursorId = itemSlot->item.itemId;
@@ -1013,14 +1011,8 @@ static int lua_PickupContainerItem(lua_State* L) {
     // The destination is this bag slot rather than the server's choice, which
     // is what dropping on a particular square means.
     if (s_cursorType == CursorType::GUILDBANK) {
-        uint8_t dstBag, dstSlot;
-        if (bag == 0) {
-            dstBag = 0xFF;
-            dstSlot = static_cast<uint8_t>(game::slots::backpackWireSlot(slot - 1));
-        } else {
-            dstBag = static_cast<uint8_t>(game::slots::wornBagContainer(bag - 1));
-            dstSlot = static_cast<uint8_t>(slot - 1);
-        }
+        const uint8_t dstBag = containerWireBag(bag);
+        const uint8_t dstSlot = containerWireSlot(bag, slot);
         gh->guildBankWithdrawItem(static_cast<uint8_t>(s_cursorBag - 1),
                                   static_cast<uint8_t>(s_cursorSlot - 1),
                                   dstBag, dstSlot, s_cursorSplit);
@@ -1039,14 +1031,13 @@ static int lua_PickupContainerItem(lua_State* L) {
     // dragged item was picked up and never put down anywhere.
     uint8_t srcBag = 0, srcSlot = 0;
     if (cursorWireSlot(srcBag, srcSlot)) {
-        uint8_t dstBag, dstSlot;
-        if (bag == 0) {
-            dstBag = 0xFF;
-            dstSlot = static_cast<uint8_t>(game::slots::backpackWireSlot(slot - 1));
-        } else {
-            dstBag = static_cast<uint8_t>(game::slots::wornBagContainer(bag - 1));
-            dstSlot = static_cast<uint8_t>(slot - 1);
-        }
+        // Through the shared pair rather than written out here. This knew the
+        // backpack and treated everything else as a worn bag, so a drop into
+        // the bank - container -1 - asked wornBagContainer for container 17 and
+        // sent the move to a container that is not one. Nothing in the bank
+        // window could be dragged anywhere, including a bag sitting in it.
+        const uint8_t dstBag = containerWireBag(bag);
+        const uint8_t dstSlot = containerWireSlot(bag, slot);
         // At warning level because it is the outcome of a drag and happens
         // once per drop, and because the log carries nothing below warning -
         // which is why "did the move go out" could not be answered at all.
