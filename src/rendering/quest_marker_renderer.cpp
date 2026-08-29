@@ -244,6 +244,14 @@ void QuestMarkerRenderer::loadTextures(pipeline::AssetManager* assetManager) {
         "Interface\\GossipFrame\\ActiveQuestIcon.blp",
         "Interface\\GossipFrame\\IncompleteQuestIcon.blp"
     };
+    // The grey question mark is 2.x's art and a 1.12 client does not have it -
+    // its GossipFrame holds ActiveQuestIcon and AvailableQuestIcon and nothing
+    // else. Falling back to the active mark draws a quest in progress the way
+    // that client draws one, rather than reporting a missing file twice and
+    // leaving the head bare.
+    const char* fallback[3] = {
+        nullptr, nullptr, "Interface\\GossipFrame\\ActiveQuestIcon.blp"
+    };
 
     VkDevice device = vkCtx_->getDevice();
 
@@ -262,6 +270,13 @@ void QuestMarkerRenderer::loadTextures(pipeline::AssetManager* assetManager) {
         if (!allocated[i]) continue;
 
         pipeline::BLPImage blp = assetManager->loadTexture(paths[i]);
+        if (!blp.isValid() && fallback[i]) {
+            blp = assetManager->loadTexture(fallback[i]);
+            if (blp.isValid()) {
+                LOG_WARNING("Quest marker: ", paths[i], " is not in this client's "
+                            "data - drawing ", fallback[i], " instead");
+            }
+        }
         if (!blp.isValid()) {
             LOG_WARNING("Failed to load quest marker texture: ", paths[i]);
             continue;
