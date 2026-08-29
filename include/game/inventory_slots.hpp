@@ -38,20 +38,65 @@ inline constexpr int kBackpackCount = 16;
 inline constexpr int kWornBagFirst = 19;
 inline constexpr int kWornBagCount = 4;
 
-/// The 28 general bank slots, inside kNoContainer, after the worn equipment.
+/// The general bank slots, inside kNoContainer, after the worn equipment.
+///
+/// Where they start is the same in every expansion; how many there are is not,
+/// and everything after them moves with it. Vanilla has 24 general slots and 6
+/// bank bags, so its bank bags begin at 63 and its keyring at 81; 2.0 added
+/// four general slots and a seventh bag, which is the layout WotLK still has.
+///
+/// The count and everything past it are read rather than fixed - see
+/// bankLayout(). Only the first is a constant, because only the first agrees.
 inline constexpr int kBankGeneralFirst = 39;
-inline constexpr int kBankGeneralCount = 28;
 
-/// The 7 bank bag slots, following the general ones.
-inline constexpr int kBankBagFirst = kBankGeneralFirst + kBankGeneralCount;  // 67
-inline constexpr int kBankBagCount = 7;
+/// Where the bank's slots are, for the expansion now being played.
+///
+/// Verified against the cores rather than recalled: turtle's Player.h has
+/// BANK_SLOT_ITEM_START 39 / _END 63, BANK_SLOT_BAG_START 63 / _END 69 and
+/// KEYRING_SLOT_START 81; 3.3.5 has 39/67, 67/74 and 86.
+///
+/// TBC is on the later layout here on the strength of 2.0 having added the
+/// slots, which is the one part of this not read off a core. If a 2.4.3 tree
+/// ever says otherwise, this is the one place to change.
+struct BankLayout {
+    int generalCount;
+    int bagFirst;
+    int bagCount;
+    int keyringFirst;
+};
 
-/// The keyring, past the bags.
-inline constexpr int kKeyringFirst = 86;
+/// The two tables, without asking anything about the world - so both can be
+/// checked in a test, where there is no expansion to be playing.
+inline constexpr BankLayout bankLayoutFor(bool classicLike) {
+    return classicLike ? BankLayout{24, 63, 6, 81}
+                       : BankLayout{28, 67, 7, 86};
+}
+
+/// The one the expansion now being played uses.
+///
+/// State rather than a lookup, and set once when the expansion is chosen -
+/// ExpansionRegistry::setActive does it. The alternative was asking the
+/// registry from inside the slot arithmetic, which every handler includes and
+/// none of which should have to know what an Application is.
+///
+/// The later layout until something says otherwise, which is what a client with
+/// no expansion chosen has always assumed.
+inline BankLayout& bankLayoutRef() {
+    static BankLayout layout = bankLayoutFor(false);
+    return layout;
+}
+inline BankLayout bankLayout() { return bankLayoutRef(); }
+inline void setBankLayout(const BankLayout& layout) { bankLayoutRef() = layout; }
+
+/// The same four, for a caller that wants one of them and not the struct.
+inline int bankGeneralCount() { return bankLayout().generalCount; }
+inline int bankBagFirst()     { return bankLayout().bagFirst; }
+inline int bankBagCount()     { return bankLayout().bagCount; }
+inline int keyringFirst()     { return bankLayout().keyringFirst; }
 
 inline constexpr int backpackWireSlot(int index)    { return kBackpackFirst + index; }
 inline constexpr int bankGeneralWireSlot(int index) { return kBankGeneralFirst + index; }
-inline constexpr int keyringWireSlot(int index)     { return kKeyringFirst + index; }
+inline int keyringWireSlot(int index)              { return keyringFirst() + index; }
 
 /// The container number of the nth worn bag.
 inline constexpr int wornBagContainer(int index)    { return kWornBagFirst + index; }
@@ -59,8 +104,8 @@ inline constexpr int wornBagContainer(int index)    { return kWornBagFirst + ind
 /// The nth bank bag - both the slot the bag sits in and the container its
 /// contents sit in, which are the same number. Named twice so the two uses read
 /// as deliberate rather than as one of them being a mistake.
-inline constexpr int bankBagWireSlot(int index)     { return kBankBagFirst + index; }
-inline constexpr int bankBagContainer(int index)    { return bankBagWireSlot(index); }
+inline int bankBagWireSlot(int index)               { return bankBagFirst() + index; }
+inline int bankBagContainer(int index)              { return bankBagWireSlot(index); }
 
 /// The interface numbers inventory slots from one; the wire numbers them from
 /// zero. Every place that takes a slot from Lua and sends it crosses this, and
@@ -69,7 +114,7 @@ inline constexpr int toInventorySlot(int wireSlot)  { return wireSlot + 1; }
 inline constexpr int toWireSlot(int inventorySlot)  { return inventorySlot - 1; }
 
 /// The inventory slot the first bank bag occupies, as Lua counts.
-inline constexpr int kFirstBankBagInventorySlot = toInventorySlot(bankBagWireSlot(0));
+inline int firstBankBagInventorySlot() { return toInventorySlot(bankBagWireSlot(0)); }
 
 /// Where an item on the cursor was picked up from, in the numbering the
 /// interface bindings keep beside it: 0 the backpack, 1 to 4 a worn bag, and

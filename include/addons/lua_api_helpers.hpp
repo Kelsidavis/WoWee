@@ -644,9 +644,11 @@ constexpr int kBankContainer = -1;
 /// to 11. Each is a container of its own and containerframe.lua opens them
 /// exactly as it opens a worn bag.
 constexpr int kFirstBankBagContainer = 5;
-constexpr int kBankBagContainers = 7;
+/// How many there are is the expansion's business: vanilla has six bank bags
+/// and 2.0 onward have seven, and a container number past the end is not one.
 inline bool isBankBagContainer(int c) {
-    return c >= kFirstBankBagContainer && c < kFirstBankBagContainer + kBankBagContainers;
+    return c >= kFirstBankBagContainer &&
+           c < kFirstBankBagContainer + game::slots::bankBagCount();
 }
 
 /// How many slots a container has, in the interface's numbering.
@@ -654,7 +656,7 @@ inline int containerSlotCount(const game::Inventory& inv, int container) {
     if (container == 0) return inv.getBackpackSize();
     if (container >= 1 && container <= 4) return inv.getBagSize(container - 1);
     if (container == kKeyringContainer) return inv.getKeyringSize();
-    if (container == kBankContainer) return game::Inventory::BANK_SLOTS;
+    if (container == kBankContainer) return game::slots::bankGeneralCount();
     if (isBankBagContainer(container))
         return inv.getBankBagSize(container - kFirstBankBagContainer);
     return 0;
@@ -687,15 +689,15 @@ inline const game::ItemSlot* inventorySlotItem(const game::Inventory& inv, int s
     if (slotId >= 1 && slotId <= static_cast<int>(game::EquipSlot::NUM_SLOTS)) {
         return &inv.getEquipSlot(static_cast<game::EquipSlot>(slotId - 1));
     }
+    const game::slots::BankLayout bank = game::slots::bankLayout();
     if (wire >= game::slots::kBankGeneralFirst &&
-        wire <  game::slots::kBankGeneralFirst + game::slots::kBankGeneralCount) {
+        wire <  game::slots::kBankGeneralFirst + bank.generalCount) {
         return &inv.getBankSlot(wire - game::slots::kBankGeneralFirst);
     }
     // The bag a bank bag *is*, not what is inside it - the seven slots the
     // bank's own bag row draws.
-    if (wire >= game::slots::kBankBagFirst &&
-        wire <  game::slots::kBankBagFirst + game::slots::kBankBagCount) {
-        return &inv.getBankBagItem(wire - game::slots::kBankBagFirst);
+    if (wire >= bank.bagFirst && wire < bank.bagFirst + bank.bagCount) {
+        return &inv.getBankBagItem(wire - bank.bagFirst);
     }
     return nullptr;
 }

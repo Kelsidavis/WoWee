@@ -2773,9 +2773,9 @@ static int lua_PutItemInBag(lua_State* L) {
     // bag on the cursor clicked onto one did nothing but open whatever was
     // already in it. The drag path handled them all along; the click did not.
     const int wornIndex = inventoryId - 20;                                    // 0-3
-    const int bankIndex = inventoryId - game::slots::kFirstBankBagInventorySlot;  // 0-6
+    const int bankIndex = inventoryId - game::slots::firstBankBagInventorySlot();  // 0-6
     const bool isWorn = wornIndex >= 0 && wornIndex < game::Inventory::NUM_BAG_SLOTS;
-    const bool isBank = bankIndex >= 0 && bankIndex < game::Inventory::BANK_BAG_SLOTS;
+    const bool isBank = bankIndex >= 0 && bankIndex < game::slots::bankBagCount();
     if (!gh || (!isWorn && !isBank) || !heldWireSlot(srcBag, srcSlot)) {
         lua_pushboolean(L, 0);
         return 1;

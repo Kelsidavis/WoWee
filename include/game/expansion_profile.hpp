@@ -76,6 +76,11 @@ private:
     std::vector<ExpansionProfile> profiles_;
     std::string activeId_;
 
+    /// Told when activeId_ moves, by either of the two things that move it.
+    /// The bank's shape follows the expansion and a slot number is what a move
+    /// names, so anything that has to change with the expansion changes here.
+    void activeChanged();
+
     bool loadProfile(const std::string& jsonPath, const std::string& dirPath);
 };
 

@@ -2265,7 +2265,7 @@ void InventoryHandler::fireBagUpdates() {
     // not here: they are player fields rather than a container, and they are
     // told through PLAYERBANKSLOTS_CHANGED.
     constexpr int kLastWornBag = game::Inventory::NUM_BAG_SLOTS;          // 1..4
-    constexpr int kLastBankBag = kLastWornBag + game::slots::kBankBagCount;  // 5..11
+    const int kLastBankBag = kLastWornBag + game::slots::bankBagCount();  // 5..11, or 5..10
     for (int bag = 0; bag <= kLastBankBag; ++bag) fire("BAG_UPDATE", {std::to_string(bag)});
     // The character sheet redraws from this one rather than from BAG_UPDATE, so
     // both go out together - equipping something changes a bag and a slot.

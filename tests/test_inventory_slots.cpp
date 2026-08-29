@@ -11,15 +11,45 @@ using namespace wowee::game::slots;
 // cannot drift apart.
 
 TEST_CASE("The bank's three regions do not overlap", "[bank][slots]") {
-    // The general slots run out exactly where the bags begin.
-    REQUIRE(bankGeneralWireSlot(kBankGeneralCount - 1) + 1 == bankBagWireSlot(0));
-    // And the bags end before the keyring starts.
-    REQUIRE(bankBagWireSlot(kBankBagCount - 1) < keyringWireSlot(0));
+    // In both layouts, because the bank is not the same shape in both.
+    for (bool classicLike : {false, true}) {
+        const BankLayout l = bankLayoutFor(classicLike);
+        INFO("classicLike=" << classicLike);
+        // The general slots run out exactly where the bags begin.
+        REQUIRE(kBankGeneralFirst + l.generalCount == l.bagFirst);
+        // And the bags end before the keyring starts.
+        REQUIRE(l.bagFirst + l.bagCount <= l.keyringFirst);
+    }
+}
+
+// Vanilla's bank is a different shape from WotLK's, and everything after the
+// general slots moves with it. Read off the cores rather than recalled:
+// turtle's Player.h has BANK_SLOT_ITEM_START 39 / _END 63, BANK_SLOT_BAG_START
+// 63 / _END 69 and KEYRING_SLOT_START 81, and 1.12's own BankFrame.lua says
+// NUM_BANKBAGSLOTS = 6 where 3.3.5's constants.lua says 7.
+TEST_CASE("Each expansion's bank is where that expansion puts it",
+          "[bank][slots]") {
+    const BankLayout vanilla = bankLayoutFor(true);
+    CHECK(vanilla.generalCount == 24);
+    CHECK(vanilla.bagFirst == 63);
+    CHECK(vanilla.bagCount == 6);
+    CHECK(vanilla.keyringFirst == 81);
+
+    const BankLayout later = bankLayoutFor(false);
+    CHECK(later.generalCount == 28);
+    CHECK(later.bagFirst == 67);
+    CHECK(later.bagCount == 7);
+    CHECK(later.keyringFirst == 86);
+
+    // The one thing they agree on, which is why it is still a constant.
+    CHECK(bankGeneralWireSlot(0) == 39);
 }
 
 TEST_CASE("The wire slots are the ones this client already sends",
           "[bank][slots]") {
     // Read out of inventory_screen.cpp, which has been sending these all along.
+    // With no expansion selected the later layout answers, which is the one
+    // these figures came from.
     REQUIRE(bankGeneralWireSlot(0) == 39);
     REQUIRE(bankBagWireSlot(0) == 67);
     REQUIRE(keyringWireSlot(0) == 86);
@@ -30,8 +60,8 @@ TEST_CASE("The interface's first bank bag is the wire's, one higher",
     // BankButtonIDToInvSlotID(1, isBag) answers this, and PickupBagFromSlot is
     // handed it back. The two have to meet exactly or a bag is picked up from
     // one slot and put down in another.
-    REQUIRE(kFirstBankBagInventorySlot == 68);
-    REQUIRE(toWireSlot(kFirstBankBagInventorySlot) == bankBagWireSlot(0));
+    REQUIRE(firstBankBagInventorySlot() == 68);
+    REQUIRE(toWireSlot(firstBankBagInventorySlot()) == bankBagWireSlot(0));
 }
 
 TEST_CASE("Crossing between the two numberings round-trips", "[bank][slots]") {
@@ -42,9 +72,9 @@ TEST_CASE("Crossing between the two numberings round-trips", "[bank][slots]") {
 
 TEST_CASE("Every bank bag maps to a distinct slot in both numberings",
           "[bank][slots]") {
-    for (int i = 0; i < kBankBagCount; ++i) {
+    for (int i = 0; i < bankBagCount(); ++i) {
         const int inv = toInventorySlot(bankBagWireSlot(i));
-        REQUIRE(inv == kFirstBankBagInventorySlot + i);
+        REQUIRE(inv == firstBankBagInventorySlot() + i);
         REQUIRE(toWireSlot(inv) == bankBagWireSlot(i));
     }
 }
@@ -64,7 +94,7 @@ TEST_CASE("A bank bag's container is its slot", "[bank][slots]") {
     // Not a coincidence and not a bug: a bag is an item in a slot and a
     // container at once, and the wire gives both the same number. Two names
     // for it so neither use reads as a mistake.
-    for (int i = 0; i < kBankBagCount; ++i) {
+    for (int i = 0; i < bankBagCount(); ++i) {
         REQUIRE(bankBagContainer(i) == bankBagWireSlot(i));
     }
 }
@@ -74,7 +104,7 @@ TEST_CASE("No two regions inside the no-container overlap", "[bank][slots]") {
     // so an overlap would make one region's slot mean another's.
     REQUIRE(kNoContainer == 0xFF);
     REQUIRE(backpackWireSlot(kBackpackCount - 1) < kBankGeneralFirst);
-    REQUIRE(bankBagWireSlot(kBankBagCount - 1) < kKeyringFirst);
+    REQUIRE(bankBagWireSlot(bankBagCount() - 1) < keyringFirst());
 }
 
 // ---------------------------------------------------------------------------

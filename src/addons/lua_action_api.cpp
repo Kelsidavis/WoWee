@@ -1131,9 +1131,9 @@ static int lua_PickupBagFromSlot(lua_State* L) {
     if (!gh) return 0;
     const int slot = static_cast<int>(luaL_optnumber(L, 1, 0));
 
-    const int bankIndex = slot - game::slots::kFirstBankBagInventorySlot;
+    const int bankIndex = slot - game::slots::firstBankBagInventorySlot();
     const int wornIndex = slot - kFirstWornBagInventorySlot;
-    const bool isBank = bankIndex >= 0 && bankIndex < game::Inventory::BANK_BAG_SLOTS;
+    const bool isBank = bankIndex >= 0 && bankIndex < game::slots::bankBagCount();
     const bool isWorn = wornIndex >= 0 && wornIndex < game::Inventory::NUM_BAG_SLOTS;
     // Only the bank half was handled, so dragging one of the four worn bags did
     // nothing at all - it returned here before doing anything. Latent until the

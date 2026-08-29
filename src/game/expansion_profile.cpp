@@ -1,4 +1,5 @@
 #include "game/expansion_profile.hpp"
+#include "game/inventory_slots.hpp"
 #include "core/logger.hpp"
 #include <filesystem>
 #include <fstream>
@@ -148,6 +149,7 @@ size_t ExpansionRegistry::initialize(const std::string& dataRoot) {
         }
         activeId_ = (it != profiles_.end()) ? it->id : profiles_.back().id;
     }
+    activeChanged();
 
     LOG_INFO("ExpansionRegistry: discovered ", profiles_.size(), " expansion(s), active=", activeId_);
     return profiles_.size();
@@ -160,9 +162,23 @@ const ExpansionProfile* ExpansionRegistry::getProfile(const std::string& id) con
     return nullptr;
 }
 
+void ExpansionRegistry::activeChanged() {
+    // The bank is not the same shape in every expansion - vanilla has 24
+    // general slots and 6 bags where 2.0 onward have 28 and 7, and the keyring
+    // moves with them - and a slot number is what a move names.
+    //
+    // Both places that move activeId_ come through here. Discovery sets it
+    // directly rather than through setActive, so hanging this off setActive
+    // alone would have left every auto-detected install - which is every
+    // ordinary one - on the layout it was not playing.
+    slots::setBankLayout(
+        slots::bankLayoutFor(activeId_ == "classic" || activeId_ == "turtle"));
+}
+
 bool ExpansionRegistry::setActive(const std::string& id) {
     if (!getProfile(id)) return false;
     activeId_ = id;
+    activeChanged();
     return true;
 }
 
