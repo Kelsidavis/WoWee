@@ -86,6 +86,13 @@ jobs:
         cp extract_assets.sh "${STAGING}/"
         cp tools/asset_pipeline_gui.py "${STAGING}/"
 
+        # This client's own addons, which the build puts beside the binary and
+        # every release so far has left behind. WoweeAllBags is the combined bag
+        # window and the Sort Bags button - the two things the client used to
+        # draw itself and handed to FrameXML, which has neither - so on a
+        # released build they simply were not there.
+        cp -r addons "${STAGING}/"
+
         # Assets (exclude proprietary music)
         rsync -a --exclude='Original Music' build/bin/assets/ "${STAGING}/assets/"
 
@@ -200,6 +207,11 @@ jobs:
         # Extraction scripts and GUI
         cp extract_assets.sh Wowee.app/Contents/Resources/
         cp tools/asset_pipeline_gui.py Wowee.app/Contents/Resources/
+
+        # This client's own addons. Into Resources rather than MacOS, because
+        # that is the directory the app makes current at startup and the addon
+        # search is relative to it.
+        cp -r addons Wowee.app/Contents/Resources/
 
         # Assets (exclude proprietary music)
         rsync -a --exclude='Original Music' build/bin/assets/ \
@@ -463,6 +475,9 @@ jobs:
         cp extract_assets.ps1 "${STAGING}/"
         cp extract_assets.bat "${STAGING}/"
         cp tools/asset_pipeline_gui.py "${STAGING}/"
+
+        # This client's own addons, beside the exe where the addon search looks.
+        cp -r addons "${STAGING}/"
 
         # Assets (exclude proprietary music)
         mkdir -p "${STAGING}/assets"
