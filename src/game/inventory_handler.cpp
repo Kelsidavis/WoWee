@@ -15,6 +15,7 @@
 #include "audio/player_voice_manager.hpp"
 #include "core/application.hpp"
 #include "core/logger.hpp"
+#include "game/sell_count.hpp"
 #include "network/world_socket.hpp"
 #include "network/packet.hpp"
 #include "pipeline/asset_manager.hpp"
@@ -1488,13 +1489,14 @@ void InventoryHandler::sellItemBySlot(int backpackIndex) {
               " itemGuid=0x", std::hex, itemGuid, std::dec,
               " vendorGuid=0x", std::hex, currentVendorItems_.vendorGuid, std::dec);
     if (itemGuid != 0 && currentVendorItems_.vendorGuid != 0) {
+        const uint32_t count = sellCountForStack(slot.item.stackCount);
         BuybackItem sold;
         sold.itemGuid = itemGuid;
         sold.item = slot.item;
-        sold.count = 1;
+        sold.count = count;
         pendingSellToBuyback_[itemGuid] = sold;
         buybackItems_.push_back(sold);
-        sellItem(currentVendorItems_.vendorGuid, itemGuid, 1);
+        sellItem(currentVendorItems_.vendorGuid, itemGuid, count);
     } else if (itemGuid == 0) {
         owner_.raiseUiError("Cannot sell: item not found in inventory.");
         LOG_WARNING("Sell failed: missing item GUID for slot ", backpackIndex);
@@ -1533,13 +1535,14 @@ void InventoryHandler::sellItemInBag(int bagIndex, int slotIndex) {
     }
 
     if (itemGuid != 0 && currentVendorItems_.vendorGuid != 0) {
+        const uint32_t count = sellCountForStack(slot.item.stackCount);
         BuybackItem sold;
         sold.itemGuid = itemGuid;
         sold.item = slot.item;
-        sold.count = 1;
+        sold.count = count;
         pendingSellToBuyback_[itemGuid] = sold;
         buybackItems_.push_back(sold);
-        sellItem(currentVendorItems_.vendorGuid, itemGuid, 1);
+        sellItem(currentVendorItems_.vendorGuid, itemGuid, count);
     } else if (itemGuid == 0) {
         owner_.raiseUiError("Cannot sell: item not found.");
     } else {
@@ -2502,8 +2505,10 @@ void InventoryHandler::handleListInventory(network::Packet& packet) {
                 uint64_t itemGuid = owner_.backpackSlotGuidsRef()[i];
                 if (itemGuid == 0) itemGuid = owner_.resolveOnlineItemGuid(slot.item.itemId);
                 if (itemGuid != 0) {
-                    sellItem(currentVendorItems_.vendorGuid, itemGuid, 1);
-                    totalSellPrice += sellPrice;
+                    const uint32_t count = sellCountForStack(slot.item.stackCount);
+                    sellItem(currentVendorItems_.vendorGuid, itemGuid, count);
+                    // Per unit, so the money reported matches the money paid.
+                    totalSellPrice += sellPrice * count;
                     ++itemsSold;
                 }
             }
@@ -2529,8 +2534,9 @@ void InventoryHandler::handleListInventory(network::Packet& packet) {
                     }
                     if (itemGuid == 0) itemGuid = owner_.resolveOnlineItemGuid(slot.item.itemId);
                     if (itemGuid != 0) {
-                        sellItem(currentVendorItems_.vendorGuid, itemGuid, 1);
-                        totalSellPrice += sellPrice;
+                        const uint32_t count = sellCountForStack(slot.item.stackCount);
+                        sellItem(currentVendorItems_.vendorGuid, itemGuid, count);
+                        totalSellPrice += sellPrice * count;
                         ++itemsSold;
                     }
                 }

@@ -163,6 +163,10 @@ endfunction()
 
 
 
+# What a vendor sell asks for. Header-only arithmetic, no game state.
+wowee_add_test(test_sell_count
+    SOURCES test_sell_count.cpp)
+
 # Stock-style hill climbing regression test. Run directly with:
 #   cmake --build build --target test_hill_climbing && ctest --test-dir build -R hill_climbing
 wowee_add_test(test_hill_climbing
