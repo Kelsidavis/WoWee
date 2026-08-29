@@ -283,11 +283,15 @@ std::vector<uint8_t> AuthSessionPacket::computeAuthHash(
     // Session key (40 bytes)
     hashInput.insert(hashInput.end(), sessionKey.begin(), sessionKey.end());
 
-    // Diagnostic: dump auth hash inputs for debugging AUTH_REJECT
+    // Everything an AUTH_REJECT needs, and nothing that authenticates. The
+    // session key is a credential (see GameHandler::onAuthSuccess) and
+    // hashInput ends with all 40 of its bytes, so neither can be logged even at
+    // DEBUG - a debug log is still a file that gets attached to bug reports.
+    // The digest is what goes out on the wire, so it is safe and is the value
+    // actually worth comparing against the server's.
     LOG_DEBUG("AUTH HASH: account='", accountName, "' clientSeed=0x", std::hex, clientSeed,
-              " serverSeed=0x", serverSeed, std::dec);
-    LOG_DEBUG("AUTH HASH: sessionKey=", core::toHexString(sessionKey.data(), sessionKey.size()));
-    LOG_DEBUG("AUTH HASH: input(", hashInput.size(), ")=", core::toHexString(hashInput.data(), hashInput.size()));
+              " serverSeed=0x", serverSeed, std::dec, " sessionKey=", sessionKey.size(),
+              " bytes input=", hashInput.size(), " bytes");
 
     // Compute SHA1 hash
     auto result = auth::Crypto::sha1(hashInput);
