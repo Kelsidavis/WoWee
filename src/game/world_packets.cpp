@@ -284,7 +284,8 @@ std::vector<uint8_t> AuthSessionPacket::computeAuthHash(
     hashInput.insert(hashInput.end(), sessionKey.begin(), sessionKey.end());
 
     // Everything an AUTH_REJECT needs, and nothing that authenticates. The
-    // session key is a credential (see GameHandler::onAuthSuccess) and
+    // session key is a credential - it is what AuthSuccessCallback hands over
+    // and what GameHandler::connect is given - and
     // hashInput ends with all 40 of its bytes, so neither can be logged even at
     // DEBUG - a debug log is still a file that gets attached to bug reports.
     // The digest is what goes out on the wire, so it is safe and is the value
