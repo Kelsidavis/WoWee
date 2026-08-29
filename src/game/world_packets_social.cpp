@@ -404,14 +404,19 @@ network::Packet QueryTimePacket::build() {
 }
 
 bool QueryTimeResponseParser::parse(network::Packet& packet, QueryTimeResponseData& data) {
-    // Validate minimum packet size: serverTime(4) + timeOffset(4)
-    if (!packet.hasRemaining(8)) {
+    // The time alone is the whole packet before WotLK. Turtle's own server
+    // builds it four bytes long - WorldPacket(SMSG_QUERY_TIME_RESPONSE, 4)
+    // carrying time(nullptr) and nothing else - and the daily-reset countdown
+    // beside it is later. Demanding both dropped the response whole, so the
+    // client never learned the server's time from the one packet that carries
+    // it. Same shape as SMSG_PLAYED_TIME below, and for the same reason.
+    if (!packet.hasRemaining(4)) {
         LOG_WARNING("SMSG_QUERY_TIME_RESPONSE: packet too small (", packet.getSize(), " bytes)");
         return false;
     }
 
     data.serverTime = packet.readUInt32();
-    data.timeOffset = packet.readUInt32();
+    data.timeOffset = packet.hasRemaining(4) ? packet.readUInt32() : 0;
     LOG_DEBUG("Parsed SMSG_QUERY_TIME_RESPONSE: time=", data.serverTime, " offset=", data.timeOffset);
     return true;
 }
