@@ -587,7 +587,15 @@ bool ClassicPacketParsers::parseSpellGo(network::Packet& packet, SpellGoData& da
             return true;
         };
 
-        if (!parseHitList(false) && !parseHitList(true)) {
+        // Packed first, because packed is what the format documented at the
+        // top of this function says Classic sends. Trying full eight-byte GUIDs
+        // first only fails when the packet runs out of bytes - and a spell go
+        // carries a SpellCastTargets tail after the lists, so there are usually
+        // bytes to spare. The full-GUID branch then "succeeds" by eating the
+        // packed guids, the miss count and part of the tail as GUID data, and
+        // every field after it is read from the wrong offset. Bounds checks
+        // cannot see that: nothing overruns, it is just all shifted.
+        if (!parseHitList(true) && !parseHitList(false)) {
             LOG_WARNING("[Classic] Spell go: truncated hit targets at index 0/", static_cast<int>(rawHitCount));
             traceFailure("truncated_hit_target", packet.getReadPos(), rawHitCount);
             packet.setReadPos(startPos);
@@ -657,9 +665,10 @@ bool ClassicPacketParsers::parseSpellGo(network::Packet& packet, SpellGoData& da
             for (uint16_t i = 0; i < rawMissCount; ++i) {
                 SpellGoMissEntry m;
                 const size_t missEntryPos = packet.getReadPos();
-                if (!parseMissEntry(m, false)) {
+                // Packed first here too, and for the same reason.
+                if (!parseMissEntry(m, true)) {
                     packet.setReadPos(missEntryPos);
-                    if (!parseMissEntry(m, true)) {
+                    if (!parseMissEntry(m, false)) {
                         LOG_WARNING("[Classic] Spell go: truncated miss targets at index ", i,
                                     "/", static_cast<int>(rawMissCount));
                         traceFailure("truncated_miss_target", packet.getReadPos(), i);
@@ -996,7 +1005,9 @@ bool ClassicPacketParsers::parseMessageChat(network::Packet& packet, MessageChat
     switch (data.type) {
         case ChatType::MONSTER_EMOTE: {
             // Length-prefixed, bounds-checked against the packet, terminator stripped.
-            packet.readSizedString(data.senderName);
+            // Truncated here means the name length is a lie, and reading on would
+            // consume it as the leading bytes of the GUID below.
+            if (!packet.readSizedString(data.senderName)) return false;
             data.receiverGuid = packet.readUInt64();
             break;
         }
@@ -1030,7 +1041,9 @@ bool ClassicPacketParsers::parseMessageChat(network::Packet& packet, MessageChat
             // senderGuid(u64) + nameLen(u32) + name + targetGuid(u64)
             data.senderGuid = packet.readUInt64();
             // Length-prefixed, bounds-checked against the packet, terminator stripped.
-            packet.readSizedString(data.senderName);
+            // Truncated here means the name length is a lie, and reading on would
+            // consume it as the leading bytes of the GUID below.
+            if (!packet.readSizedString(data.senderName)) return false;
             data.receiverGuid = packet.readUInt64();
             break;
         }
@@ -1054,8 +1067,21 @@ bool ClassicPacketParsers::parseMessageChat(network::Packet& packet, MessageChat
     // Read message length
     uint32_t messageLen = packet.readUInt32();
 
+    // Against what is actually left, not only against a ceiling. readUInt8
+    // answers zero at the end of the buffer without advancing, so a declared
+    // length longer than the packet built a message padded with NULs out of
+    // nothing and reported success - and a length of 8192 or more skipped the
+    // message entirely and then read its first byte as the chat tag. Neither
+    // overruns the buffer; both hand the interface a fabricated line.
+    if (messageLen >= 8192 || messageLen > packet.getRemainingSize()) {
+        LOG_WARNING("[Classic] Chat message length ", messageLen,
+                    " does not fit the ", packet.getRemainingSize(),
+                    " bytes left; dropping the message");
+        return false;
+    }
+
     // Read message
-    if (messageLen > 0 && messageLen < 8192) {
+    if (messageLen > 0) {
         data.message.resize(messageLen);
         for (uint32_t i = 0; i < messageLen; ++i) {
             data.message[i] = static_cast<char>(packet.readUInt8());
