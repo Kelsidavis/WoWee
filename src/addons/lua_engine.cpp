@@ -9243,15 +9243,12 @@ bool LuaEngine::dispatchBindingKey(int sdlKeycode, bool shift, bool ctrl,
     return true;
 }
 
-bool LuaEngine::dispatchFrameKey(int sdlKeycode, bool down) {
-    if (!L_) return false;
-    const std::string key = wowKeyName(sdlKeycode);
-    if (key.empty()) return false;
-
-    // The topmost frame that is both visible and listening. Everything that
-    // declares a key handler in the interface is a dialog that is hidden until
-    // it is wanted, so in ordinary play there is nothing here and the key goes
-    // straight through to the game.
+/// The topmost frame that is both visible and listening for keys.
+///
+/// Everything that declares a key handler in the interface is a dialog that is
+/// hidden until it is wanted, so in ordinary play there is nothing here and the
+/// key goes straight through to the game.
+const ui::Widget* LuaEngine::topKeyboardFrame() const {
     const ui::Widget* best = nullptr;
     for (size_t id = 1; id < widgets_.size(); ++id) {
         const ui::Widget* w = widgets_.get(static_cast<uint32_t>(id));
@@ -9262,6 +9259,34 @@ bool LuaEngine::dispatchFrameKey(int sdlKeycode, bool down) {
             best = w;
         }
     }
+    return best;
+}
+
+void LuaEngine::dispatchFrameChar(const char* utf8) {
+    if (!L_ || !utf8 || !*utf8) return;
+    const ui::Widget* best = topKeyboardFrame();
+    if (!best) return;
+    // One call per character, which is what a handler written against WoW
+    // expects: StackSplitFrame_OnChar compares its argument with "0" and "9"
+    // and multiplies the number it is building by ten.
+    for (const char* at = utf8; *at != '\0';) {
+        const unsigned char lead = static_cast<unsigned char>(*at);
+        size_t len = 1;
+        if      ((lead & 0xF8u) == 0xF0u) len = 4;
+        else if ((lead & 0xF0u) == 0xE0u) len = 3;
+        else if ((lead & 0xE0u) == 0xC0u) len = 2;
+        const std::string one(at, len);
+        callFrameScript(best->id, "OnChar", one.c_str());
+        at += len;
+    }
+}
+
+bool LuaEngine::dispatchFrameKey(int sdlKeycode, bool down) {
+    if (!L_) return false;
+    const std::string key = wowKeyName(sdlKeycode);
+    if (key.empty()) return false;
+
+    const ui::Widget* best = topKeyboardFrame();
     if (!best) return false;
 
     callFrameScript(best->id, down ? "OnKeyDown" : "OnKeyUp", key.c_str());

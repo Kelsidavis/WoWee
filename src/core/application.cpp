@@ -1413,12 +1413,21 @@ void Application::run() {
                     audio::AudioEngine::instance().setSuspended(!focused && !playInBackground);
                 }
             }
-            // Typed text, when an addon's edit box is listening for it.
+            // Typed text, when an edit box is listening for it - or, when none
+            // is, whichever frame has asked for the keyboard.
+            //
+            // A dialog reads its digits from OnChar and not from OnKeyDown:
+            // StackSplitFrame's key handler passes numbers straight through on
+            // purpose, so the amount could only be reached with the arrows and
+            // typing "12" did nothing at all.
             else if (event.type == SDL_TEXTINPUT) {
                 if (addonManager_ && addonsLoaded_) {
-                    if (auto* engine = addonManager_->getLuaEngine();
-                        engine && engine->editBoxHasFocus()) {
-                        engine->dispatchText(event.text.text);
+                    if (auto* engine = addonManager_->getLuaEngine()) {
+                        if (engine->editBoxHasFocus()) {
+                            engine->dispatchText(event.text.text);
+                        } else {
+                            engine->dispatchFrameChar(event.text.text);
+                        }
                     }
                 }
             }

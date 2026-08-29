@@ -171,6 +171,12 @@ public:
     /// a binding - which is the whole reason a dialog can be typed into.
     bool dispatchFrameKey(int sdlKeycode, bool down);
 
+    /// A typed character, for a frame that asked for the keyboard and is not an
+    /// edit box. OnChar is where a dialog reads digits: StackSplitFrame's own
+    /// OnKeyDown deliberately ignores them and its OnChar is what builds the
+    /// number up, so without this a stack could only be split with the arrows.
+    void dispatchFrameChar(const char* utf8);
+
     /// Run whatever FrameXML has bound to this key, if anything. True if a
     /// binding ran.
     ///
@@ -275,6 +281,9 @@ private:
     /// in any one silently removed every method that chunk defined - and the
     /// only symptom was a method quietly answering as though unimplemented.
     void bootstrap(const char* code);
+
+    /// The frame a typed key belongs to - see dispatchFrameKey.
+    [[nodiscard]] const ui::Widget* topKeyboardFrame() const;
 
     void callFrameScript(uint32_t wid, const char* script, const char* arg = nullptr);
     /// The same, with a number. A handler that compares its argument against
