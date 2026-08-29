@@ -177,19 +177,43 @@ void Logger::emitLineLocked(LogLevel level, const std::string& message) {
 #endif
     if (fileStream.is_open()) {
         fileStream << line.str() << '\n';
-        bool shouldFlush = (level >= LogLevel::WARNING);
+        // An error or worse goes to disk at once: the lines just before a crash
+        // are the ones a report is opened for, and a crash runs no destructor.
+        //
+        // A warning does not, though it used to. This client puts its
+        // diagnostics at warning deliberately, so warnings arrive in bursts -
+        // a hundred and twelve lines while FrameXML loads, two hundred for one
+        // takeover check - and a flush per line is a write syscall per line,
+        // back to back, in the middle of a frame. They take the same interval
+        // as everything else now, which turns a burst into one write; a warning
+        // on its own still goes out immediately, because the interval has long
+        // since elapsed by the time it arrives.
+        bool shouldFlush = (level >= kLogLevelError);
         if (!shouldFlush) {
             auto nowSteady = std::chrono::steady_clock::now();
             auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(nowSteady - lastFlushTime_).count();
             shouldFlush = (elapsedMs >= static_cast<long long>(flushIntervalMs_));
-            if (shouldFlush) {
-                lastFlushTime_ = nowSteady;
-            }
         }
         if (shouldFlush) {
+            lastFlushTime_ = std::chrono::steady_clock::now();
             fileStream.flush();
+            unflushed_ = false;
+        } else {
+            unflushed_ = true;
         }
     }
+}
+
+void Logger::flushIfStale() {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!unflushed_ || !fileStream.is_open()) return;
+    const auto now = std::chrono::steady_clock::now();
+    const auto elapsedMs =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - lastFlushTime_).count();
+    if (elapsedMs < static_cast<long long>(flushIntervalMs_)) return;
+    lastFlushTime_ = now;
+    fileStream.flush();
+    unflushed_ = false;
 }
 
 void Logger::flushSuppressedLocked() {

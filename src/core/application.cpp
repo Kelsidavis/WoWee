@@ -1253,6 +1253,10 @@ void Application::run() {
     while (running && !window->shouldClose()) {
         const auto frameStart = std::chrono::steady_clock::now();
         beatWatchdog();
+        // What a burst of warnings left in the buffer. A warning no longer
+        // writes itself to disk one line at a time - see Logger::flushIfStale -
+        // so this is what keeps the tail of one from sitting there.
+        Logger::getInstance().flushIfStale();
 
         // Handle watchdog mouse-release request on the main thread where
         // SDL video calls are safe (required by SDL2 threading model).

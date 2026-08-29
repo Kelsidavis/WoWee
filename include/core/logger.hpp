@@ -97,6 +97,8 @@ private:
     bool echoToStdout_ = true;
     std::chrono::steady_clock::time_point lastFlushTime_{};
     uint32_t flushIntervalMs_ = 250;
+    /// Something is written and not yet on disk. See flushIfStale.
+    bool unflushed_ = false;
     bool dedupeEnabled_ = true;
     uint32_t dedupeWindowMs_ = 250;
     LogLevel lastLevel_ = LogLevel::DEBUG;
@@ -104,6 +106,18 @@ private:
     std::chrono::steady_clock::time_point lastMessageTime_{};
     uint64_t suppressedCount_ = 0;
     void emitLineLocked(LogLevel level, const std::string& message);
+public:
+    /// Put whatever is buffered on disk if it has been there long enough.
+    ///
+    /// Called once a frame. A warning used to flush the stream by itself, which
+    /// is a write for every line - and this client puts its diagnostics at
+    /// warning on purpose, so a burst is hundreds of them in a row: a hundred
+    /// and twelve while FrameXML loads, two hundred for one takeover check. The
+    /// interval coalesces a burst into one write and this keeps the tail of it
+    /// from sitting in the buffer afterwards, so a warning still reaches the
+    /// file within a frame or two of being written.
+    void flushIfStale();
+private:
     void flushSuppressedLocked();
     void ensureFile();
 };
