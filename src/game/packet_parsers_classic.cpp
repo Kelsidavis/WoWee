@@ -587,15 +587,20 @@ bool ClassicPacketParsers::parseSpellGo(network::Packet& packet, SpellGoData& da
             return true;
         };
 
-        // Packed first, because packed is what the format documented at the
-        // top of this function says Classic sends. Trying full eight-byte GUIDs
-        // first only fails when the packet runs out of bytes - and a spell go
-        // carries a SpellCastTargets tail after the lists, so there are usually
-        // bytes to spare. The full-GUID branch then "succeeds" by eating the
-        // packed guids, the miss count and part of the tail as GUID data, and
-        // every field after it is read from the wrong offset. Bounds checks
-        // cannot see that: nothing overruns, it is just all shifted.
-        if (!parseHitList(true) && !parseHitList(false)) {
+        // Full eight-byte GUIDs first, because that is what the wire carries.
+        // Turtle's own server writes this list as `*data << ihit.targetGUID`,
+        // and ObjectGuid's stream operator is `buf << uint64(GetRawValue())`;
+        // packed is written explicitly, through GetPackGUID, and SendSpellGo
+        // uses it for exactly two fields - the caster and the caster unit -
+        // which are the two this parser already reads as packed above.
+        // mangos-zero writes it the same way, so this holds for vanilla cores
+        // generally.
+        //
+        // #135 turned this order round on the reading that the layout
+        // documented above says packed. It does not: the packed guids it names
+        // are the two at the head. Packed first would consume a full guid's
+        // bytes by its mask and shift every field after the lists.
+        if (!parseHitList(false) && !parseHitList(true)) {
             LOG_WARNING("[Classic] Spell go: truncated hit targets at index 0/", static_cast<int>(rawHitCount));
             traceFailure("truncated_hit_target", packet.getReadPos(), rawHitCount);
             packet.setReadPos(startPos);
@@ -665,10 +670,11 @@ bool ClassicPacketParsers::parseSpellGo(network::Packet& packet, SpellGoData& da
             for (uint16_t i = 0; i < rawMissCount; ++i) {
                 SpellGoMissEntry m;
                 const size_t missEntryPos = packet.getReadPos();
-                // Packed first here too, and for the same reason.
-                if (!parseMissEntry(m, true)) {
+                // Full first here too, and for the same reason: the miss
+                // list is written with the same operator as the hit list.
+                if (!parseMissEntry(m, false)) {
                     packet.setReadPos(missEntryPos);
-                    if (!parseMissEntry(m, false)) {
+                    if (!parseMissEntry(m, true)) {
                         LOG_WARNING("[Classic] Spell go: truncated miss targets at index ", i,
                                     "/", static_cast<int>(rawMissCount));
                         traceFailure("truncated_miss_target", packet.getReadPos(), i);
