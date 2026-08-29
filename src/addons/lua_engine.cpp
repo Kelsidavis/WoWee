@@ -1067,6 +1067,19 @@ static void fireTooltipSetItem(lua_State* L) {
     if (lua_istable(L, 1)) callScriptOnTable(L, 1, "OnTooltipSetItem", 0.0);
 }
 
+/// Which item a tooltip is showing, where the interface can read it.
+///
+/// GameTooltip:GetItem() answers from this field, and GameTooltip_ShowCompareItem
+/// returns on its first line without it - so the comparison the shift key asks
+/// for is skipped for any tooltip that did not record what it was built from.
+/// _WoweePopulateItemTooltip sets it at the end of its own run; every path that
+/// does not go through it has to say so here.
+static void noteTooltipItem(lua_State* L, uint32_t itemId) {
+    if (!lua_istable(L, 1) || itemId == 0) return;
+    lua_pushnumber(L, static_cast<lua_Number>(itemId));
+    lua_setfield(L, 1, "__itemId");
+}
+
 // Scroll frames. A window onto a taller child: the child is laid out at its
 // full size and moved by the offset, and what falls outside the frame is
 // clipped. Until now SetVerticalScroll was a no-op and every getter answered
@@ -2487,7 +2500,17 @@ static bool fillItemTooltipById(lua_State* L, game::GameHandler* gh,
     } else {
         lua_settop(L, top);
     }
-    return fillItemTooltipById(w, gh, itemId);
+    // The C builder answered instead, for an item GetItemInfo has not arrived
+    // for. It is still an item tooltip: what it is showing has to be recorded
+    // and OnTooltipSetItem has to fire, or everything hanging off that script
+    // is skipped for exactly those items - the shift-key comparison first
+    // among them, which reads the item back through GetItem().
+    if (fillItemTooltipById(w, gh, itemId)) {
+        noteTooltipItem(L, itemId);
+        fireTooltipSetItem(L);
+        return true;
+    }
+    return false;
 }
 
 /// SetAuctionItem(list, index) - the item on an auction row.
@@ -2672,6 +2695,7 @@ int lua_Tooltip_SetInventoryItem(lua_State* L) {
     // than answering briefly.
     if (!fillItemTooltipById(L, gh, s.item.itemId)) {
         fillItemTooltip(w, s.item, gh);
+        noteTooltipItem(L, s.item.itemId);
         fireTooltipSetItem(L);
     } else {
         // Only on the by-id path. fillItemTooltip builds from the instance and
@@ -2778,6 +2802,7 @@ int lua_Tooltip_SetBagItem(lua_State* L) {
     // than answering briefly.
     if (!fillItemTooltipById(L, gh, s.item.itemId)) {
         fillItemTooltip(w, s.item, gh);
+        noteTooltipItem(L, s.item.itemId);
         fireTooltipSetItem(L);
     }
     lua_pushboolean(L, 1);
