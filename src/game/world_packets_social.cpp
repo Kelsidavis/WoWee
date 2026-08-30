@@ -129,11 +129,17 @@ bool MessageChatParser::parse(network::Packet& packet, MessageChatData& data) {
                 bool isPet = ((highGuid & kGuidTypeMask) == kGuidTypePet) ||
                              ((highGuid & kGuidTypeMask) == kGuidTypeVehicle);
                 if (!isPlayer && !isPet) {
-                    // Read receiver name (SizedCString)
-                    uint32_t recvNameLen = packet.readUInt32();
-                    if (recvNameLen > 0 && recvNameLen < 256) {
-                        packet.setReadPos(packet.getReadPos() + recvNameLen);
-                    }
+                    // Read receiver name (SizedCString), which we skip rather
+                    // than keep - but the skip has to be one the packet can
+                    // actually take. A length past the end walked the read
+                    // position off the buffer, and the message length below
+                    // then read a clamped zero, passed its own bounds test on
+                    // the strength of it, and delivered an empty monster line
+                    // that no server ever sent. A name this long is a lie
+                    // about the packet, so refuse the packet.
+                    const uint32_t recvNameLen = packet.readUInt32();
+                    if (recvNameLen > packet.getRemainingSize()) return false;
+                    packet.setReadPos(packet.getReadPos() + recvNameLen);
                 }
             }
             break;
