@@ -284,10 +284,9 @@ TEST_CASE("A monster chat line cannot skip past the end of its own packet", "[ch
     }
 
     SECTION("an absurd length is refused") {
-        // This one was already refused, but by accident: the old code skipped
-        // nothing at all for a length of 256 or more, so the message length
-        // below read the first bytes of the name instead and came out too
-        // large. Kept as a test because the refusal is now deliberate.
+        // Not merely unskipped: a length of 256 or more was skipped by nothing
+        // at all, so the message length below read the name's own bytes and
+        // the line came out of the wrong part of the packet. Refused now.
         auto packet = build(0xFFFFu, "");
         MessageChatData parsed;
         REQUIRE_FALSE(MessageChatParser::parse(packet, parsed));
@@ -300,6 +299,20 @@ TEST_CASE("A monster chat line cannot skip past the end of its own packet", "[ch
         // interface was handed an empty monster line no server had sent.
         const std::string target = "Sputtervalve";
         auto packet = build(static_cast<uint32_t>(target.size() + 40), target);
+        MessageChatData parsed;
+        REQUIRE_FALSE(MessageChatParser::parse(packet, parsed));
+    }
+
+    SECTION("a name that eats the packet exactly is refused too") {
+        // The edge the remaining-size check alone leaves open: a length equal
+        // to what is left lands the read position on the end rather than past
+        // it, so the skip is legal by that test. The message length then reads
+        // the same clamped zero and delivers the same empty line - which is
+        // why the length is asked for before it is read.
+        //
+        // The tail after the name field is the message length (4), the message
+        // and its terminator, and the chat tag.
+        auto packet = build(static_cast<uint32_t>(message.size() + 6), "");
         MessageChatData parsed;
         REQUIRE_FALSE(MessageChatParser::parse(packet, parsed));
     }

@@ -182,7 +182,14 @@ bool MessageChatParser::parse(network::Packet& packet, MessageChatData& data) {
             break;
     }
 
-    // Read message length
+    // Read message length.
+    //
+    // Asked for before it is read, because readUInt32 answers 0 past the end
+    // rather than failing - and a zero passes the bounds test below on its own
+    // strength, delivering an empty line no server sent. Every field above
+    // consumes bytes on the packet's word for how many, so a packet that has
+    // run out by here is one that has already been walked off its own end.
+    if (!packet.hasRemaining(4)) return false;
     uint32_t messageLen = packet.readUInt32();
     if (messageLen > packet.getRemainingSize()) return false;
 
