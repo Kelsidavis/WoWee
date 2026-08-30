@@ -72,6 +72,19 @@ public:
     void saveAllSavedVariables();
     void setCharacterName(const std::string& name) { characterName_ = name; }
 
+    /// Take the interface down, leaving a live but empty Lua state.
+    ///
+    /// The interface belongs to the character that was playing: it is built by
+    /// running FrameXML's files, and running them again over a state that
+    /// already holds them builds every frame a second time - the widget tree
+    /// appends rather than replaces, so both copies draw. That is what a
+    /// logout followed by another login without quitting did. Whoever clears
+    /// the "addons are loaded" flag has to call this, or the next world entry
+    /// loads a second interface on top of the first.
+    ///
+    /// Saved variables are written on the way out, as they are on a reload.
+    bool unloadAll();
+
     /// Re-initialize the Lua VM and reload all addons (used by /reload).
     bool reload();
 

@@ -644,6 +644,21 @@ class WidgetTree {
 public:
     WidgetTree();
 
+    /// Back to a tree holding nothing but the screen and UIParent.
+    ///
+    /// create() appends; it never replaces. An interface loaded over one that
+    /// is already built therefore leaves both in the tree, both laid out and
+    /// both drawn - a doubled interface, with the second copy of every frame
+    /// sitting exactly on the first. So anything that tears the Lua state down
+    /// has to bring the tree down with it: the frames belong to the state that
+    /// built them.
+    ///
+    /// The user scale survives. It is the player's own setting rather than
+    /// anything the interface built, and dropping it to 1 here would resize
+    /// every frame to a scale nobody chose until something set it back. The
+    /// effective scale is derived from it at each layout, so it needs nothing.
+    void reset();
+
     /// Links drawn this frame. Cleared at the start of each draw and refilled
     /// by it, so a link that stopped being drawn stops being clickable in the
     /// same frame rather than one later.

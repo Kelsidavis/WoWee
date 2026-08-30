@@ -5310,6 +5310,23 @@ void LuaEngine::shutdown() {
         ui::frameXmlSetCursorBridge(nullptr, nullptr);
         lua_close(L_);
         L_ = nullptr;
+        // The frames go with the state that built them. Without this the next
+        // load appends a second copy of every frame to the first and both draw
+        // - which is what a logout followed by another login did, since that
+        // path loads the interface again on a state it thought was empty.
+        widgets_.reset();
+        hoverWid_ = 0;
+        lastClickWid_ = 0;
+        lastClickTime_ = 0.0;
+        focusedWid_ = 0;
+        draggingWid_ = 0;
+        draggingButton_ = -1;
+        lastMouseHit_ = 0;
+        pickerPart_ = 0;
+        for (int b = 0; b < kMouseButtons; ++b) {
+            pressedWid_[b] = 0;
+            buttonDown_[b] = false;
+        }
         LOG_INFO("LuaEngine: shut down");
     }
 }

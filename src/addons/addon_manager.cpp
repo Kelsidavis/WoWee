@@ -1535,21 +1535,38 @@ void AddonManager::saveAllSavedVariables() {
     }
 }
 
-bool AddonManager::reload() {
-    LOG_INFO("AddonManager: reloading all addons...");
+bool AddonManager::unloadAll() {
     saveAllSavedVariables();
     addons_.clear();
+    lodAddons_.clear();
+    lodLoaded_.clear();
+    addonsLoaded_ = false;
+    // Closing the state is what disposes of the interface: the widget tree
+    // goes down with it, so the frames FrameXML built are gone rather than
+    // left for the next load to build a second copy on top of.
     luaEngine_.shutdown();
 
     if (!luaEngine_.initialize()) {
-        LOG_ERROR("AddonManager: failed to reinitialize Lua VM during reload");
+        LOG_ERROR("AddonManager: failed to reinitialize the Lua VM");
         return false;
     }
     luaEngine_.setGameHandler(gameHandler_);
     luaEngine_.setLuaServices(luaServices_);
 
+    // The list of what is on disk is not part of the interface and has to
+    // survive it - the AddOns manager on character select reads it while
+    // nothing is loaded at all.
+    if (!addonsPath_.empty()) scanAddons(addonsPath_);
+    return true;
+}
+
+bool AddonManager::reload() {
+    LOG_INFO("AddonManager: reloading all addons...");
+    if (!unloadAll()) {
+        LOG_ERROR("AddonManager: failed to reinitialize Lua VM during reload");
+        return false;
+    }
     if (!addonsPath_.empty()) {
-        scanAddons(addonsPath_);
         loadAllAddons();
     }
     LOG_INFO("AddonManager: reload complete");

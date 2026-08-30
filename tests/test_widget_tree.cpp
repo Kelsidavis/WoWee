@@ -2720,3 +2720,60 @@ TEST_CASE("Ordinary children still stack one above their parent", "[widget][leve
     tree.layout(1920.0f, 1080.0f);
     CHECK(tree.get(inner)->effLevel == tree.get(outer)->effLevel + 1);
 }
+
+// ── reset ───────────────────────────────────────────────────────────────────
+
+// The interface belongs to the Lua state that built it. Loading a second one
+// over the first is how a logout and another login without quitting produced a
+// doubled interface: create() appends, so every frame existed twice and both
+// copies drew.
+TEST_CASE("Reset leaves nothing but the screen and UIParent", "[widget][reset]") {
+    WidgetTree tree;
+    const uint32_t before = tree.create(WidgetKind::Frame, tree.uiParentId(), "PlayerFrame");
+    tree.get(before)->width = 100.0f;
+    tree.get(before)->height = 40.0f;
+    tree.layout(kScreenW, kScreenH);
+
+    tree.reset();
+
+    // The frame is gone by name as well as by id: findByName is what the client
+    // and FrameXML both reach a frame through.
+    CHECK(tree.findByName("PlayerFrame") == nullptr);
+    CHECK(tree.get(before) == nullptr);
+
+    // And the two the tree is built around are back, in that order, with
+    // UIParent inside the screen.
+    REQUIRE(tree.root() != 0);
+    REQUIRE(tree.uiParentId() != 0);
+    CHECK(tree.uiParentId() != tree.root());
+    CHECK(tree.get(tree.uiParentId())->parent == tree.root());
+    CHECK(tree.findByName("UIParent") == tree.get(tree.uiParentId()));
+    // The screen has no name, so nothing in FrameXML can find it.
+    CHECK(tree.get(tree.root())->name.empty());
+    CHECK(tree.get(tree.root())->children.size() == 1);
+}
+
+TEST_CASE("A second load after a reset draws one interface, not two", "[widget][reset]") {
+    WidgetTree tree;
+    auto buildInterface = [&] {
+        const uint32_t f = tree.create(WidgetKind::Frame, tree.uiParentId(), "PlayerFrame");
+        Widget* w = tree.get(f);
+        w->width = 100.0f;
+        w->height = 40.0f;
+        tree.addPoint(f, Anchor{});
+        const uint32_t art = tree.create(WidgetKind::Texture, f, "PlayerFrameTexture");
+        tree.get(art)->texturePath = "Interface\\TargetingFrame\\UI-PlayerFrame.blp";
+        tree.setAllPoints(art, f);
+        return f;
+    };
+
+    const uint32_t first = buildInterface();
+    tree.reset();
+    const uint32_t second = buildInterface();
+    tree.layout(kScreenW, kScreenH);
+
+    CHECK(tree.drawOrder().size() == 1);
+    CHECK(tree.findByName("PlayerFrame")->id == second);
+    // Reused, because the reset gave the ids back.
+    CHECK(second == first);
+}

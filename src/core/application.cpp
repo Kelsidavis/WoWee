@@ -1837,15 +1837,15 @@ void Application::setState(AppState newState) {
             if (uiManager && assetManager) {
                 uiManager->getCharacterScreen().setAssetManager(assetManager.get());
             }
+            // A backstop. Leaving the world goes through performLogoutToLogin,
+            // which takes the interface down there; this catches any other way
+            // of arriving here with it still standing, and does nothing when
+            // it is already down.
+            unloadInterface();
             // Ensure no stale in-world player model leaks into the next login attempt.
             // If we reuse a previously spawned instance without forcing a respawn, appearance (notably hair) can desync.
-            if (addonManager_ && addonsLoaded_) {
-                addonManager_->fireEvent("PLAYER_LEAVING_WORLD");
-                addonManager_->saveAllSavedVariables();
-            }
             npcsSpawned = false;
             playerCharacterSpawned = false;
-            addonsLoaded_ = false;
             if (appearanceComposer_) appearanceComposer_->setWeaponsSheathed(false);
             wasAutoAttacking_ = false;
             if (worldLoader_) worldLoader_->resetLoadedMap();
@@ -2144,8 +2144,37 @@ void Application::processDeferredLogoutToLogin() {
     performLogoutToLogin();
 }
 
+void Application::unloadInterface() {
+    if (addonManager_ && addonsLoaded_) {
+        addonManager_->fireEvent("PLAYER_LEAVING_WORLD");
+        // Saves the saved variables on its way out, so this has to run while
+        // the outgoing character is still the one named - the per-character
+        // files are keyed by that name, and writing them after it changed
+        // would put one character's variables in another's file.
+        addonManager_->unloadAll();
+        // And now it goes, so nothing can be written under it by accident.
+        // The next world entry sets the name of whoever logged in before it
+        // loads anything; an unset name skips the per-character files rather
+        // than guessing at one.
+        addonManager_->setCharacterName("");
+    }
+    addonsLoaded_ = false;
+}
+
 void Application::performLogoutToLogin() {
     LOG_INFO("Logout requested");
+
+    // The interface leaves the world with the character that was wearing it.
+    //
+    // Here rather than at character select, which is where this used to
+    // happen: leaving it standing until then meant the interface outlived the
+    // session it belonged to, dormant but intact, and another account or
+    // character logged in to would have found it.
+    //
+    // Before the disconnect below, so PLAYER_LEAVING_WORLD reaches handlers
+    // while there is still a world for them to ask about, which is what the
+    // event is for.
+    unloadInterface();
 
     // Disconnect TransportManager from WMORenderer before tearing down
     if (gameHandler && gameHandler->getTransportManager()) {

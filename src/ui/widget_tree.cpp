@@ -91,6 +91,33 @@ const char* strataName(FrameStrata strata) {
 }
 
 WidgetTree::WidgetTree() {
+    reset();
+}
+
+void WidgetTree::reset() {
+    widgets_.clear();
+    drawOrder_.clear();
+    linkRects_.clear();
+    scrollFrames_.clear();
+    ownedTooltips_.clear();
+    portraitsByUnit_.clear();
+    portraitUnitOf_.clear();
+    // Every one of these names a widget by id, and the ids are about to mean
+    // something else. A drag or a focus held across the reset would be held on
+    // whatever frame the new load happens to give that number to.
+    hoveredId_ = 0;
+    pressedId_ = 0;
+    movingWid_ = 0;
+    sizingWid_ = 0;
+    sizingPoint_.clear();
+    rootId_ = 0;
+    uiParentId_ = 0;
+    nextOrder_ = 1;
+    lastPixelW_ = 0.0f;
+    lastPixelH_ = 0.0f;
+    layingOut_ = false;
+    markLayoutDirty();
+
     widgets_.emplace_back();          // id 0 is "none"
     // The screen, then UIParent inside it. The screen carries no name: nothing
     // in FrameXML may find it, and GetParent on a detached frame answers nil

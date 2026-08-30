@@ -151,6 +151,17 @@ private:
     void render();
     void performLogoutToLogin();
     void processDeferredLogoutToLogin();
+
+    /// Take the interface down, because the character it belongs to is leaving.
+    ///
+    /// The frames hold that character - their bags, their spells, their saved
+    /// layout - and whoever logs in next must not find any of it still there.
+    /// Beyond the data, the widget tree appends rather than replaces, so an
+    /// interface left standing is one the next world entry builds a second
+    /// copy on top of: every frame twice over, one sitting exactly on the
+    /// other. Clearing addonsLoaded_ without this is what made a second login
+    /// in one session come up doubled.
+    void unloadInterface();
     /// Records how long one named stage of a frame took.
     ///
     /// The per-stage timings only ever spoke up above 50ms, which says which
