@@ -375,6 +375,13 @@ void AddonManager::loadAllAddons() {
         }
         // A scale you cannot read is applied before you can judge it, and the
         // way out is the panel you just made unreadable.
+        // Shift pressed over a tooltip that is already up. FrameXML asks
+        // about the modifier once, while the tooltip is being built, and the
+        // real client re-fires it in C when the key changes.
+        if (!luaEngine_.executeString(kTooltipModifierRefreshLua)) {
+            LOG_WARNING("Tooltip modifier refresh did not install: ",
+                        luaEngine_.lastError());
+        }
         if (!luaEngine_.executeString(kOptionRangeFixesLua)) {
             LOG_WARNING("Option range fixes did not apply: ", luaEngine_.lastError());
         }

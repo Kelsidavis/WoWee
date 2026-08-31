@@ -7178,6 +7178,10 @@ void LuaEngine::registerCoreAPI() {
         // per reason, because this runs on every tooltip the interface builds
         // and a line per hover would bury the log it is meant to explain.
         "local __cmpSaid = {}\n"
+        // A local, not a global: with the missing-API fallback on, an
+        // undefined global answers with a truthy stand-in, so `if not
+        // __cmpSeen` would never be taken and the table never made.
+        "local __cmpSeen = {}\n"
         "local function __cmpNo(why)\n"
         "    if not __cmpSaid[why] then\n"
         "        __cmpSaid[why] = true\n"
@@ -7188,6 +7192,16 @@ void LuaEngine::registerCoreAPI() {
         "function __WoweeFrameMT:SetHyperlinkCompareItem(link, index, shift, anchor)\n"
         "    self:ClearLines()\n"
         "    if not link then return __cmpNo('no link given') end\n"
+        // What the tooltip believes it is showing, said once per item. The
+        // comparison is only ever as right as this: GameTooltip_ShowCompareItem
+        // reads GetItem() and passes the link on, so an item recorded by an
+        // earlier tooltip and not replaced by this one is compared instead of
+        // the one under the cursor - and every refusal after this point names
+        // the wrong item without knowing it.
+        "    if not __cmpSeen[link] then\n"
+        "        __cmpSeen[link] = true\n"
+        "        __WoweeLogWarning('item compare asked about ' .. tostring(link))\n"
+        "    end\n"
         "    local id = tonumber(link:match('item:(%d+)'))\n"
         "    if not id then return __cmpNo('link carries no item id') end\n"
         "    local _, _, _, _, _, _, _, _, equipSlot = GetItemInfo(id)\n"
@@ -7210,7 +7224,8 @@ void LuaEngine::registerCoreAPI() {
         // player hovering what they already wear.
         "    if wornId == id then\n"
         "        return __cmpNo('slot ' .. tostring(slot) .. ' holds item ' .. tostring(wornId)\n"
-        "                       .. ', the same as the one hovered') end\n"
+        "                       .. ', the same as the one hovered (which the tooltip called a '\n"
+        "                       .. tostring(equipSlot) .. ')') end\n"
         "    if not _WoweePopulateItemTooltip(self, wornId) then return __cmpNo('no tooltip could be built for the worn item') end\n"
         "    self:Show()\n"
         "    return true\n"

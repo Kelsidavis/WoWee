@@ -1457,6 +1457,21 @@ void Application::run() {
                     // of key-downs and the interface would rebuild every
                     // tooltip in the game for each one.
                     if (modName && event.key.repeat == 0) {
+                        // Said once for shift going down, upstream of any
+                        // tooltip. IsModifiedClick(COMPAREITEMS) answered false
+                        // through two runs in which the key was pressed, which
+                        // is either a key this client never sees or a question
+                        // nothing asks again once the tooltip is already up.
+                        // This separates them: a line here and no matching
+                        // true from the gate means the event arrives and
+                        // nothing acts on it.
+                        static bool saidShift = false;
+                        if (!saidShift && event.type == SDL_KEYDOWN &&
+                            (modName[1] == 'S')) {
+                            saidShift = true;
+                            LOG_WARNING("MODIFIER_STATE_CHANGED fired for ",
+                                        modName, " down - the client sees shift");
+                        }
                         addonManager_->fireEvent(
                             "MODIFIER_STATE_CHANGED",
                             {modName, event.type == SDL_KEYDOWN ? "1" : "0"});

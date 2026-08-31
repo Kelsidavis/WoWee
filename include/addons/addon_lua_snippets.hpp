@@ -1471,5 +1471,44 @@ if type(original) == "function" then
 end
 )LUA";
 
+/// Rebuild an item tooltip when a modifier goes down or comes up.
+///
+/// GameTooltip's OnTooltipSetItem is the only place FrameXML asks
+/// IsModifiedClick("COMPAREITEMS"), and that script runs when the tooltip is
+/// built and never again. Nothing here listens for MODIFIER_STATE_CHANGED on a
+/// tooltip - only the state driver, the multicast bar and the paperdoll frame
+/// do - because the real client re-fires the tooltip itself in C when a
+/// modifier changes. This client fired the event and nothing acted on it, so
+/// holding shift before hovering showed a comparison and pressing shift while
+/// already hovering did nothing at all, which is the way round anyone actually
+/// does it.
+///
+/// Guarded at every step: an interface without GameTooltip_ShowCompareItem, or
+/// a tooltip showing something that is not an item, is left alone.
+inline constexpr const char* kTooltipModifierRefreshLua = R"LUA(
+local watcher = CreateFrame("Frame")
+watcher:RegisterEvent("MODIFIER_STATE_CHANGED")
+watcher:SetScript("OnEvent", function()
+    if not GameTooltip or not GameTooltip.IsShown or not GameTooltip:IsShown() then
+        return
+    end
+    local id = GameTooltip.__itemId
+    if not id or id == 0 then return end
+    if IsModifiedClick("COMPAREITEMS") then
+        if GameTooltip_ShowCompareItem then
+            GameTooltip_ShowCompareItem(GameTooltip, 1)
+        end
+    else
+        -- The comparison goes away with the key, as it does in the real
+        -- client. GameTooltip's own OnHide clears these when the tooltip
+        -- itself goes, which is a different moment.
+        for _, name in ipairs({"ShoppingTooltip1", "ShoppingTooltip2", "ShoppingTooltip3"}) do
+            local t = _G[name]
+            if t and t.Hide then t:Hide() end
+        end
+    end
+end)
+)LUA";
+
 }  // namespace addons
 }  // namespace wowee
