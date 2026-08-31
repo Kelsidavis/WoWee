@@ -1404,56 +1404,45 @@ inline constexpr const char* kCoinAmountClearanceLua = R"LUA(
 -- the CVar and the global never followed. The uvar is registered now, so this
 -- assignment would only overwrite it on the way past.
 
--- Between an amount and its own coin. Re-anchoring the buttons to each other
--- as well was tried and put copper two units worse than it started: their
--- spacing is MoneyFrame_Update's own, and it is right.
-local kClearance = 6
-
--- The interface's own denomination letters, read once. Fallbacks because a
--- money frame can be updated before globalstrings has been through, and "12"
--- with a nil beside it raises where "12g" was wanted.
-local kSymbols = {
-    Gold   = GOLD_AMOUNT_SYMBOL   or "g",
-    Silver = SILVER_AMOUNT_SYMBOL or "s",
-    Copper = COPPER_AMOUNT_SYMBOL or "c",
-}
+-- Between an amount and its own coin.
+--
+-- Small because there is nothing spare: the button is 19 units wide, the coin
+-- is 13 of them and the digits about 6, so the two already fill it and every
+-- unit here shows. Six was the figure from when the coin was being cleared and
+-- the amount had the whole button, and with the coin back it read as a gap
+-- almost a digit wide.
+--
+-- Re-anchoring the buttons to each other as well was tried and put copper two
+-- units worse than it started: their spacing is MoneyFrame_Update's own, and it
+-- is right.
+local kClearance = 2
 
 local function nudge(frameName)
     for _, coin in ipairs({"Gold", "Silver", "Copper"}) do
         local text = _G[frameName .. coin .. "ButtonText"]
         local button = _G[frameName .. coin .. "Button"]
         if text and button then
-            -- The amount and its denomination, as a letter.
+            -- The amount and its coin, which is how WoW writes money: the
+            -- number, then the picture. Only MoneyFrame_Update's colourblind
+            -- branch writes a letter instead.
             --
-            -- The coin picture comes off below, and an amount with nothing
-            -- beside it says nothing: a training cost read as three numbers in
-            -- a row with no way to tell gold from silver. The letters are the
-            -- interface's own - GOLD_AMOUNT_SYMBOL and its two siblings, what
-            -- the colourblind branch writes - so they are localised and this
-            -- client's own windows already print costs the same way.
+            -- This used to write the letter itself and clear the coin. The
+            -- reason was that the sliced coins out of UI-MoneyIcons read as
+            -- small marks after each number, back when this client drew its own
+            -- money bar and carried coins in its art - so there were two sets
+            -- and the interface's own came off. FrameXML owns the money frame
+            -- now and draws one set, which renders, and the letters beside them
+            -- are what is left over: reported as "1g" against a gold coin.
             --
-            -- Written from the digits rather than appended, so running twice
-            -- over the same frame does not leave "12gg".
-            local shown = text:GetText()
-            if shown then
-                local bare = shown:match("^(%d+)")
-                if bare then text:SetText(bare .. kSymbols[coin]) end
-            end
-            -- No coin of ours.
-            --
-            -- MoneyFrame_Update makes a texture per denomination and slices the
-            -- coin out of UI-MoneyIcons for it. The money bar this client draws
-            -- already carries the coins in its own art, so those three are a
-            -- second set on top of the first - and small, sliced and overlapping
-            -- the amounts, they read as letters after each number. Four reports
-            -- of "letters next to the coins" are that.
-            --
-            -- The amount then wants the whole button, since nothing sits to its
-            -- right any more.
+            -- The clearance this is named for stays. Past the coin's own width,
+            -- because the coin is still there to clear.
             local icon = button:GetNormalTexture()
-            if icon then icon:SetTexture(nil) end
-            text:ClearAllPoints()
-            text:SetPoint("RIGHT", button, "RIGHT", -kClearance, 0)
+            local iconW = 0
+            if icon and icon.GetWidth then iconW = icon:GetWidth() or 0 end
+            if iconW > 0 then
+                text:ClearAllPoints()
+                text:SetPoint("RIGHT", button, "RIGHT", -(iconW + kClearance), 0)
+            end
         end
     end
 end
