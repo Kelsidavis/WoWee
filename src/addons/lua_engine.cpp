@@ -1089,8 +1089,32 @@ int lua_ScrollFrame_SetScrollChild(lua_State* L) {
     const uint32_t id = widgetIdOf(L, 1);
     if (!tree || id == 0) return 0;
     tree->markScrollFrame(id);
+    uint32_t childId = 0;
     if (auto* w = tree->get(id)) {
-        w->scrollChild = lua_istable(L, 2) ? widgetIdOf(L, 2) : 0;
+        childId = lua_istable(L, 2) ? widgetIdOf(L, 2) : 0;
+        w->scrollChild = childId;
+    }
+    // The child is placed by the frame that scrolls it, which is the one thing
+    // this recorded the relationship without doing.
+    //
+    // A scroll child is declared with no anchors of its own - WoW positions it
+    // from the scroll frame - so ours stayed unanchored and fell back to a
+    // default rect. Everything hanging off it inherited that: ItemTextFrame's
+    // page sat at x=173 inside a frame 384 wide, and being 270 wide itself ran
+    // off the right edge, so a letter's every line was cut mid-word and the
+    // text began part way down the page.
+    //
+    // Only when it has none. A child that anchors itself has said where it
+    // goes, and moving it would be overriding the file rather than filling in
+    // for it.
+    if (childId != 0) {
+        if (auto* child = tree->get(childId); child && child->anchors.empty()) {
+            wowee::ui::Anchor at;
+            at.point = "TOPLEFT";
+            at.relativeTo = id;
+            at.relativePoint = "TOPLEFT";
+            tree->addPoint(childId, at);
+        }
     }
     // Kept on the table too, because GetScrollChild hands the frame itself
     // back and that is what the caller passed in.
@@ -5031,8 +5055,21 @@ static int lua_CreateFrame(lua_State* L) {
             // scroll frame clips what is under it even while it is empty.
             if (ft == "ScrollFrame") tree->markScrollFrame(id);
             // Its text lives on the frame, so the renderer has to be told
-            // this is one of the few frames that draws any.
+            // this is one of the few frames that draws any - and so does the
+            // frame metatable, whose SetText otherwise has nowhere to put it.
             w->isSimpleHtml = (ft == "SimpleHTML");
+            if (w->isSimpleHtml) {
+                lua_pushboolean(L, 1);
+                lua_setfield(L, -2, "__isSimpleHtml");
+                // A page of prose reads from the left margin. The tree's
+                // default is CENTER, which is what a button's label wants and
+                // the opposite of what a body of text does - centred inside
+                // the wrap width, every line of a letter sat pushed to the
+                // right and clipped mid-word. Set as the default rather than
+                // forced, so a justifyH the XML or the font object declares
+                // still wins: both are applied after the frame is made.
+                w->justifyH = "LEFT";
+            }
             // An edit box is clicked into, so it takes the mouse as well.
             w->isEditBox = (ft == "EditBox");
             if (w->isEditBox) {
@@ -6368,6 +6405,20 @@ void LuaEngine::registerCoreAPI() {
         // A tooltip's SetText is its first line, not a font string's text.
         // It answers whether it took the call, so this can stop there.
         "    if __WoweeTooltipSetText(self, text, r, g, b) then return end\n"
+        // A SimpleHTML draws the text itself, so it goes on the widget rather
+        // than into a field only Lua can read.
+        //
+        // Every branch below this one missed it: it is not an edit box, not a
+        // tooltip, and the font string made on demand further down is
+        // deliberately for buttons alone. So the words were kept in __text,
+        // GetText answered with them, and nothing ever drew them - which is a
+        // letter that opens to a blank page with its title and page number
+        // both correct.
+        "    if self.__isSimpleHtml then\n"
+        "        self.__text = text\n"
+        "        __WoweeSetWidgetText(self, text)\n"
+        "        return\n"
+        "    end\n"
         "    self.__text = text\n"
         // A button with no font string yet gets one, rather than storing the
         // text where nothing can draw it.
@@ -6653,6 +6704,11 @@ void LuaEngine::registerCoreAPI() {
     // CreateFrame function
     lua_pushcfunction(L_, lua_EditBox_SetText);
     lua_setglobal(L_, "__WoweeEditSetText");
+    // The same call a font string's SetText makes, reachable from the frame
+    // metatable. A SimpleHTML holds its text on the frame and nothing else
+    // could put it there - see mt:SetText.
+    lua_pushcfunction(L_, lua_FontString_SetText);
+    lua_setglobal(L_, "__WoweeSetWidgetText");
     lua_pushcfunction(L_, lua_Tooltip_SetText);
     lua_setglobal(L_, "__WoweeTooltipSetText");
     lua_pushcfunction(L_, lua_EditBox_GetText);
@@ -7107,28 +7163,55 @@ void LuaEngine::registerCoreAPI() {
         "    INVTYPE_SHIELD = {17}, INVTYPE_RANGED = {18},\n"
         "    INVTYPE_RANGEDRIGHT = {18}, INVTYPE_THROWN = {18},\n"
         "    INVTYPE_RELIC = {18}, INVTYPE_TABARD = {19},\n"
+        // A bag is compared against the bags being worn, which is four slots
+        // rather than the one or two everything above has. The table had no
+        // entry at all, so hovering a bag refused before it reached the worn
+        // item - reported by the log as "no slot mapping for INVTYPE_BAG",
+        // which is the first thing the named refusals answered.
+        //
+        // WoW's slot ids, as the rest of this table uses: the tabard is 19 and
+        // the four bags follow it.
+        "    INVTYPE_BAG = {20, 21, 22, 23},\n"
         "}\n"
+        // Nine ways to refuse and, until now, no way to tell them apart: the
+        // symptom of every one is that holding shift does nothing. Said once
+        // per reason, because this runs on every tooltip the interface builds
+        // and a line per hover would bury the log it is meant to explain.
+        "local __cmpSaid = {}\n"
+        "local function __cmpNo(why)\n"
+        "    if not __cmpSaid[why] then\n"
+        "        __cmpSaid[why] = true\n"
+        "        __WoweeLogWarning('item compare refused: ' .. why)\n"
+        "    end\n"
+        "    return false\n"
+        "end\n"
         "function __WoweeFrameMT:SetHyperlinkCompareItem(link, index, shift, anchor)\n"
         "    self:ClearLines()\n"
-        "    if not link then return false end\n"
+        "    if not link then return __cmpNo('no link given') end\n"
         "    local id = tonumber(link:match('item:(%d+)'))\n"
-        "    if not id then return false end\n"
+        "    if not id then return __cmpNo('link carries no item id') end\n"
         "    local _, _, _, _, _, _, _, _, equipSlot = GetItemInfo(id)\n"
-        "    if not equipSlot or equipSlot == '' then return false end\n"
+        "    if not equipSlot or equipSlot == '' then return __cmpNo('GetItemInfo gave no equip slot') end\n"
         "    local slots = __WoweeCompareSlots[equipSlot]\n"
-        "    if not slots then return false end\n"
+        "    if not slots then return __cmpNo('no slot mapping for ' .. tostring(equipSlot)) end\n"
         "    local slot = slots[index or 1]\n"
-        "    if not slot then return false end\n"
+        "    if not slot then return __cmpNo('no slot at compare index') end\n"
         // Nothing worn there is not a comparison, it is an empty tooltip -
         // and answering true for one would show a blank box beside the item.
         "    local wornLink = GetInventoryItemLink('player', slot)\n"
-        "    if not wornLink then return false end\n"
+        "    if not wornLink then return __cmpNo('nothing worn in slot ' .. tostring(slot)) end\n"
         "    local wornId = tonumber(wornLink:match('item:(%d+)'))\n"
-        "    if not wornId then return false end\n"
+        "    if not wornId then return __cmpNo('worn link carries no item id') end\n"
         // Comparing something against itself says nothing. WoW leaves the
         // second tooltip off when the item is already the one worn.
-        "    if wornId == id then return false end\n"
-        "    if not _WoweePopulateItemTooltip(self, wornId) then return false end\n"
+        // Both ids, because this is the one refusal that can be wrong rather
+        // than merely unhelpful: it fires when the worn lookup answers with the
+        // hovered item, and from outside that is indistinguishable from a
+        // player hovering what they already wear.
+        "    if wornId == id then\n"
+        "        return __cmpNo('slot ' .. tostring(slot) .. ' holds item ' .. tostring(wornId)\n"
+        "                       .. ', the same as the one hovered') end\n"
+        "    if not _WoweePopulateItemTooltip(self, wornId) then return __cmpNo('no tooltip could be built for the worn item') end\n"
         "    self:Show()\n"
         "    return true\n"
         "end\n"

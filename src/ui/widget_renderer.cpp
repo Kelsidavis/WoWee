@@ -2032,6 +2032,25 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
             // Wrapped to the frame, like a message frame's lines and unlike a
             // font string's, because the page has a width and the text has to
             // live inside it. Top down, since a page is read from the top.
+            if (w->isSimpleHtml) {
+                // Said once per frame, because a blank page has been diagnosed
+                // twice from the source and been wrong both times. Everything
+                // this reports read correctly when asked from outside - the
+                // text is stored, the font resolves, the box has a size - so
+                // the one thing left to learn is what the renderer holds at the
+                // moment it would paint.
+                static std::set<uint32_t> saidHtml;
+                if (saidHtml.insert(w->id).second) {
+                    LOG_WARNING("SimpleHTML '",
+                                w->name.empty() ? "(unnamed)" : w->name,
+                                "': ", w->text.size(), " chars, box (", x0, ",",
+                                y0, " to ", x1, ",", y1, "), font height ",
+                                w->fontHeight, " scaled ",
+                                interfaceFontSize(w->fontHeight) * s,
+                                ", colour a=", w->color[3], " alpha=", w->alpha,
+                                ", visible=", w->visible ? 1 : 0);
+                }
+            }
             if (w->isSimpleHtml && !w->text.empty()) {
                 ImFont* font = interfaceFaceOrDefault(w->fontFace);
                 const float size = interfaceFontSize(w->fontHeight) * s;

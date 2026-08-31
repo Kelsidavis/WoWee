@@ -1402,10 +1402,26 @@ static int lua_IsModifiedClick(lua_State* L) {
         return 1;
     }
     const std::string binding = modifiedClickBinding(L, act);
-    // An action bindings.xml has never heard of. Shift is what the interface's
-    // own unbound actions use, and answering false would make a modified click
-    // on one unreachable rather than merely bound elsewhere.
-    lua_pushboolean(L, (binding.empty() ? shiftHeld() : modifiersHeldFor(binding)) ? 1 : 0);
+    const bool answer = binding.empty() ? shiftHeld() : modifiersHeldFor(binding);
+    // The gate the comparison tooltip goes through, said once each way.
+    //
+    // Shift-hovering an item that differs from the worn one produced no
+    // refusal from SetHyperlinkCompareItem at all, which means FrameXML never
+    // got as far as calling it - and this is what it asks first. Whether the
+    // answer is yes or no, and which binding decided it, is the difference
+    // between a modifier this client never sees and a comparison that is
+    // refused further along.
+    if (act == "COMPAREITEMS") {
+        static bool saidYes = false, saidNo = false;
+        bool& said = answer ? saidYes : saidNo;
+        if (!said) {
+            said = true;
+            LOG_WARNING("IsModifiedClick(COMPAREITEMS) = ", answer ? "true" : "false",
+                        ", binding '", binding.empty() ? "(none - falls back to shift)" : binding,
+                        "', shift held ", shiftHeld() ? "yes" : "no");
+        }
+    }
+    lua_pushboolean(L, answer ? 1 : 0);
     return 1;
 }
 
