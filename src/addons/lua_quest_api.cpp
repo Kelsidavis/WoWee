@@ -116,6 +116,20 @@ std::vector<QuestRow> questRows(game::GameHandler* gh) {
     return rows;
 }
 
+/// Server text as the player should read it.
+///
+/// Quest text arrives with the reader left blank - $n for their name, $c for
+/// class, $r for race, $g male:female; for a phrase that splits on gender - and
+/// the client is what fills them in. The quest giver's own panels have resolved
+/// them since pushQuestText was written, and the quest log did not: the same
+/// quest greeted the player by name while it was being offered and by the two
+/// characters "$N" once it was accepted, which is where it is read most.
+std::string forPlayer(lua_State* L, const std::string& text) {
+    if (text.empty()) return text;
+    auto* gh = getGameHandler(L);
+    return gh ? ui::chat_utils::replaceGenderPlaceholders(text, *gh) : text;
+}
+
 }  // namespace
 
 // Declared in lua_api_helpers.hpp; defined here because questRows above is the
@@ -541,7 +555,7 @@ static int lua_GetQuestLogTitle(lua_State* L) {
     // received a zero and so no quest ever showed as complete; isDaily
     // received the quest id, which is a large number and therefore true, so
     // every quest in the log was marked daily; and questID arrived nil.
-    lua_pushstring(L, q.title.c_str());  // 1: title
+    lua_pushstring(L, forPlayer(L, q.title).c_str());  // 1: title
     // The level is tracked - the query response carries it - and was being
     // answered as a flat zero beside a comment saying it was not.
     lua_pushnumber(L, q.level);          // 2: level
@@ -593,8 +607,8 @@ static int lua_GetQuestLogQuestText(lua_State* L) {
     // "not stored" was true only of the store - the bytes were in hand and
     // discarded, and the quest log drew a blank panel above every objective
     // list because of it.
-    lua_pushstring(L, q.description.c_str());  // description
-    lua_pushstring(L, q.objectives.c_str());   // objectives
+    lua_pushstring(L, forPlayer(L, q.description).c_str());  // description
+    lua_pushstring(L, forPlayer(L, q.objectives).c_str());   // objectives
     return 2;
 }
 
@@ -2621,22 +2635,9 @@ QuestSource currentQuestSource(game::GameHandler* gh) {
 
 int pushQuestText(lua_State* L, const std::string* s) {
     if (!s || s->empty()) { lua_pushstring(L, ""); return 1; }
-    // Resolve WoW's in-text tokens against the player before the interface
-    // sees the string.
-    //
-    // These come off the wire as literals - $n for the player's name, $c for
-    // class, $r for race, $g male:female; for a gender-split phrase - and the
-    // parser only ever turned $b into a line break, because it has no player
-    // to resolve the rest against. So a quest that greeted "$n" showed the two
-    // characters, and "$glad:lass;" showed its own markup. The binding is the
-    // first point that has the player: replaceGenderPlaceholders is the same
-    // resolver chat and this client's own dialog already run.
-    if (auto* gh = getGameHandler(L)) {
-        const std::string resolved = ui::chat_utils::replaceGenderPlaceholders(*s, *gh);
-        lua_pushstring(L, resolved.c_str());
-    } else {
-        lua_pushstring(L, s->c_str());
-    }
+    // The binding is the first point that has the player to resolve against;
+    // the parser only ever turned $b into a line break. See forPlayer.
+    lua_pushstring(L, forPlayer(L, *s).c_str());
     return 1;
 }
 
@@ -3147,7 +3148,10 @@ void registerQuestLuaAPI(lua_State* L) {
             const uint32_t id = pendingAbandonQuest();
             if (gh && id != 0) {
                 for (const auto& q : gh->getQuestLog()) {
-                    if (q.questId == id) { lua_pushstring(L, q.title.c_str()); return 1; }
+                    if (q.questId == id) {
+                        lua_pushstring(L, forPlayer(L, q.title).c_str());
+                        return 1;
+                    }
                 }
             }
             lua_pushstring(L, "");
