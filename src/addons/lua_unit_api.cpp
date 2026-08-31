@@ -26,7 +26,32 @@ static int lua_UnitName(lua_State* L) {
         } else if (gh && guid != 0) {
             // Try player name cache
             const std::string& cached = gh->lookupName(guid);
-            lua_pushstring(L, cached.empty() ? "Unknown" : cached.c_str());
+            if (!cached.empty()) {
+                lua_pushstring(L, cached.c_str());
+            } else {
+                // The player's own name, from the list they picked it off.
+                //
+                // "Unknown" is a real answer for a stranger whose name query
+                // has not come back, and a wrong one for the player: the
+                // client knows who they are before it knows anything else -
+                // world_loader reads this very name to set up per-character
+                // SavedVariables, two lines before it loads the addons.
+                //
+                // Addons ask at load and keep the answer. Bagnon takes
+                // UnitName('player') into a local at file scope and compares
+                // every later answer against it to decide whether a bag is the
+                // live one or a remembered one; given "Unknown" once, it spent
+                // the session certain it was looking at an offline character
+                // and drew its bags out of an empty database. No error, no
+                // warning, an empty window.
+                std::string own;
+                if (guid == gh->getPlayerGuid()) {
+                    for (const auto& c : gh->getCharacters()) {
+                        if (c.guid == guid) { own = c.name; break; }
+                    }
+                }
+                lua_pushstring(L, own.empty() ? "Unknown" : own.c_str());
+            }
         } else {
             lua_pushstring(L, "Unknown");
         }
