@@ -2070,8 +2070,28 @@ static int& trainerSelection() {
     static int selected = 0;
     return selected;
 }
+/// The three type filters, seeded rather than empty.
+///
+/// A trainer is walked up to to see what can be learned now, and the list that
+/// answers that is the available one: a hundred-row tradeskill trainer opened
+/// on everything is mostly rows the player cannot act on. So available shows
+/// and the two that cannot be acted on do not - which is the panel's filter
+/// doing what it is for, not a fourth control.
+///
+/// Seeded rather than left unset because three readers consult this map and all
+/// three have to agree what an absent entry means: the list, the dropdown's
+/// ticks, and the setter deciding whether a call is a change. With the three
+/// names always present there is no absent entry to disagree about, and an
+/// unknown name still reads as showing.
+///
+/// The player's own changes outlive it - this is where the session's filter
+/// lives, so a tick turned on stays on until the client restarts.
 static std::unordered_map<std::string, bool>& trainerFilters() {
-    static std::unordered_map<std::string, bool> filters;
+    static std::unordered_map<std::string, bool> filters{
+        {"available", true},
+        {"unavailable", false},
+        {"used", false},
+    };
     return filters;
 }
 
@@ -2108,7 +2128,7 @@ static const char* trainerServiceCategory(game::GameHandler* gh,
 }
 
 /// Whether the filter dropdown is currently letting this category through.
-/// Unset means showing, which is how a freshly opened panel looks.
+/// The three the panel names are always in the map; anything else shows.
 static bool trainerCategoryShowing(const char* category) {
     const auto& filters = trainerFilters();
     auto it = filters.find(category);
@@ -4103,8 +4123,8 @@ void registerQuestLuaAPI(lua_State* L) {
                                                  : (lua_toboolean(L, 2) != 0);
             auto& filters = trainerFilters();
             const auto it = filters.find(which);
-            // Unset reads as showing, the same as GetTrainerServiceTypeFilter
-            // answers, so the first call that hides a category is a change.
+            // Read back the same way GetTrainerServiceTypeFilter answers, so
+            // "no change" here means the dropdown's tick would not move either.
             const bool was = (it == filters.end()) || it->second;
             filters[which] = show;
             if (was == show) return 0;
@@ -4145,7 +4165,8 @@ void registerQuestLuaAPI(lua_State* L) {
                 {"GetTrainerServiceTypeFilter", [](lua_State* L) -> int {
             const char* which = luaL_optstring(L, 1, "");
             auto it = trainerFilters().find(which);
-            // Unset means showing, which is how a freshly opened panel looks.
+            // The three the panel asks about are always set; a name it does
+            // not use reads as showing rather than as hidden.
             lua_pushboolean(L, it == trainerFilters().end() ? 1 : (it->second ? 1 : 0));
             return 1;
         }},
