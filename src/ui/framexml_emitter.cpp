@@ -686,6 +686,18 @@ struct Emitter {
     /// Applies whatever this node inherits onto `var`. Templates apply before
     /// the frame's own settings, so anything stated on the frame overrides what
     /// it inherited - the order FrameXML relies on.
+    /// A template that never loaded is reported once, by name.
+    ///
+    /// Unexplained, and worth knowing before spending time on it again: a
+    /// v3.1.12 run against Turtle's interface inherited an undeclared
+    /// OptionsListButtonTemplate eighteen times and said nothing, while the
+    /// same run reported ItemButtonTemplate and TaxiRouteFrame normally. Four
+    /// explanations were tested against that build and all four are wrong -
+    /// this function does emit all eighteen checks for that file; the missing
+    /// API fallback does not reach a real table's absent key, so the else arm
+    /// is taken; __WoweeMissingTemplate predates the build by four weeks; and
+    /// the emitted order puts the first check 279 lines above the OnLoad that
+    /// raised, so nothing aborted before it. See #132.
     void emitInherits(const XmlNode& node, const std::string& var) {
         const std::string* inherits = node.attr("inherits");
         if (!inherits) return;
