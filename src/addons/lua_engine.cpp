@@ -3872,6 +3872,15 @@ void installRegionMethods(lua_State* L, bool isTexture, bool isFontString) {
         set("SetFontObject", lua_FontString_SetFontObject);
         set("SetShadowOffset", lua_FontString_SetShadowOffset);
         set("SetShadowColor", lua_FontString_SetShadowColor);
+        // How a long line breaks, which is a font string's own question and
+        // was answerable only through the frame metatable. A region keeps its
+        // methods on itself, so a string made by CreateFontString - which is
+        // most of them outside the XML - had none of these and raised on the
+        // first call: Bagnon's options panel sets SetNonSpaceWrap on its
+        // description text and took the whole panel down with it.
+        set("SetWordWrap", lua_FontString_SetWordWrap);
+        set("CanWordWrap", lua_FontString_CanWordWrap);
+        set("SetNonSpaceWrap", lua_FontString_SetNonSpaceWrap);
     }
     // Anything still unimplemented stays a no-op rather than an error, which is
     // what keeps a large addon running while the surface is filled in.

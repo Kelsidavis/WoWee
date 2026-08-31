@@ -1440,6 +1440,21 @@ bool AddonManager::loadXmlFile(const std::string& path, int depth) {
         }
     }
     for (const auto& script : emitted.scriptFiles) {
+        // A file the manifest names and the package does not ship is not a
+        // failure. Addons carry these routinely - Bagnon's config lists seven
+        // localisations and ships five, and a widget it no longer has - and
+        // the real client loads what is there and says nothing. Reported as an
+        // error, three absent translations made a working addon read as a
+        // broken one in the log, which is worse than silence: it is the log
+        // being wrong.
+        //
+        // Said once, and quietly, because a file that is missing when it
+        // should be there is still worth knowing.
+        if (!fs::exists(sibling(script))) {
+            LOG_WARNING("AddonManager: ", path, " names ", script,
+                        ", which this addon does not ship - skipped");
+            continue;
+        }
         // And the other way round, for the same reason.
         const bool loaded = isLua(script)
             ? luaEngine_.executeFile(sibling(script).string())
