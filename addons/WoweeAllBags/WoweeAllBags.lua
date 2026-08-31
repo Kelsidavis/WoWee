@@ -45,13 +45,40 @@ local function settings()
     if type(WoweeAllBagsSettings.columns) ~= 'number' then
         WoweeAllBagsSettings.columns = 10
     end
-    -- The keyring is off unless asked for. It is a dozen empty slots for most
-    -- characters and it sat under the inventory as a block of nothing; the
-    -- game's own ToggleKeyRing is what asks for it, below.
-    if type(WoweeAllBagsSettings.keyring) ~= 'boolean' then
-        WoweeAllBagsSettings.keyring = false
-    end
     return WoweeAllBagsSettings
+end
+
+-- ── The client's own controls ───────────────────────────────────────────────
+--
+-- Interface > Bags in the WoWee settings has had three of these since before
+-- the bags were handed to FrameXML: "Separate bag windows", "Show keyring" and
+-- "Bag scale". They drove this client's own bag window, and that window went
+-- when FrameXML took the bags - so all three have been controls wired to
+-- nothing. They mean exactly what this window does, so this reads them rather
+-- than growing a second set of preferences beside them.
+--
+-- Strings both ways, as a CVar is. A client too old to answer leaves the
+-- fallback, which is what the schema says the default is.
+
+local function clientSetting(key, fallback)
+    if not WoweeGetSetting then return fallback end
+    local v = WoweeGetSetting(key)
+    if v == nil or v == '' then return fallback end
+    return v
+end
+
+local function clientFlag(key, fallback)
+    return clientSetting(key, fallback and '1' or '0') ~= '0'
+end
+
+--- One window, or FrameXML's one per bag. The player's answer to that decides
+--- whether this replaces the bags at all - see the overrides at the end.
+local function separateBags()
+    return clientFlag('separatebags', true)
+end
+
+local function showKeyring()
+    return clientFlag('showkeyring', true)
 end
 
 local function columns()
@@ -213,7 +240,7 @@ local function visibleSections()
         if total > 0 then out[#out + 1] = {name = name, bags = bags} end
     end
     add("Inventory", INVENTORY)
-    if settings().keyring then add("Keyring", KEYRING) end
+    if showKeyring() then add("Keyring", KEYRING) end
     if bankOpen then add("Bank", BANK) end
     return out
 end
@@ -303,6 +330,12 @@ function WoweeAllBags_Update()
     f:SetWidth(EDGE * 2 + cols * (SLOT + PAD) - PAD)
     f:SetHeight(TOP + rows * (SLOT + PAD) - PAD + BOTTOM + usedHeaders * HEADER)
 
+    -- The size the player asked for, from the same control that used to size
+    -- this client's own bag window.
+    local scale = tonumber(clientSetting('bagscale', '1')) or 1
+    if scale < 0.5 then scale = 0.5 elseif scale > 2 then scale = 2 end
+    if f:GetScale() ~= scale then f:SetScale(scale) end
+
     counts:SetText(used .. " used, " .. free .. " free")
     if MoneyFrame_Update then MoneyFrame_Update("WoweeAllBagsMoney", GetMoney()) end
     if sort.SetEnabled then
@@ -364,23 +397,63 @@ local function closeOurs()
     if f:IsShown() then WoweeAllBags_Toggle() end
 end
 
-ToggleBackpack = WoweeAllBags_Toggle
-ToggleAllBags = WoweeAllBags_Toggle
-ToggleBag = function() WoweeAllBags_Toggle() end
-OpenBackpack = openOurs
-OpenAllBags = openOurs
-OpenBag = function() openOurs() end
-CloseBackpack = closeOurs
-CloseAllBags = closeOurs
-CloseBag = function() closeOurs() end
+--- Each of these keeps the interface's own version and asks, at the moment it
+--- is called, which window the player wants. Deciding once at load would mean
+--- the setting only took effect after a reload, and the control it comes from
+--- is a checkbox that should work when it is clicked.
+local function replacing(original)
+    return function(...)
+        if separateBags() then
+            if original then return original(...) end
+            return
+        end
+        return WoweeAllBags_Toggle()
+    end
+end
+
+local function replacingWith(original, ours)
+    return function(...)
+        if separateBags() then
+            if original then return original(...) end
+            return
+        end
+        return ours(...)
+    end
+end
+
+ToggleBackpack = replacing(ToggleBackpack)
+ToggleAllBags  = replacing(ToggleAllBags)
+ToggleBag      = replacing(ToggleBag)
+OpenBackpack   = replacingWith(OpenBackpack, openOurs)
+OpenAllBags    = replacingWith(OpenAllBags, openOurs)
+OpenBag        = replacingWith(OpenBag, openOurs)
+CloseBackpack  = replacingWith(CloseBackpack, closeOurs)
+CloseAllBags   = replacingWith(CloseAllBags, closeOurs)
+CloseBag       = replacingWith(CloseBag, closeOurs)
 
 --- Whether the bag bar should draw its button as pressed. One window, so every
 --- bag is open exactly when it is.
-IsBagOpen = function(id) return f:IsShown() and id or nil end
+local wasBagOpen = IsBagOpen
+IsBagOpen = function(id)
+    if separateBags() then
+        if wasBagOpen then return wasBagOpen(id) end
+        return nil
+    end
+    return f:IsShown() and id or nil
+end
 
-ToggleKeyRing = function()
-    local s = settings()
-    s.keyring = not s.keyring
+--- The game's keyring button, pointed at the setting rather than at a
+--- preference of this addon's own - so the checkbox in Interface > Bags and
+--- this button are the same switch.
+local wasToggleKeyRing = ToggleKeyRing
+ToggleKeyRing = function(...)
+    if separateBags() then
+        if wasToggleKeyRing then return wasToggleKeyRing(...) end
+        return
+    end
+    if WoweeSetSetting then
+        WoweeSetSetting('showkeyring', not showKeyring())
+    end
     openOurs()
     WoweeAllBags_Update()
 end
