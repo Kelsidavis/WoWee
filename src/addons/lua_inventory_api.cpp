@@ -583,6 +583,25 @@ static int lua_IsDressableItem(lua_State* L) {
     return 1;
 }
 
+/// GetItemFamily(itemIdOrLink) - which specialised bag an item belongs in.
+///
+/// A mask, and zero for anything an ordinary bag holds, which is most items.
+/// On a bag it says what that bag accepts, which is what an addon asks it for:
+/// Bagnon's BagSlotInfo:GetBagType hands the answer straight to bit.band, so an
+/// unbound GetItemFamily returned nil and took down every item slot it was
+/// drawing - the bag frame opened and stayed empty.
+///
+/// Zero rather than nil when the item is not cached yet. The callers do
+/// arithmetic on this without checking, exactly as they do against the real
+/// client, where the answer is always a number.
+static int lua_GetItemFamily(lua_State* L) {
+    auto* gh = getGameHandler(L);
+    const uint32_t itemId = itemIdFromArg(L, 1);
+    const auto* info = (gh && itemId) ? gh->getItemInfo(itemId) : nullptr;
+    lua_pushnumber(L, info ? info->bagFamily : 0);
+    return 1;
+}
+
 static int lua_GetItemInfo(lua_State* L) {
     auto* gh = getGameHandler(L);
     if (!gh) { return luaReturnNil(L); }
@@ -2552,6 +2571,12 @@ static const game::ItemSlot* auctionSellItemSlot(game::GameHandler* gh,
 static int lua_GetInventoryItemCount(lua_State* L) {
     auto* gh = getGameHandler(L);
     const char* uid = luaL_optstring(L, 1, "player");
+    // As above: optnumber defaults on nil but still raises on a boolean, and
+    // the same line of SaveBag asks this one about the same false slot.
+    if (!lua_isnumber(L, 2) && !lua_isnoneornil(L, 2)) {
+        lua_pushnumber(L, 0);
+        return 1;
+    }
     const int slotId = static_cast<int>(luaL_optnumber(L, 2, 0));
     std::string uidStr(uid);
     toLowerInPlace(uidStr);
@@ -2598,7 +2623,18 @@ static uint32_t inspectedItemEntry(game::GameHandler* gh, const std::string& uid
 static int lua_GetInventoryItemLink(lua_State* L) {
     auto* gh = getGameHandler(L);
     const char* uid = luaL_optstring(L, 1, "player");
-    int slotId = static_cast<int>(luaL_checknumber(L, 2));
+    // A slot that is not a number is not an error, it is no slot.
+    //
+    // The real client answers nil and addons lean on that, because the idiom
+    // for "this bag has an equipment slot only if it is not the backpack" is
+    //
+    //     local equipSlot = bag > 0 and ContainerIDToInventoryID(bag)
+    //
+    // which hands this `false` for the backpack. Bagnon_Forever's SaveBag does
+    // exactly that, and luaL_checknumber raised inside its event handler - so
+    // the cache that feeds every bag frame it draws never ran.
+    if (!lua_isnumber(L, 2)) return luaReturnNil(L);
+    int slotId = static_cast<int>(lua_tonumber(L, 2));
     // The bank is named through these too, at forty and up.
     if (!gh) { return luaReturnNil(L); }
     std::string uidStr(uid);
@@ -2656,7 +2692,18 @@ static int lua_GetInventoryItemID(lua_State* L) {
 static int lua_GetInventoryItemTexture(lua_State* L) {
     auto* gh = getGameHandler(L);
     const char* uid = luaL_optstring(L, 1, "player");
-    int slotId = static_cast<int>(luaL_checknumber(L, 2));
+    // A slot that is not a number is not an error, it is no slot.
+    //
+    // The real client answers nil and addons lean on that, because the idiom
+    // for "this bag has an equipment slot only if it is not the backpack" is
+    //
+    //     local equipSlot = bag > 0 and ContainerIDToInventoryID(bag)
+    //
+    // which hands this `false` for the backpack. Bagnon_Forever's SaveBag does
+    // exactly that, and luaL_checknumber raised inside its event handler - so
+    // the cache that feeds every bag frame it draws never ran.
+    if (!lua_isnumber(L, 2)) return luaReturnNil(L);
+    int slotId = static_cast<int>(lua_tonumber(L, 2));
     // 1..19 is head through tabard; 20..23 are the four bag slots. The bag bar
     // buttons ask about those four, and stopping at 19 answered "no bag" for
     // every one of them.
@@ -3531,6 +3578,7 @@ void registerInventoryLuaAPI(lua_State* L) {
                 {"SetCurrencyBackpack", [](lua_State* L) -> int { (void)L; return 0; }},
                 {"SetCurrencyUnused",   [](lua_State* L) -> int { (void)L; return 0; }},
                 {"GetItemCount",      lua_GetItemCount},
+                {"GetItemFamily",     lua_GetItemFamily},
                 {"UseContainerItem",  lua_UseContainerItem},
                 // SortBags() - merge partial stacks, then order every bag slot.
                 //

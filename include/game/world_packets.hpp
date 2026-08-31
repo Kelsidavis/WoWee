@@ -1960,6 +1960,11 @@ struct ItemQueryResponseData {
     // has to be looked up from.
     uint32_t gemProperties = 0;
     uint32_t itemSetId   = 0;   // ItemSet.dbc entry; 0=not part of a set
+    /// Which specialised bag this item belongs in, as a mask: 1 arrows,
+    /// 2 bullets, 4 soul shards, and so on up through the profession bags.
+    /// Zero for the great majority of items, which any bag will hold. On a
+    /// bag it is what that bag accepts.
+    uint32_t bagFamily   = 0;
     // Requirement fields
     uint32_t requiredSkill = 0;       // SkillLine.dbc ID (0 = no skill required)
     uint32_t requiredSkillRank = 0;   // Minimum skill value

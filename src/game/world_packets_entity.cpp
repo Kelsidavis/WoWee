@@ -645,8 +645,12 @@ bool ItemQueryResponseParser::parse(network::Packet& packet, ItemQueryResponseDa
         // LockID(0), Material(1), Sheath(2), RandomProperty(3), RandomSuffix(4), Block(5)
         for (size_t i = 0; i < 6; ++i) packet.readUInt32();
         data.itemSetId = packet.readUInt32(); // ItemSet(6)
-        // MaxDurability(7), Area(8), Map(9), BagFamily(10), TotemCategory(11)
-        for (size_t i = 0; i < 5; ++i) packet.readUInt32();
+        // MaxDurability(7), Area(8), Map(9)
+        for (size_t i = 0; i < 3; ++i) packet.readUInt32();
+        // BagFamily(10) - kept rather than skipped. GetItemFamily answers from
+        // it, and an addon asking what a bag holds gets nil without it.
+        data.bagFamily = packet.readUInt32();
+        packet.readUInt32();  // TotemCategory(11)
         // The three sockets, colour and content together, one socket at a
         // time - `for (s) { << Socket[s].Color; << Socket[s].Content; }`.
         // Read as three colours followed by three contents this took the
