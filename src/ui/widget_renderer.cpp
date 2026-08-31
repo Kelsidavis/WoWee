@@ -1985,7 +1985,7 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                 int painted = 0;
                 const int scroll = w->messageScroll;
                 for (int i = static_cast<int>(w->messages.size()) - 1 - scroll;
-                     i >= 0 && y >= y0 - lineH; --i) {
+                     i >= 0 && y >= y0; --i) {
                     const auto& m = w->messages[static_cast<size_t>(i)];
                     // A line whose time is up is still in the history - it
                     // comes back when the frame is scrolled - but it takes no
@@ -2007,6 +2007,20 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                     // the cursor then moves past all of them.
                     const size_t rows = lineCount(m.text);
                     const float top = y - static_cast<float>(rows - 1) * lineH;
+                    // A message that does not fit whole is not drawn at all.
+                    //
+                    // The loop's own bound only knows where the *last* row of
+                    // the next message goes, and a wrapped one is drawn from as
+                    // many lines above that as it needs - so a two-row line
+                    // arriving at the top of the window put its first row above
+                    // the window, through the tabs and whatever else sat there.
+                    // "Total time played: 1 day, 4 hours, 23 minutes" is two
+                    // rows and is the first thing said on every login.
+                    //
+                    // Stopping rather than skipping: these are drawn newest
+                    // first and upward, so the next one back starts higher
+                    // still and nothing after this can fit either.
+                    if (top < y0) break;
                     // Under the line, the same single offset copy a font
                     // string draws. ChatFontNormal declares one; this surface
                     // ignored it, which is what left chat pale over bright
