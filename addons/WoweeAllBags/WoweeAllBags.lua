@@ -45,6 +45,12 @@ local function settings()
     if type(WoweeAllBagsSettings.columns) ~= 'number' then
         WoweeAllBagsSettings.columns = 10
     end
+    -- The keyring is off unless asked for. It is a dozen empty slots for most
+    -- characters and it sat under the inventory as a block of nothing; the
+    -- game's own ToggleKeyRing is what asks for it, below.
+    if type(WoweeAllBagsSettings.keyring) ~= 'boolean' then
+        WoweeAllBagsSettings.keyring = false
+    end
     return WoweeAllBagsSettings
 end
 
@@ -207,7 +213,7 @@ local function visibleSections()
         if total > 0 then out[#out + 1] = {name = name, bags = bags} end
     end
     add("Inventory", INVENTORY)
-    add("Keyring", KEYRING)
+    if settings().keyring then add("Keyring", KEYRING) end
     if bankOpen then add("Bank", BANK) end
     return out
 end
@@ -330,11 +336,53 @@ function WoweeAllBags_Toggle()
         if s.x and s.y then
             f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", s.x, s.y)
         else
-            f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+            -- Where the bags themselves open, since this is what opens in
+            -- their place: up from the bottom right, clear of the action bars.
+            f:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -12, 100)
         end
         f:Show()
         WoweeAllBags_Update()
     end
+end
+
+--- Opening the bags opens this instead.
+---
+--- The interface routes every way in through these: the bag bar's buttons, the
+--- B key, a merchant closing, the bank opening. Replacing them is what makes
+--- this the bag window rather than a second one beside it - before this, B gave
+--- you the four ContainerFrames and this window as well, both holding the same
+--- items.
+---
+--- Defined after FrameXML, which is where addons load, so these are the last
+--- word. The keyring keeps its own toggle: it is a section here rather than a
+--- window, and the game's button for it is the natural thing to flip it with.
+local function openOurs()
+    if not f:IsShown() then WoweeAllBags_Toggle() end
+end
+
+local function closeOurs()
+    if f:IsShown() then WoweeAllBags_Toggle() end
+end
+
+ToggleBackpack = WoweeAllBags_Toggle
+ToggleAllBags = WoweeAllBags_Toggle
+ToggleBag = function() WoweeAllBags_Toggle() end
+OpenBackpack = openOurs
+OpenAllBags = openOurs
+OpenBag = function() openOurs() end
+CloseBackpack = closeOurs
+CloseAllBags = closeOurs
+CloseBag = function() closeOurs() end
+
+--- Whether the bag bar should draw its button as pressed. One window, so every
+--- bag is open exactly when it is.
+IsBagOpen = function(id) return f:IsShown() and id or nil end
+
+ToggleKeyRing = function()
+    local s = settings()
+    s.keyring = not s.keyring
+    openOurs()
+    WoweeAllBags_Update()
 end
 
 SLASH_WOWEEALLBAGS1 = "/allbags"
