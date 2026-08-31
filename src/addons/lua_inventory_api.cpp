@@ -1220,9 +1220,29 @@ static int lua_CloseMail(lua_State* L) {
     return 0;
 }
 
+/// SetSendMailMoney(copper) - and it answers whether it took the amount.
+///
+/// The answer is the whole of it. staticpopup.lua's SEND_MONEY dialog is
+///
+///     if ( SetSendMailMoney(MoneyInputFrame_GetCopper(SendMailMoney)) ) then
+///         SendMailFrame_SendMail();
+///     end
+///
+/// and attaching gold to a letter is the one path that goes through that
+/// dialog. Answering nothing made the test fail every time: the confirmation
+/// appeared, Accept closed it, and SendMailFrame_SendMail was never reached -
+/// so the letter was not sent and the gold and every attachment stayed where
+/// they were, with nothing said about why.
+///
+/// True once the amount is recorded, which is all this setter does. Whether the
+/// player can actually afford it is the server's to refuse, and it does; a
+/// client-side test that answered false here would put back the exact fault
+/// being fixed - a dialog whose Accept silently does nothing - for anyone whose
+/// money had not finished syncing.
 static int lua_SetSendMailMoney(lua_State* L) {
     s_sendMailMoney = copperArg(L, 1);
-    return 0;
+    lua_pushboolean(L, 1);
+    return 1;
 }
 
 static int lua_SetSendMailCOD(lua_State* L) {
