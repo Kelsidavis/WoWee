@@ -2659,6 +2659,38 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
         if (submitResult == VK_ERROR_DEVICE_LOST) {
             deviceLost_ = true;
         }
+        // And no present. renderSem is signalled by the submission that just
+        // failed, so presenting on it queues a wait that nothing will ever
+        // satisfy - the same trap the timeline value above is withheld to
+        // avoid, one semaphore further along. A driver answers that with a
+        // hang or a second error, either of which buries the real one.
+        //
+        // The sync state is remade here rather than left to the rebuild.
+        // recreateSwapchain() does wait the device idle, but it only creates or
+        // destroys semaphores when the swapchain image *count* changes, so a
+        // rebuild that keeps the count carries every one of them across with
+        // its state intact - and marking the swapchain dirty is not enough on
+        // its own.
+        //
+        // acquireSem is the one that matters. A failed submit never waits on
+        // it, so it stays signalled, and handing an already-signalled semaphore
+        // to vkAcquireNextImageKHR is undefined: the driver answers by losing
+        // the device, which is the failure this return exists to avoid
+        // compounding rather than to cause one frame later.
+        //
+        // resetFrameSyncState() is what remakes them unsignalled. It also
+        // remakes the fences signalled and points every timeline slot at the
+        // value the counter has reached, so the next frame begins on a slot
+        // that is satisfied by construction. On a device that is already gone
+        // it logs its failed wait-idle and carries on, which is the treatment
+        // the MSAA rebuild path gives it.
+        //
+        // It leaves currentFrame at 0 itself, so this path does not advance the
+        // slot: after the reset every slot is safe to begin on, which is all
+        // advancing past this one was for.
+        resetFrameSyncState();
+        swapchainDirty = true;
+        return;
     }
 
     VkPresentInfoKHR presentInfo{};
