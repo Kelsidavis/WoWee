@@ -3802,8 +3802,33 @@ void registerQuestLuaAPI(lua_State* L) {
                 // canMake is the count this client already works out for the
                 // reagent lines, so the filter is the same number read twice.
                 {"TradeSkillOnlyShowMakeable",  [](lua_State* L) -> int {
-            tradeSkillOnlyMakeable() = lua_toboolean(L, 1) != 0;
+            const bool only = lua_toboolean(L, 1) != 0;
+            // Only on a change, because TradeSkillFrame_Show calls this with
+            // the box's current state on the way up - after it has restored the
+            // selection and before its own redraw. Raising the event there
+            // would reselect the first recipe every time the window opened and
+            // throw that restored selection away.
+            if (only == tradeSkillOnlyMakeable()) return 0;
+            tradeSkillOnlyMakeable() = only;
             ++tradeSkillRowsGeneration();
+
+            // The panel is told, because the checkbox does not tell it.
+            //
+            // Both filter dropdowns call TradeSkillFrame_Update themselves
+            // after setting their filter; this box's OnClick is one line - this
+            // call - and then nothing. So the rows were rebuilt behind a window
+            // still drawing the old ones and the tick did nothing visible until
+            // something else redrew the list.
+            //
+            // TRADE_SKILL_FILTER_UPDATE rather than TRADE_SKILL_UPDATE:
+            // TradeSkillFrame_OnLoad registers both and TradeSkillFrame_OnEvent
+            // handles them together, except that a filter update reselects the
+            // first recipe rather than keeping the selected index - which is
+            // what a list that has just changed length needs, since the index
+            // no longer names the row it did.
+            if (auto* gh = getGameHandler(L)) {
+                gh->fireAddonEvent("TRADE_SKILL_FILTER_UPDATE", {});
+            }
             return 0;
         }},
                 {"CollapseTradeSkillSubClass",  [](lua_State* L) -> int {
