@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <ctime>
 #include <limits>
+#include <set>
 #include <sstream>
 
 namespace wowee {
@@ -2315,8 +2316,53 @@ void QuestHandler::classifyGossipQuests(bool updateQuestLog) {
         if (hasReward) status = QuestGiverStatus::REWARD;
         else if (hasAvailable) status = QuestGiverStatus::AVAILABLE;
         else if (hasIncomplete) status = QuestGiverStatus::INCOMPLETE;
-        if (status != QuestGiverStatus::NONE)
-            npcQuestStatus_[currentGossip_.npcGuid] = status;
+
+        // The overhead mark, but only where the server has not already said.
+        //
+        // SMSG_QUESTGIVER_STATUS carries a DIALOG_STATUS worked out for exactly
+        // this question, and the client re-asks for it whenever a quest is
+        // taken, advanced or handed in. What is derived here comes from the
+        // per-quest icons in the list, which cannot say as much: the other
+        // reader of that same field in this client - GetNumGossipAvailableQuests
+        // - treats 4 as "active" and everything else as available, and a quest
+        // that is finished and one that is not both arrive as active. Nothing
+        // in the icons distinguishes them, so no list here can produce REWARD.
+        //
+        // Overwriting with that turned a turn-in's gold ? grey, or replaced it
+        // with the ! of whatever else the NPC was offering - and it happened
+        // only once the player had opened the window, which is why the mark
+        // looked right until it was looked at.
+        //
+        // So this fills a gap rather than replacing an answer. Nothing and
+        // NONE are both gaps; a real status is not.
+        if (status != QuestGiverStatus::NONE) {
+            const auto known = npcQuestStatus_.find(currentGossip_.npcGuid);
+            if (known == npcQuestStatus_.end() ||
+                known->second == QuestGiverStatus::NONE) {
+                npcQuestStatus_[currentGossip_.npcGuid] = status;
+            } else if (known->second != status) {
+                // Once per questgiver, and only on a disagreement. The icon
+                // values are the part still in doubt - two places in this
+                // client read them differently - so this prints the ones that
+                // actually arrived beside the status the server sent for the
+                // same NPC. A run with no such line is a run where the two
+                // agreed.
+                static std::set<uint64_t> said;
+                if (said.insert(currentGossip_.npcGuid).second) {
+                    std::string icons;
+                    for (const auto& q : currentGossip_.quests) {
+                        if (!icons.empty()) icons += ",";
+                        icons += std::to_string(q.questIcon);
+                    }
+                    LOG_WARNING("Questgiver 0x", std::hex, currentGossip_.npcGuid,
+                                std::dec, ": server status ",
+                                static_cast<int>(known->second),
+                                ", quest icons (", icons, ") read as ",
+                                static_cast<int>(status),
+                                " - the server's is kept");
+                }
+            }
+        }
     }
 }
 
