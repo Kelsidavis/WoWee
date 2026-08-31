@@ -382,6 +382,11 @@ void AddonManager::loadAllAddons() {
             LOG_WARNING("Tooltip modifier refresh did not install: ",
                         luaEngine_.lastError());
         }
+        // Stats that arrive after the tooltip did.
+        if (!luaEngine_.executeString(kTooltipItemDataRefreshLua)) {
+            LOG_WARNING("Tooltip item-data refresh did not install: ",
+                        luaEngine_.lastError());
+        }
         if (!luaEngine_.executeString(kOptionRangeFixesLua)) {
             LOG_WARNING("Option range fixes did not apply: ", luaEngine_.lastError());
         }

@@ -4297,6 +4297,22 @@ void InventoryHandler::handleItemQueryResponse(network::Packet& packet) {
         rebuildOnlineInventory();
         maybeDetectVisibleItemLayout();
 
+        // The answer to a question a tooltip asked and could not wait for.
+        //
+        // _GetItemTooltipData returns nothing for an item that is not cached
+        // yet and asks for it, so a tooltip built before the reply has no
+        // stats at all - and nothing rebuilt it when the reply came. It shows
+        // most on a comparison, where the item being compared against is one
+        // the player has worn rather than hovered and so is often unknown, but
+        // any tooltip opened early reads the same way.
+        //
+        // Named so a listener can tell whether the item it is showing is the
+        // one that just arrived, rather than rebuilding on every reply.
+        if (owner_.addonEventCallbackRef()) {
+            owner_.addonEventCallbackRef()("GET_ITEM_INFO_RECEIVED",
+                                           {std::to_string(data.entry)});
+        }
+
         // A quest's item icons are drawn before their items are known - the
         // query goes out when the panel opens and lands after it has drawn - so
         // without this they stayed blank until something else redrew them.

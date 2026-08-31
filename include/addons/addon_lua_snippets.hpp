@@ -1510,5 +1510,44 @@ watcher:SetScript("OnEvent", function()
 end)
 )LUA";
 
+/// Rebuild a tooltip when the item data it was waiting on arrives.
+///
+/// _GetItemTooltipData answers nothing for an item that is not cached and asks
+/// the server for it, so a tooltip built before the reply carries a name and a
+/// slot and none of the stats. Nothing rebuilt it when the reply came, so the
+/// lines stayed missing until the item was hovered a second time.
+///
+/// Worst on a comparison, where the item compared against is one the player has
+/// worn rather than hovered and so is usually the one not yet known - which is
+/// the half of the comparison a player is reading it for.
+///
+/// Rebuilt only when the item that arrived is the one on screen, or when a
+/// comparison is up and the arrival may be the worn item it is showing.
+inline constexpr const char* kTooltipItemDataRefreshLua = R"LUA(
+local watcher = CreateFrame("Frame")
+watcher:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+watcher:SetScript("OnEvent", function(self, event, a1)
+    if not GameTooltip or not GameTooltip.IsShown or not GameTooltip:IsShown() then
+        return
+    end
+    local shown = GameTooltip.__itemId
+    if not shown or shown == 0 then return end
+    local arrived = tonumber(a1)
+    local comparing = ShoppingTooltip1 and ShoppingTooltip1.IsShown
+                      and ShoppingTooltip1:IsShown()
+    if arrived and arrived ~= shown and not comparing then return end
+    -- The same builder every item setter uses, run again now that the data it
+    -- asked for is in hand. Re-firing OnTooltipSetItem alone would redo only
+    -- the comparison and leave the stats it was missing still missing.
+    if _WoweePopulateItemTooltip then
+        _WoweePopulateItemTooltip(GameTooltip, shown)
+        GameTooltip:Show()
+    end
+    if IsModifiedClick("COMPAREITEMS") and GameTooltip_ShowCompareItem then
+        GameTooltip_ShowCompareItem(GameTooltip, 1)
+    end
+end)
+)LUA";
+
 }  // namespace addons
 }  // namespace wowee
