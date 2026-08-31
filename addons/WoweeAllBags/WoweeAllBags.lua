@@ -30,6 +30,11 @@ local INVENTORY = {0, 1, 2, 3, 4}
 local KEYRING   = {KEYRING_CONTAINER or -2}
 local BANK      = {BANK_CONTAINER or -1, 5, 6, 7, 8, 9, 10, 11}
 
+-- Declared here and defined at the end, beside the overrides they belong to:
+-- the bank's own event opens this window, and that handler is written long
+-- before them.
+local openOurs, closeOurs
+
 local buttons = {}         -- flat list, reused across redraws
 local headers = {}         -- section captions, likewise
 local search  = ""
@@ -179,6 +184,12 @@ local function slotButton(index)
     b:SetWidth(SLOT)
     b:SetHeight(SLOT)
     b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    -- Dragged as well as clicked. Clicking to pick up and clicking again to
+    -- drop is how the real bags work and it was all this had; dragging one
+    -- slot onto another is the other half, and without it a press that moved
+    -- at all did nothing. A drag belongs to the frame the press landed on, so
+    -- this takes it from the window's own drag rather than fighting it.
+    b:RegisterForDrag("LeftButton")
 
     b.icon = b:CreateTexture(nil, "BACKGROUND")
     b.icon:SetAllPoints(b)
@@ -187,9 +198,15 @@ local function slotButton(index)
     -- GetItemQualityColor so it says the same thing the item's name does in a
     -- tooltip. Hidden for common and poor, which is what the real bag does:
     -- a border on everything is a border that says nothing.
+    -- Much larger than the slot and centred on it, because this texture is a
+    -- soft glow with most of its size given over to the falloff. Held to the
+    -- slot's own bounds the faded part is cropped away and what is left is a
+    -- flat coloured square sitting behind the icon, which is what a green box
+    -- around every uncommon item was.
     b.border = b:CreateTexture(nil, "ARTWORK")
-    b.border:SetPoint("TOPLEFT", b, "TOPLEFT", -2, 2)
-    b.border:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 2, -2)
+    b.border:SetWidth(SLOT + 30)
+    b.border:SetHeight(SLOT + 30)
+    b.border:SetPoint("CENTER", b, "CENTER", 0, 0)
     b.border:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
     b.border:SetBlendMode("ADD")
     b.border:Hide()
@@ -204,6 +221,18 @@ local function slotButton(index)
         GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b:SetScript("OnDragStart", function(self)
+        if not self.bag then return end
+        PickupContainerItem(self.bag, self.slot)
+        WoweeAllBags_Update()
+    end)
+    -- Dropping onto a slot is the same call: it puts down what the cursor is
+    -- holding, or swaps it with what is already there.
+    b:SetScript("OnReceiveDrag", function(self)
+        if not self.bag then return end
+        PickupContainerItem(self.bag, self.slot)
+        WoweeAllBags_Update()
+    end)
     b:SetScript("OnClick", function(self, button)
         if not self.bag then return end
         if button == "RightButton" then UseContainerItem(self.bag, self.slot)
@@ -348,6 +377,10 @@ end
 f:SetScript("OnEvent", function(self, event, arg1)
     if event == "BANKFRAME_OPENED" then
         bankOpen = true
+        -- And shown, because Update does nothing while the window is shut -
+        -- walking up to a bank with the bags closed added a section to a frame
+        -- nobody could see. This is the moment a bank window is wanted.
+        if not separateBags() then openOurs() end
     elseif event == "BANKFRAME_CLOSED" then
         bankOpen = false
     elseif event == "WOWEE_SETTING_CHANGED" then
@@ -410,11 +443,11 @@ end
 --- Defined after FrameXML, which is where addons load, so these are the last
 --- word. The keyring keeps its own toggle: it is a section here rather than a
 --- window, and the game's button for it is the natural thing to flip it with.
-local function openOurs()
+function openOurs()
     if not f:IsShown() then WoweeAllBags_Toggle() end
 end
 
-local function closeOurs()
+function closeOurs()
     if f:IsShown() then WoweeAllBags_Toggle() end
 end
 
