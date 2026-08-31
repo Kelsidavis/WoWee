@@ -18,7 +18,7 @@ local COLS_MAX   = 16
 local SLOT       = 37      -- button size
 local PAD        = 4       -- gap between slots
 local EDGE       = 14      -- frame border inset
-local TOP        = 62      -- room for the title, search box and buttons
+local TOP        = 40      -- room for the one row of controls
 local BOTTOM     = 34      -- room for the money line
 local HEADER     = 16      -- room for a section's caption
 
@@ -38,7 +38,6 @@ local openOurs, closeOurs
 local buttons = {}         -- flat list, reused across redraws
 local headers = {}         -- section captions, likewise
 local search  = ""
-local bankOpen = false
 
 -- ── Saved settings ──────────────────────────────────────────────────────────
 --
@@ -116,19 +115,39 @@ f:SetBackdrop({
 })
 f:Hide()
 
-local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-title:SetPoint("TOP", f, "TOP", 0, -16)
-title:SetText("All Bags")
+-- No caption. "All Bags" over a window full of bags said nothing that the
+-- window did not, and it cost a row of height on every screen it opened on.
+-- What belongs in that space is the one control the window was missing.
 
 local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -8)
+
+-- Bags or bank, and the reason this window needed a caption's worth of space
+-- for something.
+--
+-- The bank's contents are the client's to remember: it holds the twenty-eight
+-- general slots and the bank bags from the last visit, so they can be looked at
+-- from anywhere. Only moving things needs a banker. Standing at one switches
+-- here automatically and switches back when it closes; away from a bank this is
+-- how you see what you left in it.
+local viewingBank = false
+
+local view = CreateFrame("Button", "WoweeAllBagsView", f, "UIPanelButtonTemplate")
+view:SetWidth(52)
+view:SetHeight(21)
+view:SetPoint("TOPLEFT", f, "TOPLEFT", EDGE, -12)
+view:SetText("Bank")
+view:SetScript("OnClick", function()
+    viewingBank = not viewingBank
+    WoweeAllBags_Update()
+end)
 
 -- Sort. Disabled while the moves are still going out, because a sort is dozens
 -- of swaps and the client sends them a tick at a time.
 local sort = CreateFrame("Button", "WoweeAllBagsSort", f, "UIPanelButtonTemplate")
 sort:SetWidth(64)
 sort:SetHeight(21)
-sort:SetPoint("TOPLEFT", f, "TOPLEFT", EDGE, -34)
+sort:SetPoint("TOPLEFT", view, "TOPRIGHT", 4, 0)
 sort:SetText("Sort")
 sort:SetScript("OnClick", function()
     if SortBags then SortBags() end
@@ -152,7 +171,7 @@ box:SetScript("OnEscapePressed", function(self) self:SetText("") self:ClearFocus
 local wider = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
 wider:SetWidth(22)
 wider:SetHeight(21)
-wider:SetPoint("TOPRIGHT", f, "TOPRIGHT", -34, -34)
+wider:SetPoint("TOPRIGHT", f, "TOPRIGHT", -34, -12)
 wider:SetText(">")
 wider:SetScript("OnClick", function()
     settings().columns = columns() + 1
@@ -268,9 +287,12 @@ local function visibleSections()
         end
         if total > 0 then out[#out + 1] = {name = name, bags = bags} end
     end
-    add("Inventory", INVENTORY)
-    if showKeyring() then add("Keyring", KEYRING) end
-    if bankOpen then add("Bank", BANK) end
+    if viewingBank then
+        add("Bank", BANK)
+    else
+        add("Inventory", INVENTORY)
+        if showKeyring() then add("Keyring", KEYRING) end
+    end
     return out
 end
 
@@ -365,6 +387,8 @@ function WoweeAllBags_Update()
     if scale < 0.5 then scale = 0.5 elseif scale > 2 then scale = 2 end
     if f:GetScale() ~= scale then f:SetScale(scale) end
 
+    view:SetText(viewingBank and "Bags" or "Bank")
+
     counts:SetText(used .. " used, " .. free .. " free")
     if MoneyFrame_Update then MoneyFrame_Update("WoweeAllBagsMoney", GetMoney()) end
     if sort.SetEnabled then
@@ -376,13 +400,14 @@ end
 
 f:SetScript("OnEvent", function(self, event, arg1)
     if event == "BANKFRAME_OPENED" then
-        bankOpen = true
-        -- And shown, because Update does nothing while the window is shut -
-        -- walking up to a bank with the bags closed added a section to a frame
-        -- nobody could see. This is the moment a bank window is wanted.
+        -- Switched to and shown. Update does nothing while the window is shut,
+        -- so walking up to a bank with the bags closed put a section into a
+        -- frame nobody could see; and standing at a bank is the one moment the
+        -- bank is certainly what you want to look at.
+        viewingBank = true
         if not separateBags() then openOurs() end
     elseif event == "BANKFRAME_CLOSED" then
-        bankOpen = false
+        viewingBank = false
     elseif event == "WOWEE_SETTING_CHANGED" then
         -- Ticking "Separate bag windows" while this window is open has to put
         -- it away: from that moment the bag keys go to FrameXML's windows, so
