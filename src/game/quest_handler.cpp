@@ -972,6 +972,18 @@ void QuestHandler::registerOpcodes(DispatchTable& table) {
                     break;
                 }
             }
+            // The mark over the giver's head is now wrong, and this is the one
+            // completion path that never said so. Every other one re-asks -
+            // the kill counter when its objective fills, both item paths, and
+            // the compatibility branch above - so a quest finished by this
+            // opcode kept the grey "in progress" question mark on an NPC that
+            // was ready to take the turn-in.
+            //
+            // Only stale for an NPC already spawned when the quest finished: a
+            // giver is asked about as it spawns, so walking up to a fresh one
+            // showed the right mark and walking back to a familiar one did
+            // not. That is what made it look intermittent.
+            requeryNearbyQuestGiverStatus();
         }
     };
 
