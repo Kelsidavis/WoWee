@@ -2634,7 +2634,21 @@ void InventoryHandler::handleTrainerList(network::Packet& packet) {
     owner_.closeGossip();
     if (owner_.addonEventCallbackRef()) owner_.addonEventCallbackRef()("TRAINER_SHOW", {});
 
-    LOG_INFO("Trainer list: ", currentTrainerList_.spells.size(), " spells");
+    // At WARNING, and broken down by the three states the panel filters on,
+    // because a trainer showing no rows looks the same whether it sent none,
+    // sent only things this character already knows, or the filter hid what it
+    // did send - and which of those it was decides whether anything is wrong.
+    // The states are the ones on the wire; the panel promotes a spell to known
+    // the moment the spell handler has it, so its own count can be higher.
+    size_t available = 0, unavailable = 0, known = 0;
+    for (const auto& sp : currentTrainerList_.spells) {
+        if (sp.state == 0)      ++available;
+        else if (sp.state == 2) ++known;
+        else                    ++unavailable;
+    }
+    LOG_WARNING("Trainer list: ", currentTrainerList_.spells.size(), " spells - ",
+                available, " available, ", unavailable, " unavailable, ",
+                known, " already known");
 
     owner_.loadSpellNameCache();
     owner_.loadSkillLineDbc();

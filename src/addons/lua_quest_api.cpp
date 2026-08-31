@@ -11,6 +11,7 @@
 #include "core/logger.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <map>
 #include <set>
 #include <vector>
@@ -2074,6 +2075,25 @@ static std::unordered_map<std::string, bool>& trainerFilters() {
     return filters;
 }
 
+/// What the trainer panel's search box holds, folded to lower case.
+///
+/// Beside the type filter rather than inside it because it is the same kind of
+/// thing - a rule the panel applies to the list the trainer sent, kept here
+/// because every binding that takes a service index has to agree about which
+/// service index 3 is. 3.3.5's trainer has no search box; this client's has
+/// one, and shownTrainerServices is where the two filters meet.
+static std::string& trainerSearch() {
+    static std::string search;
+    return search;
+}
+
+/// Case-insensitively, because a player types "linen" and the spell is called
+/// "Brown Linen Robe".
+static std::string foldedForSearch(std::string v) {
+    for (char& c : v) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return v;
+}
+
 /// The word the trainer panel colours a service by, and the name of the filter
 /// that hides it.
 ///
@@ -2106,8 +2126,17 @@ static bool trainerCategoryShowing(const char* category) {
 static std::vector<const game::TrainerSpell*> shownTrainerServices(game::GameHandler* gh) {
     std::vector<const game::TrainerSpell*> shown;
     if (!gh) return shown;
+    const std::string& search = trainerSearch();
     for (const auto& sp : gh->getTrainerSpells().spells) {
-        if (trainerCategoryShowing(trainerServiceCategory(gh, sp))) shown.push_back(&sp);
+        if (!trainerCategoryShowing(trainerServiceCategory(gh, sp))) continue;
+        // The name only when there is something to match, so the common case
+        // costs no lookups at all.
+        if (!search.empty() &&
+            foldedForSearch(gh->getSpellName(sp.spellId)).find(search) ==
+                std::string::npos) {
+            continue;
+        }
+        shown.push_back(&sp);
     }
     return shown;
 }
@@ -4040,8 +4069,53 @@ void registerQuestLuaAPI(lua_State* L) {
         }},
                 {"SetTrainerServiceTypeFilter", [](lua_State* L) -> int {
             const char* which = luaL_optstring(L, 1, "");
-            trainerFilters()[which] = lua_toboolean(L, 2) != 0;
+            // A number is read as a number. The dropdown clears a category
+            // with SetTrainerServiceTypeFilter(value, 0), and lua_toboolean
+            // answers true for 0 - only nil and false are false in Lua - so
+            // every attempt to hide one set it instead, and no filter on this
+            // panel had ever turned anything off.
+            const bool show = lua_isnumber(L, 2) ? (lua_tonumber(L, 2) != 0)
+                                                 : (lua_toboolean(L, 2) != 0);
+            auto& filters = trainerFilters();
+            const auto it = filters.find(which);
+            // Unset reads as showing, the same as GetTrainerServiceTypeFilter
+            // answers, so the first call that hides a category is a change.
+            const bool was = (it == filters.end()) || it->second;
+            filters[which] = show;
+            if (was == show) return 0;
+
+            // Changing the filter has to redraw the list, and nothing was
+            // asking it to.
+            //
+            // The filter dropdown's OnClick sets the filter and then resets
+            // the scroll bar to zero, which reaches ClassTrainerFrame_Update
+            // through the scroll frame's OnVerticalScroll - but only when the
+            // value moves. Ticking a category while the list is already at the
+            // top moves nothing, so the rows the tick had just excluded stayed
+            // on screen until something else redrew them, which is the state a
+            // freshly opened trainer is always in.
+            //
+            // Raised as TRAINER_UPDATE rather than by calling the panel:
+            // ClassTrainerFrame_OnLoad registers for it and answers by
+            // reselecting and updating, so this is the redraw path the panel
+            // already has, and it works for whichever interface is drawing.
+            if (auto* gh = getGameHandler(L)) gh->fireAddonEvent("TRAINER_UPDATE", {});
             return 0;
+        }},
+                // The search box this client's trainer panel has and 3.3.5's
+                // does not. Named alongside the type filter it works with, and
+                // it redraws the same way - see SetTrainerServiceTypeFilter for
+                // why the panel has to be told rather than left to notice.
+                {"SetTrainerServiceSearch", [](lua_State* L) -> int {
+            std::string text = foldedForSearch(luaL_optstring(L, 1, ""));
+            if (text == trainerSearch()) return 0;
+            trainerSearch() = text;
+            if (auto* gh = getGameHandler(L)) gh->fireAddonEvent("TRAINER_UPDATE", {});
+            return 0;
+        }},
+                {"GetTrainerServiceSearch", [](lua_State* L) -> int {
+            lua_pushstring(L, trainerSearch().c_str());
+            return 1;
         }},
                 {"GetTrainerServiceTypeFilter", [](lua_State* L) -> int {
             const char* which = luaL_optstring(L, 1, "");

@@ -1227,6 +1227,83 @@ bool AddonManager::loadFrameXml(const std::string& frameXmlDir) {
         "for i = 1, 13 do draggable(_G['ContainerFrame' .. i]) end\n"
         "draggable(CharacterFrame)\n");
 
+    // A search box on the trainer, which 3.3.5 has no equivalent of.
+    //
+    // A tradeskill trainer is a hundred rows deep - Georgio Bolero sends 103 -
+    // and the only way through them is the scroll bar and the three type
+    // filters. Typing "linen" is the question a player actually has.
+    //
+    // The matching is the client's, not this script's: the panel identifies a
+    // service by its position in the list, and every one of the bindings that
+    // takes a service index has to agree about which service index 3 is. So the
+    // box hands the text to SetTrainerServiceSearch and the list it filters is
+    // the one GetNumTrainerServices already counts - see shownTrainerServices,
+    // where the search and the type filters meet.
+    //
+    // Beside the filter dropdown, on the row the panel leaves empty between the
+    // greeting and the first skill.
+    //
+    // On ADDON_LOADED, because Blizzard_TrainerUI is load-on-demand.
+    luaEngine_.executeString(
+        "do\n"
+        "  local f = CreateFrame('Frame')\n"
+        "  f:RegisterEvent('ADDON_LOADED')\n"
+        "  f:SetScript('OnEvent', function(self, event, name)\n"
+        "    if name ~= 'Blizzard_TrainerUI' then return end\n"
+        "    self:UnregisterEvent('ADDON_LOADED')\n"
+        "    if not ClassTrainerFrame or not ClassTrainerFrameFilterDropDown then return end\n"
+        // Without the binding there is nothing to search with, and a box that
+        // filters nothing is worse than no box.
+        "    if not SetTrainerServiceSearch then return end\n"
+        "    local box = CreateFrame('EditBox', 'ClassTrainerFrameSearchBox',\n"
+        "                            ClassTrainerFrame, 'InputBoxTemplate')\n"
+        "    box:SetWidth(104)\n"
+        "    box:SetHeight(20)\n"
+        "    box:SetPoint('RIGHT', ClassTrainerFrameFilterDropDown, 'LEFT', 6, 3)\n"
+        "    box:SetAutoFocus(false)\n"
+        "    if box.SetMaxLetters then box:SetMaxLetters(40) end\n"
+        // The word in the empty box, the way every search box in the interface
+        // says what it is for. SEARCH is globalstrings' own.
+        "    local hint = box:CreateFontString(nil, 'ARTWORK', 'GameFontDisableSmall')\n"
+        "    hint:SetPoint('LEFT', box, 'LEFT', 4, 0)\n"
+        "    hint:SetText(SEARCH or 'Search')\n"
+        "    local function hinting()\n"
+        "      if (box:GetText() or '') == '' and not box:HasFocus() then\n"
+        "        hint:Show()\n"
+        "      else\n"
+        "        hint:Hide()\n"
+        "      end\n"
+        "    end\n"
+        "    local function apply(self)\n"
+        "      SetTrainerServiceSearch(self:GetText() or '')\n"
+        "      hinting()\n"
+        "    end\n"
+        // Both, because they are not the same event here: typing raises
+        // OnTextChanged and SetText raises OnTextSet, where WoW raises
+        // OnTextChanged for both. Bound to one only, clearing the box left the
+        // word still filtering the list behind it.
+        "    box:SetScript('OnTextChanged', apply)\n"
+        "    box:SetScript('OnTextSet', apply)\n"
+        "    box:SetScript('OnEditFocusGained', hinting)\n"
+        "    box:SetScript('OnEditFocusLost', hinting)\n"
+        "    box:SetScript('OnEscapePressed', function(self)\n"
+        "      self:SetText('')\n"
+        "      apply(self)\n"
+        "      self:ClearFocus()\n"
+        "    end)\n"
+        "    box:SetScript('OnEnterPressed', function(self) self:ClearFocus() end)\n"
+        // A word left in the box would filter the next trainer the player walks
+        // up to, who is a different NPC with a different list, and the rows it
+        // hid would look like rows he does not teach.
+        "    hooksecurefunc('ClassTrainerFrame_Show', function()\n"
+        "      if (box:GetText() or '') ~= '' then box:SetText('') end\n"
+        "      SetTrainerServiceSearch('')\n"
+        "      hinting()\n"
+        "    end)\n"
+        "    hinting()\n"
+        "  end)\n"
+        "end\n");
+
     LOG_WARNING("FrameXML: ", lua, " Lua files and ", xml, " XML files loaded, ",
                 failed, " failed in ", sinceMs(loadStart), "ms");
     for (const auto& [file, why] : failures) {
