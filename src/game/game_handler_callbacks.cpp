@@ -3316,8 +3316,15 @@ void GameHandler::unequipToBackpack(EquipSlot equipSlot) {
     if (inventoryHandler_) inventoryHandler_->unequipToBackpack(equipSlot);
 }
 
-void GameHandler::swapContainerItems(uint8_t srcBag, uint8_t srcSlot, uint8_t dstBag, uint8_t dstSlot) {
-    if (inventoryHandler_) inventoryHandler_->swapContainerItems(srcBag, srcSlot, dstBag, dstSlot);
+void GameHandler::swapContainerItems(uint8_t srcBag, uint8_t srcSlot, uint8_t dstBag,
+                                     uint8_t dstSlot, bool applyLocally) {
+    if (inventoryHandler_) {
+        inventoryHandler_->swapContainerItems(srcBag, srcSlot, dstBag, dstSlot, applyLocally);
+    }
+}
+
+void GameHandler::notifyBagsChanged() {
+    if (inventoryHandler_) inventoryHandler_->fireBagUpdates();
 }
 
 void GameHandler::swapBagSlots(int srcBagIndex, int dstBagIndex) {

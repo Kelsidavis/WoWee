@@ -272,7 +272,11 @@ public:
     /// put it on.
     void splitItemTo(uint8_t srcBag, uint8_t srcSlot,
                      uint8_t dstBag, uint8_t dstSlot, uint8_t count);
-    void swapContainerItems(uint8_t srcBag, uint8_t srcSlot, uint8_t dstBag, uint8_t dstSlot);
+    /// applyLocally=false sends the move without touching the model, for a
+    /// caller that has already put the items where this would move them -
+    /// see GameHandler::sortBags.
+    void swapContainerItems(uint8_t srcBag, uint8_t srcSlot, uint8_t dstBag,
+                            uint8_t dstSlot, bool applyLocally = true);
     /// Read and write a model slot by the wire's flat numbering.
     bool readWireSlot(uint8_t container, uint8_t slot, game::ItemDef& out) const;
     bool writeWireSlot(uint8_t container, uint8_t slot, const game::ItemDef& item);

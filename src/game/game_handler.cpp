@@ -257,6 +257,14 @@ void GameHandler::sortBags() {
     // The local layout changes now so the bags read as sorted immediately; the
     // server is told the same thing over the following ticks.
     inv.sortBags();
+    // And say so. The layout above is the one the player asked for and it is
+    // already in the model, but every bag on screen reads through
+    // GetContainerItemInfo and redraws on BAG_UPDATE - so without this the
+    // sorted bags sat behind the unsorted picture until something unrelated
+    // forced a rebuild, which is most of what "sorting does nothing" looked
+    // like. The moves queued below no longer fire it, having stopped touching
+    // the model at all.
+    notifyBagsChanged();
     for (auto& m : merges) sortSwapQueue_.push_back(m);
     for (auto& s : swaps)  sortSwapQueue_.push_back(s);
 }
@@ -267,6 +275,7 @@ void GameHandler::sortBank(int mainSlotCount) {
     auto merges = inv.mergeBankPartialStacks(mainSlotCount);
     auto swaps = inv.computeBankSortSwaps(mainSlotCount);
     inv.sortBank(mainSlotCount);
+    notifyBagsChanged();
     for (auto& m : merges) sortSwapQueue_.push_back(m);
     for (auto& s : swaps)  sortSwapQueue_.push_back(s);
 }
@@ -276,6 +285,7 @@ void GameHandler::sortBankBag(int bagIndex) {
     auto& inv = getInventory();
     auto swaps = inv.computeBankBagSortSwaps(bagIndex);
     inv.sortBankBag(bagIndex);
+    notifyBagsChanged();
     for (auto& s : swaps) sortSwapQueue_.push_back(s);
 }
 
@@ -289,7 +299,12 @@ void GameHandler::updateNetworking() {
     if (!sortSwapQueue_.empty()) {
         const auto op = sortSwapQueue_.front();
         sortSwapQueue_.pop_front();
-        swapContainerItems(op.srcBag, op.srcSlot, op.dstBag, op.dstSlot);
+        // Sent, not applied. The sort put the finished layout into the model
+        // before queuing any of this; moving each pair again on the way out
+        // permuted that layout a second time - and a merge, which the server
+        // answers by combining two stacks, would have been applied here as a
+        // swap of the two slots. See swapContainerItems.
+        swapContainerItems(op.srcBag, op.srcSlot, op.dstBag, op.dstSlot, false);
     }
 
     // Reset per-tick monster-move budget tracking (Classic/Turtle flood protection).

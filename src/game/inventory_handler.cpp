@@ -2372,7 +2372,9 @@ bool InventoryHandler::writeWireSlot(uint8_t container, uint8_t slot,
     return inv.setBagSlot(bagIndex, static_cast<int>(slot), item);
 }
 
-void InventoryHandler::swapContainerItems(uint8_t srcBag, uint8_t srcSlot, uint8_t dstBag, uint8_t dstSlot) {
+void InventoryHandler::swapContainerItems(uint8_t srcBag, uint8_t srcSlot,
+                                          uint8_t dstBag, uint8_t dstSlot,
+                                          bool applyLocally) {
     if (!owner_.getSocket() || !owner_.getSocket()->isConnected()) return;
     LOG_INFO("swapContainerItems: src(bag=", (int)srcBag, " slot=", (int)srcSlot,
              ") -> dst(bag=", (int)dstBag, " slot=", (int)dstSlot, ")");
@@ -2390,6 +2392,16 @@ void InventoryHandler::swapContainerItems(uint8_t srcBag, uint8_t srcSlot, uint8
     //
     // Both sides are read before either is written, or a move into an
     // unreachable slot would empty the one it came from.
+    //
+    // Unless the caller has already moved it. A sort computes the whole
+    // finished layout, writes it into the model in one go and then sends the
+    // moves that get the server there - so applying each of those a second time
+    // permutes a layout that was already final, and the bags came out shuffled
+    // rather than sorted. That is the two halves of this file's history meeting:
+    // the local move above was added for drag-and-drop, which had no other way
+    // to move an item, and the sort has never needed it.
+    if (!applyLocally) return;
+
     ItemDef from, to;
     if (readWireSlot(srcBag, srcSlot, from) && readWireSlot(dstBag, dstSlot, to)) {
         writeWireSlot(srcBag, srcSlot, to);

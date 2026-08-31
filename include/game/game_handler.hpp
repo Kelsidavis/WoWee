@@ -3046,7 +3046,14 @@ public:
     void splitItem(uint8_t srcBag, uint8_t srcSlot, uint8_t count);
     void splitItemTo(uint8_t srcBag, uint8_t srcSlot,
                      uint8_t dstBag, uint8_t dstSlot, uint8_t count);
-    void swapContainerItems(uint8_t srcBag, uint8_t srcSlot, uint8_t dstBag, uint8_t dstSlot);
+    void swapContainerItems(uint8_t srcBag, uint8_t srcSlot, uint8_t dstBag,
+                            uint8_t dstSlot, bool applyLocally = true);
+    /// Tell every frame that draws from a bag to read it again.
+    ///
+    /// For a change made straight to the model rather than arriving from the
+    /// server: nothing on screen holds bag contents of its own, so a layout
+    /// that changes without this is correct and invisible.
+    void notifyBagsChanged();
 
     /// Merge partial stacks, then order every bag slot, and send the moves.
     ///
