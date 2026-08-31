@@ -1921,6 +1921,23 @@ int lua_Tooltip_SetAction(lua_State* L) {
 /// A link is "kind:id:more:fields", and only the kind and the first number are
 /// needed to fill one. A whole "|cff...|Hitem:1234:...|h[Name]|h|r" is accepted
 /// too, because that is the shape a link pulled out of chat arrives in.
+/// One enchant line, named by id, in the green the real client uses.
+///
+/// Shared by the two things that know an enchant by different means: an
+/// equipped or bagged item, whose enchant is looked up from its instance, and
+/// a link, which carries the id in its own text.
+static void appendEnchantLineById(wowee::ui::Widget* w, game::GameHandler* gh,
+                                  uint32_t enchantId) {
+    if (!w || !gh || enchantId == 0) return;
+    std::string name = gh->getEnchantName(enchantId);
+    if (name.empty()) return;
+    wowee::ui::Widget::TooltipLine line;
+    line.left = std::move(name);
+    line.lc[0] = 0.0f; line.lc[1] = 1.0f; line.lc[2] = 0.0f; line.lc[3] = 1.0f;
+    line.rc[0] = line.rc[1] = line.rc[2] = line.rc[3] = 1.0f;
+    w->tooltipLines.push_back(std::move(line));
+}
+
 int lua_Tooltip_SetHyperlink(lua_State* L) {
     auto* w = widgetOf(L, 1);
     auto* gh = wowee::addons::getGameHandler(L);
@@ -1942,11 +1959,27 @@ int lua_Tooltip_SetHyperlink(lua_State* L) {
         id = id * 10 + static_cast<uint32_t>(link[i] - '0');
     if (id == 0) { lua_pushboolean(L, 0); return 1; }
 
+    // The enchant, which an item link carries as its second field and this
+    // walked past. A linked weapon read as a plain one wherever a link is
+    // shown - chat, the auction house, a guild bank - because the tooltip was
+    // built from the id alone, and the id is a template.
+    uint32_t enchantId = 0;
+    if (kind == "item") {
+        size_t at = colon + 1;
+        while (at < link.size() && link[at] >= '0' && link[at] <= '9') ++at;
+        if (at < link.size() && link[at] == ':') {
+            for (++at; at < link.size() && link[at] >= '0' && link[at] <= '9'; ++at)
+                enchantId = enchantId * 10 + static_cast<uint32_t>(link[at] - '0');
+        }
+    }
+
     bool filled = false;
     if (kind == "spell" || kind == "enchant" || kind == "talent")
         filled = fillSpellTooltip(w, gh, id);
-    else if (kind == "item")
+    else if (kind == "item") {
         filled = fillItemTooltipById(L, gh, id);
+        if (filled) appendEnchantLineById(w, gh, enchantId);
+    }
     else if (kind == "quest")
         filled = fillQuestTooltip(w, gh, id);
     lua_pushboolean(L, filled ? 1 : 0);
@@ -2584,18 +2617,8 @@ static void appendEnchantLines(wowee::ui::Widget* w, game::GameHandler* gh,
     // puts both of them. The permanent one was not shown at all: an enchanted
     // weapon described its base damage and said nothing about the enchant on
     // it, in the bags and on the paperdoll alike.
-    const auto addLine = [&](uint32_t enchantId) {
-        if (enchantId == 0) return;
-        std::string name = gh->getEnchantName(enchantId);
-        if (name.empty()) return;
-        wowee::ui::Widget::TooltipLine line;
-        line.left = std::move(name);
-        line.lc[0] = 0.0f; line.lc[1] = 1.0f; line.lc[2] = 0.0f; line.lc[3] = 1.0f;
-        line.rc[0] = line.rc[1] = line.rc[2] = line.rc[3] = 1.0f;
-        w->tooltipLines.push_back(std::move(line));
-    };
-    addLine(permanentId);
-    addLine(temporaryId);
+    appendEnchantLineById(w, gh, permanentId);
+    appendEnchantLineById(w, gh, temporaryId);
 }
 
 /// The random suffix an instance rolled, on top of a tooltip built from the
@@ -2675,6 +2698,32 @@ int lua_Tooltip_AppendItemEnchants(lua_State* L) {
         appendRandomSuffix(w, gh, s->item);
     }
     appendEnchantLines(w, gh, gh->getBagItemGuid(bag, slot - 1));
+    return 0;
+}
+
+/// _WoweeAppendEquippedEnchants(self, slot) - the suffix and enchants on a
+/// worn item, as _WoweeAppendItemEnchants does for one in a bag.
+///
+/// The comparison tooltips are built by _WoweePopulateItemTooltip from the worn
+/// item's id, and an id is a template. Two things live on the instance instead
+/// and so were both absent: the enchant, and the random suffix - which carries
+/// the stats as well as the name. A "Durable Belt of the Eagle" compared as a
+/// plain Durable Belt with no intellect and no stamina on it, because the
+/// template has neither and the suffix is where they are.
+int lua_Tooltip_AppendEquippedEnchants(lua_State* L) {
+    auto* w = widgetOf(L, 1);
+    auto* gh = wowee::addons::getGameHandler(L);
+    if (!w || !gh) return 0;
+    const int slot = static_cast<int>(luaL_optnumber(L, 2, 0));
+    if (slot < 1) return 0;
+    // The suffix first, because it renames the line already at the top and the
+    // enchants are appended below it - the order its sibling uses.
+    if (const game::ItemSlot* s =
+            wowee::addons::inventorySlotItem(gh->getInventory(), slot);
+        s && !s->empty()) {
+        appendRandomSuffix(w, gh, s->item);
+    }
+    appendEnchantLines(w, gh, gh->getEquipSlotGuid(slot - 1));
     return 0;
 }
 
@@ -5684,6 +5733,7 @@ void LuaEngine::registerCoreAPI() {
         {"SetTalent",       lua_Tooltip_SetTalent},
         {"SetAuctionItem",  lua_Tooltip_SetAuctionItem},
         {"_WoweeAppendItemEnchants", lua_Tooltip_AppendItemEnchants},
+        {"_WoweeAppendEquippedEnchants", lua_Tooltip_AppendEquippedEnchants},
         {"SetTradeSkillItem", lua_Tooltip_SetTradeSkillItem},
         {"SetUnit",         lua_Tooltip_SetUnit},
         {"IsUnit",          lua_Tooltip_IsUnit},
@@ -7227,6 +7277,10 @@ void LuaEngine::registerCoreAPI() {
         "                       .. ', the same as the one hovered (which the tooltip called a '\n"
         "                       .. tostring(equipSlot) .. ')') end\n"
         "    if not _WoweePopulateItemTooltip(self, wornId) then return __cmpNo('no tooltip could be built for the worn item') end\n"
+        // What is on the worn item, which its id could not carry.
+        "    if self._WoweeAppendEquippedEnchants then\n"
+        "        self:_WoweeAppendEquippedEnchants(slot)\n"
+        "    end\n"
         "    self:Show()\n"
         "    return true\n"
         "end\n"
