@@ -3570,11 +3570,26 @@ int lua_FontString_SetFont(lua_State* L) {
 /// The height is the part anything does arithmetic on: WatchFrame measures a
 /// test line with local _, fontHeight = line.text:GetFont() and divides by it
 /// two lines later, so answering nothing loses the file.
+/// GetFont() - the face, the height and the outline this thing draws in.
+///
+/// The face was the string "Fonts\\FRIZQT__.TTF" whatever the widget was set
+/// to, and that is not only a wrong answer: FrameXML reads a font back to write
+/// it again. FCF_SetChatWindowFontSize is
+///
+///     local file, _, flags = frame:GetFont()
+///     frame:SetFont(file, size, flags)
+///
+/// and every chat window runs it when it applies its saved settings at
+/// VARIABLES_LOADED. So the round trip took ARIALN off the chat and its edit
+/// box and put FRIZQT back - thin pale text over the world, which is what
+/// "hard to read" is, arrived at by a different road than the font instance
+/// the emitter already fixed.
 int lua_FontString_GetFont(lua_State* L) {
     const auto* w = widgetOf(L, 1);
-    lua_pushstring(L, "Fonts\\FRIZQT__.TTF");
+    lua_pushstring(L, (w && !w->fontFace.empty()) ? w->fontFace.c_str()
+                                                  : "Fonts\\FRIZQT__.TTF");
     lua_pushnumber(L, wowee::ui::interfaceFontSize(w ? w->fontHeight : 0.0f));
-    lua_pushstring(L, "");
+    lua_pushstring(L, (w && !w->fontOutline.empty()) ? w->fontOutline.c_str() : "");
     return 3;
 }
 
