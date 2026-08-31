@@ -688,16 +688,20 @@ struct Emitter {
     /// it inherited - the order FrameXML relies on.
     /// A template that never loaded is reported once, by name.
     ///
-    /// Unexplained, and worth knowing before spending time on it again: a
-    /// v3.1.12 run against Turtle's interface inherited an undeclared
-    /// OptionsListButtonTemplate eighteen times and said nothing, while the
-    /// same run reported ItemButtonTemplate and TaxiRouteFrame normally. Four
-    /// explanations were tested against that build and all four are wrong -
-    /// this function does emit all eighteen checks for that file; the missing
-    /// API fallback does not reach a real table's absent key, so the else arm
-    /// is taken; __WoweeMissingTemplate predates the build by four weeks; and
-    /// the emitted order puts the first check 279 lines above the OnLoad that
-    /// raised, so nothing aborted before it. See #132.
+    /// Verified end to end against the file that prompted it: Turtle's own
+    /// OptionsFrame.xml, loaded through a toc by framexml_run, names
+    /// OptionsListButtonTemplate eighteen times with nothing declaring it and
+    /// is reported once. The check is emitted for every inherits= on both
+    /// paths - a frame's own, and a template body's.
+    ///
+    /// Recorded because a v3.1.12 run against that same file stayed silent on
+    /// it while reporting ItemButtonTemplate and TaxiRouteFrame normally, and
+    /// the cause did not survive being looked for: this function and both its
+    /// call sites are byte-identical in that release, __WoweeMissingTemplate
+    /// predates it by four weeks, __WoweeTemplates is a real table so an absent
+    /// key takes the else arm, and the emitted order puts the first check well
+    /// above the OnLoad that raised. Whatever it was is not in this path. See
+    /// #132.
     void emitInherits(const XmlNode& node, const std::string& var) {
         const std::string* inherits = node.attr("inherits");
         if (!inherits) return;
