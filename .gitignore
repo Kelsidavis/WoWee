@@ -165,3 +165,7 @@ android/build/
 android/app/build/
 android/app/.cxx/
 android/local.properties
+
+# Addon SavedVariables, which the client writes next to the addon it saves
+# them for - including the bundled ones in addons/.
+*.lua.saved

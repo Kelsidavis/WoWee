@@ -1,6 +1,7 @@
 ## Interface: 30300
 ## Title: Wowee All Bags
-## Notes: Every bag in one window, with search and sorting.
+## Notes: Inventory, keyring and bank in one window, with search, sorting and rarity borders.
 ## Author: wowee
+## SavedVariables: WoweeAllBagsSettings
 
 WoweeAllBags.lua
