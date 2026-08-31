@@ -248,11 +248,6 @@ public:
     // ---- Public methods ----
 
     /// Render the settings window (call from GameScreen::render)
-    ///
-    /// The bag windows used to be handed in as well, so that three settings
-    /// could be pushed at them. They are reached through setInventoryScreen
-    /// now, which is what lets those three work when they are changed from the
-    /// interface's options rather than only from these sliders.
     void renderSettingsWindow(ChatPanel& chatPanel, const std::function<void()>& saveCallback);
 
     /// Apply audio volume levels to all audio coordinator sound managers
@@ -308,15 +303,9 @@ public:
     /// alongside every other setting rather than through a second bridge.
     void setChatSettings(ChatSettings* settings) { chatSettings_ = settings; }
 
-    /// The bag windows, so that the three settings that only they can apply -
-    /// separate windows, the keyring, the scale - take effect when they are
-    /// changed from the interface's options rather than only from the slider.
-    void setInventoryScreen(InventoryScreen* screen) { inventoryScreen_ = screen; }
-
 private:
     UIServices services_;  // Injected service references
     ChatSettings* chatSettings_ = nullptr;      // Owned by ChatPanel, not by this
-    InventoryScreen* inventoryScreen_ = nullptr;  // Owned by GameScreen
     float appliedWindowUiScale_ = 1.0f;
     bool windowUiScaleEditing_ = false;
 

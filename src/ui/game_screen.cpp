@@ -245,7 +245,6 @@ void GameScreen::setServices(const UIServices& services) {
     // struct is what lets those keys be answered from the same place as the
     // rest rather than through a second bridge with its own list of names.
     settingsPanel_.setChatSettings(&chatPanel_.settings);
-    settingsPanel_.setInventoryScreen(&inventoryScreen);
     combatUI_.setServices(services);
     windowManager_.setServices(services);
     applyCameraControlSettings();
@@ -1264,9 +1263,38 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
     // ends in ChatEdit_OnEscapePressed, which hides the box. That is also what
     // clears the focus this poll's guard reads - so the press that sent the
     // message opened the box again behind it.
+    //
+    // Read both ways round, because the binding alone was not opening it.
+    //
+    // Slash has always come from this client's own input layer and has always
+    // worked; Enter came only from the keybinding, which ends in
+    // ImGui::IsKeyPressed - and in the world that never answered true, so there
+    // was no key that opened the box and typing began at a slash. The binding
+    // stays first so a rebound key still works; the direct read is what makes
+    // the default one work at all.
+    const bool enterPressed = input.isKeyJustPressed(SDL_SCANCODE_RETURN) ||
+                              input.isKeyJustPressed(SDL_SCANCODE_KP_ENTER);
+    // Said once, because the two disagreeing is the fault above and it is
+    // otherwise invisible: the binding refuses silently and the log's existing
+    // line is inside the branch that never runs.
+    if (enterPressed &&
+        !KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_CHAT, false)) {
+        static bool said = false;
+        if (!said) {
+            said = true;
+            LOG_WARNING("Enter reached this client's input but not the "
+                        "TOGGLE_CHAT binding - ImGui wants text: ",
+                        io.WantTextInput ? "yes" : "no",
+                        ", the interface's box has focus: ",
+                        interfaceTakingTypedInput() ? "yes" : "no",
+                        ", it already took this press: ",
+                        interfaceConsumedKey(ImGuiKey_Enter) ? "yes" : "no");
+        }
+    }
     if (!io.WantTextInput &&
         !interfaceConsumedKey(ImGuiKey_Enter) &&
-        KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_CHAT, false)) {
+        (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_CHAT, false) ||
+         (enterPressed && !interfaceTakingTypedInput()))) {
         gameHandler.runInterfaceCommand("ChatFrame_OpenChat(\"\")");
     }
 
