@@ -3439,6 +3439,79 @@ void WMORenderer::debugDumpGroupsAtPosition(float glX, float glY, float glZ) con
                 totalFloorHits, " floor hits ===");
 }
 
+/// Whether solid WMO geometry stands between two points.
+///
+/// A line of sight test, and deliberately not checkWallCollision: that one
+/// models a player cylinder stepping a fraction of a metre, and its group
+/// pre-pass only keeps groups near `to` - handed a forty-unit ray from the
+/// camera it would never look at the wall in the middle. This walks the whole
+/// segment instead, and asks nothing about radius or step height. A sight line
+/// is a line.
+///
+/// Both ends are excluded by a small margin. The far end because a player
+/// standing against a wall is in front of it, not behind it, and the near end
+/// because a camera clipped into geometry would otherwise call everything
+/// blocked.
+bool WMORenderer::segmentBlocked(const glm::vec3& from, const glm::vec3& to) const {
+    QueryTimer timer(&queryTimeMs, &queryCallCount);
+
+    const glm::vec3 delta = to - from;
+    const float dist = glm::length(delta);
+    if (dist < 1e-4f) return false;
+    const glm::vec3 dir = delta / dist;
+
+    // A metre of slack around the segment: gatherCandidates works in world
+    // bounds and a wall's instance box can begin just outside them.
+    const glm::vec3 queryMin = glm::min(from, to) - glm::vec3(1.0f);
+    const glm::vec3 queryMax = glm::max(from, to) + glm::vec3(1.0f);
+    gatherCandidates(queryMin, queryMax, tl_candidateScratch);
+
+    for (size_t idx : tl_candidateScratch) {
+        const auto& instance = instances[idx];
+        if (outsideCollisionFocus(instance)) continue;
+        if (!rayIntersectsAABB(from, dir, instance.worldBoundsMin, instance.worldBoundsMax)) {
+            continue;
+        }
+
+        auto it = loadedModels.find(instance.modelId);
+        if (it == loadedModels.end()) continue;
+        const ModelData& model = it->second;
+
+        // Into the instance's own space, where its collision mesh lives. The
+        // distance is measured there too: a scaled placement makes local units
+        // and world units different lengths, and t comes back in local ones.
+        const glm::vec3 localFrom = glm::vec3(instance.invModelMatrix * glm::vec4(from, 1.0f));
+        const glm::vec3 localTo   = glm::vec3(instance.invModelMatrix * glm::vec4(to, 1.0f));
+        const glm::vec3 localDelta = localTo - localFrom;
+        const float localDist = glm::length(localDelta);
+        if (localDist < 1e-4f) continue;
+        const glm::vec3 localDir = localDelta / localDist;
+        const float nearMargin = 0.15f * (localDist / dist);
+        const float farMargin  = 0.35f * (localDist / dist);
+
+        for (size_t gi = 0; gi < model.groups.size(); ++gi) {
+            if (gi < instance.worldGroupBounds.size()) {
+                const auto& [gMin, gMax] = instance.worldGroupBounds[gi];
+                if (!rayIntersectsAABB(from, dir, gMin, gMax)) continue;
+            }
+            const auto& group = model.groups[gi];
+            if (!trianglesAlongRay(group, localFrom, localDir, tl_triScratch)) continue;
+
+            const auto& verts = group.collisionVertices;
+            const auto& indices = group.collisionIndices;
+            for (uint32_t triStart : tl_triScratch) {
+                if (triStart + 2 >= indices.size()) continue;
+                const glm::vec3& v0 = verts[indices[triStart]];
+                const glm::vec3& v1 = verts[indices[triStart + 1]];
+                const glm::vec3& v2 = verts[indices[triStart + 2]];
+                const float t = rayTriangleIntersect(localFrom, localDir, v0, v1, v2);
+                if (t > nearMargin && t < localDist - farMargin) return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool WMORenderer::checkWallCollision(const glm::vec3& from, const glm::vec3& to, glm::vec3& adjustedPos, bool insideWMO) const {
     QueryTimer timer(&queryTimeMs, &queryCallCount);
     adjustedPos = to;

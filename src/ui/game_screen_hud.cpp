@@ -995,6 +995,41 @@ void GameScreen::renderNameplates(game::GameHandler& gameHandler) {
         float cullDist = isTarget ? 60.0f : (isPlayer ? 40.0f : 20.0f);
         if (distSq > cullDist * cullDist) continue;
 
+        // Behind a building is out of sight, and a name that reads through a
+        // wall is worse than no name: it puts a player in a room they are not
+        // in. Distance and the frustum were the only tests here, so every
+        // nameplate drew over whatever stood in front of it.
+        //
+        // Cached per unit, because this is a collision query and there can be
+        // a dozen plates up. Recomputed when either end has moved far enough
+        // to change the answer, and every so often regardless, since the
+        // geometry between them streams in and out - the same treatment the
+        // selection circle gives its floor query.
+        if (auto* wmo = services_.renderer ? services_.renderer->getWMORenderer() : nullptr) {
+            struct SightCache {
+                glm::vec3 from{}, to{};
+                int age = 1000;
+                bool blocked = false;
+            };
+            static std::unordered_map<uint64_t, SightCache> sight;
+            // Bounded, because every unit ever seen would otherwise keep an
+            // entry for the life of the process. Dropping the lot costs one
+            // recomputation each for the handful currently on screen.
+            if (sight.size() > 512) sight.clear();
+            SightCache& c = sight[guid];
+            const bool moved = glm::distance(c.from, camPos) > 0.5f ||
+                               glm::distance(c.to, renderPos) > 0.5f;
+            if (moved || c.age >= 15) {
+                c.from = camPos;
+                c.to = renderPos;
+                c.age = 0;
+                c.blocked = wmo->segmentBlocked(camPos, renderPos);
+            } else {
+                ++c.age;
+            }
+            if (c.blocked) continue;
+        }
+
         // Project to clip space
         glm::vec4 clipPos = viewProj * glm::vec4(renderPos, 1.0f);
         if (clipPos.w <= 0.01f) continue;  // Behind camera

@@ -361,6 +361,11 @@ public:
      */
     bool checkWallCollision(const glm::vec3& from, const glm::vec3& to, glm::vec3& adjustedPos, bool insideWMO = false) const;
 
+    /// Whether solid WMO geometry stands between two points - a sight line
+    /// rather than a step, so no player radius and no step height. See the
+    /// definition for why checkWallCollision cannot answer this.
+    bool segmentBlocked(const glm::vec3& from, const glm::vec3& to) const;
+
     /**
      * Check if a position is inside any WMO
      * @param outModelId If not null, receives the model ID of the WMO
