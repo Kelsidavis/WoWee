@@ -1310,6 +1310,7 @@ void Application::run() {
         // ever describes the iteration it was set in: the pump sets it and
         // the draw, further down this same iteration, is the only reader.
         ui::clearInterfaceConsumedKeys();
+        ui::ageChatSlashEcho();
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
 #ifdef __ANDROID__
@@ -1428,7 +1429,12 @@ void Application::run() {
                 if (addonManager_ && addonsLoaded_) {
                     if (auto* engine = addonManager_->getLuaEngine()) {
                         if (engine->editBoxHasFocus()) {
-                            engine->dispatchText(event.text.text);
+                            // Unless it is the slash that opened this box,
+                            // arriving after it took focus - see
+                            // noteChatOpenedBySlash.
+                            if (!ui::consumeChatSlashEcho(event.text.text)) {
+                                engine->dispatchText(event.text.text);
+                            }
                         } else {
                             engine->dispatchFrameChar(event.text.text);
                         }

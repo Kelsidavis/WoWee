@@ -104,6 +104,26 @@ void noteInterfaceConsumedKey(ImGuiKey key) {
 
 void clearInterfaceConsumedKeys() { consumedKeys().clear(); }
 
+namespace {
+/// Pumps left in which a '/' text event still counts as the echo of the key
+/// that opened the box. Two, because the event arrives in the same pump or the
+/// next one and never later.
+int& slashEchoPumps() { static int pumps = 0; return pumps; }
+}  // namespace
+
+void noteChatOpenedBySlash() { slashEchoPumps() = 2; }
+
+bool consumeChatSlashEcho(const char* text) {
+    if (slashEchoPumps() <= 0) return false;
+    if (!text || text[0] != '/' || text[1] != '\0') return false;
+    slashEchoPumps() = 0;
+    return true;
+}
+
+void ageChatSlashEcho() {
+    if (slashEchoPumps() > 0) --slashEchoPumps();
+}
+
 ImGuiKey KeybindingManager::getKeyForAction(Action action) const {
     auto it = bindings_.find(static_cast<int>(action));
     if (it == bindings_.end()) return ImGuiKey_None;

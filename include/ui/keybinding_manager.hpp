@@ -135,4 +135,23 @@ void noteInterfaceConsumedKey(ImGuiKey key);
 /// iteration it was set in.
 void clearInterfaceConsumedKeys();
 
+/// The '/' that opened the chat box, which must not also be typed into it.
+///
+/// Pressing slash opens the box with a slash already in it, and SDL sends the
+/// same press again as text. Whether that text lands depends on whether it
+/// arrives before or after the box takes focus - before, it is dispatched as a
+/// frame character and dropped; after, it is inserted, and the player who typed
+/// one slash gets two. Which of the two happens is a matter of when SDL chooses
+/// to deliver it, so it cannot be reasoned about, only accounted for.
+///
+/// Set when the key opens the box; the next matching text event within a couple
+/// of pumps is swallowed and the mark cleared.
+void noteChatOpenedBySlash();
+
+/// Whether this text event is that echo. Consumes the mark when it is.
+bool consumeChatSlashEcho(const char* text);
+
+/// Ages the mark by one pump, so a slash typed later is not eaten.
+void ageChatSlashEcho();
+
 }  // namespace wowee::ui

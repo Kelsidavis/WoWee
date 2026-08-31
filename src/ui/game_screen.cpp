@@ -1240,6 +1240,9 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
     if (!io.WantTextInput && !interfaceTakingTypedInput() &&
         input.isKeyJustPressed(SDL_SCANCODE_SLASH)) {
         gameHandler.runInterfaceCommand("ChatFrame_OpenChat(\"/\")");
+        // The box now holds the slash; the keypress that put it there is still
+        // on its way as a text event.
+        noteChatOpenedBySlash();
     }
     // The same one line as Escape, for the same reason: the chain reads sound
     // and the key does nothing, so what is wanted is which branch ran. The
