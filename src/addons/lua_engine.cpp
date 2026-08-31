@@ -6983,6 +6983,17 @@ void LuaEngine::registerCoreAPI() {
         "local LibStub = rawget(_G, 'LibStub') or {}\n"
         "LibStub.libs = LibStub.libs or {}\n"
         "LibStub.minors = LibStub.minors or {}\n"
+        // The version of LibStub itself, which every copy of the real one tests
+        // before deciding whether to replace what is already there:
+        //
+        //     if not LibStub or LibStub.minor < LIBSTUB_MINOR then
+        //
+        // Absent, that compared nil with a number and raised - on line 6 of the
+        // first file of the first embedded library, so every Ace3 addon died
+        // before it began. Two is what the published LibStub is, and matching
+        // it means an addon carrying its own copy keeps this one, which is the
+        // instance every library here has already registered against.
+        "LibStub.minor = LibStub.minor or 2\n"
         "function LibStub:NewLibrary(major, minor)\n"
         "    assert(type(major) == 'string', 'LibStub:NewLibrary: bad argument #1 (string expected)')\n"
         "    minor = assert(tonumber(minor or (type(minor) == 'string' and minor:match('(%d+)'))), 'LibStub:NewLibrary: bad argument #2 (number expected)')\n"
@@ -11172,6 +11183,18 @@ bool LuaEngine::executeFile(const std::string& path) {
         std::stringstream ss;
         ss << in.rdbuf();
         source = ss.str();
+    }
+    // A byte order mark is not Lua. Windows editors write EF BB BF at the head
+    // of a UTF-8 file and a great many addons ship one - Bagnon's localisations
+    // and one of its utility files all carry it - where 5.1's lexer reads it as
+    // a stray symbol and refuses the whole file on line 1. The real client
+    // takes those files, so the mark cannot be the addon's fault.
+    //
+    // Only at the very start, and only the one: anywhere else it is content.
+    if (source.size() >= 3 && static_cast<unsigned char>(source[0]) == 0xEF &&
+        static_cast<unsigned char>(source[1]) == 0xBB &&
+        static_cast<unsigned char>(source[2]) == 0xBF) {
+        source.erase(0, 3);
     }
     const std::string chunkName = "@" + path;
     int err = runChunk(L_, source.c_str(), source.size(), chunkName.c_str());

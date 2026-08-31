@@ -40,20 +40,41 @@ struct AuctionSubFilter   { const char* label; uint32_t subId; };
 struct AuctionSlotFilter  { const char* label; uint32_t invType; const char* token; };
 
 // WoW 3.3.5a item class ids: 0=Consumable, 1=Container, 2=Weapon, 3=Gem,
-// 4=Armor, 7=Trade Goods, 9=Recipe, 11=Quiver, 15=Miscellaneous.
+// 4=Armor, 6=Projectile, 7=Trade Goods, 9=Recipe, 11=Quiver, 12=Quest,
+// 15=Miscellaneous, 16=Glyph.
+//
+// Twelve categories in the real client's order, and both facts matter to
+// something outside this file. GetAuctionItemClasses hands this list to Lua
+// positionally, and addons read positions out of it rather than names -
+// Bagnon's item component opens with
+//
+//     select(12, GetAuctionItemClasses())
+//
+// to get "Quest" for its quest-item search, and a list of nine ending in
+// Miscellaneous answered nothing there. format() was then handed a nil, which
+// took down the file that builds every item slot it draws, so the addon loaded
+// and displayed nothing.
+//
+// Glyph, Projectile and Quest were the three missing. Reordering the rest to
+// match is safe because the position *is* the protocol only between this table
+// and itself: FrameXML and this client's own window both read the categories
+// from here and send back an index into the same array.
 inline constexpr AuctionClassFilter kAuctionClasses[] = {
     {.label = "All",           .classId = kAuctionAny},
     {.label = "Weapon",        .classId = 2},
     {.label = "Armor",         .classId = 4},
     {.label = "Container",     .classId = 1},
     {.label = "Consumable",    .classId = 0},
+    {.label = "Glyph",         .classId = 16},
     {.label = "Trade Goods",   .classId = 7},
-    {.label = "Gem",           .classId = 3},
-    {.label = "Recipe",        .classId = 9},
+    {.label = "Projectile",    .classId = 6},
     {.label = "Quiver",        .classId = 11},
+    {.label = "Recipe",        .classId = 9},
+    {.label = "Gem",           .classId = 3},
     {.label = "Miscellaneous", .classId = 15},
+    {.label = "Quest",         .classId = 12},
 };
-inline constexpr int kNumAuctionClasses = 10;
+inline constexpr int kNumAuctionClasses = 13;
 
 inline constexpr AuctionSubFilter kAuctionWeaponSubs[] = {
     {.label = "All", .subId = kAuctionAny}, {.label = "Axe (1H)", .subId = 0}, {.label = "Axe (2H)", .subId = 1}, {.label = "Bow", .subId = 2},
