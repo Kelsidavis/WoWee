@@ -1236,17 +1236,6 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
         showMinimapCoordinates_ = pendingShowMinimapCoordinates;
     } else if (key == "latencymeter") {
         showLatencyMeter_ = pendingShowLatencyMeter;
-    } else if (key == "separatebags") {
-        if (inventoryScreen_) inventoryScreen_->setSeparateBags(pendingSeparateBags);
-    } else if (key == "showkeyring") {
-        if (inventoryScreen_) inventoryScreen_->setShowKeyring(pendingShowKeyring);
-    } else if (key == "bagscale") {
-        // The screen clamps, so the field is read back from it rather than left
-        // saying something the bags are not doing.
-        if (inventoryScreen_) {
-            inventoryScreen_->setBagScale(pendingBagScale);
-            pendingBagScale = inventoryScreen_->getBagScale();
-        }
     } else if (key == "woweemusic") {
         // Not a volume: it changes which tracks the zone rotation can pick, and
         // switching it off has to stop whichever of ours is playing now - the

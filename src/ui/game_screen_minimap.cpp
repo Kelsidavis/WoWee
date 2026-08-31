@@ -1854,7 +1854,6 @@ void GameScreen::loadSettings() {
     }
     settingsPanel_.pendingBagScale =
         SettingsPanel::recommendedPixelScale(currentDisplayHeight, 0.75f, 1.5f);
-    inventoryScreen.setBagScale(settingsPanel_.pendingBagScale);
     settingsPanel_.pendingWindowUiScale =
         SettingsPanel::recommendedPixelScale(currentDisplayHeight, 0.75f, 1.5f);
     // The action bar's slots are 48 pixels times this, and nothing else moves
@@ -1937,13 +1936,10 @@ void GameScreen::loadSettings() {
                 settingsPanel_.showChestTracker_ = (std::stoi(val) != 0);
             } else if (key == "separate_bags") {
                 settingsPanel_.pendingSeparateBags = (std::stoi(val) != 0);
-                inventoryScreen.setSeparateBags(settingsPanel_.pendingSeparateBags);
             } else if (key == "show_keyring") {
                 settingsPanel_.pendingShowKeyring = (std::stoi(val) != 0);
-                inventoryScreen.setShowKeyring(settingsPanel_.pendingShowKeyring);
             } else if (key == "bag_scale") {
                 settingsPanel_.pendingBagScale = std::clamp(std::stof(val), 0.75f, 1.5f);
-                inventoryScreen.setBagScale(settingsPanel_.pendingBagScale);
                 bagScaleLoaded = true;
             } else if (key == "show_micro_menu") {
                 settingsPanel_.pendingShowMicroMenu = (std::stoi(val) != 0);
@@ -2095,7 +2091,6 @@ void GameScreen::loadSettings() {
         if (!bagScaleLoaded) {
             settingsPanel_.pendingBagScale =
                 SettingsPanel::recommendedPixelScale(defaultHeight, 0.75f, 1.5f);
-            inventoryScreen.setBagScale(settingsPanel_.pendingBagScale);
         }
         if (!windowScaleLoaded) {
             settingsPanel_.pendingWindowUiScale =

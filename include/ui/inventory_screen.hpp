@@ -33,22 +33,13 @@ public:
     void toggle() { open = !open; }
     void setOpen(bool o) { open = o; }
 
-    // Separate bag window controls
-    void setSeparateBags(bool sep) { separateBags_ = sep; }
-    [[nodiscard]] bool isSeparateBags() const { return separateBags_; }
-    void toggleCompactBags() { compactBags_ = !compactBags_; }
-    [[nodiscard]] bool isCompactBags() const { return compactBags_; }
-    void setShowKeyring(bool show) { showKeyring_ = show; }
-    [[nodiscard]] bool isShowKeyring() const { return showKeyring_; }
-    void setBagScale(float scale) { bagScale_ = std::clamp(scale, 0.75f, 1.5f); }
-    [[nodiscard]] float getBagScale() const { return bagScale_; }
-    static float recommendedBagScale(float displayHeight) {
-        if (displayHeight >= 2000.0f) return 1.20f;
-        if (displayHeight >= 1300.0f) return 1.10f;
-        return 1.00f;
-    }
-    [[nodiscard]] bool isBackpackOpen() const { return backpackOpen_; }
-    [[nodiscard]] bool isBagOpen(int idx) const { return idx >= 0 && idx < 4 ? bagOpen_[idx] : false; }
+    // The bag window this class used to draw is gone - FrameXML draws the bags
+    // now, and the combined view is the bundled WoweeAllBags addon. Its
+    // controls went with it: "Separate bag windows", "Show keyring" and "Bag
+    // scale" are still in Interface > Bags and the addon reads them through
+    // WoweeGetSetting, so the settings are live and the eight accessors that
+    // used to carry them here were a write-only sink - set from two files and
+    // read by none, this class included.
 
     [[nodiscard]] bool isCharacterOpen() const { return characterOpen; }
     void setCharacterOpen(bool o) { characterOpen = o; }
@@ -71,12 +62,6 @@ public:
 private:
     bool open = false;
     bool characterOpen = false;
-    bool separateBags_ = true;
-    bool compactBags_ = false;
-    bool showKeyring_ = true;
-    float bagScale_ = 1.0f;
-    bool backpackOpen_ = false;
-    std::array<bool, 4> bagOpen_{};
     bool equipmentDirty = false;
     bool inventoryDirty = false;
 
