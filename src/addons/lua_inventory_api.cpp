@@ -2948,7 +2948,20 @@ static int lua_GetLootSlotInfo(lua_State* L) {
     if (lootHasCoin(gh) && slot == 1) {
         // The coin slot describes itself: the interface shows the amount as the
         // name and has a texture of its own for it.
-        lua_pushstring(L, "Interface\\Icons\\INV_Misc_Coin_01");
+        //
+        // Which coin depends on how much, as it does everywhere else money is
+        // drawn: gold at a gold and above, silver at a silver, copper below.
+        // This was pinned to the gold pile, so a corpse carrying eight copper
+        // was looted from a heap of gold.
+        //
+        // The same thresholds GetCoinIcon uses, against the icon set's own
+        // grouping - the pairs run gold, silver, copper.
+        constexpr uint32_t kCopperPerSilver = 100;
+        constexpr uint32_t kCopperPerGold   = 100 * 100;
+        const char* coin = (loot.gold >= kCopperPerGold)   ? "Interface\\Icons\\INV_Misc_Coin_01"
+                         : (loot.gold >= kCopperPerSilver) ? "Interface\\Icons\\INV_Misc_Coin_03"
+                                                           : "Interface\\Icons\\INV_Misc_Coin_05";
+        lua_pushstring(L, coin);
         lua_pushstring(L, lootCoinText(loot.gold).c_str());
         lua_pushnumber(L, loot.gold);
         lua_pushnumber(L, 1);
