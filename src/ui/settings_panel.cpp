@@ -6,6 +6,7 @@
 #include "ui/graphics_choices.hpp"
 #include "ui/graphics_presets.hpp"
 #include "ui/settings_panel.hpp"
+#include "addons/addon_manager.hpp"
 #include "ui/settings_schema.hpp"
 #include "addons/lua_api_registrations.hpp"
 #include "ui/display_modes.hpp"
@@ -1270,6 +1271,18 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
         // Every volume goes through one call, because each of them is a balance
         // against the others and the coordinator works them all out together.
         applyAudioVolumes(services_.audioCoordinator);
+    }
+
+    // And say so, for the settings whose effect is not this client's to apply.
+    //
+    // Interface > Bags is three of them: the bag window they describe is drawn
+    // by the bundled all-bags addon now, which reads them through
+    // WoweeGetSetting. Reading is not enough on its own - a checkbox has to
+    // work when it is clicked, not at the next reload - and an addon has no way
+    // to notice a value it is not told about. So every applied setting names
+    // itself here, and anything that cares registers for it.
+    if (services_.addonManager) {
+        services_.addonManager->fireEvent("WOWEE_SETTING_CHANGED", {key});
     }
 }
 

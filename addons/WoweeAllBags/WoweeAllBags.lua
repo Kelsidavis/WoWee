@@ -345,11 +345,30 @@ end
 
 -- ── Events and the way in ───────────────────────────────────────────────────
 
-f:SetScript("OnEvent", function(self, event)
+f:SetScript("OnEvent", function(self, event, arg1)
     if event == "BANKFRAME_OPENED" then
         bankOpen = true
     elseif event == "BANKFRAME_CLOSED" then
         bankOpen = false
+    elseif event == "WOWEE_SETTING_CHANGED" then
+        -- Ticking "Separate bag windows" while this window is open has to put
+        -- it away: from that moment the bag keys go to FrameXML's windows, so
+        -- left open this one could not be closed by the key that opened it.
+        -- Untick it and FrameXML's go instead, for the same reason.
+        if arg1 == "separatebags" then
+            if separateBags() then
+                if f:IsShown() then f:Hide() end
+            else
+                -- FrameXML's own windows, hidden directly rather than through
+                -- its CloseAllBags: that function calls CloseBackpack and
+                -- CloseBag, which are this file's now, so asking it to shut
+                -- Blizzard's bags shut this one instead.
+                for i = 1, 13 do
+                    local cf = _G['ContainerFrame' .. i]
+                    if cf and cf.IsShown and cf:IsShown() then cf:Hide() end
+                end
+            end
+        end
     end
     WoweeAllBags_Update()
 end)
@@ -359,6 +378,8 @@ f:RegisterEvent("PLAYER_MONEY")
 f:RegisterEvent("BANKFRAME_OPENED")
 f:RegisterEvent("BANKFRAME_CLOSED")
 f:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
+-- Interface > Bags, so its three controls take effect when they are clicked.
+f:RegisterEvent("WOWEE_SETTING_CHANGED")
 
 function WoweeAllBags_Toggle()
     if f:IsShown() then
