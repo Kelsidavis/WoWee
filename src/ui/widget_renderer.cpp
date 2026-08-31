@@ -2352,9 +2352,32 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                 ImDrawList* dl; bool on;
                 ~ClipPop() { if (on) dl->PopClipRect(); }
             } clipPop{.dl = dl, .on = clipToBox};
+            // Measured stripped, which is how the sizing pass measured it.
+            //
+            // sizeFontStrings measures strippedText, and that measurement is
+            // what this label's rect came from. Measuring the raw string here
+            // counts the markup as glyphs, so the extent came back wider than
+            // the box by however long the escapes were - and the justify below
+            // divides that difference in half and moves the text by it. A
+            // centred label therefore drew to the *left* of its own rect, by
+            // half the width of characters that are never drawn at all.
+            //
+            // "|cff20ff20Available|r" is twelve characters of colour code
+            // around nine of word, and the trainer's filter menu is the one
+            // place in the interface whose dropdown entries carry them: its
+            // three rows drew a good way left of where they were placed, over
+            // the ticks sitting in the gutter at each row's left edge, while
+            // every plain label in every other dropdown sat correctly. The
+            // anchors were right the whole time, which is why reading them
+            // back said nothing was wrong.
+            //
+            // The glyphs themselves were never in question - drawMarkupText
+            // parses the runs and draws only the visible ones, in their
+            // colours. It was the width the placement is computed from.
+            const std::string measured = strippedText(w->text);
             ImVec2 extent =
-                font ? font->CalcTextSizeA(size, FLT_MAX, 0.0f, w->text.c_str())
-                     : ImGui::CalcTextSize(w->text.c_str());
+                font ? font->CalcTextSizeA(size, FLT_MAX, 0.0f, measured.c_str())
+                     : ImGui::CalcTextSize(measured.c_str());
             // Counted even when nothing wraps: |n is a line break at any
             // width, so a label with one in it is two lines tall whether or
             // not it is also being broken to fit.
