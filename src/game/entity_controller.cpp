@@ -3043,9 +3043,21 @@ void EntityController::handleGameObjectPageText(network::Packet& packet) {
 
 void EntityController::handlePageTextQueryResponse(network::Packet& packet) {
     PageTextQueryResponseData data;
-    if (!PageTextQueryResponseParser::parse(packet, data)) return;
+    if (!PageTextQueryResponseParser::parse(packet, data)) {
+        // The other two ways a read ends with an empty page, and the two that
+        // nothing else can report: the request went out, the server answered,
+        // and the answer was dropped here. Silence at this point is
+        // indistinguishable from a server that never replied.
+        LOG_WARNING("handlePageTextQueryResponse: could not parse the reply - "
+                    "the page it carries is lost and the reader stays empty");
+        return;
+    }
 
-    if (!data.isValid()) return;
+    if (!data.isValid()) {
+        LOG_WARNING("handlePageTextQueryResponse: reply carries page id 0, "
+                    "which is the server saying it has no such page");
+        return;
+    }
 
     std::string playerName;
     if (auto entity = owner_.getEntityManager().getEntity(owner_.getPlayerGuid())) {

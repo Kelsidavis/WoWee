@@ -2174,7 +2174,18 @@ void InventoryHandler::readItemBySlot(int backpackIndex) {
 
     const auto* info = owner_.getItemInfo(slot.item.itemId);
     uint32_t pageTextId = info ? info->pageTextId : slot.item.pageTextId;
-    if (pageTextId == 0) return;
+    if (pageTextId == 0) {
+        // Said rather than shrugged off. This is the first of four places a
+        // read can end with nothing on screen, and the reader is left looking
+        // at an empty page either way - so which one it was has to come from
+        // somewhere. An item with no page text is not readable at all, and
+        // arriving here means either the item query has not answered yet or it
+        // answered without the field.
+        LOG_WARNING("readItemBySlot: no page text for item ", slot.item.itemId,
+                    " (info ", info ? "cached" : "not yet queried",
+                    ") - nothing to read");
+        return;
+    }
 
     uint64_t itemGuid = owner_.backpackSlotGuidsRef()[backpackIndex];
     if (itemGuid == 0) itemGuid = owner_.resolveOnlineItemGuid(slot.item.itemId);
@@ -2199,7 +2210,12 @@ void InventoryHandler::readItemInBag(int bagIndex, int slotIndex) {
 
     const auto* info = owner_.getItemInfo(slot.item.itemId);
     uint32_t pageTextId = info ? info->pageTextId : slot.item.pageTextId;
-    if (pageTextId == 0) return;
+    if (pageTextId == 0) {
+        LOG_WARNING("readItemInBag: no page text for item ", slot.item.itemId,
+                    " (info ", info ? "cached" : "not yet queried",
+                    ") - nothing to read");
+        return;
+    }
 
     uint64_t itemGuid = 0;
     uint64_t bagGuid = owner_.equipSlotGuidsRef()[Inventory::FIRST_BAG_EQUIP_SLOT + bagIndex];
