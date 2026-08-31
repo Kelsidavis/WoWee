@@ -3,6 +3,7 @@
 #include "ui/text_markup.hpp"
 #include "ui/link_hit.hpp"
 #include "ui/text_wrap.hpp"
+#include <deque>
 #include <set>
 
 #include "ui/widget_tree.hpp"
@@ -403,15 +404,29 @@ void WidgetRenderer::sizeTooltips(WidgetTree& tree) {
         // one of nothing but short lines should not force prose into a column.
         constexpr float kMinWrap = 180.0f, kMaxWrap = 320.0f;
         float widest = 0.0f;
+        // A picture counts toward the width, as it does when the line is
+        // drawn. Measured from the stripped text alone, a sell price came out
+        // as wide as its digits and the coins hung off the end.
+        const auto measure = [&](const std::string& text) {
+            float total = 0.0f;
+            for (const auto& run : parseMarkup(text)) {
+                if (!run.texture.empty()) {
+                    total += run.texWidth > 0.0f    ? run.texWidth
+                           : run.texHeight > 0.0f   ? run.texHeight
+                                                    : size;
+                } else {
+                    total += font->CalcTextSizeA(size, FLT_MAX, 0.0f,
+                                                 run.text.c_str()).x;
+                }
+            }
+            return total;
+        };
         for (const auto& line : w->tooltipLines) {
             if (line.wrap) continue;
-            float wide = font->CalcTextSizeA(size, FLT_MAX, 0.0f,
-                                             strippedText(line.left).c_str()).x;
+            float wide = measure(line.left);
             if (!line.right.empty()) {
                 // Left and right text share a line with a gap between them.
-                wide += 20.0f +
-                        font->CalcTextSizeA(size, FLT_MAX, 0.0f,
-                                            strippedText(line.right).c_str()).x;
+                wide += 20.0f + measure(line.right);
             }
             if (wide > widest) widest = wide;
         }
@@ -1719,10 +1734,38 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
         for (const auto& p : wanted) if (*p.first == path && p.second == add) return;
         wanted.emplace_back(&path, add);
     };
+    // An inline texture is named inside the text rather than in a field of
+    // its own, so this pass never saw one: |TInterface\MoneyFrame\UI-GoldIcon|t
+    // was parsed, given its width and drawn as nothing, because nothing had
+    // ever asked for it to be uploaded. That is every coin on every sell
+    // price, and the gap where each one belongs.
+    //
+    // The strings outlive the parse because `wanted` holds pointers into them
+    // and is drained further down; a deque keeps those valid as it grows.
+    std::deque<std::string> markupPaths;
+    const auto wantMarkup = [&](const std::string& text) {
+        // Cheap first: almost no label carries one, and parsing every string
+        // on screen each frame to learn that would not pay.
+        if (text.find("|T") == std::string::npos) return;
+        for (const auto& run : parseMarkup(text)) {
+            if (run.texture.empty()) continue;
+            if (static_cast<int>(wanted.size()) >= kUploadsPerFrame) return;
+            if (cachedTexture(run.texture, false)) continue;
+            markupPaths.push_back(run.texture);
+            want(markupPaths.back());
+        }
+    };
+
     for (const Widget* w : order) {
         if (static_cast<int>(wanted.size()) >= kUploadsPerFrame) break;
         if (w->kind == WidgetKind::Texture && !w->solidColor)
             want(w->texturePath, w->blendAdd);
+        if (!w->text.empty()) wantMarkup(w->text);
+        for (const auto& line : w->tooltipLines) {
+            wantMarkup(line.left);
+            wantMarkup(line.right);
+        }
+        for (const auto& m : w->messages) wantMarkup(m.text);
         if (w->kind == WidgetKind::Frame) {
             if (w->hasBackdrop) { want(w->bgFile); want(w->edgeFile); }
             if (w->isStatusBar) want(w->barTexture);
