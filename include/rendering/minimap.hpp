@@ -33,6 +33,20 @@ public:
                               const VkPipelineShaderStageCreateInfo& vertStage,
                               const VkPipelineShaderStageCreateInfo& fragStage);
 
+    /// Select the render pass the display quad is recorded into.
+    ///
+    /// The minimap draws over the finished scene, and water is the one thing
+    /// that draws after it: where water leaves the scene pass for a
+    /// continuation of its own, the minimap has to follow or the water sheet is
+    /// painted straight over it. Same reason SwimEffects has this.
+    ///
+    /// A null pass means the scene pass, which is where it goes when water has
+    /// not moved. Call before initialize() or recreatePipelines().
+    void setTargetPass(VkRenderPass pass, VkSampleCountFlagBits samples) {
+        targetPass_ = pass;
+        targetSamples_ = samples;
+    }
+
     void setAssetManager(pipeline::AssetManager* am) { assetManager = am; }
     void setMapName(const std::string& name);
 
@@ -95,6 +109,9 @@ private:
     void updateTileDescriptors(uint32_t frameIdx, int centerTileX, int centerTileY);
 
     VkContext* vkCtx = nullptr;
+    /// Null until something says otherwise - see setTargetPass.
+    VkRenderPass targetPass_ = VK_NULL_HANDLE;
+    VkSampleCountFlagBits targetSamples_ = VK_SAMPLE_COUNT_1_BIT;
     pipeline::AssetManager* assetManager = nullptr;
     std::string mapName = "Azeroth";
 

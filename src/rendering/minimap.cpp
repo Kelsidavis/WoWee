@@ -69,9 +69,11 @@ void Minimap::buildDisplayPipeline(VkDevice device,
         .setRasterization(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE)
         .setNoDepthTest()
         .setColorBlendAttachment(PipelineBuilder::blendAlpha())
-        .setMultisample(vkCtx->getMsaaSamples())
+        .setMultisample(targetPass_ != VK_NULL_HANDLE ? targetSamples_
+                                                      : vkCtx->getMsaaSamples())
         .setLayout(displayPipelineLayout)
-        .setRenderPass(vkCtx->getImGuiRenderPass())
+        .setRenderPass(targetPass_ != VK_NULL_HANDLE ? targetPass_
+                                                     : vkCtx->getImGuiRenderPass())
         .setDynamicStates(viewportAndScissorDynamic())
         .build(device, vkCtx->getPipelineCache());
 }

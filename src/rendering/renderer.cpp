@@ -944,7 +944,11 @@ void Renderer::applyMsaaChange() {
         if (auto* lf = skySystem->getLensFlare()) lf->recreatePipelines();
     }
 
-    if (minimap) minimap->recreatePipelines();
+    if (minimap) {
+        // After syncSwimEffectsTargetPass above, which is what decides the pass
+        // this is built against.
+        minimap->recreatePipelines();
+    }
 
     // Resize HiZ pyramid (depth format/MSAA may have changed)
     if (hizSystem_) {
@@ -2812,6 +2816,10 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
         if (swimEffects && camera && swimEffectsDrawWithWater_) {
             swimEffects->render(currentCmd, perFrameSet);
         }
+
+        // And the minimap, last of all: it is the interface rather than the
+        // world, and nothing in the world belongs over it.
+        if (minimapDrawsWithWater_) renderMinimapOverlay(currentCmd, gameHandler);
     }
 
     auto renderEnd = std::chrono::steady_clock::now();
@@ -2821,12 +2829,13 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
 // Water can leave the scene pass only when there is a continuation pass to draw
 // it in, which excludes MSAA. Everything else in the frame is unaffected.
 void Renderer::syncSwimEffectsTargetPass() {
-    if (!swimEffects || !vkCtx) return;
+    if (!vkCtx) return;
 
-    // Default: the spray stays in the scene pass, matching its MSAA sample count.
+    // Default: they stay in the scene pass, matching its MSAA sample count.
     VkRenderPass pass = vkCtx->getImGuiRenderPass();
     VkSampleCountFlagBits samples = vkCtx->getMsaaSamples();
     swimEffectsDrawWithWater_ = false;
+    minimapDrawsWithWater_ = false;
 
     if (waterDrawsInContinuePass()) {
         // Both continuation passes are single-sampled: with MSAA the water draws
@@ -2839,12 +2848,25 @@ void Renderer::syncSwimEffectsTargetPass() {
         if (pass != VK_NULL_HANDLE) {
             samples = VK_SAMPLE_COUNT_1_BIT;
             swimEffectsDrawWithWater_ = true;
+            minimapDrawsWithWater_ = true;
         } else {
             pass = vkCtx->getImGuiRenderPass();
         }
     }
 
-    swimEffects->setTargetPass(pass, samples);
+    if (swimEffects) swimEffects->setTargetPass(pass, samples);
+    // The minimap for the same reason as the spray, and it is the more visible
+    // of the two: it is a fixed disc in the corner of the screen, so any water
+    // on screen behind it painted straight over the terrain it draws. The
+    // spray at least only lost against water it was thrown off.
+    //
+    // Only when water has actually left the scene pass. Where it has not - MSAA
+    // onto an off-screen scene, or no continuation pass at all - water is drawn
+    // before this and the minimap is already on top of it.
+    if (minimap) {
+        minimap->setTargetPass(minimapDrawsWithWater_ ? pass : VK_NULL_HANDLE,
+                               samples);
+    }
 }
 
 void Renderer::renderUnderwaterOverlay(VkCommandBuffer cmd) {
@@ -2974,6 +2996,14 @@ void Renderer::renderPostSceneOverlays(VkCommandBuffer cmd,
         }
     }
 
+    // Unless it is following water into the pass after this one, where it is
+    // drawn instead - see renderMinimapOverlay's caller below the water.
+    if (!minimapDrawsWithWater_) renderMinimapOverlay(cmd, gameHandler);
+}
+
+/// The minimap disc, over whatever has been drawn so far.
+void Renderer::renderMinimapOverlay(VkCommandBuffer cmd,
+                                    game::GameHandler* gameHandler) {
     if (minimap && minimap->isEnabled() && camera && window) {
         glm::vec3 minimapCenter = camera->getPosition();
         if (cameraController && cameraController->isThirdPerson())

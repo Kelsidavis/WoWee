@@ -203,6 +203,7 @@ private:
     /// carried different ones.
     void renderUnderwaterOverlay(VkCommandBuffer cmd);
     void renderPostSceneOverlays(VkCommandBuffer cmd, game::GameHandler* gameHandler);
+    void renderMinimapOverlay(VkCommandBuffer cmd, game::GameHandler* gameHandler);
 
     /// Point the swim spray at whichever pass the water ends up drawing in, so
     /// it can be recorded after the water rather than under it. Must run before
@@ -214,6 +215,9 @@ private:
     /// pass. Draw sites test this rather than waterDrawsInContinuePass() so a
     /// mid-run mode change cannot record a pipeline into an incompatible pass.
     bool swimEffectsDrawWithWater_ = false;
+    /// Whether the minimap follows water out of the scene pass, for the same
+    /// reason the spray does - see syncSwimEffectsTargetPass.
+    bool minimapDrawsWithWater_ = false;
 
     void runDeferredWorldInitStep(float deltaTime);
 
