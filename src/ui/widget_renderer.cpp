@@ -2021,6 +2021,38 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                 }
             }
 
+            // A page of text held by the frame itself.
+            //
+            // ItemTextFrame's page is a SimpleHTML, and FrameXML fills it with
+            // ItemTextPageText:SetText(body). The words were stored on the
+            // widget and read back correctly, and nothing drew them: text is
+            // painted for a FontString, and this is a Frame. So every letter,
+            // book, sign and plaque opened to a blank page.
+            //
+            // Wrapped to the frame, like a message frame's lines and unlike a
+            // font string's, because the page has a width and the text has to
+            // live inside it. Top down, since a page is read from the top.
+            if (w->isSimpleHtml && !w->text.empty()) {
+                ImFont* font = interfaceFaceOrDefault(w->fontFace);
+                const float size = interfaceFontSize(w->fontHeight) * s;
+                const float wrapW = (x1 - x0) > size ? (x1 - x0) : 0.0f;
+                // The shadow under the words, the single offset copy a font
+                // string draws, for the same reason it does.
+                if (w->hasShadow) {
+                    float sc[4] = {w->shadowColor[0], w->shadowColor[1],
+                                   w->shadowColor[2], w->shadowColor[3]};
+                    drawMarkupText(dl, font, size,
+                                   ImVec2(x0 + w->shadowX * s, y0 - w->shadowY * s),
+                                   packColor(sc, w->alpha * w->shadowColor[3]),
+                                   w->alpha, w->text, wrapW, false,
+                                   w->justifyH.c_str(), true);
+                }
+                drawMarkupText(dl, font, size, ImVec2(x0, y0),
+                               packColor(w->color, w->alpha), w->alpha, w->text,
+                               wrapW, false, w->justifyH.c_str(), false,
+                               &tree, w->id);
+            }
+
             if (w->isEditBox) {
                 // Its own text, drawn where a label would be, with a caret
                 // while it has focus so it is clear which box is listening.

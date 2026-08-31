@@ -2777,3 +2777,39 @@ TEST_CASE("A second load after a reset draws one interface, not two", "[widget][
     // Reused, because the reset gave the ids back.
     CHECK(second == first);
 }
+
+// ── SimpleHTML ──────────────────────────────────────────────────────────────
+
+// A SimpleHTML holds its text on the frame rather than in a font string child,
+// which is how FrameXML fills ItemTextFrame's page. A plain frame with nothing
+// to paint is culled from the draw order, so one holding a page of text has to
+// be kept - otherwise the letter opens blank, which is what it did.
+TEST_CASE("A SimpleHTML holding text is drawn", "[widget][simplehtml]") {
+    WidgetTree tree;
+    const uint32_t page = tree.create(WidgetKind::Frame, tree.uiParentId(), "PageText");
+    Widget* w = tree.get(page);
+    w->width = 270.0f;
+    w->height = 304.0f;
+    tree.addPoint(page, Anchor{});
+    w->isSimpleHtml = true;
+
+    SECTION("with a page of text it is in the draw order") {
+        w->text = "Meet me at the tower when you are able.";
+        tree.layout(kScreenW, kScreenH);
+        bool found = false;
+        for (const Widget* d : tree.drawOrder()) {
+            if (d->id == page) { found = true; break; }
+        }
+        CHECK(found);
+    }
+
+    SECTION("empty it is culled like any other bare frame") {
+        w->text.clear();
+        tree.layout(kScreenW, kScreenH);
+        bool found = false;
+        for (const Widget* d : tree.drawOrder()) {
+            if (d->id == page) { found = true; break; }
+        }
+        CHECK_FALSE(found);
+    }
+}

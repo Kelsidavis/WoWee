@@ -416,6 +416,16 @@ struct Widget {
         return f < 0.0f ? 0.0f : (f > 1.0f ? 1.0f : f);
     }
 
+    /// A SimpleHTML holds one block of text on the frame itself, the way an
+    /// edit box and a message frame do - the interface calls SetText on the
+    /// frame rather than on a font string inside it. ItemTextFrame's page is
+    /// one, which is why a letter opened to a blank page: the words were set
+    /// and stored, and nothing drew text for anything but a FontString.
+    ///
+    /// The markup is ignored. Real SimpleHTML parses a subset of HTML and this
+    /// draws the text as it stands, which is right for the pages the game
+    /// actually ships - they are plain text with line breaks.
+    bool  isSimpleHtml = false;
     /// A scrolling message frame keeps its own lines rather than a single
     /// string: chat is a list that grows at one end and falls off the other,
     /// and the frame draws as many as fit from the bottom up.

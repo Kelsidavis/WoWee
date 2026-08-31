@@ -5030,6 +5030,9 @@ static int lua_CreateFrame(lua_State* L) {
             // Marked at creation rather than only when a child is set, so a
             // scroll frame clips what is under it even while it is empty.
             if (ft == "ScrollFrame") tree->markScrollFrame(id);
+            // Its text lives on the frame, so the renderer has to be told
+            // this is one of the few frames that draws any.
+            w->isSimpleHtml = (ft == "SimpleHTML");
             // An edit box is clicked into, so it takes the mouse as well.
             w->isEditBox = (ft == "EditBox");
             if (w->isEditBox) {

@@ -1174,6 +1174,7 @@ void WidgetTree::collectDrawOrder() {
         // listening, and an empty box still has to show it.
         if (w.kind == WidgetKind::Frame && !w.hasBackdrop && !w.isStatusBar &&
             !w.isEditBox && w.externalTexture == 0 &&
+            !(w.isSimpleHtml && !w.text.empty()) &&
             !(w.isMessageFrame && !w.messages.empty()) &&
             !(w.isTooltip && !w.tooltipLines.empty())) continue;
         if (w.rectW <= 0.0f || w.rectH <= 0.0f) continue;
