@@ -7252,6 +7252,12 @@ void LuaEngine::registerCoreAPI() {
         "end\n"
         "function __WoweeFrameMT:SetHyperlinkCompareItem(link, index, shift, anchor)\n"
         "    self:ClearLines()\n"
+        // And hidden, because a refusal below returns false and
+        // GameTooltip_ShowCompareItem answers that by simply not showing this
+        // tooltip - not by hiding one already up. Shown for the last item
+        // hovered and cleared for this one, it stayed on screen as an empty
+        // box beside the cursor. Every success path calls Show() at the end.
+        "    self:Hide()\n"
         "    if not link then return __cmpNo('no link given') end\n"
         // What the tooltip believes it is showing, said once per item. The
         // comparison is only ever as right as this: GameTooltip_ShowCompareItem
@@ -7277,16 +7283,18 @@ void LuaEngine::registerCoreAPI() {
         "    if not wornLink then return __cmpNo('nothing worn in slot ' .. tostring(slot)) end\n"
         "    local wornId = tonumber(wornLink:match('item:(%d+)'))\n"
         "    if not wornId then return __cmpNo('worn link carries no item id') end\n"
-        // Comparing something against itself says nothing. WoW leaves the
-        // second tooltip off when the item is already the one worn.
-        // Both ids, because this is the one refusal that can be wrong rather
-        // than merely unhelpful: it fires when the worn lookup answers with the
-        // hovered item, and from outside that is indistinguishable from a
-        // player hovering what they already wear.
-        "    if wornId == id then\n"
-        "        return __cmpNo('slot ' .. tostring(slot) .. ' holds item ' .. tostring(wornId)\n"
-        "                       .. ', the same as the one hovered (which the tooltip called a '\n"
-        "                       .. tostring(equipSlot) .. ')') end\n"
+        // An item you already wear is compared against itself, and the panel
+        // shows it twice. That reads oddly written down and it is what the real
+        // client does: the comparison answers "here is what you have in that
+        // slot", and the answer does not stop being true because it is the same
+        // item. Refusing instead left the auction house showing a blank box
+        // beside anything already equipped - the previous hover's tooltip,
+        // cleared and never hidden.
+        //
+        // A ring is the case that shows why the refusal was wrong even on its
+        // own terms: wearing one copy and hovering another, index 1 is the copy
+        // worn and index 2 the other ring, and dropping the first leaves the
+        // player comparing against one hand only.
         "    if not _WoweePopulateItemTooltip(self, wornId) then return __cmpNo('no tooltip could be built for the worn item') end\n"
         // What is on the worn item, which its id could not carry.
         "    if self._WoweeAppendEquippedEnchants then\n"
