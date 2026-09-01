@@ -213,6 +213,12 @@ TEST_CASE("every setting reaches its target at startup", "[settings]") {
         {"graphicspreset", "would overwrite the settings loaded beside it"},
         // Reached by a call rather than by reading the field.
         {"windowuiscale", "applyWindowUiScale() is called from GameScreen"},
+        // Pulled rather than pushed: GetCVar("chatStyle") answers from this
+        // setting, and the interface reads that every time it activates or
+        // deactivates a chat box - including on its own way up, which is what
+        // decides whether the box is on screen at login. The side effect is
+        // for the tick mid-session, when nothing is about to ask.
+        {"chatboxvisible", "the interface reads it through GetCVar(\"chatStyle\")"},
     };
 
     for (const std::string& key : sideEffects) {
