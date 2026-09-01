@@ -1388,6 +1388,108 @@ if type(realOpen) == "function" then
 end
 )LUA";
 
+/// The chat input box wears the chat window's background.
+///
+/// Blizzard's box is a pill of its own: UI-ChatInputBorder-Left2, -Mid2 and
+/// -Right2 in the background, and a second, brighter set swapped in while it
+/// has focus. That art was drawn for a box that appears for as long as a line
+/// is being typed and then goes away. Kept on screen - which is what "Chat box
+/// always visible" does, and the whole point of it is that there is something
+/// to click - it sits under the chat window as a differently-coloured shape
+/// that does not belong to it.
+///
+/// So the box takes the window's own background instead: the same texture, the
+/// same vertex colour, the same alpha, read off ChatFrame1Background rather
+/// than copied as numbers, so recolouring the window in the chat options moves
+/// the box with it.
+///
+/// The box's own alpha goes to full and stays there. ChatEdit_SetDeactivated
+/// puts it at 0.35, which was a third of Blizzard's art and is a third of this
+/// background - a strip too faint to read as somewhere to click. What is left
+/// to say the box has focus is the header beside it, "Say:", which the
+/// interface shows and hides for exactly that.
+inline constexpr const char* kChatInputBackgroundLua = R"LUA(
+local kParts = {"Left", "Mid", "Right", "FocusLeft", "FocusMid", "FocusRight"}
+
+local function paint(box)
+    if type(box) ~= "table" or not box.GetName then return end
+    local name = box:GetName()
+    if not name then return end
+
+    for _, part in ipairs(kParts) do
+        local art = _G[name .. part]
+        if art and art.Hide then art:Hide() end
+    end
+
+    local bg = box.woweeBackground
+    if not bg then
+        bg = box:CreateTexture(nil, "BACKGROUND")
+        -- Inset by what the art's rounded ends took up, so the strip lines up
+        -- with the text rather than with the frame the art needed.
+        bg:SetPoint("TOPLEFT", box, "TOPLEFT", 5, -5)
+        bg:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -5, 5)
+        box.woweeBackground = bg
+    end
+
+    -- The window this box belongs to, which is the one it is anchored under.
+    local frame = box.chatFrame or DEFAULT_CHAT_FRAME
+    local source = frame and frame.GetName and _G[frame:GetName() .. "Background"]
+    if source then
+        bg:SetTexture(source:GetTexture())
+        local r, g, b = source:GetVertexColor()
+        bg:SetVertexColor(r or 0, g or 0, b or 0)
+        bg:SetAlpha(source:GetAlpha())
+    else
+        bg:SetTexture("Interface\\ChatFrame\\ChatFrameBackground")
+        bg:SetVertexColor(0, 0, 0)
+        bg:SetAlpha(0.25)
+    end
+    bg:Show()
+    box:SetAlpha(1)
+end
+
+local function paintAll()
+    for i = 1, (NUM_CHAT_WINDOWS or 10) do
+        paint(_G["ChatFrame" .. i .. "EditBox"])
+    end
+end
+
+paintAll()
+
+-- Both of these put the art back: deactivating shows the plain set and drops
+-- the alpha, activating shows the focus set. Painted after each, rather than
+-- replaced, so the interface keeps deciding when a box is shown and this only
+-- decides what it looks like.
+if type(ChatEdit_DeactivateChat) == "function" then
+    hooksecurefunc("ChatEdit_DeactivateChat", paint)
+end
+if type(ChatEdit_ActivateChat) == "function" then
+    hooksecurefunc("ChatEdit_ActivateChat", paint)
+end
+
+-- The chat options recolour the window: same colour, same alpha, and the box
+-- follows. FCF_SetWindowColor takes the frame, so the box is found from it.
+local function repaintWindow(frame)
+    if frame and frame.editBox then paint(frame.editBox) end
+end
+if type(FCF_SetWindowColor) == "function" then
+    hooksecurefunc("FCF_SetWindowColor", repaintWindow)
+end
+if type(FCF_SetWindowAlpha) == "function" then
+    hooksecurefunc("FCF_SetWindowAlpha", repaintWindow)
+end
+
+-- A window opened later brings its own box.
+local realOpen = FCF_OpenNewWindow
+if type(realOpen) == "function" then
+    FCF_OpenNewWindow = function(...)
+        local frame = realOpen(...)
+        if frame and frame.editBox then paint(frame.editBox) end
+        return frame
+    end
+end
+)LUA";
+
 inline constexpr const char* kCoinAmountClearanceLua = R"LUA(
 -- Colourblind mode off, explicitly.
 --

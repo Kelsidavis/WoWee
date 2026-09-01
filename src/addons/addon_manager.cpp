@@ -526,6 +526,10 @@ void AddonManager::giveCoinAmountsClearance() {
     if (!luaEngine_.executeString(kChatNoFadeLua)) {
         LOG_WARNING("Chat fade removal did not apply: ", luaEngine_.lastError());
     }
+    // The input box, in the chat window's own colours.
+    if (!luaEngine_.executeString(kChatInputBackgroundLua)) {
+        LOG_WARNING("Chat input background did not apply: ", luaEngine_.lastError());
+    }
     // What the player last set, applied.
     //
     // The CVar store is filled from disk before any renderer, camera or audio

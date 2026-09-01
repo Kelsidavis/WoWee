@@ -2116,7 +2116,12 @@ void SocialHandler::requestRaidInfo() {
     if (owner_.getState() != WorldState::IN_WORLD || !owner_.getSocket()) return;
     auto packet = RequestRaidInfoPacket::build();
     owner_.getSocket()->send(packet);
-    owner_.addSystemChatMessage("Requesting raid lockout information...");
+    // Not said in chat. The interface asks for this at every login - it is what
+    // fills the Raid Info panel - so the line was three words of noise in the
+    // first frame of every session, describing a request nobody made. The
+    // player-facing answer belongs to whoever asked: /raidinfo prints what came
+    // back, and the panel draws it.
+    LOG_INFO("CMSG_REQUEST_RAID_INFO: asked for saved instance lockouts");
 }
 
 // ============================================================

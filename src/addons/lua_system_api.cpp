@@ -7038,7 +7038,12 @@ void registerSystemLuaAPI(lua_State* L) {
             const auto& lockouts = gh->getInstanceLockouts();
             if (index > static_cast<int>(lockouts.size())) { return luaReturnNil(L); }
             const auto& l = lockouts[index - 1];
-            lua_pushstring(L, ("Instance " + std::to_string(l.mapId)).c_str()); // name (would need MapDBC for real names)
+            // The real name, out of Map.dbc, which the client already reads for
+            // its own loading screens. The number was a placeholder and it
+            // reached the Raid Info panel as the instance's name.
+            std::string mapName = gh->getMapName(l.mapId);
+            if (mapName.empty()) mapName = "Instance " + std::to_string(l.mapId);
+            lua_pushstring(L, mapName.c_str());     // name
             lua_pushnumber(L, l.mapId);             // id
             lua_pushnumber(L, static_cast<double>(l.resetTime - static_cast<uint64_t>(time(nullptr)))); // reset (seconds until)
             lua_pushnumber(L, l.difficulty);        // difficulty

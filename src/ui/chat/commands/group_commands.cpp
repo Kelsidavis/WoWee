@@ -9,6 +9,8 @@
 #include "game/game_handler.hpp"
 #include <algorithm>
 #include <cctype>
+#include <ctime>
+#include <string>
 
 namespace wowee { namespace ui {
 
@@ -178,7 +180,43 @@ public:
 class RaidInfoCommand : public IChatCommand {
 public:
     ChatCommandResult execute(ChatCommandContext& ctx) override {
+        // Asked again first, for the next time this is run. The reply is a
+        // packet and arrives well after this returns, so what is printed is
+        // what the last request brought back - the one the interface makes at
+        // login, which is why there is something to print at all.
         ctx.gameHandler.requestRaidInfo();
+        const auto& lockouts = ctx.gameHandler.getInstanceLockouts();
+        if (lockouts.empty()) {
+            ctx.gameHandler.addSystemChatMessage("You are not saved to any instances.");
+            return {};
+        }
+        ctx.gameHandler.addSystemChatMessage("Saved instances:");
+        const auto now = static_cast<uint64_t>(std::time(nullptr));
+        for (const auto& lo : lockouts) {
+            std::string name = ctx.gameHandler.getMapName(lo.mapId);
+            if (name.empty()) name = "Instance " + std::to_string(lo.mapId);
+            static const char* kDifficulties[] = {"Normal", "Heroic",
+                                                  "25-Man Normal", "25-Man Heroic"};
+            if (lo.difficulty < 4) {
+                name += " (";
+                name += kDifficulties[lo.difficulty];
+                name += ")";
+            }
+            // Days and hours, which is the granularity a lockout is read at.
+            // A reset already past is possible - the server sends the time it
+            // was set to, and nothing here is told when it comes round.
+            std::string when = "expired";
+            if (lo.resetTime > now) {
+                const uint64_t left = lo.resetTime - now;
+                const uint64_t days = left / 86400;
+                const uint64_t hours = (left % 86400) / 3600;
+                when = days > 0 ? std::to_string(days) + "d " + std::to_string(hours) + "h"
+                                : std::to_string(hours) + "h";
+            }
+            ctx.gameHandler.addSystemChatMessage(
+                "  " + name + " - resets in " + when +
+                (lo.extended ? " (extended)" : ""));
+        }
         return {};
     }
     [[nodiscard]] std::vector<std::string> aliases() const override { return {"raidinfo"}; }
