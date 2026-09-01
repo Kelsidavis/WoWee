@@ -1197,10 +1197,28 @@ void WidgetTree::collectDrawOrder() {
     // declared - and a bar with a dark backing of its own wore it over the
     // fill. The cast bar is exactly that: a BACKGROUND backing, a BORDER fill
     // and ARTWORK border art, which has to come out in that order.
+    // An edit box draws its own text, the way a status bar draws its own fill,
+    // and it sorts the same way and for the same reason: one level in, among
+    // its own regions.
+    //
+    // Left at the frame's own level the text goes under everything the box
+    // owns - and a chat input box owns UI-ChatInputBorder-Mid2, a dark strip
+    // across its whole width in the BACKGROUND layer. So what you typed was
+    // painted at full white and then shaded to a third of it, while the "Say:"
+    // header beside it stayed bright: that one is a font string in ARTWORK and
+    // is drawn after the strip rather than under it. Measured at the pixel:
+    // (255,255,255) for the header, (81,82,81) for the text.
+    //
+    // ARTWORK, so it lands above the box's background and border art and
+    // alongside the header rather than over it - the two never overlap, the
+    // insets see to that.
     auto sortLevel = [](const Widget* w) {
-        return (w->isStatusBar && !w->barTexture.empty()) ? w->effLevel + 1 : w->effLevel;
+        return ((w->isStatusBar && !w->barTexture.empty()) || w->isEditBox)
+                   ? w->effLevel + 1
+                   : w->effLevel;
     };
     auto sortLayer = [](const Widget* w) {
+        if (w->isEditBox) return layerRank(DrawLayer::Artwork);
         return layerRank((w->isStatusBar && !w->barTexture.empty()) ? w->barLayer : w->layer);
     };
     std::sort(drawOrder_.begin(), drawOrder_.end(),

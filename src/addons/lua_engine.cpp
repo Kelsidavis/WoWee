@@ -5816,6 +5816,11 @@ void LuaEngine::registerCoreAPI() {
         {"IsMouseEnabled",  lua_Frame_IsMouseEnabled},
         {"SetNormalFontObject",   lua_Frame_SetNormalFontObject},
         {"SetTextColor",          lua_FontString_SetTextColor},
+        // And reading it back. The setter has been on this table since it was
+        // written and the getter never was, so a frame could be coloured and
+        // not asked - which is one-way for FrameXML and, for anyone chasing
+        // why text came out the wrong shade, unanswerable.
+        {"GetTextColor",          lua_FontString_GetTextColor},
         // A frame can be a font instance in its own right. An EditBox, a
         // MessageFrame and a SimpleHTML all draw text of their own, and the
         // XML says how by putting a <FontString> straight inside the frame -
