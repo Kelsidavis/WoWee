@@ -1203,12 +1203,8 @@ const std::vector<uint64_t>& GameHandler::getMasterLootCandidates() const {
 bool GameHandler::hasMasterLootCandidates() const {
     return inventoryHandler_ ? inventoryHandler_->hasMasterLootCandidates() : !masterLootCandidates_.empty();
 }
-bool GameHandler::hasPendingLootRoll() const {
-    return inventoryHandler_ ? inventoryHandler_->hasPendingLootRoll() : pendingLootRollActive_;
-}
-const LootRollEntry& GameHandler::getPendingLootRoll() const {
-    if (inventoryHandler_) return inventoryHandler_->getPendingLootRoll();
-    return pendingLootRoll_;
+const LootRollEntry* GameHandler::getLootRoll(int rollId) const {
+    return inventoryHandler_ ? inventoryHandler_->getLootRoll(rollId) : nullptr;
 }
 
 // Vendor

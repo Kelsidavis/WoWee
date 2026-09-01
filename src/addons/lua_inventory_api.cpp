@@ -3128,12 +3128,13 @@ static int lua_CloseLoot(lua_State* L) {
 // of answering about the wrong item.
 namespace {
 
-/// The roll a Lua roll id refers to, or null if it is not the one in progress.
+/// The roll a Lua roll id refers to, or null if that roll has closed.
+///
+/// Every open roll is kept now. This used to compare the id against the one
+/// roll the client held - so with two windows up, one of them was asking about
+/// the other's item, and the answer was either the wrong item or nothing.
 const game::LootRollEntry* rollFor(game::GameHandler* gh, int rollId) {
-    if (!gh || !gh->hasPendingLootRoll()) return nullptr;
-    const auto& roll = gh->getPendingLootRoll();
-    if (rollId != static_cast<int>(roll.slot) + 1) return nullptr;
-    return &roll;
+    return gh ? gh->getLootRoll(rollId) : nullptr;
 }
 
 // Which buttons the server said it would accept. The same three bits the

@@ -2025,8 +2025,9 @@ public:
 
     // Group loot roll (aliased from handler_types.hpp)
     using LootRollEntry = game::LootRollEntry;
-    bool hasPendingLootRoll() const;
-    const LootRollEntry& getPendingLootRoll() const;
+    /// One open loot roll by the id the interface knows it by, or null when
+    /// that roll has closed.
+    const LootRollEntry* getLootRoll(int rollId) const;
     void sendLootRoll(uint64_t objectGuid, uint32_t slot, uint8_t rollType);
     // rollType: 0=need, 1=greed, 2=disenchant, 96=pass
 
@@ -4459,8 +4460,6 @@ private:
     std::vector<uint64_t> masterLootCandidates_;  // from SMSG_LOOT_MASTER_LIST
 
     // Group loot roll state
-    bool          pendingLootRollActive_ = false;
-    LootRollEntry pendingLootRoll_;
     struct LocalLootState {
         LootResponseData data;
         bool moneyTaken = false;

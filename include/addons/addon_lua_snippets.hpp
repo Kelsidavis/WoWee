@@ -1408,6 +1408,37 @@ end
 /// background - a strip too faint to read as somewhere to click. What is left
 /// to say the box has focus is the header beside it, "Say:", which the
 /// interface shows and hides for exactly that.
+/// A loot roll window fills itself in again when its item arrives.
+///
+/// GroupLootFrame_OnShow reads the name, the icon and the quality once, when
+/// the window opens, and the window opens the moment the roll starts. This
+/// client asks the server what the item is at that same moment, so the answer
+/// lands after - and nothing read it again. The window sat there for the whole
+/// roll with a blank icon and "Item #43102" where the name goes, which is what
+/// a need-or-greed on an unfamiliar drop looked like every time.
+///
+/// GET_ITEM_INFO_RECEIVED is the client's own event for exactly this, and
+/// OnShow is the interface's own fill: re-running it is a redraw, not a rewrite
+/// of what the window says. Only the windows that are up, and only while a roll
+/// is on screen - the query answers hundreds of times over a login and this is
+/// nothing to do with any of them.
+inline constexpr const char* kLootRollRefreshLua = R"LUA(
+local watcher = CreateFrame("Frame")
+watcher:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+watcher:SetScript("OnEvent", function()
+    if type(GroupLootFrame_OnShow) ~= "function" then return end
+    for i = 1, (NUM_GROUP_LOOT_FRAMES or 4) do
+        local frame = _G["GroupLootFrame" .. i]
+        -- rollID is what OnShow asks about; a frame that has none has never
+        -- held a roll. OnShow hides a window whose roll has since closed,
+        -- which is the right answer for one too.
+        if frame and frame.rollID and frame:IsShown() then
+            GroupLootFrame_OnShow(frame)
+        end
+    end
+end)
+)LUA";
+
 inline constexpr const char* kChatInputBackgroundLua = R"LUA(
 local kParts = {"Left", "Mid", "Right", "FocusLeft", "FocusMid", "FocusRight"}
 

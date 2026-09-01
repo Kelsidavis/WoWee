@@ -116,8 +116,18 @@ public:
 
     // Group loot roll (aliased from handler_types.hpp)
     using LootRollEntry = game::LootRollEntry;
-    bool hasPendingLootRoll() const { return pendingLootRollActive_; }
-    const LootRollEntry& getPendingLootRoll() const { return pendingLootRoll_; }
+    /// The roll the interface means, or null when it has already closed.
+    ///
+    /// Every roll the player has open is kept. This used to hold one: a dungeon
+    /// boss puts up several at once, each new roll overwrote the last, and a
+    /// window already on screen then described the item from the roll after it
+    /// - and rolling Need on it rolled on that one instead.
+    const LootRollEntry* getLootRoll(int rollId) const {
+        for (const auto& roll : lootRolls_) {
+            if (roll.rollId == rollId) return &roll;
+        }
+        return nullptr;
+    }
     void sendLootRoll(uint64_t objectGuid, uint32_t slot, uint8_t rollType);
 
     // ---- Equipment Sets (aliased from handler_types.hpp) ----
@@ -552,7 +562,9 @@ private:
     /// The roll window hides itself on this and nothing else, so without it a
     /// resolved roll stays on screen over a bar that has run down, offering
     /// buttons the server has already stopped listening for.
-    void announceLootRollClosed(uint32_t lootSlot);
+    LootRollEntry& beginLootRoll(uint64_t objectGuid, uint32_t slot);
+    LootRollEntry* findLootRoll(uint64_t objectGuid, uint32_t slot);
+    void endLootRoll(uint64_t objectGuid, uint32_t slot);
     void handleShowBank(network::Packet& packet);
     void handleBuyBankSlotResult(network::Packet& packet);
     void handleGuildBankList(network::Packet& packet);
@@ -636,8 +648,10 @@ private:
     std::vector<uint64_t> masterLootCandidates_;
 
     // Group loot roll state
-    bool          pendingLootRollActive_ = false;
-    LootRollEntry pendingLootRoll_;
+    std::vector<LootRollEntry> lootRolls_;
+    /// Never reused within a session, so a window that outlives its roll finds
+    /// nothing rather than somebody else's item.
+    int           nextLootRollId_ = 1;
     struct LocalLootState {
         LootResponseData data;
         bool moneyTaken = false;

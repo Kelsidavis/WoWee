@@ -330,30 +330,28 @@ void InventoryHandler::registerOpcodes(DispatchTable& table) {
         std::string itemName = (info && !info->name.empty()) ? info->name : ("Item #" + std::to_string(itemId));
         uint8_t quality = info ? static_cast<uint8_t>(info->quality) : 1;
 
-        pendingLootRollActive_ = true;
-        pendingLootRoll_ = {};
-        pendingLootRoll_.objectGuid = objectGuid;
-        pendingLootRoll_.slot = lootSlot;
-        pendingLootRoll_.itemId = itemId;
-        pendingLootRoll_.itemName = itemName;
-        pendingLootRoll_.itemQuality = quality;
-        pendingLootRoll_.rollCountdownMs = countdown;
-        pendingLootRoll_.voteMask = voteMask;
-        pendingLootRoll_.rollStartedAt = std::chrono::steady_clock::now();
-        pendingLootRoll_.playerRolls.clear();
+        // Its own entry, kept alongside whatever else is being rolled for.
+        // A boss puts four of these up at once and there was one slot to hold
+        // them, so the last to arrive answered for all of them.
+        LootRollEntry& roll = beginLootRoll(objectGuid, lootSlot);
+        roll.itemId = itemId;
+        roll.itemName = itemName;
+        roll.itemQuality = quality;
+        roll.rollCountdownMs = countdown;
+        roll.voteMask = voteMask;
+        roll.rollStartedAt = std::chrono::steady_clock::now();
         std::string link = buildItemLink(itemId, quality, itemName);
         owner_.addSystemChatMessage("Loot roll started for " + link + ".");
-        // The roll id the interface will ask every later question by. The slot
-        // plus one, so it is never zero and stays the same for the whole roll;
-        // fired without it, the roll window opened with a nil id and could not
-        // find out what it was asking about.
+        // The roll id the interface will ask every later question by. Its own
+        // number: the slot plus one was unique only while one roll was open,
+        // and two corpses both rolling their first item shared it.
         if (owner_.addonEventCallbackRef()) {
             // ...and the time to roll in, which the packet carried all along
             // and this read past. GroupLootFrame_OpenNewFrame takes it as the
             // second argument and sizes the countdown bar from it; without one
             // the bar had no length and the window could not time out.
             owner_.addonEventCallbackRef()("START_LOOT_ROLL",
-                                           {std::to_string(lootSlot + 1),
+                                           {std::to_string(roll.rollId),
                                             std::to_string(countdown)});
         }
     };
@@ -361,7 +359,7 @@ void InventoryHandler::registerOpcodes(DispatchTable& table) {
     table[Opcode::SMSG_LOOT_ALL_PASSED] = [this](network::Packet& packet) {
         // objectGuid(8) + lootSlot(4) + itemId(4) + randSuffix(4) + randProp(4)
         if (!packet.hasRemaining(24)) return;
-        /*uint64_t objectGuid =*/ packet.readUInt64();
+        const uint64_t passedGuid = packet.readUInt64();
         const uint32_t passedSlot = packet.readUInt32();
         uint32_t itemId     = packet.readUInt32();
         /*uint32_t randSuffix =*/ packet.readUInt32();
@@ -372,8 +370,7 @@ void InventoryHandler::registerOpcodes(DispatchTable& table) {
             ? allPassInfo->name : ("Item #" + std::to_string(itemId));
         uint32_t allPassQuality = allPassInfo ? allPassInfo->quality : 1u;
         owner_.addSystemChatMessage("Everyone passed on " + buildItemLink(itemId, allPassQuality, allPassName) + ".");
-        pendingLootRollActive_ = false;
-        announceLootRollClosed(passedSlot);
+        endLootRoll(passedGuid, passedSlot);
     };
 
     table[Opcode::SMSG_LOOT_ITEM_NOTIFY] = [this](network::Packet& packet) {
@@ -1266,11 +1263,53 @@ void InventoryHandler::handleLootRemoved(network::Packet& packet) {
 // Loot Roll
 // ============================================================
 
-void InventoryHandler::announceLootRollClosed(uint32_t lootSlot) {
-    // Same id START_LOOT_ROLL was fired with: the slot plus one.
-    if (owner_.addonEventCallbackRef()) {
-        owner_.addonEventCallbackRef()("CANCEL_LOOT_ROLL",
-                                       {std::to_string(lootSlot + 1)});
+/// A new roll, with the id the interface will know it by.
+///
+/// Any roll already open on the same item of the same corpse is replaced: the
+/// server restates a roll when its countdown is reset, and two windows for one
+/// item is worse than none.
+LootRollEntry& InventoryHandler::beginLootRoll(uint64_t objectGuid, uint32_t slot) {
+    for (auto& roll : lootRolls_) {
+        if (roll.objectGuid == objectGuid && roll.slot == slot) {
+            const int keptId = roll.rollId;
+            roll = LootRollEntry{};
+            roll.rollId = keptId;
+            roll.objectGuid = objectGuid;
+            roll.slot = slot;
+            return roll;
+        }
+    }
+    LootRollEntry roll;
+    roll.rollId = nextLootRollId_++;
+    roll.objectGuid = objectGuid;
+    roll.slot = slot;
+    lootRolls_.push_back(roll);
+    return lootRolls_.back();
+}
+
+/// The roll on one item of one corpse, which is how every later packet names
+/// it - the roll id is this client's own and the server has never seen it.
+LootRollEntry* InventoryHandler::findLootRoll(uint64_t objectGuid, uint32_t slot) {
+    for (auto& roll : lootRolls_) {
+        if (roll.objectGuid == objectGuid && roll.slot == slot) return &roll;
+    }
+    return nullptr;
+}
+
+/// Close one roll and take its window down with it.
+void InventoryHandler::endLootRoll(uint64_t objectGuid, uint32_t slot) {
+    for (auto it = lootRolls_.begin(); it != lootRolls_.end(); ++it) {
+        if (it->objectGuid != objectGuid || it->slot != slot) continue;
+        const int rollId = it->rollId;
+        lootRolls_.erase(it);
+        // Named, so the window that closes is the one this roll opened. It was
+        // the slot plus one here as well, which closed a different roll's
+        // window whenever two were up.
+        if (owner_.addonEventCallbackRef()) {
+            owner_.addonEventCallbackRef()("CANCEL_LOOT_ROLL",
+                                           {std::to_string(rollId)});
+        }
+        return;
     }
 }
 
@@ -1281,9 +1320,9 @@ void InventoryHandler::sendLootRoll(uint64_t objectGuid, uint32_t slot, uint8_t 
     pkt.writeUInt32(slot);
     pkt.writeUInt8(rollType);
     owner_.getSocket()->send(pkt);
-    // Once we've sent any choice (pass/need/greed/disenchant), close the dialog.
-    pendingLootRollActive_ = false;
-    announceLootRollClosed(slot);
+    // Once we've sent any choice (pass/need/greed/disenchant), close the dialog
+    // - this roll's, and only this roll's.
+    endLootRoll(objectGuid, slot);
 }
 
 void InventoryHandler::handleLootRoll(network::Packet& packet) {
@@ -1306,14 +1345,12 @@ void InventoryHandler::handleLootRoll(network::Packet& packet) {
     if (nit != owner_.getPlayerNameCache().end()) playerName = nit->second;
     if (playerName.empty()) playerName = "Player";
 
-    if (pendingLootRollActive_ &&
-        pendingLootRoll_.objectGuid == objectGuid &&
-        pendingLootRoll_.slot == lootSlot) {
+    if (LootRollEntry* roll = findLootRoll(objectGuid, lootSlot)) {
         LootRollEntry::PlayerRollResult result;
         result.playerName = playerName;
         result.rollNum = rollNumber;
         result.rollType = rollType;
-        pendingLootRoll_.playerRolls.push_back(result);
+        roll->playerRolls.push_back(result);
     }
 
     // RollVote enum: 0=Pass, 1=Need, 2=Greed, 3=Disenchant.
@@ -1331,7 +1368,7 @@ void InventoryHandler::handleLootRoll(network::Packet& packet) {
 void InventoryHandler::handleLootRollWon(network::Packet& packet) {
     // objectGuid(8) + lootSlot(4) + itemId(4) + itemSuffix(4) + itemProp(4) + playerGuid(8) + rollNumber(1) + rollType(1)
     if (!packet.hasRemaining(34)) return;
-    /*uint64_t objectGuid =*/ packet.readUInt64();
+    const uint64_t wonGuid = packet.readUInt64();
     const uint32_t wonSlot = packet.readUInt32();
     uint32_t itemId     = packet.readUInt32();
     /*uint32_t randSuffix =*/ packet.readUInt32();
@@ -1361,8 +1398,7 @@ void InventoryHandler::handleLootRollWon(network::Packet& packet) {
     else if (rollType == 3) typeStr = "Disenchant";
 
     owner_.addSystemChatMessage(winnerName + " won " + link + " (" + typeStr + " - " + std::to_string(rollNumber) + ")");
-    pendingLootRollActive_ = false;
-    announceLootRollClosed(wonSlot);
+    endLootRoll(wonGuid, wonSlot);
 }
 
 // ============================================================

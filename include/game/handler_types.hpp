@@ -472,6 +472,11 @@ struct ArenaTeamRoster {
 // ---- Group loot roll ----
 
 struct LootRollEntry {
+    /// What the interface calls this roll, and what it passes back to
+    /// RollOnLoot. Its own number rather than the loot slot: a dungeon rolls
+    /// several items at once and two of them can sit in the same slot of
+    /// different corpses, so the slot does not tell one roll from another.
+    int      rollId        = 0;
     uint64_t objectGuid    = 0;
     uint32_t slot          = 0;
     uint32_t itemId        = 0;
