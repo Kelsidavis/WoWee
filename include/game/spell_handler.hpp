@@ -140,6 +140,8 @@ public:
 
     // Aura cache mutation (formerly accessed via friend)
     void clearUnitAurasCache() { unitAurasCache_.clear(); }
+    /// Copy a unit's auras into the by-guid list the party frames read.
+    void mirrorAurasByGuid(uint64_t guid, const std::vector<AuraSlot>& auras);
     void removeUnitAuraCache(uint64_t guid) { unitAurasCache_.erase(guid); }
 
     // Known spells mutation (formerly accessed via friend)

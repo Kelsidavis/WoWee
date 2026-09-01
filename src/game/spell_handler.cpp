@@ -2311,6 +2311,24 @@ void SpellHandler::handleCooldownEvent(network::Packet& packet) {
     }
 }
 
+/// Keep the by-guid copy of a unit's auras in step with the target view.
+///
+/// Every unit but the player is kept by guid as well, because that is the only
+/// list a party or raid frame can reach: UnitBuff("party1", i) resolves a guid
+/// and asks for it. Updates for a unit that happened to be the current target
+/// went to the target's own list *instead* of that one, and the target's list
+/// is emptied the moment the target changes.
+///
+/// So a healer watching a party member lost their buffs from the party frame as
+/// soon as they clicked on them, and a buff cast on them while they were
+/// targeted never appeared there at all - which reads exactly like the buff
+/// being cancelled, or never landing.
+void SpellHandler::mirrorAurasByGuid(uint64_t guid, const std::vector<AuraSlot>& auras) {
+    if (guid == 0 || guid == owner_.getPlayerGuid()) return;
+    auto& cached = unitAurasCache_[guid];
+    if (&cached != &auras) cached = auras;
+}
+
 void SpellHandler::handleAuraUpdate(network::Packet& packet, bool isAll) {
     AuraUpdateData data;
     if (!owner_.getPacketParsers()->parseAuraUpdate(packet, data, isAll)) return;
@@ -2348,6 +2366,7 @@ void SpellHandler::handleAuraUpdate(network::Packet& packet, bool isAll) {
             }
             (*auraList)[slot] = aura;
         }
+        mirrorAurasByGuid(data.guid, *auraList);
 
         if (owner_.addonEventCallbackRef()) {
             std::string unitId;
@@ -4511,6 +4530,7 @@ void SpellHandler::handleExtraAuraInfo(network::Packet& packet, bool isInit) {
             a.receivedAtMs = nowMs;
         }
     }
+    if (auraList) mirrorAurasByGuid(auraTargetGuid, *auraList);
     if (auraList && owner_.addonEventCallbackRef()) {
         std::string unitId;
         if (auraTargetGuid == owner_.getPlayerGuid()) unitId = "player";
@@ -4987,6 +5007,7 @@ void SpellHandler::handleClearExtraAuraInfo(network::Packet& packet) {
         if (auraList && slot < auraList->size()) {
             (*auraList)[slot] = AuraSlot{};
         }
+        if (auraList) mirrorAurasByGuid(clearGuid, *auraList);
         if (auraList && owner_.addonEventCallbackRef()) {
             std::string unitId;
             if (clearGuid == owner_.getPlayerGuid()) unitId = "player";
