@@ -313,7 +313,10 @@ jobs:
 
     - name: Create DMG
       run: |
+        set -euo pipefail
         TAG="${GITHUB_REF_NAME}"
+        DMG="wowee-${TAG}-macos-${{ matrix.arch }}.dmg"
+        rm -f "${DMG}"
         rm -rf dmg-root
         mkdir dmg-root
         mv Wowee.app dmg-root/
@@ -321,12 +324,36 @@ jobs:
         cp tools/macos/ASSET_EXTRACTION_README.txt \
           "dmg-root/README - Asset Extraction.txt"
         ln -s /Applications dmg-root/Applications
-        hdiutil create -volname Wowee -srcfolder dmg-root -ov -format UDZO \
-          "wowee-${TAG}-macos-${{ matrix.arch }}.dmg"
+        # A runner can leave a Wowee volume mounted from an earlier job, and
+        # hdiutil will not create over it. build.yml hit this and grew both a
+        # detach and a retry; this step is the one that cannot be re-run without
+        # cutting the tag again, and it had neither.
+        if [ -d "/Volumes/Wowee" ]; then
+          hdiutil detach "/Volumes/Wowee" -force || true
+          sleep 2
+        fi
+
+        ok=0
+        for attempt in 1 2 3 4 5; do
+          if hdiutil create -volname Wowee -srcfolder dmg-root -ov -format UDZO "${DMG}"; then
+            ok=1
+            break
+          fi
+          echo "hdiutil create failed on attempt ${attempt}; retrying..."
+          if [ -d "/Volumes/Wowee" ]; then
+            hdiutil detach "/Volumes/Wowee" -force || true
+          fi
+          sleep 3
+        done
+
+        if [ "$ok" -ne 1 ] || [ ! -f "${DMG}" ]; then
+          echo "Failed to create ${DMG} after retries."
+          exit 1
+        fi
+
         codesign --force --sign "${APPLE_SIGNING_IDENTITY}" \
-          --timestamp "wowee-${TAG}-macos-${{ matrix.arch }}.dmg"
-        codesign --verify --strict --verbose=2 \
-          "wowee-${TAG}-macos-${{ matrix.arch }}.dmg"
+          --timestamp "${DMG}"
+        codesign --verify --strict --verbose=2 "${DMG}"
 
     - name: Notarize and staple DMG
       env:

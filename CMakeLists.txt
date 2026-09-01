@@ -2420,6 +2420,10 @@ add_custom_target(copy_bundled_addons ALL
     COMMAND ${CMAKE_COMMAND} -E rm -rf $<TARGET_FILE_DIR:wowee>/addons
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             ${CMAKE_SOURCE_DIR}/addons $<TARGET_FILE_DIR:wowee>/addons
+    # And without anyone's saved variables - see the script for why the source
+    # tree has them at all.
+    COMMAND ${CMAKE_COMMAND} -DDIR=$<TARGET_FILE_DIR:wowee>/addons
+            -P ${CMAKE_SOURCE_DIR}/cmake/strip_saved_vars.cmake
     COMMENT "Copying bundled addons")
 add_dependencies(copy_bundled_addons wowee)
 
