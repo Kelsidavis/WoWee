@@ -3429,14 +3429,21 @@ public:
     /// built from, so this writes there and asks for the rebuild - the same
     /// path a confirmed change takes, which is why the preview and the result
     /// cannot look different.
-    void previewPlayerAppearance(uint32_t appearanceBytes, uint8_t facialFeatures) {
+    /// False when there is no record to write to, which is the one way this can
+    /// quietly do nothing.
+    bool previewPlayerAppearance(uint32_t appearanceBytes, uint8_t facialFeatures) {
+        // Keyed the way the reader is keyed. The model is rebuilt from
+        // getActiveCharacter(), which finds the record by activeCharacterGuid_,
+        // so writing to any other record is a change nothing draws.
+        const uint64_t guid = activeCharacterGuid_ != 0 ? activeCharacterGuid_ : playerGuid;
         for (auto& ch : characters) {
-            if (ch.guid != playerGuid) continue;
+            if (ch.guid != guid) continue;
             ch.appearanceBytes = appearanceBytes;
             ch.facialFeatures = facialFeatures;
-            break;
+            if (playerModelRebuildCallback_) playerModelRebuildCallback_();
+            return true;
         }
-        if (playerModelRebuildCallback_) playerModelRebuildCallback_();
+        return false;
     }
     auto& updateFieldTableRef() { return updateFieldTable_; }
     auto& lastPlayerFieldsRef() { return lastPlayerFields_; }

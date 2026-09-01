@@ -1099,15 +1099,38 @@ CameraController::FloorSample CameraController::sampleFloorUnderFeet(const glm::
 void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
                                                glm::vec3& targetPos,
                                                const glm::vec3& prevTargetPos) {
-    // Seated in something, and the server said where. A chair is an M2 with
-    // collision whose seat stands about a metre off the floor, and nothing here
-    // can tell a seat from a step: the grounding put the character's feet on
-    // top of the chair and left them standing on it, which is what sitting in a
-    // barber's chair looked like - floating well above it.
+    // Seated in something, and the server said where: held there, exactly.
     //
-    // The server teleports the character onto the chair and holds them there
-    // until they stand, so there is nothing to compute in the meantime.
-    if (seatedInChair_) return;
+    // A chair is an M2 with collision whose seat stands about a metre off the
+    // floor, and nothing here can tell a seat from a step - so the grounding
+    // put the character's feet on top of the chair and left them standing on
+    // it, which is what sitting in a barber's chair looked like.
+    //
+    // Returning early is not enough and was worse: gravity is applied before
+    // this runs, and this is what stops it, so skipping it let the character
+    // sink through the floor and out under the city. The height is pinned to
+    // where the server seated them and the fall is cancelled every frame.
+    if (seatedInChair_) {
+        // Pinned again if the character has been moved somewhere else while
+        // seated - a teleport out of the shop, a summon - so the hold follows
+        // the server rather than keeping a height that is no longer under
+        // anything.
+        const float movedXY = std::hypot(targetPos.x - seatedPinXY_.x,
+                                         targetPos.y - seatedPinXY_.y);
+        if (!seatedPinValid_ || movedXY > 1.0f) {
+            seatedPinZ_ = targetPos.z;
+            seatedPinXY_ = glm::vec2(targetPos.x, targetPos.y);
+            seatedPinValid_ = true;
+        }
+        targetPos.z = seatedPinZ_;
+        verticalVelocity = 0.0f;
+        grounded = true;
+        hasRealGround_ = true;
+        noGroundTimer_ = 0.0f;
+        lastGroundZ = seatedPinZ_;
+        return;
+    }
+    seatedPinValid_ = false;
 
     // Ground the character to terrain or WMO floor
     // Skip entirely while swimming - the swim floor clamp handles vertical bounds.

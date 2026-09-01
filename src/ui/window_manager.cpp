@@ -360,7 +360,17 @@ void WindowManager::barberPreview(game::GameHandler& gameHandler) {
                          | (static_cast<uint32_t>(sel.hairColor) << 24);
     barberPreviewActive_ = bytes != barberOrigAppearanceBytes_ ||
                            sel.facialHair != barberOrigFacialHair_;
-    gameHandler.previewPlayerAppearance(bytes, sel.facialHair);
+    if (!gameHandler.previewPlayerAppearance(bytes, sel.facialHair)) {
+        // Said once. A preview that reaches no record looks exactly like a
+        // preview that is not wired up at all, which is the shape this whole
+        // panel arrived in.
+        static bool said = false;
+        if (!said) {
+            said = true;
+            LOG_WARNING("Barber preview: no character record to show it on - "
+                        "the styles will cycle and the character will not change");
+        }
+    }
 }
 
 

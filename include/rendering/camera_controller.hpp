@@ -504,6 +504,12 @@ private:
     /// barber's chair. Held apart from `sitting` because only this one means
     /// the character's height is the server's to decide.
     bool seatedInChair_ = false;
+    /// The height the character was seated at, held for as long as they are in
+    /// the chair. Taken the first frame after the server seats them, which is
+    /// after its teleport has landed.
+    float seatedPinZ_ = 0.0f;
+    glm::vec2 seatedPinXY_{0.0f, 0.0f};
+    bool seatedPinValid_ = false;
     bool ignoreSlopeLimit_ = false;
     float maxDistanceFactor_ = 1.0f;
     bool xKeyWasDown = false;
