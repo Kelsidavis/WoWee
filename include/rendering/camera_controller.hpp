@@ -142,6 +142,16 @@ public:
     [[nodiscard]] bool isInsideInteriorWMO() const { return cachedInsideInteriorWMO; }
     void setGrounded(bool g) { grounded = g; }
     void setSitting(bool s) { sitting = s; }
+    /// What the server says the character is doing: standing, sitting, seated
+    /// in a chair, asleep, kneeling. UnitStandStateType.
+    ///
+    /// Sitting in something is a position this client does not compute - the
+    /// server put the character in the chair - so grounding stands down for it.
+    void applyServerStandState(uint8_t standState) {
+        sitting = standState >= 1 && standState <= 6;
+        seatedInChair_ = standState == 2 || (standState >= 4 && standState <= 6);
+    }
+    [[nodiscard]] bool isSeatedInChair() const { return seatedInChair_; }
     /// Ignore the slope limit, so any face can be walked straight up.
     ///
     /// For reaching a place to look at it, not for playing. Off by default and
@@ -490,6 +500,10 @@ private:
     // State
     bool enabled = true;
     bool sitting = false;
+    /// Seated in something rather than on the ground: a chair, a bench, the
+    /// barber's chair. Held apart from `sitting` because only this one means
+    /// the character's height is the server's to decide.
+    bool seatedInChair_ = false;
     bool ignoreSlopeLimit_ = false;
     float maxDistanceFactor_ = 1.0f;
     bool xKeyWasDown = false;

@@ -117,6 +117,14 @@ void WindowManager::ensureBarberState(game::GameHandler& gameHandler) {
     // on its early return, which stops happening the moment the panel is handed
     // over - and stale originals would price a change against the wrong hair.
     if (!gameHandler.isBarberShopOpen()) {
+        // Out of the chair with the preview still on them - closed by the
+        // server, walked away from, or escaped out of. Put back what they came
+        // in wearing; a style is only theirs once it is paid for.
+        if (barberPreviewActive_) {
+            barberPreviewActive_ = false;
+            gameHandler.previewPlayerAppearance(barberOrigAppearanceBytes_,
+                                                barberOrigFacialHair_);
+        }
         barberInitialized_ = false;
         return;
     }
@@ -130,6 +138,8 @@ void WindowManager::ensureBarberState(game::GameHandler& gameHandler) {
     // BarberShopStyle IDs, rather than the visible appearance numbers, are the
     // wire values expected by a WotLK server. Build the race/sex-specific lists
     // once each time the chair opens.
+    barberOrigAppearanceBytes_ = ch->appearanceBytes;
+    barberPreviewActive_ = false;
     barberOrigSkinColor_ = static_cast<uint8_t>(ch->appearanceBytes & 0xFF);
     barberOrigHairStyle_ = static_cast<uint8_t>((ch->appearanceBytes >> 16) & 0xFF);
     barberOrigHairColor_ = static_cast<uint8_t>((ch->appearanceBytes >> 24) & 0xFF);
@@ -251,6 +261,9 @@ void WindowManager::barberResetSelections(game::GameHandler& gameHandler) {
     barberFacialHair_ = barberFindAppearance(barberFacialStyles_, barberOrigFacialHair_);
     barberSkinColor_ = 0;
     rebuildBarberHairColors(barberOrigHairStyle_, barberOrigHairColor_, raceId, sexId);
+    // And put the character back the way they walked in, since the preview has
+    // been changing them as the selectors moved.
+    barberPreview(gameHandler);
 }
 
 void WindowManager::barberApplySelection(game::GameHandler& gameHandler) {
@@ -324,6 +337,30 @@ void WindowManager::barberCycleStyle(game::GameHandler& gameHandler, int selecto
     }
     // Re-resolve so a hair style change rebuilds the colours behind it.
     barberSelection(gameHandler);
+    barberPreview(gameHandler);
+}
+
+/// Put the current selection on the character standing in the shop.
+///
+/// The whole of the barber shop is a preview - WoW shows the change on the
+/// character itself and charges for it when Accept is pressed - and this was
+/// the missing half: the selectors named a style and cycling them changed a
+/// number, with nothing to see. Nothing is sent by this; barberApplySelection
+/// is still the only thing that talks to the server.
+void WindowManager::barberPreview(game::GameHandler& gameHandler) {
+    const auto* ch = gameHandler.getActiveCharacter();
+    if (!ch) return;
+    const BarberSelection sel = barberSelection(gameHandler);
+    // Skin, face, hair style and hair colour, one byte each, in the order
+    // PLAYER_BYTES packs them. The face is not the barber's to change, so it is
+    // kept from what is already there.
+    const uint32_t bytes = static_cast<uint32_t>(sel.skin)
+                         | (ch->appearanceBytes & 0x0000FF00u)
+                         | (static_cast<uint32_t>(sel.hairStyle) << 16)
+                         | (static_cast<uint32_t>(sel.hairColor) << 24);
+    barberPreviewActive_ = bytes != barberOrigAppearanceBytes_ ||
+                           sel.facialHair != barberOrigFacialHair_;
+    gameHandler.previewPlayerAppearance(bytes, sel.facialHair);
 }
 
 

@@ -1810,6 +1810,10 @@ static int lua_BarberShopReset(lua_State* L) {
 
 /// CancelBarberShop() - leave the chair without buying anything.
 static int lua_CancelBarberShop(lua_State* L) {
+    // The preview has been changing the character as the selectors moved, so
+    // leaving without buying has to put them back. Before the close, because
+    // closing the shop is what drops the state the reset is read from.
+    if (auto* svc = getLuaServices(L); svc && svc->barberReset) svc->barberReset();
     if (auto* gh = getGameHandler(L)) gh->closeBarberShop();
     return 0;
 }

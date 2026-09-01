@@ -3422,6 +3422,22 @@ public:
     uint32_t getBuild() const { return build; }
     const std::vector<uint8_t>& getSessionKey() const override { return sessionKey; }
     auto& charactersRef() { return characters; }
+    /// Show an appearance on the player's own model without telling the server.
+    ///
+    /// The barber shop's preview: the styles are cycled locally and only the
+    /// Accept button sends anything. The character record is what the model is
+    /// built from, so this writes there and asks for the rebuild - the same
+    /// path a confirmed change takes, which is why the preview and the result
+    /// cannot look different.
+    void previewPlayerAppearance(uint32_t appearanceBytes, uint8_t facialFeatures) {
+        for (auto& ch : characters) {
+            if (ch.guid != playerGuid) continue;
+            ch.appearanceBytes = appearanceBytes;
+            ch.facialFeatures = facialFeatures;
+            break;
+        }
+        if (playerModelRebuildCallback_) playerModelRebuildCallback_();
+    }
     auto& updateFieldTableRef() { return updateFieldTable_; }
     auto& lastPlayerFieldsRef() { return lastPlayerFields_; }
     auto& timeSinceLastPingRef() { return timeSinceLastPing; }

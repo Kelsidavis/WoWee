@@ -1099,6 +1099,16 @@ CameraController::FloorSample CameraController::sampleFloorUnderFeet(const glm::
 void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
                                                glm::vec3& targetPos,
                                                const glm::vec3& prevTargetPos) {
+    // Seated in something, and the server said where. A chair is an M2 with
+    // collision whose seat stands about a metre off the floor, and nothing here
+    // can tell a seat from a step: the grounding put the character's feet on
+    // top of the chair and left them standing on it, which is what sitting in a
+    // barber's chair looked like - floating well above it.
+    //
+    // The server teleports the character onto the chair and holds them there
+    // until they stand, so there is nothing to compute in the meantime.
+    if (seatedInChair_) return;
+
     // Ground the character to terrain or WMO floor
     // Skip entirely while swimming - the swim floor clamp handles vertical bounds.
     if (!swimming) {

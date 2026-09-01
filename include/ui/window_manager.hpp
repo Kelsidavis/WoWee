@@ -92,6 +92,11 @@ public:
     uint8_t barberColorsForHairStyle_ = 0xFF;
     float barberBaseCost_ = 0.0f;
     bool barberInitialized_ = false;
+    /// What the character walked into the shop wearing, and whether the preview
+    /// has changed them since. Kept whole rather than as the four parts,
+    /// because the face is in there too and the barber does not sell faces.
+    uint32_t barberOrigAppearanceBytes_ = 0;
+    bool barberPreviewActive_ = false;
 
     // Barber state, separated from the window that used to hold it.
     //
@@ -119,6 +124,8 @@ public:
     bool barberStyleInfo(game::GameHandler& gameHandler, int selector,
                          std::string& name, bool& isCurrent);
     void barberCycleStyle(game::GameHandler& gameHandler, int selector, int direction);
+    /// Show the current selection on the character, without sending it.
+    void barberPreview(game::GameHandler& gameHandler);
     uint32_t barberTotalCostCopper(game::GameHandler& gameHandler);
     void barberResetSelections(game::GameHandler& gameHandler);
     /// Buy the current selection. The Okay button on either barber calls this;
