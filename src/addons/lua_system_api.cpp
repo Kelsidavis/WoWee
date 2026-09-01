@@ -1124,22 +1124,17 @@ static void pushCvarDefault(lua_State* L, const std::string& n) {
     // to the "0" below would have left the indicator off with the option
     // reading Never, which is a preference nobody chose.
     else if (n == "threatwarning") lua_pushstring(L, "3");
-    // The social options panel branches on this and raises on anything it does
-    // not recognise, so "0" - what an unknown CVar answers - took its whole
-    // update down. "classic" is the stock setting.
+    // Only reached with no client behind the call, because GetCVar answers this
+    // one from the "Chat box always visible" setting. A word, not a number: the
+    // social options panel branches on it and raises on anything it does not
+    // recognise, so the blanket "0" below took its whole update down.
     //
     // "im" keeps the box on screen - ChatEdit_SetDeactivated hides it only for
     // "classic", and otherwise leaves it at a third alpha with its text
     // cleared, which is a box you can click into. That is the whole of what
     // this switch does, and it is why the setting is phrased as visibility
     // rather than as a style.
-    else if (n == "chatstyle") {
-        auto* svc = getLuaServices(L);
-        const std::string visible =
-            svc && svc->getClientSetting ? svc->getClientSetting("chatboxvisible")
-                                         : std::string();
-        lua_pushstring(L, visible == "0" ? "classic" : "im");
-    }
+    else if (n == "chatstyle") lua_pushstring(L, "im");
     // "none", which is the word this one is switched off with - and the blanket
     // default below is a number, which is not off but a format string.
     //
@@ -1245,6 +1240,16 @@ std::string cvarValueOr(lua_State* L, const char* name, const char* fallback) {
 /// can be put in.
 static bool g_applyingCVarToSetting = false;
 
+/// Set while the stored CVars are being replayed into client state at startup.
+///
+/// That replay is for the CVars the interface owns and the client follows. A
+/// CVar the client owns runs the other way, and replaying one writes a stale
+/// echo over the setting it is supposed to be reading: the store keeps whatever
+/// the options panel last wrote, which for chatStyle is a value from before the
+/// setting existed. Left alone it turned "Chat box always visible" off at every
+/// launch, on the player's behalf.
+static bool g_replayingStoredCVars = false;
+
 const ClientCVarBinding* findClientCVar(const std::string& lowerName) {
     for (const auto& b : kClientCVars) {
         if (lowerName == b.cvar) return &b;
@@ -1304,6 +1309,22 @@ static int lua_GetCVar(lua_State* L) {
                 lua_pushstring(L, ui::settingNumberText(v).c_str());
             }
             return 1;
+        }
+    } else if (n == "chatstyle") {
+        // Above the store, like the nameplate and minimap rows: the client owns
+        // this one now, under "Chat box always visible", and the store holds
+        // whatever the social options panel last wrote.
+        //
+        // It writes on load as well as on a change - so a config saved before
+        // that setting existed already says chatstyle=classic, and answering
+        // from the store meant the new setting was read once at the default and
+        // never again. The box stayed hidden with the box ticked.
+        if (auto* svc = getLuaServices(L); svc && svc->getClientSetting) {
+            const std::string visible = svc->getClientSetting("chatboxvisible");
+            if (!visible.empty()) {
+                lua_pushstring(L, visible == "0" ? "classic" : "im");
+                return 1;
+            }
         }
     } else if (n == "autoselfcast") {
         if (auto* gh = getGameHandler(L)) {
@@ -1487,6 +1508,15 @@ static void applyCVarSideEffects(lua_State* L, const std::string& key,
     // is routed into that setting rather than to the camera directly - two
     // controls over one value, which is what setSettingValue exists for, and
     // it persists on the way past.
+    // Chat Style, which is this client's "Chat box always visible" seen from
+    // the interface's own Social panel. Routed into the setting so the two
+    // controls cannot disagree - and so the read above, which answers from the
+    // setting, sees what the panel chose.
+    if (key == "chatstyle" && !g_replayingStoredCVars) {
+        if (auto* svc = getLuaServices(L); svc && svc->setClientSetting) {
+            svc->setClientSetting("chatboxvisible", value == "classic" ? "0" : "1");
+        }
+    }
     if (key == "camerasmoothstyle") {
         if (auto* svc = getLuaServices(L); svc && svc->setClientSetting) {
             svc->setClientSetting("smoothfollow", value == "0" ? "0" : "1");
@@ -1674,9 +1704,11 @@ void noteClientSettingChanged(const std::string& settingKey, const std::string& 
 }
 
 void applyStoredCVarSideEffects(lua_State* L) {
+    g_replayingStoredCVars = true;
     for (const auto& [key, value] : cvarStore()) {
         applyCVarSideEffects(L, key, value);
     }
+    g_replayingStoredCVars = false;
     LOG_INFO("CVars: applied ", cvarStore().size(), " stored values");
 }
 
