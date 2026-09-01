@@ -370,15 +370,27 @@ bool GroupListParser::parse(network::Packet& packet, GroupListData& data,
         data.roles = 0;
     }
 
-    // WotLK: LFG data gated by groupType bit 0x04 (LFD group type)
-    if (hasRoles && (data.groupType & 0x04)) {
+    // WotLK: a dungeon finder group says so in its type, and writes two extra
+    // fields before the group guid - the state and the dungeon entry, five
+    // bytes, and nothing else.
+    //
+    // A sixth was being read on a guess: "may or may not send the lfg flags
+    // byte - read it only if present", where present was tested as thirteen
+    // bytes left. There are always more than thirteen left at that point, so
+    // the guess was always taken and every member of every dungeon group was
+    // read one byte late. The member count came out of the last three bytes of
+    // the real count plus the first letter of the first member's name -
+    // 0x54000000, a 'T' - which is what the implausible-count warning below has
+    // been reporting once per group update.
+    //
+    // Both bits, because the two listings of GroupType disagree about which one
+    // marks a finder group - 0x08 in one, 0x04 in the other - and servers set
+    // them together.
+    constexpr uint8_t kGroupTypeLfg = 0x0C;
+    if (hasRoles && (data.groupType & kGroupTypeLfg)) {
         if (rem() < 5) return false;
         packet.readUInt8();  // lfg state
-        packet.readUInt32(); // lfg entry
-        // WotLK 3.3.5a may or may not send the lfg flags byte - read it only if present
-        if (rem() >= 13) { // enough for lfgFlags(1)+groupGuid(8)+counter(4)
-            packet.readUInt8(); // lfg flags
-        }
+        packet.readUInt32(); // lfg dungeon entry
     }
 
     if (rem() < 8) return false;
@@ -390,9 +402,27 @@ bool GroupListParser::parse(network::Packet& packet, GroupListData& data,
 
     if (rem() < 4) return false;
     data.memberCount = packet.readUInt32();
-    if (data.memberCount > 40) {
-        LOG_WARNING("GroupListParser: implausible memberCount=", data.memberCount, ", clamping");
-        data.memberCount = 40;
+    // A count this cannot be is a misread of the packet, not a large group, and
+    // the members behind it are the packet's own bytes read as names and guids.
+    // Clamping it to forty kept that: forty invented members reached the party
+    // frames. Refused instead, with the bytes, because the count is the first
+    // place a layout that has shifted shows itself and the dump is what says by
+    // how much.
+    const uint32_t kMaxGroup = 40;
+    if (data.memberCount > kMaxGroup) {
+        std::string bytes;
+        const auto& raw = packet.getData();
+        for (size_t i = 0; i < raw.size() && i < 64; ++i) {
+            char hex[4];
+            std::snprintf(hex, sizeof(hex), "%02x ", raw[i]);
+            bytes += hex;
+        }
+        LOG_WARNING("GroupListParser: memberCount=", data.memberCount,
+                    " is not a group size - the packet is being read at the wrong "
+                    "offset. groupType=0x", std::hex, static_cast<int>(data.groupType),
+                    std::dec, " hasRoles=", hasRoles, " read ", packet.getReadPos(),
+                    " of ", raw.size(), " bytes: ", bytes);
+        return false;
     }
     data.members.reserve(data.memberCount);
 

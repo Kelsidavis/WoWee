@@ -2033,6 +2033,13 @@ wowee_add_test(test_gather_spells
     SOURCES test_gather_spells.cpp
             ${TEST_COMMON_SOURCES})
 
+# ── test_group_list_parse ────────────────────────────────────
+# SMSG_GROUP_LIST built as the server writes it and read back, in both its
+# shapes. The dungeon finder shape was read a byte long - a seventh field that
+# is never sent - so every member of every finder group came out shifted and
+# the member count was three bytes of the real count plus a letter of a name.
+wowee_add_packet_test(test_group_list_parse)
+
 # ── test_party_wire_codes ────────────────────────────────────
 # Party operation and result codes against AzerothCore. PARTY_OP_SWAP is 4
 # and SWAP was declared 3, which is not an operation at all, so the field
