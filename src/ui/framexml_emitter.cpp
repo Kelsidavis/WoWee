@@ -12,6 +12,14 @@ namespace ui {
 
 namespace {
 
+/// The truth of an attribute already read, spelled the way attrBool spells it.
+///
+/// Needed where the *absence* of the attribute and a written "false" mean
+/// different things: absent leaves the template's state, written overrides it.
+inline bool attrIsTrue(const std::string& value) {
+    return value == "true" || value == "1";
+}
+
 /// Element names that produce a frame rather than a region. Everything here is
 /// created through CreateFrame with its own type, so a Button gets a Button's
 /// behaviour even where the widget system does not yet distinguish them.
@@ -311,7 +319,12 @@ struct Emitter {
         if (node.attrBool("setAllPoints")) {
             line(var + ":SetAllPoints(" + parentVar + ")");
         }
-        if (node.attrBool("hidden")) line(var + ":Hide()");
+        // Either way, for the reason the frame path spells out: a region
+        // inheriting a hidden template and declaring itself visible was left
+        // hidden.
+        if (const std::string* hidden = node.attr("hidden")) {
+            line(var + (attrIsTrue(*hidden) ? ":Hide()" : ":Show()"));
+        }
 
         if (const XmlNode* size = node.child("Size")) {
             float w = 0, h = 0;
@@ -927,7 +940,17 @@ struct Emitter {
         // Hiding first also lets an OnLoad that shows its own frame win, which
         // is what the real client does and what hiding afterwards silently
         // undid.
-        if (node.attrBool("hidden")) line(var + ":Hide()");
+        //
+        // Written either way, because a template declares this too and the
+        // instance may disagree with it. EyeTemplate is hidden="true" and every
+        // use of it says hidden="false" - the dungeon finder's eye on the
+        // minimap is one - and emitting nothing for the false left the
+        // template's Hide() standing. The frame was there and took the pointer,
+        // its tooltip and its menu worked, and the eye itself was never drawn:
+        // reported as the dungeon finder icon missing from the minimap.
+        if (const std::string* hidden = node.attr("hidden")) {
+            line(var + (attrIsTrue(*hidden) ? ":Hide()" : ":Show()"));
+        }
 
         if (const XmlNode* size = node.child("Size")) {
             float w = 0, h = 0;

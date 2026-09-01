@@ -3793,7 +3793,12 @@ enum : uint8_t {
     kLfgDefault             = 0,
     kLfgLeaderUnk1          = 1,
     kLfgRoleCheckAborted    = 4,
-    kLfgJoinQueue           = 6,
+    // Five, observed: it arrives the moment a queue is joined, carrying a body
+    // that says queued. The listings of this enum disagree about whether the
+    // join is 5 or 6, so both are treated as one - the flags in the body decide
+    // the state either way, and this only decides the wording.
+    kLfgJoinQueue           = 5,
+    kLfgJoinQueueAlt        = 6,
     kLfgRoleCheckFailed     = 7,
     kLfgRemovedFromQueue    = 8,
     kLfgProposalFailed      = 9,
@@ -3813,7 +3818,8 @@ enum : uint8_t {
 /// with it.
 const char* lfgUpdateMessage(uint8_t updateType) {
     switch (updateType) {
-        case kLfgJoinQueue:        return "Dungeon Finder: You have joined the queue.";
+        case kLfgJoinQueue:
+        case kLfgJoinQueueAlt:     return "Dungeon Finder: You have joined the queue.";
         case kLfgAddedToQueue:     return "Dungeon Finder: Added to the queue.";
         case kLfgRemovedFromQueue: return "Dungeon Finder: Removed from the queue.";
         case kLfgRoleCheckFailed:  return "Dungeon Finder: The role check failed.";
