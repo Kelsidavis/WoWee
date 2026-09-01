@@ -2552,6 +2552,17 @@ void Application::applyServerMovementState(float deltaTime) {
     }
     if (renderer) {
         if (auto* ac = renderer->getAnimationController()) ac->setTaxiFlight(onTaxi);
+        // Round to the character's face while the barber has them in the chair,
+        // and back to the player's own view when either ends.
+        //
+        // Reconciled here rather than on the packet that seats them, because
+        // the seat and the shop arrive in either order - they are two packets
+        // sent together - and a view set from whichever came first would have
+        // been set on half the story.
+        if (auto* cam = renderer->getCameraController()) {
+            cam->setBarberShopView(gameHandler && gameHandler->isBarberShopOpen() &&
+                                   cam->isSeatedInChair());
+        }
     }
     if (renderer && renderer->getTerrainManager()) {
     renderer->getTerrainManager()->setStreamingEnabled(true);

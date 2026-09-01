@@ -152,6 +152,40 @@ public:
         seatedInChair_ = standState == 2 || (standState >= 4 && standState <= 6);
     }
     [[nodiscard]] bool isSeatedInChair() const { return seatedInChair_; }
+
+    /// Look the character in the face, close in, for the barber shop.
+    ///
+    /// The barber's preview is the character themselves - the interface asks
+    /// for no camera at all, because on the real client this is the client's
+    /// job. Without it the camera stays where it was, behind the character or
+    /// pointed at a wall, and cycling styles changes something nobody can see:
+    /// reported, twice, as there being no preview.
+    ///
+    /// The player's own view is put back when the chair is left.
+    void setBarberShopView(bool on) {
+        if (on == barberView_) return;
+        barberView_ = on;
+        if (on) {
+            savedBarberYaw_ = yaw;
+            savedBarberPitch_ = pitch;
+            savedBarberDistance_ = userTargetDistance;
+            savedBarberPivot_ = pivotHeight_;
+            // Round to the front: the camera yaw is the character's facing, so
+            // half a turn from it is looking back at them.
+            yaw = facingYaw + 180.0f;
+            // Slightly above level, so the face is in view rather than the top
+            // of the head, and close enough for hair to be worth choosing.
+            pitch = 8.0f;
+            userTargetDistance = 2.4f;
+            pivotHeight_ = 1.7f;
+        } else {
+            yaw = savedBarberYaw_;
+            pitch = savedBarberPitch_;
+            userTargetDistance = savedBarberDistance_;
+            pivotHeight_ = savedBarberPivot_;
+        }
+    }
+    [[nodiscard]] bool isBarberShopView() const { return barberView_; }
     /// Ignore the slope limit, so any face can be walked straight up.
     ///
     /// For reaching a place to look at it, not for playing. Off by default and
@@ -507,6 +541,11 @@ private:
     /// The height the character was seated at, held for as long as they are in
     /// the chair. Taken the first frame after the server seats them, which is
     /// after its teleport has landed.
+    bool barberView_ = false;
+    float savedBarberYaw_ = 0.0f;
+    float savedBarberPitch_ = 0.0f;
+    float savedBarberDistance_ = 10.0f;
+    float savedBarberPivot_ = 0.0f;
     float seatedPinZ_ = 0.0f;
     glm::vec2 seatedPinXY_{0.0f, 0.0f};
     bool seatedPinValid_ = false;
