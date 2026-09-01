@@ -3750,8 +3750,12 @@ int32_t GameHandler::getLfgAvgWaitSec() const {
     return socialHandler_ ? socialHandler_->getLfgAvgWaitSec() : -1;
 }
 
-uint32_t GameHandler::getLfgTimeInQueueMs() const {
-    return socialHandler_ ? socialHandler_->getLfgTimeInQueueMs() : 0;
+int32_t GameHandler::getLfgMyWaitSec() const {
+    return socialHandler_ ? socialHandler_->getLfgMyWaitSec() : -1;
+}
+
+uint32_t GameHandler::getLfgQueuedSeconds() const {
+    return socialHandler_ ? socialHandler_->getLfgQueuedSeconds() : 0;
 }
 
 uint32_t GameHandler::getLfgBootVotes() const {

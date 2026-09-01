@@ -3558,8 +3558,11 @@ void SocialHandler::handleLfgQueueStatus(network::Packet& packet) {
     // time in queue.
     if (!packet.hasRemaining(31)) return;
     lfgDungeonId_ = packet.readUInt32();
-    const int32_t avgWait  = static_cast<int32_t>(packet.readUInt32());
-    const int32_t waitTime = static_cast<int32_t>(packet.readUInt32());
+    // Two different numbers, and the panel shows them in two different places:
+    // the average across everyone queued for this dungeon, and the estimate for
+    // this player in the role they picked. They were being collapsed into one.
+    lfgAvgWaitSec_ = static_cast<int32_t>(packet.readUInt32());
+    lfgMyWaitSec_  = static_cast<int32_t>(packet.readUInt32());
     lfgWaitTank_   = static_cast<int32_t>(packet.readUInt32());
     lfgWaitHealer_ = static_cast<int32_t>(packet.readUInt32());
     lfgWaitDps_    = static_cast<int32_t>(packet.readUInt32());
@@ -3568,8 +3571,16 @@ void SocialHandler::handleLfgQueueStatus(network::Packet& packet) {
     lfgNeedTank_   = packet.readUInt8();
     lfgNeedHealer_ = packet.readUInt8();
     lfgNeedDps_    = packet.readUInt8();
-    lfgTimeInQueueMs_ = packet.readUInt32();
-    lfgAvgWaitSec_ = (waitTime >= 0) ? (waitTime / 1000) : (avgWait / 1000);
+    // Seconds, not milliseconds. Every time on this packet is a difference of
+    // two time_t values on the server, and all three were being divided by a
+    // thousand on the way in - so the queue timer read 0:00 for the whole wait
+    // and the average wait time came out as zero, which the interface prints
+    // through SecondsToTime as an empty string. A wait estimate that is missing
+    // rather than wrong is this division.
+    //
+    // -1 is the server saying it does not know yet, and it is kept: the panel
+    // tests for it and says so, where a zero claims the group is instant.
+    lfgQueuedSeconds_ = packet.readUInt32();
     lfgState_ = LfgState::Queued;
     // Read and then kept to itself. The wait time is what the queue window
     // counts up, and LFDSearchStatus_Update is reached from this event and no
@@ -3590,6 +3601,22 @@ void SocialHandler::handleLfgQueueStatus(network::Packet& packet) {
         owner_.addonEventCallbackRef()("LFG_UPDATE", {});
     }
 }
+
+namespace {
+
+// 3.3.5 LfgProposalState. Nought is the proposal arriving, not the proposal
+// failing: the three were read one place along, so the packet that offers the
+// group announced "Group proposal failed" and closed the dialog before it was
+// ever shown, and the one that says everyone accepted announced the offer.
+// Reported as a group found and then a proposal failed, which is those two
+// lines in the order the server sends them.
+enum : uint32_t {
+    kProposalInitiating = 0,
+    kProposalFailed     = 1,
+    kProposalSuccess    = 2,
+};
+
+}  // namespace
 
 void SocialHandler::handleLfgProposalUpdate(network::Packet& packet) {
     // The header is fifteen bytes, and the state is ONE of them.
@@ -3630,14 +3657,29 @@ void SocialHandler::handleLfgProposalUpdate(network::Packet& packet) {
 
     lfgDungeonId_ = dungeonId; lfgProposalId_ = proposalId;
     switch (proposalState) {
-        case 0: lfgState_ = LfgState::Queued; lfgProposalId_ = 0;
-            owner_.addUIError("Dungeon Finder: Group proposal failed."); owner_.addSystemChatMessage("Dungeon Finder: Group proposal failed."); break;
-        case 1: { lfgState_ = LfgState::InDungeon; lfgProposalId_ = 0;
+        case kProposalInitiating: {
+            lfgState_ = LfgState::Proposal;
             std::string dName = owner_.getLfgDungeonName(dungeonId);
-            owner_.addSystemChatMessage(dName.empty() ? "Dungeon Finder: Group found! Entering dungeon..." : "Dungeon Finder: Group found for " + dName + "! Entering dungeon..."); break; }
-        case 2: { lfgState_ = LfgState::Proposal;
+            owner_.addSystemChatMessage(dName.empty()
+                ? "Dungeon Finder: A group has been found. Accept or decline."
+                : "Dungeon Finder: A group has been found for " + dName +
+                  ". Accept or decline.");
+            break;
+        }
+        case kProposalFailed:
+            lfgState_ = LfgState::Queued; lfgProposalId_ = 0;
+            owner_.addUIError("Dungeon Finder: Group proposal failed.");
+            owner_.addSystemChatMessage("Dungeon Finder: Group proposal failed.");
+            break;
+        case kProposalSuccess: {
+            lfgState_ = LfgState::InDungeon; lfgProposalId_ = 0;
             std::string dName = owner_.getLfgDungeonName(dungeonId);
-            owner_.addSystemChatMessage(dName.empty() ? "Dungeon Finder: A group has been found. Accept or decline." : "Dungeon Finder: A group has been found for " + dName + ". Accept or decline."); break; }
+            owner_.addSystemChatMessage(dName.empty()
+                ? "Dungeon Finder: Group found! Entering dungeon..."
+                : "Dungeon Finder: Group found for " + dName +
+                  "! Entering dungeon...");
+            break;
+        }
         default: break;
     }
     // The proposal dialog is built from GetLFGProposal, which already answers
@@ -3656,21 +3698,21 @@ void SocialHandler::handleLfgProposalUpdate(network::Packet& packet) {
     // this as each member answers, and showing again would reset the dialog's
     // countdown and its per-member ticks every time.
     switch (proposalState) {
-        case 0:
-            shownProposalId_ = 0;
-            fire("LFG_PROPOSAL_FAILED", {});
-            break;
-        case 1:
-            shownProposalId_ = 0;
-            fire("LFG_PROPOSAL_SUCCEEDED", {});
-            break;
-        case 2:
+        case kProposalInitiating:
             // Not when the server says silent: that means the player is
             // already in the group being proposed to and has nothing to answer.
             if (!silent && shownProposalId_ != proposalId) {
                 shownProposalId_ = proposalId;
                 fire("LFG_PROPOSAL_SHOW", {});
             }
+            break;
+        case kProposalFailed:
+            shownProposalId_ = 0;
+            fire("LFG_PROPOSAL_FAILED", {});
+            break;
+        case kProposalSuccess:
+            shownProposalId_ = 0;
+            fire("LFG_PROPOSAL_SUCCEEDED", {});
             break;
         default:
             break;

@@ -1934,7 +1934,8 @@ public:
     const std::unordered_map<uint32_t, uint32_t>& getLfgLocks() const;
     const std::vector<LfgReward>& getLfgRewards() const;
     int32_t  getLfgAvgWaitSec() const;
-    uint32_t getLfgTimeInQueueMs() const;
+    int32_t  getLfgMyWaitSec() const;
+    uint32_t getLfgQueuedSeconds() const;
     int32_t  getLfgWaitTank() const;
     int32_t  getLfgWaitHealer() const;
     int32_t  getLfgWaitDps() const;

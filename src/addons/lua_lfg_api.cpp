@@ -439,8 +439,18 @@ void registerLfgLuaAPI(lua_State* L) {
         lua_pushnumber(L, wait(gh->getLfgWaitTank()));           // 9: tankWait
         lua_pushnumber(L, wait(gh->getLfgWaitHealer()));         // 10: healerWait
         lua_pushnumber(L, wait(gh->getLfgWaitDps()));            // 11: damageWait
-        lua_pushnumber(L, gh->getLfgTimeInQueueMs() / 1000.0);   // 12: myWait
-        lua_pushnumber(L, gh->getLfgTimeInQueueMs() / 1000.0);   // 13: queuedTime
+        // The player's own estimate, which is the one the panel prints as
+        // "Average Wait Time" - it was being given the time already waited, so
+        // the line described the past rather than the wait. -1 passes through:
+        // the panel hides the line for it, which is what the server not
+        // knowing yet should look like.
+        lua_pushnumber(L, gh->getLfgMyWaitSec());                // 12: myWait
+        // A moment, not a duration: LFDSearchStatus_Update computes
+        // GetTime() - queuedTime for the timer it counts up. Handed the
+        // duration, it subtracted a minute from the clock and reported a queue
+        // entered when the client started.
+        lua_pushnumber(L, luaGetTimeNow() -
+                          static_cast<double>(gh->getLfgQueuedSeconds())); // 13: queuedTime
         return 13;
     }},
 

@@ -3,6 +3,7 @@
 #include "ui/settings_schema.hpp"
 #include "ui/framexml_takeover.hpp"
 #include "ui/ui_raid_icons.hpp"
+#include "ui/ui_texture_load.hpp"
 #include "ui/ui_colors.hpp"
 #include "ui/ui_helpers.hpp"
 #include "ui/minimap_projection.hpp"
@@ -63,6 +64,34 @@
 namespace {
     using namespace wowee::ui::colors;
     using namespace wowee::ui::helpers;
+
+    /// The Dungeon Finder eye, uploaded once.
+    ///
+    /// FrameXML draws this itself as MiniMapLFGFrame, which lives inside
+    /// MinimapCluster - and the cluster is hidden whenever this client draws
+    /// the minimap, so the eye went with it and there was no icon at all while
+    /// queued. Its art is a sprite sheet: 512x256, 64x64 frames, 29 of them,
+    /// which is what EyeTemplate_OnUpdate animates.
+    constexpr int kEyeColumns = 8;
+    constexpr int kEyeFrames = 29;
+    constexpr float kEyeU = 64.0f / 512.0f;
+    constexpr float kEyeV = 64.0f / 256.0f;
+    /// A frame every twentieth of a second, which is the speed AnimateTexCoords
+    /// runs it at.
+    constexpr double kEyeFrameSeconds = 0.05;
+
+    VkDescriptorSet dungeonFinderEye(wowee::pipeline::AssetManager* assetManager) {
+        static VkDescriptorSet cached = VK_NULL_HANDLE;
+        if (cached) return cached;
+        if (!assetManager) return VK_NULL_HANDLE;
+        // Only a successful upload is kept, so a failure early in a session is
+        // retried rather than blacklisting the icon for good.
+        VkDescriptorSet ds = wowee::ui::uploadUiTextureFromBlp(
+            assetManager, "Interface\\LFGFrame\\LFG-Eye.blp",
+            wowee::core::Application::getInstance().getWindow());
+        if (ds) cached = ds;
+        return ds;
+    }
 
     /// How close the cursor has to be to a minimap blip to be pointing at it.
     ///
@@ -309,6 +338,87 @@ void GameScreen::renderMinimapButtons(game::GameHandler& gameHandler, float cent
     }
     ImGui::End();
 
+    // The Dungeon Finder eye, at the lower left of the ring where WoW hangs it.
+    //
+    // Shown only while there is a queue to speak of, which is what
+    // MiniMapLFG_UpdateIsShown decides from GetLFGMode. Animated while waiting
+    // and still once a group is on offer, as EyeTemplate does.
+    {
+        using LfgState = game::GameHandler::LfgState;
+        const LfgState lfg = gameHandler.getLfgState();
+        const bool waiting = lfg == LfgState::Queued || lfg == LfgState::RoleCheck;
+        if (waiting || lfg == LfgState::Proposal) {
+            if (VkDescriptorSet eye = dungeonFinderEye(services_.assetManager)) {
+                constexpr float kEyeSize = 30.0f;
+                const ImVec2 at(centerX - mapRadius + 2.0f,
+                                centerY + mapRadius - kEyeSize - 6.0f);
+                ImGui::SetNextWindowPos(at, ImGuiCond_Always);
+                ImGui::SetNextWindowSize(ImVec2(kEyeSize, kEyeSize), ImGuiCond_Always);
+                ImGuiWindowFlags eyeFlags = ImGuiWindowFlags_NoTitleBar |
+                    ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                    ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground;
+                if (ImGui::Begin("##MinimapLfgEye", nullptr, eyeFlags)) {
+                    ImDrawList* draw = ImGui::GetWindowDrawList();
+                    const ImVec2 p = ImGui::GetCursorScreenPos();
+                    const ImVec2 size(kEyeSize - 2.0f, kEyeSize - 2.0f);
+                    if (ImGui::InvisibleButton("##MinimapLfgEyeButton", size)) {
+                        gameHandler.runInterfaceCommand("ToggleLFDParentFrame()");
+                    }
+                    const int frame = waiting
+                        ? static_cast<int>(ImGui::GetTime() / kEyeFrameSeconds) % kEyeFrames
+                        : 0;
+                    const float u0 = static_cast<float>(frame % kEyeColumns) * kEyeU;
+                    const float v0 = static_cast<float>(frame / kEyeColumns) * kEyeV;
+                    draw->AddImage((ImTextureID)(uintptr_t)eye, p,
+                                   ImVec2(p.x + size.x, p.y + size.y),
+                                   ImVec2(u0, v0), ImVec2(u0 + kEyeU, v0 + kEyeV));
+                    if (ImGui::IsItemHovered()) {
+                        // What LFDSearchStatus would say. It cannot say it:
+                        // that panel is a child of MiniMapLFGFrame, so it is
+                        // hidden with the cluster - which is why the wait
+                        // estimate had nowhere to appear.
+                        ImGui::BeginTooltip();
+                        const std::string dungeon =
+                            gameHandler.getLfgDungeonName(gameHandler.getLfgDungeonId());
+                        ImGui::TextUnformatted(dungeon.empty() ? "Looking for Dungeon"
+                                                               : dungeon.c_str());
+                        if (lfg == LfgState::RoleCheck) {
+                            ImGui::TextUnformatted("Role check in progress");
+                        } else if (lfg == LfgState::Proposal) {
+                            ImGui::TextUnformatted("A group has been found");
+                        } else {
+                            const uint32_t queued = gameHandler.getLfgQueuedSeconds();
+                            ImGui::Text("Time in queue: %u:%02u", queued / 60, queued % 60);
+                            const int32_t mine = gameHandler.getLfgMyWaitSec();
+                            const int32_t avg  = gameHandler.getLfgAvgWaitSec();
+                            // -1 is the server saying it does not know yet,
+                            // which is worth printing as such rather than as a
+                            // zero that promises an instant group.
+                            if (mine >= 0) {
+                                ImGui::Text("Average wait: %d:%02d", mine / 60, mine % 60);
+                            } else if (avg >= 0) {
+                                ImGui::Text("Average wait: %d:%02d", avg / 60, avg % 60);
+                            } else {
+                                ImGui::TextUnformatted("Average wait: unknown");
+                            }
+                            const uint8_t needTank = gameHandler.getLfgNeedTank();
+                            const uint8_t needHeal = gameHandler.getLfgNeedHealer();
+                            const uint8_t needDps  = gameHandler.getLfgNeedDps();
+                            if (needTank || needHeal || needDps) {
+                                ImGui::Text("Still needed: %u tank, %u healer, %u damage",
+                                            static_cast<unsigned>(needTank),
+                                            static_cast<unsigned>(needHeal),
+                                            static_cast<unsigned>(needDps));
+                            }
+                        }
+                        ImGui::EndTooltip();
+                    }
+                }
+                ImGui::End();
+            }
+        }
+    }
+
 }
 
 // The clock at the bottom right of the ring, when it is wanted. Local time,
@@ -446,9 +556,9 @@ void GameScreen::renderMinimapIndicators(game::GameHandler& gameHandler, float c
                     float pulse = 0.6f + 0.4f * std::sin(static_cast<float>(ImGui::GetTime()) * 3.0f);
                     ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, pulse), "LFG: Role Check...");
                 } else {
-                    uint32_t qMs  = gameHandler.getLfgTimeInQueueMs();
-                    int      qMin = static_cast<int>(qMs / 60000);
-                    int      qSec = static_cast<int>((qMs % 60000) / 1000);
+                    const uint32_t queued = gameHandler.getLfgQueuedSeconds();
+                    const int qMin = static_cast<int>(queued / 60);
+                    const int qSec = static_cast<int>(queued % 60);
                     float pulse = 0.6f + 0.4f * std::sin(static_cast<float>(ImGui::GetTime()) * 1.2f);
                     ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, pulse),
                         "LFG: %d:%02d", qMin, qSec);

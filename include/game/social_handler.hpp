@@ -467,7 +467,10 @@ public:
     [[nodiscard]] std::string getCurrentLfgDungeonName() const;
     [[nodiscard]] uint32_t getLfgProposalId()      const { return lfgProposalId_; }
     [[nodiscard]] int32_t  getLfgAvgWaitSec()      const { return lfgAvgWaitSec_; }
-    [[nodiscard]] uint32_t getLfgTimeInQueueMs()   const { return lfgTimeInQueueMs_; }
+    /// This player's own estimate, in seconds, or -1 while the server has none.
+    [[nodiscard]] int32_t  getLfgMyWaitSec()       const { return lfgMyWaitSec_; }
+    /// How long this player has been in the queue, in seconds.
+    [[nodiscard]] uint32_t getLfgQueuedSeconds()   const { return lfgQueuedSeconds_; }
     [[nodiscard]] uint32_t getLfgBootVotes()       const { return lfgBootVotes_; }
     [[nodiscard]] uint32_t getLfgBootTotal()       const { return lfgBootTotal_; }
     [[nodiscard]] uint32_t getLfgBootTimeLeft()    const { return lfgBootTimeLeft_; }
@@ -687,7 +690,8 @@ private:
     /// The group a proposal is offering, in the order the server lists it.
     std::vector<LfgProposalMember> lfgProposalMembers_;
     int32_t  lfgAvgWaitSec_   = -1;
-    uint32_t lfgTimeInQueueMs_= 0;
+    int32_t  lfgMyWaitSec_    = -1;
+    uint32_t lfgQueuedSeconds_= 0;
     uint32_t lfgBootVotes_    = 0;
     uint32_t lfgBootTotal_    = 0;
     uint32_t lfgBootTimeLeft_ = 0;
