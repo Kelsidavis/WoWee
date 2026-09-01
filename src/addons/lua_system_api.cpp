@@ -1127,7 +1127,19 @@ static void pushCvarDefault(lua_State* L, const std::string& n) {
     // The social options panel branches on this and raises on anything it does
     // not recognise, so "0" - what an unknown CVar answers - took its whole
     // update down. "classic" is the stock setting.
-    else if (n == "chatstyle") lua_pushstring(L, "classic");
+    //
+    // "im" keeps the box on screen - ChatEdit_SetDeactivated hides it only for
+    // "classic", and otherwise leaves it at a third alpha with its text
+    // cleared, which is a box you can click into. That is the whole of what
+    // this switch does, and it is why the setting is phrased as visibility
+    // rather than as a style.
+    else if (n == "chatstyle") {
+        auto* svc = getLuaServices(L);
+        const std::string visible =
+            svc && svc->getClientSetting ? svc->getClientSetting("chatboxvisible")
+                                         : std::string();
+        lua_pushstring(L, visible == "0" ? "classic" : "im");
+    }
     // "none", which is the word this one is switched off with - and the blanket
     // default below is a number, which is not off but a format string.
     //

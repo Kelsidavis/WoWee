@@ -137,6 +137,7 @@ public:
     bool pendingShowKeyring = true;
     float pendingBagScale = 1.0f;
     bool pendingShowMicroMenu = false;
+    bool pendingChatBoxVisible = true;
 
     // ---- Pending gameplay ----
     bool pendingAutoLoot = false;

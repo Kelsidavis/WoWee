@@ -994,6 +994,7 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "windowuiscale", .asFloat = &SettingsPanel::pendingWindowUiScale},
     {.key = "latencymeter",  .asBool  = &SettingsPanel::pendingShowLatencyMeter},
     {.key = "micromenu",     .asBool  = &SettingsPanel::pendingShowMicroMenu},
+    {.key = "chatboxvisible", .asBool = &SettingsPanel::pendingChatBoxVisible},
     {.key = "bagscale",      .asFloat = &SettingsPanel::pendingBagScale},
     {.key = "separatebags",  .asBool  = &SettingsPanel::pendingSeparateBags},
     {.key = "showkeyring",   .asBool  = &SettingsPanel::pendingShowKeyring},

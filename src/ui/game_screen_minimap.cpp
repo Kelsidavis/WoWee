@@ -1732,6 +1732,7 @@ void GameScreen::saveSettings() {
     out << "show_keyring=" << (settingsPanel_.pendingShowKeyring ? 1 : 0) << "\n";
     out << "bag_scale=" << settingsPanel_.pendingBagScale << "\n";
     out << "show_micro_menu=" << (settingsPanel_.pendingShowMicroMenu ? 1 : 0) << "\n";
+    out << "chat_box_visible=" << (settingsPanel_.pendingChatBoxVisible ? 1 : 0) << "\n";
     out << "idle_camera_orbit=" << (settingsPanel_.pendingIdleCameraOrbit ? 1 : 0) << "\n";
     out << "buff_bar_scale=" << settingsPanel_.pendingBuffBarScale << "\n";
     out << "action_bar_scale=" << settingsPanel_.pendingActionBarScale << "\n";
@@ -1941,6 +1942,8 @@ void GameScreen::loadSettings() {
             } else if (key == "bag_scale") {
                 settingsPanel_.pendingBagScale = std::clamp(std::stof(val), 0.75f, 1.5f);
                 bagScaleLoaded = true;
+            } else if (key == "chat_box_visible") {
+                settingsPanel_.pendingChatBoxVisible = (std::stoi(val) != 0);
             } else if (key == "show_micro_menu") {
                 settingsPanel_.pendingShowMicroMenu = (std::stoi(val) != 0);
             } else if (key == "idle_camera_orbit") {

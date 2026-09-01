@@ -330,6 +330,16 @@ constexpr SettingDesc kSchema[] = {
     // and it has its own controls for them; the copies in this client's own
     // settings window drive a chat panel that is not shown at all while
     // FrameXML owns chat, which is every run by default.
+    // The one piece of chat's appearance that is here, because it is not
+    // appearance: with the box hidden there is nothing to click, and the only
+    // way in is a key. WoW calls the two "classic" and "im" and this is that
+    // switch, phrased as what it does rather than as what Blizzard named it.
+    {"chatboxvisible", "Chat box always visible", SettingKind::Bool, 0, 0, 0,
+     "Chat", "Input",
+     "Keep the chat input box on screen so it can be clicked into.\n"
+     "Off, it appears when you press Enter and hides again when you send.",
+     "", 1},
+
     {"joingeneral", "General", SettingKind::Bool, 0, 0, 0, "Chat", "Channels to join",
      "The zone-wide channel.", "", 1},
     {"jointrade", "Trade", SettingKind::Bool, 0, 0, 0, "Chat", "",

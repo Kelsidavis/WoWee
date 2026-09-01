@@ -10312,6 +10312,28 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
                 if (cand->topLevel) { widgets_.raise(id); break; }
                 id = cand->parent;
             }
+            // Clicking a box is how you type into one.
+            //
+            // Focus was taken by an autoFocus box on becoming visible and by
+            // SetFocus called by name, and by nothing else - so a box that
+            // stays on screen waiting to be clicked, which is what the chat
+            // input is with "Chat box always visible" on, could be clicked all
+            // day and never take the keyboard. The nearest edit box at or above
+            // what was hit, because a click lands on a region inside the box
+            // rather than on the box itself.
+            //
+            // Left button only, and only when it lands on one: a press
+            // elsewhere leaves the focus where it is, as it does in WoW, so
+            // clicking the world does not silently close the box you were
+            // typing in.
+            if (b.name && std::strcmp(b.name, "LeftButton") == 0) {
+                for (uint32_t id = hit; id != 0;) {
+                    const auto* cand = widgets_.get(id);
+                    if (!cand) break;
+                    if (cand->isEditBox && cand->visible) { setEditFocus(id); break; }
+                    id = cand->parent;
+                }
+            }
             pressX_[i] = x;
             pressY_[i] = y;
             // Which half of a colour picker this press landed on, decided once
