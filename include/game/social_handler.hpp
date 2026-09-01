@@ -538,6 +538,10 @@ private:
     void handleLfgProposalUpdate(network::Packet& packet);
     void handleLfgRoleCheckUpdate(network::Packet& packet);
     void handleLfgUpdatePlayer(network::Packet& packet);
+    void handleLfgUpdateParty(network::Packet& packet);
+    void readLfgDungeonList(network::Packet& packet);
+    void applyLfgUpdate(uint8_t updateType, bool extraInfo, bool queued,
+                        bool inDungeon);
     void handleLfgPlayerReward(network::Packet& packet);
     void handleLfgBootProposalUpdate(network::Packet& packet);
     void handleLfgTeleportDenied(network::Packet& packet);

@@ -3775,13 +3775,23 @@ static int lua_GetLFGProposal(lua_State* L) {
 static int lua_GetLFGInfoServer(lua_State* L) {
     auto* gh = getGameHandler(L);
     const bool queued = gh && gh->isLfgQueued();
-    lua_pushnil(L);                        // 1: inParty
+    // Answers, not blanks. LFRFrame_OnEvent does
+    // `LFRQueueFrameComment:SetText(lfgComment)` and then `strtrim(lfgComment)`
+    // whenever it is told the queue was joined, and nil there raised inside
+    // strtrim - once for every LFG_UPDATE, which the server prompts every few
+    // seconds while queued. The whole handler died with it each time, so the
+    // raid browser's comment box was never updated and the log filled up.
+    //
+    // This client keeps no listing comment: an empty string is what it has,
+    // and it is the value the interface tests for anyway.
+    const bool inParty = gh && gh->isInGroup();
+    lua_pushboolean(L, inParty ? 1 : 0);   // 1: inParty
     lua_pushboolean(L, queued ? 1 : 0);    // 2: joined
     lua_pushboolean(L, queued ? 1 : 0);    // 3: queued
-    lua_pushnil(L);                        // 4: noPartialClear
-    lua_pushnil(L);                        // 5: achievements
-    lua_pushnil(L);                        // 6: lfgComment
-    lua_pushnil(L);                        // 7: slotCount
+    lua_pushboolean(L, 0);                 // 4: noPartialClear
+    lua_pushboolean(L, 0);                 // 5: achievements
+    lua_pushstring(L, "");                 // 6: lfgComment
+    lua_pushnumber(L, queued ? 1 : 0);     // 7: slotCount
     return 7;
 }
 

@@ -22,7 +22,10 @@
 // are where a localisation pass should read them from.
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <iterator>
+#include <string_view>
 
 namespace wowee {
 namespace game {
@@ -117,6 +120,58 @@ inline constexpr AuctionSlotFilter kAuctionSlots[] = {
 };
 inline constexpr int kNumAuctionSlots = 21;
 
+/// Where a slot sits in kAuctionSlots, found by its inventory-type token.
+///
+/// The lists below used to be written as bare positions with the slot names in
+/// a comment beside them, and the two drifted apart: the Miscellaneous list
+/// said "Neck, Finger, Trinket, Back" and held the positions of Neck, Trinket,
+/// Back and Relic. So Armor > Miscellaneous - the category every ring in the
+/// game is in - offered every slot except the one for rings, and searching for
+/// one found nothing. Nothing could have noticed: every number in it was a
+/// valid row, just not the row the comment named.
+///
+/// Looked up by name, the list is the comment.
+inline constexpr uint8_t auctionSlotPos(std::string_view token) {
+    for (int i = 0; i < kNumAuctionSlots; ++i) {
+        if (std::string_view(kAuctionSlots[i].token) == token) {
+            return static_cast<uint8_t>(i);
+        }
+    }
+    // Out of range on purpose: the static_asserts below fail on it, and
+    // auctionSlotIdAt treats it as no slot rather than as some other one.
+    return static_cast<uint8_t>(kNumAuctionSlots);
+}
+
+inline constexpr uint8_t kSlotHead        = auctionSlotPos("INVTYPE_HEAD");
+inline constexpr uint8_t kSlotNeck        = auctionSlotPos("INVTYPE_NECK");
+inline constexpr uint8_t kSlotShoulder    = auctionSlotPos("INVTYPE_SHOULDER");
+inline constexpr uint8_t kSlotChest       = auctionSlotPos("INVTYPE_CHEST");
+inline constexpr uint8_t kSlotWaist       = auctionSlotPos("INVTYPE_WAIST");
+inline constexpr uint8_t kSlotLegs        = auctionSlotPos("INVTYPE_LEGS");
+inline constexpr uint8_t kSlotFeet        = auctionSlotPos("INVTYPE_FEET");
+inline constexpr uint8_t kSlotWrist       = auctionSlotPos("INVTYPE_WRIST");
+inline constexpr uint8_t kSlotHands       = auctionSlotPos("INVTYPE_HAND");
+inline constexpr uint8_t kSlotFinger      = auctionSlotPos("INVTYPE_FINGER");
+inline constexpr uint8_t kSlotTrinket     = auctionSlotPos("INVTYPE_TRINKET");
+inline constexpr uint8_t kSlotBack        = auctionSlotPos("INVTYPE_CLOAK");
+inline constexpr uint8_t kSlotOneHand     = auctionSlotPos("INVTYPE_WEAPON");
+inline constexpr uint8_t kSlotTwoHand     = auctionSlotPos("INVTYPE_2HWEAPON");
+inline constexpr uint8_t kSlotMainHand    = auctionSlotPos("INVTYPE_WEAPONMAINHAND");
+inline constexpr uint8_t kSlotOffHand     = auctionSlotPos("INVTYPE_WEAPONOFFHAND");
+inline constexpr uint8_t kSlotRanged      = auctionSlotPos("INVTYPE_RANGED");
+inline constexpr uint8_t kSlotShield      = auctionSlotPos("INVTYPE_SHIELD");
+inline constexpr uint8_t kSlotHeldOffHand = auctionSlotPos("INVTYPE_HOLDABLE");
+inline constexpr uint8_t kSlotRelic       = auctionSlotPos("INVTYPE_RELIC");
+
+/// Every position in a list names a row. False is a token above that names
+/// nothing, which is the one way the lookup can go wrong.
+inline constexpr bool auctionSlotsKnown(const uint8_t* list, size_t n) {
+    for (size_t i = 0; i < n; ++i) {
+        if (list[i] >= kNumAuctionSlots) return false;
+    }
+    return true;
+}
+
 /// The subclass list for a class id, or null when that class has none offered.
 /// Only weapons and armour are divided here, which is what the window has
 /// always shown; every other class searches whole.
@@ -143,14 +198,38 @@ inline const uint8_t* auctionSlotsFor(uint32_t classId, int subIndex, int& count
     // client does: a shield is only ever worn in one place, and a bow is only
     // ever ranged, so offering every slot under each of them is a tree the
     // player has to read past rather than one that helps.
-    static constexpr uint8_t kOneHand[]  = {13, 15, 16};        // One-Hand, Main Hand, Off Hand
-    static constexpr uint8_t kTwoHand[]  = {14};                // Two-Hand
-    static constexpr uint8_t kRanged[]   = {17};                // Ranged
-    static constexpr uint8_t kAnyWeapon[] = {13, 14, 15, 16, 17, 19, 20};
-    static constexpr uint8_t kWorn[]     = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    static constexpr uint8_t kShield[]   = {18};
-    static constexpr uint8_t kTrinketry[] = {2, 11, 12, 20};    // Neck, Finger, Trinket, Back
-    static constexpr uint8_t kAnyArmor[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 20};
+    static constexpr uint8_t kOneHand[] = {
+        kSlotOneHand, kSlotMainHand, kSlotOffHand};
+    static constexpr uint8_t kTwoHand[] = {kSlotTwoHand};
+    static constexpr uint8_t kRanged[]  = {kSlotRanged};
+    static constexpr uint8_t kAnyWeapon[] = {
+        kSlotOneHand, kSlotTwoHand, kSlotMainHand, kSlotOffHand, kSlotRanged,
+        kSlotHeldOffHand, kSlotRelic};
+    // What a suit of armour is worn in. Not the neck or the fingers: a ring is
+    // Miscellaneous armour, never cloth or plate, so those two rows searched a
+    // combination no item has. The back is here instead, because a cloak is
+    // cloth - it was in neither list, and could not be searched for at all.
+    static constexpr uint8_t kWorn[] = {
+        kSlotHead, kSlotShoulder, kSlotChest, kSlotWaist, kSlotLegs,
+        kSlotFeet, kSlotWrist, kSlotHands, kSlotBack};
+    static constexpr uint8_t kShield[] = {kSlotShield};
+    // Miscellaneous armour: the jewellery, and the things held in the off hand
+    // that are not weapons.
+    static constexpr uint8_t kTrinketry[] = {
+        kSlotNeck, kSlotFinger, kSlotTrinket, kSlotHeldOffHand};
+    static constexpr uint8_t kAnyArmor[] = {
+        kSlotHead, kSlotNeck, kSlotShoulder, kSlotChest, kSlotWaist, kSlotLegs,
+        kSlotFeet, kSlotWrist, kSlotHands, kSlotFinger, kSlotTrinket, kSlotBack,
+        kSlotShield, kSlotHeldOffHand, kSlotRelic};
+
+    static_assert(auctionSlotsKnown(kOneHand, std::size(kOneHand)));
+    static_assert(auctionSlotsKnown(kTwoHand, std::size(kTwoHand)));
+    static_assert(auctionSlotsKnown(kRanged, std::size(kRanged)));
+    static_assert(auctionSlotsKnown(kAnyWeapon, std::size(kAnyWeapon)));
+    static_assert(auctionSlotsKnown(kWorn, std::size(kWorn)));
+    static_assert(auctionSlotsKnown(kShield, std::size(kShield)));
+    static_assert(auctionSlotsKnown(kTrinketry, std::size(kTrinketry)));
+    static_assert(auctionSlotsKnown(kAnyArmor, std::size(kAnyArmor)));
 
     const auto give = [&count](const uint8_t* list, size_t n) {
         count = static_cast<int>(n);

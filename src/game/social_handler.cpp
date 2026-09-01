@@ -22,6 +22,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <vector>
 
 namespace wowee {
@@ -875,9 +876,11 @@ void SocialHandler::registerOpcodes(DispatchTable& table) {
     table[Opcode::SMSG_LFG_QUEUE_STATUS] = [this](network::Packet& packet) { handleLfgQueueStatus(packet); };
     table[Opcode::SMSG_LFG_PROPOSAL_UPDATE] = [this](network::Packet& packet) { handleLfgProposalUpdate(packet); };
     table[Opcode::SMSG_LFG_ROLE_CHECK_UPDATE] = [this](network::Packet& packet) { handleLfgRoleCheckUpdate(packet); };
-    for (auto op : { Opcode::SMSG_LFG_UPDATE_PLAYER, Opcode::SMSG_LFG_UPDATE_PARTY }) {
-        table[op] = [this](network::Packet& packet) { handleLfgUpdatePlayer(packet); };
-    }
+    // Two opcodes, two bodies. They were sharing a handler, and the party one
+    // carries a join flag and three more bytes of padding the player one does
+    // not - so every party update read the wrong byte as the queue flag.
+    table[Opcode::SMSG_LFG_UPDATE_PLAYER] = [this](network::Packet& packet) { handleLfgUpdatePlayer(packet); };
+    table[Opcode::SMSG_LFG_UPDATE_PARTY]  = [this](network::Packet& packet) { handleLfgUpdateParty(packet); };
     table[Opcode::SMSG_LFG_PLAYER_REWARD] = [this](network::Packet& packet) { handleLfgPlayerReward(packet); };
     table[Opcode::SMSG_LFG_BOOT_PROPOSAL_UPDATE] = [this](network::Packet& packet) { handleLfgBootProposalUpdate(packet); };
     table[Opcode::SMSG_LFG_TELEPORT_DENIED] = [this](network::Packet& packet) { handleLfgTeleportDenied(packet); };
@@ -3722,36 +3725,180 @@ void SocialHandler::handleLfgRoleCheckUpdate(network::Packet& packet) {
     }
 }
 
-void SocialHandler::handleLfgUpdatePlayer(network::Packet& packet) {
-    if (!packet.hasRemaining(1)) return;
-    uint8_t updateType = packet.readUInt8();
-    bool hasExtra = (updateType != 0 && updateType != 1 && updateType != 15 && updateType != 17 && updateType != 18);
-    if (!hasExtra || !packet.hasRemaining(3)) {
-        switch (updateType) {
-            case 8:  lfgState_ = LfgState::None; owner_.addSystemChatMessage("Dungeon Finder: Removed from queue."); break;
-            case 9:  lfgState_ = LfgState::Queued; owner_.addSystemChatMessage("Dungeon Finder: Proposal failed - re-queuing."); break;
-            case 10: lfgState_ = LfgState::Queued; owner_.addSystemChatMessage("Dungeon Finder: A member declined the proposal."); break;
-            case 15: lfgState_ = LfgState::None; owner_.addSystemChatMessage("Dungeon Finder: Left the queue."); break;
-            case 18: lfgState_ = LfgState::None; owner_.addSystemChatMessage("Dungeon Finder: Your group disbanded."); break;
-            default: break;
-        }
-        return;
-    }
-    packet.readUInt8(); packet.readUInt8(); packet.readUInt8();
-    if (packet.hasRemaining(1)) {
-        uint8_t count = packet.readUInt8();
-        for (uint8_t i = 0; i < count && packet.getRemainingSize() >= 4; ++i) {
-            uint32_t dungeonEntry = packet.readUInt32();
-            if (i == 0) lfgDungeonId_ = dungeonEntry;
-        }
-    }
+/// SMSG_LFG_UPDATE_PLAYER and SMSG_LFG_UPDATE_PARTY.
+///
+/// Both open with the update type and a flag saying whether the rest of the
+/// packet is there. Neither was being read: the flag was *inferred* from the
+/// update type by a list of the types thought not to carry a body, and the
+/// body itself - which is where the server says whether you are queued - was
+/// skipped three bytes at a time.
+///
+/// The numbers were a version out too. Under 3.3.5's LfgUpdateType, 15 is
+/// UPDATE_STATUS, the refresh the server sends whenever the queue state is
+/// restated; this read it as "left the queue", set the state to none and said
+/// so in chat. So a player queued for a dungeon was thrown out of the queue by
+/// the packet whose whole job is to confirm they are still in it - locally,
+/// while the server kept them queued, which is what made it look like being
+/// dropped for no reason.
+///
+/// Reading the flags instead of the type is what stops that returning: the
+/// server states the queue in the packet, and the update type only decides
+/// what to say about it.
+namespace {
+
+// 3.3.5 LfgUpdateType, as the server writes it.
+enum : uint8_t {
+    kLfgDefault             = 0,
+    kLfgLeaderUnk1          = 1,
+    kLfgRoleCheckAborted    = 4,
+    kLfgJoinQueue           = 6,
+    kLfgRoleCheckFailed     = 7,
+    kLfgRemovedFromQueue    = 8,
+    kLfgProposalFailed      = 9,
+    kLfgProposalDeclined    = 10,
+    kLfgGroupFound          = 11,
+    kLfgAddedToQueue        = 13,
+    kLfgProposalBegin       = 14,
+    kLfgUpdateStatus        = 15,
+    kLfgGroupMemberOffline  = 16,
+    kLfgGroupDisband        = 17,
+};
+
+/// What to say about an update, or nullptr for the ones that are not news.
+///
+/// Said only when the state actually moves, because the server restates the
+/// same state on a schedule and every line here would otherwise arrive again
+/// with it.
+const char* lfgUpdateMessage(uint8_t updateType) {
     switch (updateType) {
-        case 6:  lfgState_ = LfgState::Queued; owner_.addSystemChatMessage("Dungeon Finder: You have joined the queue."); break;
-        case 11: lfgState_ = LfgState::Proposal; owner_.addSystemChatMessage("Dungeon Finder: A group has been found!"); break;
-        case 12: lfgState_ = LfgState::Queued; owner_.addSystemChatMessage("Dungeon Finder: Added to queue."); break;
-        case 14: lfgState_ = LfgState::InDungeon; break;
-        default: break;
+        case kLfgJoinQueue:        return "Dungeon Finder: You have joined the queue.";
+        case kLfgAddedToQueue:     return "Dungeon Finder: Added to the queue.";
+        case kLfgRemovedFromQueue: return "Dungeon Finder: Removed from the queue.";
+        case kLfgRoleCheckFailed:  return "Dungeon Finder: The role check failed.";
+        case kLfgRoleCheckAborted: return "Dungeon Finder: The role check was cancelled.";
+        case kLfgProposalFailed:   return "Dungeon Finder: The group did not form - back in the queue.";
+        case kLfgProposalDeclined: return "Dungeon Finder: Someone declined - back in the queue.";
+        case kLfgGroupFound:       return "Dungeon Finder: A group has been found!";
+        case kLfgGroupDisband:     return "Dungeon Finder: Your group disbanded.";
+        default:                   return nullptr;
     }
+}
+
+}  // namespace
+
+void SocialHandler::handleLfgUpdatePlayer(network::Packet& packet) {
+    //   uint8  updateType
+    //   uint8  extraInfo
+    //   if extraInfo:
+    //     uint8  queued
+    //     uint8  0
+    //     uint8  0
+    //     uint8  dungeonCount
+    //     uint32 dungeon x dungeonCount
+    //     cstring comment
+    if (!packet.hasRemaining(2)) return;
+    const uint8_t updateType = packet.readUInt8();
+    const bool extraInfo = packet.readUInt8() != 0;
+    bool queued = false;
+    if (extraInfo && packet.hasRemaining(4)) {
+        queued = packet.readUInt8() != 0;
+        packet.readUInt8();
+        packet.readUInt8();
+        readLfgDungeonList(packet);
+    }
+    applyLfgUpdate(updateType, extraInfo, queued, /*inDungeon=*/false);
+}
+
+void SocialHandler::handleLfgUpdateParty(network::Packet& packet) {
+    // The same opening, and then a body of its own - a join flag ahead of the
+    // queued one and three more bytes before the count. Routed to the player
+    // handler before this existed, which read the join flag as "queued" and
+    // the dungeon count out of the middle of the padding.
+    //
+    //   uint8  updateType
+    //   uint8  extraInfo
+    //   if extraInfo:
+    //     uint8  joined
+    //     uint8  queued
+    //     uint8  0
+    //     uint8  0
+    //     uint8  0 x3
+    //     uint8  dungeonCount
+    //     uint32 dungeon x dungeonCount
+    //     cstring comment
+    if (!packet.hasRemaining(2)) return;
+    const uint8_t updateType = packet.readUInt8();
+    const bool extraInfo = packet.readUInt8() != 0;
+    bool queued = false;
+    bool joined = false;
+    if (extraInfo && packet.hasRemaining(8)) {
+        joined = packet.readUInt8() != 0;
+        queued = packet.readUInt8() != 0;
+        for (int i = 0; i < 5; ++i) packet.readUInt8();
+        readLfgDungeonList(packet);
+    }
+    // The party's join flag covers being in the dungeon as well as being in the
+    // queue, so it only means "in a dungeon" when the queue flag is off.
+    applyLfgUpdate(updateType, extraInfo, queued, joined && !queued);
+}
+
+/// The dungeons the update is about. The first is the one the queue window
+/// names; the comment after them is the group's listing text, which this
+/// client does not offer a way to set.
+void SocialHandler::readLfgDungeonList(network::Packet& packet) {
+    if (!packet.hasRemaining(1)) return;
+    const uint8_t count = packet.readUInt8();
+    for (uint8_t i = 0; i < count && packet.hasRemaining(4); ++i) {
+        const uint32_t dungeonEntry = packet.readUInt32();
+        if (i == 0) lfgDungeonId_ = dungeonEntry & 0x00FFFFFFu;
+    }
+}
+
+/// The state the packet describes, and a word about it if it moved.
+void SocialHandler::applyLfgUpdate(uint8_t updateType, bool extraInfo,
+                                   bool queued, bool inDungeon) {
+    const LfgState previous = lfgState_;
+
+    // A proposal is the one state the flags do not distinguish: the server
+    // sends it with the queue flag still set, because a proposal is a queue
+    // that has found something.
+    if (updateType == kLfgGroupFound || updateType == kLfgProposalBegin) {
+        lfgState_ = LfgState::Proposal;
+    } else if (!extraInfo) {
+        // No body means no state, which is the server's way of saying none -
+        // and for the types that never carry one it is not a statement about
+        // the queue at all, so those are left alone.
+        switch (updateType) {
+            case kLfgDefault:
+            case kLfgLeaderUnk1:
+            case kLfgGroupMemberOffline:
+                break;
+            default:
+                lfgState_ = LfgState::None;
+                break;
+        }
+    } else if (queued) {
+        lfgState_ = LfgState::Queued;
+    } else if (inDungeon) {
+        lfgState_ = LfgState::InDungeon;
+    }
+
+    if (const char* message = lfgUpdateMessage(updateType)) {
+        // Only on a move. UPDATE_STATUS says nothing of its own and the rest
+        // repeat: the server restates the queue every few seconds, and each
+        // restatement used to arrive as a line of chat.
+        if (lfgState_ != previous) owner_.addSystemChatMessage(message);
+    } else if (updateType != kLfgUpdateStatus && updateType != kLfgDefault) {
+        // An update type this client has no name for. Said once so it can be
+        // added, rather than silently deciding the queue is over.
+        static std::set<uint8_t> said;
+        if (said.insert(updateType).second) {
+            LOG_WARNING("SMSG_LFG_UPDATE: unhandled update type ",
+                        static_cast<int>(updateType), " (extraInfo=", extraInfo,
+                        ", queued=", queued, ") - the queue state is left as it was");
+        }
+    }
+
     // Queue state changed - GetLFGInfoServer answers the new one.
     if (owner_.addonEventCallbackRef()) owner_.addonEventCallbackRef()("LFG_UPDATE", {});
 }

@@ -13,6 +13,8 @@
 
 #include "game/auction_filters.hpp"
 
+#include <set>
+
 using namespace wowee::game;
 
 TEST_CASE("a weapon slot position resolves to a weapon slot", "[auction-slot]") {
@@ -26,6 +28,60 @@ TEST_CASE("an armour slot position resolves to a worn slot", "[auction-slot]") {
     CHECK(auctionSlotIdAt(4, 0, 1) == 1);   // Head
     CHECK(auctionSlotIdAt(4, 0, 2) == 2);   // Neck
     CHECK(auctionSlotIdAt(4, 0, 3) == 3);   // Shoulder
+}
+
+namespace {
+
+/// Every inventory type offered under a class and subclass.
+std::set<uint32_t> offeredSlots(uint32_t classId, int subIndex) {
+    std::set<uint32_t> slots;
+    int count = 0;
+    if (!auctionSlotsFor(classId, subIndex, count)) return slots;
+    for (int position = 1; position <= count; ++position) {
+        slots.insert(auctionSlotIdAt(classId, subIndex, position));
+    }
+    return slots;
+}
+
+// Positions in kAuctionArmorSubs.
+constexpr int kArmorAll           = 0;
+constexpr int kArmorCloth         = 1;
+constexpr int kArmorMiscellaneous = 6;
+
+// Inventory types, as kAuctionSlots carries them.
+constexpr uint32_t kNeck    = 2;
+constexpr uint32_t kFinger  = 11;
+constexpr uint32_t kTrinket = 12;
+constexpr uint32_t kCloak   = 16;
+constexpr uint32_t kChest   = 5;
+
+}  // namespace
+
+TEST_CASE("the category rings are in offers the finger slot", "[auction-slot]") {
+    // Armor > Miscellaneous is the subclass every ring, neck and trinket in the
+    // game belongs to. Its list was written as positions with the slot names in
+    // a comment beside them, and the two had drifted a row apart - Finger was
+    // not in it, so no search in the auction house could ask for a ring.
+    //
+    // The checks above cannot see this: each position it did offer was a real
+    // slot, and no slot was offered twice. Only the names catch it.
+    const std::set<uint32_t> misc = offeredSlots(4, kArmorMiscellaneous);
+    CHECK(misc.count(kFinger) == 1);
+    CHECK(misc.count(kNeck) == 1);
+    CHECK(misc.count(kTrinket) == 1);
+    // And under everything, which is where a search starts.
+    CHECK(offeredSlots(4, kArmorAll).count(kFinger) == 1);
+}
+
+TEST_CASE("a suit of armour is not searched by the fingers", "[auction-slot]") {
+    // The other half of the same drift: cloth and plate offered Neck and Finger,
+    // which no item is - jewellery is Miscellaneous, whatever it is made of -
+    // and did not offer Back, which every cloak in the game is.
+    const std::set<uint32_t> cloth = offeredSlots(4, kArmorCloth);
+    CHECK(cloth.count(kFinger) == 0);
+    CHECK(cloth.count(kNeck) == 0);
+    CHECK(cloth.count(kCloak) == 1);
+    CHECK(cloth.count(kChest) == 1);
 }
 
 TEST_CASE("every offered position resolves to a real slot", "[auction-slot]") {
@@ -120,8 +176,11 @@ TEST_CASE("a subclass narrows the list to where that item is worn",
     CHECK(count == 1);
     CHECK(auctionSlotIdAt(2, 3, 1) == 26);   // INVTYPE_RANGED
 
+    // Nine: the eight places a suit is worn, and the back. Ten before, which
+    // was those nine with Neck and Finger in place of the back - jewellery
+    // this subclass cannot contain, and no room for the cloaks it does.
     auctionSlotsFor(4, 1, count);            // Armor, Cloth
-    CHECK(count == 10);
+    CHECK(count == 9);
     CHECK(auctionSlotIdAt(4, 1, 1) == 1);    // Head
 
     auctionSlotsFor(2, 9, count);            // Weapon, Sword (2H)
@@ -138,8 +197,9 @@ TEST_CASE("an unpicked subclass still offers the whole class", "[auction-slot]")
     // Selecting Armor without a subclass has to keep every armour slot, or
     // the filter disappears until a subclass is chosen.
     int count = 0;
+    // Fifteen with the off hand, which is armour and was in none of the lists.
     auctionSlotsFor(4, 0, count);
-    CHECK(count == 14);
+    CHECK(count == 15);
     auctionSlotsFor(2, 0, count);
     CHECK(count == 7);
 }
