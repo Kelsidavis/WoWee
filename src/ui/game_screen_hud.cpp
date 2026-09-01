@@ -1,4 +1,5 @@
 #include "ui/game_screen.hpp"
+#include "ui/sight_cache.hpp"
 #include "addons/lua_api_registrations.hpp"
 #include "ui/ui_texture_load.hpp"
 #include "ui/ui_upload_budget.hpp"
@@ -1005,29 +1006,10 @@ void GameScreen::renderNameplates(game::GameHandler& gameHandler) {
         // to change the answer, and every so often regardless, since the
         // geometry between them streams in and out - the same treatment the
         // selection circle gives its floor query.
-        if (auto* wmo = services_.renderer ? services_.renderer->getWMORenderer() : nullptr) {
-            struct SightCache {
-                glm::vec3 from{}, to{};
-                int age = 1000;
-                bool blocked = false;
-            };
-            static std::unordered_map<uint64_t, SightCache> sight;
-            // Bounded, because every unit ever seen would otherwise keep an
-            // entry for the life of the process. Dropping the lot costs one
-            // recomputation each for the handful currently on screen.
-            if (sight.size() > 512) sight.clear();
-            SightCache& c = sight[guid];
-            const bool moved = glm::distance(c.from, camPos) > 0.5f ||
-                               glm::distance(c.to, renderPos) > 0.5f;
-            if (moved || c.age >= 15) {
-                c.from = camPos;
-                c.to = renderPos;
-                c.age = 0;
-                c.blocked = wmo->segmentBlocked(camPos, renderPos);
-            } else {
-                ++c.age;
-            }
-            if (c.blocked) continue;
+        static SightCache sight;
+        if (sight.blocked(services_.renderer ? services_.renderer->getWMORenderer() : nullptr,
+                          guid, camPos, renderPos)) {
+            continue;
         }
 
         // Project to clip space

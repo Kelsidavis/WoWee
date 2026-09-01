@@ -1758,6 +1758,8 @@ static bool fillItemTooltipById(wowee::ui::Widget* w, game::GameHandler* gh,
                                 uint32_t itemId);
 static bool fillItemTooltipById(lua_State* L, game::GameHandler* gh,
                                 uint32_t itemId);
+static void appendRandomSuffix(wowee::ui::Widget* w, game::GameHandler* gh,
+                               const game::ItemDef& item);
 
 /// One spell tooltip, for every path that shows one.
 ///
@@ -2589,8 +2591,25 @@ int lua_Tooltip_SetAuctionItem(lua_State* L) {
         lua_pushboolean(L, 0);
         return 1;
     }
-    const bool filled =
-        fillItemTooltipById(L, gh, results.auctions[index - 1].itemEntry);
+    const auto& row = results.auctions[index - 1];
+    const bool filled = fillItemTooltipById(L, gh, row.itemEntry);
+    if (filled) {
+        // The suffix it rolled, which for a ring is usually all of its stats.
+        //
+        // The row was being described by its item id alone, and a suffixed
+        // item's id is the plain base: "Ring of the Whale" is Ring plus a
+        // suffix, and the base has no stats at all. So the tooltip named an
+        // item with nothing on it - reported as rings in the auction house
+        // missing their stats, which is exactly the ones a suffix is on.
+        //
+        // Both halves come off the auction row, which has carried them since
+        // it was parsed, and the id is signed there: a suffix is negative.
+        game::ItemDef def;
+        def.itemId           = row.itemEntry;
+        def.randomPropertyId = static_cast<int32_t>(row.randomPropertyId);
+        def.suffixFactor     = row.suffixFactor;
+        appendRandomSuffix(w, gh, def);
+    }
     lua_pushboolean(L, filled ? 1 : 0);
     return 1;
 }

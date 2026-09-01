@@ -4680,6 +4680,15 @@ void registerInventoryLuaAPI(lua_State* L) {
             const auto& a = r->auctions[index - 1];
             const auto* info = gh->getItemInfo(a.itemEntry);
             std::string name = info ? info->name : "Item #" + std::to_string(a.itemEntry);
+            // With the suffix it rolled. The row was named from the item id
+            // alone, and a suffixed item's id is its plain base - so a whole
+            // page of "Ring" gave no way to tell one from another, and the
+            // stats that tell them apart are the suffix's.
+            if (info && a.randomPropertyId != 0) {
+                const std::string suffix =
+                    gh->getRandomPropertyName(static_cast<int32_t>(a.randomPropertyId));
+                if (!suffix.empty()) name += " " + suffix;
+            }
             std::string icon = (info && info->displayInfoId != 0) ? gh->getItemIconPath(info->displayInfoId) : "";
             uint32_t quality = info ? info->quality : 1;
             lua_pushstring(L, name.c_str());        // name
