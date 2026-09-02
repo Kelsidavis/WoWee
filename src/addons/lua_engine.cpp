@@ -11279,13 +11279,28 @@ bool LuaEngine::saveSavedVariables(const std::string& path, const std::vector<st
     if (!L_ || varNames.empty()) return false;
     std::string output;
     for (const auto& name : varNames) {
-        lua_getglobal(L_, name.c_str());
-        if (!lua_isnil(L_, -1)) {
+        // Raw, so the missing-API fallback cannot answer for a variable that is
+        // not there - and only real data is written.
+        //
+        // That fallback hands back a stand-in *table* for any unknown global,
+        // which is what makes feature detection work; here it made every absent
+        // saved variable read as an empty table and be written as one. So an
+        // addon whose variables were not in this state - because the interface
+        // had been unloaded, which is exactly when they are written - had its
+        // file overwritten with `Settings = {}`, and everything the player had
+        // set was gone at the next start with nothing to say so.
+        lua_pushvalue(L_, LUA_GLOBALSINDEX);
+        lua_pushlstring(L_, name.data(), name.size());
+        lua_rawget(L_, -2);
+        const int type = lua_type(L_, -1);
+        const bool storable = (type == LUA_TTABLE) || (type == LUA_TSTRING) ||
+                              (type == LUA_TNUMBER) || (type == LUA_TBOOLEAN);
+        if (storable) {
             output += name + " = ";
             serializeLuaValue(L_, lua_gettop(L_), output, 0);
             output += "\n";
         }
-        lua_pop(L_, 1);
+        lua_pop(L_, 2);
     }
     if (output.empty()) return true;
 

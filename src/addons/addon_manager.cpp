@@ -1636,6 +1636,12 @@ void AddonManager::update(float deltaTime) {
 }
 
 void AddonManager::saveAllSavedVariables() {
+    // Only what a loaded interface is holding. unloadAll saves, tears the Lua
+    // state down and then scans the disk again - so the addon list is full
+    // again while the state that held their variables is gone, and the save on
+    // the way out of the process would write every one of those files from a
+    // state that never loaded them.
+    if (!addonsLoaded_) return;
     for (const auto& addon : addons_) {
         auto savedVars = addon.getSavedVariables();
         if (!savedVars.empty()) {
