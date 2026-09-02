@@ -9402,20 +9402,28 @@ int lua_EditBox_HasFocus(lua_State* L) {
 
 void LuaEngine::setEditFocus(uint32_t wid) {
     if (focusedWid_ == wid) return;
-    if (focusedWid_ != 0) {
-        if (auto* old = widgets_.get(focusedWid_)) {
+    // Moved before the scripts run, because a script clears focus itself.
+    //
+    // ChatEdit_OnEditFocusLost ends in ChatEdit_SetDeactivated, which calls
+    // ClearFocus - and with the old id still standing here that came straight
+    // back in and fired the same script again, and again, until the C stack ran
+    // out. "AutoComplete.lua:135: C stack overflow" every time the player
+    // clicked away from the chat box, taking the rest of the handler with it.
+    const uint32_t previous = focusedWid_;
+    focusedWid_ = wid;
+    if (previous != 0) {
+        if (auto* old = widgets_.get(previous)) {
             old->editFocused = false;
             // And its selection, for the same reason: a box that is no longer
             // being typed into must not keep a run that the next visit would
             // overwrite.
             old->hasSelection = false;
         }
-        callFrameScript(focusedWid_, "OnEditFocusLost");
+        callFrameScript(previous, "OnEditFocusLost");
     }
-    focusedWid_ = wid;
-    if (focusedWid_ != 0) {
-        if (auto* w = widgets_.get(focusedWid_)) w->editFocused = true;
-        callFrameScript(focusedWid_, "OnEditFocusGained");
+    if (wid != 0) {
+        if (auto* w = widgets_.get(wid)) w->editFocused = true;
+        callFrameScript(wid, "OnEditFocusGained");
     }
 }
 
@@ -10391,18 +10399,20 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
             }
             // Clicking a box is how you type into one.
             //
-            // Focus was taken by an autoFocus box on becoming visible and by
-            // SetFocus called by name, and by nothing else - so a box that
-            // stays on screen waiting to be clicked, which is what the chat
-            // input is with "Chat box always visible" on, could be clicked all
-            // day and never take the keyboard. The nearest edit box at or above
-            // what was hit, because a click lands on a region inside the box
-            // rather than on the box itself.
+            // The nearest edit box at or above what was hit, because a click
+            // lands on a region inside the box rather than on the box itself.
             //
-            // Left button only, and only when it lands on one: a press
-            // elsewhere leaves the focus where it is, as it does in WoW, so
-            // clicking the world does not silently close the box you were
-            // typing in.
+            // Left button only, and only when it lands on one. A press
+            // elsewhere leaves the focus where it is, which is what the game
+            // does: clicking a bag, a paperdoll slot or the world while a line
+            // is half typed does not throw the line away. It used to clear the
+            // focus here, and that is what stopped shift-clicking an item from
+            // linking it - HandleModifiedItemClick asks ChatEdit_InsertLink,
+            // which needs an *active* chat box, and the click that named the
+            // item had just deactivated it.
+            //
+            // Escape and Enter are what give the keyboard back, as they do in
+            // WoW.
             if (b.name && std::strcmp(b.name, "LeftButton") == 0) {
                 for (uint32_t id = hit; id != 0;) {
                     const auto* cand = widgets_.get(id);
@@ -10436,12 +10446,6 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
                         }
                     }
                 }
-            }
-            // Clicking into an edit box takes focus; clicking anywhere else
-            // gives it up, which is what makes a chat box stop eating keys.
-            if (i == 0) {
-                const auto* hw = hit ? widgets_.get(hit) : nullptr;
-                setEditFocus(hw && hw->isEditBox ? hit : 0);
             }
             if (pressedWid_[i] != 0)
                 callFrameScript(pressedWid_[i], "OnMouseDown", b.name);
