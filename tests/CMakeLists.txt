@@ -1233,6 +1233,23 @@ register_test_target(test_font_em_scale)
 # pick used to be "whichever is longer", which answered a different question.
 wowee_add_test(test_quest_text SOURCES test_quest_text.cpp)
 
+# ── test_interface_text_lines ────────────────────────────────
+# How many lines a label takes, measured on demand rather than read off the
+# last frame. The quest tracker sizes every row from that answer, and a stale
+# zero drew each wrapped objective over the row beneath it.
+add_executable(test_interface_text_lines
+    test_interface_text_lines.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/interface_fonts.cpp
+)
+target_include_directories(test_interface_text_lines PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_interface_text_lines SYSTEM PRIVATE
+    ${TEST_SYSTEM_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/extern/imgui
+)
+target_link_libraries(test_interface_text_lines PRIVATE catch2_main imgui)
+add_test(NAME interface_text_lines COMMAND test_interface_text_lines)
+register_test_target(test_interface_text_lines)
+
 # ── test_npc_flags ───────────────────────────────────────────
 # UNIT_NPC_FLAGS bit by bit. A wrong one is invisible - the mask just always
 # answers no - and NPC_FLAG_VENDOR was 0x04, a bit nothing sets, so no merchant

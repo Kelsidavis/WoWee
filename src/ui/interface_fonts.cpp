@@ -3,6 +3,9 @@
 #include <imgui.h>
 #include <cfloat>
 
+#include "ui/text_markup.hpp"
+#include "ui/text_wrap.hpp"
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -85,6 +88,22 @@ float interfaceTextWidth(const std::string& text, const std::string& fontFace,
     // is answering zero, and MoneyFrame does SetWidth(GetTextWidth() +
     // iconWidth), which then places three buttons on top of each other.
     return static_cast<float>(text.size()) * size * 0.5f;
+}
+
+int interfaceTextLines(const std::string& text, const std::string& fontFace,
+                       float fontHeight, float wrapWidth, bool nonSpaceWrap) {
+    if (text.empty()) return 0;
+    const float size = interfaceFontSize(fontHeight);
+    ImFont* font = interfaceFaceOrDefault(fontFace);
+    const auto measure = [&](const std::string& piece) {
+        if (font) return font->CalcTextSizeA(size, FLT_MAX, 0.0f, piece.c_str()).x;
+        // The same estimate interfaceTextWidth falls back on when there is no
+        // context yet, so a measure taken during the load does not answer that
+        // everything fits on one line.
+        return static_cast<float>(piece.size()) * size * 0.5f;
+    };
+    const auto lines = wrapText(parseMarkup(text), wrapWidth, nonSpaceWrap, measure);
+    return lines.empty() ? 1 : static_cast<int>(lines.size());
 }
 
 float fontEmSizeScale(const void* ttfData, size_t byteCount) {

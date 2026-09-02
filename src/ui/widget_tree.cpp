@@ -365,15 +365,21 @@ void WidgetTree::pinToCurrentPosition(uint32_t id) {
     // One anchor leaves the size to be stated rather than solved, so a frame
     // that was sized by two opposing corners keeps the size it had rather than
     // collapsing the moment it is picked up.
-    if (w->width <= 0.0f)  w->width  = w->rectW;
-    if (w->height <= 0.0f) w->height = w->rectH;
+    const float es = (w->effScale > 0.0f) ? w->effScale : 1.0f;
+    if (w->width <= 0.0f)  w->width  = w->rectW / es;
+    if (w->height <= 0.0f) w->height = w->rectH / es;
 
+    // The offset is in this frame's own units and the rects are in screen
+    // units, which differ by the frame's scale - see layoutWidget, where the
+    // offset is the one term multiplied by it. Pinning a scaled frame without
+    // dividing wrote a screen distance into a frame-unit offset, and the frame
+    // jumped by its own scale factor the moment it was picked up.
     Anchor a;
     a.point = "BOTTOMLEFT";
     a.relativePoint = "BOTTOMLEFT";
     a.relativeTo = 0;   // the parent
-    a.x = w->left - px;
-    a.y = w->bottom - py;
+    a.x = (w->left - px) / es;
+    a.y = (w->bottom - py) / es;
     w->anchors.clear();
     w->anchors.push_back(a);
     w->userMoved = true;
@@ -424,8 +430,16 @@ void WidgetTree::resizeBy(uint32_t id, const std::string& point,
     // A frame sized by two opposing anchors has no width of its own to change,
     // so pin it to what it is currently drawn at first - the same reason
     // pinToCurrentPosition does this before a move.
-    if (w->width <= 0.0f)  w->width  = w->rectW;
-    if (w->height <= 0.0f) w->height = w->rectH;
+    //
+    // Out of the drawn rect and into the frame's own units, which is what a
+    // declared width is: layoutWidget multiplies it by the scale on the way
+    // back out. The two are the same number on an unscaled frame and nowhere
+    // else, and the cursor delta below crosses the same line.
+    const float es = (w->effScale > 0.0f) ? w->effScale : 1.0f;
+    if (w->width <= 0.0f)  w->width  = w->rectW / es;
+    if (w->height <= 0.0f) w->height = w->rectH / es;
+    dx /= es;
+    dy /= es;
 
     const bool movesLeft   = point.find("LEFT")   != std::string::npos;
     const bool movesBottom = point.find("BOTTOM") != std::string::npos;
@@ -477,7 +491,12 @@ void WidgetTree::nudge(uint32_t id, float dx, float dy) {
             dy = bottom - w->bottom;
         }
     }
-    for (Anchor& a : w->anchors) { a.x += dx; a.y += dy; }
+    // Into the frame's own units, which is what an anchor offset is: the
+    // cursor moved dx across the screen, and a frame at scale 1.25 covers that
+    // in 1.25 fewer units of its own. Without this a scaled window ran ahead of
+    // the cursor that was dragging it.
+    const float es = (w->effScale > 0.0f) ? w->effScale : 1.0f;
+    for (Anchor& a : w->anchors) { a.x += dx / es; a.y += dy / es; }
 }
 
 /// Move every descendant that carries its own level by the same amount.

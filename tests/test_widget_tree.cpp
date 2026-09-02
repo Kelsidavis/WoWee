@@ -2813,3 +2813,56 @@ TEST_CASE("A SimpleHTML holding text is drawn", "[widget][simplehtml]") {
         CHECK_FALSE(found);
     }
 }
+
+// A frame with a scale of its own lives in two coordinate spaces, and the two
+// halves of moving it have to agree about which is which: a drawn rect is in
+// screen units, while a declared size and an anchor offset are in the frame's
+// own - layoutWidget multiplies the offset by the scale and nothing else.
+//
+// Dragging read the cursor delta straight into the offset, so a window at 1.25
+// travelled a quarter again as far as the hand holding it; pinning wrote the
+// drawn position into the offset, so it jumped by its own scale the moment it
+// was picked up. Both are the bag window, which Interface > Bags scales.
+TEST_CASE("A scaled frame moves with the cursor, not ahead of it",
+          "[widget][layout][scale]") {
+    WidgetTree tree;
+    const uint32_t f = tree.create(WidgetKind::Frame, 0, "F");
+    Widget* w = tree.get(f);
+    w->width = 100.0f;
+    w->height = 50.0f;
+    w->scale = 1.25f;
+    Anchor a;
+    a.point = "BOTTOMLEFT";
+    a.relativePoint = "BOTTOMLEFT";
+    a.x = 100.0f;
+    a.y = 100.0f;
+    tree.addPoint(f, a);
+    tree.layout(kScreenW, kScreenH);
+
+    // The offset is in the frame's units, so the drawn corner is a scale out.
+    REQUIRE(w->left == Catch::Approx(125.0f));
+    REQUIRE(w->rectW == Catch::Approx(125.0f));
+
+    // Forty pixels of cursor is forty pixels of frame.
+    tree.nudge(f, 40.0f, 0.0f);
+    tree.layout(kScreenW, kScreenH);
+    REQUIRE(w->left == Catch::Approx(165.0f));
+
+    SECTION("and pinning it where it is does not move it") {
+        const float left = w->left, bottom = w->bottom;
+        const float rectW = w->rectW, rectH = w->rectH;
+        tree.pinToCurrentPosition(f);
+        tree.layout(kScreenW, kScreenH);
+        REQUIRE(w->left == Catch::Approx(left));
+        REQUIRE(w->bottom == Catch::Approx(bottom));
+        REQUIRE(w->rectW == Catch::Approx(rectW));
+        REQUIRE(w->rectH == Catch::Approx(rectH));
+    }
+
+    SECTION("and a resize follows the cursor too") {
+        tree.resizeBy(f, "BOTTOMRIGHT", 25.0f, 0.0f);
+        tree.layout(kScreenW, kScreenH);
+        // Twenty-five pixels wider on screen, whatever the frame calls it.
+        REQUIRE(w->rectW == Catch::Approx(150.0f));
+    }
+}

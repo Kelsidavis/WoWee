@@ -785,20 +785,43 @@ int lua_Region_GetFieldSize(lua_State* L) {
     return 1;
 }
 
-int lua_Region_GetTextHeight(lua_State* L) {
-    const auto* w = textWidgetOf(L, 1);
-    if (!w) { lua_pushnumber(L, 0.0); return 1; }
-    // Every line of it. This answered one line's height however many the label
-    // drew, and FrameXML sizes panels from it - a quest description or an
-    // options paragraph asked how tall it was, was told twelve, and the frame
-    // around it was built to fit one line of the several on screen.
+/// How tall a font string's own text is, measured now.
+///
+/// Every line of it. This answered one line's height however many the label
+/// drew, and FrameXML sizes panels from it - a quest description or an options
+/// paragraph asked how tall it was, was told twelve, and the frame around it
+/// was built to fit one line of the several on screen.
+///
+/// Measured here rather than read off the last frame's measure, because the
+/// interface writes and reads in the same breath: WatchFrame_SetLine sets a
+/// row's text, gives it a width, and asks how tall it came out - all before
+/// anything is drawn again. Reading the stale figure answered the height of
+/// whatever that row said last time, and for a freshly reset row that is zero,
+/// so a two-line objective was given a one-line row and the rows below it were
+/// drawn over its second line.
+///
+/// The width it wraps inside is the renderer's own rule: a declared width with
+/// no height is a paragraph, and so is anything the interface has marked as
+/// wrapping. A label sized by its own text wraps at nothing and is one line
+/// unless it carries a |n.
+double fontStringTextHeight(const wowee::ui::Widget& w) {
     // The size it is actually drawn at, which is what interfaceFontSize
     // answers. Three places asked this question with three different
     // fallbacks - twelve here, twelve below, fourteen in the edit box - and a
     // label with no declared height is drawn at none of them.
-    const float line = wowee::ui::interfaceFontSize(w->fontHeight);
-    const int lines = (w->wrappedLines > 0) ? w->wrappedLines : 1;
-    lua_pushnumber(L, line * 1.2 * lines);
+    const float line = wowee::ui::interfaceFontSize(w.fontHeight);
+    const float wrapWidth =
+        (w.wrapsToWidth || (!w.autoSized && w.width > 0.0f)) ? w.width : 0.0f;
+    const int lines = std::max(1, wowee::ui::interfaceTextLines(
+                                      w.text, w.fontFace, w.fontHeight,
+                                      wrapWidth, w.nonSpaceWrap));
+    return line * 1.2 * lines;
+}
+
+int lua_Region_GetTextHeight(lua_State* L) {
+    const auto* w = textWidgetOf(L, 1);
+    if (!w) { lua_pushnumber(L, 0.0); return 1; }
+    lua_pushnumber(L, fontStringTextHeight(*w));
     return 1;
 }
 
@@ -825,6 +848,19 @@ int lua_Region_GetWidth(lua_State* L) {
 int lua_Region_GetHeight(lua_State* L) {
     const auto* w = measuredWidgetOf(L, 1);
     const float es = (w && w->effScale > 0.0f) ? w->effScale : 1.0f;
+    if (w && w->rectH <= 0.0f && w->height <= 0.0f &&
+        w->kind == wowee::ui::WidgetKind::FontString && !w->text.empty()) {
+        // A font string that was never given a height is as tall as its text,
+        // the same way one never given a width is as wide as it - and the
+        // interface reads that. `<Size x="160" y="0"/>` is how a wrapping
+        // label is declared, and WatchFrameLineTemplate_Reset writes the zero
+        // back on every rebuild; the tracker then compares the height it gets
+        // against one line and gives a two-line objective a taller row. Zero
+        // failed that test always, so every wrapped objective was drawn over
+        // the row beneath it.
+        lua_pushnumber(L, fontStringTextHeight(*w));
+        return 1;
+    }
     lua_pushnumber(L, w ? (w->rectH > 0.0f ? w->rectH / es : w->height) : 0.0);
     return 1;
 }
@@ -835,9 +871,24 @@ int lua_Region_GetHeight(lua_State* L) {
 // works out where its dock sits, the container frames decide which side to
 // open a tooltip on. A no-op behind them is not a getter that answers badly,
 // it is nil in a subtraction, which takes the whole file down.
+//
+// In the frame's own units, as GetWidth and GetHeight are and as WoW reports
+// them: the laid-out rect has the effective scale in it, and multiplying by
+// GetEffectiveScale is how the interface turns one of these into pixels. The
+// distinction only shows on a frame with a scale of its own, and there it is
+// the whole story: an anchor offset is in the frame's own units too, so a
+// window that saved GetLeft and opened itself with SetPoint at that number
+// came back a scale factor further out every time it was opened. That is the
+// bag window, which is scaled by Interface > Bags: at 1.25 it walked right and
+// up the screen on every restart until the clamp caught it, which reads as a
+// window that does not remember where it was put.
+static float ownUnits(const wowee::ui::Widget* w, float v) {
+    const float es = (w && w->effScale > 0.0f) ? w->effScale : 1.0f;
+    return v / es;
+}
 int lua_Region_GetLeft(lua_State* L) {
     const auto* w = measuredWidgetOf(L, 1);
-    lua_pushnumber(L, w ? w->left : 0.0);
+    lua_pushnumber(L, w ? ownUnits(w, w->left) : 0.0);
     return 1;
 }
 /// GetCenter() - the middle of the frame, in the same screen units GetLeft and
@@ -852,8 +903,8 @@ int lua_Region_GetLeft(lua_State* L) {
 int lua_Region_GetCenter(lua_State* L) {
     const auto* w = measuredWidgetOf(L, 1);
     if (!w) { lua_pushnil(L); lua_pushnil(L); return 2; }
-    lua_pushnumber(L, w->left + w->rectW * 0.5f);
-    lua_pushnumber(L, w->bottom + w->rectH * 0.5f);
+    lua_pushnumber(L, ownUnits(w, w->left + w->rectW * 0.5f));
+    lua_pushnumber(L, ownUnits(w, w->bottom + w->rectH * 0.5f));
     return 2;
 }
 
@@ -889,17 +940,17 @@ static int lua_Region_GetParent(lua_State* L) {
 
 int lua_Region_GetRight(lua_State* L) {
     const auto* w = measuredWidgetOf(L, 1);
-    lua_pushnumber(L, w ? (w->left + w->rectW) : 0.0);
+    lua_pushnumber(L, w ? ownUnits(w, w->left + w->rectW) : 0.0);
     return 1;
 }
 int lua_Region_GetBottom(lua_State* L) {
     const auto* w = measuredWidgetOf(L, 1);
-    lua_pushnumber(L, w ? w->bottom : 0.0);
+    lua_pushnumber(L, w ? ownUnits(w, w->bottom) : 0.0);
     return 1;
 }
 int lua_Region_GetTop(lua_State* L) {
     const auto* w = measuredWidgetOf(L, 1);
-    lua_pushnumber(L, w ? (w->bottom + w->rectH) : 0.0);
+    lua_pushnumber(L, w ? ownUnits(w, w->bottom + w->rectH) : 0.0);
     return 1;
 }
 /// GetRect() → left, bottom, width, height. All four at once, which is what
@@ -925,10 +976,10 @@ int lua_Region_IsMouseOver(lua_State* L) {
 int lua_Region_GetRect(lua_State* L) {
     const auto* w = measuredWidgetOf(L, 1);
     if (!w) return 0;
-    lua_pushnumber(L, w->left);
-    lua_pushnumber(L, w->bottom);
-    lua_pushnumber(L, w->rectW);
-    lua_pushnumber(L, w->rectH);
+    lua_pushnumber(L, ownUnits(w, w->left));
+    lua_pushnumber(L, ownUnits(w, w->bottom));
+    lua_pushnumber(L, ownUnits(w, w->rectW));
+    lua_pushnumber(L, ownUnits(w, w->rectH));
     return 4;
 }
 /// Per-frame scale is not modelled - the tree scales the whole interface at

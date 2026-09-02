@@ -1910,6 +1910,24 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
         const float x1 = (w->left + w->rectW) * s;
         const float y1 = screenH - w->bottom * s;
 
+        // Pixels per unit for what is drawn *inside* this widget: the
+        // interface's scale, and the frame's own scale on top of it.
+        //
+        // The rect above already carries the frame's scale - left and rectW
+        // come out of a layout that multiplied by it - so anything else
+        // measured in the frame's own units has to be scaled the same way or
+        // it is drawn to a different ruler than the box it is drawn in. A font
+        // height is exactly that, and it was being scaled by the interface
+        // alone.
+        //
+        // The world map is where it shows. Its quest pane is at 0.9, so every
+        // label in it was drawn a ninth too large for a box a ninth too small,
+        // wrapped to more lines than the sizing pass had counted, and - a font
+        // string is centred in its box - was lifted clear of that box and over
+        // the heading above it. The quest title sat on its own objectives and
+        // "Description" sat on its own first line.
+        const float ws = s * (w->effScale > 0.0f ? w->effScale : 1.0f);
+
         if (w->kind == WidgetKind::Frame) {
             // Whatever the client rendered for it, under its own regions -
             // a model frame is a window onto a scene and the art around it
@@ -1924,7 +1942,10 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                              ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
                              packColor(w->color, w->alpha));
             }
-            if (w->hasBackdrop) drawBackdrop(dl, *w, s, x0, y0, x1, y1);
+            // With the frame's own scale in it: a backdrop's insets and edge
+            // size are in the frame's units, the same as a font height, and a
+            // scaled frame's border is drawn to the same ruler as its rect.
+            if (w->hasBackdrop) drawBackdrop(dl, *w, ws, x0, y0, x1, y1);
             if (w->isStatusBar) drawStatusBar(dl, *w, x0, y0, x1, y1);
             if (w->isSlider) drawSlider(dl, *w, x0, y0, x1, y1);
             if (w->isCooldown) drawCooldown(dl, *w, x0, y0, x1, y1);
@@ -1933,9 +1954,9 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
             if (w->isTooltip && w->objectType == "GameTooltip" &&
             !w->tooltipLines.empty()) {
                 ImFont* font = interfaceFaceOrDefault(w->fontFace);
-                const float size = interfaceFontSize(w->fontHeight) * s;
+                const float size = interfaceFontSize(w->fontHeight) * ws;
                 const float lineH = size * 1.2f;
-                const float pad = 10.0f * s;
+                const float pad = 10.0f * ws;
                 float y = y0 + pad;
                 const float textW = (x1 - x0) - pad * 2.0f;
                 for (const auto& line : w->tooltipLines) {
@@ -1963,8 +1984,8 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
             // rather than moving the lines.
             if (w->isMessageFrame && !w->messages.empty()) {
                 ImFont* font = interfaceFaceOrDefault(w->fontFace);
-                const float size = interfaceFontSize(w->fontHeight) * s;
-                const float lineH = size * 1.15f + w->messagePadding * s;
+                const float size = interfaceFontSize(w->fontHeight) * ws;
+                const float lineH = size * 1.15f + w->messagePadding * ws;
                 // A chat line is wrapped to the frame, not run off the end of
                 // it. Every other label in the interface has wrapped for as
                 // long as there has been a wrapper; this surface drew each
@@ -2110,7 +2131,7 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
             }
             if (w->isSimpleHtml && !w->text.empty()) {
                 ImFont* font = interfaceFaceOrDefault(w->fontFace);
-                const float size = interfaceFontSize(w->fontHeight) * s;
+                const float size = interfaceFontSize(w->fontHeight) * ws;
                 const float wrapW = (x1 - x0) > size ? (x1 - x0) : 0.0f;
                 // The shadow under the words, the single offset copy a font
                 // string draws, for the same reason it does.
@@ -2133,7 +2154,7 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                 // Its own text, drawn where a label would be, with a caret
                 // while it has focus so it is clear which box is listening.
                 ImFont* font = interfaceFaceOrDefault(w->fontFace);
-                const float size = interfaceFontSize(w->fontHeight) * s;
+                const float size = interfaceFontSize(w->fontHeight) * ws;
                 const uint32_t col = packColor(w->color, w->alpha);
                 // Between the top and bottom insets rather than the whole
                 // frame, so a box with art above its text does not sit high.
@@ -2317,7 +2338,7 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
             // face so this client's panels are left alone.
             if (!font) font = interfaceFace("frizqt__");
             if (!font) font = ImGui::GetFont();
-            const float size = interfaceFontSize(w->fontHeight) * s;
+            const float size = interfaceFontSize(w->fontHeight) * ws;
             // A label whose width came from its own text has nothing to wrap
             // to; one given a width by its XML or by two anchors wraps inside
             // it. Nothing wrapped before, so every label of the second kind

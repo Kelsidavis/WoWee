@@ -37,6 +37,16 @@ ImFont* interfaceFace(const std::string& pathOrName);
 float interfaceTextWidth(const std::string& text, const std::string& fontFace,
                          float fontHeight);
 
+/// How many lines a piece of text takes when it is drawn.
+///
+/// A soft wrap inside `wrapWidth` - zero means none, which is what a label
+/// sized by its own text wants - and |n breaks a line at any width. This is
+/// the count the renderer's own measure arrives at, asked on demand: FrameXML
+/// sets a string's text and reads its height in the same breath, long before
+/// the next frame is laid out, and the quest tracker sizes every row that way.
+int interfaceTextLines(const std::string& text, const std::string& fontFace,
+                       float fontHeight, float wrapWidth, bool nonSpaceWrap);
+
 /// The face a widget draws in, resolved the way the renderer resolves it: its
 /// own, then the interface default, then whatever is current.
 ImFont* interfaceFaceOrDefault(const std::string& fontFace);
