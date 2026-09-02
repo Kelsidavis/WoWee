@@ -508,7 +508,15 @@ static int lua_UnitCastInfo(lua_State* L, bool wantChannel) {
     lua_pushstring(L, name.empty() ? "Unknown" : name.c_str()); // name
     const std::string& rank = gh->getSpellRank(spellId);
     lua_pushstring(L, rank.c_str());                             // nameSubtext
-    lua_pushstring(L, "");                                       // text
+    // What the bar is labelled with, which is the third value and not the
+    // first: castingbarframe.lua reads `text` into barText and never touches
+    // `name`. An empty string there is a bar that fills up saying nothing -
+    // no way to tell a Fireball from a Frostbolt, or a cast from a channel.
+    //
+    // The spell's own name, because that is what this is for every spell. It
+    // differs only for a trade skill, where the real client puts the item
+    // being made here, and this client has no such cast in flight to name.
+    lua_pushstring(L, name.empty() ? "Unknown" : name.c_str()); // text
     if (!iconPath.empty()) lua_pushstring(L, iconPath.c_str());
     else lua_pushstring(L, "Interface\\Icons\\INV_Misc_QuestionMark");  // texture
     lua_pushnumber(L, startTimeMs);                              // startTime (ms)
