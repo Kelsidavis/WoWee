@@ -1201,8 +1201,19 @@ void WidgetTree::collectDrawOrder() {
             !(w.isMessageFrame && !w.messages.empty()) &&
             !(w.isTooltip && !w.tooltipLines.empty())) continue;
         if (w.rectW <= 0.0f || w.rectH <= 0.0f) continue;
+        // A texture with nothing to show is dropped - unless it is the colour
+        // picker's, whose art is generated rather than loaded.
+        //
+        // <ColorWheelTexture> and <ColorValueTexture> carry no file, because
+        // there is no file: a wheel of every hue and a bar of every brightness
+        // are a function of the colour being picked, and the renderer paints
+        // them. Dropped here they never reached it, so the picker opened with
+        // its frame, its buttons and its two thumbs - which do have art - over
+        // nothing at all. Every colour in the interface is chosen through that
+        // window: a chat window's background among them.
         if (w.kind == WidgetKind::Texture && w.texturePath.empty() &&
-            !w.solidColor && w.externalTexture == 0) continue;
+            !w.solidColor && w.externalTexture == 0 &&
+            w.colorRole == Widget::ColorRole::None) continue;
         if (w.kind == WidgetKind::Frame && w.isStatusBar && w.barTexture.empty() &&
             !w.hasBackdrop) continue;
         if (w.kind == WidgetKind::FontString && w.text.empty()) continue;

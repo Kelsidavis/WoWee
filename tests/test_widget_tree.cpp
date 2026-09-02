@@ -2866,3 +2866,44 @@ TEST_CASE("A scaled frame moves with the cursor, not ahead of it",
         REQUIRE(w->rectW == Catch::Approx(150.0f));
     }
 }
+
+// The colour picker's art is generated, not loaded, so the rule that drops a
+// texture with nothing to show must not drop it.
+//
+// <ColorWheelTexture> and <ColorValueTexture> carry no file because there is no
+// file: a wheel of every hue and a bar of every brightness are a function of the
+// colour being picked, and the renderer paints them. Dropped from the draw order
+// they never reach it, and the picker opens as a frame, two buttons and two
+// thumbs over nothing - which is every colour in the interface, a chat window's
+// background among them.
+TEST_CASE("The colour picker's generated art stays in the draw order",
+          "[widget][draworder][colorpicker]") {
+    WidgetTree tree;
+    const uint32_t picker = tree.create(WidgetKind::Frame, 0, "ColorPickerFrame");
+    tree.get(picker)->width = 200.0f;
+    tree.get(picker)->height = 200.0f;
+    tree.get(picker)->hasBackdrop = true;
+    tree.addPoint(picker, Anchor{});
+
+    const uint32_t wheel = tree.create(WidgetKind::Texture, picker, "ColorPickerWheel");
+    tree.get(wheel)->width = 128.0f;
+    tree.get(wheel)->height = 128.0f;
+    tree.get(wheel)->colorRole = Widget::ColorRole::Wheel;
+    tree.addPoint(wheel, Anchor{});
+
+    // The same texture with no role and no file is still nothing to draw.
+    const uint32_t blank = tree.create(WidgetKind::Texture, picker, "Blank");
+    tree.get(blank)->width = 128.0f;
+    tree.get(blank)->height = 128.0f;
+    tree.addPoint(blank, Anchor{});
+
+    tree.layout(kScreenW, kScreenH);
+
+    bool wheelDrawn = false, blankDrawn = false;
+    for (const Widget* w : tree.drawOrder()) {
+        if (w->id == wheel) wheelDrawn = true;
+        if (w->id == blank) blankDrawn = true;
+    }
+    CHECK(wheelDrawn);
+    CHECK_FALSE(blankDrawn);
+}

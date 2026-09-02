@@ -722,7 +722,8 @@ int main(int argc, char** argv) {
             else if (w->rectW <= 0.0f || w->rectH <= 0.0f) why = "no width or no height";
             else if (w->kind == wowee::ui::WidgetKind::Texture &&
                      w->texturePath.empty() && !w->solidColor &&
-                     w->externalTexture == 0)
+                     w->externalTexture == 0 &&
+                     w->colorRole == wowee::ui::Widget::ColorRole::None)
                 why = "a texture with no image and no colour";
             else if (w->kind == wowee::ui::WidgetKind::FontString && w->text.empty())
                 why = "a font string with no text";
