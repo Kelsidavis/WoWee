@@ -12,6 +12,7 @@
 #include "core/application.hpp"
 #include "core/appearance_composer.hpp"
 #include "addons/addon_manager.hpp"
+#include "ui/link_hit.hpp"
 #include "core/coordinates.hpp"
 #include "core/input.hpp"
 #include "rendering/renderer.hpp"
@@ -1670,6 +1671,28 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
             }
         }
 
+    }
+
+    // A link says it can be clicked.
+    //
+    // The chat window takes no clicks at all - it is click-through by design -
+    // so nothing about hovering an item link in it looked any different from
+    // hovering the text beside it, and the only way to find out a link was
+    // there was to click and see.
+    //
+    // Tested against the rects the last draw filed, which is the same list the
+    // click itself is resolved against, so the pointer cannot promise a link
+    // that clicking would miss.
+    if (services_.addonManager) {
+        if (auto* engine = services_.addonManager->getLuaEngine()) {
+            auto& widgets = engine->widgets();
+            const glm::vec2 mouse = input.getMousePosition();
+            float lx = mouse.x, ly = mouse.y;
+            const float screenH = services_.window
+                ? static_cast<float>(services_.window->getHeight()) : 0.0f;
+            ui::mouseToTreeSpace(lx, ly, screenH, widgets.uiScale());
+            if (widgets.linkAt(lx, ly)) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        }
     }
 
     // Cursor affordance: show hand cursor over interactable entities.
