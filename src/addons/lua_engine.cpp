@@ -17,6 +17,8 @@
 #include <climits>
 #include <set>
 #include <cstdlib>
+// The clipboard, for paste and copy in an edit box.
+#include <SDL.h>
 #include "addons/lua_api_helpers.hpp"
 #include "addons/lua_handler_globals.hpp"
 #include "addons/lua_api_registrations.hpp"
@@ -9629,7 +9631,41 @@ void LuaEngine::dispatchKey(int sdlKeycode, bool ctrlHeld) {
     if (!L_ || focusedWid_ == 0) return;
     auto* w = widgets_.get(focusedWid_);
     if (!w || !w->isEditBox) return;
-    (void)ctrlHeld;
+
+    // Ctrl+V and Ctrl+C, which every box in every other program answers and
+    // this one ignored - the modifier was taken and thrown away one line below
+    // here. Pasting a web address into chat had to be typed out by hand.
+    //
+    // The clipboard comes in as one piece of text and a chat line is one line,
+    // so the newlines a copied block brings are turned into spaces rather than
+    // dropped: two lines pasted together should not become one word.
+    if (ctrlHeld && (sdlKeycode == 'v' || sdlKeycode == 'V')) {
+        char* clip = SDL_GetClipboardText();
+        if (clip) {
+            std::string text(clip);
+            SDL_free(clip);
+            for (char& c : text) {
+                if (c == '\n' || c == '\r' || c == '\t') c = ' ';
+            }
+            // Through the same path typing goes through, so the letter limit,
+            // the numeric-only boxes, the selection it replaces and the
+            // handlers that follow all behave as they do for typed text.
+            if (!text.empty()) dispatchText(text.c_str());
+        }
+        return;
+    }
+    if (ctrlHeld && (sdlKeycode == 'c' || sdlKeycode == 'C')) {
+        // The highlighted run, or the whole line when nothing is highlighted -
+        // which is what a player copying a link out of chat wants.
+        std::string text = w->editText;
+        if (w->hasSelection) {
+            const size_t from = std::min(w->selStart, w->selEnd);
+            const size_t to   = std::min(std::max(w->selStart, w->selEnd), text.size());
+            text = (from < to) ? text.substr(from, to - from) : std::string();
+        }
+        if (!text.empty()) SDL_SetClipboardText(text.c_str());
+        return;
+    }
 
     // Keycodes are SDL's, which is what the window reports; the caller does not
     // translate them so this stays the only place that knows.

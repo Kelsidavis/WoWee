@@ -1491,8 +1491,13 @@ void Application::run() {
                 if (addonManager_ && addonsLoaded_) {
                     if (auto* engine = addonManager_->getLuaEngine();
                         engine && engine->editBoxHasFocus()) {
+                        // Command counts as control here, because this is the
+                        // copy-and-paste modifier and on a Mac that is the one
+                        // every other program uses. Windows and Linux send
+                        // control; both are taken, so the gesture is the one
+                        // the player already knows on whichever they are on.
                         const bool ctrl =
-                            (event.key.keysym.mod & KMOD_CTRL) != 0;
+                            (event.key.keysym.mod & (KMOD_CTRL | KMOD_GUI)) != 0;
                         // Said before the dispatch, because dispatching is
                         // what lets go of the focus that the check above
                         // just used - ask afterwards and the box no longer
