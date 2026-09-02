@@ -667,7 +667,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     windowManager_.renderInstanceLockouts(gameHandler);
     combatUI_.renderCombatLog(gameHandler, spellbookScreen);
     windowManager_.renderSkillsWindow(gameHandler);
-    windowManager_.renderTitlesWindow(gameHandler);
     windowManager_.renderEquipSetWindow(gameHandler);
     combatUI_.renderThreatWindow(gameHandler);
     // The blips, whoever draws the ring around them.
@@ -1605,9 +1604,17 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 }
             }
 
-            // Toggle Titles window with H (hero/title screen - no conflicting keybinding)
-            if (input.isKeyJustPressed(SDL_SCANCODE_H)) {
-                windowManager_.showTitlesWindow_ = !windowManager_.showTitlesWindow_;
+            // H, which in WoW is TOGGLECHARACTER4: the Player vs Player panel,
+            // where battlegrounds and arenas are queued for.
+            //
+            // It was toggling a titles window this client drew, under a comment
+            // saying H had no keybinding to conflict with - it has had one since
+            // the game shipped. The titles window went with it: the character
+            // sheet has a title picker of its own, on the panel FrameXML draws
+            // in every run, so keeping a second one on a key that belongs to
+            // something else was two faults holding each other up.
+            if (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_PVP)) {
+                gameHandler.runInterfaceCommand("TogglePVPFrame()");
             }
 
             // Screenshot (PrintScreen key)

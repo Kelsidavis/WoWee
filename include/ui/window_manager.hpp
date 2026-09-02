@@ -44,7 +44,6 @@ public:
     /// The game handler is only for the Help button, which has to reach
     /// FrameXML's help frame when that element is handed over.
     void renderInstanceLockouts(game::GameHandler& gameHandler);
-    void renderTitlesWindow(game::GameHandler& gameHandler);
     void renderEquipSetWindow(game::GameHandler& gameHandler);
     void renderSkillsWindow(game::GameHandler& gameHandler);
 
@@ -57,7 +56,6 @@ public:
     bool showSkillsWindow_ = false;
 
     // Titles
-    bool showTitlesWindow_ = false;
 
     // Equipment Sets
     bool showEquipSetWindow_ = false;

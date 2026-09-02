@@ -39,6 +39,10 @@ void KeybindingManager::initializeDefaults() {
     bindings_[static_cast<int>(Action::TOGGLE_NAMEPLATES)] = ImGuiKey_V;
     bindings_[static_cast<int>(Action::TOGGLE_ACHIEVEMENTS)] = ImGuiKey_Y;  // WoW standard key (Shift+Y in retail)
     bindings_[static_cast<int>(Action::TOGGLE_SKILLS)]      = ImGuiKey_K;  // WoW standard: K opens Skills/Professions
+    // WoW standard: H is TOGGLECHARACTER4, which is TogglePVPFrame() - the
+    // panel battlegrounds are queued for. This client had H on a titles
+    // window of its own, under a comment saying nothing was bound to it.
+    bindings_[static_cast<int>(Action::TOGGLE_PVP)]         = ImGuiKey_H;
 }
 
 bool KeybindingManager::isActionPressed(Action action, bool repeat) {
@@ -161,6 +165,7 @@ const char* KeybindingManager::getActionName(Action action) {
         case Action::TOGGLE_NAMEPLATES: return "Nameplates";
         case Action::TOGGLE_ACHIEVEMENTS: return "Achievements";
         case Action::TOGGLE_SKILLS: return "Skills / Professions";
+        case Action::TOGGLE_PVP: return "Player vs Player";
         case Action::ACTION_COUNT: break;
     }
     return "Unknown";
@@ -226,6 +231,7 @@ void KeybindingManager::loadFromConfigFile(const std::string& filePath) {
         else if (action == "toggle_quest_log") actionIdx = static_cast<int>(Action::TOGGLE_QUESTS);  // legacy alias
         else if (action == "toggle_achievements") actionIdx = static_cast<int>(Action::TOGGLE_ACHIEVEMENTS);
         else if (action == "toggle_skills") actionIdx = static_cast<int>(Action::TOGGLE_SKILLS);
+        else if (action == "toggle_pvp") actionIdx = static_cast<int>(Action::TOGGLE_PVP);
 
         if (actionIdx < 0) continue;
 
@@ -324,6 +330,7 @@ void KeybindingManager::saveToConfigFile(const std::string& filePath) const {
         {.action = Action::TOGGLE_NAMEPLATES, .name = "toggle_nameplates"},
         {.action = Action::TOGGLE_ACHIEVEMENTS, .name = "toggle_achievements"},
         {.action = Action::TOGGLE_SKILLS, .name = "toggle_skills"},
+        {.action = Action::TOGGLE_PVP, .name = "toggle_pvp"},
     };
 
     for (const auto& [action, nameStr] : actionMap) {
