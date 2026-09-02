@@ -283,8 +283,19 @@ void InventoryHandler::registerOpcodes(DispatchTable& table) {
         pendingLootMoneyNotifyTimer_ = 0.0f;
         announceLootMoney(notifyGuid, amount);
         if (owner_.addonEventCallbackRef()) owner_.addonEventCallbackRef()("PLAYER_MONEY", {});
+        // Both packets report the same thing and a server may send either, so
+        // the coin goes on whichever arrives first.
+        //
+        // Only for an amount that is this corpse's whole purse, though: in a
+        // group this notify carries one player's share and reaches everyone,
+        // including someone standing over a different corpse of their own.
+        // SMSG_LOOT_CLEAR_MONEY is the one that names the loot itself, and it
+        // is what clears the coin in that case.
+        if (amount == currentLoot_.gold) clearLootMoney();
     };
-    table[Opcode::SMSG_LOOT_CLEAR_MONEY] = [](network::Packet& /*packet*/) {};
+    table[Opcode::SMSG_LOOT_CLEAR_MONEY] = [this](network::Packet& /*packet*/) {
+        clearLootMoney();
+    };
 
     // ---- Read item (books) (moved from GameHandler) ----
     table[Opcode::SMSG_READ_ITEM_OK] = [](network::Packet& packet) {
@@ -1108,6 +1119,19 @@ void InventoryHandler::cancelTempEnchantment(uint8_t handIndex) {
     owner_.getSocket()->send(packet);
 }
 
+void InventoryHandler::clearLootMoney() {
+    if (currentLoot_.gold == 0) return;
+    currentLoot_.gold = 0;
+    auto it = localLootState_.find(currentLoot_.lootGuid);
+    if (it != localLootState_.end()) it->second.data.gold = 0;
+    // Display slot one, which is where the coin sits whenever there is one.
+    if (lootWindowOpen_ && owner_.addonEventCallbackRef()) {
+        owner_.addonEventCallbackRef()("LOOT_SLOT_CLEARED", {"1"});
+    }
+    // A corpse that held only money is empty now.
+    if (lootWindowOpen_ && currentLoot_.items.empty()) closeLoot();
+}
+
 void InventoryHandler::closeLoot() {
     if (!lootWindowOpen_) return;
     const uint64_t lootGuid = currentLoot_.lootGuid;
@@ -1184,7 +1208,15 @@ void InventoryHandler::handleLootResponse(network::Packet& packet) {
             pendingLootMoneyNotifyTimer_ = suppressFallback ? 0.0f : 0.4f;
             auto pkt = LootMoneyPacket::build();
             owner_.getSocket()->send(pkt);
-            currentLoot_.gold = 0;
+            // The coin stays in the window until the server says it is taken.
+            //
+            // Clearing it here emptied the slot the interface had just been
+            // told about: the loot frame builds its buttons on LOOT_OPENED,
+            // which fires above, and the coin is display slot one with the
+            // items after it. Dropping the coin out from under that renumbered
+            // every item - GetLootSlotInfo(2) answered the *second* item, or
+            // nothing at all - so the window went on showing a coin that had
+            // been taken and an item button that did nothing when clicked.
         }
     }
 
@@ -4373,6 +4405,24 @@ void InventoryHandler::handleItemQueryResponse(network::Packet& packet) {
         if (owner_.addonEventCallbackRef()) {
             owner_.addonEventCallbackRef()("GET_ITEM_INFO_RECEIVED",
                                            {std::to_string(data.entry)});
+        }
+
+        // The loot window's row for this item, which was drawn before the
+        // item was known.
+        //
+        // SMSG_LOOT_RESPONSE carries an item id and a count and nothing a
+        // player can read, so the queries go out as the window opens and land
+        // after it has drawn - "Item #4606" against an empty square, kept for
+        // as long as the corpse is open. LOOT_SLOT_CHANGED is the event the
+        // loot frame redraws one button on.
+        if (lootWindowOpen_ && owner_.addonEventCallbackRef()) {
+            const int coinSlots = currentLoot_.gold > 0 ? 1 : 0;
+            for (size_t i = 0; i < currentLoot_.items.size(); ++i) {
+                if (currentLoot_.items[i].itemId != data.entry) continue;
+                owner_.addonEventCallbackRef()(
+                    "LOOT_SLOT_CHANGED",
+                    {std::to_string(coinSlots + static_cast<int>(i) + 1)});
+            }
         }
 
         // An objective that had no name for what it asks for now has one.
