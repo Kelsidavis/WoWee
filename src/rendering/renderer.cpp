@@ -3044,6 +3044,13 @@ bool Renderer::waterDrawsInContinuePass() const {
 // initPostProcess(), resizePostProcess(), shutdownPostProcess() removed -
 // post-process pipeline is now handled by Vulkan (Phase 6 cleanup).
 
+void Renderer::setActiveMapName(const std::string& name) {
+    if (terrainManager) terrainManager->setMapName(name);
+    if (minimap) minimap->setMapName(name);
+    if (worldMap) worldMap->setMapName(name);
+    if (wmoRenderer) wmoRenderer->setMapName(name);
+}
+
 bool Renderer::initializeRenderers(pipeline::AssetManager* assetManager, const std::string& mapName) {
     if (!assetManager) {
         LOG_ERROR("Asset manager is null");
@@ -3239,9 +3246,7 @@ bool Renderer::initializeRenderers(pipeline::AssetManager* assetManager, const s
     }
 
     // Set map name on sub-renderers
-    if (terrainManager) terrainManager->setMapName(mapName);
-    if (minimap) minimap->setMapName(mapName);
-    if (worldMap) worldMap->setMapName(mapName);
+    setActiveMapName(mapName);
 
     // Initialize audio managers
     if (audioCoordinator_->getMusicManager() && assetManager && !cachedAssetManager) {

@@ -339,9 +339,11 @@ void WorldLoader::loadMapGeometry(uint32_t mapId, const std::string& mapName,
             renderer_->initializeRenderers(assetManager_, mapName);
         }
 
-        // Set map name on WMO renderer and disable terrain streaming (no ADT tiles for instances)
+        // Every sub-renderer, not the two this used to name: the minimap looks
+        // its tiles up by map, and left on the last one it found none - a
+        // dungeon with no dungeon on its minimap.
+        renderer_->setActiveMapName(mapName);
         if (renderer_->getWMORenderer()) {
-            renderer_->getWMORenderer()->setMapName(mapName);
             renderer_->getWMORenderer()->setWMOOnlyMap(true);
         }
         if (renderer_->getTerrainManager()) {
@@ -568,10 +570,9 @@ void WorldLoader::loadMapGeometry(uint32_t mapId, const std::string& mapName,
             LOG_INFO("Online world terrain loading initiated");
         }
 
-        // Set map name on WMO renderer (initializeRenderers handles terrain/minimap/worldMap)
-        if (renderer_->getWMORenderer()) {
-            renderer_->getWMORenderer()->setMapName(mapName);
-        }
+        // Every sub-renderer. initializeRenderers does this too, and it runs
+        // once - so on a map change what it set stayed on the first map.
+        renderer_->setActiveMapName(mapName);
 
         // Character renderer is created inside loadTestTerrain(), so spawn the
         // player model now that the renderer actually exists.
@@ -910,15 +911,10 @@ void WorldLoader::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
     }
     renderer_->setCharacterYaw(spawnYawDeg);
 
-    // Set map name for WMO renderer and reset instance mode
+    // Every sub-renderer, and out of instance mode.
+    renderer_->setActiveMapName(mapName);
     if (renderer_->getWMORenderer()) {
-        renderer_->getWMORenderer()->setMapName(mapName);
         renderer_->getWMORenderer()->setWMOOnlyMap(false);
-    }
-
-    // Set map name for terrain manager
-    if (renderer_->getTerrainManager()) {
-        renderer_->getTerrainManager()->setMapName(mapName);
     }
 
     // NOTE: TransportManager renderer connection moved to after initializeRenderers (later in this function)

@@ -99,6 +99,15 @@ public:
      * without loading any ADT tile.  Used by WMO-only maps (dungeons/raids/BGs).
      */
     bool initializeRenderers(pipeline::AssetManager* assetManager, const std::string& mapName);
+    /// The map every sub-renderer is looking at.
+    ///
+    /// initializeRenderers set this on all four when it built them, and it
+    /// builds them once - so on every later map change the two the loader
+    /// remembered by hand moved and the two it did not stayed on the map the
+    /// session started in. The minimap was one of those: in a dungeon it went
+    /// on asking for the tiles of wherever the player had logged in, and got
+    /// none, which is a minimap with no dungeon on it.
+    void setActiveMapName(const std::string& name);
 
     /**
      * Enable/disable terrain rendering
