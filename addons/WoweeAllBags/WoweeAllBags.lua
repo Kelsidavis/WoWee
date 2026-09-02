@@ -254,6 +254,14 @@ local function slotButton(index)
     end)
     b:SetScript("OnClick", function(self, button)
         if not self.bag then return end
+        -- Shift to put the item in chat, ctrl to try it on. Both are
+        -- HandleModifiedItemClick's to answer - it is what every item button in
+        -- the interface asks first, and it says whether it took the click.
+        -- Without it a shift-click picked the item up instead of linking it.
+        if HandleModifiedItemClick and
+           HandleModifiedItemClick(GetContainerItemLink(self.bag, self.slot)) then
+            return
+        end
         if button == "RightButton" then UseContainerItem(self.bag, self.slot)
         else                            PickupContainerItem(self.bag, self.slot) end
         WoweeAllBags_Update()
