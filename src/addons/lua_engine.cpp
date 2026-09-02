@@ -1945,6 +1945,10 @@ int lua_Tooltip_SetHyperlink(lua_State* L) {
     auto* gh = wowee::addons::getGameHandler(L);
     std::string link = luaL_optstring(L, 2, "");
     if (!w || !gh || link.empty()) { lua_pushboolean(L, 0); return 1; }
+    // Kept before the parsing below takes it apart, and kept as a string of
+    // this client's own rather than as the argument: the builders called from
+    // here run Lua, and what is on the stack afterwards is their business.
+    const std::string originalLink = link;
 
     // Take what is between |H and |h if the wrapper is there.
     if (const size_t at = link.find("|H"); at != std::string::npos) {
@@ -1981,9 +1985,25 @@ int lua_Tooltip_SetHyperlink(lua_State* L) {
     else if (kind == "item") {
         filled = fillItemTooltipById(L, gh, id);
         if (filled) appendEnchantLineById(w, gh, enchantId);
+        // Asked for whether it was found or not: the answer is what turns a
+        // name into a tooltip, and the miss is exactly when it is needed.
+        gh->ensureItemInfo(id);
     }
     else if (kind == "quest")
         filled = fillQuestTooltip(w, gh, id);
+
+    // Kept whole, so the refresh below rebuilds the item that was linked
+    // rather than the template behind it, and set even when nothing could be
+    // filled in - that is the case the refresh exists for.
+    lua_pushstring(L, originalLink.c_str());
+    lua_setfield(L, 1, "__hyperlink");
+    lua_getglobal(L, "__WoweeRefreshHyperlinkTooltip");
+    if (lua_isfunction(L, -1)) {
+        lua_setfield(L, 1, "UpdateTooltip");
+    } else {
+        lua_pop(L, 1);
+    }
+
     lua_pushboolean(L, filled ? 1 : 0);
     return 1;
 }
@@ -7640,6 +7660,23 @@ void LuaEngine::registerCoreAPI() {
         "        filter = 'HARMFUL'\n"
         "    end\n"
         "    return self:SetUnitAura(unit, index, filter)\n"
+        "end\n"
+        // A tooltip built from a link fills itself in again while it is up.
+        //
+        // An item this client has never seen has no template until the server
+        // answers CMSG_ITEM_QUERY_SINGLE, and the answer lands after the
+        // tooltip is drawn. A hovered item recovers on its own - GameTooltip's
+        // OnUpdate re-runs the owner's UpdateTooltip every quarter second - but
+        // a link clicked in chat opens ItemRefTooltip, which is filled once by
+        // SetItemRef and never again. So an item somebody else linked showed
+        // its name and nothing else, for as long as it was open.
+        //
+        // Setting UpdateTooltip is what puts the link path on that same clock;
+        // the link itself is kept because rebuilding from the item id alone
+        // would drop the enchant and the suffix it was linked with.
+        "function __WoweeRefreshHyperlinkTooltip(self)\n"
+        "    local link = self and rawget(self, '__hyperlink')\n"
+        "    if link then self:SetHyperlink(link) end\n"
         "end\n"
         // Shared item tooltip builder using GetItemInfo return values
         "function _WoweePopulateItemTooltip(self, itemId)\n"
