@@ -3252,6 +3252,27 @@ int lua_Region_Hide(lua_State* L) {
         if (w->shown && frameScriptSet(L, 1, "OnHide") && w->shownToggles < 200) {
             ++w->shownToggles;
         }
+        // A hidden tooltip belongs to nobody.
+        //
+        // The owner is what FrameXML tests to decide whether a tooltip on
+        // screen is its own, and it is *set* on every hover and cleared by
+        // nothing here - so once a button had been hovered it owned the tooltip
+        // for the rest of the session. ActionButton_Update then does
+        //
+        //     if ( GameTooltip:GetOwner() == self ) then ActionButton_SetTooltip(self) end
+        //
+        // and SetTooltip shows it again. Any button that updates often enough
+        // put its tooltip back on screen with the cursor nowhere near it, and
+        // Execute updates on every change to the target's health, which is why
+        // it was the one that stuck.
+        //
+        // The real client answers nil here for the same reason: an owner is a
+        // property of a tooltip that is up.
+        if (w->isTooltip) {
+            w->tooltipOwnerId = 0;
+            lua_pushnil(L);
+            lua_setfield(L, 1, "__owner");
+        }
         w->shown = false;
     }
     lua_pushboolean(L, 0); lua_setfield(L, 1, "__visible");
