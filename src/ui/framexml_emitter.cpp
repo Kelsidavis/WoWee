@@ -694,6 +694,17 @@ struct Emitter {
                 line(name + ".shadowA = " + std::to_string(sc->attrFloat("a", 1.0f)));
             }
         }
+        // Which way the text sits in its box, which for a font object is most
+        // of what distinguishes one from another: fontstyles.xml defines
+        // GameFontNormalLeft as GameFontNormal and this attribute, and nothing
+        // else. Dropped, the two were the same object, and every label that
+        // asked for the left-hand one was centred - the chat menu's commands
+        // among them, where the labels drifted right until they ran into the
+        // /slash column beside them.
+        if (const std::string* j = node.attr("justifyH"))
+            line(name + ".justifyH = " + quote(*j));
+        if (const std::string* jv = node.attr("justifyV"))
+            line(name + ".justifyV = " + quote(*jv));
     }
 
     /// Applies whatever this node inherits onto `var`. Templates apply before

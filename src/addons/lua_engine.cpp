@@ -3610,7 +3610,14 @@ int lua_FontString_GetJustifyV(lua_State* L) {
     const auto* w = widgetOf(L, 1);
     lua_pushstring(L, w ? w->justifyV.c_str() : "MIDDLE");
     return 1;
-    return 0;
+}
+/// The other half of the pair, which was never bound - so a file asking a
+/// label which way it sits got the missing-API stand-in and a comparison
+/// against a string that is not one.
+int lua_FontString_GetJustifyH(lua_State* L) {
+    const auto* w = widgetOf(L, 1);
+    lua_pushstring(L, w ? w->justifyH.c_str() : "CENTER");
+    return 1;
 }
 
 // ── Fonts ───────────────────────────────────────────────────────────────────
@@ -3773,6 +3780,15 @@ static void applyFontObject(lua_State* L, int fontIndex, wowee::ui::Widget* w) {
         lua_getfield(L, -1, "outline");
         if (lua_isstring(L, -1)) w->fontOutline = lua_tostring(L, -1);
         lua_pop(L, 1);
+        // Which way it sits in its box. A font object carries this and it was
+        // being read off the object by nothing, so GameFontNormalLeft and
+        // GameFontNormal drew identically.
+        lua_getfield(L, -1, "justifyH");
+        if (lua_isstring(L, -1)) w->justifyH = lua_tostring(L, -1);
+        lua_pop(L, 1);
+        lua_getfield(L, -1, "justifyV");
+        if (lua_isstring(L, -1)) w->justifyV = lua_tostring(L, -1);
+        lua_pop(L, 1);
         const char* keys[4] = {"r", "g", "b", "a"};
         for (int i = 0; i < 4; ++i) {
             lua_getfield(L, -1, keys[i]);
@@ -3911,11 +3927,47 @@ int lua_Frame_SetNormalFontObject(lua_State* L) {
     auto* tree = wowee::addons::getWidgetTree(L);
     if (!tree) return 0;
     // The label, not the button: a button has no text of its own.
+    //
+    // Made here if it does not exist yet. A template names its font as it is
+    // built and the label is created lazily, by the first SetText - so the
+    // settings were applied to the button, the label arrived afterwards with
+    // none of them, and a button that asked for GameFontNormalLeft drew its
+    // text centred at the default size.
     lua_getfield(L, 1, "__fontString");
-    wowee::ui::Widget* fs =
-        lua_istable(L, -1) ? tree->get(widgetIdOf(L, lua_gettop(L))) : nullptr;
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        lua_getfield(L, 1, "GetFontString");
+        if (lua_isfunction(L, -1)) {
+            lua_pushvalue(L, 1);
+            if (lua_pcall(L, 1, 1, 0) != 0) {
+                lua_pop(L, 1);
+                lua_pushnil(L);
+            }
+        }
+    }
+    const uint32_t fsId =
+        lua_istable(L, -1) ? widgetIdOf(L, lua_gettop(L)) : 0;
+    wowee::ui::Widget* fs = fsId ? tree->get(fsId) : nullptr;
     lua_pop(L, 1);
     applyFontObject(L, 2, fs ? fs : widgetOf(L, 1));
+
+    // A label with no anchors of its own is centred on its button - that is
+    // what an unanchored region gets - and justifying text inside a box that
+    // is only as wide as the text moves nothing. So a font object asking for
+    // the left or the right is taken as asking for that edge of the button,
+    // which is what it means: UIMenuButtonTemplate names GameFontNormalLeft
+    // and expects "Say" against the left edge with /s away at the other one.
+    //
+    // Only where the interface has said nothing about where the label goes. A
+    // <ButtonText> with anchors of its own keeps them.
+    if (fs && fs->anchors.empty() &&
+        (fs->justifyH == "LEFT" || fs->justifyH == "RIGHT")) {
+        wowee::ui::Anchor a;
+        a.point = fs->justifyH;
+        a.relativePoint = fs->justifyH;
+        a.relativeTo = 0;   // the button
+        tree->addPoint(fsId, a);
+    }
     return 0;
 }
 
@@ -4009,6 +4061,7 @@ void installRegionMethods(lua_State* L, bool isTexture, bool isFontString) {
         set("GetText", lua_FontString_GetText);
         set("SetJustifyH", lua_FontString_SetJustifyH);
         set("SetJustifyV", lua_FontString_SetJustifyV);
+        set("GetJustifyH", lua_FontString_GetJustifyH);
         set("GetJustifyV", lua_FontString_GetJustifyV);
         set("SetTextColor", lua_FontString_SetTextColor);
         set("SetFont", lua_FontString_SetFont);
