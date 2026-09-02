@@ -741,34 +741,49 @@ void WidgetRenderer::drawColorPicker(ImDrawList* dl, const WidgetTree& tree,
             // looked broken and the only control that could bring it back was
             // the bar beside it.
             //
-            // Drawn as flat cells rather than a gradient mesh: a hundred and
-            // ninety-two of them across a 128-pixel disc is finer than the eye
-            // resolves, and it costs no vertex writing into a draw list whose
-            // texture binding belongs to someone else.
-            constexpr int kSectors = 48, kRings = 4;
+            // One fan of triangles with a colour per corner, rather than a
+            // grid of flat cells.
+            //
+            // The cells were 48 sectors by 4 rings, each filled in its own
+            // average colour, on the reading that 192 of them across a
+            // 128-pixel disc is finer than the eye resolves. The colour was:
+            // the seams were not. Every fill is antialiased, so each cell
+            // faded out at its edge and its neighbour faded in against the
+            // frame behind them both - a darker line down every sector and
+            // round every ring, a wheel drawn in graph paper.
+            //
+            // A fan has no interior edges to seam: white in the middle, the
+            // hues around the rim, and the saturation between them is the
+            // rasteriser's own interpolation. It is also a quarter of the
+            // geometry.
+            constexpr int kSectors = 64;
             const float cx = (x0 + x1) * 0.5f, cy = (y0 + y1) * 0.5f;
             const float radius = std::min(x1 - x0, y1 - y0) * 0.5f;
-            for (int ring = 0; ring < kRings; ++ring) {
-                const float r0 = radius * static_cast<float>(ring) / kRings;
-                const float r1 = radius * static_cast<float>(ring + 1) / kRings;
-                const float sat = (static_cast<float>(ring) + 0.5f) / kRings;
-                for (int seg = 0; seg < kSectors; ++seg) {
-                    const float a0 = 6.2831853f * seg / kSectors;
-                    const float a1 = 6.2831853f * (seg + 1) / kSectors;
-                    const float cell[3] = {(seg + 0.5f) / kSectors, sat, 1.0f};
-                    float rgb[3];
-                    hsvToRgb(cell, rgb);
-                    const ImU32 col = IM_COL32(int(rgb[0] * 255), int(rgb[1] * 255),
-                                               int(rgb[2] * 255), 255);
-                    // Screen y grows downward and the wheel's hue runs
-                    // anticlockwise, so the sine is negated to keep red at the
-                    // right and the order the same as the client's.
-                    dl->AddQuadFilled(
-                        ImVec2(cx + std::cos(a0) * r0, cy - std::sin(a0) * r0),
-                        ImVec2(cx + std::cos(a1) * r0, cy - std::sin(a1) * r0),
-                        ImVec2(cx + std::cos(a1) * r1, cy - std::sin(a1) * r1),
-                        ImVec2(cx + std::cos(a0) * r1, cy - std::sin(a0) * r1), col);
-                }
+            const ImVec2 uv = ImGui::GetFontTexUvWhitePixel();
+            dl->PrimReserve(kSectors * 3, kSectors + 1);
+            const unsigned int base = dl->_VtxCurrentIdx;
+            // The middle, which is every hue at no saturation: white.
+            dl->PrimWriteVtx(ImVec2(cx, cy), uv, IM_COL32_WHITE);
+            for (int seg = 0; seg < kSectors; ++seg) {
+                const float a = 6.2831853f * static_cast<float>(seg) / kSectors;
+                const float rim[3] = {static_cast<float>(seg) / kSectors, 1.0f, 1.0f};
+                float rgb[3];
+                hsvToRgb(rim, rgb);
+                // Screen y grows downward and the wheel's hue runs
+                // anticlockwise, so the sine is negated to keep red at the
+                // right and the order the same as the client's.
+                dl->PrimWriteVtx(
+                    ImVec2(cx + std::cos(a) * radius, cy - std::sin(a) * radius),
+                    uv,
+                    IM_COL32(int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255), 255));
+            }
+            for (int seg = 0; seg < kSectors; ++seg) {
+                const unsigned int here = base + 1 + static_cast<unsigned int>(seg);
+                const unsigned int next =
+                    base + 1 + static_cast<unsigned int>((seg + 1) % kSectors);
+                dl->PrimWriteIdx(static_cast<ImDrawIdx>(base));
+                dl->PrimWriteIdx(static_cast<ImDrawIdx>(here));
+                dl->PrimWriteIdx(static_cast<ImDrawIdx>(next));
             }
             break;
         }
