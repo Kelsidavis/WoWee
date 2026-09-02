@@ -1491,6 +1491,31 @@ static void applyCVarSideEffects(lua_State* L, const std::string& key,
             }
         }
     }
+    // The minimap's zoom, put back where the player left it.
+    //
+    // Not a setting anyone sets in a panel: it is where the +/- buttons and the
+    // wheel over the ring were left, and the real client remembers that across
+    // a session. Minimap:SetZoom writes it here on the way past; this is the
+    // way back, and it runs after FrameXML is up, which is the first moment
+    // there is a Minimap to put it on.
+    //
+    // Straight onto the widget rather than through Minimap:SetZoom, so it does
+    // not write back what it just read. MINIMAP_UPDATE_ZOOM is what the real
+    // client fires when the zoom changes under the interface, and it is what
+    // greys the button that can no longer go any further - without it a map
+    // restored at full zoom offers a zoom-in that does nothing.
+    if (key == "wowee_minimapzoom") {
+        if (auto* tree = getWidgetTree(L)) {
+            if (auto* mm = tree->findByName("Minimap")) {
+                const int z = std::atoi(value.c_str());
+                mm->zoomLevel = (z < 0) ? 0 : (z > 4 ? 4 : z);
+                lua_getfield(L, LUA_REGISTRYINDEX, "wowee_lua_engine");
+                auto* engine = static_cast<LuaEngine*>(lua_touserdata(L, -1));
+                lua_pop(L, 1);
+                if (engine) engine->fireEvent("MINIMAP_UPDATE_ZOOM", {});
+            }
+        }
+    }
     // Unticking it puts the interface back to the size the screen's own height
     // gives, which is what the tick means: use a scale of mine rather than the
     // default. It did nothing at all before - the box moved and the interface
@@ -1684,6 +1709,15 @@ std::string storedCVarValue(const std::string& key, const std::string& fallback)
         if (k == wanted) return line.substr(eq + 1);
     }
     return fallback;
+}
+
+void setStoredCVar(const std::string& key, const std::string& value) {
+    std::string k = key;
+    toLowerInPlace(k);
+    const auto existing = cvarStore().find(k);
+    if (existing != cvarStore().end() && existing->second == value) return;
+    cvarStore()[k] = value;
+    saveStoredCVars();
 }
 
 void noteClientSettingChanged(const std::string& settingKey, const std::string& value) {
@@ -4623,6 +4657,24 @@ static int lua_WoweeSetSetting(lua_State* L) {
     return 0;
 }
 
+// WoweeSaveVariables() - write the loaded addons' SavedVariables out now.
+//
+// WoW writes them at logout and so does this client, which is enough for a
+// client that is only ever exited tidily. This one is killed, rebuilt under
+// itself and crashed in a renderer under development, and each of those loses
+// whatever the player set that session - a bag window dragged somewhere is back
+// where it was on the next start, which reads as "it does not remember".
+//
+// So an addon with something worth keeping says so, and it is on disk before
+// the next thing happens. The CVar file beside it is written the same way and
+// for the same reason.
+static int lua_WoweeSaveVariables(lua_State* L) {
+    if (auto* svc = getLuaServices(L); svc && svc->saveAddOnVariables) {
+        svc->saveAddOnVariables();
+    }
+    return 0;
+}
+
 // WoweeShowSettings(tab) - open this client's settings window.
 //
 // FrameXML's game menu has Video, Sound and Interface buttons, and the frames
@@ -4972,6 +5024,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 {"WoweeVersion",             lua_WoweeVersion},
                 {"WoweeGetSetting",          lua_WoweeGetSetting},
                 {"WoweeSetSetting",          lua_WoweeSetSetting},
+                {"WoweeSaveVariables",       lua_WoweeSaveVariables},
                 {"HasLFGRestrictions",       lua_HasLFGRestrictions},
                 {"GetLFGProposal",           lua_GetLFGProposal},
                 {"GetLFGInfoServer",         lua_GetLFGInfoServer},

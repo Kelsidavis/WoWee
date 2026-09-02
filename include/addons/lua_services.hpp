@@ -297,6 +297,20 @@ struct LuaServices {
     /// Whether a named addon has been loaded, for IsAddOnLoaded.
     std::function<bool(const std::string& name)> isAddOnLoaded;
 
+    /// Write every loaded addon's SavedVariables out now.
+    ///
+    /// WoW writes them at logout, and so does this client - but this client is
+    /// also closed by killing it, by a crash in a renderer under development,
+    /// and by a rebuild while it runs, and none of those reach the exit path.
+    /// So a window moved and a setting changed were remembered only by a player
+    /// who quit tidily, which is the shape of "it does not remember anything".
+    ///
+    /// An addon calls this when it has just changed something worth keeping -
+    /// the same rule the CVar file keeps, which is written on every change for
+    /// exactly this reason. Cheap: a few hundred bytes, and nothing calls it
+    /// per frame.
+    std::function<void()> saveAddOnVariables;
+
     /// Turn an addon on or off for the next run, as EnableAddOn and
     /// DisableAddOn do. It takes effect on reload rather than at once - an
     /// addon already loaded has its functions in the Lua state and its frames

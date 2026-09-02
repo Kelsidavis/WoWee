@@ -40,6 +40,11 @@ bool AddonManager::initialize(game::GameHandler* gameHandler, const LuaServices&
     luaServices_.loadAddOn = [this](const std::string& name, std::string& reason) {
         return loadAddOnByName(name, reason);
     };
+    // Saved variables on demand, for an addon that has just been given
+    // something worth keeping - a window moved to where the player wants it.
+    // Same reasoning as the loaders above: the manager owns both the list of
+    // addons and the paths their variables are written to.
+    luaServices_.saveAddOnVariables = [this]() { saveAllSavedVariables(); };
     luaServices_.isAddOnLoaded = [this](const std::string& name) {
         return isAddOnLoadedByName(name);
     };

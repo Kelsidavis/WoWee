@@ -3088,6 +3088,18 @@ int lua_Minimap_SetZoom(lua_State* L) {
     if (auto* w = widgetOf(L, 1)) {
         int z = static_cast<int>(luaL_optnumber(L, 2, 0));
         w->zoomLevel = (z < 0) ? 0 : (z > 4 ? 4 : z);
+        // And kept, because the player set it by using the map rather than by
+        // setting a setting, and it was gone at every start: the ring came back
+        // at its widest however far in it had been left. Written to the CVar
+        // store, which is saved as it changes - see setStoredCVar - and read
+        // back once FrameXML has a Minimap to put it on.
+        //
+        // Only for the map itself. SetZoom sits on the frame metatable, so any
+        // frame can be sent one, and a stray call on another frame must not be
+        // what the minimap opens at next time.
+        if (w->name == "Minimap") {
+            setStoredCVar("wowee_minimapZoom", std::to_string(w->zoomLevel));
+        }
     }
     return 0;
 }

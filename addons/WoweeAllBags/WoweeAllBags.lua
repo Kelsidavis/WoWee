@@ -49,7 +49,22 @@ local function settings()
     if type(WoweeAllBagsSettings.columns) ~= 'number' then
         WoweeAllBagsSettings.columns = 10
     end
+    -- A corner this window was never anchored by, saved by an earlier version
+    -- and read by nothing. Dropped here so it stops being written back.
+    WoweeAllBagsSettings.point = nil
     return WoweeAllBagsSettings
+end
+
+--- Put them on disk now, rather than trusting the exit to do it.
+---
+--- SavedVariables are written when the interface unloads, which is a logout or
+--- a tidy quit. A client killed, rebuilt under itself or crashed reaches none
+--- of those, so a window dragged into place was back where it started on the
+--- next start - the setting was never kept, only remembered. Called where
+--- something worth keeping has just changed; the client writes a few hundred
+--- bytes and nothing here calls it per frame.
+local function remember()
+    if WoweeSaveVariables then WoweeSaveVariables() end
 end
 
 -- ── The client's own controls ───────────────────────────────────────────────
@@ -103,9 +118,13 @@ f:RegisterForDrag("LeftButton")
 f:SetScript("OnDragStart", function(self) self:StartMoving() end)
 f:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
-    -- Where it was left, so it opens there next time.
+    -- Where it was left, so it opens there next time. The corner it is stored
+    -- by is the corner it is anchored to when it opens - see the SetPoint in
+    -- WoweeAllBags_Toggle - and a third field naming some other corner was
+    -- written here and read nowhere.
     local s = settings()
-    s.point, s.x, s.y = "CENTER", self:GetLeft(), self:GetBottom()
+    s.x, s.y = self:GetLeft(), self:GetBottom()
+    remember()
 end)
 f:SetBackdrop({
     bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -175,6 +194,7 @@ wider:SetPoint("TOPRIGHT", f, "TOPRIGHT", -34, -12)
 wider:SetText(">")
 wider:SetScript("OnClick", function()
     settings().columns = columns() + 1
+    remember()
     WoweeAllBags_Update()
 end)
 
@@ -185,6 +205,7 @@ narrower:SetPoint("RIGHT", wider, "LEFT", -2, 0)
 narrower:SetText("<")
 narrower:SetScript("OnClick", function()
     settings().columns = columns() - 1
+    remember()
     WoweeAllBags_Update()
 end)
 

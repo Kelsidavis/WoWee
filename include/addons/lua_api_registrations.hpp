@@ -41,6 +41,16 @@ std::string storedCVarValue(const std::string& key, const std::string& fallback)
 /// actually moves: the settings window applies on every frame of a slider drag,
 /// and saving the store means writing a file.
 void noteClientSettingChanged(const std::string& settingKey, const std::string& value);
+
+/// Put a value in the CVar store and on disk, without the CVAR_UPDATE the
+/// interface's own SetCVar announces.
+///
+/// For the things the player sets by using the interface rather than by
+/// setting a setting - the minimap's zoom is the first - which have to be
+/// there again on the next start. The store is written on every change for the
+/// reason its own file says: a value that survives only a clean exit is not one
+/// a player can rely on, and this client is exited every way there is.
+void setStoredCVar(const std::string& key, const std::string& value);
 void registerActionLuaAPI(lua_State* L);
 
 /// Whether this client performs a binding command itself, without the
