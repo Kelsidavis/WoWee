@@ -729,9 +729,17 @@ void WidgetRenderer::drawColorPicker(ImDrawList* dl, const WidgetTree& tree,
 
     switch (w.colorRole) {
         case Widget::ColorRole::Wheel: {
-            // Hue around, saturation outward, at the brightness the bar is set
-            // to - so the wheel dims with the colour rather than showing a
-            // brightness that is not being chosen.
+            // Hue around, saturation outward, at full brightness.
+            //
+            // It was drawn at the brightness the bar is set to, on the reading
+            // that the wheel should show the colour being chosen. The real
+            // client's wheel is a fixed image and does not dim, and the reason
+            // is what happens at the bottom of the bar: a colour picked on a
+            // black one - a chat window's background is black - opens the wheel
+            // at brightness nought, which painted the whole disc black. Every
+            // hue was there and none of them could be seen, so the picker
+            // looked broken and the only control that could bring it back was
+            // the bar beside it.
             //
             // Drawn as flat cells rather than a gradient mesh: a hundred and
             // ninety-two of them across a 128-pixel disc is finer than the eye
@@ -747,7 +755,7 @@ void WidgetRenderer::drawColorPicker(ImDrawList* dl, const WidgetTree& tree,
                 for (int seg = 0; seg < kSectors; ++seg) {
                     const float a0 = 6.2831853f * seg / kSectors;
                     const float a1 = 6.2831853f * (seg + 1) / kSectors;
-                    const float cell[3] = {(seg + 0.5f) / kSectors, sat, hsv[2]};
+                    const float cell[3] = {(seg + 0.5f) / kSectors, sat, 1.0f};
                     float rgb[3];
                     hsvToRgb(cell, rgb);
                     const ImU32 col = IM_COL32(int(rgb[0] * 255), int(rgb[1] * 255),
