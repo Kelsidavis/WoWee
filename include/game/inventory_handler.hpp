@@ -538,9 +538,20 @@ public:
     void emitOtherPlayerEquipment(uint64_t guid);
     /// The same resolution, answered rather than announced - see the
     /// definition for why both shapes exist.
+    ///
+    /// The player's own guid is answered too, from their own equipped slots -
+    /// see resolvePlayerEquipment.
     bool resolveOtherPlayerEquipment(uint64_t guid,
                                      std::array<uint32_t, 19>& displayIds,
                                      std::array<uint8_t, 19>& invTypes) const;
+    /// What this character is wearing, in the same nineteen slots and the same
+    /// order the visible-item fields use.
+    ///
+    /// Out of the inventory rather than out of that table, because the table
+    /// is built from other players' update fields and deliberately holds
+    /// nothing for the player - this client knows its own equipment exactly.
+    bool resolvePlayerEquipment(std::array<uint32_t, 19>& displayIds,
+                                std::array<uint8_t, 19>& invTypes) const;
     void emitAllOtherPlayerEquipment();
     void handleItemQueryResponse(network::Packet& packet);
 

@@ -46,7 +46,31 @@ void UnitPortrait::update(game::GameHandler& gameHandler,
         registered_ = true;
     }
 
-    const uint64_t equipHash = game::hashEquipmentAppearance(self->equipment);
+    // What they are wearing now, not what they wore when they logged in.
+    //
+    // The character list carries the equipment SMSG_CHAR_ENUM described and
+    // nothing updates it afterwards, so this portrait kept the gear the
+    // character was wearing at the select screen for the whole session. The
+    // inventory is the live answer, and it is the same one the target frame
+    // gets when this character is the target - the two portraits are of the
+    // same person and must not disagree. The login list stands in until the
+    // item queries have come back, which is a moment at most.
+    std::vector<game::EquipmentItem> worn;
+    {
+        std::array<uint32_t, 19> displayIds{};
+        std::array<uint8_t, 19> invTypes{};
+        if (gameHandler.getOtherPlayerEquipment(self->guid, displayIds, invTypes)) {
+            for (size_t slot = 0; slot < displayIds.size(); ++slot) {
+                if (displayIds[slot] == 0) continue;
+                worn.push_back({.displayModel = displayIds[slot],
+                                .inventoryType = invTypes[slot],
+                                .enchantment = 0u});
+            }
+        }
+        if (worn.empty()) worn = self->equipment;
+    }
+
+    const uint64_t equipHash = game::hashEquipmentAppearance(worn);
     const bool changed = (loadedGuid_ != self->guid) ||
                          (loadedAppearance_ != self->appearanceBytes) ||
                          (loadedFacialFeatures_ != self->facialFeatures) ||
@@ -63,7 +87,7 @@ void UnitPortrait::update(game::GameHandler& gameHandler,
         if (preview_->loadCharacter(self->race, self->gender, skin, face,
                                     hairStyle, hairColor, self->facialFeatures,
                                     self->useFemaleModel)) {
-            preview_->applyEquipment(self->equipment);
+            preview_->applyEquipment(worn);
             // After the model, because its bounds are what the framing is
             // measured against.
             if (framing_ == Framing::Face) {

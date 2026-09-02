@@ -5549,11 +5549,54 @@ void InventoryHandler::cacheInspectedPlayerEquipment(uint64_t guid, const std::a
 ///
 /// False when nothing is known yet, which is different from "wearing nothing"
 /// - the difference between leaving a model as it is and stripping it.
+bool InventoryHandler::resolvePlayerEquipment(
+        std::array<uint32_t, 19>& displayIds,
+        std::array<uint8_t, 19>& invTypes) const {
+    displayIds = {};
+    invTypes = {};
+    int resolved = 0;
+    // The nineteen equipment slots, in the order the visible-item fields use -
+    // which is the order the slots themselves are in.
+    for (int slot = 0; slot < 19; ++slot) {
+        const auto& equipped =
+            owner_.inventoryRef().getEquipSlot(static_cast<EquipSlot>(slot));
+        if (equipped.empty()) continue;
+        // The item as the inventory holds it, and the template behind it when
+        // the inventory's copy has not been filled in yet: an item known only
+        // by its entry until its query comes back is the ordinary case on the
+        // first frames after login.
+        uint32_t displayId = equipped.item.displayInfoId;
+        uint8_t invType = equipped.item.inventoryType;
+        if (displayId == 0) {
+            auto infoIt = owner_.itemInfoCacheRef().find(equipped.item.itemId);
+            if (infoIt == owner_.itemInfoCacheRef().end()) continue;
+            displayId = infoIt->second.displayInfoId;
+            invType = static_cast<uint8_t>(infoIt->second.inventoryType);
+        }
+        if (displayId == 0) continue;
+        displayIds[static_cast<size_t>(slot)] = displayId;
+        invTypes[static_cast<size_t>(slot)] = invType;
+        ++resolved;
+    }
+    return resolved > 0;
+}
+
 bool InventoryHandler::resolveOtherPlayerEquipment(
         uint64_t guid, std::array<uint32_t, 19>& displayIds,
         std::array<uint8_t, 19>& invTypes) const {
     displayIds = {};
     invTypes = {};
+    // This character, out of this character's own inventory.
+    //
+    // The table below is built from other players' visible-item fields and
+    // updateOtherPlayerVisibleItems refuses the player's own guid outright, so
+    // asking it about the player answered "nothing known" - and every portrait
+    // drawn from that answer put the player in nothing but their skin. That is
+    // what targeting yourself showed: the player frame draws from the character
+    // list and was dressed, and the target frame drew the same character bare.
+    if (guid != 0 && guid == owner_.getPlayerGuid()) {
+        return resolvePlayerEquipment(displayIds, invTypes);
+    }
     auto it = owner_.otherPlayerVisibleItemEntriesRef().find(guid);
     if (it == owner_.otherPlayerVisibleItemEntriesRef().end()) return false;
 

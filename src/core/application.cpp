@@ -4033,7 +4033,28 @@ void Application::render() {
                             // standing in for the slot it belongs to. Replaced
                             // rather than appended: wearing two chests is
                             // wearing the second.
-                            std::vector<game::EquipmentItem> worn = self->equipment;
+                            //
+                            // Now rather than at login, and from the same place
+                            // the portrait beside it reads: the character list
+                            // holds the equipment SMSG_CHAR_ENUM described and
+                            // is never updated, so a dressing room built from it
+                            // showed the gear worn at the select screen under
+                            // whatever was being tried on.
+                            std::vector<game::EquipmentItem> worn;
+                            {
+                                std::array<uint32_t, 19> displayIds{};
+                                std::array<uint8_t, 19> invTypes{};
+                                if (gameHandler->getOtherPlayerEquipment(
+                                        self->guid, displayIds, invTypes)) {
+                                    for (size_t slot = 0; slot < displayIds.size(); ++slot) {
+                                        if (displayIds[slot] == 0) continue;
+                                        worn.push_back({.displayModel = displayIds[slot],
+                                                        .inventoryType = invTypes[slot],
+                                                        .enchantment = 0u});
+                                    }
+                                }
+                                if (worn.empty()) worn = self->equipment;
+                            }
                             for (const auto& tried : dressUp->tryOnItems) {
                                 bool replaced = false;
                                 for (auto& item : worn) {
