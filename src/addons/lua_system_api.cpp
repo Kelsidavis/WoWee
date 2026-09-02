@@ -4009,6 +4009,32 @@ static int lua_BattlegroundHonorBonusesNone(lua_State* L) {
     return 5;
 }
 
+/// GetRandomBGHonorCurrencyBonuses() → hasWin, winHonor, winArena, lossHonor,
+/// lossArena - what the random battleground pays on top of the match itself.
+///
+/// The five zeroes above are what this answered, and the panel hides an amount
+/// that is zero - so the random battleground's rewards box was drawn empty,
+/// which is the whole reason a player picks that row.
+///
+/// The figures are the stock ones: thirty honour and twenty-five arena points
+/// for the day's first win, five honour for a loss. They are the server's to
+/// decide and it never sends them, so a realm that has changed its
+/// Battleground.RewardWinner* settings will be described by this as though it
+/// had not - which is a great deal closer than nothing at all, and is what the
+/// real client shows, since it does not ask either.
+///
+/// hasWin is false because whether *today's* first win is still waiting is
+/// per-character daily state the server keeps to itself. The panel does not
+/// read it; it is the fifth return only because the API has five.
+static int lua_GetRandomBGHonorCurrencyBonuses(lua_State* L) {
+    lua_pushboolean(L, 0);    // hasWin
+    lua_pushnumber(L, 30);    // winHonor
+    lua_pushnumber(L, 25);    // winArena
+    lua_pushnumber(L, 5);     // lossHonor
+    lua_pushnumber(L, 0);     // lossArena
+    return 5;
+}
+
 // GetBattlefieldInstanceInfo(index) → which numbered instance that row is.
 //
 // Zero, which the list reads as unnumbered - the same "first available" the
@@ -4263,6 +4289,20 @@ static int lua_GetBattlegroundInfo(lua_State* L) {
     return 5;
 }
 
+/// The battleground the interface has selected, as a type id.
+///
+/// The panel knows its selection as a row number and tells this client about it
+/// in one place only - RequestBattlegroundInstanceInfo, which it calls whenever
+/// the selection moves and again when it opens - so that call is where the
+/// choice is remembered.
+///
+/// JoinBattlefield used to queue for the last entry of the list of every
+/// battleground instance info had ever been asked for. That list is keyed by
+/// type and updated in place, so its last entry is whichever battleground was
+/// looked at *first*: clicking Warsong Gulch, then Arathi Basin, then back to
+/// Warsong Gulch and pressing Join queued for Arathi Basin.
+static uint32_t& selectedBattlegroundTypeId() { static uint32_t typeId = 0; return typeId; }
+
 // RequestBattlegroundInstanceInfo(index) - ask which instances are running.
 //
 // The reply is SMSG_BATTLEFIELD_LIST, which this client already handled and
@@ -4274,7 +4314,8 @@ static int lua_RequestBattlegroundInstanceInfo(lua_State* L) {
     if (!gh) return 0;
     const auto& list = gh->getBattlegroundTypes();
     if (index < 1 || index > static_cast<int>(list.size())) return 0;
-    gh->requestBattlefieldList(list[static_cast<size_t>(index - 1)].id);
+    selectedBattlegroundTypeId() = list[static_cast<size_t>(index - 1)].id;
+    gh->requestBattlefieldList(selectedBattlegroundTypeId());
     return 0;
 }
 
@@ -4303,20 +4344,46 @@ static int lua_SetSelectedBattlefield(lua_State* L) {
 }
 
 // JoinBattlefield(index, asGroup, isArena) - queue for it.
+//
+// The index names an instance of the selected battleground, and zero means the
+// first available one - which is what both join buttons pass.
 static int lua_JoinBattlefield(lua_State* L) {
     auto* gh = getGameHandler(L);
     if (!gh) return 0;
-    const auto& bgs = gh->getAvailableBgs();
-    if (bgs.empty()) return 0;
     const int index = static_cast<int>(luaL_optnumber(L, 1, 0));
     const bool asGroup = lua_toboolean(L, 2) != 0;
-    // The index names an instance in the list, and zero means first available.
-    const auto& bg = bgs.back();
-    uint32_t instanceId = 0;
-    if (index > 0 && index <= static_cast<int>(bg.instanceIds.size())) {
-        instanceId = bg.instanceIds[static_cast<size_t>(index) - 1];
+
+    const auto& bgs = gh->getAvailableBgs();
+    uint32_t bgTypeId = selectedBattlegroundTypeId();
+    // Nothing selected can still happen - a queue asked for before the panel
+    // has told anyone what it is showing - and one battleground on offer is
+    // then not a guess.
+    if (bgTypeId == 0 && bgs.size() == 1) bgTypeId = bgs.front().bgTypeId;
+    if (bgTypeId == 0) {
+        LOG_WARNING("JoinBattlefield: no battleground is selected, so there is "
+                    "nothing to queue for - the panel names its choice through "
+                    "RequestBattlegroundInstanceInfo and has not");
+        return 0;
     }
-    gh->joinBattlefield(gh->getCurrentGossip().npcGuid, bg.bgTypeId, instanceId, asGroup);
+
+    uint32_t instanceId = 0;
+    for (const auto& bg : bgs) {
+        if (bg.bgTypeId != bgTypeId) continue;
+        if (index > 0 && index <= static_cast<int>(bg.instanceIds.size())) {
+            instanceId = bg.instanceIds[static_cast<size_t>(index) - 1];
+        }
+        break;
+    }
+
+    // The battlemaster, when there is one to name. Queueing from the panel is
+    // done standing anywhere, and the guid then belongs to whoever was last
+    // spoken to - a vendor, a flight master - which is not a battlemaster and
+    // is not what the real client sends. Nought is.
+    const uint64_t battlemaster =
+        gh->isGossipWindowOpen() ? gh->getCurrentGossip().npcGuid : 0;
+    LOG_INFO("CMSG_BATTLEMASTER_JOIN: bgTypeId=", bgTypeId, " instance=", instanceId,
+             " asGroup=", asGroup, " battlemaster=0x", std::hex, battlemaster, std::dec);
+    gh->joinBattlefield(battlemaster, bgTypeId, instanceId, asGroup);
     return 0;
 }
 
@@ -4951,7 +5018,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 {"IsVehicleAimAngleAdjustable",  lua_IsVehicleAimAngleAdjustable},
                 {"HasKey",                       lua_HasKey},
                 {"GetArenaTeam",             lua_GetArenaTeam},
-                {"GetRandomBGHonorCurrencyBonuses",  lua_BattlegroundHonorBonusesNone},
+                {"GetRandomBGHonorCurrencyBonuses",  lua_GetRandomBGHonorCurrencyBonuses},
                 {"GetHolidayBGHonorCurrencyBonuses", lua_BattlegroundHonorBonusesNone},
                 {"GetBattlefieldInstanceInfo",       lua_GetBattlefieldInstanceInfo},
                 {"GetNumBattlefields",       lua_GetNumBattlefields},
