@@ -1078,11 +1078,19 @@ static int lua_GetQuestLogLeaderBoard(lua_State* L) {
             if (it != q.itemCounts.end()) current = it->second;
             uint32_t required = q.itemObjectives[i].required;
             bool finished = (current >= required);
-            // Get item name if available
+            // What it asks for, by name. The quest sends the query when it is
+            // read; this asks again for an objective whose answer never came,
+            // and the number stands in for the moment - the answer lands with a
+            // QUEST_LOG_UPDATE behind it and the line is rewritten with the
+            // name on it.
             std::string itemName;
             const auto* info = gh->getItemInfo(q.itemObjectives[i].itemId);
-            if (info && !info->name.empty()) itemName = info->name;
-            else itemName = "Item #" + std::to_string(q.itemObjectives[i].itemId);
+            if (info && !info->name.empty()) {
+                itemName = info->name;
+            } else {
+                gh->queryItemInfo(q.itemObjectives[i].itemId, 0);
+                itemName = "Item #" + std::to_string(q.itemObjectives[i].itemId);
+            }
             std::string text = itemName + ": " + std::to_string(current) + "/" + std::to_string(required);
             lua_pushstring(L, text.c_str());
             lua_pushstring(L, "item");

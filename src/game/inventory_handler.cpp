@@ -4375,6 +4375,24 @@ void InventoryHandler::handleItemQueryResponse(network::Packet& packet) {
                                            {std::to_string(data.entry)});
         }
 
+        // An objective that had no name for what it asks for now has one.
+        //
+        // The quest log and the tracker draw "0/1 Item #1349" until the item
+        // query answers, and the answer lands well after the row was drawn -
+        // for a quest accepted while the tracker is on screen, always. Nothing
+        // asked them to look again, so the number stayed for the life of the
+        // quest. The same shape the creature and game object queries have.
+        if (owner_.addonEventCallbackRef()) {
+            bool wanted = false;
+            for (const auto& quest : owner_.getQuestLog()) {
+                for (const auto& obj : quest.itemObjectives) {
+                    if (obj.itemId == data.entry && obj.required > 0) { wanted = true; break; }
+                }
+                if (wanted) break;
+            }
+            if (wanted) owner_.addonEventCallbackRef()("QUEST_LOG_UPDATE", {});
+        }
+
         // A quest's item icons are drawn before their items are known - the
         // query goes out when the panel opens and lands after it has drawn - so
         // without this they stayed blank until something else redrew them.
