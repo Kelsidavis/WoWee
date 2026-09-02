@@ -72,3 +72,10 @@ TEST_CASE("the chat box visibility script parses", "[addonlua]") {
     INFO(err);
     CHECK(err.empty());
 }
+
+TEST_CASE("the chat background swatch script parses", "[addonlua]") {
+    const std::string err = compileError(wowee::addons::kChatBackgroundSwatchLua,
+                                         "ChatBackgroundSwatch");
+    INFO(err);
+    CHECK(err.empty());
+}

@@ -549,6 +549,10 @@ void AddonManager::giveCoinAmountsClearance() {
     if (!luaEngine_.executeString(kChatInputBackgroundLua)) {
         LOG_WARNING("Chat input background did not apply: ", luaEngine_.lastError());
     }
+    // And a wheel on the row that opens the colour picker.
+    if (!luaEngine_.executeString(kChatBackgroundSwatchLua)) {
+        LOG_WARNING("Chat background swatch did not apply: ", luaEngine_.lastError());
+    }
     // A loot roll window, filled in again when its item is answered for.
     if (!luaEngine_.executeString(kLootRollRefreshLua)) {
         LOG_WARNING("Loot roll refresh did not apply: ", luaEngine_.lastError());

@@ -1387,6 +1387,39 @@ if GetCVar("chatStyle") == "im" then
 end
 )LUA";
 
+/// The chat window's Background row shows a colour wheel rather than a swatch.
+///
+/// The row opens the colour picker, and the square beside it showed the colour
+/// it would be editing - which for a chat window is black on a dark menu, a
+/// control that looks like nothing at all. A wheel says what the row does.
+///
+/// Only that row. Every other colour swatch in the interface - the per-channel
+/// chat colours, most of all - is showing a colour that is the information, and
+/// a wheel there would take it away. The row is found by the function it sets
+/// rather than by its label, so a translated interface finds it too.
+inline constexpr const char* kChatBackgroundSwatchLua = R"LUA(
+if type(UIDropDownMenu_AddButton) == "function" and
+   type(FCF_SetChatWindowBackGroundColor) == "function" then
+    hooksecurefunc("UIDropDownMenu_AddButton", function(info, level)
+        if not info or info.swatchFunc ~= FCF_SetChatWindowBackGroundColor then
+            return
+        end
+        level = level or 1
+        local list = _G["DropDownList" .. level]
+        if not list or not list.numButtons then return end
+        local button = _G["DropDownList" .. level .. "Button" .. list.numButtons]
+        local swatch = button and button.GetName and
+                       _G[button:GetName() .. "ColorSwatch"]
+        local face = swatch and swatch.GetNormalTexture and swatch:GetNormalTexture()
+        -- The renderer paints a wheel into any region a ColorSelect names as
+        -- one, and that is all this is asking for.
+        if face and swatch.SetColorWheelTexture then
+            swatch:SetColorWheelTexture(face)
+        end
+    end)
+end
+)LUA";
+
 /// Chat lines do not fade.
 ///
 /// ChatFrameTemplate declares displayDuration="120.0", so lines faded two
