@@ -720,28 +720,6 @@ void GameScreen::renderWorldMap(game::GameHandler& gameHandler) {
         wm->setRares(std::move(rares));
     }
 
-    // Chest tracker: mark loaded type-3 chest objects while excluding mining and
-    // herbalism nodes, which share GAMEOBJECT_TYPE_CHEST on the wire.
-    {
-        std::vector<rendering::WorldMapChestMark> chests;
-        if (settingsPanel_.showChestTracker_) {
-            for (const auto& [guid, entity] : gameHandler.getEntityManager().getEntities()) {
-                if (!entity || entity->getType() != game::ObjectType::GAMEOBJECT) continue;
-                auto chest = std::static_pointer_cast<game::GameObject>(entity);
-                const auto* info = gameHandler.getCachedGameObjectInfo(chest->getEntry());
-                if (!info || !info->isValid() || info->type != 3) continue;
-                if (gameHandler.isGatherGameObject(guid)) continue;
-
-                rendering::WorldMapChestMark mark;
-                mark.renderPos = core::coords::canonicalToRender(
-                    glm::vec3(chest->getX(), chest->getY(), chest->getZ()));
-                mark.name = chest->getName().empty() ? info->name : chest->getName();
-                chests.push_back(std::move(mark));
-            }
-        }
-        wm->setChests(std::move(chests));
-    }
-
     glm::vec3 playerPos = renderer->getCharacterPosition();
     float playerYaw = renderer->getCharacterYaw();
     auto* window = app.getWindow();

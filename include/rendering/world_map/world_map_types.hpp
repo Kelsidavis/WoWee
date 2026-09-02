@@ -108,13 +108,6 @@ struct RareMark {
     int rank = 4;          ///< Creature rank: 2 = Rare Elite, 4 = Rare
 };
 
-// ── Nearby spawned chest marker (UI layer → world map overlay) ─
-
-struct ChestMark {
-    glm::vec3 renderPos;   ///< Position in render-space coordinates
-    std::string name;      ///< Chest/container name (shown as tooltip on hover)
-};
-
 // ── Taxi (flight master) node (UI layer → world map overlay) ─
 
 struct TaxiNode {

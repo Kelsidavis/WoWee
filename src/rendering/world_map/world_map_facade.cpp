@@ -18,7 +18,6 @@
 #include "rendering/world_map/layers/quest_poi_layer.hpp"
 #include "rendering/world_map/layers/corpse_marker_layer.hpp"
 #include "rendering/world_map/layers/rare_tracker_layer.hpp"
-#include "rendering/world_map/layers/chest_tracker_layer.hpp"
 #include "rendering/world_map/layers/zone_highlight_layer.hpp"
 #include "rendering/world_map/layers/coordinate_display.hpp"
 #include "rendering/world_map/layers/subzone_tooltip_layer.hpp"
@@ -133,13 +132,11 @@ struct WorldMapFacade::Impl {
     // Typed layer pointers for setters (non-owning references into overlay)
     PartyDotLayer* partyDotLayer = nullptr;
     std::vector<RareMark> rares;
-    std::vector<ChestMark> chests;
     TaxiNodeLayer* taxiNodeLayer = nullptr;
     POIMarkerLayer* poiMarkerLayer = nullptr;
     QuestPOILayer* questPOILayer = nullptr;
     CorpseMarkerLayer* corpseMarkerLayer = nullptr;
     RareTrackerLayer* rareTrackerLayer = nullptr;
-    ChestTrackerLayer* chestTrackerLayer = nullptr;
     ZoneHighlightLayer* zoneHighlightLayer = nullptr;
     PlayerMarkerLayer* playerMarkerLayer = nullptr;
 
@@ -324,11 +321,6 @@ void WorldMapFacade::Impl::initOverlayLayers() {
     auto rtLayer = std::make_unique<RareTrackerLayer>();
     rareTrackerLayer = rtLayer.get();
     overlay.addLayer(std::move(rtLayer));
-
-    // Nearby spawned chest tracker
-    auto ctLayer = std::make_unique<ChestTrackerLayer>();
-    chestTrackerLayer = ctLayer.get();
-    overlay.addLayer(std::move(ctLayer));
 
     // Coordinate display
     overlay.addLayer(std::make_unique<CoordinateDisplay>());
@@ -801,10 +793,6 @@ void WorldMapFacade::setRares(std::vector<RareMark> rares) {
     impl_->rares = std::move(rares);
 }
 
-void WorldMapFacade::setChests(std::vector<ChestMark> chests) {
-    impl_->chests = std::move(chests);
-}
-
 void WorldMapFacade::setTaxiNodes(std::vector<TaxiNode> nodes) {
     impl_->taxiNodes = std::move(nodes);
 }
@@ -1027,7 +1015,6 @@ void WorldMapFacade::Impl::renderImGuiOverlay(const glm::vec3& playerRenderPos,
         // Update layer data pointers
         if (partyDotLayer) partyDotLayer->setDots(partyDots);
         if (rareTrackerLayer) rareTrackerLayer->setRares(rares);
-        if (chestTrackerLayer) chestTrackerLayer->setChests(chests);
         if (taxiNodeLayer) taxiNodeLayer->setNodes(taxiNodes);
         if (poiMarkerLayer) poiMarkerLayer->setMarkers(data.poiMarkers());
         if (questPOILayer) questPOILayer->setPois(questPois);

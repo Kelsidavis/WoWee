@@ -285,7 +285,7 @@ constexpr SettingDesc kSchema[] = {
     {"raretracker", "Rare tracker", SettingKind::Bool, 0, 0, 0, "Combat & HUD", "",
      "Mark rare creatures near you on both maps.", "", 0},
     {"chesttracker", "Chest tracker", SettingKind::Bool, 0, 0, 0, "Combat & HUD", "",
-     "Mark chests near you on both maps.", "", 0},
+     "Mark chests near you on the minimap.", "", 0},
 
     {"damageflash", "Damage flash", SettingKind::Bool, 0, 0, 0, "Combat & HUD", "Screen effects",
      "A red vignette at the edges of the screen when you are hit.", "", 1},

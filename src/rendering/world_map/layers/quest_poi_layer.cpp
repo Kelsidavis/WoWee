@@ -68,7 +68,15 @@ void QuestPOILayer::render(const LayerContext& ctx) {
                                   IM_COL32(0, 0, 0, 255), marker);
         }
 
-        if (!qp.name.empty()) {
+        // The name goes under an objective and nowhere else.
+        //
+        // Every marker used to carry one, so a zone with a dozen quest givers
+        // in it was a wall of yellow NPC names over the map - and the names
+        // were the least of what the marker already said: the ! and the ? say
+        // what the NPC is for, and hovering one still names it. What a marker
+        // cannot say by its shape is which quest an objective circle belongs
+        // to, so that is the one that keeps its label.
+        if (qp.kind == QuestPOI::Kind::OBJECTIVE && !qp.name.empty()) {
             ImVec2 nameSz = qFont->CalcTextSizeA(ImGui::GetFontSize() * 0.85f, FLT_MAX, 0.0f, qp.name.c_str());
             float tx = px - nameSz.x * 0.5f;
             float ty = py - nameSz.y - 7.0f;
