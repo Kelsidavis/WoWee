@@ -3290,8 +3290,14 @@ int lua_Region_Hide(lua_State* L) {
         //
         // The real client answers nil here for the same reason: an owner is a
         // property of a tooltip that is up.
+        //
+        // The interface's own idea of the owner, and only that one. The
+        // tree keeps a second, which is what takes a tooltip away with the
+        // panel it belonged to - clearing that as well made every hidden
+        // tooltip look orphaned the next time something showed it without
+        // naming an owner again, and the comparison tooltip flashed on and
+        // off at the tooltip update rate as the two fought.
         if (w->isTooltip) {
-            w->tooltipOwnerId = 0;
             lua_pushnil(L);
             lua_setfield(L, 1, "__owner");
         }

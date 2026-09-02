@@ -208,6 +208,10 @@ void WidgetTree::hideOrphanedTooltips() {
     for (uint32_t id : ownedTooltips_) {
         Widget* tip = get(id);
         if (!tip || !tip->shown) continue;
+        // A tooltip with no owner recorded is not an orphan - it is a tooltip
+        // nobody claimed, and taking it away would be this sweep deciding what
+        // is on screen rather than tidying up after a panel that closed.
+        if (tip->tooltipOwnerId == 0) continue;
         const Widget* owner = get(tip->tooltipOwnerId);
         // Gone outright, or hidden with the panel it sat in. visibleChain is
         // the one that answers the second: a loot button is still shown in its
