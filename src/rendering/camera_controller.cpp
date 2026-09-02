@@ -1099,38 +1099,6 @@ CameraController::FloorSample CameraController::sampleFloorUnderFeet(const glm::
 void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
                                                glm::vec3& targetPos,
                                                const glm::vec3& prevTargetPos) {
-    // Seated in something, and the server said where: held there, exactly.
-    //
-    // A chair is an M2 with collision whose seat stands about a metre off the
-    // floor, and nothing here can tell a seat from a step - so the grounding
-    // put the character's feet on top of the chair and left them standing on
-    // it, which is what sitting in a barber's chair looked like.
-    //
-    // Returning early is not enough and was worse: gravity is applied before
-    // this runs, and this is what stops it, so skipping it let the character
-    // sink through the floor and out under the city. The height is pinned to
-    // where the server seated them and the fall is cancelled every frame.
-    if (seatedInChair_) {
-        // Pinned again if the character has been moved somewhere else while
-        // seated - a teleport out of the shop, a summon - so the hold follows
-        // the server rather than keeping a height that is no longer under
-        // anything.
-        const float movedXY = std::hypot(targetPos.x - seatedPinXY_.x,
-                                         targetPos.y - seatedPinXY_.y);
-        if (!seatedPinValid_ || movedXY > 1.0f) {
-            seatedPinZ_ = targetPos.z;
-            seatedPinXY_ = glm::vec2(targetPos.x, targetPos.y);
-            seatedPinValid_ = true;
-        }
-        targetPos.z = seatedPinZ_;
-        verticalVelocity = 0.0f;
-        grounded = true;
-        hasRealGround_ = true;
-        noGroundTimer_ = 0.0f;
-        lastGroundZ = seatedPinZ_;
-        return;
-    }
-    seatedPinValid_ = false;
 
     // Ground the character to terrain or WMO floor
     // Skip entirely while swimming - the swim floor clamp handles vertical bounds.
@@ -1142,7 +1110,27 @@ void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
         // Slope limit: reject surfaces too steep to walk (prevent clipping).
         // WMO tunnel/bridge ramps are often steeper than outdoor terrain ramps.
         // The floor directly under the feet, and the surfaces that answered.
-        const FloorSample sample = sampleFloorUnderFeet(targetPos, stepUpBudget);
+        FloorSample sample = sampleFloorUnderFeet(targetPos, stepUpBudget);
+        // Seated in something: the chair itself is not a floor to stand on.
+        //
+        // A chair is an M2 with collision whose seat is about a metre off the
+        // ground, and nothing here can tell a seat from a step - so the feet
+        // were put on top of the chair and the character stood on it, which is
+        // what sitting in a barber's chair looked like.
+        //
+        // Only the M2 is dropped, and only while the server says the character
+        // is in a chair. Everything else about the grounding stays: the floor
+        // under the chair is a real floor, gravity still applies, and the
+        // seated pose is what puts the character on the seat. Holding the
+        // height instead - which is what this did first - meant a character who
+        // stopped being seated without this noticing walked around at whatever
+        // height they had been sitting at.
+        if (seatedInChair_ && sample.m2 && (sample.wmo || sample.terrain)) {
+            sample.m2 = std::nullopt;
+            sample.floor = selectReachableFloor3(sample.terrain, sample.wmo,
+                                                 std::nullopt, targetPos.z,
+                                                 stepUpBudget);
+        }
         std::optional<float> groundH = sample.floor;
         const std::optional<float> centerTerrainH = sample.terrain;
         const std::optional<float> centerWmoH = sample.wmo;

@@ -1913,7 +1913,7 @@ void SocialHandler::convertToRaid() {
         owner_.raiseUiError("You must be the party leader to convert to raid.");
         return;
     }
-    if (partyData.groupType == 1) {
+    if (groupIsRaid(partyData.groupType)) {
         owner_.raiseUiError("You are already in a raid group.");
         return;
     }
@@ -2219,7 +2219,7 @@ void SocialHandler::handleGroupList(network::Packet& packet) {
         // on this event and nothing else, so the roles were parsed, readable,
         // and never shown.
         owner_.addonEventCallbackRef()("PLAYER_ROLES_ASSIGNED", {});
-        if (partyData.groupType == 1)
+        if (groupIsRaid(partyData.groupType))
             owner_.addonEventCallbackRef()("RAID_ROSTER_UPDATE", {});
     }
 }
@@ -2372,7 +2372,7 @@ void SocialHandler::handlePartyMemberStats(network::Packet& packet, bool isFull)
 
     if (owner_.addonEventCallbackRef()) {
         std::string unitId;
-        if (partyData.groupType == 1) {
+        if (groupIsRaid(partyData.groupType)) {
             for (size_t i = 0; i < partyData.members.size(); ++i) {
                 if (partyData.members[i].guid == memberGuid) { unitId = "raid" + std::to_string(i + 1); break; }
             }

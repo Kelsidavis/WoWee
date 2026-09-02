@@ -919,7 +919,8 @@ static int lua_IsInGroup(lua_State* L) {
 
 static int lua_IsInRaid(lua_State* L) {
     auto* gh = getGameHandler(L);
-    lua_pushboolean(L, gh && gh->isInGroup() && gh->getPartyData().groupType == 1);
+    lua_pushboolean(L, gh && gh->isInGroup() &&
+                       game::groupIsRaid(gh->getPartyData().groupType));
     return 1;
 }
 
@@ -1124,7 +1125,7 @@ static int lua_UnitPlayerOrPetInParty(lua_State* L) {
 
 static int lua_UnitPlayerOrPetInRaid(lua_State* L) {
     auto* gh = getGameHandler(L);
-    if (!gh || gh->getPartyData().groupType != 1) { return luaReturnFalse(L); }
+    if (!gh || !game::groupIsRaid(gh->getPartyData().groupType)) { return luaReturnFalse(L); }
     return lua_UnitPlayerOrPetInParty(L);
 }
 
@@ -1948,23 +1949,45 @@ static int lua_StopAttack(lua_State* L) {
 // appear. Nothing here counts down to a forced release, and -1 is the game's
 // own way of saying so.
 
+/// GetNumRaidMembers() → everyone in the raid, this player included, or nought
+/// when the group is not a raid.
+///
+/// The player is counted because the interface counts them: GetDisplayedAllyFrames
+/// compares this against MEMBERS_PER_RAID_GROUP to decide between the party
+/// frames and the raid frames, and a raid of five that answered four would be
+/// drawn as a party for ever.
 static int lua_GetNumRaidMembers(lua_State* L) {
     auto* gh = getGameHandler(L);
     if (!gh || !gh->isInGroup()) { return luaReturnZero(L); }
     const auto& pd = gh->getPartyData();
-    lua_pushnumber(L, (pd.groupType == 1) ? pd.memberCount : 0);
+    if (!game::groupIsRaid(pd.groupType)) { return luaReturnZero(L); }
+    lua_pushnumber(L, static_cast<int>(pd.members.size()) + 1);
     return 1;
 }
 
+/// GetNumPartyMembers() → the other members of this player's own party.
+///
+/// The roster the server sends is already written without the player in it -
+/// SMSG_GROUP_LIST carries members-minus-one and then that many entries - and
+/// this subtracted one from it again. A pair answered nought, which is a party
+/// the interface draws no frames for at all, and a five-man answered three and
+/// lost its last member.
+///
+/// In a raid it is the player's own subgroup that is asked about, which is what
+/// the party frames along the left of the screen show for a raid of one group.
 static int lua_GetNumPartyMembers(lua_State* L) {
     auto* gh = getGameHandler(L);
     if (!gh || !gh->isInGroup()) { return luaReturnZero(L); }
     const auto& pd = gh->getPartyData();
-    // In party (not raid), count excludes self
-    int count = (pd.groupType == 0) ? static_cast<int>(pd.memberCount) : 0;
-    // memberCount includes self on some servers, subtract 1 if needed
-    if (count > 0) count = std::max(0, count - 1);
-    lua_pushnumber(L, count);
+    if (!game::groupIsRaid(pd.groupType)) {
+        lua_pushnumber(L, static_cast<int>(pd.members.size()));
+        return 1;
+    }
+    int inSubgroup = 0;
+    for (const auto& member : pd.members) {
+        if (member.subGroup == pd.subGroup) ++inSubgroup;
+    }
+    lua_pushnumber(L, inSubgroup);
     return 1;
 }
 
@@ -1996,7 +2019,7 @@ static int lua_UnitInRaid(lua_State* L) {
     std::string uidStr(uid);
     toLowerInPlace(uidStr);
     const auto& pd = gh->getPartyData();
-    if (pd.groupType != 1) { return luaReturnFalse(L); }
+    if (!game::groupIsRaid(pd.groupType)) { return luaReturnFalse(L); }
     if (uidStr == "player") {
         lua_pushboolean(L, 1);
         return 1;

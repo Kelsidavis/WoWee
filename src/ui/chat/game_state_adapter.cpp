@@ -39,7 +39,8 @@ bool GameStateAdapter::hasPet() const   { return gameHandler_.hasPet(); }
 bool GameStateAdapter::isInGroup() const { return gameHandler_.isInGroup(); }
 
 bool GameStateAdapter::isInRaid() const {
-    return gameHandler_.isInGroup() && gameHandler_.getPartyData().groupType == 1;
+    return gameHandler_.isInGroup() &&
+           game::groupIsRaid(gameHandler_.getPartyData().groupType);
 }
 
 bool GameStateAdapter::isIndoors() const {
