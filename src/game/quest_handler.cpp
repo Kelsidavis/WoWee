@@ -7,6 +7,7 @@
 #include "game/entity.hpp"
 #include "game/update_field_table.hpp"
 #include "game/quest_progress.hpp"
+#include "game/quest_text.hpp"
 #include "game/packet_parsers.hpp"
 #include "network/world_socket.hpp"
 #include "rendering/renderer.hpp"
@@ -152,18 +153,11 @@ void QuestHandler::sendQuestGiverStatusQueries() {
 }
 
 
+// The readability test and the completed-line choice live in game/quest_text.hpp
+// so they can be tested without a packet; this is the name the file has always
+// called the first of them by.
 static bool isReadableQuestText(const std::string& s, size_t minLen, size_t maxLen) {
-    if (s.size() < minLen || s.size() > maxLen) return false;
-    bool hasAlpha = false;
-    for (unsigned char c : s) {
-        // Reject control characters but allow UTF-8 multi-byte sequences (0x80+)
-        // so localized servers (French, German, Russian, etc.) work correctly.
-        if (c < 0x20 && c != '\t' && c != '\n' && c != '\r') return false;
-        if (c >= 0x20 && c <= 0x7E && std::isalpha(c)) hasAlpha = true;
-        // UTF-8 continuation/lead bytes (0x80+) are allowed but don't count as alpha
-        // since we only need at least one ASCII letter to distinguish from binary garbage.
-    }
-    return hasAlpha;
+    return questTextIsReadable(s, minLen, maxLen);
 }
 
 static bool isPlaceholderQuestTitle(const std::string& s) {
@@ -259,6 +253,27 @@ static std::string normalizeQuestText(std::string s, bool singleLine) {
     return s;
 }
 
+/// Whether the objective records really do begin where this string run ends.
+///
+/// The five strings are followed by the kill and item objectives, which are
+/// numbers with a shape - an entry id and a count, both inside plausible
+/// bounds. So a candidate offset can be checked rather than guessed at: read
+/// past its strings and ask whether what follows parses as the block that must
+/// follow them. Defined below, beside the parse it borrows.
+static bool questStringRunFitsObjectives(const std::vector<uint8_t>& data,
+                                         size_t stringsStart, int nStrings,
+                                         bool wotlkLayout);
+
+/// The completed line, chosen in game/quest_text.hpp and then expanded: the
+/// $b and $n tokens in it are the server's, and every other quest string on
+/// its way to the interface goes through the same normalisation.
+static std::string pickQuestCompletedLine(const std::string& endText,
+                                          const std::string& completedText) {
+    std::string chosen = questCompletedText(endText, completedText);
+    if (chosen.empty()) return {};
+    return normalizeQuestText(std::move(chosen), false);
+}
+
 static QuestQueryTextCandidate pickBestQuestQueryTexts(const std::vector<uint8_t>& data, bool classicHint) {
     QuestQueryTextCandidate best;
     if (data.size() <= 9) return best;
@@ -297,6 +312,21 @@ static QuestQueryTextCandidate pickBestQuestQueryTexts(const std::vector<uint8_t
                 QuestQueryTextCandidate c;
                 c.title = normalizeQuestText(title, true);
                 c.score = scoreQuestTitle(c.title) + 20; // Prefer expected struct offsets
+                // And prefer, far above anything a scan can claim, an offset
+                // whose strings are followed by a block that reads as the
+                // objectives. That is not a preference between two guesses:
+                // the numbers after the strings have a shape, and an offset
+                // whose run ends exactly at one is the offset the server
+                // wrote. Without this a suffix of some other string could
+                // outscore a short title - "Sven's Revenge" is fourteen
+                // characters - and win the whole candidate, completed line
+                // included, which is one way that line came back empty on a
+                // quest that had one.
+                const bool wotlkSeed = (off == wotlkOffset);
+                if (questStringRunFitsObjectives(data, off, wotlkSeed ? 5 : 4,
+                                                 wotlkSeed)) {
+                    c.score += 100;
+                }
 
                 std::string s2;
                 size_t n2 = next;
@@ -339,20 +369,13 @@ static QuestQueryTextCandidate pickBestQuestQueryTexts(const std::vector<uint8_t
                             c.description = normalizeQuestText(s3, false);
                         }
                         // The completed line sits one string later on WotLK
-                        // (past AreaDescription) than on the earlier clients,
-                        // where it follows the details directly. Read both and
-                        // take whichever is a readable sentence, longest first -
-                        // AreaDescription is usually empty, so it rarely wins,
-                        // and an empty one never does.
+                        // (past EndText) than on the earlier clients, where
+                        // EndText is the last string there is. Read both and
+                        // let questCompletedText say which one this quest
+                        // actually carries.
                         if (readCStringAt(data, n3, s4, n4)) {
                             readCStringAt(data, n4, s5, n5);
-                            const bool s5ok = isReadableQuestText(s5, 8, 600);
-                            const bool s4ok = isReadableQuestText(s4, 8, 600);
-                            if (s5ok && (!s4ok || s5.size() >= s4.size())) {
-                                c.completionText = normalizeQuestText(s5, false);
-                            } else if (s4ok) {
-                                c.completionText = normalizeQuestText(s4, false);
-                            }
+                            c.completionText = pickQuestCompletedLine(s4, s5);
                         }
                     }
                 }
@@ -398,10 +421,7 @@ static QuestQueryTextCandidate pickBestQuestQueryTexts(const std::vector<uint8_t
                 if (isReadableQuestText(d3, 8, 4096)) c.description = normalizeQuestText(d3, false);
                 if (readCStringAt(data, m3, d4, m4)) {
                     readCStringAt(data, m4, d5, m5);
-                    const bool d5ok = isReadableQuestText(d5, 8, 600);
-                    const bool d4ok = isReadableQuestText(d4, 8, 600);
-                    if (d5ok && (!d4ok || d5.size() >= d4.size())) c.completionText = normalizeQuestText(d5, false);
-                    else if (d4ok) c.completionText = normalizeQuestText(d4, false);
+                    c.completionText = pickQuestCompletedLine(d4, d5);
                 }
             }
         }
@@ -486,6 +506,12 @@ static QuestQueryObjectives tryParseQuestObjectivesAt(const std::vector<uint8_t>
 
     out.valid = true;
     return out;
+}
+
+static bool questStringRunFitsObjectives(const std::vector<uint8_t>& data,
+                                         size_t stringsStart, int nStrings,
+                                         bool wotlkLayout) {
+    return tryParseQuestObjectivesAt(data, stringsStart, nStrings, wotlkLayout).valid;
 }
 
 static QuestQueryObjectives extractQuestQueryObjectives(const std::vector<uint8_t>& data,

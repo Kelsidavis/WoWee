@@ -1228,6 +1228,11 @@ target_link_libraries(test_font_em_scale PRIVATE catch2_main imgui)
 add_test(NAME font_em_scale COMMAND test_font_em_scale)
 register_test_target(test_font_em_scale)
 
+# ── test_quest_text ──────────────────────────────────────────
+# Which of a quest's five strings holds the line a finished quest shows. The
+# pick used to be "whichever is longer", which answered a different question.
+wowee_add_test(test_quest_text SOURCES test_quest_text.cpp)
+
 # ── test_npc_flags ───────────────────────────────────────────
 # UNIT_NPC_FLAGS bit by bit. A wrong one is invisible - the mask just always
 # answers no - and NPC_FLAG_VENDOR was 0x04, a bit nothing sets, so no merchant

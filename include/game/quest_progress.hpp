@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 
 namespace wowee::game {
 
@@ -61,6 +62,24 @@ inline bool isQuestSlotComplete(uint8_t questLogStride, uint32_t stateField) {
 /// as completion was being read.
 inline bool isQuestSlotFailed(uint8_t questLogStride, uint32_t stateField) {
     return (questSlotState(questLogStride, stateField) & 0x2u) != 0;
+}
+
+/// One objective line, the way the game writes it.
+///
+/// QUEST_MONSTERS_KILLED is "%s slain: %d/%d" and QUEST_OBJECTS_FOUND is
+/// "%s: %d/%d" - a chest is found rather than slain. The name is whatever the
+/// creature or game object query answered; while that is still out there is
+/// nothing to name it with, and the generic word stands in for the moment.
+///
+/// The quest log and the tracker both read this, and both said "Creature
+/// slain: 12/15" for every kill objective at once - which names none of the
+/// fifteen things and is the one thing an objective line is for.
+inline std::string questObjectiveLine(const std::string& name, bool isObject,
+                                      uint32_t current, uint32_t required) {
+    const std::string counts =
+        std::to_string(current) + "/" + std::to_string(required);
+    if (isObject) return (name.empty() ? "Object" : name) + ": " + counts;
+    return (name.empty() ? "Creature" : name) + " slain: " + counts;
 }
 
 } // namespace wowee::game

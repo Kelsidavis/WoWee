@@ -6,6 +6,7 @@ using wowee::game::decodeQuestObjectiveCounts;
 using wowee::game::normalizeQuestObjectiveEntry;
 using wowee::game::isQuestSlotComplete;
 using wowee::game::questObjectiveCountFieldOffset;
+using wowee::game::questObjectiveLine;
 
 TEST_CASE("Classic quest counters use four packed 6-bit values", "[quest][progress]") {
     const uint32_t packed = 5u | (12u << 6) | (31u << 12) | (63u << 18)
@@ -76,4 +77,23 @@ TEST_CASE("A failed quest slot reads as failed, not as unfinished",
         CHECK(wowee::game::isQuestSlotComplete(stride, 0x01000000));
         CHECK(wowee::game::isQuestSlotFailed(stride, 0x03000000));
     }
+}
+
+// An objective line names what it is about. Both the quest log and the tracker
+// read this one string, and it used to say "Creature slain: 12/15" for every
+// kill objective at once - fifteen of what, the line could not say.
+TEST_CASE("A kill objective is named, and counted", "[quest][objective]") {
+    REQUIRE(questObjectiveLine("Nightbane Worgen", false, 12, 15) ==
+            "Nightbane Worgen slain: 12/15");
+    // A game object is found rather than slain, which is the game's own
+    // QUEST_OBJECTS_FOUND against its QUEST_MONSTERS_KILLED.
+    REQUIRE(questObjectiveLine("Bundle of Wood", true, 0, 8) ==
+            "Bundle of Wood: 0/8");
+}
+
+TEST_CASE("An objective with no name yet still counts", "[quest][objective]") {
+    // The creature query has not answered. The count is real and belongs on
+    // screen now; the name arrives behind it and rewrites the line.
+    REQUIRE(questObjectiveLine("", false, 3, 8) == "Creature slain: 3/8");
+    REQUIRE(questObjectiveLine("", true, 3, 8) == "Object: 3/8");
 }

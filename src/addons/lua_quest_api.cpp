@@ -7,6 +7,7 @@
 #include "game/auction_filters.hpp"
 #include "game/game_utils.hpp"
 #include "game/packed_time.hpp"
+#include "game/quest_progress.hpp"
 #include "ui/chat/chat_utils.hpp"
 #include "core/logger.hpp"
 
@@ -795,6 +796,32 @@ static int lua_GetQuestLink(lua_State* L) {
     return 1;
 }
 
+/// Whether a quest's objective record is a line in the log at all.
+///
+/// A count of none is not an objective. The server's quest template names the
+/// creature an item drops from in the kill record beside it - Dextren Ward
+/// carries the Hand of Dextren Ward - and writes a required count of zero on
+/// that record, because there is nothing to kill. Counting those as objectives
+/// gave every such quest one more leader board than it has, and the extra one
+/// answers "0/0", which reads as finished: the tracker drew nothing for it and
+/// the world map drew its dash with nothing beside it, on quest after quest.
+static bool isQuestObjective(int32_t id, uint32_t required) {
+    return id != 0 && required > 0;
+}
+
+/// How many objective lines a quest draws: the kill and item objectives it
+/// carries, which is what GetNumQuestLeaderBoards counts.
+static int questObjectiveCount(const game::GameHandler::QuestLogEntry& q) {
+    int count = 0;
+    for (const auto& ko : q.killObjectives) {
+        if (isQuestObjective(ko.npcOrGoId, ko.required)) ++count;
+    }
+    for (const auto& io : q.itemObjectives) {
+        if (isQuestObjective(static_cast<int32_t>(io.itemId), io.required)) ++count;
+    }
+    return count;
+}
+
 // GetNumQuestLeaderBoards(questLogIndex) → count of objectives
 static int lua_GetNumQuestLeaderBoards(lua_State* L) {
     auto* gh = getGameHandler(L);
@@ -802,15 +829,7 @@ static int lua_GetNumQuestLeaderBoards(lua_State* L) {
     if (!gh || index < 1) { return luaReturnZero(L); }
     const auto* qp = questAtRow(gh, index);
     if (!qp) { return luaReturnZero(L); }
-    const auto& q = *qp;
-    int count = 0;
-    for (const auto& ko : q.killObjectives) {
-        if (ko.npcOrGoId != 0 || ko.required > 0) ++count;
-    }
-    for (const auto& io : q.itemObjectives) {
-        if (io.itemId != 0 || io.required > 0) ++count;
-    }
-    lua_pushnumber(L, count);
+    lua_pushnumber(L, questObjectiveCount(*qp));
     return 1;
 }
 
@@ -894,31 +913,55 @@ static int lua_QuestPOIGetQuestIDByVisibleIndex(lua_State* L) {
     return 2;
 }
 
-/// QuestPOIGetIconInfo(questId) → completed, x, y.
+/// QuestPOIGetIconInfo(questId) → completed, x, y, objectiveIndex.
 ///
-/// The endpoint marker is the one the map draws for a quest, so that is the
-/// one reported: objective index -1 identifies it. Completion comes from the
-/// quest log rather than the marker, which does not carry it.
+/// Where the map marks a quest: on the work while there is work to do, and on
+/// the hand-in once there is not. This reported the hand-in either way - it
+/// took the marker with objective index -1 whenever there was one - so every
+/// quest in the log was marked at whichever NPC it is returned to, and a zone
+/// full of objectives had all its numbers piled on the town it is quested from.
+///
+/// The position is a fraction across the map now showing, not a place in the
+/// world: worldmapframe.lua multiplies what it gets by WorldMapDetailFrame's
+/// width. World coordinates there are tens of thousands of pixels off the
+/// parchment, which is the same fault GetPlayerMapPosition had. A quest whose
+/// marker is on another map answers no position at all, and the caller's
+/// `if ( posX and posY )` leaves its button where it was.
 static int lua_QuestPOIGetIconInfo(lua_State* L) {
     auto* gh = getGameHandler(L);
+    auto* svc = getLuaServices(L);
     const uint32_t questId = static_cast<uint32_t>(luaL_checknumber(L, 1));
     if (!gh || questId == 0) { return luaReturnNil(L); }
-
-    const game::GossipPoi* best = nullptr;
-    for (const auto& poi : gh->getGossipPois()) {
-        if (poi.data != questId || poi.questObjectiveIndex == -2) continue;
-        if (!best || poi.questObjectiveIndex == -1) best = &poi;
-        if (poi.questObjectiveIndex == -1) break;
-    }
-    if (!best) { return luaReturnNil(L); }
 
     bool complete = false;
     for (const auto& q : gh->getQuestLog()) {
         if (q.questId == questId) { complete = q.complete; break; }
     }
+
+    // The kind that suits the quest's state, and whatever there is when the
+    // server sent only the other kind.
+    const game::GossipPoi* best = nullptr;
+    for (const auto& poi : gh->getGossipPois()) {
+        if (poi.data != questId || poi.questObjectiveIndex == -2) continue;
+        const bool endpoint = (poi.questObjectiveIndex == -1);
+        if (endpoint == complete) { best = &poi; break; }
+        if (!best) best = &poi;
+    }
+    if (!best) { return luaReturnNil(L); }
+
+    float u = 0.0f, v = 0.0f;
+    const bool onThisMap = svc && svc->mapUVForWorldPos &&
+                           svc->mapUVForWorldPos(best->x, best->y, 0.0f, u, v);
+
     lua_pushboolean(L, complete);
-    lua_pushnumber(L, best->x);
-    lua_pushnumber(L, best->y);
+    if (!onThisMap) {
+        lua_pushnil(L);
+        lua_pushnil(L);
+        lua_pushnil(L);
+        return 4;
+    }
+    lua_pushnumber(L, u);
+    lua_pushnumber(L, v);
     // The fourth value the API names: which objective this marker belongs to.
     // The client has carried it all along as questObjectiveIndex, where -1
     // means the quest itself rather than one of its lines - which is nil here,
@@ -958,6 +1001,29 @@ static int lua_GetQuestPOILeaderBoard(lua_State* L) {
     return lua_GetQuestLogLeaderBoard(L);
 }
 
+/// What a kill objective is about, by name: a creature for a positive id, a
+/// game object for a negative one.
+///
+/// Empty while the query is out. The quest asks for both the moment its own
+/// query response is parsed, so the usual case is that the name is already
+/// here; this asks again for the one that is not, because a log built from a
+/// saved character can reach an objective whose query was never sent.
+static std::string objectiveTargetName(game::GameHandler* gh, int32_t npcOrGoId) {
+    if (!gh || npcOrGoId == 0) return {};
+    const uint32_t entry = static_cast<uint32_t>(std::abs(npcOrGoId));
+    if (npcOrGoId > 0) {
+        std::string name = gh->getCachedCreatureName(entry);
+        if (name.empty()) gh->queryCreatureInfo(entry, 0);
+        return name;
+    }
+    const auto* info = gh->getCachedGameObjectInfo(entry);
+    if (!info || info->name.empty()) {
+        gh->queryGameObjectInfo(entry, 0);
+        return {};
+    }
+    return info->name;
+}
+
 static int lua_GetQuestLogLeaderBoard(lua_State* L) {
     auto* gh = getGameHandler(L);
     int objIdx = static_cast<int>(luaL_checknumber(L, 1));
@@ -971,7 +1037,8 @@ static int lua_GetQuestLogLeaderBoard(lua_State* L) {
     // Build ordered list: kill objectives first, then item objectives
     int cur = 0;
     for (int i = 0; i < 4; ++i) {
-        if (q.killObjectives[i].npcOrGoId == 0 && q.killObjectives[i].required == 0) continue;
+        if (!isQuestObjective(q.killObjectives[i].npcOrGoId,
+                              q.killObjectives[i].required)) continue;
         ++cur;
         if (cur == objIdx) {
             // Get current count from killCounts map (keyed by abs(npcOrGoId))
@@ -981,17 +1048,29 @@ static int lua_GetQuestLogLeaderBoard(lua_State* L) {
             if (it != q.killCounts.end()) current = it->second.first;
             uint32_t required = q.killObjectives[i].required;
             bool finished = (current >= required);
-            // Build display text like "Kobold Vermin slain: 3/8"
-            std::string text = (q.killObjectives[i].npcOrGoId < 0 ? "Object" : "Creature")
-                + std::string(" slain: ") + std::to_string(current) + "/" + std::to_string(required);
+            // Whatever it is that has to be killed or found, by name.
+            //
+            // This said "Creature slain: 12/15" for every kill objective in the
+            // log and the tracker at once, which names none of the fifteen
+            // things and is the one thing an objective line is for. The name
+            // comes from the creature or game object query the quest sent when
+            // it was read; until that answers there is no name to give, and the
+            // generic word stands in for the moment - the answer lands with a
+            // QUEST_LOG_UPDATE behind it, so the line is rewritten with the
+            // name on it.
+            const bool isObject = q.killObjectives[i].npcOrGoId < 0;
+            const std::string text = game::questObjectiveLine(
+                objectiveTargetName(gh, q.killObjectives[i].npcOrGoId),
+                isObject, current, required);
             lua_pushstring(L, text.c_str());
-            lua_pushstring(L, q.killObjectives[i].npcOrGoId < 0 ? "object" : "monster");
+            lua_pushstring(L, isObject ? "object" : "monster");
             lua_pushboolean(L, finished ? 1 : 0);
             return 3;
         }
     }
     for (int i = 0; i < 6; ++i) {
-        if (q.itemObjectives[i].itemId == 0 && q.itemObjectives[i].required == 0) continue;
+        if (!isQuestObjective(static_cast<int32_t>(q.itemObjectives[i].itemId),
+                              q.itemObjectives[i].required)) continue;
         ++cur;
         if (cur == objIdx) {
             uint32_t current = 0;
@@ -2971,6 +3050,22 @@ void registerQuestLuaAPI(lua_State* L) {
                 // "" left the row blank where "Return to Marshal Dughan"
                 // belongs. It is the fifth string in SMSG_QUEST_QUERY_RESPONSE
                 // and was being walked past.
+                //
+                // A quest whose server sent no such line falls back to its own
+                // objectives sentence rather than to nothing. Both callers put
+                // this string on screen unconditionally - the tracker as the
+                // one line under a completed quest's title, the world map in
+                // the pin's tooltip - so an empty answer is a bare dash where a
+                // sentence belongs, which is what completed quests in the
+                // tracker looked like.
+                //
+                // The objectives sentence and not a phrase of this client's
+                // own: "Bring Mor'Ladim's Skull to Sven Yorgen." says where to
+                // take it, which is what this line is for, and it is the
+                // server's own words. A stand-in reading "Quest completed" was
+                // tried and is wrong - the tracker draws this line for any
+                // quest with nothing countable in it, complete or not, so that
+                // phrase announced completion on quests that were still open.
                 {"GetQuestLogCompletionText", [](lua_State* L) -> int {
             auto* gh = getGameHandler(L);
             const game::GameHandler::QuestLogEntry* q = nullptr;
@@ -2979,7 +3074,33 @@ void registerQuestLuaAPI(lua_State* L) {
             } else {
                 q = selectedLogEntry(gh);
             }
-            lua_pushstring(L, q ? q->completionText.c_str() : "");
+            if (!q) { lua_pushstring(L, ""); return 1; }
+            if (!q->completionText.empty()) {
+                lua_pushstring(L, q->completionText.c_str());
+                return 1;
+            }
+            // Only where the interface actually draws this line: a quest the
+            // server has called complete, or one with nothing countable in it,
+            // which the tracker treats as complete itself. Anything else keeps
+            // the empty answer the API promises.
+            const int objectives = questObjectiveCount(*q);
+            const bool drawnAsComplete = q->complete || objectives == 0;
+            if (!drawnAsComplete) { lua_pushstring(L, ""); return 1; }
+
+            // Said once per quest that lands here, because two different
+            // things put a quest in this branch and only the log can tell them
+            // apart: the server calling it complete, or this client having no
+            // countable objective for it - which the tracker then reads as
+            // complete on its own, marker and all, whether or not it is.
+            static std::set<uint32_t> announced;
+            if (announced.insert(q->questId).second) {
+                LOG_WARNING("Quest ", q->questId, " (", q->title, ") is drawn as "
+                            "complete with no completed line of its own: complete=",
+                            q->complete, " objectives=", objectives,
+                            " - falling back to its objectives text, '",
+                            q->objectives, "'");
+            }
+            lua_pushstring(L, q->objectives.c_str());
             return 1;
         }},
                 // The words on a book or a plaque, which this client parses out

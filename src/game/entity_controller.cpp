@@ -2908,6 +2908,25 @@ void EntityController::handleNameQueryResponse(network::Packet& packet) {
     }
 }
 
+/// Whether a quest in the log is waiting on this name.
+///
+/// The log and the tracker draw an objective as "<name> slain: 3/8", and the
+/// name is whatever the creature or game object query answers. Both are drawn
+/// long before the answer arrives, and neither looks again on its own - so an
+/// objective built while the query was out kept the bare word "Creature" until
+/// something else happened to that quest. This is what tells them to look.
+static bool questObjectiveNames(const std::vector<GameHandler::QuestLogEntry>& log,
+                                uint32_t entry, bool isGameObject) {
+    for (const auto& quest : log) {
+        for (const auto& obj : quest.killObjectives) {
+            if (obj.npcOrGoId == 0 || obj.required == 0) continue;
+            if ((obj.npcOrGoId < 0) != isGameObject) continue;
+            if (static_cast<uint32_t>(std::abs(obj.npcOrGoId)) == entry) return true;
+        }
+    }
+    return false;
+}
+
 void EntityController::handleCreatureQueryResponse(network::Packet& packet) {
     CreatureQueryResponseData data;
     if (!owner_.getPacketParsers()->parseCreatureQueryResponse(packet, data)) return;
@@ -2952,6 +2971,11 @@ void EntityController::handleCreatureQueryResponse(network::Packet& packet) {
         if (!kind.empty() && owner_.addonEventCallbackRef()) {
             owner_.addonEventCallbackRef()("COMPANION_UPDATE", {kind});
         }
+        // An objective that had no name for what it is about now has one.
+        if (owner_.addonEventCallbackRef() &&
+            questObjectiveNames(owner_.getQuestLog(), data.entry, false)) {
+            owner_.addonEventCallbackRef()("QUEST_LOG_UPDATE", {});
+        }
     }
 }
 
@@ -2982,6 +3006,13 @@ void EntityController::handleGameObjectQueryResponse(network::Packet& packet) {
         // The model was spawned from the display id before this response arrived,
         // so anything keyed off the game object's type has to be revisited now.
         if (owner_.gameObjectInfoCallbackRef()) owner_.gameObjectInfoCallbackRef()(data.entry);
+
+        // And the same for an objective that names this one - a chest to open
+        // rather than a creature to kill.
+        if (owner_.addonEventCallbackRef() &&
+            questObjectiveNames(owner_.getQuestLog(), data.entry, true)) {
+            owner_.addonEventCallbackRef()("QUEST_LOG_UPDATE", {});
+        }
 
         // MO_TRANSPORT (type 15): assign TaxiPathNode path if available.
         const uint32_t mapId = owner_.getCurrentMapId();
