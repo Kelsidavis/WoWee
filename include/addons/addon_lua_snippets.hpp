@@ -1356,6 +1356,37 @@ if realInitialize then
 end
 )LUA";
 
+/// The chat box appears or disappears when Chat Style changes.
+///
+/// The interface reads chatStyle when a chat box is activated or deactivated
+/// and at no other time, so without this the tick did nothing until the next
+/// time chat was opened and closed - a control that looks broken for as long as
+/// anyone watches it. Deactivating is what applies it: that call hides the box
+/// for "classic" and leaves it on screen at a third alpha otherwise. The box
+/// being typed in is left alone, and in "im" the dock's sending box is shown
+/// again after, because in that mode it keeps one.
+///
+/// Here rather than as a literal inside the settings panel, which is where it
+/// was: written as a run of adjacent C++ strings with no separator between
+/// them, so the `end` closing the loop ran into the `end` closing the `if` and
+/// then into the `if` after it - `endendif` - and the whole thing failed to
+/// parse every time the setting was clicked. Nothing compiles a literal like
+/// that until the client runs it; a snippet in this file is parsed by
+/// test_addon_lua_snippets before it ever reaches a player.
+inline constexpr const char* kChatBoxVisibilityLua = R"LUA(
+for i = 1, (NUM_CHAT_WINDOWS or 10) do
+    local e = _G["ChatFrame" .. i .. "EditBox"]
+    if e and not e:HasFocus() then
+        ChatEdit_DeactivateChat(e)
+        if GetCVar("chatStyle") == "classic" then e:Hide() end
+    end
+end
+if GetCVar("chatStyle") == "im" then
+    local send = ChatEdit_ChooseBoxForSend()
+    if send and not send:HasFocus() then send:Show() end
+end
+)LUA";
+
 /// Chat lines do not fade.
 ///
 /// ChatFrameTemplate declares displayDuration="120.0", so lines faded two

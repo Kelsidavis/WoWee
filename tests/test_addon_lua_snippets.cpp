@@ -60,3 +60,15 @@ TEST_CASE("the coin clearance script parses", "[addonlua]") {
     INFO(err);
     CHECK(err.empty());
 }
+
+TEST_CASE("the chat box visibility script parses", "[addonlua]") {
+    // The one that proves the point of this file. It lived in the settings
+    // panel as a run of adjacent C++ string literals with no separator, so the
+    // `end` closing its loop ran into the `end` closing its `if` and then into
+    // the `if` after that. Every click of Chat Style printed a script error and
+    // changed nothing, and no build ever said so.
+    const std::string err =
+        compileError(wowee::addons::kChatBoxVisibilityLua, "ChatBoxVisibility");
+    INFO(err);
+    CHECK(err.empty());
+}

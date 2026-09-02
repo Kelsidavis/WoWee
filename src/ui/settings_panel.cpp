@@ -3,6 +3,7 @@
 // Owns all settings UI rendering, settings state, and
 // graphics preset logic.
 // ============================================================
+#include "addons/addon_lua_snippets.hpp"
 #include "ui/graphics_choices.hpp"
 #include "ui/graphics_presets.hpp"
 #include "ui/settings_panel.hpp"
@@ -1269,29 +1270,12 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
             renderer->setGrassDistance(static_cast<float>(pendingGrassDistance));
         }
     } else if (key == "chatboxvisible") {
-        // The interface reads chatStyle when a chat box is activated or
-        // deactivated and at no other time, so without this the tick did
-        // nothing until the next time chat was opened and closed - a control
-        // that looks broken for as long as anyone watches it.
-        //
-        // Deactivating is what applies it: that call hides the box for
-        // "classic" and leaves it on screen at a third alpha otherwise. The one
-        // that is being typed in is left alone, and the box that sends is shown
-        // again after, because in this mode the dock's selected window is the
-        // one that keeps a box.
+        // Applied by deactivating every box that is not being typed in - see
+        // kChatBoxVisibilityLua, which is where the script lives so that
+        // something parses it before a player does.
         if (services_.gameHandler) {
             services_.gameHandler->runInterfaceCommand(
-                "for i = 1, NUM_CHAT_WINDOWS do"
-                "  local e = _G['ChatFrame'..i..'EditBox']"
-                "  if e and not e:HasFocus() then"
-                "    ChatEdit_DeactivateChat(e)"
-                "    if GetCVar('chatStyle') == 'classic' then e:Hide() end"
-                "  end"
-                "end"
-                "if GetCVar('chatStyle') == 'im' then"
-                "  local send = ChatEdit_ChooseBoxForSend()"
-                "  if send and not send:HasFocus() then send:Show() end"
-                "end");
+                wowee::addons::kChatBoxVisibilityLua);
         }
     } else if (isVolumeKey(key)) {
         // Every volume goes through one call, because each of them is a balance
