@@ -655,6 +655,16 @@ void WidgetTree::scrollContentExtent(uint32_t childId, float& outW, float& outH)
     outH = maxY - minY;
 }
 
+void WidgetTree::noteScreenSize(float pixelW, float pixelH) {
+    if (pixelW <= 0.0f || pixelH <= 0.0f) return;
+    lastPixelW_ = pixelW;
+    lastPixelH_ = pixelH;
+    // The same scale the full pass works out, so a rect resolved before that
+    // pass is in the units everything else will be in.
+    uiScale_ = (pixelH / kInterfaceHeight) * userScale_;
+    markLayoutDirty();
+}
+
 void WidgetTree::resolveWidget(uint32_t id) {
     if (layingOut_) return;
     // Nothing has run a full pass yet, so there is no screen size to resolve

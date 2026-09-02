@@ -173,6 +173,12 @@ int main(int argc, char** argv) {
     if (auto* engine = mgr.getLuaEngine()) {
         engine->setLuaErrorCallback(
             [&errors](const std::string& e) { errors.push_back(e); });
+        // The screen the interface loads against, which in the client comes
+        // from the window - there is none here, and the same size the relayout
+        // below uses stands in for it. Without it every rect the interface
+        // reads while it builds itself answers zero, which is a state the
+        // client is not in and so not one worth reproducing.
+        engine->widgets().noteScreenSize(1920.0f, 1080.0f);
     }
 
     mgr.setFrameXmlDir(assetPath + "/interface/FrameXML");

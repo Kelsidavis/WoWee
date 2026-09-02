@@ -988,6 +988,25 @@ private:
     bool  layingOut_ = false;
     void collectDrawOrder();
 
+public:
+    /// The screen the tree will lay out against, before it has laid out once.
+    ///
+    /// Reads of a frame's rect resolve on demand, and that resolution needs a
+    /// screen to solve against - so before the first full pass every rect read
+    /// answers zero. The interface reads its own rects while it loads:
+    /// FCF_UpdateButtonSide positions a chat window, asks how far its left edge
+    /// is from the screen's, and puts the scroll buttons on the side with more
+    /// room. Answering zero there put them on the right of every chat window,
+    /// where the window's own background then ran a button's width past the
+    /// input box below it.
+    ///
+    /// The size is the window's, which the client knows before it loads
+    /// anything - not a guess. The next full pass overwrites both values as it
+    /// always did.
+    void noteScreenSize(float pixelW, float pixelH);
+
+private:
+
     /// A deque, not a vector, because get() hands out a pointer into this and
     /// create() grows it. A vector reallocates, and any pointer taken before a
     /// create would dangle after one - a use-after-free waiting on the first

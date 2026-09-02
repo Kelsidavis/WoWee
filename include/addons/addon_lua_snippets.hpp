@@ -1483,19 +1483,36 @@ local function paint(box)
         if art and art.Hide then art:Hide() end
     end
 
-    local bg = box.woweeBackground
-    if not bg then
-        bg = box:CreateTexture(nil, "BACKGROUND")
-        -- Inset by what the art's rounded ends took up, so the strip lines up
-        -- with the text rather than with the frame the art needed.
-        bg:SetPoint("TOPLEFT", box, "TOPLEFT", 5, -5)
-        bg:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -5, 5)
-        box.woweeBackground = bg
-    end
-
     -- The window this box belongs to, which is the one it is anchored under.
     local frame = box.chatFrame or DEFAULT_CHAT_FRAME
     local source = frame and frame.GetName and _G[frame:GetName() .. "Background"]
+
+    local bg = box.woweeBackground
+    if not bg then
+        bg = box:CreateTexture(nil, "BACKGROUND")
+        box.woweeBackground = bg
+    end
+    -- Exactly as wide as the window above it, and edge for edge with it.
+    --
+    -- The box is five units wider than its window on each side, because the
+    -- art it replaces had rounded ends to fit; the window's own background
+    -- runs two units the other way. Inset by the box's five, the strip came out
+    -- narrower than the window it sits under by four units a side - two of
+    -- window, two of box - which is a step in the outline of what should read
+    -- as one panel. Taking the left and right edges from that background
+    -- rather than counting insets keeps them together whatever the window is
+    -- doing: docked, resized, or dragged somewhere else.
+    bg:ClearAllPoints()
+    bg:SetPoint("TOP", box, "TOP", 0, -5)
+    bg:SetPoint("BOTTOM", box, "BOTTOM", 0, 5)
+    if source then
+        bg:SetPoint("LEFT", source, "LEFT", 0, 0)
+        bg:SetPoint("RIGHT", source, "RIGHT", 0, 0)
+    else
+        bg:SetPoint("LEFT", box, "LEFT", 5, 0)
+        bg:SetPoint("RIGHT", box, "RIGHT", -5, 0)
+    end
+
     if source then
         bg:SetTexture(source:GetTexture())
         local r, g, b = source:GetVertexColor()

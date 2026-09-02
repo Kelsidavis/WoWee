@@ -9,6 +9,7 @@ extern "C" {
 #include "addons/addon_globals.hpp"
 #include "ui/framexml_takeover.hpp"
 #include "core/logger.hpp"
+#include "core/window.hpp"
 #include "core/config_paths.hpp"
 #include <sstream>
 #include "ui/xml_parser.hpp"
@@ -362,6 +363,19 @@ void AddonManager::loadAllAddons() {
         // below, before any script of ours could run. The flag is cleared in
         // every exit from here, so a load that throws cannot leave the client
         // mute.
+        // The screen the interface lays out against, before it lays out.
+        //
+        // FrameXML measures its own frames as it builds them, and a rect read
+        // before the first full pass has no screen to be solved against and
+        // answers zero. The window's size is known long before this, so the
+        // tree is told it rather than left to answer nothing - see
+        // noteScreenSize for the chat window's scroll buttons, which is where
+        // it shows.
+        if (luaServices_.window) {
+            luaEngine_.widgets().noteScreenSize(
+                static_cast<float>(luaServices_.window->getWidth()),
+                static_cast<float>(luaServices_.window->getHeight()));
+        }
         luaEngine_.setUiSoundsSuppressed(true);
         loadFrameXml(frameXmlDir_);
         luaEngine_.setUiSoundsSuppressed(false);

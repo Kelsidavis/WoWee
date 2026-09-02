@@ -2907,3 +2907,35 @@ TEST_CASE("The colour picker's generated art stays in the draw order",
     CHECK(wheelDrawn);
     CHECK_FALSE(blankDrawn);
 }
+
+// A rect read before the first full pass has no screen to be solved against and
+// answers zero - and the interface reads its own rects while it builds itself.
+// FCF_UpdateButtonSide positions a chat window, asks how far its left edge is
+// from the screen's, and puts the scroll buttons on the side with more room; a
+// zero there put them on the right of every chat window, where the window's
+// background then ran a button's width past the input box below it.
+//
+// The window's size is known before any of that, so the tree is told it.
+TEST_CASE("A rect resolves before the first layout once the screen is known",
+          "[widget][layout]") {
+    WidgetTree tree;
+    const uint32_t f = tree.create(WidgetKind::Frame, 0, "F");
+    Widget* w = tree.get(f);
+    w->width = 100.0f;
+    w->height = 50.0f;
+    Anchor a;
+    a.point = "BOTTOMLEFT";
+    a.relativePoint = "BOTTOMLEFT";
+    a.x = 35.0f;
+    a.y = 115.0f;
+    tree.addPoint(f, a);
+
+    // Nothing has laid out and no screen has been named: still nothing to say.
+    tree.resolveWidget(f);
+    CHECK(w->left == Catch::Approx(0.0f));
+
+    tree.noteScreenSize(kScreenW, kScreenH);
+    tree.resolveWidget(f);
+    CHECK(w->left == Catch::Approx(35.0f));
+    CHECK(w->bottom == Catch::Approx(115.0f));
+}
