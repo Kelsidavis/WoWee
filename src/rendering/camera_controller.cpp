@@ -1691,9 +1691,29 @@ void CameraController::updateOrbitCamera(float deltaTime, FrameInput& f,
             lastInsideWMOCheckPos = targetPos;
         }
 
-        // Smoothly pull camera in when entering WMO interiors
-        if (cachedInsideWMO && userTargetDistance > MAX_DISTANCE_INTERIOR) {
-            userTargetDistance = MAX_DISTANCE_INTERIOR;
+        // Pulled in indoors, and let back out again.
+        //
+        // This is the same containment test IsIndoors answers with - the one a
+        // macro's [indoors] reads and the one that says a mount is not allowed
+        // here - asked at the player rather than at the camera. Indoors the
+        // camera is forever being pushed off a wall and let back out, and that
+        // is what turns a corridor into a bout of motion sickness.
+        if (cachedInsideWMO) {
+            if (!indoorZoomHeld_) {
+                indoorZoomHeld_ = true;
+                outdoorTargetDistance_ = userTargetDistance;
+            }
+            if (userTargetDistance > MAX_DISTANCE_INTERIOR) {
+                userTargetDistance = MAX_DISTANCE_INTERIOR;
+            }
+        } else if (indoorZoomHeld_) {
+            indoorZoomHeld_ = false;
+            // Given back only if they have not chosen something closer while
+            // they were inside: their own wheel outranks the restore.
+            if (userTargetDistance >= MAX_DISTANCE_INTERIOR - 0.01f &&
+                outdoorTargetDistance_ > userTargetDistance) {
+                userTargetDistance = outdoorTargetDistance_;
+            }
         }
     }
 

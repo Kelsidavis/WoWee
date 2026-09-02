@@ -411,7 +411,14 @@ public:
     static constexpr float kMaxDistanceFactorLimit =
         MAX_DISTANCE_EXTENDED / MAX_DISTANCE_NORMAL;
 private:
-    static constexpr float MAX_DISTANCE_INTERIOR = 12.0f;  // Max zoom inside WMOs
+    /// Max zoom indoors.
+    ///
+    /// Twelve still reached the walls of an ordinary room, so the collision
+    /// sweep pulled the camera in and let it back out with every step and every
+    /// turn - and that in-and-out is the motion that makes people ill. Eight
+    /// sits inside most rooms, so the sweep has nothing to hit and the view
+    /// stays still.
+    static constexpr float MAX_DISTANCE_INTERIOR = 8.0f;
     bool extendedZoom_ = false;
     static constexpr float ZOOM_SMOOTH_SPEED = 15.0f;  // How fast zoom eases
     static constexpr float CAM_SMOOTH_SPEED_DEFAULT = 30.0f;
@@ -471,6 +478,11 @@ private:
     // Cached isInsideWMO result (throttled to avoid per-frame cost)
     bool cachedInsideWMO = false;
     bool cachedInsideInteriorWMO = false;
+    /// The zoom the player chose outdoors, kept while the indoor limit holds
+    /// them closer and given back on the way out - a limit that quietly keeps
+    /// their zoom is a setting changed behind their back.
+    float outdoorTargetDistance_ = 0.0f;
+    bool indoorZoomHeld_ = false;
     int insideStateCheckCounter_ = 0;
     glm::vec3 lastInsideStateCheckPos_ = glm::vec3(0.0f);
     int insideWMOCheckCounter = 0;
