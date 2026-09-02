@@ -745,6 +745,29 @@ int main(int argc, char** argv) {
         // both, because a faded line is still in the history and comes back
         // when the frame is scrolled. The alpha is the only thing that
         // separates "nothing was said" from "everything said has gone".
+        // --links prints the clickable links the last draw filed.
+        //
+        // A link in chat that does nothing when clicked is one of two faults -
+        // no rect was filed for it, or the hit test looks somewhere else - and
+        // they are indistinguishable from outside. This prints the rects in the
+        // same space --mouse arrives in.
+        if (std::strcmp(argv[i], "--links") == 0) {
+            auto* engine = mgr.getLuaEngine();
+            if (!engine) { std::printf("   no engine\n"); continue; }
+            const auto& tree = engine->widgets();
+            const auto& links = tree.linkRects();
+            std::printf("   %zu link(s) filed by the last draw\n", links.size());
+            int shown = 0;
+            for (const auto& r : links) {
+                if (++shown > 12) { std::printf("   ...\n"); break; }
+                const auto* owner = tree.get(r.widget);
+                std::printf("   %-18s (%.0f,%.0f)-(%.0f,%.0f) %s\n",
+                            owner && !owner->name.empty() ? owner->name.c_str()
+                                                          : "(unnamed)",
+                            r.x0, r.y0, r.x1, r.y1, r.link.c_str());
+            }
+            continue;
+        }
         if (std::strcmp(argv[i], "--messages") == 0) {
             relayout();
             auto* engine = mgr.getLuaEngine();

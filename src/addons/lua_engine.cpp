@@ -10487,6 +10487,70 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
                 callFrameScript(pressedWid_[i], "OnMouseDown", b.name);
         } else if (!b.down && buttonDown_[i]) {
             buttonDown_[i] = false;
+            // Before anything asks which frame was pressed, because a link is
+            // not a frame's click to take and the frame it is drawn in need not
+            // have taken the press at all.
+            //
+            // This sat inside the block below - the one that runs only when the
+            // press landed on a widget - and a chat window is click-through by
+            // design, so a press over chat text lands on nothing and the whole
+            // block was skipped. Links in a tooltip or a quest frame worked,
+            // because those frames do take the mouse; an item link in chat
+            // could not be clicked at all.
+            const bool draggingThisButton = (draggingWid_ != 0 && draggingButton_ == i);
+            // A link is not the frame's click to take.
+            //
+            // This used to sit inside the block below, which needs the
+            // frame under the cursor to accept an ordinary click. A chat
+            // window does not: ChatFrameTemplate declares OnHyperlinkClick
+            // and FloatingChatFrameTemplate sets enableMouse="false" over
+            // it, because a chat window is click-through by design. So the
+            // press landed on no widget, the gate never opened, and no item
+            // link in chat could be clicked - while the same link in a
+            // tooltip or a quest frame, which do take clicks, worked.
+            //
+            // FrameXML puts the handler on the chat frame rather than on
+            // the font string the text is drawn in, so it is looked for up
+            // the parent chain. A frame that declares none lets the click
+            // carry on as an ordinary one.
+            //
+            // A frame can turn its own links off without giving up the
+            // handler: FCF_SetUninteractable does exactly that to a window
+            // made click-through, and the GM chat addon does it while a
+            // ticket is being written. The click then carries on to
+            // whatever is underneath, as it would if the link were not
+            // there.
+            bool tookLink = false;
+            if (!draggingThisButton) {
+                if (const ui::LinkRect* hitLink = widgets_.linkAt(x, y)) {
+                    const uint32_t owner = ui::findScriptOwner(
+                        widgets_, hitLink->widget, [this](uint32_t w) {
+                            return frameHasScript(w, "OnHyperlinkClick");
+                        });
+                    const ui::Widget* ownerW = owner ? widgets_.get(owner) : nullptr;
+                    // Only when the link is what the mouse is actually on.
+                    //
+                    // A link rect is filed wherever its text was drawn and
+                    // says nothing about what has been opened over the top
+                    // of it since. Hoisting this check out of the block
+                    // below took that away with the gate: a window drawn
+                    // over the chat left the chat still answering clicks
+                    // through it, because the rect was still there.
+                    //
+                    // Nothing under the cursor at all is the chat's own
+                    // case - the window is click-through, so the hit test
+                    // finds no widget and the link is the only thing there.
+                    const bool linkIsWhatIsUnderTheCursor =
+                        hit == 0 || ui::isSelfOrDescendantOf(widgets_, hit, owner);
+                    if (owner != 0 && ownerW && ownerW->hyperlinksEnabled &&
+                        linkIsWhatIsUnderTheCursor) {
+                        callFrameScript3(owner, "OnHyperlinkClick",
+                                         hitLink->link.c_str(),
+                                         hitLink->text.c_str(), b.name);
+                        tookLink = true;
+                    }
+                }
+            }
             if (pressedWid_[i] != 0) {
                 callFrameScript(pressedWid_[i], "OnMouseUp", b.name);
                 // A click is press and release on the same frame, which is what
@@ -10611,60 +10675,6 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
                 // a release on the same bar would compare an ancestor against a
                 // child and never match.
                 const uint32_t releasedOn = clickOwnerOf(hit, b.name);
-
-                // A link is not the frame's click to take.
-                //
-                // This used to sit inside the block below, which needs the
-                // frame under the cursor to accept an ordinary click. A chat
-                // window does not: ChatFrameTemplate declares OnHyperlinkClick
-                // and FloatingChatFrameTemplate sets enableMouse="false" over
-                // it, because a chat window is click-through by design. So the
-                // press landed on no widget, the gate never opened, and no item
-                // link in chat could be clicked - while the same link in a
-                // tooltip or a quest frame, which do take clicks, worked.
-                //
-                // FrameXML puts the handler on the chat frame rather than on
-                // the font string the text is drawn in, so it is looked for up
-                // the parent chain. A frame that declares none lets the click
-                // carry on as an ordinary one.
-                //
-                // A frame can turn its own links off without giving up the
-                // handler: FCF_SetUninteractable does exactly that to a window
-                // made click-through, and the GM chat addon does it while a
-                // ticket is being written. The click then carries on to
-                // whatever is underneath, as it would if the link were not
-                // there.
-                bool tookLink = false;
-                if (!wasDragged) {
-                    if (const ui::LinkRect* hitLink = widgets_.linkAt(x, y)) {
-                        const uint32_t owner = ui::findScriptOwner(
-                            widgets_, hitLink->widget, [this](uint32_t w) {
-                                return frameHasScript(w, "OnHyperlinkClick");
-                            });
-                        const ui::Widget* ownerW = owner ? widgets_.get(owner) : nullptr;
-                        // Only when the link is what the mouse is actually on.
-                        //
-                        // A link rect is filed wherever its text was drawn and
-                        // says nothing about what has been opened over the top
-                        // of it since. Hoisting this check out of the block
-                        // below took that away with the gate: a window drawn
-                        // over the chat left the chat still answering clicks
-                        // through it, because the rect was still there.
-                        //
-                        // Nothing under the cursor at all is the chat's own
-                        // case - the window is click-through, so the hit test
-                        // finds no widget and the link is the only thing there.
-                        const bool linkIsWhatIsUnderTheCursor =
-                            hit == 0 || ui::isSelfOrDescendantOf(widgets_, hit, owner);
-                        if (owner != 0 && ownerW && ownerW->hyperlinksEnabled &&
-                            linkIsWhatIsUnderTheCursor) {
-                            callFrameScript3(owner, "OnHyperlinkClick",
-                                             hitLink->link.c_str(),
-                                             hitLink->text.c_str(), b.name);
-                            tookLink = true;
-                        }
-                    }
-                }
 
                 if (!tookLink && !wasDragged && pressedWid_[i] == releasedOn &&
                     (!pressed || pressed->enabled) && takesIt) {

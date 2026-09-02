@@ -674,6 +674,10 @@ public:
     /// same frame rather than one later.
     void clearLinkRects() { linkRects_.clear(); }
     void addLinkRect(const LinkRect& r) { linkRects_.push_back(r); }
+    /// Every link the last draw filed, for the harness to print: a link that
+    /// cannot be clicked is either one that was never filed or one the hit test
+    /// misses, and only the list itself tells the two apart.
+    [[nodiscard]] const std::vector<LinkRect>& linkRects() const { return linkRects_; }
     /// The last link drawn under this point, which is the topmost - the draw
     /// order is back to front and later rects sit over earlier ones.
     [[nodiscard]] const LinkRect* linkAt(float x, float y) const {
