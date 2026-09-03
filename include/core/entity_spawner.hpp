@@ -97,6 +97,15 @@ public:
     bool isPlayerPending(uint64_t guid) const { return pendingPlayerSpawnGuids_.count(guid) > 0; }
     bool isGameObjectSpawned(uint64_t guid) const { return gameObjectInstances_.count(guid) > 0; }
 
+    /// What the server says a game object is doing: open, closed, destroyed.
+    ///
+    /// A door is a pose. The state arrives twice - once in the create block for
+    /// an object that is already open when it comes into view, and again
+    /// whenever it changes - and the first of those used to arrive before the
+    /// model existed and was dropped, so every door in the world was drawn in
+    /// its closed pose however the server had it.
+    void applyGameObjectState(uint64_t guid, uint8_t goState);
+
     // Quick instance ID lookups (returns 0 if not found)
     uint32_t getCreatureInstanceId(uint64_t guid) const {
         auto it = creatureInstances_.find(guid); return (it != creatureInstances_.end()) ? it->second : 0;
@@ -592,6 +601,8 @@ private:
     std::unordered_set<uint32_t> gameObjectDisplayIdFailedCache_;
     std::unordered_map<uint32_t, uint32_t> gameObjectDisplayIdWmoCache_;
     std::unordered_map<uint64_t, GameObjectInstanceInfo> gameObjectInstances_;
+    /// States that arrived before their model did, applied when it spawns.
+    std::unordered_map<uint64_t, uint8_t> gameObjectPendingState_;
     struct PendingTransportMove {
         float x = 0.0f, y = 0.0f, z = 0.0f, orientation = 0.0f;
     };

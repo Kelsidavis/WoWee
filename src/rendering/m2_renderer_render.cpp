@@ -493,7 +493,12 @@ void M2Renderer::update(float deltaTime, const glm::vec3& cameraPos, const glm::
             instance.animDuration = rendering::M2_DEFAULT_PARTICLE_ANIM_MS;
         }
         if (instance.animDuration > 0.0f && instance.animTime >= instance.animDuration) {
-            if (instance.playingVariation) {
+            if (instance.holdAtEnd) {
+                // Stay on the last frame. A door's open sequence ends with the
+                // door open, and that is the pose the server is describing.
+                instance.animTime = instance.animDuration;
+                instance.animSpeed = 0.0f;
+            } else if (instance.playingVariation) {
                 instance.playingVariation = false;
                 instance.currentSequenceIndex = instance.idleSequenceIndex;
                 if (instance.idleSequenceIndex < static_cast<int>(model.sequences.size())) {
@@ -511,7 +516,8 @@ void M2Renderer::update(float deltaTime, const glm::vec3& cameraPos, const glm::
         }
 
         // Idle variation timer
-        if (!instance.playingVariation && model.idleVariationIndices.size() > 1) {
+        if (!instance.playingVariation && !instance.holdAtEnd &&
+            model.idleVariationIndices.size() > 1) {
             instance.variationTimer -= dtMs;
             if (instance.variationTimer <= 0.0f) {
                 int pick = static_cast<int>(randRange(static_cast<uint32_t>(model.idleVariationIndices.size())));

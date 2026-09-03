@@ -2124,6 +2124,19 @@ void EntityController::onCreateGameObject(const UpdateBlock& block, std::shared_
         }
         queryGameObjectInfo(itEntry->second, block.guid);
     }
+    // What it is doing, which the create block carries as surely as an update
+    // does: a door standing open when the player walks into the room says so
+    // here and nowhere else. Only the update path read it, so every object came
+    // into view in its closed pose and stayed there until something changed it.
+    const uint16_t ufBytes1 = fieldIndex(UF::GAMEOBJECT_BYTES_1);
+    if (ufBytes1 != 0xFFFF) {
+        auto itBytes = block.fields.find(ufBytes1);
+        if (itBytes != block.fields.end() && owner_.gameObjectStateCallbackRef()) {
+            owner_.gameObjectStateCallbackRef()(
+                block.guid, static_cast<uint8_t>(itBytes->second & 0xFF));
+        }
+    }
+
     // Detect transport GameObjects via UPDATEFLAG_TRANSPORT (0x0002)
     LOG_DEBUG("GameObject CREATE: guid=0x", std::hex, block.guid, std::dec,
              " entry=", go->getEntry(), " displayId=", go->getDisplayId(),

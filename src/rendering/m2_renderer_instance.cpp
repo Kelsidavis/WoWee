@@ -79,8 +79,33 @@ void M2Renderer::setInstanceAnimationFrozen(uint32_t instanceId, bool frozen) {
     if (idxIt == instanceIndexById.end()) return;
     auto& inst = instances[idxIt->second];
     inst.animSpeed = frozen ? 0.0f : 1.0f;
+    inst.holdAtEnd = false;
     if (frozen) {
         inst.animTime = 0.0f;  // Reset to bind pose
+    }
+}
+
+void M2Renderer::setInstanceAnimationHeld(uint32_t instanceId, uint32_t animationId,
+                                          bool skipToEnd) {
+    auto idxIt = instanceIndexById.find(instanceId);
+    if (idxIt == instanceIndexById.end()) return;
+    auto& inst = instances[idxIt->second];
+    if (!inst.cachedModel) return;
+    const auto& seqs = inst.cachedModel->sequences;
+    for (int i = 0; i < static_cast<int>(seqs.size()); ++i) {
+        if (seqs[i].id != animationId) continue;
+        inst.currentSequenceIndex = i;
+        inst.animDuration = static_cast<float>(seqs[i].duration);
+        inst.playingVariation = false;   // not a variation: it does not go back
+        inst.holdAtEnd = true;
+        if (skipToEnd) {
+            inst.animTime = inst.animDuration;
+            inst.animSpeed = 0.0f;
+        } else {
+            inst.animTime = 0.0f;
+            inst.animSpeed = 1.0f;
+        }
+        return;
     }
 }
 
@@ -99,6 +124,7 @@ void M2Renderer::setInstanceAnimation(uint32_t instanceId, uint32_t animationId,
             inst.animSpeed = 1.0f;
             // Use playingVariation=true for one-shot (returns to idle when done)
             inst.playingVariation = !loop;
+            inst.holdAtEnd = false;
             return;
         }
     }

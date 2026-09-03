@@ -120,34 +120,11 @@ void EntitySpawnCallbackHandler::setupCallbacks() {
         }
     });
 
-    // GameObject state change callback - animate doors/chests opening/closing/destroying
+    // GameObject state change callback: a door, a chest, a destructible is a
+    // pose the server describes, and the spawner holds it - including the one
+    // that arrives before the model does.
     gameHandler_.setGameObjectStateCallback([this](uint64_t guid, uint8_t goState) {
-        auto& goInstances = entitySpawner_.getGameObjectInstances();
-        auto it = goInstances.find(guid);
-        if (it == goInstances.end()) return;
-        auto& info = it->second;
-        if (info.isWmo) return; // WMOs don't have M2 animation sequences
-        auto* m2r = renderer_.getM2Renderer();
-        if (!m2r) return;
-        uint32_t instId = info.instanceId;
-        // Canonical GOState: 0=ACTIVE/open, 1=READY/closed, 2=ACTIVE_ALTERNATIVE.
-        if (goState == 0) {
-            // Opening: play OPEN(148) one-shot, fall back to unfreezing
-            if (m2r->hasAnimation(instId, 148))
-                m2r->setInstanceAnimation(instId, 148, false);
-            else
-                m2r->setInstanceAnimationFrozen(instId, false);
-        } else if (goState == 2) {
-            // Destroyed: play DESTROY(149) one-shot
-            if (m2r->hasAnimation(instId, 149))
-                m2r->setInstanceAnimation(instId, 149, false);
-        } else {
-            // Closed: play CLOSE(146) one-shot, else freeze
-            if (m2r->hasAnimation(instId, 146))
-                m2r->setInstanceAnimation(instId, 146, false);
-            else
-                m2r->setInstanceAnimationFrozen(instId, true);
-        }
+        entitySpawner_.applyGameObjectState(guid, goState);
     });
 
     // Creature move callback (online mode) - update creature positions

@@ -236,6 +236,14 @@ struct M2Instance {
     float variationTimer = 0.0f; // Time until next variation attempt (ms)
     bool playingVariation = false;// Currently playing a one-shot variation
 
+    /// Stop at the end of the sequence and stay there.
+    ///
+    /// A door is a pose, not a performance: the server says open or closed and
+    /// the model holds that. Without this a one-shot ran to its end and went
+    /// back to the idle sequence, which for a door is the closed pose - so an
+    /// open door swung open and shut itself, over and over.
+    bool holdAtEnd = false;
+
     /// Lit while the player is pressing on this instance: 0 none, 1 full.
     ///
     /// A game object has no selection circle - it is used rather than selected
@@ -455,6 +463,14 @@ public:
     void setInstancePosition(uint32_t instanceId, const glm::vec3& position);
     void setInstanceTransform(uint32_t instanceId, const glm::mat4& transform);
     void setInstanceAnimationFrozen(uint32_t instanceId, bool frozen);
+    /// Play an animation once and stay on its last frame.
+    ///
+    /// skipToEnd puts the model there immediately, which is what a door that
+    /// was already open when it came into view wants - the swing belongs to
+    /// the moment it opens, not to the moment it is first seen.
+    void setInstanceAnimationHeld(uint32_t instanceId, uint32_t animationId,
+                                  bool skipToEnd);
+
     /// Light an instance while it is being pressed on. 0 clears it.
     void setInstanceHighlight(uint32_t instanceId, float amount);
     /// Take the light off whatever has it, whichever instance that was.

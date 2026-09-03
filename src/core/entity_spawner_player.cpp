@@ -1301,6 +1301,12 @@ void EntitySpawner::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_
 
         gameObjectInstances_[guid] = {.modelId = modelId, .instanceId = instanceId, .isWmo = false};
 
+        // ...and the pose the server described before this model existed.
+        if (auto pending = gameObjectPendingState_.find(guid);
+            pending != gameObjectPendingState_.end()) {
+            applyGameObjectState(guid, pending->second);
+        }
+
         // Notify transport system for M2 transports (e.g. Deeprun Tram cars)
         if (gameHandler_ && gameHandler_->isTransportGuid(guid)) {
             LOG_DEBUG("M2 transport spawned: guid=0x", std::hex, guid, std::dec,

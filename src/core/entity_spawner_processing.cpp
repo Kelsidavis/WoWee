@@ -2003,6 +2003,35 @@ void EntitySpawner::applyGameObjectAnimationPolicy(uint64_t guid, uint32_t entry
               " entry=", entry, " type=", info->type, " frozen=", freeze);
 }
 
+void EntitySpawner::applyGameObjectState(uint64_t guid, uint8_t goState) {
+    auto it = gameObjectInstances_.find(guid);
+    if (it == gameObjectInstances_.end()) {
+        // The model is built after the create block is read, and a door that
+        // is already open when it comes into view has its state in that block.
+        gameObjectPendingState_[guid] = goState;
+        return;
+    }
+    // A WMO has no animation sequences to hold a pose with.
+    if (it->second.isWmo) return;
+    auto* m2 = renderer_ ? renderer_->getM2Renderer() : nullptr;
+    if (!m2) return;
+
+    const uint32_t instanceId = it->second.instanceId;
+    // Canonical GOState: 0 ACTIVE (open), 1 READY (closed), 2 ACTIVE_ALTERNATIVE
+    // (destroyed). The animation ids are the game's own: OPEN, CLOSE, DESTROY.
+    const uint32_t anim = goState == 0 ? 148u : (goState == 2 ? 149u : 146u);
+    // Straight to the end when the state arrived before the model: the swing
+    // belongs to the moment a door opens, not to the moment it is first seen.
+    const bool skipToEnd = gameObjectPendingState_.erase(guid) > 0;
+    if (m2->hasAnimation(instanceId, anim)) {
+        m2->setInstanceAnimationHeld(instanceId, anim, skipToEnd);
+        return;
+    }
+    // No sequence for it: the closed pose is the bind pose, and an open door
+    // with nothing to play is better left running than stuck shut.
+    m2->setInstanceAnimationFrozen(instanceId, goState != 0);
+}
+
 void EntitySpawner::onGameObjectInfoReceived(uint32_t entry) {
     auto it = gameObjectPendingAnimPolicy_.find(entry);
     if (it == gameObjectPendingAnimPolicy_.end()) return;
