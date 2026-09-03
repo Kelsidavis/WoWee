@@ -267,3 +267,31 @@ TEST_CASE("a street lamp is ironwork, not a sapling", "[m2][classifier]") {
         CHECK_FALSE(classify("GnomeStreetSign01").isFoliageLike);
     }
 }
+
+// Cloth hung from its top edge, which sways from the bar down rather than from
+// the ground up. The names are the real assets: Stormwind's gate and interior
+// banners are WMO doodads under PASSIVE DOODADS\BANNERS, and Karazhan's are
+// tapestries.
+TEST_CASE("hanging cloth is picked out by name", "[m2][classifier][cloth]") {
+    SECTION("banners, tapestries and flags") {
+        for (const char* n : {
+                 "WORLD\\GENERIC\\HUMAN\\PASSIVE DOODADS\\BANNERS\\STORMWINDLIONBANNER.m2",
+                 "world\\generic\\human\\passive doodads\\banners\\stormwindgriffonbanner01.m2",
+                 "world\\azeroth\\karazahn\\passivedoodads\\tapestries\\karazantapestry01.m2",
+                 "world\\azeroth\\elwynn\\passivedoodads\\battlegladebanner1\\battlegladebanner1.m2",
+                 "AllianceFlag01", "HordePennant02"}) {
+            INFO(n);
+            CHECK(classify(n).isHangingCloth);
+        }
+    }
+
+    SECTION("what is not cloth") {
+        // A flagstone is a floor, and swaying a floor is worse than a still
+        // banner. Foliage keeps its own sway rather than taking this one.
+        for (const char* n : {"Flagstone01", "ElwynnFlagstoneFloor",
+                              "StormwindBrazier01", "ElwynnTree01"}) {
+            INFO(n);
+            CHECK_FALSE(classify(n).isHangingCloth);
+        }
+    }
+}

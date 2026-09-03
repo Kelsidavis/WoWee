@@ -1511,6 +1511,16 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
     gpuModel.ambientEmitterType          = cls.ambientEmitterType;
     gpuModel.boundMin = tightMin;
     gpuModel.boundMax = tightMax;
+    if (cls.isHangingCloth) {
+        // Named, once each, so a banner that does not move can be told from a
+        // banner this never saw: cloth built into a building's own mesh is not
+        // an M2 at all and nothing here can sway it.
+        static core::LogBudget clothBudget(12, "Cloth models given a sway");
+        if (clothBudget.take()) {
+            LOG_WARNING("Cloth sway: '", model.name, "' drop=",
+                        tightMax.z - tightMin.z, " yards");
+        }
+    }
     gpuModel.boundRadius = model.boundRadius;
     // Fallback when the M2 header reports 0. Measured from the model origin,
     // like the header value it stands in for: the sphere this feeds is centred
