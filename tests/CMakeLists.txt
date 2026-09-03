@@ -2108,6 +2108,15 @@ wowee_add_test(test_blp_truncation
 wowee_add_test(test_grass_blade_layout
     SOURCES test_grass_blade_layout.cpp)
 
+# ── test_adt_alpha ─────────────────────────────────────
+# MCAL alpha maps, and the row and column at the end of a four-bit one that are
+# not data. Left alone they put a hard line between every pair of chunks.
+wowee_add_test(test_adt_alpha
+    SOURCES test_adt_alpha.cpp
+            ${TEST_COMMON_SOURCES}
+            ${CMAKE_SOURCE_DIR}/src/pipeline/adt_alpha.cpp
+            ${CMAKE_SOURCE_DIR}/src/pipeline/adt_loader.cpp)
+
 # ── test_grass_terrain ─────────────────────────────────
 # Whether grass grows at a point, answered from the ADT's own ground-effect
 # ids rather than from a classifier of ours. Headless: the chunks are built by

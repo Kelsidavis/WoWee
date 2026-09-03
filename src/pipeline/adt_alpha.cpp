@@ -5,6 +5,33 @@
 namespace wowee {
 namespace pipeline {
 
+namespace {
+
+/// The last row and column of a four-bit map are not data.
+///
+/// A chunk's alpha map is stored 64 wide and only 63 of those are painted: the
+/// file's last row and column carry whatever was left there, and the client
+/// fills them from the row and column before. Without it every chunk ends in a
+/// strip of something else, and since the strip is on two of the four sides,
+/// the boundary between two chunks is a hard line - which is the ground
+/// textures not quite lining up, in a grid across the whole world.
+///
+/// Only the four-bit form. The eight-bit and compressed maps are what a map
+/// with "big alpha" carries, and those are painted to the edge.
+void fixLastRowAndColumn(std::vector<uint8_t>& alpha) {
+    if (alpha.size() < ALPHA_MAP_SIZE) return;
+    constexpr size_t kLast = ALPHA_MAP_DIM - 1;
+    for (size_t i = 0; i < ALPHA_MAP_DIM; ++i) {
+        alpha[kLast * ALPHA_MAP_DIM + i] = alpha[(kLast - 1) * ALPHA_MAP_DIM + i];
+    }
+    // After the row, so the corner takes the value the row above it just did.
+    for (size_t i = 0; i < ALPHA_MAP_DIM; ++i) {
+        alpha[i * ALPHA_MAP_DIM + kLast] = alpha[i * ALPHA_MAP_DIM + kLast - 1];
+    }
+}
+
+}  // namespace
+
 bool decodeLayerAlpha(const MapChunk& chunk, size_t layerIdx,
                       std::vector<uint8_t>& outAlpha, uint8_t unsetFill) {
     outAlpha.assign(ALPHA_MAP_SIZE, unsetFill);
@@ -67,6 +94,7 @@ bool decodeLayerAlpha(const MapChunk& chunk, size_t layerIdx,
             outAlpha[i * 2] = static_cast<uint8_t>((v & 0x0F) * 17);
             outAlpha[i * 2 + 1] = static_cast<uint8_t>((v >> 4) * 17);
         }
+        fixLastRowAndColumn(outAlpha);
         return true;
     }
 
