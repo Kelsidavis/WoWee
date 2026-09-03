@@ -38,6 +38,13 @@ struct GPUPushConstants {
     glm::mat4 model;
 };
 
+/// The WMO's own, which carries where a batch of cloth hangs beside the model
+/// matrix: (top z, drop, centre x, centre y) in the model's local space.
+struct WMOPushConstants {
+    glm::mat4 model;
+    glm::vec4 cloth{0.0f};
+};
+
 // Push constants for shadow rendering passes
 struct ShadowPush {
     glm::mat4 lightSpaceMatrix;

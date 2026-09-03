@@ -501,6 +501,17 @@ private:
             bool isTransparent = false;     // blendMode >= 2
             bool isWindow = false;          // F_SIDN or F_WINDOW material
             bool isLava = false;            // lava/magma texture (UV scroll)
+            /// Cloth hung in the building's own mesh: where the bar is, how
+            /// far the cloth drops below it, and where it hangs.
+            ///
+            /// Stormwind's gate banners are geometry in the city WMO rather
+            /// than doodads - the material is STORMWINDBANNER01 - so the sway
+            /// a banner model gets has to be applied to the batch that draws
+            /// one. Zero drop means the batch is not cloth.
+            float clothTop = 0.0f;
+            float clothDrop = 0.0f;
+            float clothCentreX = 0.0f;
+            float clothCentreY = 0.0f;
             // 0 = not luminous, 1 = authored lamp glass (bright), 2 = firelit
             // from behind with a flicker (clock faces). See wmo.frag's emissive
             // branch for how each level is shaded.

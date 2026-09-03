@@ -252,7 +252,7 @@ bool WMORenderer::initialize(VkContext* ctx, VkDescriptorSetLayout perFrameLayou
     VkPushConstantRange pushRange{};
     pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     pushRange.offset = 0;
-    pushRange.size = sizeof(GPUPushConstants);
+    pushRange.size = sizeof(WMOPushConstants);
 
     std::vector<VkDescriptorSetLayout> setLayouts = { perFrameLayout, materialSetLayout_ };
     pipelineLayout_ = createPipelineLayout(device, setLayouts, { pushRange });
@@ -653,7 +653,17 @@ WMORenderer::ModelLoadResult WMORenderer::loadModelIncremental(
     }
 
     // Build pre-merged batches for each group (texture-sorted for efficient rendering)
+    size_t mergeGroupIndex = 0;
     for (auto& groupRes : modelData.groups) {
+        // The group this one was uploaded from, for the vertices a batch draws.
+        // Only used to measure cloth; a mismatch leaves banners still rather
+        // than swaying the wrong triangles.
+        const pipeline::WMOGroup* srcGroup = nullptr;
+        if (mergeGroupIndex < model.groups.size() &&
+            model.groups[mergeGroupIndex].batches.size() == groupRes.batches.size()) {
+            srcGroup = &model.groups[mergeGroupIndex];
+        }
+        ++mergeGroupIndex;
         // Use pointer value as key for batching
         struct BatchKey {
             uintptr_t texPtr;
@@ -719,6 +729,7 @@ WMORenderer::ModelLoadResult WMORenderer::loadModelIncremental(
             // rendering/wmo_material_class.hpp.
             bool isWindow = false;
             bool isLava = false;
+            bool isCloth = false;
             uint8_t emissiveLevel = 0;
             if (batch.materialId < modelData.materialTextureIndices.size()) {
                 uint32_t ti = modelData.materialTextureIndices[batch.materialId];
@@ -739,6 +750,44 @@ WMORenderer::ModelLoadResult WMORenderer::loadModelIncremental(
                     isLava = (texNameLower.find("lava") != std::string::npos ||
                               texNameLower.find("molten") != std::string::npos ||
                               texNameLower.find("magma") != std::string::npos);
+                    // Cloth painted into the building: the gate banners of
+                    // Stormwind are geometry in the city's own WMO, textured
+                    // STORMWINDBANNER01, not doodads with models of their own.
+                    // A flagstone is a floor, as ever.
+                    isCloth = texNameLower.find("banner") != std::string::npos ||
+                              texNameLower.find("tapestry") != std::string::npos ||
+                              texNameLower.find("pennant") != std::string::npos ||
+                              (texNameLower.find("flag") != std::string::npos &&
+                               texNameLower.find("flagstone") == std::string::npos);
+                }
+            }
+
+            // Where that cloth hangs, from the vertices this batch draws:
+            // the top edge it is held at, how far it falls, and its middle -
+            // which is what makes two banners on one gate swing out of step.
+            float clothTop = 0.0f, clothDrop = 0.0f;
+            float clothCx = 0.0f, clothCy = 0.0f;
+            if (isCloth && srcGroup) {
+                float minZ = std::numeric_limits<float>::max();
+                float maxZ = -std::numeric_limits<float>::max();
+                float minX = minZ, maxX = maxZ, minY = minZ, maxY = maxZ;
+                for (uint32_t i = 0; i < batch.indexCount; ++i) {
+                    const uint32_t at = batch.startIndex + i;
+                    if (at >= srcGroup->indices.size()) break;
+                    const uint16_t vi = srcGroup->indices[at];
+                    if (vi >= srcGroup->vertices.size()) continue;
+                    const auto& v = srcGroup->vertices[vi].position;
+                    minZ = std::min(minZ, v.z); maxZ = std::max(maxZ, v.z);
+                    minX = std::min(minX, v.x); maxX = std::max(maxX, v.x);
+                    minY = std::min(minY, v.y); maxY = std::max(maxY, v.y);
+                }
+                if (maxZ > minZ) {
+                    clothTop = maxZ;
+                    clothDrop = maxZ - minZ;
+                    clothCx = (minX + maxX) * 0.5f;
+                    clothCy = (minY + maxY) * 0.5f;
+                } else {
+                    isCloth = false;
                 }
             }
 
@@ -754,6 +803,10 @@ WMORenderer::ModelLoadResult WMORenderer::loadModelIncremental(
                 mb.isWindow = isWindow;
                 mb.isLava = isLava;
                 mb.emissiveLevel = emissiveLevel;
+                mb.clothTop = clothTop;
+                mb.clothDrop = clothDrop;
+                mb.clothCentreX = clothCx;
+                mb.clothCentreY = clothCy;
                 // Look up normal/height map from texture cache
                 if (hasTexture && tex != whiteTexture_.get()) {
                     for (const auto& [cacheKey, cacheEntry] : textureCache) {
@@ -1730,11 +1783,15 @@ void WMORenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const
         const ModelData& model = *dl.model;
 
 
-        // Push model matrix
-        GPUPushConstants push{};
+        // Push model matrix. The cloth half is written per batch below; this
+        // sets the instance's matrix and clears the cloth for everything that
+        // is not one.
+        WMOPushConstants push{};
         push.model = instance.modelMatrix;
+        push.cloth = glm::vec4(0.0f);
         vkCmdPushConstants(cmd, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT,
-                            0, sizeof(GPUPushConstants), &push);
+                            0, sizeof(WMOPushConstants), &push);
+        glm::vec4 pushedCloth(0.0f);
 
         // LOD shell groups render only beyond this distance squared (190 units)
         static constexpr float LOD_SHELL_DIST_SQ = 196.0f * 196.0f;
@@ -1789,6 +1846,18 @@ void WMORenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const
                 // Bind material descriptor set (set 1)
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_,
                                          1, 1, &mb.materialSet, 0, nullptr);
+
+                // Where this batch's cloth hangs, when it is cloth. Written
+                // only when it changes: most batches are walls and share the
+                // zero that says "not cloth".
+                const glm::vec4 wantCloth(mb.clothTop, mb.clothDrop,
+                                          mb.clothCentreX, mb.clothCentreY);
+                if (wantCloth != pushedCloth) {
+                    pushedCloth = wantCloth;
+                    vkCmdPushConstants(cmd, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT,
+                                       offsetof(WMOPushConstants, cloth),
+                                       sizeof(glm::vec4), &pushedCloth);
+                }
 
                 // Issue draw calls for each range in this merged batch
                 for (const auto& dr : mb.draws) {
