@@ -3437,9 +3437,14 @@ void InventoryHandler::openGuildBank(uint64_t guid) {
         return;
     }
     guildBankerGuid_ = guid;
-    guildBankOpen_ = true;
     guildBankActiveTab_ = 0;
-    if (owner_.addonEventCallbackRef()) owner_.addonEventCallbackRef()("GUILDBANKFRAME_OPENED", {});
+    // The window opens when the vault answers, not when it is asked.
+    //
+    // Raising it here meant any refusal - a guild the client thought the player
+    // was in and the server did not, a banker out of range, a permission the
+    // rank does not carry - left an empty vault on screen with nothing coming.
+    // handleGuildBankList shows it the moment a tab list arrives, which is the
+    // server agreeing that this player may look.
     // CMSG_GUILD_BANKER_ACTIVATE registers this session with the guild banker so
     // the server sends the tab list + contents (SMSG_GUILD_BANK_LIST). Without it
     // the follow-up query-tab is rejected and no bank list ever arrives, so the

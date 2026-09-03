@@ -207,6 +207,19 @@ public:
     [[nodiscard]] const std::string& getGuildName() const { return guildName_; }
     [[nodiscard]] const GuildRosterData& getGuildRoster() const { return guildRoster_; }
     [[nodiscard]] bool hasGuildRoster() const { return hasGuildRoster_; }
+
+    /// Forget which guild the player is in, for a character that is not them.
+    ///
+    /// Called as a character enters the world: the name, the ranks and the
+    /// roster all belong to whoever was played last, and isInGuild() reads the
+    /// name.
+    void clearGuildMembership() {
+        guildName_.clear();
+        guildRankNames_.clear();
+        guildRoster_ = GuildRosterData{};
+        hasGuildRoster_ = false;
+        guildQueryData_ = GuildQueryResponseData{};
+    }
     [[nodiscard]] const std::vector<std::string>& getGuildRankNames() const { return guildRankNames_; }
     /// The rights bitmask of the player's own guild rank, or 0 when it is not
     /// known. The roster carries one per rank and the member row names which

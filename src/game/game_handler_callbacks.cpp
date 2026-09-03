@@ -551,6 +551,16 @@ void GameHandler::selectCharacter(uint64_t characterGuid) {
     // This avoids relying on UI/Application ordering for appearance-dependent logic.
     activeCharacterGuid_ = characterGuid;
 
+    // The last character's guild is not this one's.
+    //
+    // The guild name is kept for the character being played and was cleared
+    // only when that character left the guild or it disbanded - so logging out
+    // of a guilded character and into a guildless one left the name behind,
+    // and everything that asks "am I in a guild" answered yes. The guild vault
+    // is where that showed: the click passed the check, the server refused it
+    // with error 9, and an empty vault window was already on screen.
+    if (socialHandler_) socialHandler_->clearGuildMembership();
+
     LOG_INFO("========================================");
     LOG_INFO("   ENTERING WORLD");
     LOG_INFO("========================================");
