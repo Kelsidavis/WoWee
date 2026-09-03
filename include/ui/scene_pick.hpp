@@ -74,8 +74,12 @@ struct ScenePick {
     uint64_t deadUnitGuid = 0;         ///< Nearest corpse, by centre.
     float    deadUnitCenterT = 1e30f;
 
-    uint64_t objectGuid = 0;           ///< Nearest interactable game object, by centre.
-    float    objectCenterT = 1e30f;
+    uint64_t objectGuid = 0;           ///< The interactable object best aimed at.
+    float    objectCenterT = 1e30f;    ///< Its centre's distance along the ray.
+    /// How far the ray passed from that object's centre, as a fraction of its
+    /// radius: nought is dead centre, one is a graze. What objects are ranked
+    /// by - see the picker, and the scenery-at-the-elbow it exists to stop.
+    float    objectAim = 1e30f;
 
     /// The living win; a corpse is still selectable, but only when nothing alive
     /// was under the cursor - which is what makes a player standing on a body
