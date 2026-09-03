@@ -1009,7 +1009,7 @@ end
 
 local about = CreateFrame("Button", "GameMenuButtonWoweeAbout", GameMenuFrame,
                           "GameMenuButtonTemplate")
-about:SetText("About")
+about:SetText("About WoWee")
 about:SetPoint("TOP", GameMenuButtonQuit, "BOTTOM", 0, -1)
 about:SetScript("OnClick", function()
     HideUIPanel(GameMenuFrame)
