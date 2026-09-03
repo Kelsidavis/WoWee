@@ -2269,15 +2269,20 @@ int lua_Tooltip_SetTradeSkillItem(lua_State* L) {
     const int index = static_cast<int>(luaL_optnumber(L, 2, 0));
     if (!w || !gh || index < 1) { lua_pushboolean(L, 0); return 1; }
 
-    const auto recipes = gh->getCraftingRecipes();
-    if (index > static_cast<int>(recipes.size())) { lua_pushboolean(L, 0); return 1; }
-    const uint32_t spellId = recipes[index - 1].spellId;
+    // A drawn-row index, not an index into the recipe list. The panel groups
+    // recipes under subclass headings and filters them, so the two lists have
+    // neither the same length nor the same order: subscripting the recipes
+    // described whatever happened to sit at that offset - "Enchant Bracer -
+    // Lesser Spirit" was shown as "Enchant Bracer - Minor Deflection".
+    const auto* recipe = wowee::addons::recipeAtTradeSkillRow(gh, index);
+    if (!recipe) { lua_pushboolean(L, 0); return 1; }
+    const uint32_t spellId = recipe->spellId;
     if (spellId == 0) { lua_pushboolean(L, 0); return 1; }
 
     w->isTooltip = true;
     w->tooltipLines.clear();
     wowee::ui::Widget::TooltipLine title;
-    title.left = recipes[index - 1].name;
+    title.left = recipe->name;
     title.lc[0] = 1.0f; title.lc[1] = 0.82f; title.lc[2] = 0.0f; title.lc[3] = 1.0f;
     title.rc[0] = title.rc[1] = title.rc[2] = title.rc[3] = 1.0f;
     w->tooltipLines.push_back(std::move(title));

@@ -2157,6 +2157,14 @@ static const game::GameHandler::CraftRecipe* tradeSkillRecipeAt(
     return row.isHeader ? nullptr : &row.recipe;
 }
 
+/// The same translation, for the one binding that lives in another file: the
+/// tooltip is a widget method and sits on the widget metatable in lua_engine.
+const game::GameHandler::CraftRecipe* recipeAtTradeSkillRow(game::GameHandler* gh,
+                                                            int index) {
+    if (!gh) return nullptr;
+    return tradeSkillRecipeAt(tradeSkillRows(gh), index);
+}
+
 /// Open or close the heading at a drawn-row index. A click on a recipe row is
 /// ignored rather than refused: the panel calls these from the row template
 /// whatever the row turns out to be.

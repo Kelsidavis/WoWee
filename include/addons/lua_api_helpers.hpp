@@ -910,6 +910,20 @@ bool boughtHeldMerchantItem(lua_State* L);
 /// quest than the one asked about.
 const game::GameHandler::QuestLogEntry* questAtLogRow(game::GameHandler* gh, int index);
 
+/// The recipe a drawn trade skill row stands for, or null for a heading, an
+/// index past the end, or no open profession.
+///
+/// A trade skill index is a DISPLAY index, for the same reason a quest log
+/// index is: the list is grouped under subclass headings, the headings are
+/// rows too, and the filters - Have Materials, subclass, slot, the search box
+/// - decide which recipes are in it at all. So index N is not the Nth entry of
+/// getCraftingRecipes(), and subscripting that list answers about a different
+/// recipe. The tooltip did exactly that: hovering "Enchant Bracer - Lesser
+/// Spirit" described "Enchant Bracer - Minor Deflection", three rows further
+/// down, because that is what index 4 is in a list with no heading in it.
+const game::GameHandler::CraftRecipe* recipeAtTradeSkillRow(game::GameHandler* gh,
+                                                            int index);
+
 /// Let the trade skill row list be rebuilt on the next read.
 ///
 /// The list is held still between redraws: the frame reads it many times to
