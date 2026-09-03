@@ -45,6 +45,7 @@ layout(location = 3) flat in vec3 InstanceOrigin;
 layout(location = 4) in float ModelHeight;
 layout(location = 5) in float vFadeAlpha;
 layout(location = 6) flat in int vSkyMode;
+layout(location = 7) flat in float vHighlight;
 
 layout(location = 0) out vec4 outColor;
 
@@ -277,5 +278,14 @@ void main() {
     if (colorKeyBlack != 0 && alphaTest == 0) {
         outAlpha = vFadeAlpha;
     }
+    // Pressed on. The real client lifts the whole model while the button is
+    // down over it, which is what says "this one, and the click landed": a
+    // warm brightening rather than a tint, so a dark door reads as lit and a
+    // pale one does not blow out.
+    if (vHighlight > 0.0) {
+        float lift = clamp(vHighlight, 0.0, 1.0);
+        result = result * (1.0 + 0.6 * lift) + vec3(0.22, 0.19, 0.10) * lift;
+    }
+
     outColor = vec4(result, outAlpha);
 }

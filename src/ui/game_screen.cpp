@@ -1800,9 +1800,38 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
         input.isMouseButtonJustPressed(SDL_BUTTON_LEFT) && !input.isMouseButtonPressed(SDL_BUTTON_RIGHT)) {
         leftClickPressPos_ = input.getMousePosition();
         leftClickWasPress_ = true;
+
+        // Light the object being pressed on.
+        //
+        // A game object is used rather than selected, so nothing else says the
+        // press landed on it - a unit has its circle and its frame, and an
+        // object had only the cursor, which does not change when the button
+        // goes down. Lit on the press and dark again on the release, which is
+        // where the real client puts it too.
+        if (auto* camera = services_.renderer ? services_.renderer->getCamera() : nullptr) {
+            if (auto* window = services_.window) {
+                const rendering::Ray pressRay = camera->screenToWorldRay(
+                    leftClickPressPos_.x, leftClickPressPos_.y,
+                    static_cast<float>(window->getWidth()),
+                    static_cast<float>(window->getHeight()));
+                const uint64_t pressed =
+                    ui::pickScene(gameHandler, pressRay, ui::ScenePickParams{}).resolve();
+                auto entity = pressed ? gameHandler.getEntityManager().getEntity(pressed)
+                                      : nullptr;
+                core::Application::getInstance().setPressedGameObject(
+                    entity && entity->getType() == game::ObjectType::GAMEOBJECT ? pressed : 0);
+            }
+        }
     }
 
     // On mouse-up, check if it was a click (not a drag)
+    if (input.isMouseButtonJustReleased(SDL_BUTTON_LEFT)) {
+        // Dark again the moment the button comes up, whatever the release
+        // turns out to mean - a click, a drag that turned the camera, or a
+        // press that ended somewhere else entirely.
+        core::Application::getInstance().setPressedGameObject(0);
+    }
+
     if (leftClickWasPress_ && input.isMouseButtonJustReleased(SDL_BUTTON_LEFT)) {
         leftClickWasPress_ = false;
         glm::vec2 releasePos = input.getMousePosition();

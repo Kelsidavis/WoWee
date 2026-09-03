@@ -37,6 +37,9 @@ struct InstanceData {
     int useBones;
     int boneBase;
     int boneCount;
+    // 0 for an ordinary instance, 1 while the player is pressing on it. Sits
+    // in what was padding, so the entry is the same 96 bytes it always was.
+    float highlight;
 };
 layout(set = 3, binding = 0) readonly buffer InstanceSSBO {
     InstanceData instanceData[];
@@ -56,6 +59,7 @@ layout(location = 3) flat out vec3 InstanceOrigin;
 layout(location = 4) out float ModelHeight;
 layout(location = 5) out float vFadeAlpha;
 layout(location = 6) flat out int vSkyMode;
+layout(location = 7) flat out float vHighlight;
 
 void main() {
     // Fetch per-instance data from SSBO
@@ -208,6 +212,7 @@ void main() {
     ModelHeight = pos.z;
     vFadeAlpha = fade;
     vSkyMode = push.isFoliage < 0 ? 1 : 0;
+    vHighlight = instanceData[instIdx].highlight;
 
     gl_Position = projection * view * worldPos;
 }

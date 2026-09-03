@@ -236,6 +236,13 @@ struct M2Instance {
     float variationTimer = 0.0f; // Time until next variation attempt (ms)
     bool playingVariation = false;// Currently playing a one-shot variation
 
+    /// Lit while the player is pressing on this instance: 0 none, 1 full.
+    ///
+    /// A game object has no selection circle - it is used rather than selected
+    /// - so the press is the only thing that can say the click landed on this
+    /// one and not the scenery beside it.
+    float highlight = 0.0f;
+
     // Particle emitter state
     std::vector<float> emitterAccumulators;  // fractional particle counter per emitter
     std::vector<M2Particle> particles;
@@ -448,6 +455,10 @@ public:
     void setInstancePosition(uint32_t instanceId, const glm::vec3& position);
     void setInstanceTransform(uint32_t instanceId, const glm::mat4& transform);
     void setInstanceAnimationFrozen(uint32_t instanceId, bool frozen);
+    /// Light an instance while it is being pressed on. 0 clears it.
+    void setInstanceHighlight(uint32_t instanceId, float amount);
+    /// Take the light off whatever has it, whichever instance that was.
+    void clearInstanceHighlights();
     /// Set the animation sequence by animation ID (e.g. anim::OPEN, anim::CLOSE).
     /// Finds the first sequence with matching ID. Unfreezes the instance and resets time.
     void setInstanceAnimation(uint32_t instanceId, uint32_t animationId, bool loop = true);
@@ -668,7 +679,8 @@ private:
         int32_t useBones;          //  4 bytes @ offset 76
         int32_t boneBase;          //  4 bytes @ offset 80
         int32_t boneCount;         //  4 bytes @ offset 84 - clamps skinning reads
-        int32_t _pad[2] = {};      //  8 bytes @ offset 88 - align to 96 (std430)
+        float highlight = 0.0f;    //  4 bytes @ offset 88 - pressed-on lift
+        int32_t _pad = {};         //  4 bytes @ offset 92 - align to 96 (std430)
     };
     // How many instances one frame may hand the GPU, not how many exist. Ground
     // clutter is what fills it: it is drawn by the thousand and every tuft

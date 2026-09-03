@@ -61,6 +61,19 @@ void M2Renderer::setInstancePosition(uint32_t instanceId, const glm::vec3& posit
                  inst.worldBoundsMin, inst.worldBoundsMax, instanceId);
 }
 
+void M2Renderer::setInstanceHighlight(uint32_t instanceId, float amount) {
+    auto idxIt = instanceIndexById.find(instanceId);
+    if (idxIt == instanceIndexById.end()) return;
+    instances[idxIt->second].highlight = amount;
+}
+
+void M2Renderer::clearInstanceHighlights() {
+    // A walk of every instance rather than a record of the lit one, because a
+    // press can end with the instance gone - the object despawned, the tile
+    // unloaded - and a remembered id would then light whatever took its slot.
+    for (auto& inst : instances) inst.highlight = 0.0f;
+}
+
 void M2Renderer::setInstanceAnimationFrozen(uint32_t instanceId, bool frozen) {
     auto idxIt = instanceIndexById.find(instanceId);
     if (idxIt == instanceIndexById.end()) return;

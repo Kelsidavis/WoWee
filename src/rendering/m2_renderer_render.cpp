@@ -1386,7 +1386,8 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
                 e.useBones = (p.useBones && !kM2NoSkinning) ? 1 : 0;
                 e.boneBase = p.useBones ? static_cast<int32_t>(inst.megaBoneOffset) : 0;
                 e.boneCount = static_cast<int32_t>(inst.boneMatrices.size());
-                std::memset(e._pad, 0, sizeof(e._pad));
+                e.highlight = inst.highlight;
+                e._pad = 0;
                 instanceDataCount_++;
                 ++writtenInstances;
             }
@@ -1614,7 +1615,8 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
                             e.useBones = (p.useBones && !kM2NoSkinning) ? 1 : 0;
                             e.boneBase = p.useBones ? static_cast<int32_t>(inst.megaBoneOffset) : 0;
                             e.boneCount = static_cast<int32_t>(inst.boneMatrices.size());
-                            std::memset(e._pad, 0, sizeof(e._pad));
+                            e.highlight = inst.highlight;
+                            e._pad = 0;
                             instanceDataCount_++;
                         }
                     }
@@ -1861,7 +1863,8 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
             e.useBones = (needsBones && !kM2NoSkinning) ? 1 : 0;
             e.boneBase = needsBones ? static_cast<int32_t>(instance.megaBoneOffset) : 0;
             e.boneCount = static_cast<int32_t>(instance.boneMatrices.size());
-            std::memset(e._pad, 0, sizeof(e._pad));
+            e.highlight = instance.highlight;
+            e._pad = 0;
             instanceDataCount_++;
 
             // Pipeline selection
