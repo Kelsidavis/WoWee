@@ -137,6 +137,18 @@ private:
     void handleCreatureQueryResponse(network::Packet& packet);
     void handleGameObjectQueryResponse(network::Packet& packet);
     void handleGameObjectPageText(network::Packet& packet);
+
+public:
+    /// Read what is written on a game object: a sign, a plaque, a gravestone.
+    ///
+    /// Public because the click is where this starts. SMSG_GAMEOBJECT_PAGETEXT
+    /// is the server *offering* a page, which not every server sends and no
+    /// server sends for a plain sign - the real client reads the page id out of
+    /// the object's own data and asks for the text itself. Both ends arrive
+    /// here.
+    void showGameObjectPageText(uint64_t guid);
+
+private:
     void handlePageTextQueryResponse(network::Packet& packet);
 
     // --- Entity lifecycle ---

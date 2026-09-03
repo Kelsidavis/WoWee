@@ -3033,7 +3033,10 @@ void EntityController::handleGameObjectQueryResponse(network::Packet& packet) {
 
 void EntityController::handleGameObjectPageText(network::Packet& packet) {
     if (!packet.hasRemaining(8)) return;
-    uint64_t guid = packet.readUInt64();
+    showGameObjectPageText(packet.readUInt64());
+}
+
+void EntityController::showGameObjectPageText(uint64_t guid) {
     auto entity = entityManager.getEntity(guid);
     if (!entity || entity->getType() != ObjectType::GAMEOBJECT) return;
 

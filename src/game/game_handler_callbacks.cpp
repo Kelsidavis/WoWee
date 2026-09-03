@@ -2963,6 +2963,7 @@ void GameHandler::performGameObjectInteractionNow(uint64_t guid) {
     // Determine GO type for interaction strategy
     bool isMailbox = false;
     bool isGuildBank = false;
+    bool isReadable = false;
     bool chestLike = false;
     bool metadataPending = false;
     if (entity && entity->getType() == ObjectType::GAMEOBJECT) {
@@ -2975,6 +2976,11 @@ void GameHandler::performGameObjectInteractionNow(uint64_t guid) {
             isGuildBank = true;
         } else if (goInfo && goInfo->type == 3) {
             chestLike = true;
+        } else if (goInfo && (goInfo->type == 9 ||
+                              (goInfo->type == 10 && goInfo->hasData && goInfo->data[7] != 0))) {
+            // 9 is TEXT - a sign - and a GOOBER carries a page of its own in
+            // data[7] when it has one to show.
+            isReadable = true;
         }
     }
     if (!chestLike && !goName.empty()) {
@@ -3115,6 +3121,15 @@ void GameHandler::performGameObjectInteractionNow(uint64_t guid) {
         // Guild vault: CMSG_GAMEOBJ_USE above is a no-op on the server; the bank
         // opens via CMSG_GUILD_BANKER_ACTIVATE, which openGuildBank() sends.
         openGuildBank(guid);
+    } else if (isReadable) {
+        // A sign, a plaque, a gravestone: the client reads it.
+        //
+        // Nothing happened when one was clicked because this waited for
+        // SMSG_GAMEOBJECT_PAGETEXT, which is the server offering a page - and
+        // for a type 9 the server has nothing to offer, the page id being in
+        // the object's own data where the real client reads it from. Stormwind
+        // is full of signs that answered a click with silence.
+        if (entityController_) entityController_->showGameObjectPageText(guid);
     }
 
     // CMSG_GAMEOBJ_REPORT_USE triggers GO AI scripts (SmartAI, ScriptAI) which
