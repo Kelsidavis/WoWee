@@ -1,5 +1,6 @@
 #include "ui/graphics_choices.hpp"
 #include "ui/game_screen.hpp"
+#include "core/click_drag.hpp"
 #include "addons/lua_api_registrations.hpp"
 #include "ui/escape_action.hpp"
 #include "ui/display_modes.hpp"
@@ -146,20 +147,7 @@ void GameScreen::applySavedDisplayMode(core::Window* window) {
 // Set UI services and propagate to child components
 
 namespace {
-/// How far the cursor may travel between press and release and still count as a
-/// click rather than a camera drag.
-///
-/// This was a flat five pixels, which is a different gesture on different
-/// screens: five pixels is a third of a percent of a 1280-wide window and a
-/// tenth of that on a 3840-wide one, so the same small hand movement that reads
-/// as a click on a modest display reads as a drag on a large one - and a
-/// discarded right-click is an NPC that cannot be interacted with at all.
-/// Scaled by the window, with a floor so it never becomes stricter than it was.
-float clickDragThreshold() {
-    const ImGuiIO& io = ImGui::GetIO();
-    const float shorter = std::min(io.DisplaySize.x, io.DisplaySize.y);
-    return std::max(5.0f, shorter * 0.008f);
-}
+using core::clickDragThreshold;
 }
 
 bool GameScreen::getFullscreen() const {

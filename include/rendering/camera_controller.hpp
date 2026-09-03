@@ -392,8 +392,15 @@ private:
     // button is held. This keeps a click (to select an NPC) from nudging the view on
     // tiny hand jitter - which made NPCs appear to shift out from under the cursor.
     bool rotateArmed_ = false;
-    float dragPixelsSincePress_ = 0.0f;
-    static constexpr float kRotateDeadzonePixels = 5.0f;
+    /// Where the cursor has got to since the press, as a net offset.
+    ///
+    /// Summed signed rather than as |dx|+|dy| per event: the old measure was
+    /// the length of the path the cursor took, so a trackpad click that
+    /// jittered a few pixels and came back to where it started still read as
+    /// a drag and swung the view. What decides a click elsewhere is the
+    /// straight line from press to release, and this is now the same line.
+    float dragOffsetX_ = 0.0f;
+    float dragOffsetY_ = 0.0f;
 
     // Third-person orbit camera (WoW-style)
     bool thirdPerson = false;

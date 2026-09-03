@@ -982,6 +982,7 @@ set(WOWEE_SOURCES
     src/ui/plural_escape.cpp
     src/ui/chat/chat_markup_renderer.cpp
     src/core/open_url.cpp
+    src/core/click_drag.cpp
     src/ui/chat/item_tooltip_renderer.cpp
     src/ui/chat/chat_command_registry.cpp
     src/ui/chat/macro_evaluator.cpp

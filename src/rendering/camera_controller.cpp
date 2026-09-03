@@ -1,4 +1,5 @@
 #include "rendering/camera_controller.hpp"
+#include "core/click_drag.hpp"
 #include "core/coordinates.hpp"
 #include "ui/keybinding_manager.hpp"
 #include "ui/framexml_takeover.hpp"
@@ -2810,12 +2811,17 @@ void CameraController::processMouseMotion(const SDL_MouseMotionEvent& event) {
         return;
     }
 
-    // Hold rotation until the drag clears a small dead-zone, so a select-click with
-    // slight jitter doesn't rotate the view (which makes NPCs seem to move away).
+    // Hold rotation until the cursor has actually gone somewhere, so a click
+    // that means "target this" does not swing the view on the way.
+    //
+    // The same distance the click test uses, measured the same way: the net
+    // offset from the press, not the length of the path taken to get there.
     if (!rotateArmed_) {
-        dragPixelsSincePress_ += std::abs(static_cast<float>(event.xrel)) +
-                                 std::abs(static_cast<float>(event.yrel));
-        if (dragPixelsSincePress_ < kRotateDeadzonePixels) {
+        dragOffsetX_ += static_cast<float>(event.xrel);
+        dragOffsetY_ += static_cast<float>(event.yrel);
+        const float threshold = core::clickDragThreshold();
+        if (dragOffsetX_ * dragOffsetX_ + dragOffsetY_ * dragOffsetY_ <
+            threshold * threshold) {
             return;
         }
         rotateArmed_ = true;  // past the dead-zone: this is a deliberate drag
@@ -2859,9 +2865,16 @@ void CameraController::processMouseButton(const SDL_MouseButtonEvent& event) {
     bool anyDown = leftMouseDown || rightMouseDown;
     if (anyDown && !mouseButtonDown) {
         SDL_SetRelativeMouseMode(SDL_TRUE);
+        // Throw away the delta the switch itself makes. Entering relative
+        // mode hands over the movement since the last relative read, which on
+        // a press is everything the cursor did on its way to the thing being
+        // clicked - a whole screen's worth, delivered as one motion event
+        // that cleared any dead-zone on its own.
+        SDL_GetRelativeMouseState(nullptr, nullptr);
         // Arm the rotation dead-zone fresh for this press.
         rotateArmed_ = false;
-        dragPixelsSincePress_ = 0.0f;
+        dragOffsetX_ = 0.0f;
+        dragOffsetY_ = 0.0f;
     } else if (!anyDown && mouseButtonDown) {
         SDL_SetRelativeMouseMode(SDL_FALSE);
         rotateArmed_ = false;
@@ -2874,7 +2887,8 @@ void CameraController::releaseMouseCapture() {
     rightMouseDown = false;
     mouseButtonDown = false;
     rotateArmed_ = false;
-    dragPixelsSincePress_ = 0.0f;
+    dragOffsetX_ = 0.0f;
+    dragOffsetY_ = 0.0f;
     SDL_SetRelativeMouseMode(SDL_FALSE);
     SDL_ShowCursor(SDL_ENABLE);
 }
