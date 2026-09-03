@@ -848,9 +848,22 @@ static int lua_GetQuestLogLeaderBoard(lua_State* L);
 // quests that have a POI on the map now, not a quest log index. The two differ
 // as soon as one quest in the log has no marker.
 
-/// The quest ids that have a marker, in the order the server sent them, each
-/// appearing once. Built on demand: the list is short and changes whenever the
-/// server sends a new one.
+/// The quest ids that have a marker, completed ones first, each appearing once.
+/// Built on demand: the list is short and changes whenever the server sends a
+/// new one.
+///
+/// The order is not decoration. WorldMapFrame numbers its POI buttons from
+/// this list: a completed quest at visible index i takes button i of the
+/// completed set, and an incomplete one takes button `i - completedSoFar` of
+/// the numeric set. Both are only contiguous from 1 if every completed quest
+/// comes first, which is how the real client orders them - and where it does
+/// not, QuestPOI_HideButtons walks from 1 to the highest button made and
+/// indexes a name nothing created:
+///
+///     QuestPOI.lua:200: attempt to index local 'poiButton' (a nil value)
+///
+/// which fired on every map update, took the rest of the update with it, and
+/// left the map with no quest list and no objectives on it.
 static std::vector<uint32_t> questsWithPois(game::GameHandler* gh) {
     std::vector<uint32_t> out;
     if (!gh) return out;
@@ -859,6 +872,14 @@ static std::vector<uint32_t> questsWithPois(game::GameHandler* gh) {
         if (poi.questObjectiveIndex == -2 || poi.data == 0) continue;
         if (std::find(out.begin(), out.end(), poi.data) == out.end()) out.push_back(poi.data);
     }
+    const auto isComplete = [gh](uint32_t questId) {
+        for (const auto& quest : gh->getQuestLog()) {
+            if (quest.questId == questId) return quest.complete;
+        }
+        return false;
+    };
+    // Stable, so the server's order still decides within each group.
+    std::stable_partition(out.begin(), out.end(), isComplete);
     return out;
 }
 
