@@ -1211,8 +1211,24 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
         pc.swayRefHeight = 20.0f;
         pc.swayAmp = 1.0f;
         pc.plantHeight = 0.0f;
-        if (sky || !mdl.shadowWindFoliage) {
-            pc.isFoliage = sky ? -1 : 0;
+        if (sky) {
+            pc.isFoliage = -1;
+            return;
+        }
+        if (mdl.isHangingCloth) {
+            // Held at the top and free at the hem, so the shader is given the
+            // top rather than a height to normalise against. The throw is a
+            // twentieth of the cloth's own drop: a banner indoors breathes,
+            // it does not flap.
+            const float span = std::max(mdl.boundMax.z - mdl.boundMin.z, 0.05f);
+            pc.isFoliage = 3;
+            pc.swayRefHeight = mdl.boundMax.z;
+            pc.plantHeight = span;
+            pc.swayAmp = span * 0.05f;
+            return;
+        }
+        if (!mdl.shadowWindFoliage) {
+            pc.isFoliage = 0;
             return;
         }
         pc.isFoliage = mdl.isGroundDetail ? 2 : 1;

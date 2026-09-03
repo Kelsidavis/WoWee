@@ -1458,6 +1458,7 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
     gpuModel.isFoliageLike               = cls.isFoliageLike;
     gpuModel.disableAnimation            = cls.disableAnimation;
     gpuModel.shadowWindFoliage           = cls.shadowWindFoliage;
+    gpuModel.isHangingCloth              = cls.isHangingCloth;
     gpuModel.isFireflyEffect             = cls.isFireflyEffect;
     gpuModel.isSmallFoliage              = cls.isSmallFoliage;
     gpuModel.isSmoke                     = cls.isSmoke;

@@ -18,7 +18,7 @@ layout(set = 0, binding = 0) uniform PerFrame {
 // Per-draw push constants (batch-level data only)
 layout(push_constant) uniform Push {
     int texCoordSet;         // UV set index (0 or 1)
-    int isFoliage;           // -1 = sky, 0 = none, 1 = foliage, 2 = ground clutter
+    int isFoliage;           // -1 sky, 0 none, 1 foliage, 2 clutter, 3 hanging cloth
     int instanceDataOffset;  // Base index into InstanceSSBO for this draw group
     float swayRefHeight;     // Model height the sway normalises against (model space)
     float swayAmp;           // Sway amplitude scale; 1.0 = the tree-sized default
@@ -129,6 +129,35 @@ void main() {
         pos.y += trunkSwayY + branchSwayY + leafFlutterY;
     }
 
+    // Cloth hung from its top edge: a banner, a flag, a tapestry.
+    //
+    // The opposite taper to a plant's. A tree is held at the root and swings
+    // at the tip; a banner is nailed to its bar and moves at the hem, so the
+    // weight is the drop below the top rather than the height above the base -
+    // which also leaves the pole or the bar in the same model still, its
+    // vertices being at the top where the weight is zero.
+    //
+    // Two rates: a slow sway of the whole cloth and a smaller ripple across it,
+    // so it breathes rather than swinging like a sign. The amplitude is a
+    // twentieth of the cloth's own drop, set on the client side.
+    if (push.isFoliage == 3) {
+        float windTime = fogParams.z;
+        vec3 worldRef = model[3].xyz;
+        float span = max(push.plantHeight, 0.01);
+        float drop = clamp((push.swayRefHeight - pos.z) / span, 0.0, 1.0);
+        drop *= drop;
+        float amp = push.swayAmp * drop;
+
+        // Per banner rather than per vertex, so two on the same wall are not
+        // in step - the phase comes from where the instance stands.
+        float phase = windTime * 1.1 + dot(worldRef.xy, vec2(0.21, 0.17));
+        pos.x += (sin(phase) * 0.7 + sin(phase * 2.7 + pos.y * 1.9) * 0.25) * amp;
+        pos.y += (cos(phase * 0.9) * 0.6 + cos(phase * 3.1 + pos.x * 1.7) * 0.2) * amp;
+        // A little in and out as well, so the cloth is not a flat sheet sliding
+        // sideways.
+        pos.z += sin(phase * 1.6 + pos.x * 1.3) * 0.12 * amp;
+    }
+
     vec4 worldPos = model * pos;
 
     // Foliage parts around whoever walks through it, then springs back. Applied
@@ -140,7 +169,7 @@ void main() {
     // between them is on the plant's own height rather than on which of the two
     // sway modes it happens to use. A shoulder-high bush and a waist-high one
     // should not behave differently because a bounding box crossed a threshold.
-    if (push.isFoliage > 0 && push.plantHeight > 0.0) {
+    if (push.isFoliage > 0 && push.isFoliage != 3 && push.plantHeight > 0.0) {
         vec3 base = model[3].xyz;                      // instance origin, on the ground
         float zScale = length(model[2].xyz);
         float plantHeight = push.plantHeight * zScale;

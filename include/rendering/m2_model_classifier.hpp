@@ -109,6 +109,12 @@ struct M2ClassificationResult {
     // --- Animation flags ---
     bool disableAnimation   = false; ///< Keep visually stable (foliage, chest lids, etc.)
     bool shadowWindFoliage  = false; ///< Apply wind sway in shadow pass for foliage/trees
+    /// A banner, a flag, a tapestry: cloth hung from its top edge.
+    ///
+    /// Held at the bar and free at the hem, which is the opposite of a plant -
+    /// so it gets a sway of its own rather than the foliage one, and a small
+    /// one: a banner indoors moves, it does not flap.
+    bool isHangingCloth     = false;
 };
 
 /**

@@ -477,6 +477,17 @@ M2ClassificationResult classifyM2Model(
     // and most of them are named for their tileset rather than for a plant
     // (ElwGra01, 8DE_Detail02). Wind and the player's passage apply to them.
     r.shadowWindFoliage = r.isFoliageLike || r.isGroundDetail;
+    // Cloth hung from a bar: banners, flags, tapestries, pennants. Not the
+    // pole or the stand they hang from, which are named for the whole thing -
+    // the sway is applied per vertex from the top down, so a rigid pole in the
+    // same model barely moves and the cloth below it does.
+    // "flag" alone is not enough: a flagstone is a floor tile, and swaying a
+    // floor is worse than a still banner.
+    const bool flagCloth = has(n, "flag") && !has(n, "flagstone") &&
+                           !has(n, "flagging");
+    r.isHangingCloth = !r.isFoliageLike &&
+                       (has(n, "banner") || flagCloth || has(n, "tapestry") ||
+                        has(n, "pennant"));
     r.isFireflyEffect   = ambientCreature;
 
     // Small foliage: foliage-like models with a small bounding box.
