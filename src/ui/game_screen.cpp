@@ -1,5 +1,7 @@
 #include "ui/graphics_choices.hpp"
 #include "ui/game_screen.hpp"
+
+#include <set>
 #include "core/click_drag.hpp"
 #include "addons/lua_api_registrations.hpp"
 #include "ui/escape_action.hpp"
@@ -1052,6 +1054,58 @@ void GameScreen::renderPlayerInfo(game::GameHandler& gameHandler) {
     ImGui::End();
 }
 
+/// A cursor picture, uploaded once and kept.
+///
+/// Only a successful upload is cached, so a transient descriptor-pool failure
+/// is retried rather than leaving the cursor plain for good, and a file that
+/// will not load says so once - a cursor that fails and a thing that has no
+/// cursor of its own both end as the plain hand, and from the chair they look
+/// the same.
+VkDescriptorSet cursorTexture(pipeline::AssetManager* assets, core::Window* window,
+                              const char* path) {
+    static std::unordered_map<std::string, VkDescriptorSet> loaded;
+    auto it = loaded.find(path);
+    if (it != loaded.end() && it->second != VK_NULL_HANDLE) return it->second;
+
+    ui::UiTextureLoad why = ui::UiTextureLoad::Ok;
+    VkDescriptorSet tex = ui::uploadUiTextureFromBlp(assets, path, window, &why);
+    if (tex) {
+        loaded[path] = tex;
+        return tex;
+    }
+    static std::set<std::string> said;
+    if (said.insert(path).second) {
+        LOG_WARNING("Cursor art ", path, " did not load (", static_cast<int>(why),
+                    ") - the pointer stays the plain hand there");
+    }
+    return VK_NULL_HANDLE;
+}
+
+/// Draw one in place of the pointer. The tip sits at the mouse position, the
+/// way the art is authored.
+void drawCursorTexture(VkDescriptorSet tex) {
+    ImGui::SetMouseCursor(ImGuiMouseCursor_None);
+    const ImVec2 at = ImGui::GetIO().MousePos;
+    constexpr float kSize = 32.0f;
+    ImGui::GetForegroundDrawList()->AddImage(
+        (ImTextureID)(uintptr_t)tex, at, ImVec2(at.x + kSize, at.y + kSize));
+}
+
+/// Which cursor a game object wears, by its GameObjectType.
+///
+/// The numbers are 3.3.5's own: 0 door, 1 button, 2 questgiver, 3 chest,
+/// 7 chair, 17 fishing node, 19 mailbox, 20 auction house. Anything else is
+/// something to interact with, which is what the hand with the gear says.
+const char* objectCursorPath(uint32_t goType) {
+    switch (goType) {
+        case 2:  return "Interface\\Cursor\\Quest.blp";
+        case 3:  return "Interface\\Cursor\\LootAll.blp";
+        case 17: return "Interface\\Cursor\\Fishing.blp";
+        case 19: return "Interface\\Cursor\\Mail.blp";
+        default: return "Interface\\Cursor\\Interact.blp";
+    }
+}
+
 /// Interface\\Cursor\\Buy.blp under the pointer while it is over a vendor.
 ///
 /// Every interactable answered the same hand cursor, so a merchant looked like
@@ -1110,6 +1164,36 @@ bool GameScreen::drawVendorCursor(game::GameHandler& gameHandler,
     ImGui::GetForegroundDrawList()->AddImage(
         (ImTextureID)(uintptr_t)cursorTex, at,
         ImVec2(at.x + kSize, at.y + kSize));
+    return true;
+}
+
+bool GameScreen::drawWorldObjectCursor(game::GameHandler& gameHandler,
+                                       const ui::ScenePick& pick) {
+    // resolve(), for the reason the vendor cursor gives: it is what a click
+    // would act on, and asking the hover a different question puts the two
+    // back into disagreement.
+    const uint64_t guid = pick.resolve();
+    if (guid == 0) return false;
+    auto entity = gameHandler.getEntityManager().getEntity(guid);
+    if (!entity || entity->getType() != game::ObjectType::GAMEOBJECT) return false;
+
+    auto go = std::static_pointer_cast<game::GameObject>(entity);
+    const auto* info = gameHandler.getCachedGameObjectInfo(go->getEntry());
+    VkDescriptorSet tex = cursorTexture(services_.assetManager, services_.window,
+                                        objectCursorPath(info ? info->type : 0u));
+    if (!tex) return false;
+    drawCursorTexture(tex);
+
+    // ...and what it is, beside the pointer, which is the whole of what the
+    // real client shows for an object: a cursor saying what it is for and a
+    // name saying what it is. An object whose name has not come back yet is
+    // left silent rather than labelled "Unknown".
+    const std::string name = game::entityDisplayName(entity);
+    if (!name.empty() && name != "Unknown") {
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted(name.c_str());
+        ImGui::EndTooltip();
+    }
     return true;
 }
 
@@ -1702,7 +1786,8 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
             const ui::ScenePick hoverPick =
                 ui::pickScene(gameHandler, ray, ui::ScenePickParams{});
             if (hoverPick.closestGuid != 0) {
-                if (!drawVendorCursor(gameHandler, hoverPick)) {
+                if (!drawVendorCursor(gameHandler, hoverPick) &&
+                    !drawWorldObjectCursor(gameHandler, hoverPick)) {
                     ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
                 }
             }

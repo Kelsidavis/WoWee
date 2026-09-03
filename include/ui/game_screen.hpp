@@ -357,6 +357,12 @@ private:
     /// The vendor cursor, drawn in place of the pointer. True when it drew, so
     /// the caller knows not to also ask for the hand.
     bool drawVendorCursor(game::GameHandler& gameHandler, const ui::ScenePick& pick);
+    /// The cursor the real client shows over what is under the pointer.
+    ///
+    /// A door, a chest and a mailbox are each their own picture there, and the
+    /// name of the thing is said beside it. True when it drew one, so the
+    /// caller leaves the plain hand alone.
+    bool drawWorldObjectCursor(game::GameHandler& gameHandler, const ui::ScenePick& pick);
 
     // Minimap quest-objective cache, rebuilt only when tracked quest progress changes.
     uint64_t minimapQuestCacheSignature_ = 0;
