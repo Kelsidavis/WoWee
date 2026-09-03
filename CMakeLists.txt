@@ -2218,6 +2218,7 @@ add_executable(wowee_editor
     src/pipeline/wowee_chat_links.cpp
     src/pipeline/custom_zone_discovery.cpp
     src/pipeline/terrain_mesh.cpp
+    src/pipeline/adt_alpha.cpp
 
     # Rendering core
     src/rendering/vk_context.cpp

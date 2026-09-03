@@ -88,7 +88,6 @@ private:
 
     // Object panel
     char objFilterBuf_[128] = "";
-    int objDirIdx_ = -1;
     bool showM2s_ = true;
     bool showWMOs_ = true;
 
