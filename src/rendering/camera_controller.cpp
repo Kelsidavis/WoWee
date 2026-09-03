@@ -1114,7 +1114,27 @@ void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
     // Nothing drifts while this stands down: movement is blocked for as long
     // as the character is seated, and the moment they stand up the pass runs
     // again from wherever the server left them.
-    if (sitting) return;
+    //
+    // One thing is still enforced: the floor. Standing the pass down entirely
+    // left nothing to catch a seat that ends up under the ground - a tile that
+    // streamed in after the sit, a server seating the character at a Z the
+    // floor here does not agree with - and a character below the floor is a
+    // character who falls through it when they stand. So the floor under the
+    // feet is still sampled and used one way only, upward, and never from the
+    // chair's own M2, which is what standing on the furniture was.
+    if (sitting) {
+        const FloorSample seated = sampleFloorUnderFeet(targetPos, movement::kMaxStepUp);
+        const std::optional<float> under = selectReachableFloor3(
+            seated.terrain, seated.wmo, std::nullopt, targetPos.z, movement::kMaxStepUp);
+        if (under && targetPos.z < *under) {
+            targetPos.z = *under;
+            lastGroundZ = *under;
+            hasRealGround_ = true;
+            grounded = true;
+            verticalVelocity = 0.0f;
+        }
+        return;
+    }
 
     // Ground the character to terrain or WMO floor
     // Skip entirely while swimming - the swim floor clamp handles vertical bounds.
