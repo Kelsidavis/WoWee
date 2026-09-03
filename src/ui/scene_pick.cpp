@@ -1,14 +1,12 @@
 #include "ui/scene_pick.hpp"
 
 #include "core/application.hpp"
-#include "core/logger.hpp"
 #include "core/coordinates.hpp"
 #include "game/game_handler.hpp"
 #include "game/entity.hpp"
 #include "rendering/camera.hpp"
 
 #include <algorithm>
-#include <set>
 #include <cmath>
 
 namespace wowee {
@@ -138,20 +136,6 @@ ScenePick pickScene(game::GameHandler& gameHandler,
         } else if (type == game::ObjectType::GAMEOBJECT) {
             const bool interactive = !goInfo || (goInfo->type != kGoTypeGeneric &&
                                                  goInfo->type != kGoTypeFishingHole);
-            // Said once per kind of object refused, and at warning because the
-            // default log carries nothing else: an object the ray hits and the
-            // picker will not name is invisible to every affordance downstream
-            // - no cursor, no name, no click - and from the chair that looks
-            // exactly like an object the ray missed.
-            if (!interactive) {
-                static core::LogBudget refusedBudget(8, "Pick: object refused as scenery");
-                static std::set<uint32_t> saidFor;
-                if (saidFor.insert(goInfo->entry).second && refusedBudget.take()) {
-                    LOG_WARNING("Pick: '", goInfo->name, "' entry=", goInfo->entry,
-                                " type=", goInfo->type,
-                                " is scenery to this client and takes no click");
-                }
-            }
             // How well the ray is aimed at this one, as a fraction of its own
             // size: nought is dead centre and one is a graze. Ranked by that
             // rather than by which centre is nearest along the ray, because
@@ -165,6 +149,12 @@ ScenePick pickScene(game::GameHandler& gameHandler,
                 pick.objectAim = aim;
                 pick.objectCenterT = centerT;
                 pick.objectGuid = guid;
+            }
+            // Named whatever it is. Scenery takes no click and still says what
+            // it is when the pointer is on it, which is how a sign is read.
+            if (aim < pick.namedObjectAim) {
+                pick.namedObjectAim = aim;
+                pick.namedObjectGuid = guid;
             }
         }
 

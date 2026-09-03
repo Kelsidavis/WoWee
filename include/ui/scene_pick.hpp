@@ -81,6 +81,16 @@ struct ScenePick {
     /// by - see the picker, and the scenery-at-the-elbow it exists to stop.
     float    objectAim = 1e30f;
 
+    /// The object best aimed at whether or not it can be used.
+    ///
+    /// A signpost, a banner, a shop's hanging board are GameObjectType 5 -
+    /// generic scenery - and nothing uses them in WoW either. What they do have
+    /// is a name, and reading it off the sign is the whole point of a sign:
+    /// "Mage Quarter", "Trias' Cheese", "Everyday Merchandise". Kept apart from
+    /// objectGuid so a click still cannot land on scenery.
+    uint64_t namedObjectGuid = 0;
+    float    namedObjectAim = 1e30f;
+
     /// The living win; a corpse is still selectable, but only when nothing alive
     /// was under the cursor - which is what makes a player standing on a body
     /// clickable, and what looting and skinning still need.

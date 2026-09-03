@@ -1172,17 +1172,27 @@ bool GameScreen::drawWorldObjectCursor(game::GameHandler& gameHandler,
     // resolve(), for the reason the vendor cursor gives: it is what a click
     // would act on, and asking the hover a different question puts the two
     // back into disagreement.
-    const uint64_t guid = pick.resolve();
+    //
+    // ...and where a click would act on nothing, the object the pointer is on
+    // anyway. A signpost, a banner, a shop's board are generic scenery: WoW
+    // uses none of them either, and all three carry the name that is the whole
+    // point of them - "Mage Quarter", "Everyday Merchandise". Named, with no
+    // cursor of its own, since nothing will happen if it is clicked.
+    uint64_t guid = pick.resolve();
+    const bool usable = guid != 0;
+    if (guid == 0) guid = pick.namedObjectGuid;
     if (guid == 0) return false;
     auto entity = gameHandler.getEntityManager().getEntity(guid);
     if (!entity || entity->getType() != game::ObjectType::GAMEOBJECT) return false;
 
     auto go = std::static_pointer_cast<game::GameObject>(entity);
     const auto* info = gameHandler.getCachedGameObjectInfo(go->getEntry());
-    VkDescriptorSet tex = cursorTexture(services_.assetManager, services_.window,
-                                        objectCursorPath(info ? info->type : 0u));
-    if (!tex) return false;
-    drawCursorTexture(tex);
+    if (usable) {
+        VkDescriptorSet tex = cursorTexture(services_.assetManager, services_.window,
+                                            objectCursorPath(info ? info->type : 0u));
+        if (!tex) return false;
+        drawCursorTexture(tex);
+    }
 
     // ...and what it is, beside the pointer, which is the whole of what the
     // real client shows for an object: a cursor saying what it is for and a
@@ -1193,6 +1203,9 @@ bool GameScreen::drawWorldObjectCursor(game::GameHandler& gameHandler,
         ImGui::BeginTooltip();
         ImGui::TextUnformatted(name.c_str());
         ImGui::EndTooltip();
+    } else if (!usable) {
+        // Scenery with nothing to say is not worth taking the pointer for.
+        return false;
     }
     return true;
 }
