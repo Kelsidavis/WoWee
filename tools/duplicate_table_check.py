@@ -32,11 +32,16 @@ without that the report is drowned by `{0, 0, 0, 0}` and by Vulkan struct
 initialisers, which repeat because the API is shaped that way and carry no
 knowledge to drift.
 
+A second pass compares tables of strings with the spelling taken out -
+case, spaces and punctuation dropped - so a set that drifted apart is
+still reported. That is how the four instance difficulties were found:
+"25 Normal" in the shared name, "25-Man" in the calendar and the lockout
+table, "25-Man Normal" in chat, one value named three ways.
+
 WHAT IT CANNOT SEE
 
-A table that was reworded - reordered, renamed, or written with different
-literal spellings of the same values. The contents are compared as text.
-`repeated_literal_check.py` is the angle for that.
+A table that was reordered or renamed, or one whose values were reworded
+rather than respelled. `repeated_literal_check.py` is the angle for that.
 
 Nor a table split across a struct and its initialiser, or built at runtime.
 """
@@ -112,6 +117,22 @@ def tables():
     return found
 
 
+def respelled_key(contents):
+    """The same table with its spelling taken out, or None if it is not one.
+
+    Strings only. Numbers respell into each other far too easily - 0x10 and
+    16 and 16.0f are one key under any normalisation worth the name - and a
+    table of them carries no wording to drift.
+    """
+    items = contents.split("|")
+    if not all(i.startswith('"') and i.endswith('"') for i in items):
+        return None
+    plain = [re.sub(r"[^a-z0-9]", "", i.lower()) for i in items]
+    if any(not p for p in plain):
+        return None
+    return "|".join(plain)
+
+
 def main() -> int:
     found = tables()
     if not found:
@@ -127,6 +148,24 @@ def main() -> int:
             continue
         dupes.append((len(contents.split("|")), contents, sites))
     dupes.sort(reverse=True)
+
+    # The same table under different spellings. Grouped after the exact pass
+    # so a group that is already reported there is not reported twice.
+    respelled = collections.defaultdict(dict)
+    for contents, sites in found.items():
+        key = respelled_key(contents)
+        if key is None:
+            continue
+        respelled[key].setdefault(contents, []).extend(sites)
+    drifted = []
+    for key, spellings in respelled.items():
+        if len(spellings) < 2:
+            continue
+        sites = [site for group in spellings.values() for site in group]
+        if all(name in skip for _, name in sites):
+            continue
+        drifted.append((len(key.split("|")), spellings))
+    drifted.sort(reverse=True)
 
     print(f"{len(found)} tables of {MIN_ITEMS}+ items with {MIN_DISTINCT}+ distinct values")
     print(f"{len(SETTLED)} group(s) settled and not reported\n")
@@ -144,6 +183,17 @@ def main() -> int:
         more = "" if len(sites) <= 4 else f", +{len(sites) - 4} more"
         print(f"  {count:3d} items  {where}{more}")
         print(f"            {contents[:100]}")
+
+    print(f"\n{len(drifted)} written out more than once with different spellings:")
+    if not drifted:
+        print("  (none)")
+    for count, spellings in drifted:
+        print(f"  {count:3d} items")
+        for contents, sites in sorted(spellings.items()):
+            where = ", ".join(f"{name} ({f})" for f, name in sorted(sites)[:3])
+            more = "" if len(sites) <= 3 else f", +{len(sites) - 3} more"
+            print(f"            {contents[:80]}")
+            print(f"              {where}{more}")
     return 0
 
 
