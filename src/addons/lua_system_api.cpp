@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 #include "game/group_defines.hpp"
+#include "core/open_url.hpp"
 #include "core/version.hpp"
 #include "core/config_paths.hpp"
 #include "ui/settings_schema.hpp"
@@ -4633,6 +4634,17 @@ static int lua_WoweeVersion(lua_State* L) {
     return 1;
 }
 
+// WoweeOpenURL(url) -> true when the browser was asked.
+//
+// The same opener a chat link uses, checks and all: http(s) only, safe ASCII
+// only, and no shell anywhere in it. The About box is the caller this was
+// added for, and its address is checked like any other.
+static int lua_WoweeOpenURL(lua_State* L) {
+    const char* url = luaL_checkstring(L, 1);
+    lua_pushboolean(L, core::openExternalUrl(url ? url : "") ? 1 : 0);
+    return 1;
+}
+
 // WoweeGetSetting(key) / WoweeSetSetting(key, value) - the values behind that
 // list. Strings both ways, as a CVar is.
 static int lua_WoweeGetSetting(lua_State* L) {
@@ -5022,6 +5034,7 @@ void registerSystemLuaAPI(lua_State* L) {
                 {"WoweeShowSettings",        lua_WoweeShowSettings},
                 {"WoweeSettingList",         lua_WoweeSettingList},
                 {"WoweeVersion",             lua_WoweeVersion},
+                {"WoweeOpenURL",             lua_WoweeOpenURL},
                 {"WoweeGetSetting",          lua_WoweeGetSetting},
                 {"WoweeSetSetting",          lua_WoweeSetSetting},
                 {"WoweeSaveVariables",       lua_WoweeSaveVariables},

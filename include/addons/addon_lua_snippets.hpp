@@ -937,6 +937,93 @@ end
 /// up - so the marker is telling the player something the dial already says.
 /// Minimap_UpdateRotationSetting shows it again every time the rotation setting
 /// is touched, so the hide is hooked onto that rather than done once.
+inline constexpr const char* kAboutMenuLua = R"LUA(
+-- An About entry in the game menu, between Exit Game and Return to Game.
+--
+-- The client already says who wrote it and where it lives, on a panel of its
+-- own that the game menu has no button for. This is the same three facts
+-- where a player would look for them, taken from the same places rather than
+-- typed again: the version comes from the build, so cutting a tag moves it.
+-- rawget, not _G[...]: an unknown global answers with a stand-in table here,
+-- so reading one to ask whether it exists says yes every time - which is how
+-- this snippet spent its first run returning at the first line.
+if not GameMenuFrame or rawget(_G, "GameMenuButtonWoweeAbout") then return end
+
+local kURL = "https://github.com/Kelsidavis/WoWee"
+local kAuthor = "Kelsi Davis"
+
+local function showAbout()
+    local frame = rawget(_G, "WoweeAboutFrame")
+    if not frame then
+        -- DialogBoxFrame is the interface's own bordered box, and it brings
+        -- the OKAY button that closes it.
+        frame = CreateFrame("Frame", "WoweeAboutFrame", UIParent, "DialogBoxFrame")
+        frame:SetWidth(400)
+        frame:SetHeight(230)
+        frame:SetPoint("CENTER")
+        frame:SetFrameStrata("FULLSCREEN_DIALOG")
+
+        local title = frame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+        title:SetPoint("TOP", frame, "TOP", 0, -22)
+        title:SetText("WoWee")
+
+        local version = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+        version:SetPoint("TOP", title, "BOTTOM", 0, -10)
+        version:SetText(WoweeVersion and WoweeVersion() or "")
+
+        local blurb = frame:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+        blurb:SetPoint("TOP", version, "BOTTOM", 0, -14)
+        blurb:SetText("A World of Warcraft client, written from scratch.")
+
+        local author = frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        author:SetPoint("TOP", blurb, "BOTTOM", 0, -14)
+        author:SetText("by " .. kAuthor)
+
+        local link = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        link:SetPoint("TOP", author, "BOTTOM", 0, -12)
+        link:SetText(kURL)
+        link:SetTextColor(0.4, 0.7, 1.0)
+
+        local open = CreateFrame("Button", "WoweeAboutOpenButton", frame,
+                                 "UIPanelButtonTemplate")
+        open:SetWidth(150)
+        open:SetHeight(22)
+        open:SetPoint("TOP", link, "BOTTOM", 0, -12)
+        open:SetText("Open in Browser")
+        open:SetScript("OnClick", function()
+            -- Refused rather than silently dropped: a browser that will not
+            -- start is worth a line, since the address is on screen to copy.
+            if not (WoweeOpenURL and WoweeOpenURL(kURL)) then
+                if DEFAULT_CHAT_FRAME then
+                    DEFAULT_CHAT_FRAME:AddMessage("WoWee: " .. kURL)
+                end
+            end
+        end)
+
+        -- Escape closes it, as it does every dialog the interface owns.
+        if UISpecialFrames then tinsert(UISpecialFrames, "WoweeAboutFrame") end
+    end
+    frame:Show()
+    frame:Raise()
+end
+
+local about = CreateFrame("Button", "GameMenuButtonWoweeAbout", GameMenuFrame,
+                          "GameMenuButtonTemplate")
+about:SetText("About")
+about:SetPoint("TOP", GameMenuButtonQuit, "BOTTOM", 0, -1)
+about:SetScript("OnClick", function()
+    HideUIPanel(GameMenuFrame)
+    showAbout()
+end)
+
+-- Return to Game keeps its gap below the list, and the frame grows by exactly
+-- the row that was added - one button and the single unit between buttons.
+GameMenuButtonContinue:ClearAllPoints()
+GameMenuButtonContinue:SetPoint("TOP", about, "BOTTOM", 0, -16)
+local rowHeight = about:GetHeight() or 21
+GameMenuFrame:SetHeight((GameMenuFrame:GetHeight() or 240) + rowHeight + 1)
+)LUA";
+
 inline constexpr const char* kMinimapNorthTagLua = R"LUA(
 -- Both of them, because which one is showing depends on a CVar.
 --

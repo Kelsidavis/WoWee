@@ -574,6 +574,11 @@ void AddonManager::giveCoinAmountsClearance() {
         LOG_WARNING("Missing uvars did not apply: ", luaEngine_.lastError());
     }
 
+    // Who wrote this client, in the menu that opens with Escape.
+    if (!luaEngine_.executeString(kAboutMenuLua)) {
+        LOG_WARNING("About menu entry did not apply: ", luaEngine_.lastError());
+    }
+
     // The compass N, which sits on top of this client's zone name.
     if (!luaEngine_.executeString(kMinimapNorthTagLua)) {
         LOG_WARNING("Minimap north tag did not apply: ", luaEngine_.lastError());
