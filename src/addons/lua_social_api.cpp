@@ -4,6 +4,7 @@
 #include <vector>
 #include "addons/lua_api_helpers.hpp"
 #include "game/reputation_standing.hpp"
+#include "game/stationery.hpp"
 #include "rendering/animation_controller.hpp"
 
 namespace wowee::addons {
@@ -1731,12 +1732,16 @@ void registerSocialLuaAPI(lua_State* L) {
                 {"GetStationeryInfo", [](lua_State* L) -> int {
                     if (static_cast<int>(luaL_optnumber(L, 1, 0)) != 1) return luaReturnNil(L);
                     lua_pushstring(L, "Default");
-                    lua_pushstring(L, "Default");   // STATIONERY_PATH..texture.."1"
+                    // The plain parchment, by the name its art carries:
+                    // STATIONERY_PATH..texture.."1" has to reach a file, and
+                    // "Default" reached none - so the letter being written had
+                    // the same black background the one being read did.
+                    lua_pushstring(L, game::stationeryTexture(1, 0));
                     lua_pushnil(L);                 // free
                     return 3;
                 }},
                 {"GetSelectedStationeryTexture", [](lua_State* L) -> int {
-                    lua_pushstring(L, "Default");
+                    lua_pushstring(L, game::stationeryTexture(1, 0));
                     return 1;
                 }},
                 // Which one is chosen is the frame's business - it keeps the

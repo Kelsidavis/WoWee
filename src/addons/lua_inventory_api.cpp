@@ -5,6 +5,7 @@
 #include "addons/lua_engine.hpp"
 #include "game/inventory_slots.hpp"
 #include "game/game_utils.hpp"
+#include "game/stationery.hpp"
 #include "game/auction_filters.hpp"
 #include "ui/framexml_takeover.hpp"
 #include "core/logger.hpp"
@@ -4815,9 +4816,13 @@ void registerInventoryLuaAPI(lua_State* L) {
                 //
                 // The third decides whether the frame offers to take anything,
                 // so a letter with coin or attachments in it needs to say so.
-                // The stationery is answered with nothing: the id is known but
-                // what art belongs to it is not, and a nil texture is an empty
-                // background rather than a wrong one.
+                //
+                // The stationery used to be answered with nothing, on the
+                // reasoning that an empty background beats a wrong one. It
+                // does not: the mail font is a dark brown meant for parchment,
+                // so an empty background is that text on black, which is the
+                // letter unreadable. The id is in the letter and the art is
+                // named for it in Stationery.dbc.
                 // Reading a letter is what marks it read, and nothing did it.
                 //
                 // mailMarkAsRead had one caller - this client's own mail
@@ -4836,7 +4841,7 @@ void registerInventoryLuaAPI(lua_State* L) {
             if (!mail) { return luaReturnNil(L); }
             if (!mail->read && mail->messageId != 0) gh->mailMarkAsRead(mail->messageId);
             lua_pushstring(L, mail->body.c_str());
-            lua_pushnil(L);
+            lua_pushstring(L, game::stationeryTexture(mail->stationeryId, mail->messageType));
             lua_pushboolean(L, (mail->money > 0 || !mail->attachments.empty()) ? 1 : 0);
             // Whether this is an auction house invoice, which was answered no
             // for every letter. OpenMail_Update asks here first and only calls

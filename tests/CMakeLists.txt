@@ -2072,6 +2072,13 @@ wowee_add_test(test_party_wire_codes
     SOURCES test_party_wire_codes.cpp
             ${TEST_COMMON_SOURCES})
 
+# ── test_stationery ──────────────────────────────────────────
+# The letterhead a letter is written on. Answering nil for it drew the mail
+# body's dark brown font on an empty black frame.
+wowee_add_test(test_stationery
+    SOURCES test_stationery.cpp
+            ${TEST_COMMON_SOURCES})
+
 # ── test_polygon_triangulate ─────────────────────────────────
 # Ear clipping for quest blob outlines, which are regularly concave. The
 # check is that the triangles cover the ring's own area and no more.
