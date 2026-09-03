@@ -988,10 +988,21 @@ std::string SocialHandler::getCurrentLfgDungeonName() const {
     return owner_.getLfgDungeonName(lfgDungeonId_);
 }
 
-bool SocialHandler::isInGuild() const {
-    if (!guildName_.empty()) return true;
+uint32_t SocialHandler::ownGuildId() const {
+    // The player's own field first: it is what the server keeps current, and
+    // the character list's copy was taken at login - before any guild joined
+    // or left since.
+    if (const uint32_t live = getEntityGuildId(owner_.getPlayerGuid())) return live;
     const Character* ch = owner_.getActiveCharacter();
-    return ch && ch->hasGuild();
+    return ch ? ch->guildId : 0;
+}
+
+bool SocialHandler::isInGuild() const {
+    // Three records, and the newest wins: a guild joined this session is in
+    // none of the others until the next login.
+    if (inGuild_) return true;
+    if (!guildName_.empty()) return true;
+    return ownGuildId() != 0;
 }
 
 uint32_t SocialHandler::getEntityGuildId(uint64_t guid) const {
@@ -1607,8 +1618,16 @@ void SocialHandler::setGuildOfficerNote(const std::string& name, const std::stri
 void SocialHandler::acceptGuildInvite() {
     if (owner_.getState() != WorldState::IN_WORLD || !owner_.getSocket()) return;
     pendingGuildInvite_ = false;
+    // What the invite called it, until the guild names itself: the roster that
+    // confirms the join does not carry a name, and the query that does needs
+    // an id the player only has once the server has moved them.
+    joinedGuildName_ = pendingGuildInviteGuildName_;
     auto packet = GuildAcceptPacket::build();
     owner_.getSocket()->send(packet);
+    // ...and the roster, which is what fills the social window's guild tab.
+    // The server sends the join event to the guild rather than a roster to the
+    // joiner, so nothing arrived unless something asked.
+    requestGuildRoster();
 }
 
 void SocialHandler::declineGuildInvite() {
@@ -2437,6 +2456,29 @@ void SocialHandler::handleGuildRoster(network::Packet& packet) {
     if (!owner_.getPacketParsers()->parseGuildRoster(packet, data)) return;
     guildRoster_ = std::move(data);
     hasGuildRoster_ = true;
+
+    // A roster is only sent to a member, so this is the server saying so.
+    //
+    // Joining mid-session left every record of membership untouched: the
+    // character list's guild id was taken at login and the guild name is only
+    // written for a character that already had one. So the social window's
+    // guild tab stayed empty for a player who had just accepted an invite, and
+    // stayed empty until the next login.
+    const bool newlyIn = !inGuild_;
+    inGuild_ = true;
+    if (guildName_.empty() && !joinedGuildName_.empty()) {
+        guildName_ = joinedGuildName_;
+    }
+    if (guildName_.empty()) {
+        // The name comes from the guild's own query, which needs the id - and
+        // the id is on the player now that the server has moved them.
+        if (const uint32_t id = ownGuildId()) queryGuildInfo(id);
+    }
+    if (newlyIn && owner_.addonEventCallbackRef()) {
+        // What the social window listens for to rebuild its guild tab. Without
+        // it the frame has a roster and no idea it is meant to draw one.
+        owner_.addonEventCallbackRef()("PLAYER_GUILD_UPDATE", {});
+    }
     // False: the roster in hand is the fresh one, so nothing should ask again.
     // The argument is "you may request a roster", and every reader answers it
     // with `if arg1 then GuildRoster() end` - friendsframe, the guild bank and
@@ -2490,8 +2532,10 @@ void SocialHandler::handleGuildQueryResponse(network::Packet& packet) {
             rememberGuildName(data.guildId, data.guildName);
         }
     }
-    const Character* ch = owner_.getActiveCharacter();
-    bool isLocalGuild = (ch && ch->hasGuild() && ch->guildId == data.guildId);
+    // Ours when it names the guild this character is actually in - which is
+    // the player's own field once they have joined one, not the character
+    // list's copy from login.
+    const bool isLocalGuild = (ownGuildId() != 0 && ownGuildId() == data.guildId);
     if (isLocalGuild) {
         const bool wasUnknown = guildName_.empty();
         guildName_ = data.guildName;

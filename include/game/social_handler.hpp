@@ -208,12 +208,27 @@ public:
     [[nodiscard]] const GuildRosterData& getGuildRoster() const { return guildRoster_; }
     [[nodiscard]] bool hasGuildRoster() const { return hasGuildRoster_; }
 
+    /// Membership the server has confirmed this session, for a guild joined
+    /// after login - which no record built at login can know about.
+    bool inGuild_ = false;
+    /// What the invite called it, kept until the guild names itself.
+    std::string joinedGuildName_;
+
+    /// The guild this character is in, by id, whichever record knows it.
+    ///
+    /// The character list is the record at login and goes stale the moment a
+    /// guild is joined or left mid-session; the player's own PLAYER_GUILDID
+    /// field is the one the server keeps current. Zero for a player in none.
+    [[nodiscard]] uint32_t ownGuildId() const;
+
     /// Forget which guild the player is in, for a character that is not them.
     ///
     /// Called as a character enters the world: the name, the ranks and the
     /// roster all belong to whoever was played last, and isInGuild() reads the
     /// name.
     void clearGuildMembership() {
+        inGuild_ = false;
+        joinedGuildName_.clear();
         guildName_.clear();
         guildRankNames_.clear();
         guildRoster_ = GuildRosterData{};
