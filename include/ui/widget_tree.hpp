@@ -250,6 +250,13 @@ struct Widget {
     float texCoordQuad[8] = {0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f};
     float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
     bool solidColor = false;    ///< SetTexture(r,g,b[,a]) rather than a file.
+    /// A unit's face, claimed by SetPortraitTexture.
+    ///
+    /// The interface's own portraits are circular images with transparent
+    /// corners, and the art around them is drawn to cover a circle. A live
+    /// render is a square with a corner in each of those places, so the
+    /// renderer draws one as a disc - see the live-texture branch.
+    bool isUnitPortrait = false;
 
     // Backdrop, the bordered panel look most of the original interface is
     // built from. The edge file is a strip of eight square tiles - verified

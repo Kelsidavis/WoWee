@@ -2344,6 +2344,47 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                                  ImVec2(q[6], q[7]),   // lower-right
                                  ImVec2(q[2], q[3]),   // lower-left
                                  packColor(w->color, w->alpha));
+            } else if (live && w->isUnitPortrait &&
+                       std::fabs((x1 - x0) - (y1 - y0)) <= 0.02f * (x1 - x0)) {
+                // A face, drawn as the disc the interface expects.
+                //
+                // Every portrait the interface draws is a circular image whose
+                // corners are transparent, and the art around one is cut to
+                // cover a circle and no more. A live render is a square, so
+                // its corners land wherever that art is thin - the target
+                // frame's lower left, where a corner of the model sat outside
+                // the ring. Masked here rather than in the render, because the
+                // same picture is drawn into square frames too: the character
+                // sheet's paper doll and the inspect window are the same
+                // model, and those are not circles.
+                constexpr int kSegments = 48;
+                const ImVec2 centre((x0 + x1) * 0.5f, (y0 + y1) * 0.5f);
+                const float rx = (x1 - x0) * 0.5f;
+                const float ry = (y1 - y0) * 0.5f;
+                const ImU32 col = packColor(w->color, w->alpha);
+                dl->PushTextureID(reinterpret_cast<ImTextureID>(tex));
+                dl->PrimReserve(kSegments * 3, kSegments + 1);
+                const unsigned int base = dl->_VtxCurrentIdx;
+                dl->PrimWriteVtx(centre,
+                                 ImVec2((uv0.x + uv1.x) * 0.5f, (uv0.y + uv1.y) * 0.5f),
+                                 col);
+                for (int i = 0; i < kSegments; ++i) {
+                    const float a = static_cast<float>(i) / kSegments * 6.2831853f;
+                    const float cs = std::cos(a);
+                    const float sn = std::sin(a);
+                    dl->PrimWriteVtx(
+                        ImVec2(centre.x + cs * rx, centre.y + sn * ry),
+                        ImVec2(uv0.x + (0.5f + 0.5f * cs) * (uv1.x - uv0.x),
+                               uv0.y + (0.5f + 0.5f * sn) * (uv1.y - uv0.y)),
+                        col);
+                }
+                for (int i = 0; i < kSegments; ++i) {
+                    dl->PrimWriteIdx(static_cast<ImDrawIdx>(base));
+                    dl->PrimWriteIdx(static_cast<ImDrawIdx>(base + 1 + i));
+                    dl->PrimWriteIdx(
+                        static_cast<ImDrawIdx>(base + 1 + ((i + 1) % kSegments)));
+                }
+                dl->PopTextureID();
             } else {
                 dl->AddImage(reinterpret_cast<ImTextureID>(tex),
                              ImVec2(x0, y0), ImVec2(x1, y1), uv0, uv1,

@@ -242,12 +242,16 @@ void WidgetTree::setPortraitUnit(uint32_t id, const std::string& unit) {
         // which is how the next target wore the player's face, and a game
         // object made it obvious by having no portrait of its own to overwrite
         // it with.
-        if (auto* w = get(id)) w->externalTexture = 0;
+        if (auto* w = get(id)) {
+            w->externalTexture = 0;
+            w->isUnitPortrait = false;
+        }
     }
 
     if (unit.empty()) return;
     portraitsByUnit_[unit].push_back(id);
     portraitUnitOf_[id] = unit;
+    if (auto* w = get(id)) w->isUnitPortrait = true;
 }
 
 const std::vector<uint32_t>& WidgetTree::portraitsFor(const std::string& unit) const {
