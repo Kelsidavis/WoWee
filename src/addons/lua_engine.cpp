@@ -831,8 +831,21 @@ int lua_Region_GetWidth(lua_State* L) {
     // has the effective scale in it and handing that back would have a script
     // that reads a width and sets it again shrink the frame every time.
     const float es = (w && w->effScale > 0.0f) ? w->effScale : 1.0f;
-    if (w && w->rectW <= 0.0f && w->width <= 0.0f &&
-        w->kind == wowee::ui::WidgetKind::FontString && !w->text.empty()) {
+    // A label sized by its own text, whose text has changed since it was last
+    // measured, is as wide as what it says now - not as wide as what it used
+    // to say.
+    //
+    // The measuring happens once a frame in the renderer, and the interface
+    // reads the width in the same breath as it writes the text:
+    // ChatEdit_UpdateHeader sets the header to "Guild:" or "To Someone:" and
+    // then insets the box by 15 plus that header's width. Answering last
+    // frame's width gave every category the same inset, so what was typed
+    // began under the longer ones.
+    const bool staleAutoSize =
+        w && w->kind == wowee::ui::WidgetKind::FontString && w->autoSized &&
+        !w->text.empty() && w->text != w->measuredText;
+    if (w && !w->text.empty() && w->kind == wowee::ui::WidgetKind::FontString &&
+        (staleAutoSize || (w->rectW <= 0.0f && w->width <= 0.0f))) {
         // A font string that was never given a width is as wide as its text.
         // That is what WoW answers, and the interface sizes things from it:
         // PanelTemplates_TabResize builds a tab's width out of
@@ -848,8 +861,14 @@ int lua_Region_GetWidth(lua_State* L) {
 int lua_Region_GetHeight(lua_State* L) {
     const auto* w = measuredWidgetOf(L, 1);
     const float es = (w && w->effScale > 0.0f) ? w->effScale : 1.0f;
-    if (w && w->rectH <= 0.0f && w->height <= 0.0f &&
-        w->kind == wowee::ui::WidgetKind::FontString && !w->text.empty()) {
+    // The same staleness as GetWidth: a label measured last frame is measured
+    // against last frame's text, and the interface reads a height it has just
+    // changed the text of.
+    const bool staleAutoSize =
+        w && w->kind == wowee::ui::WidgetKind::FontString && w->autoSized &&
+        !w->text.empty() && w->text != w->measuredText;
+    if (w && !w->text.empty() && w->kind == wowee::ui::WidgetKind::FontString &&
+        (staleAutoSize || (w->rectH <= 0.0f && w->height <= 0.0f))) {
         // A font string that was never given a height is as tall as its text,
         // the same way one never given a width is as wide as it - and the
         // interface reads that. `<Size x="160" y="0"/>` is how a wrapping
