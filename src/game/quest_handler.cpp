@@ -2500,11 +2500,15 @@ void QuestHandler::handleQuestPoiQueryResponse(network::Packet& packet) {
             if (pointCount == 0) continue;
             if (packet.getRemainingSize() < pointCount * 8) return;
             float sumX = 0.0f, sumY = 0.0f;
+            std::vector<std::pair<float, float>> outline;
+            outline.reserve(pointCount);
             for (uint32_t pt = 0; pt < pointCount; ++pt) {
                 const int32_t px = static_cast<int32_t>(packet.readUInt32());
                 const int32_t py = static_cast<int32_t>(packet.readUInt32());
                 sumX += static_cast<float>(px);
                 sumY += static_cast<float>(py);
+                // Canonical, the same swap the centroid below makes.
+                outline.emplace_back(static_cast<float>(py), static_cast<float>(px));
             }
             // Skip POIs for maps other than the player's current map.
             if (mapId != owner_.currentMapIdRef()) continue;
@@ -2519,6 +2523,9 @@ void QuestHandler::handleQuestPoiQueryResponse(network::Packet& packet) {
             poi.data = questId;
             poi.questObjectiveIndex = objIndex;
             poi.name = questTitle.empty() ? "Quest objective" : questTitle;
+            // Three points is the least that encloses anything. Fewer is a
+            // line or a dot, which the centroid already says.
+            if (outline.size() >= 3) poi.area = std::move(outline);
             LOG_DEBUG("Quest POI: questId=", questId, " mapId=", mapId,
                       " centroid=(", poi.x, ",", poi.y, ") title=", poi.name);
             if (gossipPois_.size() >= 200) gossipPois_.erase(gossipPois_.begin());

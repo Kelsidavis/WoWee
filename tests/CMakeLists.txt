@@ -2072,6 +2072,14 @@ wowee_add_test(test_party_wire_codes
     SOURCES test_party_wire_codes.cpp
             ${TEST_COMMON_SOURCES})
 
+# ── test_polygon_triangulate ─────────────────────────────────
+# Ear clipping for quest blob outlines, which are regularly concave. The
+# check is that the triangles cover the ring's own area and no more.
+wowee_add_test(test_polygon_triangulate
+    SOURCES test_polygon_triangulate.cpp
+            ${CMAKE_SOURCE_DIR}/src/rendering/polygon_triangulate.cpp
+            ${TEST_COMMON_SOURCES})
+
 # ── test_raid_mark_names ─────────────────────────────────────
 # The eight raid marker names, which /mark matches lowercase and the minimap
 # prints capitalised. They were written out three times; the words the

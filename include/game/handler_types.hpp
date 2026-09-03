@@ -315,6 +315,11 @@ struct GossipPoi {
     // SMSG_GOSSIP_POI; -1 identifies the quest endpoint/turn-in POI.
     int32_t  questObjectiveIndex = -2;
     std::string name;
+    /// The outline the server sent, canonical, in order. x and y above are its
+    /// centre; this is the shape the map shades when the quest is selected -
+    /// DrawQuestBlob in FrameXML. Empty for a gossip point, which is a place
+    /// rather than an area.
+    std::vector<std::pair<float, float>> area;
 };
 
 // ---- Instance lockouts ----

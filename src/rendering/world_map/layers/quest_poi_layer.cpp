@@ -3,11 +3,25 @@
 #include "rendering/world_map/layers/quest_poi_layer.hpp"
 #include "rendering/world_map/coordinate_projection.hpp"
 #include "core/coordinates.hpp"
+#include "rendering/polygon_triangulate.hpp"
 #include <imgui.h>
+#include <vector>
 
 namespace wowee {
 namespace rendering {
 namespace world_map {
+
+namespace {
+
+// The objective area, in the same teal the objective marker is drawn in: a
+// wash the map reads through, with a firmer edge so the shape is legible on
+// noisy ground.
+constexpr ImU32 kBlobFill = IM_COL32(0, 210, 255, 40);
+constexpr ImU32 kBlobEdge = IM_COL32(0, 210, 255, 150);
+
+}  // namespace
+
+using wowee::rendering::triangulateSimplePolygon;
 
 void QuestPOILayer::render(const LayerContext& ctx) {
     if (!pois_ || pois_->empty()) return;
@@ -16,6 +30,43 @@ void QuestPOILayer::render(const LayerContext& ctx) {
 
     ImVec2 mp = ImGui::GetMousePos();
     ImFont* qFont = ImGui::GetFont();
+
+    // The shaded areas first, so every marker sits on top of every blob
+    // rather than under the next one along.
+    const ImVec2 imgMax(ctx.imgMin.x + ctx.displayW, ctx.imgMin.y + ctx.displayH);
+    for (const auto& qp : *pois_) {
+        if (qp.area.size() < 3) continue;
+        std::vector<ImVec2> screen;
+        std::vector<glm::vec2> flat;
+        screen.reserve(qp.area.size());
+        flat.reserve(qp.area.size());
+        bool anyOnMap = false;
+        for (const auto& pt : qp.area) {
+            const glm::vec3 rPos = core::coords::canonicalToRender(glm::vec3(pt.x, pt.y, 0.0f));
+            const glm::vec2 uv = renderPosToMapUV(rPos, projection->bounds, projection->isContinent);
+            if (uv.x >= 0.0f && uv.x <= 1.0f && uv.y >= 0.0f && uv.y <= 1.0f) anyOnMap = true;
+            const float sx = ctx.imgMin.x + uv.x * ctx.displayW;
+            const float sy = ctx.imgMin.y + uv.y * ctx.displayH;
+            screen.push_back(ImVec2(sx, sy));
+            flat.push_back(glm::vec2(sx, sy));
+        }
+        // An area belonging to another part of the world is not drawn at all;
+        // one that only crosses the edge is drawn and cut off there, since
+        // clamping its points to the edge would change the shape.
+        if (!anyOnMap) continue;
+        ctx.drawList->PushClipRect(ctx.imgMin, imgMax, true);
+        // Cut into triangles rather than handed to AddConvexPolyFilled: a
+        // blob that follows a valley or wraps a lake is concave, and a convex
+        // fill of one paints over ground the objective is not on.
+        const auto tris = triangulateSimplePolygon(flat);
+        for (size_t i = 0; i + 2 < tris.size(); i += 3) {
+            ctx.drawList->AddTriangleFilled(screen[tris[i]], screen[tris[i + 1]],
+                                            screen[tris[i + 2]], kBlobFill);
+        }
+        ctx.drawList->AddPolyline(screen.data(), static_cast<int>(screen.size()),
+                                  kBlobEdge, ImDrawFlags_Closed, 1.5f);
+        ctx.drawList->PopClipRect();
+    }
     for (const auto& qp : *pois_) {
         glm::vec3 rPos = core::coords::canonicalToRender(
             glm::vec3(qp.wowX, qp.wowY, 0.0f));

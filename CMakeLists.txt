@@ -856,6 +856,7 @@ set(WOWEE_SOURCES
     # Rendering (Vulkan infrastructure)
     src/rendering/vk_context.cpp
     src/rendering/vk_utils.cpp
+    src/rendering/polygon_triangulate.cpp
     src/rendering/vk_shader.cpp
     src/rendering/vk_texture.cpp
     src/rendering/vk_buffer.cpp
@@ -2223,6 +2224,7 @@ add_executable(wowee_editor
     # Rendering core
     src/rendering/vk_context.cpp
     src/rendering/vk_utils.cpp
+    src/rendering/polygon_triangulate.cpp
     src/rendering/vk_shader.cpp
     src/rendering/vk_texture.cpp
     src/rendering/vk_buffer.cpp

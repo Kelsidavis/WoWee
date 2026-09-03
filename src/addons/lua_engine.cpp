@@ -3118,6 +3118,24 @@ int lua_Minimap_GetZoomLevels(lua_State* L) {
 /// centre, and turning them into a world position needs the map's view radius
 /// and the camera bearing - neither of which Lua can reach. So the request is
 /// parked on the widget and the frame loop, which has both, converts it.
+/// WorldMapBlobFrame:DrawQuestBlob(questId, show) - the shaded objective area.
+///
+/// FrameXML turns every quest's blob off as it rebuilds the map's quest list
+/// and turns one back on for the quest the player selected, so this is a set
+/// of one in practice. It was a no-op, which is why selecting a quest shaded
+/// nothing: the points were on the wire and in the POI list, and nothing ever
+/// asked for them.
+int lua_QuestBlobFrame_DrawQuestBlob(lua_State* L) {
+    auto* gh = wowee::addons::getGameHandler(L);
+    if (!gh) return 0;
+    const auto questId = static_cast<uint32_t>(luaL_optnumber(L, 2, 0));
+    if (questId == 0) return 0;
+    // Absent means show, as it does everywhere in this API.
+    const bool show = lua_isnone(L, 3) ? true : lua_toboolean(L, 3) != 0;
+    gh->setQuestBlobShown(questId, show);
+    return 0;
+}
+
 int lua_Minimap_PingLocation(lua_State* L) {
     if (auto* w = widgetOf(L, 1)) {
         w->pingX = static_cast<float>(luaL_optnumber(L, 2, 0));
@@ -5990,6 +6008,7 @@ void LuaEngine::registerCoreAPI() {
         {"GetZoom",         lua_Minimap_GetZoom},
         {"GetZoomLevels",   lua_Minimap_GetZoomLevels},
         {"PingLocation",    lua_Minimap_PingLocation},
+        {"DrawQuestBlob",   lua_QuestBlobFrame_DrawQuestBlob},
         {"GetCenter",       lua_Region_GetCenter},
         {"SetAlpha",        lua_Region_SetAlpha},
         {"GetAlpha",        lua_Region_GetAlpha},
@@ -6746,7 +6765,8 @@ void LuaEngine::registerCoreAPI() {
         "CallMethod=1,CanSaveTabardNow=1,ChildUpdate=1,Clear=1,ClearAllPoints=1,\n"
         "ClearBinding=1,ClearBindings=1,ClearFocus=1,ClearHistory=1,ClearLines=1,\n"
         "ClearModel=1,CreateFontString=1,CreatePlayerArrowFrame=1,\n"
-        "CreateTexture=1,CreateTitleRegion=1,CycleVariation=1,Disable=1,DrawQuestBlob=1,\n"
+        // DrawQuestBlob is a real binding now, applied after this set.
+        "CreateTexture=1,CreateTitleRegion=1,CycleVariation=1,Disable=1,\n"
         "Dress=1,Enable=1,EnableKeyboard=1,EnableMouse=1,EnableMouseWheel=1,\n"
         "EnableSubtitles=1,FadeOut=1,Free=1,GetAlpha=1,GetAnchorType=1,GetAttribute=1,\n"
         "GetBackdrop=1,GetBottom=1,GetButtonState=1,GetCenter=1,GetChecked=1,\n"
@@ -7391,7 +7411,10 @@ void LuaEngine::registerCoreAPI() {
         // Only the methods with no implementation behind them. Show, Hide,
         // SetScale and SetFrameLevel are real widget methods, and defining
         // them here would put a no-op table field in front of each.
-        "function WorldMapBlobFrame:DrawQuestBlob() end\n"
+        // DrawQuestBlob is a real binding now and must not be shadowed by a
+        // field on this table: worldmapframe.xml declares its own
+        // WorldMapBlobFrame over this one, and either way the method comes
+        // from the widget metatable.
         "function WorldMapBlobFrame:SetFillAlpha() end\n"
         "function WorldMapBlobFrame:SetBorderAlpha() end\n"
         // Nil rather than zero: the caller reads it as "are there blob

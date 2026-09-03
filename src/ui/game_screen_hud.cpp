@@ -672,6 +672,14 @@ void GameScreen::renderWorldMap(game::GameHandler& gameHandler) {
             qp.wowX = poi.x;
             qp.wowY = poi.y;
             qp.name = poi.name;
+            // The shaded area, for the quest the map has selected. Every
+            // objective of that quest gets its own, which is what the real
+            // client shades: DrawQuestBlob names a quest, not an objective.
+            if (poi.questObjectiveIndex >= 0 && !poi.area.empty() &&
+                gameHandler.isQuestBlobShown(poi.data)) {
+                qp.area.reserve(poi.area.size());
+                for (const auto& pt : poi.area) qp.area.emplace_back(pt.first, pt.second);
+            }
             if (poi.questObjectiveIndex == -1) {
                 // A quest POI with no objective index is the quest endpoint,
                 // not an objective area. Completed quests use a yellow ?,

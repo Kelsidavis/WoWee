@@ -2116,6 +2116,19 @@ public:
         if (changed) saveCharacterConfig();
     }
     const std::unordered_set<uint32_t>& getTrackedQuestIds() const;
+    /// The quests whose objective areas the world map shades.
+    ///
+    /// Set by WorldMapBlobFrame:DrawQuestBlob, which FrameXML calls with false
+    /// for every quest as it rebuilds the map's list and with true for the one
+    /// the player selected. View state, so it is not saved: the map decides it
+    /// again the moment it opens.
+    bool isQuestBlobShown(uint32_t questId) const {
+        return blobQuestIds_.count(questId) > 0;
+    }
+    void setQuestBlobShown(uint32_t questId, bool shown) {
+        if (shown) blobQuestIds_.insert(questId);
+        else       blobQuestIds_.erase(questId);
+    }
     bool isQuestQueryPending(uint32_t questId) const {
         return pendingQuestQueryIds_.count(questId) > 0;
     }
@@ -4537,6 +4550,7 @@ private:
     // to the QuestHandler - and has been removed.
     std::unordered_set<uint32_t> pendingQuestQueryIds_;
     std::unordered_set<uint32_t> trackedQuestIds_;
+    std::unordered_set<uint32_t> blobQuestIds_;
     bool pendingLoginQuestResync_ = false;
     float pendingLoginQuestResyncTimeout_ = 0.0f;
 

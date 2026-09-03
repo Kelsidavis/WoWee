@@ -150,6 +150,9 @@ struct QuestPOI {
     float wowX = 0, wowY = 0;  ///< Canonical WoW coordinates (centroid)
     std::string name;           ///< Quest title
     Kind kind = Kind::OBJECTIVE;
+    /// The objective's outline, canonical, when the map is shading it. Empty
+    /// for a marker that is only a point, and for a quest not selected.
+    std::vector<glm::vec2> area;
 };
 
 } // namespace world_map
