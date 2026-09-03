@@ -634,13 +634,28 @@ void GameScreen::renderWorldMap(game::GameHandler& gameHandler) {
         constexpr float kQuestGiverPoiMergeDistance = 15.0f;
         constexpr float kQuestGiverPoiMergeDistanceSq =
             kQuestGiverPoiMergeDistance * kQuestGiverPoiMergeDistance;
+        // Which quests the player is actually on. A quest POI outlives the
+        // quest that asked for it - the points are kept until the next answer
+        // for that quest, and abandoning one never comes with an answer - so
+        // without this an abandoned quest's objectives stay on the map.
+        std::unordered_set<uint32_t> questsInLog;
+        for (const auto& quest : gameHandler.getQuestLog()) {
+            if (quest.questId != 0) questsInLog.insert(quest.questId);
+        }
+        size_t objectivePois = 0;
         for (const auto& poi : gameHandler.getGossipPois()) {
-            // Keep ordinary gossip navigation POIs, but only include quest
-            // objectives/endpoints explicitly enabled from the tracker.
-            if (poi.questObjectiveIndex != -2 &&
-                !gameHandler.isQuestShownOnMap(poi.data)) {
+            // Keep ordinary gossip navigation POIs, and quest points for a
+            // quest in the log.
+            //
+            // This asked isQuestShownOnMap, a per-quest opt-in set by a
+            // checkbox in the client's own quest tracker. That tracker was
+            // handed to FrameXML and the checkbox went with it, leaving three
+            // readers of a set nothing could add to: no objective has been
+            // drawn on either map since.
+            if (poi.questObjectiveIndex != -2 && !questsInLog.count(poi.data)) {
                 continue;
             }
+            if (poi.questObjectiveIndex >= 0) ++objectivePois;
             bool duplicatesQuestGiver = false;
             for (const auto& existing : qpois) {
                 if (existing.kind == rendering::WorldMap::QuestPoi::Kind::OBJECTIVE) continue;
@@ -671,6 +686,17 @@ void GameScreen::renderWorldMap(game::GameHandler& gameHandler) {
                 }
             }
             qpois.push_back(std::move(qp));
+        }
+        // Said once, when the map has quests to show objectives for and no
+        // points to show: the server answers CMSG_QUEST_POI_QUERY from its own
+        // quest_poi table, and an empty one looks exactly like a client that
+        // is not drawing them.
+        static bool reportedNoObjectivePois = false;
+        if (objectivePois == 0 && !questsInLog.empty() && !reportedNoObjectivePois) {
+            reportedNoObjectivePois = true;
+            LOG_WARNING("World map: ", questsInLog.size(), " quest(s) in the log and no "
+                        "objective points for any of them - the server sent no quest POI "
+                        "data, so only quest givers and endpoints can be drawn");
         }
         wm->setQuestPois(std::move(qpois));
     }

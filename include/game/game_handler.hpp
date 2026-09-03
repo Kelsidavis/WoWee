@@ -2116,17 +2116,6 @@ public:
         if (changed) saveCharacterConfig();
     }
     const std::unordered_set<uint32_t>& getTrackedQuestIds() const;
-    bool isQuestShownOnMap(uint32_t questId) const {
-        return mapVisibleQuestIds_.count(questId) > 0;
-    }
-    void setQuestShownOnMap(uint32_t questId, bool shown) {
-        const bool changed = shown ? mapVisibleQuestIds_.insert(questId).second
-                                   : mapVisibleQuestIds_.erase(questId) > 0;
-        if (changed) saveCharacterConfig();
-    }
-    const std::unordered_set<uint32_t>& getMapVisibleQuestIds() const {
-        return mapVisibleQuestIds_;
-    }
     bool isQuestQueryPending(uint32_t questId) const {
         return pendingQuestQueryIds_.count(questId) > 0;
     }
@@ -4548,7 +4537,6 @@ private:
     // to the QuestHandler - and has been removed.
     std::unordered_set<uint32_t> pendingQuestQueryIds_;
     std::unordered_set<uint32_t> trackedQuestIds_;
-    std::unordered_set<uint32_t> mapVisibleQuestIds_;
     bool pendingLoginQuestResync_ = false;
     float pendingLoginQuestResyncTimeout_ = 0.0f;
 

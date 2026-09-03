@@ -1242,17 +1242,6 @@ void GameHandler::saveCharacterConfig() {
         out << "tracked_quests=" << ids << "\n";
     }
 
-    // Map visibility is independent from HUD tracking. An empty set means no
-    // quest objectives are shown on either map.
-    if (!mapVisibleQuestIds_.empty()) {
-        std::string ids;
-        for (uint32_t qid : mapVisibleQuestIds_) {
-            if (!ids.empty()) ids += ',';
-            ids += std::to_string(qid);
-        }
-        out << "map_visible_quests=" << ids << "\n";
-    }
-
     // Which reputation headers are closed. The server has no opinion about it,
     // so this file is the only place it can survive a logout.
     if (!collapsedFactionIds_.empty()) {
@@ -1282,7 +1271,6 @@ void GameHandler::loadCharacterConfig() {
     // These selections are per-character. Clear the previous character's
     // values even when the new character has no saved config yet.
     trackedQuestIds_.clear();
-    mapVisibleQuestIds_.clear();
 
     std::string path = getCharacterConfigDir() + "/" + ch->name + ".cfg";
     std::ifstream in(path);
@@ -1334,15 +1322,17 @@ void GameHandler::loadCharacterConfig() {
             } else if (key.substr(secondUnder + 1) == "icon" && !val.empty()) {
                 macroIcons_[macroId] = val;
             }
-        } else if ((key == "tracked_quests" || key == "map_visible_quests" ||
-                    key == "collapsed_factions" ||
+        } else if ((key == "tracked_quests" || key == "collapsed_factions" ||
                     key == "collapsed_skill_categories") && !val.empty()) {
             // Parse a comma-separated id list into the matching selection.
+            // map_visible_quests was a fourth of these and is no longer read:
+            // the quests whose objectives the maps draw are the ones in the
+            // log and the ones being tracked. An old file still carrying the
+            // key falls through to the unknown-key branch.
             auto& destination =
                   key == "tracked_quests"    ? trackedQuestIds_
                 : key == "collapsed_factions" ? collapsedFactionIds_
-                : key == "collapsed_skill_categories" ? collapsedSkillCategories_
-                                                      : mapVisibleQuestIds_;
+                                              : collapsedSkillCategories_;
             if (key == "collapsed_factions") reputationRowsDirty_ = true;
             destination.clear();
             size_t tqPos = 0;

@@ -108,11 +108,11 @@ void GameScreen::refreshQuestObjectiveCache(game::GameHandler& gameHandler) {
         signature ^= value;
         signature *= 1099511628211ull;
     };
-    const auto& mapVisible = gameHandler.getMapVisibleQuestIds();
-    mix(mapVisible.size());
+    const auto& tracked = gameHandler.getTrackedQuestIds();
+    mix(tracked.size());
     for (const auto& quest : gameHandler.getQuestLog()) {
         if (quest.complete || quest.questId == 0 ||
-            !mapVisible.count(quest.questId)) continue;
+            !tracked.count(quest.questId)) continue;
         mix(quest.questId);
         for (const auto& objective : quest.killObjectives) {
             if (objective.required == 0) continue;
@@ -131,7 +131,7 @@ void GameScreen::refreshQuestObjectiveCache(game::GameHandler& gameHandler) {
     minimapQuestGameObjectEntries_.clear();
     for (const auto& quest : gameHandler.getQuestLog()) {
         if (quest.complete || quest.questId == 0 ||
-            !mapVisible.count(quest.questId)) continue;
+            !tracked.count(quest.questId)) continue;
         for (const auto& objective : quest.killObjectives) {
             if (objective.required == 0 || objective.npcOrGoId == 0) continue;
             const uint32_t entry = static_cast<uint32_t>(objective.npcOrGoId > 0
@@ -923,10 +923,13 @@ void GameScreen::renderMinimapQuestKills(const MinimapFrame& frame, const Entity
         // Build map of NPC entry → (quest title, current, required) for tooltips
         struct KillInfo { std::string questTitle; uint32_t current = 0; uint32_t required = 0; };
         std::unordered_map<uint32_t, KillInfo> killInfoMap;
-        const auto& mapVisibleIds = gameHandler.getMapVisibleQuestIds();
+        // Tracked, not every quest in the log: this highlights live NPCs in
+        // the world, and a player with twenty quests wants the ones they are
+        // watching lit up rather than all of them.
+        const auto& trackedIds = gameHandler.getTrackedQuestIds();
         for (const auto& quest : gameHandler.getQuestLog()) {
             if (quest.complete) continue;
-            if (!mapVisibleIds.count(quest.questId)) continue;
+            if (!trackedIds.count(quest.questId)) continue;
             for (const auto& obj : quest.killObjectives) {
                 if (obj.npcOrGoId <= 0 || obj.required == 0) continue;
                 uint32_t npcEntry = static_cast<uint32_t>(obj.npcOrGoId);
@@ -984,8 +987,8 @@ void GameScreen::renderMinimapQuestKills(const MinimapFrame& frame, const Entity
 void GameScreen::renderMinimapGossipPois(const MinimapFrame& frame, game::GameHandler& gameHandler) {
     // Gossip POI markers (quest / NPC navigation targets)
     for (const auto& poi : gameHandler.getGossipPois()) {
-        if (poi.questObjectiveIndex != -2 &&
-            !gameHandler.isQuestShownOnMap(poi.data)) {
+        // A gossip target always, a quest's points while it is tracked.
+        if (poi.questObjectiveIndex != -2 && !gameHandler.isQuestTracked(poi.data)) {
             continue;
         }
         // Convert WoW canonical coords to render coords for minimap projection
