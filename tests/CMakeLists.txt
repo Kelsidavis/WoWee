@@ -619,6 +619,7 @@ wowee_add_test(test_tile_size_agreement
     SOURCES test_tile_size_agreement.cpp
             ${TEST_COMMON_SOURCES}
             ${CMAKE_SOURCE_DIR}/src/pipeline/terrain_mesh.cpp
+            ${CMAKE_SOURCE_DIR}/src/pipeline/adt_alpha.cpp
             ${CMAKE_SOURCE_DIR}/src/pipeline/adt_loader.cpp)
 
 # ── test_chunk_surface ───────────────────────────────────────
@@ -628,6 +629,7 @@ wowee_add_test(test_chunk_surface
     SOURCES test_chunk_surface.cpp
             ${TEST_COMMON_SOURCES}
             ${CMAKE_SOURCE_DIR}/src/pipeline/terrain_mesh.cpp
+            ${CMAKE_SOURCE_DIR}/src/pipeline/adt_alpha.cpp
             ${CMAKE_SOURCE_DIR}/src/pipeline/adt_loader.cpp)
 
 # ── test_spline_body ─────────────────────────────────────────

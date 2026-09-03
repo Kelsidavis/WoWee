@@ -1,4 +1,5 @@
 #include "pipeline/terrain_mesh.hpp"
+#include "pipeline/adt_alpha.hpp"
 #include <algorithm>
 #include "core/coordinates.hpp"
 #include "core/logger.hpp"
@@ -116,64 +117,29 @@ ChunkMesh TerrainMeshGenerator::generateChunkMesh(const MapChunk& chunk, int chu
         layerInfo.textureId = layer.textureId;
         layerInfo.flags = layer.flags;
 
-        // Extract alpha data for this layer if it has alpha
-        if (layer.useAlpha() && layer.offsetMCAL < chunk.alphaMap.size()) {
-            size_t offset = layer.offsetMCAL;
-
-            // Compute actual per-layer size from next layer's offset (not total remaining)
-            size_t layerSize;
-            bool foundNext = false;
-            for (size_t j = layerIdx + 1; j < chunk.layers.size(); j++) {
-                if (chunk.layers[j].useAlpha()) {
-                    layerSize = chunk.layers[j].offsetMCAL - offset;
-                    foundNext = true;
-                    break;
-                }
-            }
-            if (!foundNext) {
-                layerSize = chunk.alphaMap.size() - offset;
-            }
-
-            if (layer.compressedAlpha()) {
-                // Decompress RLE-compressed alpha map to 64x64 = 4096 bytes
-                layerInfo.alphaData.resize(4096, 0);
-                size_t readPos = offset;
-                size_t writePos = 0;
-
-                while (writePos < 4096 && readPos < chunk.alphaMap.size()) {
-                    uint8_t cmd = chunk.alphaMap[readPos++];
-                    bool fill = (cmd & 0x80) != 0;
-                    int count = (cmd & 0x7F) + 1;
-
-                    if (fill) {
-                        if (readPos < chunk.alphaMap.size()) {
-                            uint8_t val = chunk.alphaMap[readPos++];
-                            for (int i = 0; i < count && writePos < 4096; i++) {
-                                layerInfo.alphaData[writePos++] = val;
-                            }
-                        }
-                    } else {
-                        for (int i = 0; i < count && writePos < 4096 && readPos < chunk.alphaMap.size(); i++) {
-                            layerInfo.alphaData[writePos++] = chunk.alphaMap[readPos++];
-                        }
-                    }
-                }
-            } else if (layerSize >= 4096) {
-                // Big alpha: 64x64 at 8-bit = 4096 bytes
-                layerInfo.alphaData.resize(4096);
-                std::copy(chunk.alphaMap.begin() + offset,
-                         chunk.alphaMap.begin() + offset + 4096,
-                         layerInfo.alphaData.begin());
-            } else if (layerSize >= 2048) {
-                // Non-big alpha: 2048 bytes = 4-bit per texel, 64x64
-                // Each byte: low nibble = first texel, high nibble = second texel
-                // Scale 0-15 to 0-255 (multiply by 17)
-                layerInfo.alphaData.resize(4096);
-                for (size_t i = 0; i < 2048; i++) {
-                    uint8_t byte = chunk.alphaMap[offset + i];
-                    layerInfo.alphaData[i * 2]     = (byte & 0x0F) * 17;
-                    layerInfo.alphaData[i * 2 + 1] = (byte >> 4) * 17;
-                }
+        // The layer's alpha map, through the one decoder.
+        //
+        // This was a third copy of it - the header beside decodeLayerAlpha
+        // says it exists because two had already grown, and this is the one
+        // that was left. It is also the copy that reaches the screen: the
+        // renderer builds its blend textures from these. So the fix that fills
+        // a four-bit map's unpainted last row and column landed in the decoder
+        // the grass and the queries use, and the ground went on drawing a
+        // strip of something else along two sides of every chunk.
+        //
+        // Zero for what a layer's data does not reach, which is what this
+        // builder has always used: an absent alpha means the layer covers
+        // nothing, and the base layer beneath it shows through.
+        //
+        // And nothing at all when there is no map to decode. The renderer
+        // reads an empty one as "this layer covers everything under it" and
+        // hands it the opaque texture, so a map that failed to decode must
+        // leave the vector alone rather than fill it with zeroes - which would
+        // be the opposite instruction.
+        if (layer.useAlpha()) {
+            std::vector<uint8_t> decoded;
+            if (decodeLayerAlpha(chunk, layerIdx, decoded, 0)) {
+                layerInfo.alphaData = std::move(decoded);
             }
         }
 
