@@ -1917,9 +1917,8 @@ void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile
 
     auto hasRoadLikeTextureAt = [&](const pipeline::MapChunk& chunk, float fracX, float fracY) -> bool {
         if (chunk.layers.empty()) return false;
-        int alphaX = glm::clamp(static_cast<int>((fracX / 8.0f) * 63.0f), 0, 63);
-        int alphaY = glm::clamp(static_cast<int>((fracY / 8.0f) * 63.0f), 0, 63);
-        int alphaIndex = alphaY * 64 + alphaX;
+        const int alphaIndex =
+            static_cast<int>(pipeline::alphaTexelIndex(fracX / 8.0f, fracY / 8.0f));
 
         size_t numLayers = std::min(chunk.layers.size(), static_cast<size_t>(4));
         for (size_t layerIdx = 0; layerIdx < numLayers; ++layerIdx) {
@@ -1988,9 +1987,8 @@ void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile
                     float fracY = (nextRand() & 0xFFFFu) / kRand16Max * 8.0f;
 
                     if (hasAlpha && !alphaScratch.empty()) {
-                        int alphaX = glm::clamp(static_cast<int>((fracX / 8.0f) * 63.0f), 0, 63);
-                        int alphaY = glm::clamp(static_cast<int>((fracY / 8.0f) * 63.0f), 0, 63);
-                        int alphaIndex = alphaY * 64 + alphaX;
+                        const int alphaIndex = static_cast<int>(
+                            pipeline::alphaTexelIndex(fracX / 8.0f, fracY / 8.0f));
                         if (alphaIndex < 0 || alphaIndex >= static_cast<int>(alphaScratch.size())) continue;
                         if (alphaScratch[alphaIndex] < 64) {
                             alphaRejected++;
@@ -2326,27 +2324,14 @@ bool TerrainManager::isHoleAt(float glX, float glY) const {
 }
 
 bool TerrainManager::chunkHasHoles(float glX, float glY) const {
-    const float unitSize = CHUNK_SIZE / 8.0f;
-    (void)unitSize;
-
-    auto tileHasHoles = [&](const TerrainTile* tile) -> std::optional<bool> {
-        if (!tile || !tile->loaded) return std::nullopt;
-        int cy = static_cast<int>(std::floor((tile->maxX - glX) / CHUNK_SIZE));
-        int cx = static_cast<int>(std::floor((tile->maxY - glY) / CHUNK_SIZE));
-        if (cx < 0 || cx >= 16 || cy < 0 || cy >= 16) return std::nullopt;
-        return tile->terrain.getChunk(cx, cy).holes != 0;
-    };
-
-    const TileCoord tc = worldToTile(glX, glY);
-    auto it = loadedTiles.find(tc);
-    if (it != loadedTiles.end()) {
-        if (auto r = tileHasHoles(it->second.get())) return *r;
-    }
-    for (const auto& [coord, tile] : loadedTiles) {
-        if (coord == tc) continue;
-        if (auto r = tileHasHoles(tile.get())) return *r;
-    }
-    return false;
+    // Through the one finder, which was the third copy of "which chunk is
+    // under this point" in this file. This one took its index from the tile's
+    // corner and read it out of the array without checking the chunk it landed
+    // on - the same shape as the area lookup, and wrong in the same way at a
+    // tile's edge.
+    float fracX = 0.0f, fracY = 0.0f;
+    const pipeline::MapChunk* chunk = findChunkAt(glX, glY, fracX, fracY);
+    return chunk != nullptr && chunk->holes != 0;
 }
 
 std::optional<uint32_t> TerrainManager::getAreaIdAt(float glX, float glY) const {
@@ -2370,98 +2355,47 @@ std::optional<uint32_t> TerrainManager::getAreaIdAt(float glX, float glY) const 
 }
 
 std::optional<std::string> TerrainManager::getDominantTextureAt(float glX, float glY) const {
-    const float unitSize = CHUNK_SIZE / 8.0f;
+    // Through the one finder, which was the last copy of "which chunk is under
+    // this point" in this file: a bounds test against the chunk's own
+    // position, the two fractions, a guess and a widening search - findChunkAt
+    // to the line, written again inside two lambdas.
+    float fracX = 0.0f, fracY = 0.0f;
+    const TerrainTile* tile = nullptr;
+    const pipeline::MapChunk* chunk = findChunkAt(glX, glY, fracX, fracY, &tile);
+    if (!chunk || !tile || chunk->layers.empty()) return std::nullopt;
+
+    const int alphaIndex =
+        static_cast<int>(pipeline::alphaTexelIndex(fracX / 8.0f, fracY / 8.0f));
+
+    // What each layer is worth at that texel. The base is whatever the layers
+    // above it leave, which is how the renderer's own blend reads them.
     std::vector<uint8_t> alphaScratch;
-    auto sampleTileTexture = [&](const TerrainTile* tile) -> std::optional<std::string> {
-        if (!tile || !tile->loaded) return std::nullopt;
-
-        auto sampleChunkTexture = [&](int cx, int cy) -> std::optional<std::string> {
-            if (cx < 0 || cx >= 16 || cy < 0 || cy >= 16) return std::nullopt;
-            const auto& chunk = tile->terrain.getChunk(cx, cy);
-            if (!chunk.hasHeightMap() || chunk.layers.empty()) return std::nullopt;
-
-            float chunkMaxX = chunk.position[0];
-            float chunkMinX = chunk.position[0] - 8.0f * unitSize;
-            float chunkMaxY = chunk.position[1];
-            float chunkMinY = chunk.position[1] - 8.0f * unitSize;
-            if (glX < chunkMinX || glX > chunkMaxX || glY < chunkMinY || glY > chunkMaxY) {
-                return std::nullopt;
-            }
-
-            float fracY = (chunk.position[0] - glX) / unitSize;
-            float fracX = (chunk.position[1] - glY) / unitSize;
-            fracX = glm::clamp(fracX, 0.0f, 8.0f);
-            fracY = glm::clamp(fracY, 0.0f, 8.0f);
-
-            int alphaX = glm::clamp(static_cast<int>((fracX / 8.0f) * 63.0f), 0, 63);
-            int alphaY = glm::clamp(static_cast<int>((fracY / 8.0f) * 63.0f), 0, 63);
-            int alphaIndex = alphaY * 64 + alphaX;
-
-            int weights[4] = {0, 0, 0, 0};
-            size_t numLayers = std::min(chunk.layers.size(), static_cast<size_t>(4));
-            int accum = 0;
-            for (size_t layerIdx = 1; layerIdx < numLayers; layerIdx++) {
-                int alpha = 0;
-                if (decodeLayerAlpha(chunk, layerIdx, alphaScratch) && alphaIndex < static_cast<int>(alphaScratch.size())) {
-                    alpha = alphaScratch[alphaIndex];
-                }
-                weights[layerIdx] = alpha;
-                accum += alpha;
-            }
-            weights[0] = glm::clamp(255 - accum, 0, 255);
-
-            size_t bestLayer = 0;
-            int bestWeight = weights[0];
-            for (size_t i = 1; i < numLayers; i++) {
-                if (weights[i] > bestWeight) {
-                    bestWeight = weights[i];
-                    bestLayer = i;
-                }
-            }
-
-            uint32_t texId = chunk.layers[bestLayer].textureId;
-            if (texId < tile->terrain.textures.size()) {
-                return tile->terrain.textures[texId];
-            }
-            return std::nullopt;
-        };
-
-        int guessCy = glm::clamp(static_cast<int>(std::floor((tile->maxX - glX) / CHUNK_SIZE)), 0, 15);
-        int guessCx = glm::clamp(static_cast<int>(std::floor((tile->maxY - glY) / CHUNK_SIZE)), 0, 15);
-        for (int dy = -1; dy <= 1; dy++) {
-            for (int dx = -1; dx <= 1; dx++) {
-                auto tex = sampleChunkTexture(guessCx + dx, guessCy + dy);
-                if (tex) return tex;
-            }
+    int weights[4] = {0, 0, 0, 0};
+    const size_t numLayers = std::min(chunk->layers.size(), static_cast<size_t>(4));
+    int accum = 0;
+    for (size_t layerIdx = 1; layerIdx < numLayers; ++layerIdx) {
+        int alpha = 0;
+        if (decodeLayerAlpha(*chunk, layerIdx, alphaScratch) &&
+            alphaIndex < static_cast<int>(alphaScratch.size())) {
+            alpha = alphaScratch[alphaIndex];
         }
+        weights[layerIdx] = alpha;
+        accum += alpha;
+    }
+    weights[0] = glm::clamp(255 - accum, 0, 255);
 
-        for (int cy = 0; cy < 16; cy++) {
-            for (int cx = 0; cx < 16; cx++) {
-                auto tex = sampleChunkTexture(cx, cy);
-                if (tex) {
-                    return tex;
-                }
-            }
+    size_t bestLayer = 0;
+    int bestWeight = weights[0];
+    for (size_t i = 1; i < numLayers; ++i) {
+        if (weights[i] > bestWeight) {
+            bestWeight = weights[i];
+            bestLayer = i;
         }
-        return std::nullopt;
-    };
-
-    // Fast path: check expected containing tile first.
-    TileCoord tc = worldToTile(glX, glY);
-    auto it = loadedTiles.find(tc);
-    if (it != loadedTiles.end()) {
-        auto tex = sampleTileTexture(it->second.get());
-        if (tex) return tex;
     }
 
-    // Fallback: seam/edge case.
-    for (const auto& [coord, tile] : loadedTiles) {
-        if (coord == tc) continue;
-        auto tex = sampleTileTexture(tile.get());
-        if (tex) return tex;
-    }
-
-    return std::nullopt;
+    const uint32_t texId = chunk->layers[bestLayer].textureId;
+    if (texId >= tile->terrain.textures.size()) return std::nullopt;
+    return tile->terrain.textures[texId];
 }
 
 void TerrainManager::streamTiles() {

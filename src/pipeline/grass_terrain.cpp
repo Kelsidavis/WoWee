@@ -19,33 +19,12 @@ float clamp01(float v) {
     return std::clamp(v, 0.0f, 1.0f);
 }
 
-/// Bilinear sample of a decoded 64x64 alpha map, returned as 0..1.
-///
-/// Bilinear rather than nearest because this is what keeps suitability
-/// continuous. Point-sampling would step in 1/64ths of a chunk - about half a
-/// yard - and the grass would end along a straight line every time two
-/// textures met.
-float sampleAlpha(const std::vector<uint8_t>& alpha, float u, float v) {
-    if (alpha.size() < ALPHA_MAP_SIZE) return 0.0f;
-
-    const float fx = clamp01(u) * static_cast<float>(ALPHA_MAP_DIM - 1);
-    const float fy = clamp01(v) * static_cast<float>(ALPHA_MAP_DIM - 1);
-    const auto x0 = static_cast<size_t>(fx);
-    const auto y0 = static_cast<size_t>(fy);
-    const size_t x1 = std::min(x0 + 1, ALPHA_MAP_DIM - 1);
-    const size_t y1 = std::min(y0 + 1, ALPHA_MAP_DIM - 1);
-    const float tx = fx - static_cast<float>(x0);
-    const float ty = fy - static_cast<float>(y0);
-
-    const float a00 = static_cast<float>(alpha[y0 * ALPHA_MAP_DIM + x0]);
-    const float a10 = static_cast<float>(alpha[y0 * ALPHA_MAP_DIM + x1]);
-    const float a01 = static_cast<float>(alpha[y1 * ALPHA_MAP_DIM + x0]);
-    const float a11 = static_cast<float>(alpha[y1 * ALPHA_MAP_DIM + x1]);
-
-    const float top = a00 + (a10 - a00) * tx;
-    const float bottom = a01 + (a11 - a01) * tx;
-    return (top + (bottom - top) * ty) / 255.0f;
-}
+// The bilinear read of an alpha map now lives beside the decoder, as
+// pipeline::sampleAlpha - the terrain queries want the same mapping and had
+// their own nearest-texel copies of it. Bilinear rather than nearest is what
+// keeps suitability continuous: point-sampling steps in 1/64ths of a chunk -
+// about half a yard - and the grass would end along a straight line every time
+// two textures met.
 
 /// Slope at (u, v) from the chunk's compressed normals, as 1 - |normal.z|.
 ///

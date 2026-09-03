@@ -43,5 +43,26 @@ inline constexpr uint8_t ALPHA_COUNT_MASK = 0x7F;
 bool decodeLayerAlpha(const MapChunk& chunk, size_t layerIdx,
                       std::vector<uint8_t>& outAlpha, uint8_t unsetFill = 255);
 
+/// The texel a point in a chunk falls on, as an index into a decoded map.
+///
+/// `u` and `v` run 0 to 1 across the chunk. The span is the 63 painted texels
+/// rather than all 64 - the last row and column are a copy of the ones before
+/// them, see decodeLayerAlpha - so a point at the far edge lands on the last
+/// thing that was painted.
+///
+/// Written three times in terrain_manager alone: once for the ground clutter's
+/// road test, once for its scatter, once for the footstep sound's dominant
+/// texture. Three copies of one mapping is three places for it to drift from
+/// what the renderer's blend actually does.
+size_t alphaTexelIndex(float u, float v);
+
+/// The same map read between texels rather than at one.
+///
+/// What grows where has to agree with what is painted, and a nearest-texel
+/// read disagrees with the renderer's own filtering at exactly the places that
+/// matter - the edge of a road, where a blade either stands in the dirt or
+/// does not.
+float sampleAlpha(const std::vector<uint8_t>& alpha, float u, float v);
+
 } // namespace pipeline
 } // namespace wowee
