@@ -337,6 +337,85 @@ local function newWindow(spec)
         return h
     end
 
+    -- ── The bank's own bag slots ────────────────────────────────────────────
+    --
+    -- The seven slots a bank bag goes into, and the price of the next one.
+    -- They belong to the bank rather than to any bag in it, which is why they
+    -- are a row of their own under the grid rather than a section in it - and
+    -- they are the reason this window can replace FrameXML's: without them
+    -- there was no way to add a bag to the bank or to buy the space for one,
+    -- so both windows had to be up and both showed the same items.
+    local bagSlots, buySlot
+    if spec.bagSlots then
+        bagSlots = {}
+        for i = 1, (NUM_BANKBAGSLOTS or 7) do
+            local b = CreateFrame("Button", spec.frameName .. "BagSlot" .. i, f)
+            b:SetWidth(SLOT)
+            b:SetHeight(SLOT)
+            b:RegisterForClicks("LeftButtonUp")
+            b:RegisterForDrag("LeftButton")
+            b.slotIndex = i
+
+            b.icon = b:CreateTexture(nil, "BACKGROUND")
+            b.icon:SetAllPoints(b)
+
+            local function invSlot(self)
+                if not BankButtonIDToInvSlotID then return nil end
+                return BankButtonIDToInvSlotID(self.slotIndex, 1)
+            end
+
+            --- Picking a bag up and putting one down are the same call, as
+            --- they are for a slot in a bag. An unbought slot offers the
+            --- purchase instead, which is what clicking one does in the real
+            --- bank window.
+            local function useSlot(self)
+                local bought = GetNumBankSlots and GetNumBankSlots() or 0
+                if self.slotIndex > bought then
+                    if BankFrame and GetBankSlotCost then
+                        BankFrame.nextSlotCost = GetBankSlotCost()
+                    end
+                    if StaticPopup_Show then StaticPopup_Show("CONFIRM_BUY_BANK_SLOT") end
+                    return
+                end
+                local id = invSlot(self)
+                if id and PickupInventoryItem then PickupInventoryItem(id) end
+                WoweeAllBags_Update()
+            end
+
+            b:SetScript("OnClick", useSlot)
+            b:SetScript("OnReceiveDrag", useSlot)
+            b:SetScript("OnDragStart", useSlot)
+            b:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                local id = invSlot(self)
+                local bought = GetNumBankSlots and GetNumBankSlots() or 0
+                if self.slotIndex <= bought and id and
+                   GetInventoryItemTexture("player", id) then
+                    GameTooltip:SetInventoryItem("player", id)
+                elseif self.slotIndex <= bought then
+                    GameTooltip:SetText("Bank Bag Slot")
+                else
+                    GameTooltip:SetText("Buy this bag slot")
+                end
+                GameTooltip:Show()
+            end)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            bagSlots[i] = b
+        end
+
+        buySlot = CreateFrame("Button", spec.frameName .. "BuySlot", f,
+                              "UIPanelButtonTemplate")
+        buySlot:SetWidth(80)
+        buySlot:SetHeight(21)
+        buySlot:SetText("Buy Slot")
+        buySlot:SetScript("OnClick", function()
+            if BankFrame and GetBankSlotCost then
+                BankFrame.nextSlotCost = GetBankSlotCost()
+            end
+            if StaticPopup_Show then StaticPopup_Show("CONFIRM_BUY_BANK_SLOT") end
+        end)
+    end
+
     -- ── Redraw ──────────────────────────────────────────────────────────────
 
     function w.Update()
@@ -432,8 +511,53 @@ local function newWindow(spec)
         for i = usedHeaders + 1, #w.headers do w.headers[i]:Hide() end
 
         local rows = math.max(1, math.ceil(row))
+        local extra = 0
+
+        if bagSlots then
+            -- Under the grid, with a caption, and the price of the next slot
+            -- beside them. A slot not yet bought is drawn dark rather than
+            -- hidden, so the row says how much room there is left to buy.
+            usedHeaders = usedHeaders + 1
+            local h = sectionHeader(usedHeaders)
+            h:ClearAllPoints()
+            h:SetPoint("TOPLEFT", f, "TOPLEFT", EDGE,
+                       -(TOP + rows * (SLOT + PAD) + (usedHeaders - 1) * HEADER))
+            h:SetText("Bag Slots")
+            h:Show()
+
+            local bought = GetNumBankSlots and GetNumBankSlots() or 0
+            local top = TOP + rows * (SLOT + PAD) + usedHeaders * HEADER
+            for i, b in ipairs(bagSlots) do
+                b:ClearAllPoints()
+                b:SetPoint("TOPLEFT", f, "TOPLEFT",
+                           EDGE + (i - 1) * (SLOT + PAD), -top)
+                local id = BankButtonIDToInvSlotID and BankButtonIDToInvSlotID(i, 1)
+                local tex = (i <= bought and id) and
+                            GetInventoryItemTexture("player", id) or nil
+                if tex then
+                    b.icon:SetTexture(tex)
+                    b.icon:SetAlpha(1.0)
+                else
+                    b.icon:SetTexture("Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag")
+                    b.icon:SetAlpha(i <= bought and 0.7 or 0.25)
+                end
+                b.icon:Show()
+                b:Show()
+            end
+
+            if buySlot then
+                buySlot:ClearAllPoints()
+                buySlot:SetPoint("TOPLEFT", f, "TOPLEFT",
+                                 EDGE + #bagSlots * (SLOT + PAD) + 6,
+                                 -(top + 8))
+                if bought >= #bagSlots then buySlot:Hide() else buySlot:Show() end
+            end
+            extra = SLOT + PAD
+        end
+
         f:SetWidth(EDGE * 2 + cols * (SLOT + PAD) - PAD)
-        f:SetHeight(TOP + rows * (SLOT + PAD) - PAD + BOTTOM + usedHeaders * HEADER)
+        f:SetHeight(TOP + rows * (SLOT + PAD) - PAD + BOTTOM +
+                    usedHeaders * HEADER + extra)
 
         -- The size the player asked for, from the same control that used to
         -- size this client's own bag window.
@@ -521,6 +645,7 @@ local bank = newWindow{
     itemPrefix  = "WoweeBankItem",
     searchName  = "WoweeBankSearch",
     title       = "Bank",
+    bagSlots    = true,
     -- Clear of the bag window's own corner, so the two do not open on top of
     -- each other the first time both are up.
     defaultPoint = {"BOTTOMLEFT", UIParent, "BOTTOMLEFT", 40, 120},
@@ -686,6 +811,33 @@ ToggleKeyRing = function(...)
     end
     openOurs()
     WoweeAllBags_Update()
+end
+
+--- FrameXML's own bank window, while ours is the one on screen.
+---
+--- Two bank windows were up at a banker, looking different and holding the
+--- same items: BankFrame opens itself from BANKFRAME_OPENED, which nothing
+--- here goes through. In combined mode it stands down entirely - shown, it
+--- hides again, and its OnHide is skipped with it, because that handler calls
+--- CloseBankBagFrames, which is CloseBag 5 through 11, which would shut ours
+--- the instant it opened.
+---
+--- With separate bag windows on, none of this applies and Blizzard's bank is
+--- the bank, untouched.
+if BankFrame then
+    local wasOnShow = BankFrame:GetScript("OnShow")
+    local wasOnHide = BankFrame:GetScript("OnHide")
+    BankFrame:SetScript("OnShow", function(self, ...)
+        if not separateBags() then
+            self:Hide()
+            return
+        end
+        if wasOnShow then return wasOnShow(self, ...) end
+    end)
+    BankFrame:SetScript("OnHide", function(self, ...)
+        if not separateBags() then return end
+        if wasOnHide then return wasOnHide(self, ...) end
+    end)
 end
 
 SLASH_WOWEEALLBAGS1 = "/allbags"
