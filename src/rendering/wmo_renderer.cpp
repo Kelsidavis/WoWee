@@ -3212,14 +3212,34 @@ std::optional<float> WMORenderer::getFloorHeight(float glX, float glY, float glZ
     //
     // Falling through something looks the same whether the building was never
     // considered, considered and rejected by the height window, or considered
-    // and simply missed by the ray - and those need different fixes. Said at
-    // most once a second, and only when the query was over one at all.
+    // and simply missed by the ray - and those need different fixes.
+    //
+    // Once per place, not once a second. The floor is queried every frame, so
+    // a player standing on a spot with no floor under it wrote the same line
+    // with the same three coordinates for as long as they stood there - a
+    // second apart, forever - and the second line said nothing the first did
+    // not. A place is a couple of units across, and after enough of them the
+    // report says so and stops: a run that is finding hundreds has one
+    // problem, not hundreds.
     if (!bestFloor && overlappedInXY) {
-        using Clock = std::chrono::steady_clock;
-        static Clock::time_point lastAt{};
-        const auto now = Clock::now();
-        if (now - lastAt > std::chrono::seconds(1)) {
-            lastAt = now;
+        struct ReportedPlace { float x, y, z; };
+        static std::vector<ReportedPlace> reported;
+        static bool reportedCap = false;
+        constexpr float kSamePlace = 2.0f;
+        constexpr size_t kMaxPlaces = 32;
+        const bool seenHere = std::any_of(
+            reported.begin(), reported.end(), [&](const ReportedPlace& p) {
+                const float dx = p.x - glX, dy = p.y - glY, dz = p.z - glZ;
+                return dx * dx + dy * dy + dz * dz <= kSamePlace * kSamePlace;
+            });
+        if (!seenHere && reported.size() >= kMaxPlaces) {
+            if (!reportedCap) {
+                reportedCap = true;
+                LOG_WARNING("No WMO floor: ", kMaxPlaces, " places reported and no more "
+                            "will be - this is one problem, not ", kMaxPlaces, " of them");
+            }
+        } else if (!seenHere) {
+            reported.push_back({glX, glY, glZ});
             if (rejectedByZ) {
                 LOG_WARNING("No WMO floor at (", glX, ",", glY, ",", glZ,
                             ") - a building covers that spot but its height window "
