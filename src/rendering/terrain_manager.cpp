@@ -1469,11 +1469,24 @@ void TerrainManager::processReadyTiles() {
         bool done = advanceFinalization(ft);
         const float stepMs = std::chrono::duration<float, std::milli>(
             std::chrono::steady_clock::now() - stepStart).count();
+        // Reported the first time a phase overruns, and after that only when
+        // it overruns worse than it ever has. Every tile streamed in runs
+        // every phase, so a phase that is over budget is over budget for as
+        // long as the player keeps walking - seventeen lines in a minute here,
+        // saying the same thing about the same phase. What is worth a line is
+        // a new worst case.
         if (stepMs > budgetMs) {
-            LOG_WARNING("Terrain finalize step overran: ", phaseName(phaseBefore),
-                        " took ", stepMs, "ms (budget ", budgetMs, "ms) tile=[",
-                        ft.pending ? ft.pending->coord.x : -1, ",",
-                        ft.pending ? ft.pending->coord.y : -1, "]");
+            static std::unordered_map<int, float> worstByPhase;
+            const int phaseKey = static_cast<int>(phaseBefore);
+            auto it = worstByPhase.find(phaseKey);
+            if (it == worstByPhase.end() || stepMs > it->second) {
+                worstByPhase[phaseKey] = stepMs;
+                LOG_WARNING("Terrain finalize step overran: ", phaseName(phaseBefore),
+                            " took ", stepMs, "ms (budget ", budgetMs, "ms) tile=[",
+                            ft.pending ? ft.pending->coord.x : -1, ",",
+                            ft.pending ? ft.pending->coord.y : -1,
+                            "] - said again only if it gets worse");
+            }
         }
         if (done) {
             finalizingTiles_.pop_front();

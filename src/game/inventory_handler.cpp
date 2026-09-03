@@ -2396,8 +2396,12 @@ void InventoryHandler::fireBagUpdates() {
     // loaded at startup, and capping the count spent them all there - leaving
     // nothing to say for the drag that prompted the question.
     static double lastSaid = 0.0;
+    // ...and an end to it. The rate limit keeps the startup burst from
+    // spending the count, and the budget keeps a session of looting from
+    // writing this every two seconds until the player logs out.
+    static core::LogBudget bagUpdateBudget(8, "BAG_UPDATE + UNIT_INVENTORY_CHANGED");
     const double now = core::appTimeSeconds();
-    if (now - lastSaid > 2.0) {
+    if (now - lastSaid > 2.0 && bagUpdateBudget.take()) {
         lastSaid = now;
         LOG_WARNING("BAG_UPDATE + UNIT_INVENTORY_CHANGED fired");
     }

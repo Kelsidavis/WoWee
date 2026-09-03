@@ -163,8 +163,9 @@ std::optional<float> movingEntityFloor(rendering::Renderer* renderer,
     if (best && previousRenderPos &&
         std::abs(*best - previousRenderPos->z) > 1.0f) {
         static std::chrono::steady_clock::time_point lastFloorJumpLog{};
+        static core::LogBudget floorJumpBudget(12, "Floor jump");
         const auto now = std::chrono::steady_clock::now();
-        if (now - lastFloorJumpLog > std::chrono::seconds(1)) {
+        if (now - lastFloorJumpLog > std::chrono::seconds(1) && floorJumpBudget.take()) {
             lastFloorJumpLog = now;
             std::optional<float> terrainF, wmoF, m2F;
             if (auto* t = renderer->getTerrainManager())
@@ -2865,8 +2866,10 @@ void Application::applyServerMovementState(float deltaTime) {
             const float dz = renderPos.z - lastZ;
             if (std::abs(dz) > 0.15f && std::abs(lastDz) > 0.15f &&
                 ((dz > 0.0f) != (lastDz > 0.0f))) {
+                static core::LogBudget reversalBudget(12, "Player Z reversal");
                 const auto now = std::chrono::steady_clock::now();
-                if (now - lastRevLog > std::chrono::milliseconds(250)) {
+                if (now - lastRevLog > std::chrono::milliseconds(250) &&
+                    reversalBudget.take()) {
                     lastRevLog = now;
                     LOG_WARNING("Player Z reversal: z=", renderPos.z,
                                 " step=", dz, " prevStep=", lastDz,
@@ -4529,8 +4532,10 @@ void Application::render() {
             // appears exactly when someone is wondering why nothing happened.
             if (overClientUi && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
                 static double lastSaid = 0.0;
+                static core::LogBudget heldBudget(
+                    5, "WidgetInput: click held over this client's own window");
                 const double now = ImGui::GetTime();
-                if (now - lastSaid > 1.0) {
+                if (now - lastSaid > 1.0 && heldBudget.take()) {
                     lastSaid = now;
                     LOG_WARNING("WidgetInput: click held over this client's own "
                                 "window, so it was not passed to the interface");

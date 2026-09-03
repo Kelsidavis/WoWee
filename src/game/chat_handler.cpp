@@ -1,4 +1,6 @@
 #include "game/chat_handler.hpp"
+
+#include <set>
 #include "addons/lua_api_registrations.hpp"
 #include "game/chat_filters.hpp"
 #include "game/text_tokens.hpp"
@@ -819,15 +821,18 @@ void ChatHandler::deliverChatMessage(MessageChatData data, bool alreadyWaited) {
                                                      : "";
         // Says a line reached the interface at all. A blank chat window is
         // either nothing arriving or something arriving and not being drawn,
-        // and those have opposite causes with the same appearance. Rate
-        // limited, because a busy channel would otherwise fill the log.
+        // and those have opposite causes with the same appearance.
+        //
+        // Once per event name, not once every two seconds: what is being
+        // asked is whether a SAY, a YELL, a WHISPER reaches the interface,
+        // and the second SAY answers nothing the first did. Rate limiting it
+        // wrote one of these every two seconds for as long as anyone in the
+        // zone was talking.
         {
-            static double lastSaid = 0.0;
-            const double now = core::appTimeSeconds();
-            if (now - lastSaid > 2.0) {
-                lastSaid = now;
+            static std::set<std::string> saidFor;
+            if (saidFor.size() < 32 && saidFor.insert(eventName).second) {
                 LOG_WARNING("Chat: fired ", eventName, " to the interface from '",
-                            data.senderName, "'");
+                            data.senderName, "' - said once per event name");
             }
         }
         // arg2 is the name the interface prints, and for an outgoing whisper
@@ -1173,11 +1178,11 @@ void ChatHandler::fireChatEvent(const MessageChatData& msg) {
     // The name, for the reason handleMessageChat gives: a number here is
     // printed as a language header in front of every line.
     {
-        static double lastSaid = 0.0;
-        const double now = core::appTimeSeconds();
-        if (now - lastSaid > 2.0) {
-            lastSaid = now;
-            LOG_WARNING("Chat: fired ", eventName, " to the interface (local)");
+        // Once per event name, for the reason the remote path above gives.
+        static std::set<std::string> saidForLocal;
+        if (saidForLocal.size() < 32 && saidForLocal.insert(eventName).second) {
+            LOG_WARNING("Chat: fired ", eventName, " to the interface (local)"
+                        " - said once per event name");
         }
     }
     // The channel's index, which the chat frame builds "CHANNEL"..arg8 out of

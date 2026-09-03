@@ -10313,17 +10313,25 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
         }
     }
 
-    // What a press landed on, once a second while one is held. The question
-    // "did my click reach anything" has no other answer from outside.
+    // What a press landed on. The question "did my click reach anything" has
+    // no other answer from outside.
+    //
+    // Said when the answer changes, not once a second while a button is held:
+    // a held button is one press, and clicking the world to move is the same
+    // answer every time. A minute of ordinary play wrote 27 of these, all of
+    // them "hit nothing", which is one fact.
     if (buttons.left) {
         static double lastPress = 0.0;
+        static std::string lastAnswer;
         const double now = core::appTimeSeconds();
-        if (now - lastPress > 1.0) {
+        const auto* w = widgets_.get(hit);
+        const std::string answer =
+            hit == 0 ? "nothing"
+                     : (w && !w->name.empty() ? w->name : std::string("(unnamed)"));
+        if (answer != lastAnswer && now - lastPress > 1.0) {
             lastPress = now;
-            const auto* w = widgets_.get(hit);
-            LOG_WARNING("WidgetInput: press at (", x, ",", y, ") hit ",
-                        hit == 0 ? "nothing"
-                                 : (w && !w->name.empty() ? w->name.c_str() : "(unnamed)"));
+            lastAnswer = answer;
+            LOG_WARNING("WidgetInput: press at (", x, ",", y, ") hit ", answer);
         }
     }
 
