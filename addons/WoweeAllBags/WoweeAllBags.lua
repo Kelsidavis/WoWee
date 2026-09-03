@@ -275,6 +275,13 @@ local function newWindow(spec)
 
         b:SetScript("OnEnter", function(self)
             if not self.bag then return end
+            -- An empty slot says nothing. The tooltip was shown for every slot
+            -- the pointer crossed, so an empty square carried whatever the
+            -- last item under the cursor had said.
+            if not GetContainerItemInfo(self.bag, self.slot) then
+                GameTooltip:Hide()
+                return
+            end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetBagItem(self.bag, self.slot)
             GameTooltip:Show()

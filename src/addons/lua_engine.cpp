@@ -2984,7 +2984,17 @@ int lua_Tooltip_SetBagItem(lua_State* L) {
     const auto& inv = gh->getInventory();
     const auto& s = (bag == 0) ? inv.getBackpackSlot(slot - 1)
                                : inv.getBagSlot(bag - 1, slot - 1);
-    if (s.empty()) { lua_pushboolean(L, 0); return 1; }
+    if (s.empty()) {
+        // An empty slot has nothing to describe, and what was there a moment
+        // ago is not it. Answering false and leaving the lines alone meant a
+        // caller that shows the tooltip anyway - which is what a bag window
+        // does, one call for every slot it draws - showed the last item's
+        // tooltip over an empty square.
+        w->tooltipLines.clear();
+        w->shown = false;
+        lua_pushboolean(L, 0);
+        return 1;
+    }
     // Through the fuller builder, with the slot's own copy of the item as the
     // floor: the slot knows the name and quality even for an entry no
     // GetItemInfo has arrived for, and answering nothing there would be worse
