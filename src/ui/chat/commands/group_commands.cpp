@@ -4,6 +4,7 @@
 //                 /lootthreshold, /mark, /roll
 // Moved from ChatPanel::sendChatMessage() if/else chain (Phase 3).
 #include "game/group_defines.hpp"
+#include "ui/chat/chat_utils.hpp"
 #include "ui/chat/i_chat_command.hpp"
 #include "ui/chat_panel.hpp"
 #include "game/game_handler.hpp"
@@ -195,11 +196,9 @@ public:
         for (const auto& lo : lockouts) {
             std::string name = ctx.gameHandler.getMapName(lo.mapId);
             if (name.empty()) name = "Instance " + std::to_string(lo.mapId);
-            static const char* kDifficulties[] = {"Normal", "Heroic",
-                                                  "25-Man Normal", "25-Man Heroic"};
-            if (lo.difficulty < 4) {
+            if (const char* difficulty = game::instanceDifficultyName(lo.difficulty)) {
                 name += " (";
-                name += kDifficulties[lo.difficulty];
+                name += difficulty;
                 name += ")";
             }
             // Days and hours, which is the granularity a lockout is read at.
@@ -339,21 +338,28 @@ public:
             ctx.gameHandler.addLocalChatMessage(noTgt);
             return {};
         }
-        static constexpr const char* kMarkWords[] = {
-            "star", "circle", "diamond", "triangle", "moon", "square", "cross", "skull"
-        };
+        // The eight names, lowercased for matching and for the line that
+        // lists them. They are spelled once, in group_defines.hpp.
+        std::string markList;
+        for (uint32_t mi = 0; mi < game::kRaidMarkCount; ++mi) {
+            if (!markList.empty()) markList += ' ';
+            markList += ui::chat_utils::toLower(game::raidMarkName(static_cast<uint8_t>(mi)));
+        }
         uint8_t icon = 7; // default: skull
         if (!ctx.args.empty()) {
-            std::string argLow = ctx.args;
-            for (auto& c : argLow) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            std::string argLow = ui::chat_utils::toLower(ctx.args);
             while (!argLow.empty() && argLow.front() == ' ') argLow.erase(argLow.begin());
             if (argLow == "clear" || argLow == "0" || argLow == "none") {
                 ctx.gameHandler.setRaidMark(ctx.gameHandler.getTargetGuid(), 0xFF);
                 return {};
             }
             bool found = false;
-            for (int mi = 0; mi < 8; ++mi) {
-                if (argLow == kMarkWords[mi]) { icon = static_cast<uint8_t>(mi); found = true; break; }
+            for (uint32_t mi = 0; mi < game::kRaidMarkCount; ++mi) {
+                if (argLow == ui::chat_utils::toLower(game::raidMarkName(static_cast<uint8_t>(mi)))) {
+                    icon = static_cast<uint8_t>(mi);
+                    found = true;
+                    break;
+                }
             }
             if (!found && !argLow.empty() && argLow[0] >= '1' && argLow[0] <= '8') {
                 icon = static_cast<uint8_t>(argLow[0] - '1');
@@ -363,7 +369,7 @@ public:
                 game::MessageChatData badArg;
                 badArg.type = game::ChatType::SYSTEM;
                 badArg.language = game::ChatLanguage::UNIVERSAL;
-                badArg.message = "Unknown mark. Use: star circle diamond triangle moon square cross skull";
+                badArg.message = "Unknown mark. Use: " + markList;
                 ctx.gameHandler.addLocalChatMessage(badArg);
                 return {};
             }

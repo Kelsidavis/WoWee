@@ -400,13 +400,8 @@ void WindowManager::renderInstanceLockouts(game::GameHandler& gameHandler) {
         ImGui::TextColored(kColorGray, "No active instance lockouts.");
     } else {
         auto difficultyLabel = [](uint32_t diff) -> const char* {
-            switch (diff) {
-                case 0: return "Normal";
-                case 1: return "Heroic";
-                case 2: return "25-Man";
-                case 3: return "25-Man Heroic";
-                default: return "Unknown";
-            }
+            const char* name = game::instanceDifficultyName(diff);
+            return name ? name : "Unknown";
         };
 
         // Current UTC time for reset countdown

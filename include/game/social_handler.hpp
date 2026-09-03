@@ -438,7 +438,7 @@ public:
     }
 
     // Raid target markers (0-7: Star, Circle, Diamond, Triangle, Moon, Square, Cross, Skull)
-    static constexpr uint32_t kRaidMarkCount = 8;
+    static constexpr uint32_t kRaidMarkCount = game::kRaidMarkCount;
     [[nodiscard]] uint64_t getRaidMarkGuid(uint32_t icon) const {
         return (icon < kRaidMarkCount) ? raidTargetGuids_[icon] : 0;
     }

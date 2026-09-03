@@ -3,13 +3,16 @@
 #include <vulkan/vulkan.h>
 #include <cstdint>
 
+#include "game/group_defines.hpp"
+
 namespace wowee {
 namespace pipeline { class AssetManager; }
 namespace ui {
 
 /// Number of raid target markers: Star, Circle, Diamond, Triangle, Moon,
 /// Square, Cross, Skull - in that order, matching the server's icon indices.
-inline constexpr uint8_t kRaidTargetIconCount = 8;
+inline constexpr uint8_t kRaidTargetIconCount =
+    static_cast<uint8_t>(game::kRaidMarkCount);
 
 /**
  * Blizzard raid target marker artwork for an icon index, ready to hand to

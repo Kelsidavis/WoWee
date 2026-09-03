@@ -64,6 +64,27 @@ inline const char* instanceDifficultyName(uint32_t difficulty) {
     return difficulty < 4 ? kByDifficulty[difficulty] : nullptr;
 }
 
+/// How many raid target markers there are.
+///
+/// GameHandler and SocialHandler each declared their own kRaidMarkCount and
+/// the icon loader a third, kRaidTargetIconCount. All three are the count of
+/// the marks the server indexes, so it is written here and the others name it.
+inline constexpr uint32_t kRaidMarkCount = 8;
+
+/// What a raid target marker is called, or null for a value that is not one.
+///
+/// Written out capitalised for the minimap's tooltip and lowercase for what
+/// /mark matches, plus a third time inside that command's help line - one set
+/// of eight words under two spellings. The display spelling lives here and
+/// the command lowercases what it compares against it.
+inline const char* raidMarkName(uint8_t mark) {
+    static constexpr const char* kByMark[] = {
+        "Star", "Circle", "Diamond", "Triangle",
+        "Moon", "Square", "Cross", "Skull",
+    };
+    return mark < kRaidMarkCount ? kByMark[mark] : nullptr;
+}
+
 /// Whether a group's type says raid.
 ///
 /// The field changed meaning between expansions and the client tested it as a

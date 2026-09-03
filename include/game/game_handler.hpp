@@ -1891,7 +1891,7 @@ public:
 
     // Raid target markers (MSG_RAID_TARGET_UPDATE)
     // Icon indices 0-7: Star, Circle, Diamond, Triangle, Moon, Square, Cross, Skull
-    static constexpr uint32_t kRaidMarkCount = 8;
+    static constexpr uint32_t kRaidMarkCount = game::kRaidMarkCount;
     // Both read SocialHandler's marks - the state MSG_RAID_TARGET_UPDATE writes.
     // Returns the GUID marked with the given icon (0 = no mark)
     uint64_t getRaidMarkGuid(uint32_t icon) const;

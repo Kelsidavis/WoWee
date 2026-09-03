@@ -2072,6 +2072,14 @@ wowee_add_test(test_party_wire_codes
     SOURCES test_party_wire_codes.cpp
             ${TEST_COMMON_SOURCES})
 
+# ── test_raid_mark_names ─────────────────────────────────────
+# The eight raid marker names, which /mark matches lowercase and the minimap
+# prints capitalised. They were written out three times; the words the
+# command accepts are now derived, so they are pinned here.
+wowee_add_test(test_raid_mark_names
+    SOURCES test_raid_mark_names.cpp
+            ${TEST_COMMON_SOURCES})
+
 # ── test_spell_mod_ops ───────────────────────────────────────
 # Spell modifier op numbers against AzerothCore's SpellDefines.h. Ops 0-19
 # were right; from 20 the list was the Cataclysm one on a 3.3.5 head, so op

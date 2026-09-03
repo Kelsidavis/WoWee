@@ -1090,12 +1090,8 @@ void GameScreen::renderMinimapPartyDots(const MinimapFrame& frame, game::GameHan
 
             if (!member.name.empty() && cursorNearBlip(sx, sy)) {
                 uint8_t pmk2 = gameHandler.getEntityRaidMark(member.guid);
-                if (pmk2 < game::GameHandler::kRaidMarkCount) {
-                    static constexpr const char* kMarkNames[] = {
-                        "Star", "Circle", "Diamond", "Triangle",
-                        "Moon", "Square", "Cross", "Skull"
-                    };
-                    ImGui::SetTooltip("%s {%s}", member.name.c_str(), kMarkNames[pmk2]);
+                if (const char* markName = game::raidMarkName(pmk2)) {
+                    ImGui::SetTooltip("%s {%s}", member.name.c_str(), markName);
                 } else {
                     ImGui::SetTooltip("%s", member.name.c_str());
                 }

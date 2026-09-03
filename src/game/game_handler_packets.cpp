@@ -3079,8 +3079,7 @@ void GameHandler::registerRemainingOpcodes() {
             /*uint64_t resetTime =*/ packet.readUInt64();
             std::string mapLabel = getMapName(mapId);
             if (mapLabel.empty()) mapLabel = "map #" + std::to_string(mapId);
-            static const char* kDiff[] = {"Normal","Heroic","25-Man","25-Man Heroic"};
-            const char* diffStr = (difficulty < 4) ? kDiff[difficulty] : nullptr;
+            const char* diffStr = instanceDifficultyName(difficulty);
             std::string msg = "Calendar: Raid lockout added for " + mapLabel;
             if (diffStr) msg += std::string(" (") + diffStr + ")";
             msg += '.';
@@ -3099,8 +3098,7 @@ void GameHandler::registerRemainingOpcodes() {
             uint32_t difficulty = packet.readUInt32();
             std::string mapLabel = getMapName(mapId);
             if (mapLabel.empty()) mapLabel = "map #" + std::to_string(mapId);
-            static const char* kDiff[] = {"Normal","Heroic","25-Man","25-Man Heroic"};
-            const char* diffStr = (difficulty < 4) ? kDiff[difficulty] : nullptr;
+            const char* diffStr = instanceDifficultyName(difficulty);
             std::string msg = "Calendar: Raid lockout removed for " + mapLabel;
             if (diffStr) msg += std::string(" (") + diffStr + ")";
             msg += '.';
