@@ -1,10 +1,16 @@
--- Every carried bag in one window, and the bank in a window of its own.
+-- Every carried bag in one window. The bank is FrameXML's own.
 --
--- The bank used to be a third section of the bag window, reached by a Bank
--- button where the caption would be, so opening the bank replaced the view of
--- what you were carrying with what you had stored - which is the one moment
--- both are wanted at once. They are two windows now, each with its own
--- position and its own width, and the bank's opens where the bank does.
+-- The bank was a third section here, reached by a Bank button where the
+-- caption would be, so opening the bank replaced the view of what you were
+-- carrying with what you had stored - at the one moment both are wanted, a
+-- deposit being a move from one to the other. Giving it a window of this
+-- window's own kind then put two bank windows on screen, since BankFrame opens
+-- itself and holds the same items.
+--
+-- So the bank is Blizzard's, whole: the twenty-eight slots, the seven bag
+-- slots and the purchase, drawn by the interface that already has all three.
+-- This window is the carried bags and the keyring, and the calls that name a
+-- bank bag are handed straight back to FrameXML.
 --
 -- 3.3.5's interface has no such thing: it opens one ContainerFrame per bag and
 -- has no sorting at all, both of which arrived years later. This client's own
@@ -44,22 +50,16 @@ local openOurs, closeOurs
 -- Position and column count, per window. Everything else is derived, and a
 -- setting that can be worked out again is one more thing to migrate.
 --
--- The bag window keeps its at the root, where it has always written them, so a
--- player who has dragged it somewhere keeps that place. The bank's live under
--- a key of their own: two windows that opened at one remembered position would
--- open on top of each other.
+-- Kept at the root, where this window has always written them.
 
 local function settings()
     if type(WoweeAllBagsSettings) ~= 'table' then WoweeAllBagsSettings = {} end
     if type(WoweeAllBagsSettings.columns) ~= 'number' then
         WoweeAllBagsSettings.columns = 10
     end
-    if type(WoweeAllBagsSettings.bank) ~= 'table' then
-        WoweeAllBagsSettings.bank = {}
-    end
-    if type(WoweeAllBagsSettings.bank.columns) ~= 'number' then
-        WoweeAllBagsSettings.bank.columns = 10
-    end
+    -- The bank had a window of this kind briefly and wrote its own position
+    -- here. It is FrameXML's again, so this stops being written back.
+    WoweeAllBagsSettings.bank = nil
     -- A corner this window was never anchored by, saved by an earlier version
     -- and read by nothing. Dropped here so it stops being written back.
     WoweeAllBagsSettings.point = nil
@@ -170,20 +170,6 @@ local function newWindow(spec)
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -8)
 
-    -- The caption. The bag window has none - "All Bags" over a window full of
-    -- bags said nothing the window did not - but two windows on screen at once
-    -- do need telling apart, and the bank's is the one that appears without
-    -- being asked for.
-    local leftAnchor = f
-    local leftX = EDGE
-    if spec.title then
-        local caption = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        caption:SetPoint("TOPLEFT", f, "TOPLEFT", EDGE, -14)
-        caption:SetText(spec.title)
-        leftAnchor = caption
-        leftX = 8
-    end
-
     local sort
     if spec.sort then
         -- Disabled while the moves are still going out, because a sort is
@@ -196,8 +182,6 @@ local function newWindow(spec)
         sort:SetScript("OnClick", function()
             if SortBags then SortBags() end
         end)
-        leftAnchor = sort
-        leftX = 12
     end
 
     -- Search. Dims what does not match rather than hiding it, so the slots keep
@@ -205,10 +189,10 @@ local function newWindow(spec)
     local box = CreateFrame("EditBox", spec.searchName, f, "InputBoxTemplate")
     box:SetWidth(150)
     box:SetHeight(20)
-    if leftAnchor == f then
-        box:SetPoint("TOPLEFT", f, "TOPLEFT", leftX + 8, -12)
+    if sort then
+        box:SetPoint("LEFT", sort, "RIGHT", 12, 0)
     else
-        box:SetPoint("LEFT", leftAnchor, "RIGHT", leftX, 0)
+        box:SetPoint("TOPLEFT", f, "TOPLEFT", EDGE, -12)
     end
     box:SetAutoFocus(false)
     box:SetScript("OnTextChanged", function(self)
@@ -337,85 +321,6 @@ local function newWindow(spec)
         return h
     end
 
-    -- ── The bank's own bag slots ────────────────────────────────────────────
-    --
-    -- The seven slots a bank bag goes into, and the price of the next one.
-    -- They belong to the bank rather than to any bag in it, which is why they
-    -- are a row of their own under the grid rather than a section in it - and
-    -- they are the reason this window can replace FrameXML's: without them
-    -- there was no way to add a bag to the bank or to buy the space for one,
-    -- so both windows had to be up and both showed the same items.
-    local bagSlots, buySlot
-    if spec.bagSlots then
-        bagSlots = {}
-        for i = 1, (NUM_BANKBAGSLOTS or 7) do
-            local b = CreateFrame("Button", spec.frameName .. "BagSlot" .. i, f)
-            b:SetWidth(SLOT)
-            b:SetHeight(SLOT)
-            b:RegisterForClicks("LeftButtonUp")
-            b:RegisterForDrag("LeftButton")
-            b.slotIndex = i
-
-            b.icon = b:CreateTexture(nil, "BACKGROUND")
-            b.icon:SetAllPoints(b)
-
-            local function invSlot(self)
-                if not BankButtonIDToInvSlotID then return nil end
-                return BankButtonIDToInvSlotID(self.slotIndex, 1)
-            end
-
-            --- Picking a bag up and putting one down are the same call, as
-            --- they are for a slot in a bag. An unbought slot offers the
-            --- purchase instead, which is what clicking one does in the real
-            --- bank window.
-            local function useSlot(self)
-                local bought = GetNumBankSlots and GetNumBankSlots() or 0
-                if self.slotIndex > bought then
-                    if BankFrame and GetBankSlotCost then
-                        BankFrame.nextSlotCost = GetBankSlotCost()
-                    end
-                    if StaticPopup_Show then StaticPopup_Show("CONFIRM_BUY_BANK_SLOT") end
-                    return
-                end
-                local id = invSlot(self)
-                if id and PickupInventoryItem then PickupInventoryItem(id) end
-                WoweeAllBags_Update()
-            end
-
-            b:SetScript("OnClick", useSlot)
-            b:SetScript("OnReceiveDrag", useSlot)
-            b:SetScript("OnDragStart", useSlot)
-            b:SetScript("OnEnter", function(self)
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                local id = invSlot(self)
-                local bought = GetNumBankSlots and GetNumBankSlots() or 0
-                if self.slotIndex <= bought and id and
-                   GetInventoryItemTexture("player", id) then
-                    GameTooltip:SetInventoryItem("player", id)
-                elseif self.slotIndex <= bought then
-                    GameTooltip:SetText("Bank Bag Slot")
-                else
-                    GameTooltip:SetText("Buy this bag slot")
-                end
-                GameTooltip:Show()
-            end)
-            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            bagSlots[i] = b
-        end
-
-        buySlot = CreateFrame("Button", spec.frameName .. "BuySlot", f,
-                              "UIPanelButtonTemplate")
-        buySlot:SetWidth(80)
-        buySlot:SetHeight(21)
-        buySlot:SetText("Buy Slot")
-        buySlot:SetScript("OnClick", function()
-            if BankFrame and GetBankSlotCost then
-                BankFrame.nextSlotCost = GetBankSlotCost()
-            end
-            if StaticPopup_Show then StaticPopup_Show("CONFIRM_BUY_BANK_SLOT") end
-        end)
-    end
-
     -- ── Redraw ──────────────────────────────────────────────────────────────
 
     function w.Update()
@@ -511,53 +416,8 @@ local function newWindow(spec)
         for i = usedHeaders + 1, #w.headers do w.headers[i]:Hide() end
 
         local rows = math.max(1, math.ceil(row))
-        local extra = 0
-
-        if bagSlots then
-            -- Under the grid, with a caption, and the price of the next slot
-            -- beside them. A slot not yet bought is drawn dark rather than
-            -- hidden, so the row says how much room there is left to buy.
-            usedHeaders = usedHeaders + 1
-            local h = sectionHeader(usedHeaders)
-            h:ClearAllPoints()
-            h:SetPoint("TOPLEFT", f, "TOPLEFT", EDGE,
-                       -(TOP + rows * (SLOT + PAD) + (usedHeaders - 1) * HEADER))
-            h:SetText("Bag Slots")
-            h:Show()
-
-            local bought = GetNumBankSlots and GetNumBankSlots() or 0
-            local top = TOP + rows * (SLOT + PAD) + usedHeaders * HEADER
-            for i, b in ipairs(bagSlots) do
-                b:ClearAllPoints()
-                b:SetPoint("TOPLEFT", f, "TOPLEFT",
-                           EDGE + (i - 1) * (SLOT + PAD), -top)
-                local id = BankButtonIDToInvSlotID and BankButtonIDToInvSlotID(i, 1)
-                local tex = (i <= bought and id) and
-                            GetInventoryItemTexture("player", id) or nil
-                if tex then
-                    b.icon:SetTexture(tex)
-                    b.icon:SetAlpha(1.0)
-                else
-                    b.icon:SetTexture("Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag")
-                    b.icon:SetAlpha(i <= bought and 0.7 or 0.25)
-                end
-                b.icon:Show()
-                b:Show()
-            end
-
-            if buySlot then
-                buySlot:ClearAllPoints()
-                buySlot:SetPoint("TOPLEFT", f, "TOPLEFT",
-                                 EDGE + #bagSlots * (SLOT + PAD) + 6,
-                                 -(top + 8))
-                if bought >= #bagSlots then buySlot:Hide() else buySlot:Show() end
-            end
-            extra = SLOT + PAD
-        end
-
         f:SetWidth(EDGE * 2 + cols * (SLOT + PAD) - PAD)
-        f:SetHeight(TOP + rows * (SLOT + PAD) - PAD + BOTTOM +
-                    usedHeaders * HEADER + extra)
+        f:SetHeight(TOP + rows * (SLOT + PAD) - PAD + BOTTOM + usedHeaders * HEADER)
 
         -- The size the player asked for, from the same control that used to
         -- size this client's own bag window.
@@ -635,34 +495,13 @@ local bags = newWindow{
     end,
 }
 
---- The bank, in a window of its own.
----
---- Its contents are the client's to remember: it holds the twenty-eight
---- general slots and the bank bags from the last visit, so /bank shows what is
---- in there from anywhere. Only moving things needs a banker.
-local bank = newWindow{
-    frameName   = "WoweeBankFrame",
-    itemPrefix  = "WoweeBankItem",
-    searchName  = "WoweeBankSearch",
-    title       = "Bank",
-    bagSlots    = true,
-    -- Clear of the bag window's own corner, so the two do not open on top of
-    -- each other the first time both are up.
-    defaultPoint = {"BOTTOMLEFT", UIParent, "BOTTOMLEFT", 40, 120},
-    store = function() return settings().bank end,
-    sections = function()
-        return sectionsOf({{name = "Bank", bags = BANK}})
-    end,
-}
-
---- Both, because one window's contents change when the other's do: a deposit
---- empties a carried slot and fills a bank one.
+--- One window, and the loop that walks them: the builder keeps the list, and
+--- a second window would be drawn by the same call.
 function WoweeAllBags_Update()
     for _, w in ipairs(windows) do w.Update() end
 end
 
 function WoweeAllBags_Toggle() bags.Toggle() end
-function WoweeBank_Toggle()    bank.Toggle() end
 
 -- Declared before the overrides at the end, which is where they are used.
 function openOurs()  bags.Open()  end
@@ -672,15 +511,7 @@ function closeOurs() bags.Close() end
 
 local ev = CreateFrame("Frame")
 ev:SetScript("OnEvent", function(self, event, arg1)
-    if event == "BANKFRAME_OPENED" then
-        -- The bank's own window, and only it. Opening the bank used to switch
-        -- the bag window over to the bank's contents, which took away the view
-        -- of what you were carrying at the one moment both are wanted: a
-        -- deposit is a move from one to the other.
-        if not separateBags() then bank.Open() end
-    elseif event == "BANKFRAME_CLOSED" then
-        bank.Close()
-    elseif event == "WOWEE_SETTING_CHANGED" then
+    if event == "WOWEE_SETTING_CHANGED" then
         -- Ticking "Separate bag windows" while these are open has to put them
         -- away: from that moment the bag keys go to FrameXML's windows, so left
         -- open these could not be closed by the key that opened them. Untick it
@@ -699,9 +530,6 @@ ev:SetScript("OnEvent", function(self, event, arg1)
                     local cf = _G['ContainerFrame' .. i]
                     if cf and cf.IsShown and cf:IsShown() then cf:Hide() end
                 end
-                if BankFrame and BankFrame.IsShown and BankFrame:IsShown() then
-                    BankFrame:Hide()
-                end
             end
         end
     end
@@ -710,9 +538,6 @@ end)
 ev:RegisterEvent("BAG_UPDATE")
 ev:RegisterEvent("ITEM_LOCK_CHANGED")
 ev:RegisterEvent("PLAYER_MONEY")
-ev:RegisterEvent("BANKFRAME_OPENED")
-ev:RegisterEvent("BANKFRAME_CLOSED")
-ev:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
 -- Interface > Bags, so its three controls take effect when they are clicked.
 ev:RegisterEvent("WOWEE_SETTING_CHANGED")
 
@@ -751,40 +576,47 @@ local function replacingWith(original, ours)
     end
 end
 
---- Which window a container id belongs to.
+--- A bank bag is not this window's.
 ---
---- The calls that name a bag have to be told apart now that there are two
---- windows, and the bank's own frame is what proves it: BankFrame_OnHide calls
---- CloseBankBagFrames, which is CloseBag(5) through CloseBag(11). Sent to the
---- carried bags - which is where every CloseBag went - walking away from a
---- bank shut the player's bags, having never opened them.
+--- The interface calls these by container id, and the bank's own frame calls
+--- them for its bags: BankFrame_OnHide is CloseBankBagFrames, which is
+--- CloseBag(5) through CloseBag(11), and opening a bank bag from the bank
+--- window is OpenBag on the same ids. Claiming those put the carried bags on
+--- screen when a bank bag was asked for and shut them when the bank closed.
+--- They go back to the interface, which draws the bank.
 local BANK_BAG = {}
 for _, id in ipairs(BANK) do BANK_BAG[id] = true end
 
-local function windowFor(id)
-    if id and BANK_BAG[id] then return bank end
-    return bags
-end
-
-local function replacingBagCall(original, method)
+--- The same, for the two that open and close rather than toggle.
+local function replacingBagCallWith(original, ours)
     return function(id, ...)
-        if separateBags() then
+        if separateBags() or (id and BANK_BAG[id]) then
             if original then return original(id, ...) end
             return
         end
-        return windowFor(id)[method]()
+        return ours()
+    end
+end
+
+local function replacingBagCall(original)
+    return function(id, ...)
+        if separateBags() or (id and BANK_BAG[id]) then
+            if original then return original(id, ...) end
+            return
+        end
+        return WoweeAllBags_Toggle()
     end
 end
 
 ToggleBackpack = replacing(ToggleBackpack)
 ToggleAllBags  = replacing(ToggleAllBags)
-ToggleBag      = replacingBagCall(ToggleBag, "Toggle")
+ToggleBag      = replacingBagCall(ToggleBag)
 OpenBackpack   = replacingWith(OpenBackpack, openOurs)
 OpenAllBags    = replacingWith(OpenAllBags, openOurs)
-OpenBag        = replacingBagCall(OpenBag, "Open")
+OpenBag        = replacingBagCallWith(OpenBag, openOurs)
 CloseBackpack  = replacingWith(CloseBackpack, closeOurs)
 CloseAllBags   = replacingWith(CloseAllBags, closeOurs)
-CloseBag       = replacingBagCall(CloseBag, "Close")
+CloseBag       = replacingBagCallWith(CloseBag, closeOurs)
 
 --- Whether the bag bar should draw its button as pressed. One window per set,
 --- so a bag is open exactly when the window holding it is.
@@ -794,7 +626,11 @@ IsBagOpen = function(id)
         if wasBagOpen then return wasBagOpen(id) end
         return nil
     end
-    return windowFor(id).frame:IsShown() and id or nil
+    if id and BANK_BAG[id] then
+        if wasBagOpen then return wasBagOpen(id) end
+        return nil
+    end
+    return bags.frame:IsShown() and id or nil
 end
 
 --- The game's keyring button, pointed at the setting rather than at a
@@ -813,38 +649,6 @@ ToggleKeyRing = function(...)
     WoweeAllBags_Update()
 end
 
---- FrameXML's own bank window, while ours is the one on screen.
----
---- Two bank windows were up at a banker, looking different and holding the
---- same items: BankFrame opens itself from BANKFRAME_OPENED, which nothing
---- here goes through. In combined mode it stands down entirely - shown, it
---- hides again, and its OnHide is skipped with it, because that handler calls
---- CloseBankBagFrames, which is CloseBag 5 through 11, which would shut ours
---- the instant it opened.
----
---- With separate bag windows on, none of this applies and Blizzard's bank is
---- the bank, untouched.
-if BankFrame then
-    local wasOnShow = BankFrame:GetScript("OnShow")
-    local wasOnHide = BankFrame:GetScript("OnHide")
-    BankFrame:SetScript("OnShow", function(self, ...)
-        if not separateBags() then
-            self:Hide()
-            return
-        end
-        if wasOnShow then return wasOnShow(self, ...) end
-    end)
-    BankFrame:SetScript("OnHide", function(self, ...)
-        if not separateBags() then return end
-        if wasOnHide then return wasOnHide(self, ...) end
-    end)
-end
-
 SLASH_WOWEEALLBAGS1 = "/allbags"
 SLASH_WOWEEALLBAGS2 = "/bags"
 SlashCmdList["WOWEEALLBAGS"] = WoweeAllBags_Toggle
-
--- The bank without a banker, which is the half of it that needs no server:
--- what was left in there, from anywhere.
-SLASH_WOWEEBANK1 = "/bank"
-SlashCmdList["WOWEEBANK"] = WoweeBank_Toggle
