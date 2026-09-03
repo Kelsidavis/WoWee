@@ -164,6 +164,20 @@ void transitionImageLayout(VkCommandBuffer cmd, VkImage image,
 AllocatedBuffer uploadBuffer(VkContext& ctx, const void* data, VkDeviceSize size,
     VkBufferUsageFlags usage);
 
+/// The same, into a buffer that already exists.
+///
+/// The staging buffer outlives the call. immediateSubmit does not submit while
+/// an upload batch is open - and one is open for the whole frame - so it
+/// records the copy and returns; destroying the source at that point frees
+/// memory the GPU has not read yet, and what lands in the target is whatever
+/// the allocator handed back. The grass field found that one: it came out of
+/// the copy in patches that popped in and out as it was rebuilt.
+///
+/// False when the staging buffer could not be made or mapped, in which case
+/// the target is untouched.
+bool uploadIntoBuffer(VkContext& ctx, const void* data, VkDeviceSize size,
+    VkBuffer target);
+
 // Environment variable utility functions
 inline size_t envSizeMBOrDefault(const char* name, size_t defMb) {
     const char* v = std::getenv(name);

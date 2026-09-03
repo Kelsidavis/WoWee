@@ -185,37 +185,11 @@ bool GrassRenderer::setPopulation(const pipeline::GrassBladeSample* blades, size
         packed[i].groundHighlight = glm::vec4(b.groundHighlight, b.submerged ? -fade : fade);
     }
 
+    // Staged through uploadIntoBuffer, which keeps the staging buffer alive
+    // until the frame that copies from it is done - see its header for the
+    // patchy field that came of destroying it any earlier.
     const VkDeviceSize bytes = sizeof(GrassBladeGPU) * count;
-    AllocatedBuffer staging = createBuffer(vkCtx_->getAllocator(), bytes,
-                                           VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                           VMA_MEMORY_USAGE_CPU_ONLY);
-    if (staging.buffer == VK_NULL_HANDLE) return false;
-
-    void* mapped = nullptr;
-    if (vmaMapMemory(vkCtx_->getAllocator(), staging.allocation, &mapped) != VK_SUCCESS) {
-        destroyBuffer(vkCtx_->getAllocator(), staging);
-        return false;
-    }
-    std::memcpy(mapped, packed.data(), bytes);
-    vmaUnmapMemory(vkCtx_->getAllocator(), staging.allocation);
-
-    vkCtx_->immediateSubmit([&](VkCommandBuffer cmd) {
-        VkBufferCopy region{};
-        region.size = bytes;
-        vkCmdCopyBuffer(cmd, staging.buffer, sourceBuffer_, 1, &region);
-    });
-
-    // The staging buffer outlives the call. immediateSubmit does not submit
-    // while an upload batch is open - and one is open for the whole frame -
-    // so it records the copy and returns, and destroying the source here freed
-    // memory the GPU had not read yet. Blades came out of that copy holding
-    // whatever the allocator handed back, which is a field that pops in and
-    // out in patches as it is rebuilt.
-    const VmaAllocator allocator = vkCtx_->getAllocator();
-    AllocatedBuffer pending = staging;
-    vkCtx_->deferAfterFrameFence([allocator, pending]() mutable {
-        destroyBuffer(allocator, pending);
-    });
+    if (!uploadIntoBuffer(*vkCtx_, packed.data(), bytes, sourceBuffer_)) return false;
 
     bladeCount_ = static_cast<uint32_t>(count);
     framesSincePopulated_ = 0;
@@ -595,29 +569,7 @@ bool GrassRenderer::setProfiles(const std::vector<pipeline::GrassProfile>& profi
     }
 
     const VkDeviceSize bytes = sizeof(GrassProfileGPU) * count;
-    AllocatedBuffer staging = createBuffer(vkCtx_->getAllocator(), bytes,
-                                           VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                           VMA_MEMORY_USAGE_CPU_ONLY);
-    if (staging.buffer == VK_NULL_HANDLE) return false;
-    void* mapped = nullptr;
-    if (vmaMapMemory(vkCtx_->getAllocator(), staging.allocation, &mapped) != VK_SUCCESS) {
-        destroyBuffer(vkCtx_->getAllocator(), staging);
-        return false;
-    }
-    std::memcpy(mapped, packed.data(), bytes);
-    vmaUnmapMemory(vkCtx_->getAllocator(), staging.allocation);
-    vkCtx_->immediateSubmit([&](VkCommandBuffer cmd) {
-        VkBufferCopy region{};
-        region.size = bytes;
-        vkCmdCopyBuffer(cmd, staging.buffer, profileBuffer_, 1, &region);
-    });
-    // Outlives the call, for the same reason setPopulation's does.
-    const VmaAllocator allocator = vkCtx_->getAllocator();
-    AllocatedBuffer pending = staging;
-    vkCtx_->deferAfterFrameFence([allocator, pending]() mutable {
-        destroyBuffer(allocator, pending);
-    });
-    return true;
+    return uploadIntoBuffer(*vkCtx_, packed.data(), bytes, profileBuffer_);
 }
 
 void GrassRenderer::recreatePipelines() {

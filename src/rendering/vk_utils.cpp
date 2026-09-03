@@ -346,5 +346,37 @@ AllocatedBuffer uploadBuffer(VkContext& ctx, const void* data, VkDeviceSize size
     return gpuBuffer;
 }
 
+bool uploadIntoBuffer(VkContext& ctx, const void* data, VkDeviceSize size,
+                      VkBuffer target) {
+    if (target == VK_NULL_HANDLE || size == 0) return false;
+
+    AllocatedBuffer staging = createBuffer(ctx.getAllocator(), size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+    if (staging.buffer == VK_NULL_HANDLE) return false;
+
+    void* mapped = nullptr;
+    if (vmaMapMemory(ctx.getAllocator(), staging.allocation, &mapped) != VK_SUCCESS) {
+        destroyBuffer(ctx.getAllocator(), staging);
+        return false;
+    }
+    std::memcpy(mapped, data, size);
+    vmaUnmapMemory(ctx.getAllocator(), staging.allocation);
+
+    ctx.immediateSubmit([&](VkCommandBuffer cmd) {
+        VkBufferCopy region{};
+        region.size = size;
+        vkCmdCopyBuffer(cmd, staging.buffer, target, 1, &region);
+    });
+
+    // See the header: the copy may not have been submitted yet, so the staging
+    // buffer goes when the frame it was recorded in is done with it.
+    const VmaAllocator allocator = ctx.getAllocator();
+    AllocatedBuffer pending = staging;
+    ctx.deferAfterFrameFence([allocator, pending]() mutable {
+        destroyBuffer(allocator, pending);
+    });
+    return true;
+}
+
 } // namespace rendering
 } // namespace wowee
