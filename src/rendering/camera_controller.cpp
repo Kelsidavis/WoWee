@@ -1100,6 +1100,21 @@ CameraController::FloorSample CameraController::sampleFloorUnderFeet(const glm::
 void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
                                                glm::vec3& targetPos,
                                                const glm::vec3& prevTargetPos) {
+    // Seated: the server placed the character, and this pass would place them
+    // again from whatever is underneath.
+    //
+    // A chair is an M2 with collision whose seat is about a metre off the
+    // floor and nothing here can tell a seat from a step, so the feet went on
+    // top of the chair and the character sat in the air above it. Dropping the
+    // chair from the floor candidates was not enough: it only applied to the
+    // stand states that name a chair, and a server that answers a chair with a
+    // plain SIT - which is what the inn's chairs did - left the whole rule
+    // switched off while the pose said otherwise.
+    //
+    // Nothing drifts while this stands down: movement is blocked for as long
+    // as the character is seated, and the moment they stand up the pass runs
+    // again from wherever the server left them.
+    if (sitting) return;
 
     // Ground the character to terrain or WMO floor
     // Skip entirely while swimming - the swim floor clamp handles vertical bounds.
@@ -1112,35 +1127,6 @@ void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
         // WMO tunnel/bridge ramps are often steeper than outdoor terrain ramps.
         // The floor directly under the feet, and the surfaces that answered.
         FloorSample sample = sampleFloorUnderFeet(targetPos, stepUpBudget);
-        // Seated in something: the chair itself is not a floor to stand on.
-        //
-        // A chair is an M2 with collision whose seat is about a metre off the
-        // ground, and nothing here can tell a seat from a step - so the feet
-        // were put on top of the chair and the character stood on it, which is
-        // what sitting in a barber's chair looked like.
-        //
-        // Only the M2 is dropped, and only while the server says the character
-        // is in a chair. Everything else about the grounding stays: the floor
-        // under the chair is a real floor, gravity still applies, and the
-        // seated pose is what puts the character on the seat. Holding the
-        // height instead - which is what this did first - meant a character who
-        // stopped being seated without this noticing walked around at whatever
-        // height they had been sitting at.
-        if (seatedInChair_ && sample.m2) {
-            sample.m2 = std::nullopt;
-            sample.floor = selectReachableFloor3(sample.terrain, sample.wmo,
-                                                 std::nullopt, targetPos.z,
-                                                 stepUpBudget);
-            // ...and where there is nothing else under the chair, the seat the
-            // server put the character in is the height to keep.
-            //
-            // This used to require a floor to fall back on, so a chair standing
-            // where no floor answered - an inn is a WMO, and a WMO does not
-            // always have a triangle to give - kept the chair as the floor and
-            // stood the character on it. A seated character is not falling
-            // anywhere, and the grounding resumes the moment they stand.
-            if (!sample.floor) sample.floor = targetPos.z;
-        }
         std::optional<float> groundH = sample.floor;
         const std::optional<float> centerTerrainH = sample.terrain;
         const std::optional<float> centerWmoH = sample.wmo;
