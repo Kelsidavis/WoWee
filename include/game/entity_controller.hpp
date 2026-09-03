@@ -114,6 +114,14 @@ private:
     std::unordered_map<uint32_t, CreatureQueryResponseData> creatureInfoCache;
     std::unordered_set<uint32_t> pendingCreatureQueries;
     std::unordered_map<uint32_t, GameObjectQueryResponseData> gameObjectInfoCache_;
+    /// Objects clicked to be read before their metadata arrived.
+    ///
+    /// The page id lives in the query response, so a sign clicked in the first
+    /// moments after it spawns has nothing to read from yet. The click is kept
+    /// here and answered when the response lands, rather than dropped - which
+    /// is a sign that does nothing the first time it is clicked and works the
+    /// second.
+    std::unordered_set<uint64_t> pendingPageTextGuids_;
     std::unordered_set<uint32_t> pendingGameObjectQueries_;
 
     // --- Update Object work queue ---

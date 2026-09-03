@@ -3007,6 +3007,26 @@ void EntityController::handleGameObjectQueryResponse(network::Packet& packet) {
         // so anything keyed off the game object's type has to be revisited now.
         if (owner_.gameObjectInfoCallbackRef()) owner_.gameObjectInfoCallbackRef()(data.entry);
 
+        // ...including a sign somebody clicked while this was in flight. The
+        // click was kept rather than dropped, so it is answered now.
+        if (!pendingPageTextGuids_.empty()) {
+            std::vector<uint64_t> ready;
+            for (uint64_t waiting : pendingPageTextGuids_) {
+                auto entity = entityManager.getEntity(waiting);
+                if (!entity || entity->getType() != ObjectType::GAMEOBJECT) {
+                    ready.push_back(waiting);   // gone; drop it
+                    continue;
+                }
+                if (std::static_pointer_cast<GameObject>(entity)->getEntry() == data.entry) {
+                    ready.push_back(waiting);
+                }
+            }
+            for (uint64_t guid : ready) {
+                pendingPageTextGuids_.erase(guid);
+                if (entityManager.getEntity(guid)) showGameObjectPageText(guid);
+            }
+        }
+
         // And the same for an objective that names this one - a chest to open
         // rather than a creature to kill.
         if (owner_.addonEventCallbackRef() &&
@@ -3046,7 +3066,10 @@ void EntityController::showGameObjectPageText(uint64_t guid) {
 
     auto cacheIt = gameObjectInfoCache_.find(entry);
     if (cacheIt == gameObjectInfoCache_.end()) {
+        pendingPageTextGuids_.insert(guid);
         queryGameObjectInfo(entry, guid);
+        LOG_WARNING("Read object 0x", std::hex, guid, std::dec, " entry=", entry,
+                    ": no metadata yet, asked for it and will read when it lands");
         return;
     }
 
@@ -3060,6 +3083,13 @@ void EntityController::showGameObjectPageText(uint64_t guid) {
     uint32_t pageMaterial = 0;
     if (info.type == 9)       { pageId = info.data[0]; pageMaterial = info.data[2]; }
     else if (info.type == 10) { pageId = info.data[7]; pageMaterial = info.data[9]; }
+
+    // At warning, because this is the whole of why a sign says nothing: the
+    // type decides where the page id is, and an object that is not a 9 or a 10
+    // has none to find. The default log carries warnings only, so an INFO line
+    // here answers nobody.
+    LOG_WARNING("Read object '", info.name, "' entry=", entry, " type=", info.type,
+                " pageId=", pageId, " hasData=", info.hasData);
 
     if (pageId != 0 && owner_.getSocket() && owner_.getState() == WorldState::IN_WORLD) {
         owner_.bookPagesRef().clear();  // start a fresh book for this interaction
