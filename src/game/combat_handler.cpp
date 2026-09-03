@@ -1279,7 +1279,22 @@ void CombatHandler::handleResurrectFailed(network::Packet& packet) {
 // Targeting
 // ============================================================
 
-bool CombatHandler::isSelectableUnit(uint64_t /*guid*/) const {
+bool CombatHandler::isSelectableUnit(uint64_t guid) const {
+    // A game object is not a target, whoever asks.
+    //
+    // WoW selects units, players and corpses; a door, a mailbox, a chest or a
+    // spell's ground effect is used or walked into, and none of them can be
+    // the target. Refused here rather than at the click, because every way in
+    // reaches this - the click, tab, /target, a macro - and each one that
+    // targeted an object put a selection circle on the floor around it and
+    // sent CMSG_SET_SELECTION for a guid that is not a unit.
+    if (auto entity = owner_.getEntityManager().getEntity(guid)) {
+        const auto type = entity->getType();
+        if (type == ObjectType::GAMEOBJECT || type == ObjectType::DYNAMICOBJECT) {
+            return false;
+        }
+    }
+
     // Everything the player clicks is selectable; the server arbitrates whether a
     // corpse actually holds loot when we send CMSG_LOOT. We deliberately do NOT
     // gate dead creature corpses on UNIT_DYNFLAG_LOOTABLE.

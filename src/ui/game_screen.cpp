@@ -875,10 +875,11 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                 } else if (target->getType() == game::ObjectType::PLAYER) {
                     showSelectionCircle = true;
                     circleColor = glm::vec3(0.3f, 1.0f, 0.3f); // green (player)
-                } else if (target->getType() == game::ObjectType::GAMEOBJECT) {
-                    showSelectionCircle = true;
-                    circleColor = glm::vec3(0.2f, 0.8f, 1.0f); // cyan (game object)
                 }
+                // Nothing else gets one. WoW draws a selection circle under a
+                // unit and a player and under nothing else - a door, a mailbox,
+                // a bank vault is used rather than selected, and a ring on the
+                // floor around one reads as a creature being fought.
                 if (showSelectionCircle) {
                     renderer->setSelectionCircle(targetGLPos, circleRadius, circleColor);
                 } else {
@@ -1795,7 +1796,18 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 if (closestGuid != 0 && gameHandler.isAwaitingUnitTarget()) {
                     gameHandler.completeItemUseOnUnit(closestGuid);
                 } else if (closestGuid != 0) {
-                    if (closestGuid == gameHandler.getHookedFishingBobberGuid()) {
+                    // A game object is used, not targeted.
+                    //
+                    // The client set every click's subject as the target, so
+                    // clicking a door made the door the target: a selection
+                    // circle on the floor around it, a name where a creature's
+                    // belongs, and CMSG_SET_SELECTION sent for a guid that is
+                    // not a unit. WoW targets units and players; a left click
+                    // on an object is a use, which is what the hand cursor over
+                    // one has been promising. The hooked fishing bobber was the
+                    // one object this already did, as a special case.
+                    auto picked = gameHandler.getEntityManager().getEntity(closestGuid);
+                    if (picked && picked->getType() == game::ObjectType::GAMEOBJECT) {
                         gameHandler.interactWithGameObject(closestGuid);
                     } else {
                         gameHandler.setTarget(closestGuid);
