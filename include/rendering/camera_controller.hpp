@@ -147,8 +147,12 @@ public:
     ///
     /// Sitting in something is a position this client does not compute - the
     /// server put the character in the chair - so grounding stands down for it.
+    ///
+    /// Both flags, from the one number: 1-6 is sitting or asleep and 8 is
+    /// kneeling, all of which movement cancels, and 2 and 4-6 are the seats a
+    /// chair puts a character in.
     void applyServerStandState(uint8_t standState) {
-        sitting = standState >= 1 && standState <= 6;
+        sitting = (standState >= 1 && standState <= 6) || standState == 8;
         seatedInChair_ = standState == 2 || (standState >= 4 && standState <= 6);
     }
     [[nodiscard]] bool isSeatedInChair() const { return seatedInChair_; }

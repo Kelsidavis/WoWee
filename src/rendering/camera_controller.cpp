@@ -1126,11 +1126,20 @@ void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
         // height instead - which is what this did first - meant a character who
         // stopped being seated without this noticing walked around at whatever
         // height they had been sitting at.
-        if (seatedInChair_ && sample.m2 && (sample.wmo || sample.terrain)) {
+        if (seatedInChair_ && sample.m2) {
             sample.m2 = std::nullopt;
             sample.floor = selectReachableFloor3(sample.terrain, sample.wmo,
                                                  std::nullopt, targetPos.z,
                                                  stepUpBudget);
+            // ...and where there is nothing else under the chair, the seat the
+            // server put the character in is the height to keep.
+            //
+            // This used to require a floor to fall back on, so a chair standing
+            // where no floor answered - an inn is a WMO, and a WMO does not
+            // always have a triangle to give - kept the chair as the floor and
+            // stood the character on it. A seated character is not falling
+            // anywhere, and the grounding resumes the moment they stand.
+            if (!sample.floor) sample.floor = targetPos.z;
         }
         std::optional<float> groundH = sample.floor;
         const std::optional<float> centerTerrainH = sample.terrain;

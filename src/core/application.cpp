@@ -1912,23 +1912,10 @@ void Application::setState(AppState newState) {
                         }
                     }
                 });
-                // What the server says the character is doing with itself.
-                //
-                // SMSG_STANDSTATE_UPDATE was parsed, logged and stored, and the
-                // callback that carries it was never set - so every seat the
-                // server put the player in was a character still standing.
-                // Both ends of it were already built: the animator has the
-                // chair-sit loops, and the camera controller has to know not to
-                // stand the character back up on the furniture.
-                gameHandler->setStandStateCallback([this](uint8_t standState) {
-                    if (!renderer) return;
-                    if (auto* ac = renderer->getAnimationController()) {
-                        ac->setStandState(standState);
-                    }
-                    if (auto* cam = renderer->getCameraController()) {
-                        cam->applyServerStandState(standState);
-                    }
-                });
+                // The stand state is carried by AnimationCallbackHandler, which
+                // owns the one callback slot for it. A second registration here
+                // replaced or was replaced by that one depending on which was
+                // built last, which is how the seated flag stopped arriving.
                 cc->setAutoFollowCancelCallback([this]() {
                     if (gameHandler) {
                         gameHandler->cancelFollow();

@@ -695,11 +695,18 @@ void AnimationCallbackHandler::setupCallbacks() {
     gameHandler_.setStandStateCallback([this](uint8_t standState) {
         using AC = rendering::AnimationController;
 
-        // Sync camera controller sitting flag: block movement while sitting/kneeling
+        // The camera controller's two flags, from the one number: movement is
+        // blocked while sitting or kneeling, and grounding stands down while
+        // the server has the character in a chair.
+        //
+        // Both used to be set, by two callbacks - and this is one slot, so the
+        // one registered later replaced the other. This handler is built long
+        // after the world is, so the registration that carried
+        // applyServerStandState never ran again: seatedInChair_ stayed false,
+        // the chair stayed a floor, and a character sat down in the right pose
+        // on top of the furniture rather than in it.
         if (auto* cc = renderer_.getCameraController()) {
-            cc->setSitting(standState >= AC::STAND_STATE_SIT &&
-                           standState <= AC::STAND_STATE_KNEEL &&
-                           standState != AC::STAND_STATE_DEAD);
+            cc->applyServerStandState(standState);
         }
 
         auto* ac = renderer_.getAnimationController();
