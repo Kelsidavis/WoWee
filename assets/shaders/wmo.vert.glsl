@@ -51,9 +51,28 @@ void main() {
         drop *= drop;
         float amp = span * 0.05 * drop;
         float phase = fogParams.z * 1.1 + dot(push.cloth.zw, vec2(0.21, 0.17));
-        pos.x += (sin(phase) * 0.7 + sin(phase * 2.7 + pos.y * 1.9) * 0.25) * amp;
-        pos.y += (cos(phase * 0.9) * 0.6 + cos(phase * 3.1 + pos.x * 1.7) * 0.2) * amp;
-        pos.z += sin(phase * 1.6 + pos.x * 1.3) * 0.12 * amp;
+        vec3 sway = vec3(
+            (sin(phase) * 0.7 + sin(phase * 2.7 + pos.y * 1.9) * 0.25) * amp,
+            (cos(phase * 0.9) * 0.6 + cos(phase * 3.1 + pos.x * 1.7) * 0.2) * amp,
+            sin(phase * 1.6 + pos.x * 1.3) * 0.12 * amp);
+
+        // Away from the wall, never into it.
+        //
+        // A banner hangs flush against stone, so any motion toward its own
+        // back face goes through the masonry - a quarter of it was still
+        // enough to show. The whole perpendicular component is taken out and a
+        // third of it given back outward only: the cloth billows away from the
+        // wall and slides in its own plane, and the half-cycle that used to
+        // push it backwards now does nothing at all.
+        //
+        // Outward is each face's own normal, so a two-sided banner puffs
+        // slightly rather than parting - which is what a cloth in a draught
+        // does anyway.
+        vec3 clothN = normalize(aNormal);
+        float perp = dot(sway, clothN);
+        sway -= clothN * perp;
+        sway += clothN * max(perp, 0.0) * 0.35;
+        pos += sway;
     }
 
     vec4 worldPos = push.model * vec4(pos, 1.0);
