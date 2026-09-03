@@ -1725,15 +1725,23 @@ TileCoord TerrainManager::worldToTile(float glX, float glY) const {
 
 void TerrainManager::getTileBounds(const TileCoord& coord, float& minX, float& minY,
                                     float& maxX, float& maxY) const {
-    // Calculate world bounds for this tile
-    // Tile (32, 32) is at origin
-    float offsetX = (32 - coord.x) * TILE_SIZE;
-    float offsetY = (32 - coord.y) * TILE_SIZE;
+    // The tile's extent in render space, which is not the axis its own index
+    // counts along: worldToTile takes the tile's X index from renderY and its
+    // Y index from renderX - see core/coordinates.hpp, where the pair is
+    // written the same way round. So the render-X edge comes from coord.y.
+    //
+    // These were named for one axis and computed from the other. Everything
+    // that reads them guesses a chunk index and then checks the guess against
+    // the chunk's own position, so the fault showed as the guess missing and
+    // the search widening - never as a wrong answer, until getAreaIdAt asked
+    // the same question without checking.
+    const float maxRenderX = (32 - coord.y) * TILE_SIZE;
+    const float maxRenderY = (32 - coord.x) * TILE_SIZE;
 
-    minX = offsetX - TILE_SIZE;
-    minY = offsetY - TILE_SIZE;
-    maxX = offsetX;
-    maxY = offsetY;
+    minX = maxRenderX - TILE_SIZE;
+    minY = maxRenderY - TILE_SIZE;
+    maxX = maxRenderX;
+    maxY = maxRenderY;
 }
 
 std::string TerrainManager::getADTPath(const TileCoord& coord) const {
@@ -2342,22 +2350,23 @@ bool TerrainManager::chunkHasHoles(float glX, float glY) const {
 }
 
 std::optional<uint32_t> TerrainManager::getAreaIdAt(float glX, float glY) const {
-    const TileCoord tc = worldToTile(glX, glY);
-    auto it = loadedTiles.find(tc);
-    if (it == loadedTiles.end() || !it->second || !it->second->loaded) {
-        return std::nullopt;
-    }
-
-    const TerrainTile& tile = *it->second;
-    // tileX advances along renderY while tileY advances along renderX.
-    const float tileMaxRenderX = (32.0f - static_cast<float>(tc.y)) * TILE_SIZE;
-    const float tileMaxRenderY = (32.0f - static_cast<float>(tc.x)) * TILE_SIZE;
-    const int chunkY = glm::clamp(
-        static_cast<int>(std::floor((tileMaxRenderX - glX) / CHUNK_SIZE)), 0, 15);
-    const int chunkX = glm::clamp(
-        static_cast<int>(std::floor((tileMaxRenderY - glY) / CHUNK_SIZE)), 0, 15);
-    const uint32_t areaId = tile.terrain.getChunk(chunkX, chunkY).areaId;
-    return areaId != 0 ? std::optional<uint32_t>(areaId) : std::nullopt;
+    // Through the one finder, as the height and the holes go.
+    //
+    // This had its own copy of "which chunk is under this point": an index
+    // worked out from the tile's corner and read straight out of the array,
+    // with nothing comparing the chunk it landed on against the point it was
+    // asked about. The other two check, and a check is what turns a wrong
+    // index into the right chunk - so the ground under the player was read
+    // correctly while the area under the same feet came from a chunk some way
+    // off, and near a tile's edge that chunk belongs to another zone.
+    //
+    // Which is what the zone flickering in Duskwood was: the border moved as
+    // the player walked, the zone name announced itself, and the dark-zone
+    // override - which pins Duskwood's hour - came and went with it.
+    float fracX = 0.0f, fracY = 0.0f;
+    const pipeline::MapChunk* chunk = findChunkAt(glX, glY, fracX, fracY);
+    if (!chunk || chunk->areaId == 0) return std::nullopt;
+    return chunk->areaId;
 }
 
 std::optional<std::string> TerrainManager::getDominantTextureAt(float glX, float glY) const {
