@@ -19,7 +19,8 @@ AzerothCore/ChromieCraft, TrinityCore, MaNGOS, and Turtle WoW 1.18.
 
 [Watch the latest demonstration](https://youtu.be/1Ax1jeNV_GU) ·
 [Download the latest release](https://github.com/Kelsidavis/WoWee/releases/latest) ·
-[Read the project status](docs/status.md)
+[Read the project status](docs/status.md) ·
+[Hear the soundtrack](https://kelsidavis.bandcamp.com/album/wowee-soundtrack)
 
 <p align="center">
   <img src="assets/orgrimmar-entrance.png" alt="WoWee rendering Orgrimmar" width="100%" />
@@ -324,6 +325,21 @@ On Android the same actions are driven by
 Graphics presets and individual controls are available under **Video
 Settings**. Shadows and MSAA have the largest performance cost; FSR2 can improve
 frame rate on supported hardware.
+
+## Soundtrack
+
+The original music in the client - the login theme, the tavern remix, and the
+zone tracks played over the Blizzard soundtrack - is released as an album.
+
+<p align="center">
+  <a href="https://kelsidavis.bandcamp.com/album/wowee-soundtrack">
+    <img src="assets/wowee-soundtrack.png" alt="WoWee Soundtrack cover" width="320" />
+  </a>
+</p>
+
+[**WoWee Soundtrack**](https://kelsidavis.bandcamp.com/album/wowee-soundtrack) -
+19 tracks, 56 minutes, available in lossless FLAC. The tracks are original
+compositions and contain no Blizzard audio.
 
 ## Documentation
 
