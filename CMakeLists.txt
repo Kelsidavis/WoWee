@@ -1557,7 +1557,7 @@ install(TARGETS wowee
 
 # Note: tool install rules are placed next to each target definition below.
 
-# Install built-in assets (exclude proprietary music)
+# Install built-in assets (the soundtrack ships with debug builds only)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets
     DESTINATION bin
     PATTERN "Original Music" EXCLUDE)

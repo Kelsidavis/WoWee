@@ -46,6 +46,8 @@ AzerothCore/ChromieCraft, TrinityCore, MaNGOS, and Turtle WoW 1.18.
 - Character creation and selection, movement, transports, combat, spells,
   talents, inventory, banks, vendors, trainers, quests, loot, mail, auction
   house, gossip, chat, parties, pets, maps, and taxi travel
+- Zone and city music, tavern and weather ambience, footsteps, mounts, combat,
+  spell and NPC voice audio
 - Optional Warden module execution through Unicorn Engine x86 emulation
 - Linux, macOS and Windows on x86-64 and ARM64, and **Android on arm64** with
   on-screen controls
@@ -328,8 +330,11 @@ frame rate on supported hardware.
 
 ## Soundtrack
 
-The original music in the client - the login theme, the tavern remix, and the
-zone tracks played over the Blizzard soundtrack - is released as an album.
+The client carries music of its own: the login theme, the track taverns open
+their rotation on, and zone rotations that play alongside whatever your game
+data provides - Elwynn, the Barrens, Booty Bay, Lordaeron, Stormwind and
+Ironforge among them. **WoWee soundtrack** under Sound settings turns it off
+and leaves the zone music to the game's own files.
 
 <p align="center">
   <a href="https://kelsidavis.bandcamp.com/album/wowee-soundtrack">
@@ -340,6 +345,10 @@ zone tracks played over the Blizzard soundtrack - is released as an album.
 [**WoWee Soundtrack**](https://kelsidavis.bandcamp.com/album/wowee-soundtrack) -
 19 tracks, 56 minutes, available in lossless FLAC. The tracks are original
 compositions and contain no Blizzard audio.
+
+The files live in `assets/Original Music/`. Debug builds and the debug APK
+carry them; release archives and the release APK leave them out to keep the
+download small.
 
 ## Documentation
 
