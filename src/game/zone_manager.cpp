@@ -52,6 +52,8 @@ void ZoneManager::initialize() {
     std::string omRunBackPolka   = om("RunBackPolka.mp3");
     std::string omWhoPulled      = om("WHO PULLED_.mp3");
     std::string omStormwindInst  = om("stormwindinst.mp3");
+    std::string omStormwindGtr   = om("stormwindguitar.mp3");
+    std::string omIronforgeIntro = om("Ironforge Intro.mp3");
 
     // Elwynn Forest (zone 12)
     ZoneInfo elwynn;
@@ -80,6 +82,7 @@ void ZoneManager::initialize() {
         "Sound\\Music\\CityMusic\\Stormwind\\stormwind10-zone.mp3",
     };
     if (!omStormwindInst.empty()) stormwind.musicPaths.push_back(omStormwindInst);
+    if (!omStormwindGtr.empty()) stormwind.musicPaths.push_back(omStormwindGtr);
     zones[1519] = stormwind;
 
     // Dun Morogh (zone 1) - neighboring zone
@@ -204,6 +207,7 @@ void ZoneManager::initialize() {
     };
     if (!omRunBackPolka.empty()) ironforge.musicPaths.push_back(omRunBackPolka);
     if (!omRollNeedGreed.empty()) ironforge.musicPaths.push_back(omRollNeedGreed);
+    if (!omIronforgeIntro.empty()) ironforge.musicPaths.push_back(omIronforgeIntro);
     zones[1537] = ironforge;
 
     // Loch Modan (zone 38)
