@@ -176,8 +176,16 @@ void AudioCoordinator::updateZoneAudio(const ZoneAudioContext& ctx) {
             wmoModelId == 220 || wmoModelId == 221 ||
             wmoModelId == 5392 || wmoModelId == 5393) {
             insideTavern = true;
-            static const std::vector<std::string> tavernTracks = {
-                "Sound\\Music\\ZoneMusic\\TavernAlliance\\TavernAlliance01.mp3",
+            // The first slot is our own tavern track. It falls back to the
+            // Blizzard one it replaces when the file is missing, and the
+            // original-soundtrack setting drops it the same way zone music does.
+            static const std::string tavernRemix =
+                game::ZoneManager::resolveOriginalMusicFile("TavernAllianceREMIX.mp3");
+            const bool useRemix = !tavernRemix.empty() &&
+                (!ctx.zoneManager || ctx.zoneManager->getUseOriginalSoundtrack());
+            const std::vector<std::string> tavernTracks = {
+                useRemix ? tavernRemix
+                         : std::string("Sound\\Music\\ZoneMusic\\TavernAlliance\\TavernAlliance01.mp3"),
                 "Sound\\Music\\ZoneMusic\\TavernAlliance\\TavernAlliance02.mp3",
                 "Sound\\Music\\ZoneMusic\\TavernHuman\\RA_HumanTavern1A.mp3",
                 "Sound\\Music\\ZoneMusic\\TavernHuman\\RA_HumanTavern2A.mp3",

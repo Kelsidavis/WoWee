@@ -3298,8 +3298,12 @@ bool Renderer::initializeRenderers(pipeline::AssetManager* assetManager, const s
                         audioCoordinator_->getMusicManager()->preloadMusic(musicPath);
                     }
                 }
-                static const std::vector<std::string> tavernTracks = {
-                    "Sound\\Music\\ZoneMusic\\TavernAlliance\\TavernAlliance01.mp3",
+                const std::string tavernRemix =
+                    game::ZoneManager::resolveOriginalMusicFile("TavernAllianceREMIX.mp3");
+                const std::vector<std::string> tavernTracks = {
+                    tavernRemix.empty()
+                        ? std::string("Sound\\Music\\ZoneMusic\\TavernAlliance\\TavernAlliance01.mp3")
+                        : tavernRemix,
                     "Sound\\Music\\ZoneMusic\\TavernAlliance\\TavernAlliance02.mp3",
                     "Sound\\Music\\ZoneMusic\\TavernHuman\\RA_HumanTavern1A.mp3",
                     "Sound\\Music\\ZoneMusic\\TavernHuman\\RA_HumanTavern2A.mp3",

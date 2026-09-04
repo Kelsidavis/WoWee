@@ -48,6 +48,11 @@ public:
     std::string getRandomMusic(uint32_t zoneId);
     [[nodiscard]] std::vector<std::string> getAllMusicPaths() const;
 
+    /// Resolve "assets/Original Music/<filename>" to a "file:<absolute path>"
+    /// track the music manager plays off disk, or "" when the file is absent.
+    /// Shared with the tavern rotation, which draws from the same directory.
+    [[nodiscard]] static std::string resolveOriginalMusicFile(const char* filename);
+
     // When false, file: (original soundtrack) tracks are excluded from the pool
     void setUseOriginalSoundtrack(bool use) { useOriginalSoundtrack_ = use; }
     [[nodiscard]] bool getUseOriginalSoundtrack() const { return useOriginalSoundtrack_; }

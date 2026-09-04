@@ -10,20 +10,27 @@
 namespace wowee {
 namespace game {
 
-// Resolve "assets/Original Music/<name>" to an absolute path, or return empty
+// Resolve "assets/Original Music/<name>" to an absolute path, or return empty.
+// fs::exists already resolves a relative path against the working directory, so
+// there is only ever one place to look; the track is found when the process runs
+// from the source tree and not otherwise.
 static std::string resolveOriginalMusic(const char* filename) {
     namespace fs = std::filesystem;
+    std::error_code ec;
     fs::path rel = fs::path("assets") / "Original Music" / filename;
-    if (fs::exists(rel)) return fs::canonical(rel).string();
-    fs::path abs = fs::current_path() / rel;
-    if (fs::exists(abs)) return fs::canonical(abs).string();
-    return "";
+    if (!fs::exists(rel, ec)) return "";
+    fs::path abs = fs::canonical(rel, ec);
+    return ec ? std::string() : abs.string();
 }
 
 // Helper: prefix with "file:" so the renderer knows to use playFilePath
 static std::string filePrefix(const std::string& path) {
     if (path.empty()) return "";
     return "file:" + path;
+}
+
+std::string ZoneManager::resolveOriginalMusicFile(const char* filename) {
+    return filePrefix(resolveOriginalMusic(filename));
 }
 
 void ZoneManager::initialize() {
