@@ -51,10 +51,15 @@ inline std::string buildItemLink(uint32_t itemId, uint32_t quality, const std::s
 /// Ten units on each axis, height included. A zeroed position matches; ground
 /// a player is standing on does not, the origin's own terrain being some way
 /// below or above z = 0 wherever the two coincide.
+///
+/// The axis test is not called `near`: windows.h defines that as a macro, and
+/// the name compiled everywhere except the two Windows targets.
 constexpr bool isCorruptOriginPosition(uint32_t mapId, float x, float y, float z) {
     constexpr float kNearOrigin = 10.0f;
-    const auto near = [](float v) { return v < kNearOrigin && v > -kNearOrigin; };
-    return mapId == 0 && near(x) && near(y) && near(z);
+    const auto withinOrigin = [](float v) {
+        return v < kNearOrigin && v > -kNearOrigin;
+    };
+    return mapId == 0 && withinOrigin(x) && withinOrigin(y) && withinOrigin(z);
 }
 
 } // namespace game
