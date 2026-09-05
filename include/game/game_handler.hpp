@@ -1596,6 +1596,16 @@ public:
 
     // Faction hostility map (populated from FactionTemplate.dbc by Application)
     void setFactionHostileMap(std::unordered_map<uint32_t, bool> map) { factionHostileMap_ = std::move(map); }
+    void setFactionFriendlyMap(std::unordered_map<uint32_t, bool> map) { factionFriendlyMap_ = std::move(map); }
+    /// Whether a beneficial spell may be aimed at this faction.
+    ///
+    /// Not the negation of isHostileFaction: a faction can be neither, and most
+    /// wildlife is. Unknown answers false, so a spell falls back to the caster
+    /// rather than being sent at something the server will refuse.
+    bool isFriendlyFaction(uint32_t factionTemplateId) const {
+        auto it = factionFriendlyMap_.find(factionTemplateId);
+        return it != factionFriendlyMap_.end() ? it->second : false;
+    }
 
     // Creature move callback (online mode - triggered by SMSG_MONSTER_MOVE)
     // Parameters: guid, x, y, z (canonical), duration_ms (0 = instant)
@@ -4559,6 +4569,7 @@ private:
 
     // Faction hostility lookup (populated from FactionTemplate.dbc)
     std::unordered_map<uint32_t, bool> factionHostileMap_;
+    std::unordered_map<uint32_t, bool> factionFriendlyMap_;
 
     // Vehicle (WotLK): non-zero when player is seated in a vehicle
     uint32_t vehicleId_ = 0;

@@ -77,9 +77,13 @@ void buildFactionHostilityMap(pipeline::AssetManager& assetManager, GameHandler&
     uint32_t playerFriendGroup = 0;
     uint32_t playerEnemyGroup = 0;
     uint32_t playerFactionId = 0;
+    // Kept apart from playerFriendGroup, which folds the two together: the
+    // friendly test below needs to ask each direction on its own.
+    uint32_t playerFactionGroup = 0;
     for (uint32_t i = 0; i < ftDbc->getRecordCount(); i++) {
         if (ftDbc->getUInt32(i, ftID) == playerFtId) {
             playerFriendGroup = ftDbc->getUInt32(i, ftFriend) | ftDbc->getUInt32(i, ftFG);
+            playerFactionGroup = ftDbc->getUInt32(i, ftFG);
             playerEnemyGroup = ftDbc->getUInt32(i, ftEnemy);
             playerFactionId = ftDbc->getUInt32(i, ftFaction);
             break;
@@ -88,6 +92,12 @@ void buildFactionHostilityMap(pipeline::AssetManager& assetManager, GameHandler&
 
     // Build hostility map for each faction template
     std::unordered_map<uint32_t, bool> factionMap;
+    // And a friendly map beside it. Not the negation of the other one: a
+    // faction can be neither, and most wildlife is. A beneficial spell may only
+    // be aimed at a unit that is actually friendly - "not hostile" let a neutral
+    // boar hold the cast, and the server refused it as an invalid target
+    // instead of the spell falling back to the caster.
+    std::unordered_map<uint32_t, bool> friendlyMap;
     for (uint32_t i = 0; i < ftDbc->getRecordCount(); i++) {
         uint32_t id = ftDbc->getUInt32(i, ftID);
         uint32_t parentFaction = ftDbc->getUInt32(i, ftFaction);
@@ -127,10 +137,22 @@ void buildFactionHostilityMap(pipeline::AssetManager& assetManager, GameHandler&
         }
 
         factionMap[id] = hostile;
+
+        // Friendly is mutual regard between the two groups, asked in both
+        // directions, and never true for something already hostile.
+        const bool friendly = !hostile &&
+            (((friendGroup & playerFactionGroup) != 0) ||
+             ((factionGroup & playerFriendGroup) != 0));
+        friendlyMap[id] = friendly;
     }
 
     uint32_t hostileCount = 0;
     for (const auto& [fid, h] : factionMap) { if (h) hostileCount++; }
+    uint32_t friendlyCount = 0;
+    for (const auto& [fid, f] : friendlyMap) { if (f) friendlyCount++; }
+    LOG_INFO("Faction friendliness: ", friendlyCount, "/", friendlyMap.size(),
+             " templates friendly; the rest are hostile or neutral");
+    gameHandler.setFactionFriendlyMap(std::move(friendlyMap));
     gameHandler.setFactionHostileMap(std::move(factionMap));
     LOG_INFO("Faction hostility for race ", static_cast<int>(playerRace), " (FT ", playerFtId, "): ",
         hostileCount, "/", ftDbc->getRecordCount(),

@@ -878,14 +878,28 @@ void SpellHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
         bool haveFriendlyTarget = false;
         if (target != 0 && target != owner_.getPlayerGuid()) {
             if (auto entity = owner_.getEntityManager().getEntity(target)) {
-                // Players and their pets are friendly unless flagged otherwise;
-                // hostility is the faction check the nameplate colour uses.
                 if (entity->isUnit()) {
+                    const auto* unit = static_cast<Unit*>(entity.get());
+                    // Friendly, not merely "not hostile". A faction can be
+                    // neither and most wildlife is: a neutral boar answered
+                    // false to isHostile, held the cast, and the server refused
+                    // it as an invalid target - which is what a heal aimed at
+                    // some enemies and not others looked like. A dead unit
+                    // cannot take a buff either, and a player may always be
+                    // helped once their faction is friendly.
+                    // Health is deliberately not asked about: it is zero for a
+                    // unit whose first update has not landed, and self-casting
+                    // a heal meant for a party member because their health had
+                    // not arrived yet would be a worse fault than the one this
+                    // fixes.
                     haveFriendlyTarget =
-                        !static_cast<Unit*>(entity.get())->isHostile();
+                        !unit->isHostile() &&
+                        owner_.isFriendlyFaction(unit->getFactionTemplate());
                 }
             }
         }
+        // Anything that is not a unit we can help - gone, dead, hostile,
+        // neutral, or never found - leaves the spell on the caster.
         if (!haveFriendlyTarget) {
             target = owner_.getPlayerGuid();
         }
