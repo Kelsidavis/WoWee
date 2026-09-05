@@ -830,9 +830,30 @@ void SpellHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
     //
     // Instant spells are unaffected, which is what keeps casting on the move
     // working for everything that should.
+    // Named rather than 0x0F, which is the same four bits and says nothing
+    // about which.
+    constexpr uint32_t kHorizontalMove =
+        static_cast<uint32_t>(MovementFlags::FORWARD) |
+        static_cast<uint32_t>(MovementFlags::BACKWARD) |
+        static_cast<uint32_t>(MovementFlags::STRAFE_LEFT) |
+        static_cast<uint32_t>(MovementFlags::STRAFE_RIGHT);
     const uint32_t moveFlags = owner_.movementInfoRef().flags;
-    const bool isMoving = (moveFlags & 0x0Fu) != 0; // FORWARD|BACKWARD|STRAFE_LEFT|STRAFE_RIGHT
+    const bool isMoving = (moveFlags & kHorizontalMove) != 0;
     if (isMoving && owner_.getSpellData(spellId).castTimeMs > 0) {
+        // Logged with the flags that decided it.
+        //
+        // The server answers SPELL_FAILED_MOVING in the same words, so a player
+        // who is standing still and told they are moving cannot tell which of
+        // the two said it. This line names the refusal as ours and prints the
+        // bits behind it: a flag still set with no key held is a stop that was
+        // never sent, and the log says which direction it was.
+        LOG_WARNING("Cast refused as moving: spell ", spellId,
+                    " castTime ", owner_.getSpellData(spellId).castTimeMs, "ms",
+                    " flags=0x", std::hex, moveFlags, std::dec,
+                    (moveFlags & static_cast<uint32_t>(MovementFlags::FORWARD)      ? " FORWARD" : ""),
+                    (moveFlags & static_cast<uint32_t>(MovementFlags::BACKWARD)     ? " BACKWARD" : ""),
+                    (moveFlags & static_cast<uint32_t>(MovementFlags::STRAFE_LEFT)  ? " STRAFE_LEFT" : ""),
+                    (moveFlags & static_cast<uint32_t>(MovementFlags::STRAFE_RIGHT) ? " STRAFE_RIGHT" : ""));
         owner_.raiseUiError("Can't do that while moving");
         return;
     }
