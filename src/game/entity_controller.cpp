@@ -762,9 +762,8 @@ void EntityController::applyPlayerTransportState(const UpdateBlock& block,
     // Reject server-pushed position corrections to near-origin on map 0.
     // The server stores a corrupted position from a faulty area-trigger
     // destination; accepting it lets heartbeats reinforce the bad save.
-    auto positionIsBad = [&](float x, float y) {
-        return owner_.getCurrentMapId() == 0 &&
-               std::abs(x) < 1000.0f && std::abs(y) < 1000.0f;
+    auto positionIsBad = [&](float x, float y, float z) {
+        return isCorruptOriginPosition(owner_.getCurrentMapId(), x, y, z);
     };
 
     if (block.onTransport) {
@@ -781,7 +780,7 @@ void EntityController::applyPlayerTransportState(const UpdateBlock& block,
             owner_.movementInfoRef().y = composed.y;
             owner_.movementInfoRef().z = composed.z;
         } else if (updateMovementInfoPos) {
-            if (positionIsBad(canonicalPos.x, canonicalPos.y)) {
+            if (positionIsBad(canonicalPos.x, canonicalPos.y, canonicalPos.z)) {
                 LOG_WARNING("REJECTED player UPDATE_OBJECT to near-origin canonical=(",
                             canonicalPos.x, ", ", canonicalPos.y, ", ", canonicalPos.z, ")");
             } else {
@@ -795,7 +794,7 @@ void EntityController::applyPlayerTransportState(const UpdateBlock& block,
                 ", ", owner_.playerTransportOffsetRef().z, ")");
     } else {
         if (updateMovementInfoPos) {
-            if (positionIsBad(canonicalPos.x, canonicalPos.y)) {
+            if (positionIsBad(canonicalPos.x, canonicalPos.y, canonicalPos.z)) {
                 LOG_WARNING("REJECTED player UPDATE_OBJECT to near-origin canonical=(",
                             canonicalPos.x, ", ", canonicalPos.y, ", ", canonicalPos.z, ")");
             } else {

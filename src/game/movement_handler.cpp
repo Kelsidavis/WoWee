@@ -432,8 +432,8 @@ bool MovementHandler::restoreWorldTransferFallbackIfNearOrigin(const char* conte
     if (!worldTransferFallbackValid_ || owner_.getCurrentMapId() != worldTransferFallbackMapId_) {
         return false;
     }
-    if (owner_.getCurrentMapId() != 0 ||
-        std::abs(movementInfo.x) >= 1000.0f || std::abs(movementInfo.y) >= 1000.0f) {
+    if (!isCorruptOriginPosition(owner_.getCurrentMapId(),
+                                movementInfo.x, movementInfo.y, movementInfo.z)) {
         return false;
     }
 
@@ -740,8 +740,8 @@ void MovementHandler::sendMovement(Opcode opcode) {
     // These positions are almost certainly bugs (area trigger misfire, corrupted
     // save). Sending them tells the server the player is there, which persists
     // the bad position across sessions and creates a teleport loop.
-    if (owner_.getCurrentMapId() == 0 &&
-        std::abs(movementInfo.x) < 1000.0f && std::abs(movementInfo.y) < 1000.0f) {
+    if (isCorruptOriginPosition(owner_.getCurrentMapId(),
+                               movementInfo.x, movementInfo.y, movementInfo.z)) {
         if (!restoreWorldTransferFallbackIfNearOrigin("sendMovement")) {
             LOG_WARNING("sendMovement: BLOCKED near-origin heartbeat canonical=(",
                         movementInfo.x, ", ", movementInfo.y, ", ", movementInfo.z,
@@ -2028,7 +2028,8 @@ void MovementHandler::handleNewWorld(network::Packet& packet) {
 
     glm::vec3 receivedCanonical = core::coords::serverToCanonical(glm::vec3(serverX, serverY, serverZ));
     const bool badEasternKingdomsNearOrigin =
-        mapId == 0 && std::abs(receivedCanonical.x) < 1000.0f && std::abs(receivedCanonical.y) < 1000.0f;
+        isCorruptOriginPosition(mapId, receivedCanonical.x, receivedCanonical.y,
+                                receivedCanonical.z);
     if (badEasternKingdomsNearOrigin) {
         if (hasPendingAreaTriggerDestination && pendingAreaTriggerDestinationMapId == mapId) {
             LOG_WARNING("Correcting bad SMSG_NEW_WORLD near-origin destination for area trigger ",
@@ -3177,8 +3178,7 @@ void MovementHandler::checkAreaTriggers() {
     // Sanity: if position is near map origin on Eastern Kingdoms (map 0),
     // something has corrupted movementInfo - skip area trigger check to
     // avoid firing Alterac/Hillsbrad triggers and causing a rogue teleport.
-    if (owner_.getCurrentMapId() == 0 &&
-        std::abs(px) < 1000.0f && std::abs(py) < 1000.0f) {
+    if (isCorruptOriginPosition(owner_.getCurrentMapId(), px, py, pz)) {
         if (!restoreWorldTransferFallbackIfNearOrigin("checkAreaTriggers")) {
             LOG_WARNING("checkAreaTriggers: position near map origin (", px, ", ", py, ", ", pz,
                         ") on map 0 - skipping to avoid rogue teleport. onTransport=",
