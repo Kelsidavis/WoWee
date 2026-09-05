@@ -1435,8 +1435,18 @@ void CharacterPreview::applyPreviewView() {
     // its head. The camera is placed in model space, so it is offset by where
     // the model stands and the model is left in its own orientation.
     if (zoomLevel_ >= 1.0f && portraitCameraValid_) {
+        // Room for the idle to move in.
+        //
+        // The artist's camera frames the pose Stand opens on, tightly. Left at
+        // exactly that, a gnoll swings its head out of shot for most of the
+        // loop. Backing off along the same axis keeps the framing the artist
+        // chose - the angle, the target, the whole composition - and only
+        // loosens the crop, which is the one thing an animated portrait needs
+        // and a still one does not. One number, tune it by eye.
+        constexpr float kPortraitHeadroom = 1.35f;
         const glm::vec3 focus = previewStandPosition_ + portraitCameraTarget_;
-        const glm::vec3 camPos = previewStandPosition_ + portraitCameraPos_;
+        const glm::vec3 camPos =
+            focus + (portraitCameraPos_ - portraitCameraTarget_) * kPortraitHeadroom;
         camera_->setPosition(camPos);
         const glm::vec3 forward = glm::normalize(focus - camPos);
         camera_->setRotation(glm::degrees(std::atan2(forward.y, forward.x)),
