@@ -816,6 +816,7 @@ constexpr const char* kGraphicsPresetKeys[] = {
     "viewdistance", "shadows", "shadowdistance", "antialiasing", "fxaa",
     "normalmapping", "normalmapstrength", "parallax", "parallaxquality",
     "groundclutter",
+    "grassenabled", "grassdensity", "grassheight", "grassdistance",
 };
 
 /// Every graphics setting that has to reach something when it is loaded.
@@ -827,7 +828,8 @@ constexpr const char* kGraphicsPresetKeys[] = {
 constexpr const char* kGraphicsApplyKeys[] = {
     "viewdistance", "shadows", "shadowdistance", "antialiasing", "fxaa",
     "normalmapping", "normalmapstrength", "parallax", "parallaxquality",
-    "groundclutter", "waterrefraction", "upscaling", "fsrquality",
+    "groundclutter", "grassenabled", "grassdensity", "grassheight",
+    "grassdistance", "waterrefraction", "upscaling", "fsrquality",
     "fsrsharpness", "framegen", "brightness", "uiopacity", "minimapsquare",
     "minimapnpcdots", "minimapclock", "minimapcoords", "latencymeter",
     "fogskyblend", "fogstrength", "sharpstars",
@@ -871,6 +873,10 @@ void SettingsPanel::applyGraphicsPreset(GraphicsPreset preset) {
         pendingPOM               = p.parallax;
         pendingPOMQuality        = p.parallaxQuality;
         pendingGroundClutterDensity = p.groundClutter;
+        pendingGrassEnabled      = p.grass;
+        pendingGrassDensity      = p.grassDensity;
+        pendingGrassHeight       = p.grassHeight;
+        pendingGrassDistance     = p.grassDistance;
         // Each one goes to the thing it affects through the one function that
         // knows where that is, rather than through a second copy of the same
         // renderer calls written out here.
@@ -900,7 +906,13 @@ void SettingsPanel::updateGraphicsPresetFromCurrentSettings() {
             pendingFXAA == p.fxaa &&
             pendingNormalMapping == p.normalMapping &&
             pendingPOM == p.parallax &&
-            std::abs(pendingGroundClutterDensity - p.groundClutter) <= 10;
+            std::abs(pendingGroundClutterDensity - p.groundClutter) <= 10 &&
+            pendingGrassEnabled == p.grass &&
+            // As with shadows: a preset that grows no grass says nothing about
+            // how dense, how tall or how far it would have been.
+            (!p.grass || (std::abs(pendingGrassDensity - p.grassDensity) <= 5 &&
+                          std::abs(pendingGrassHeight - p.grassHeight) <= 5 &&
+                          std::abs(pendingGrassDistance - p.grassDistance) <= 10));
         if (matches) {
             pendingGraphicsPreset = static_cast<GraphicsPreset>(i + 1);
             return;

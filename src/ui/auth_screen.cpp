@@ -1419,6 +1419,10 @@ void AuthScreen::applyPresetToState(LoginGraphicsState& s, int preset) {
     s.pom            = p.parallax;
     s.pomQuality     = p.parallaxQuality;
     s.groundClutter  = p.groundClutter;
+    s.grass          = p.grass;
+    s.grassDensity   = p.grassDensity;
+    s.grassHeight    = p.grassHeight;
+    s.grassDistance  = p.grassDistance;
 
     // Not in the table because the in-game preset has no opinion about them
     // either: upscaling and water refraction are the player's, and brightness,
@@ -1476,6 +1480,10 @@ void AuthScreen::loadLoginGraphicsState() {
         else if (key == "upscaling_mode")   loginGfx_.upscalingMode  = clampI(std::stoi(val), 0, 2);
         else if (key == "water_refraction") loginGfx_.waterRefraction = (val == "1");
         else if (key == "ground_clutter_density") loginGfx_.groundClutter = clampI(std::stoi(val), 0, 150);
+        else if (key == "grass_enabled")    loginGfx_.grass          = (val == "1");
+        else if (key == "grass_density")    loginGfx_.grassDensity   = clampI(std::stoi(val), 0, 300);
+        else if (key == "grass_height")     loginGfx_.grassHeight    = clampI(std::stoi(val), 50, 300);
+        else if (key == "grass_distance")   loginGfx_.grassDistance  = clampI(std::stoi(val), 30, 800);
         else if (key == "brightness")       loginGfx_.brightness     = clampI(std::stoi(val), 0, 100);
         else if (key == "vsync")            loginGfx_.vsync          = (val == "1");
         else if (key == "fullscreen")       loginGfx_.fullscreen     = (val == "1");
@@ -1512,6 +1520,10 @@ void AuthScreen::saveLoginGraphicsState() {
     cfg["upscaling_mode"]        = std::to_string(loginGfx_.upscalingMode);
     cfg["water_refraction"]      = loginGfx_.waterRefraction ? "1" : "0";
     cfg["ground_clutter_density"]= std::to_string(loginGfx_.groundClutter);
+    cfg["grass_enabled"]         = loginGfx_.grass ? "1" : "0";
+    cfg["grass_density"]         = std::to_string(loginGfx_.grassDensity);
+    cfg["grass_height"]          = std::to_string(loginGfx_.grassHeight);
+    cfg["grass_distance"]        = std::to_string(loginGfx_.grassDistance);
     cfg["brightness"]            = std::to_string(loginGfx_.brightness);
     cfg["vsync"]                 = loginGfx_.vsync           ? "1" : "0";
     cfg["fullscreen"]            = loginGfx_.fullscreen      ? "1" : "0";
