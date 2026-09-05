@@ -590,9 +590,33 @@ bool VkContext::selectPhysicalDevice() {
         depthResolveMode_ = VK_RESOLVE_MODE_NONE;
     }
 
-    LOG_INFO("Vulkan device: ", props.deviceName);
-    LOG_INFO("Vulkan API version: ", VK_VERSION_MAJOR(props.apiVersion), ".",
-             VK_VERSION_MINOR(props.apiVersion), ".", VK_VERSION_PATCH(props.apiVersion));
+    // At warning level, so a crash report carries it.
+    //
+    // A log sent in after a device loss is filtered to warnings and errors, and
+    // the adapter was named at info: every report of a lost device arrived with
+    // no idea which GPU or driver lost it, which is the first thing anyone
+    // would ask. The driver version was not written down at all.
+    //
+    // Vendors pack that version differently. NVIDIA's is 10/8/8/6 bits rather
+    // than Vulkan's 10/10/12, and decoding theirs the standard way prints a
+    // number that matches nothing on their download page.
+    const uint32_t dv = props.driverVersion;
+    char driverStr[64];
+    if (props.vendorID == 0x10DE) {  // NVIDIA
+        std::snprintf(driverStr, sizeof(driverStr), "%u.%u.%u.%u",
+                      (dv >> 22) & 0x3FFu, (dv >> 14) & 0xFFu,
+                      (dv >> 6) & 0xFFu, dv & 0x3Fu);
+    } else {
+        std::snprintf(driverStr, sizeof(driverStr), "%u.%u.%u",
+                      VK_VERSION_MAJOR(dv), VK_VERSION_MINOR(dv), VK_VERSION_PATCH(dv));
+    }
+    LOG_WARNING("Vulkan device: ", props.deviceName,
+                " vendor=0x", std::hex, props.vendorID,
+                " device=0x", props.deviceID, std::dec,
+                " driver=", driverStr,
+                " api=", VK_VERSION_MAJOR(props.apiVersion), ".",
+                VK_VERSION_MINOR(props.apiVersion), ".",
+                VK_VERSION_PATCH(props.apiVersion));
     LOG_INFO("Depth resolve support: ", depthResolveSupported_ ? "YES" : "NO");
 
     // Probe queue families to see if the graphics family supports multiple queues
