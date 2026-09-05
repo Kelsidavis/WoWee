@@ -1,6 +1,7 @@
 #include "core/application.hpp"
 #include "core/config_paths.hpp"
 #include "core/logger.hpp"
+#include "core/version.hpp"
 #include <exception>
 #include <csignal>
 #include <cstdlib>
@@ -210,6 +211,30 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     try {
         wowee::core::Logger::getInstance().setLogLevel(readLogLevelFromEnv());
         LOG_INFO("=== Wowee Native Client ===");
+        // At warning level, with the platform, because a log sent in after a
+        // crash is filtered to warnings and errors. Which build produced it is
+        // the first question asked of any report and the log did not answer it:
+        // a device loss on a version predating the fix for that very loss reads
+        // exactly like a new one.
+#if defined(_WIN32)
+        constexpr const char* kPlatform = "windows";
+#elif defined(__ANDROID__)
+        constexpr const char* kPlatform = "android";
+#elif defined(__APPLE__)
+        constexpr const char* kPlatform = "macos";
+#elif defined(__linux__)
+        constexpr const char* kPlatform = "linux";
+#else
+        constexpr const char* kPlatform = "unknown-platform";
+#endif
+#if defined(__aarch64__) || defined(_M_ARM64)
+        constexpr const char* kArch = "arm64";
+#elif defined(__x86_64__) || defined(_M_X64)
+        constexpr const char* kArch = "x86-64";
+#else
+        constexpr const char* kArch = "unknown-arch";
+#endif
+        LOG_WARNING("Wowee ", wowee::core::kVersionString, " ", kPlatform, " ", kArch);
         LOG_INFO("Starting application...");
 
         // Seed portable config from the per-user location on first portable launch.
