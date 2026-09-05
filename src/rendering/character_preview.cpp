@@ -1323,7 +1323,17 @@ void CharacterPreview::update(float deltaTime) {
         // doll rigid and its equipped weapons invisible.
         const glm::vec3 cameraPos = camera_ ? camera_->getPosition()
                                             : previewStandPosition_;
-        charRenderer_->update(deltaTime, cameraPos);
+        // A portrait framed by the model's own camera holds its pose.
+        //
+        // That camera was placed against the pose Stand opens on, and a
+        // portrait is a tight crop of a face. A gnoll's idle swings its head
+        // far enough to leave the frame entirely, so the target frame was
+        // empty most of the time. Derived here rather than set from outside
+        // because one preview is shared by players and creatures, and a flag
+        // would outlive whichever set it. Everything else still updates -
+        // bones, attachments, the composite - time simply does not advance.
+        const bool holdPose = (zoomLevel_ >= 1.0f) && portraitCameraValid_;
+        charRenderer_->update(holdPose ? 0.0f : deltaTime, cameraPos);
     }
 }
 
