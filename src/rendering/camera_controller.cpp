@@ -560,6 +560,23 @@ glm::vec3 CameraController::moveFollowedCharacter(float /*deltaTime*/, FrameInpu
                 considerFloor(mh);
             }
 
+            // Terrain is not a surface a swimmer can be underneath.
+            //
+            // considerFloor only takes a floor at or just above the feet, so a
+            // dive can pass under a dock rather than being held on top of it.
+            // Terrain has no underside to pass under, and once the feet are
+            // below the heightmap its sample is far above them: the guard drops
+            // it, no floor is left, and nothing pushes back. One fast frame
+            // through the surface and the swimmer is under the map for good.
+            //
+            // A structure floor found beneath the feet still owns the vertical,
+            // so a cave or an interior that genuinely sits below the heightmap
+            // keeps swimming as it did.
+            if (terrainManager && !floorH) {
+                auto th = terrainManager->getHeightAt(targetPos.x, targetPos.y);
+                if (th && *th > targetPos.z) floorH = th;
+            }
+
             if (ceilingH && verticalVelocity > 0.0f) {
                 float ceilingLimit = *ceilingH - 0.35f;
                 if (targetPos.z > ceilingLimit) {
