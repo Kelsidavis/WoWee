@@ -507,6 +507,15 @@ struct Widget {
         mutable int lines = 1;
     };
     std::vector<TooltipLine> tooltipLines;
+    /// Stand-ins for GameTooltipTextLeft1..N, created on demand by whatever
+    /// asks to be anchored to one. FrameXML positions things against a
+    /// tooltip's individual lines - SetTooltipMoney hangs the coin frame off
+    /// TextLeft<NumLines()> - and the lines here are strings in the vector
+    /// above rather than regions with a rect, so those names resolved to
+    /// nothing and the anchor silently fell back to the tooltip itself. Index
+    /// i holds the region standing in for line i + 1; the sizing pass gives
+    /// each one the box its line occupies.
+    std::vector<uint32_t> tooltipLineAnchors;
     /// A floor on the width the sizing pass may settle on, from
     /// SetMinimumWidth. FrameXML uses it to keep a money frame from being
     /// clipped by a tooltip narrower than the coins it is about to draw:

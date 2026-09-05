@@ -453,6 +453,49 @@ void WidgetRenderer::sizeTooltips(WidgetTree& tree) {
         w->width  = std::max(std::max(widest, wrapW) + kPad * 2.0f,
                              w->tooltipMinWidth);
         w->height = lineH * static_cast<float>(rows) + kPad * 2.0f;
+
+        // Put the per-line regions over the lines they stand for.
+        //
+        // GameTooltipTextLeft<n> is a real FontString - the template declares
+        // the first two and anything past that is made on demand - and
+        // FrameXML anchors to them by name: SetTooltipMoney hangs the coin
+        // frame off TextLeft<NumLines()>. The text of a line lives in
+        // tooltipLines here and is drawn from there, so those FontStrings hold
+        // nothing, size to nothing, and the template's own chain chases that:
+        // TextLeft2 sits at TextLeft1's BOTTOMLEFT less two units, and with
+        // every height zero the whole column collapses into the top of the
+        // tooltip two units apart. The flight cost was drawn across the
+        // destination's name for exactly that reason.
+        //
+        // Their own anchors are replaced rather than their heights corrected,
+        // so the boxes agree with the rows actually drawn instead of
+        // accumulating the template's inter-line offset a second time.
+        if (!w->name.empty()) {
+            if (w->tooltipLineAnchors.size() < w->tooltipLines.size())
+                w->tooltipLineAnchors.resize(w->tooltipLines.size(), 0);
+            float top = kPad;
+            for (size_t i = 0; i < w->tooltipLines.size(); ++i) {
+                const float rowH = lineH * static_cast<float>(w->tooltipLines[i].lines);
+                uint32_t& rid = w->tooltipLineAnchors[i];
+                if (rid == 0) {
+                    const std::string ln = w->name + "TextLeft" + std::to_string(i + 1);
+                    if (const Widget* found = tree.findByName(ln)) rid = found->id;
+                }
+                if (rid != 0) {
+                    Anchor a;
+                    a.point = "TOPLEFT";
+                    a.relativeTo = w->id;
+                    a.relativePoint = "TOPLEFT";
+                    a.x = kPad;
+                    a.y = -top;
+                    tree.clearPoints(rid);
+                    tree.addPoint(rid, a);
+                    tree.setWidth(rid, std::max(w->width - kPad * 2.0f, 1.0f));
+                    tree.setHeight(rid, rowH);
+                }
+                top += rowH;
+            }
+        }
     }
 }
 

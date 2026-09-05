@@ -408,6 +408,32 @@ uint32_t widgetIdByAnchorName(lua_State* L, int selfIndex, const char* name) {
     if (id == 0) {
         if (const wowee::ui::Widget* w = tree->findByName(resolved)) id = w->id;
     }
+    // A tooltip's individual lines. FrameXML anchors to them by name -
+    // SetTooltipMoney puts the coin frame at TextLeft<NumLines()>, and a
+    // tooltip's lines are strings here rather than regions, so the name found
+    // nothing and SetPoint fell back to the tooltip itself: the flight cost
+    // was drawn across the destination's name instead of under it. Stand-ins
+    // are made on demand and given their line's box by the sizing pass.
+    if (id == 0) {
+        const std::string kMark = "TextLeft";
+        const size_t at = resolved.rfind(kMark);
+        if (at != std::string::npos && at > 0 && at + kMark.size() < resolved.size()) {
+            const std::string digits = resolved.substr(at + kMark.size());
+            if (digits.find_first_not_of("0123456789") == std::string::npos) {
+                const long n = std::strtol(digits.c_str(), nullptr, 10);
+                wowee::ui::Widget* owner =
+                    const_cast<wowee::ui::Widget*>(tree->findByName(resolved.substr(0, at)));
+                if (owner && owner->isTooltip && n >= 1 && n <= 64) {
+                    if (owner->tooltipLineAnchors.size() < static_cast<size_t>(n))
+                        owner->tooltipLineAnchors.resize(static_cast<size_t>(n), 0);
+                    uint32_t& slot = owner->tooltipLineAnchors[static_cast<size_t>(n) - 1];
+                    if (slot == 0)
+                        slot = tree->create(wowee::ui::WidgetKind::Frame, owner->id, resolved);
+                    id = slot;
+                }
+            }
+        }
+    }
     return id;
 }
 
