@@ -1432,9 +1432,12 @@ M2Model M2Loader::load(const std::vector<uint8_t>& m2Data) {
         model.cameras.reserve(cameraCount);
         auto pushCamera = [&model](uint32_t type, float fov, float farClip, float nearClip,
                                    const float* posBase, const float* tgtBase) {
-            // type 0xFFFFFFFF marks the model's own portrait/scene camera.
-            (void)type;
+            // type 0 is the portrait camera and 1 the character-sheet one;
+            // 0xFFFFFFFF is neither. It used to be discarded, which left no way
+            // to tell the two apart and no way to frame a portrait by the one
+            // the artist placed.
             M2Camera cam;
+            cam.type = static_cast<int32_t>(type);
             cam.fov = fov;
             cam.farClip = farClip;
             cam.nearClip = nearClip;

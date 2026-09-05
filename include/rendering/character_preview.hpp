@@ -177,6 +177,18 @@ private:
     // each race; wheel zoom interpolates its focus upward toward the face.
     float zoomLevel_ = 0.0f;
     float fullBodyDistance_ = 4.5f;
+    /// The model's own portrait camera, where it has one. Framing a face by a
+    /// fraction of the bind-pose height assumes the pose the model stands in is
+    /// the pose it is drawn in, and a gnoll's is not: it stands upright in bind
+    /// pose and hunches when animated, so the guess aimed a head above the head.
+    bool portraitCameraValid_ = false;
+    /// The field of view the preview was built with. A portrait camera carries
+    /// its own, and one preview is shared by players and creatures, so the
+    /// creature's has to be handed back or the next player portrait wears it.
+    float defaultFovDegrees_ = 0.0f;
+    glm::vec3 portraitCameraPos_{0.0f};
+    glm::vec3 portraitCameraTarget_{0.0f};
+    float portraitCameraFovDegrees_ = 0.0f;
     float modelBoundMinZ_ = 0.0f;
     float modelBoundMaxZ_ = 2.0f;
     glm::vec3 previewStandPosition_{0.0f};

@@ -134,6 +134,11 @@ struct M2Attachment {
 // cinematics) carry the framing the artist authored them for; without it, a scene
 // whose geometry sits hundreds of units from its origin cannot be placed sensibly.
 struct M2Camera {
+    /// 0 is the portrait camera, 1 the character-sheet one, -1 anything else.
+    /// Kept because the portrait framing is chosen by it: a model that carries
+    /// its own portrait camera knows where its face is far better than a
+    /// fraction of the bind-pose height can guess.
+    int32_t type = -1;
     float fov = 0.0f;      // radians
     float farClip = 0.0f;
     float nearClip = 0.0f;

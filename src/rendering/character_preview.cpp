@@ -530,6 +530,9 @@ bool CharacterPreview::loadCharacter(game::Race race, game::Gender gender,
         modelBoundMinZ_ = frameMin.z;
         modelBoundMaxZ_ = frameMax.z;
         fullBodyDistance_ = camera_->getPosition().y;
+        // A player model is framed by its bounds; no creature portrait camera
+        // is in play, and a stale one from the shared preview must not be.
+        portraitCameraValid_ = false;
     }
 
     // Look up CharSections.dbc for all appearance textures
@@ -1054,6 +1057,19 @@ bool CharacterPreview::loadCreature(
         fullBodyDistance_ = camera_->getPosition().y;
     }
 
+    // The artist's own portrait framing, where the model carries one.
+    portraitCameraValid_ = false;
+    for (const auto& cam : model.cameras) {
+        if (cam.type != 0) continue;
+        if (!isFiniteVec3(cam.positionBase) || !isFiniteVec3(cam.targetBase)) break;
+        portraitCameraPos_ = cam.positionBase;
+        portraitCameraTarget_ = cam.targetBase;
+        portraitCameraFovDegrees_ =
+            (cam.fov > 0.0f && cam.fov < 3.14159f) ? glm::degrees(cam.fov) : 0.0f;
+        portraitCameraValid_ = true;
+        break;
+    }
+
     if (!charRenderer_->loadModel(model, PREVIEW_MODEL_ID)) {
         LOG_WARNING("CharacterPreview: failed to upload creature model");
         return false;
@@ -1410,6 +1426,34 @@ void CharacterPreview::resetView() {
 
 void CharacterPreview::applyPreviewView() {
     if (!camera_) return;
+
+    // A model that carries its own portrait camera is framed by it. The
+    // fraction-of-height guess below assumes the bind pose is the drawn pose,
+    // which holds for a player and not for a creature that hunches: a gnoll
+    // stands 2.04 tall in bind pose, so 82% of it aimed at 1.67 while the
+    // artist's own camera looks at 0.96, and the portrait showed the top of
+    // its head. The camera is placed in model space, so it is offset by where
+    // the model stands and the model is left in its own orientation.
+    if (zoomLevel_ >= 1.0f && portraitCameraValid_) {
+        const glm::vec3 focus = previewStandPosition_ + portraitCameraTarget_;
+        const glm::vec3 camPos = previewStandPosition_ + portraitCameraPos_;
+        camera_->setPosition(camPos);
+        const glm::vec3 forward = glm::normalize(focus - camPos);
+        camera_->setRotation(glm::degrees(std::atan2(forward.y, forward.x)),
+                             glm::degrees(std::asin(std::clamp(forward.z, -1.0f, 1.0f))));
+        if (portraitCameraFovDegrees_ > 0.0f) {
+            if (defaultFovDegrees_ <= 0.0f) defaultFovDegrees_ = camera_->getFovDegrees();
+            camera_->setFov(portraitCameraFovDegrees_);
+        }
+        if (instanceId_ > 0 && charRenderer_) {
+            charRenderer_->setInstancePosition(instanceId_, previewStandPosition_);
+            charRenderer_->setInstanceRotation(instanceId_, glm::vec3(0.0f));
+        }
+        return;
+    }
+
+    // Whatever a portrait camera last set, handed back.
+    if (defaultFovDegrees_ > 0.0f) camera_->setFov(defaultFovDegrees_);
 
     const float modelHeight = std::max(modelBoundMaxZ_ - modelBoundMinZ_, 0.1f);
     const float bodyFocusZ = (modelBoundMinZ_ + modelBoundMaxZ_) * 0.5f;
