@@ -1127,6 +1127,59 @@ local kRemoved = {
     -- it was sent. The spam filter beside it is a different thing and stays -
     -- it matches the same line pasted over and over, not the words in it.
     "InterfaceOptionsSocialPanelProfanityFilter",
+
+    -- Effects this renderer has no reader for. Ground decals are drawn from
+    -- the client's own spell-marker catalogue rather than projected, so the
+    -- switch could only ever hide raid mechanics; texture and terrain
+    -- resolution are the files' own mips, sampled as they are.
+    "VideoOptionsEffectsPanelProjectedTextures",
+    "VideoOptionsEffectsPanelTextureResolution",
+    "VideoOptionsEffectsPanelTerrainDetail",
+
+    -- Names over heads. The client reads three of these - your own name,
+    -- guilds and titles - and draws every other name regardless: NPCs,
+    -- critters, players on either side, pets, guardians and totems. The
+    -- two player groups go whole, heading and all, since every box in
+    -- them is one of the unread ones. Nameplates the same: friends,
+    -- enemies and overlap are honoured, the pet, guardian and totem
+    -- boxes under each are not.
+    "InterfaceOptionsNamesPanelNPCNames",
+    "InterfaceOptionsNamesPanelNonCombatCreature",
+    "InterfaceOptionsNamesPanelFriendly",
+    "InterfaceOptionsNamesPanelEnemy",
+    "InterfaceOptionsNamesPanelFriendlyPets",
+    "InterfaceOptionsNamesPanelFriendlyGuardians",
+    "InterfaceOptionsNamesPanelFriendlyTotems",
+    "InterfaceOptionsNamesPanelEnemyPets",
+    "InterfaceOptionsNamesPanelEnemyGuardians",
+    "InterfaceOptionsNamesPanelEnemyTotems",
+
+    -- The six engine-side rows at the top of Combat Text: the numbers the
+    -- real client floats over the target. This client floats its own, and
+    -- reads the enable switch and the dodge/parry/miss box below and none
+    -- of these. The rest of the page is Blizzard_CombatText's and stays.
+    "InterfaceOptionsCombatTextPanelTargetDamage",
+    "InterfaceOptionsCombatTextPanelPeriodicDamage",
+    "InterfaceOptionsCombatTextPanelPetDamage",
+    "InterfaceOptionsCombatTextPanelHealing",
+    "InterfaceOptionsCombatTextPanelTargetEffects",
+    "InterfaceOptionsCombatTextPanelOtherTargetEffects",
+
+    -- One each, the same reason: a cvar nothing reads. No ranged/melee
+    -- auto-switch, no raid range fade, no cinematics to subtitle, no
+    -- colourblind text in tooltips, no item level line, no automatic quest
+    -- progress or map difficulty colouring, no buff consolidation - that
+    -- came with the next expansion - and Lua errors are reported the
+    -- client's own way whatever the box says.
+    "InterfaceOptionsCombatPanelAutoRange",
+    "InterfaceOptionsUnitFramePanelRaidRange",
+    "InterfaceOptionsDisplayPanelCinematicSubtitles",
+    "InterfaceOptionsDisplayPanelColorblindMode",
+    "InterfaceOptionsDisplayPanelShowItemLevel",
+    "InterfaceOptionsObjectivesPanelAutoQuestProgress",
+    "InterfaceOptionsObjectivesPanelMapQuestDifficulty",
+    "InterfaceOptionsBuffsPanelConsolidateBuffs",
+    "InterfaceOptionsHelpPanelShowLuaErrors",
 }
 
 -- Whole pages, because every control on them is for a feature that is not
@@ -1136,6 +1189,9 @@ local kRemoved = {
 local kRemovedCategories = {
     "AudioOptionsVoicePanel",
     "VideoOptionsStereoPanel",
+    -- Every row on it is a Battle.net toast, and this client has no
+    -- Battle.net: the friends list answers zero for it and always will.
+    "InterfaceOptionsBattlenetPanel",
 }
 
 local removed = {}
