@@ -872,8 +872,15 @@ void Renderer::setWaterRefractionEnabled(bool /*enabled*/) {
 void Renderer::setMsaaSamples(VkSampleCountFlagBits samples) {
     if (!vkCtx) return;
 
-    // FSR2 requires non-MSAA render pass - block MSAA changes while FSR2 is active
-    if (postProcessPipeline_ && postProcessPipeline_->isFsr2BlockingMsaa() && samples > VK_SAMPLE_COUNT_1_BIT) return;
+    // Only a device that cannot resolve depth has to choose between the
+    // temporal upscaler and multisampling; everywhere else both run. The
+    // saved choice is kept either way and re-asserted when the upscaler goes
+    // off, by the settings panel.
+    if (postProcessPipeline_ && postProcessPipeline_->isFsr2BlockingMsaa() && samples > VK_SAMPLE_COUNT_1_BIT) {
+        LOG_WARNING("Multisampling left off: the temporal upscaler is on and this device "
+                    "cannot resolve depth");
+        return;
+    }
 
     // Clamp to device maximum
     VkSampleCountFlagBits maxSamples = vkCtx->getMaxUsableSampleCount();
@@ -890,8 +897,8 @@ void Renderer::applyMsaaChange() {
     VkSampleCountFlagBits samples = pendingMsaaSamples_;
     msaaChangePending_ = false;
 
-    // FSR2 requires non-MSAA render pass - if FSR2 was enabled after the MSAA
-    // change was queued (startup race), force 1x to avoid framebuffer mismatch.
+    // Only where the upscaler cannot share a multisampled scene - a device
+    // with no depth resolve - does a queued change have to fall back to 1x.
     if (samples > VK_SAMPLE_COUNT_1_BIT &&
         postProcessPipeline_ && postProcessPipeline_->isFsr2BlockingMsaa()) {
         samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1963,9 +1970,10 @@ void Renderer::setFSR2Enabled(bool enabled) {
         pendingMsaaSamples_ = req.samples;
         msaaChangePending_ = true;
     }
-    // If enabling FSR2 and there's already a pending MSAA change to >1x
-    // (e.g. startup settings loaded MSAA before FSR2), override it to 1x.
-    if (enabled && msaaChangePending_ && pendingMsaaSamples_ > VK_SAMPLE_COUNT_1_BIT) {
+    // A pending multisampling change loaded before the upscaler only has to
+    // yield on a device that cannot resolve depth.
+    if (enabled && msaaChangePending_ && pendingMsaaSamples_ > VK_SAMPLE_COUNT_1_BIT &&
+        postProcessPipeline_->isFsr2BlockingMsaa()) {
         pendingMsaaSamples_ = VK_SAMPLE_COUNT_1_BIT;
     }
 }

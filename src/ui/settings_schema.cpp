@@ -78,9 +78,9 @@ constexpr SettingDesc kSchema[] = {
     // printed twice, once without a control. "Multisampling" is also what the
     // game's own video options call this dropdown.
     {"antialiasing", "Multisampling", SettingKind::Enum, 0, 3, 1, "Graphics", "Anti-aliasing",
-     "Costs memory as well as time, and has no effect while FSR 3 is\n"
-     "upscaling - FSR does its own.",
-     "Off|2x MSAA|4x MSAA|8x MSAA", 1, "upscaling!=2"},
+     "Costs memory as well as time. Runs alongside FSR upscaling on any\n"
+     "device that can resolve depth, which is every desktop GPU.",
+     "Off|2x MSAA|4x MSAA|8x MSAA", 1},
     // Two, not off, and not four.
     //
     // Off was the right default for the hardware this game shipped on, and it
@@ -116,7 +116,7 @@ constexpr SettingDesc kSchema[] = {
     // --------------------------------------------------------------- Upscaling
     {"upscaling", "Upscaling", SettingKind::Enum, 0, 2, 1, "Upscaling", "Mode",
      "Render below your resolution and scale up. FSR 1 is spatial and cheap;\n"
-     "FSR 3 is temporal and sharper, and does its own anti-aliasing.",
+     "FSR 3 is temporal and sharper. Both run on top of multisampling and FXAA.",
      "Off|FSR 1 (spatial)|FSR 3 (temporal)", 0},
     {"fsrquality", "FSR quality", SettingKind::Enum, 0, 3, 1, "Upscaling", "",
      "How far below your resolution the world is drawn.",

@@ -228,6 +228,10 @@ public:
     }
     [[nodiscard]] VkFormat getDepthFormat() const { return depthFormat; }
     [[nodiscard]] VkImageView getDepthResolveImageView() const { return depthResolveImageView; }
+    /// Whether the device can resolve a multisampled depth attachment in the
+    /// render pass. Decided at device selection; the view above exists only
+    /// while MSAA is on, so this is the question to ask before turning it on.
+    [[nodiscard]] bool isDepthResolveSupported() const { return depthResolveSupported_; }
     [[nodiscard]] VkImageView getDepthImageView() const { return depthImageView; }
 
     // Sampler cache: returns a shared VkSampler matching the given create info.

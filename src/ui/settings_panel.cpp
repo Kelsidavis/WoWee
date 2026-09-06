@@ -1202,6 +1202,12 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
         if (renderer) {
             renderer->setFSREnabled(pendingUpscalingMode == 1);
             renderer->setFSR2Enabled(pendingUpscalingMode == 2);
+            // Multisampling is the player's own setting and survives the
+            // upscaler either way: re-asserted here so a device that had to
+            // give it up while upscaling gets it back the moment upscaling is
+            // off, rather than at the next touch of that control. A no-op
+            // where nothing changed.
+            renderer->setMsaaSamples(msaaSamplesForChoice(pendingAntiAliasing));
         }
     } else if (key == "fsrquality") {
         // How far below the display resolution the world is drawn, in the same

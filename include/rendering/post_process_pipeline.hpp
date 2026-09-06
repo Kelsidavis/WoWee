@@ -78,7 +78,11 @@ public:
     void destroyAllResources();
 
     /// True when FSR2 is active and MSAA changes should be blocked.
-    [[nodiscard]] bool isFsr2BlockingMsaa() const { return fsr2_.enabled; }
+    /// True only where the temporal upscaler cannot share the scene with
+    /// multisampling: it needs a single-sampled depth to read, which with MSAA
+    /// on is the render pass's depth resolve, and a device without depth
+    /// resolve has no such image. Everywhere else the two run together.
+    [[nodiscard]] bool isFsr2BlockingMsaa() const;
 
     // --- Public API (delegated from Renderer) ---
 
@@ -208,9 +212,15 @@ private:
         uint32_t internalWidth = 0;
         uint32_t internalHeight = 0;
 
-        // Off-screen scene targets (internal resolution, no MSAA - FSR2 replaces AA)
-        AllocatedImage sceneColor{};
-        AllocatedImage sceneDepth{};
+        // Off-screen scene targets at the internal resolution, laid out like
+        // FSR 1's: with MSAA on, the scene draws into the multisampled pair
+        // and the render pass resolves both into the single-sampled pair,
+        // which is what the upscaler reads. It used to insist on 1x and
+        // switch multisampling off behind the player's back to get it.
+        AllocatedImage sceneColor{};        // 1x: the render target, or the resolve target under MSAA
+        AllocatedImage sceneDepth{};        // at the scene's sample count
+        AllocatedImage sceneMsaaColor{};    // MSAA colour target, only while MSAA is on
+        AllocatedImage sceneDepthResolve{}; // 1x depth, only while MSAA is on
         VkFramebuffer sceneFramebuffer = VK_NULL_HANDLE;
 
         // Samplers
@@ -277,6 +287,11 @@ private:
     };
     FSR2State fsr2_;
     bool initFSR2Resources();
+    /// The single-sampled depth the upscaler's passes read: the resolve while
+    /// MSAA is on, the scene depth itself otherwise.
+    [[nodiscard]] const AllocatedImage& fsr2ReadDepth() const {
+        return fsr2_.sceneDepthResolve.image != VK_NULL_HANDLE ? fsr2_.sceneDepthResolve : fsr2_.sceneDepth;
+    }
     void destroyFSR2Resources();
     void dispatchMotionVectors();
     void dispatchAmdFsr2();

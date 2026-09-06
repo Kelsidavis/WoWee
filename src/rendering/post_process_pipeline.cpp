@@ -155,7 +155,7 @@ VkImage PostProcessPipeline::getSceneColorImage() const {
 VkImage PostProcessPipeline::getSceneDepthImage() const {
     // Prefer the resolved depth where MSAA produced one: it is single-sampled and
     // can be copied directly.
-    if (fsr2_.enabled && fsr2_.sceneFramebuffer) return fsr2_.sceneDepth.image;
+    if (fsr2_.enabled && fsr2_.sceneFramebuffer) return fsr2ReadDepth().image;
     if (needsFXAAPass() && fxaa_.sceneFramebuffer)
         return fxaa_.sceneDepthResolve.image ? fxaa_.sceneDepthResolve.image : fxaa_.sceneDepth.image;
     if (fsr_.enabled && fsr_.sceneFramebuffer)
@@ -163,9 +163,13 @@ VkImage PostProcessPipeline::getSceneDepthImage() const {
     return VK_NULL_HANDLE;
 }
 
+bool PostProcessPipeline::isFsr2BlockingMsaa() const {
+    return fsr2_.enabled && vkCtx_ && !vkCtx_->isDepthResolveSupported();
+}
+
 bool PostProcessPipeline::sceneDepthIsMsaa() const {
     if (!vkCtx_ || vkCtx_->getMsaaSamples() == VK_SAMPLE_COUNT_1_BIT) return false;
-    if (fsr2_.enabled && fsr2_.sceneFramebuffer) return true;  // FSR2 keeps only the sampled depth
+    if (fsr2_.enabled && fsr2_.sceneFramebuffer) return fsr2_.sceneDepthResolve.image == VK_NULL_HANDLE;
     if (needsFXAAPass() && fxaa_.sceneFramebuffer) return fxaa_.sceneDepthResolve.image == VK_NULL_HANDLE;
     if (fsr_.enabled && fsr_.sceneFramebuffer) return fsr_.sceneDepthResolve.image == VK_NULL_HANDLE;
     return true;
@@ -476,8 +480,13 @@ MsaaChangeRequest PostProcessPipeline::setFSR2Enabled(bool enabled, Camera* came
             fsr_.enabled = false;
             fsr_.needsRecreate = true;
         }
-        // FSR2 requires non-MSAA render pass (its framebuffer has 2 attachments)
-        if (vkCtx_ && vkCtx_->getMsaaSamples() > VK_SAMPLE_COUNT_1_BIT) {
+        // The upscaler reads a single-sampled depth. With MSAA on that is the
+        // render pass's depth resolve, so multisampling stays as the player
+        // set it; only a device that cannot resolve depth has to give it up.
+        if (vkCtx_ && vkCtx_->getMsaaSamples() > VK_SAMPLE_COUNT_1_BIT &&
+            !vkCtx_->isDepthResolveSupported()) {
+            LOG_WARNING("FSR2: this device cannot resolve depth, so multisampling is"
+                        " off while the upscaler is on");
             req.requested = true;
             req.samples = VK_SAMPLE_COUNT_1_BIT;
         }
@@ -853,18 +862,40 @@ bool PostProcessPipeline::initFSR2Resources() {
 
     VkFormat colorFmt = vkCtx_->getSwapchainFormat();
     VkFormat depthFmt = vkCtx_->getDepthFormat();
+    const VkSampleCountFlagBits msaa = vkCtx_->getMsaaSamples();
+    const bool useMsaa = msaa > VK_SAMPLE_COUNT_1_BIT;
+    const bool useDepthResolve = vkCtx_->getDepthResolveImageView() != VK_NULL_HANDLE;
+    if (useMsaa && !useDepthResolve) {
+        // setFSR2Enabled turns multisampling off ahead of this on such a device,
+        // so reaching here is an ordering bug rather than a configuration.
+        LOG_ERROR("FSR2: multisampling is on but the device has no depth resolve");
+        return false;
+    }
 
-    // Scene color (internal resolution, 1x - FSR2 replaces MSAA)
+    // Scene colour, always 1x and always what the upscaler reads: the render
+    // target without MSAA, the resolve target with it.
     fsr2_.sceneColor = createImage(device, alloc, fsr2_.internalWidth, fsr2_.internalHeight,
         colorFmt, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
                 | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     if (!fsr2_.sceneColor.image) { LOG_ERROR("FSR2: failed to create scene color"); return false; }
 
-    // Scene depth (internal resolution, 1x, sampled for motion vectors)
+    // Scene depth at the scene's own sample count. Without MSAA this is also
+    // what the motion vectors and the upscaler sample.
     fsr2_.sceneDepth = createImage(device, alloc, fsr2_.internalWidth, fsr2_.internalHeight,
         depthFmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
-                | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+                | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, msaa);
     if (!fsr2_.sceneDepth.image) { LOG_ERROR("FSR2: failed to create scene depth"); destroyFSR2Resources(); return false; }
+
+    if (useMsaa) {
+        fsr2_.sceneMsaaColor = createImage(device, alloc, fsr2_.internalWidth, fsr2_.internalHeight,
+            colorFmt, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, msaa);
+        if (!fsr2_.sceneMsaaColor.image) { LOG_ERROR("FSR2: failed to create MSAA color"); destroyFSR2Resources(); return false; }
+        // The single-sampled depth the passes read, resolved by the render pass.
+        fsr2_.sceneDepthResolve = createImage(device, alloc, fsr2_.internalWidth, fsr2_.internalHeight,
+            depthFmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+                    | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+        if (!fsr2_.sceneDepthResolve.image) { LOG_ERROR("FSR2: failed to create depth resolve"); destroyFSR2Resources(); return false; }
+    }
 
     // Motion vector buffer (internal resolution)
     fsr2_.motionVectors = createImage(device, alloc, fsr2_.internalWidth, fsr2_.internalHeight,
@@ -882,13 +913,25 @@ bool PostProcessPipeline::initFSR2Resources() {
         VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
     if (!fsr2_.framegenOutput.image) { LOG_ERROR("FSR2: failed to create framegen output"); destroyFSR2Resources(); return false; }
 
-    // Scene framebuffer (non-MSAA: [color, depth])
-    // Must use the same render pass as the swapchain - which must be non-MSAA when FSR2 is active
-    VkImageView fbAttachments[2] = { fsr2_.sceneColor.imageView, fsr2_.sceneDepth.imageView };
+    // Scene framebuffer, in the scene render pass's own attachment order:
+    //   1x:    [color, depth]
+    //   MSAA:  [msaaColor, depth, colorResolve, depthResolve]
+    VkImageView fbAttachments[4]{};
+    uint32_t fbCount = 2;
+    if (useMsaa) {
+        fbAttachments[0] = fsr2_.sceneMsaaColor.imageView;
+        fbAttachments[1] = fsr2_.sceneDepth.imageView;
+        fbAttachments[2] = fsr2_.sceneColor.imageView;
+        fbAttachments[3] = fsr2_.sceneDepthResolve.imageView;
+        fbCount = 4;
+    } else {
+        fbAttachments[0] = fsr2_.sceneColor.imageView;
+        fbAttachments[1] = fsr2_.sceneDepth.imageView;
+    }
     VkFramebufferCreateInfo fbInfo{};
     fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     fbInfo.renderPass = vkCtx_->getImGuiRenderPass();
-    fbInfo.attachmentCount = 2;
+    fbInfo.attachmentCount = fbCount;
     fbInfo.pAttachments = fbAttachments;
     fbInfo.width = fsr2_.internalWidth;
     fbInfo.height = fsr2_.internalHeight;
@@ -1061,7 +1104,7 @@ bool PostProcessPipeline::initFSR2Resources() {
         // Write descriptors
         VkDescriptorImageInfo depthImgInfo{};
         depthImgInfo.sampler = fsr2_.nearestSampler;
-        depthImgInfo.imageView = fsr2_.sceneDepth.imageView;
+        depthImgInfo.imageView = fsr2ReadDepth().imageView;
         depthImgInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
         VkDescriptorImageInfo mvImgInfo{};
@@ -1162,7 +1205,7 @@ bool PostProcessPipeline::initFSR2Resources() {
             // The accumulation shader already performs custom Lanczos reconstruction.
             // Use nearest here to avoid double filtering (linear + Lanczos) softening.
             VkDescriptorImageInfo colorInfo{.sampler = fsr2_.nearestSampler, .imageView = fsr2_.sceneColor.imageView, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-            VkDescriptorImageInfo depthInfo{.sampler = fsr2_.nearestSampler, .imageView = fsr2_.sceneDepth.imageView, .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
+            VkDescriptorImageInfo depthInfo{.sampler = fsr2_.nearestSampler, .imageView = fsr2ReadDepth().imageView, .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
             VkDescriptorImageInfo mvInfo{.sampler = fsr2_.nearestSampler, .imageView = fsr2_.motionVectors.imageView, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
             VkDescriptorImageInfo histInInfo{.sampler = fsr2_.linearSampler, .imageView = fsr2_.history[inputHistory].imageView, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
             VkDescriptorImageInfo histOutInfo{.sampler = VK_NULL_HANDLE, .imageView = fsr2_.history[outputHistory].imageView, .imageLayout = VK_IMAGE_LAYOUT_GENERAL};
@@ -1318,6 +1361,8 @@ void PostProcessPipeline::destroyFSR2Resources() {
     destroyImage(device, alloc, fsr2_.motionVectors);
     for (auto& img : fsr2_.history) destroyImage(device, alloc, img);
     destroyImage(device, alloc, fsr2_.framegenOutput);
+    destroyImage(device, alloc, fsr2_.sceneDepthResolve);
+    destroyImage(device, alloc, fsr2_.sceneMsaaColor);
     destroyImage(device, alloc, fsr2_.sceneDepth);
     destroyImage(device, alloc, fsr2_.sceneColor);
 
@@ -1328,8 +1373,8 @@ void PostProcessPipeline::destroyFSR2Resources() {
 void PostProcessPipeline::dispatchMotionVectors() {
     if (!fsr2_.motionVecPipeline || currentCmd_ == VK_NULL_HANDLE) return;
 
-    // Transition depth: DEPTH_STENCIL_ATTACHMENT → DEPTH_STENCIL_READ_ONLY
-    transitionImageLayout(currentCmd_, fsr2_.sceneDepth.image,
+    // Transition the depth the passes read: DEPTH_STENCIL_ATTACHMENT → DEPTH_STENCIL_READ_ONLY
+    transitionImageLayout(currentCmd_, fsr2ReadDepth().image,
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
         VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
@@ -1385,7 +1430,7 @@ void PostProcessPipeline::dispatchAmdFsr2() {
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-    transitionImageLayout(currentCmd_, fsr2_.sceneDepth.image,
+    transitionImageLayout(currentCmd_, fsr2ReadDepth().image,
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
@@ -1402,7 +1447,7 @@ void PostProcessPipeline::dispatchAmdFsr2() {
         fsr2_.internalWidth, fsr2_.internalHeight, vkCtx_->getSwapchainFormat(),
         L"FSR2_InputColor", FFX_RESOURCE_STATE_COMPUTE_READ);
     desc.depth = ffxGetTextureResourceVK(&fsr2_.amdContext,
-        fsr2_.sceneDepth.image, fsr2_.sceneDepth.imageView,
+        fsr2ReadDepth().image, fsr2ReadDepth().imageView,
         fsr2_.internalWidth, fsr2_.internalHeight, vkCtx_->getDepthFormat(),
         L"FSR2_InputDepth", FFX_RESOURCE_STATE_COMPUTE_READ);
     desc.motionVectors = ffxGetTextureResourceVK(&fsr2_.amdContext,
@@ -1463,7 +1508,7 @@ void PostProcessPipeline::dispatchAmdFsr3Framegen() {
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-    transitionImageLayout(currentCmd_, fsr2_.sceneDepth.image,
+    transitionImageLayout(currentCmd_, fsr2ReadDepth().image,
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
@@ -1483,7 +1528,7 @@ void PostProcessPipeline::dispatchAmdFsr3Framegen() {
     AmdFsr3RuntimeDispatchDesc fgDispatch{};
     fgDispatch.commandBuffer = currentCmd_;
     fgDispatch.colorImage = fsr2_.sceneColor.image;
-    fgDispatch.depthImage = fsr2_.sceneDepth.image;
+    fgDispatch.depthImage = fsr2ReadDepth().image;
     fgDispatch.motionVectorImage = fsr2_.motionVectors.image;
     fgDispatch.outputImage = fsr2_.history[fsr2_.currentHistory].image;
     fgDispatch.renderWidth = fsr2_.internalWidth;
