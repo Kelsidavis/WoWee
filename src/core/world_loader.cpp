@@ -1208,8 +1208,11 @@ void WorldLoader::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
     // world load are fully flushed before the first render frame. Without this,
     // vkCmdBeginRenderPass can crash on NVIDIA 590.x when resources from async
     // uploads haven't completed their queue operations.
+    // Checked: a device already lost during the load used to pass through
+    // here silently and be reported by the first frame's own submit instead,
+    // which put the blame one stage too late.
     if (renderer_ && renderer_->getVkContext()) {
-        vkDeviceWaitIdle(renderer_->getVkContext()->getDevice());
+        renderer_->getVkContext()->waitIdle("world entry flush");
     }
 
     if (loadingScreenOk) {

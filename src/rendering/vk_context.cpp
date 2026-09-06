@@ -553,6 +553,21 @@ bool VkContext::selectPhysicalDevice() {
     blockCompressionSupported_ =
         enableIfPresent(&VkPhysicalDeviceFeatures::textureCompressionBC);
     pipeline::setBlockCompressionSupported(blockCompressionSupported_);
+    // Bounds-checked buffer access, on unless asked otherwise. The one device
+    // loss this client has ever pinned to a cause was a vertex shader reading
+    // past the end of the M2 instance buffer; NVIDIA answers that read with a
+    // page fault and a lost device, Metal with zeros. With this on, every
+    // driver answers with zeros. Said at warning level because a log of a
+    // lost device has to show whether it was on.
+    static const bool noRobust = [] {
+        const char* v = std::getenv("WOWEE_VK_NO_ROBUST_BUFFERS");
+        return v && *v && *v != '0';
+    }();
+    robustBufferAccessSupported_ =
+        !noRobust && enableIfPresent(&VkPhysicalDeviceFeatures::robustBufferAccess);
+    LOG_WARNING("Robust buffer access: ",
+                robustBufferAccessSupported_ ? "on"
+                : (noRobust ? "off (WOWEE_VK_NO_ROBUST_BUFFERS)" : "not offered by this device"));
     LOG_INFO("Sampler anisotropy supported: ", samplerAnisotropySupported_ ? "YES" : "NO");
     LOG_INFO("Wireframe views supported: ", fillModeNonSolidSupported_ ? "YES" : "NO");
     LOG_INFO("FSR2 compute features supported: ",
@@ -661,6 +676,18 @@ bool VkContext::createLogicalDevice() {
     const bool hostImageCopyAvailable =
         hostCopyDeps &&
         vkbPhysicalDevice_.enable_extension_if_present(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME);
+    // Two that only speak after the device is lost. Three logs of a lost
+    // device from one reporter end at the same line - the frame's submit
+    // answering -4 - and the line cannot say which of the dozen submissions
+    // before it actually died, because a lost device is reported at the next
+    // call, not the faulting one. The fault extension names the address and
+    // whether it was read, written or executed; the checkpoints name the last
+    // marker each queue reached. Both are NVIDIA's to offer, which is where
+    // every one of those logs came from.
+    const bool deviceFaultAvailable =
+        vkbPhysicalDevice_.enable_extension_if_present(VK_EXT_DEVICE_FAULT_EXTENSION_NAME);
+    checkpointsSupported_ = vkbPhysicalDevice_.enable_extension_if_present(
+        VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
 
     vkb::DeviceBuilder deviceBuilder{vkbPhysicalDevice_};
 
@@ -757,6 +784,27 @@ bool VkContext::createLogicalDevice() {
         }
     }
 
+#if defined(VK_EXT_device_fault)
+    VkPhysicalDeviceFaultFeaturesEXT faultFeatures{};
+    faultFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT;
+    if (deviceFaultAvailable) {
+        // Advertising the extension is not the same as having the feature.
+        VkPhysicalDeviceFaultFeaturesEXT supported{};
+        supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT;
+        VkPhysicalDeviceFeatures2 probe{};
+        probe.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        probe.pNext = &supported;
+        vkGetPhysicalDeviceFeatures2(physicalDevice, &probe);
+        if (supported.deviceFault) {
+            faultFeatures.deviceFault = VK_TRUE;
+            deviceBuilder.add_pNext(&faultFeatures);
+            deviceFaultSupported_ = true;
+        }
+    }
+#else
+    (void)deviceFaultAvailable;
+#endif
+
     // Enable AMD device coherent memory feature if the extension was enabled
     // (prevents validation errors when VMA selects memory types with DEVICE_COHERENT_BIT_AMD)
     VkPhysicalDeviceCoherentMemoryFeaturesAMD coherentFeatures{};
@@ -838,6 +886,28 @@ bool VkContext::createLogicalDevice() {
                         "resolve - textures keep the staging buffer path");
         }
     }
+
+#if defined(VK_EXT_device_fault)
+    if (deviceFaultSupported_) {
+        getDeviceFaultInfo_ = reinterpret_cast<PFN_vkGetDeviceFaultInfoEXT>(
+            vkGetDeviceProcAddr(device, "vkGetDeviceFaultInfoEXT"));
+        if (getDeviceFaultInfo_ == nullptr) deviceFaultSupported_ = false;
+    }
+#endif
+    if (checkpointsSupported_) {
+        cmdSetCheckpoint_ = reinterpret_cast<PFN_vkCmdSetCheckpointNV>(
+            vkGetDeviceProcAddr(device, "vkCmdSetCheckpointNV"));
+        getQueueCheckpointData_ = reinterpret_cast<PFN_vkGetQueueCheckpointDataNV>(
+            vkGetDeviceProcAddr(device, "vkGetQueueCheckpointDataNV"));
+        if (cmdSetCheckpoint_ == nullptr || getQueueCheckpointData_ == nullptr) {
+            checkpointsSupported_ = false;
+        }
+    }
+    // At warning level: a log of a lost device has to show whether these
+    // were armed, or their silence reads as the driver having nothing to say.
+    LOG_WARNING("Device-loss diagnostics: fault info ",
+                deviceFaultSupported_ ? "on" : "off",
+                ", queue checkpoints ", checkpointsSupported_ ? "on" : "off");
 
     if (requestTransferQueue) {
         // With custom_queue_setup, we must retrieve queues manually.
@@ -1204,7 +1274,112 @@ void VkContext::createGpuQueryPools() {
              kMaxGpuMarks, " marks per frame");
 }
 
+void VkContext::checkpoint(VkCommandBuffer cmd, const char* label) {
+    if (!checkpointsSupported_ || cmdSetCheckpoint_ == nullptr || cmd == VK_NULL_HANDLE) return;
+    cmdSetCheckpoint_(cmd, label);
+}
+
+void VkContext::noteDeviceLost(const char* where, VkResult result) {
+    if (result != VK_ERROR_DEVICE_LOST) return;
+    // The first report is the one that matters: every call after it fails
+    // the same way, and a log full of them buries the one that was first.
+    if (deviceLost_) return;
+    deviceLost_ = true;
+    LOG_ERROR("Device lost - first seen by ", where);
+    reportDeviceFault();
+}
+
+VkResult VkContext::waitIdle(const char* where) {
+    if (device == VK_NULL_HANDLE) return VK_SUCCESS;
+    const VkResult r = vkDeviceWaitIdle(device);
+    if (r != VK_SUCCESS) LOG_ERROR("vkDeviceWaitIdle failed in ", where, ": ", static_cast<int>(r));
+    noteDeviceLost(where, r);
+    return r;
+}
+
+void VkContext::reportDeviceFault() {
+    // What each queue had reached. A checkpoint is the marker most recently
+    // executed at a stage, so the pass named here is the one that was running
+    // - or the last one that finished, if the fault was in what came after.
+    if (checkpointsSupported_ && getQueueCheckpointData_ != nullptr) {
+        auto report = [&](VkQueue queue, const char* name) {
+            if (queue == VK_NULL_HANDLE) return;
+            uint32_t count = 0;
+            getQueueCheckpointData_(queue, &count, nullptr);
+            if (count == 0) {
+                LOG_ERROR("  ", name, " queue: no checkpoint reached");
+                return;
+            }
+            std::vector<VkCheckpointDataNV> data(count);
+            for (auto& d : data) d.sType = VK_STRUCTURE_TYPE_CHECKPOINT_DATA_NV;
+            getQueueCheckpointData_(queue, &count, data.data());
+            for (uint32_t i = 0; i < count; ++i) {
+                const char* label = static_cast<const char*>(data[i].pCheckpointMarker);
+                LOG_ERROR("  ", name, " queue last reached '", label ? label : "?",
+                          "' at stage 0x", std::hex,
+                          static_cast<uint32_t>(data[i].stage), std::dec);
+            }
+        };
+        report(graphicsQueue, "graphics");
+        if (hasDedicatedTransfer_ && transferQueue_ != graphicsQueue) report(transferQueue_, "upload");
+    }
+
+#if defined(VK_EXT_device_fault)
+    if (!deviceFaultSupported_ || getDeviceFaultInfo_ == nullptr) return;
+    VkDeviceFaultCountsEXT counts{};
+    counts.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_COUNTS_EXT;
+    VkResult r = getDeviceFaultInfo_(device, &counts, nullptr);
+    if (r != VK_SUCCESS && r != VK_INCOMPLETE) {
+        LOG_ERROR("  vkGetDeviceFaultInfoEXT (counts): ", static_cast<int>(r));
+        return;
+    }
+    std::vector<VkDeviceFaultAddressInfoEXT> addresses(counts.addressInfoCount);
+    std::vector<VkDeviceFaultVendorInfoEXT> vendor(counts.vendorInfoCount);
+    counts.vendorBinarySize = 0;  // the binary blob is for the vendor's tools, not a log
+    VkDeviceFaultInfoEXT info{};
+    info.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_INFO_EXT;
+    info.pAddressInfos = addresses.empty() ? nullptr : addresses.data();
+    info.pVendorInfos = vendor.empty() ? nullptr : vendor.data();
+    r = getDeviceFaultInfo_(device, &counts, &info);
+    if (r != VK_SUCCESS && r != VK_INCOMPLETE) {
+        LOG_ERROR("  vkGetDeviceFaultInfoEXT: ", static_cast<int>(r));
+        return;
+    }
+    info.description[VK_MAX_DESCRIPTION_SIZE - 1] = '\0';
+    LOG_ERROR("  driver says: '", info.description, "'");
+    auto kind = [](VkDeviceFaultAddressTypeEXT t) {
+        switch (t) {
+            case VK_DEVICE_FAULT_ADDRESS_TYPE_NONE_EXT: return "none";
+            case VK_DEVICE_FAULT_ADDRESS_TYPE_READ_INVALID_EXT: return "invalid read";
+            case VK_DEVICE_FAULT_ADDRESS_TYPE_WRITE_INVALID_EXT: return "invalid write";
+            case VK_DEVICE_FAULT_ADDRESS_TYPE_EXECUTE_INVALID_EXT: return "invalid execute";
+            case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_UNKNOWN_EXT: return "instruction pointer unknown";
+            case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_INVALID_EXT: return "instruction pointer invalid";
+            case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_FAULT_EXT: return "instruction pointer fault";
+            default: return "?";
+        }
+    };
+    if (counts.addressInfoCount == 0) {
+        LOG_ERROR("  no faulting address reported - a hang or timeout rather than a bad access");
+    }
+    for (uint32_t i = 0; i < counts.addressInfoCount; ++i) {
+        LOG_ERROR("  fault ", i, ": ", kind(addresses[i].addressType),
+                  " at 0x", std::hex, addresses[i].reportedAddress,
+                  " (within 0x", addresses[i].addressPrecision, ")", std::dec);
+    }
+    for (uint32_t i = 0; i < counts.vendorInfoCount; ++i) {
+        vendor[i].description[VK_MAX_DESCRIPTION_SIZE - 1] = '\0';
+        LOG_ERROR("  vendor ", i, ": '", vendor[i].description,
+                  "' code 0x", std::hex, vendor[i].vendorFaultCode,
+                  " data 0x", vendor[i].vendorFaultData, std::dec);
+    }
+#endif
+}
+
 void VkContext::gpuMark(VkCommandBuffer cmd, const char* label) {
+    // A mark is also a checkpoint, so the two name the same places and a
+    // fault report reads against the same labels as the timing overlay.
+    checkpoint(cmd, label);
     if (!gpuTimingSupported_ || cmd == VK_NULL_HANDLE) return;
     uint32_t& n = gpuMarkCount_[currentFrame];
     if (n >= kMaxGpuMarks) return;   // the tail of a frame is lost, not the frame
@@ -2539,9 +2714,7 @@ VkCommandBuffer VkContext::beginFrame(uint32_t& imageIndex) {
     }
     if (fenceResult != VK_SUCCESS) {
         LOG_ERROR("beginFrame[", beginFrameCounter, "] fence wait failed: ", static_cast<int>(fenceResult));
-        if (fenceResult == VK_ERROR_DEVICE_LOST) {
-            deviceLost_ = true;
-        }
+        noteDeviceLost("beginFrame frame-slot wait", fenceResult);
         return VK_NULL_HANDLE;
     }
 
@@ -2563,7 +2736,8 @@ VkCommandBuffer VkContext::beginFrame(uint32_t& imageIndex) {
         return VK_NULL_HANDLE;
     }
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-        LOG_ERROR("Failed to acquire swapchain image");
+        LOG_ERROR("Failed to acquire swapchain image: ", static_cast<int>(result));
+        noteDeviceLost("vkAcquireNextImageKHR", result);
         return VK_NULL_HANDLE;
     }
 
@@ -2680,9 +2854,7 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
     }
     if (submitResult != VK_SUCCESS) {
         LOG_ERROR("endFrame[", endFrameCounter, "] vkQueueSubmit FAILED: ", static_cast<int>(submitResult));
-        if (submitResult == VK_ERROR_DEVICE_LOST) {
-            deviceLost_ = true;
-        }
+        noteDeviceLost("endFrame vkQueueSubmit", submitResult);
         // And no present. renderSem is signalled by the submission that just
         // failed, so presenting on it queues a wait that nothing will ever
         // satisfy - the same trap the timeline value above is withheld to
@@ -2758,6 +2930,7 @@ VkCommandBuffer VkContext::beginSingleTimeCommands() {
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(immCmdBuf_, &beginInfo);
+    checkpoint(immCmdBuf_, "immediate commands");
 
     return immCmdBuf_;
 }
@@ -2814,6 +2987,8 @@ void VkContext::endSingleTimeCommands(VkCommandBuffer cmd) {
                   " (VK_ERROR_DEVICE_LOST is -4) - the fence is not signalled,"
                   " so the reset below is the symptom rather than the cause");
     }
+    noteDeviceLost("immediate submit", submitted);
+    noteDeviceLost("immediate wait", waited);
     vkResetFences(device, 1, &immFence);
     // Buffer stays allocated; it will be reset on the next beginSingleTimeCommands.
 }
@@ -2883,6 +3058,7 @@ void VkContext::ensureBatchCmd() {
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(batchCmd_, &beginInfo);
+    checkpoint(batchCmd_, "upload batch");
 }
 
 void VkContext::endUploadBatch() {
@@ -2951,7 +3127,7 @@ void VkContext::endUploadBatch() {
         return v && *v && *v != '0';
     }();
     VkQueue targetQueue = (hasDedicatedTransfer_ && asyncUploadQueue) ? transferQueue_ : graphicsQueue;
-    vkQueueSubmit(targetQueue, 1, &submitInfo, fence);
+    noteDeviceLost("async upload batch submit", vkQueueSubmit(targetQueue, 1, &submitInfo, fence));
 
     // Said once, with the handle, because these are the only fences created
     // after startup - so a validation message naming a high handle is one of
@@ -3000,8 +3176,29 @@ void VkContext::endUploadBatchSync() {
         return;
     }
 
-    // Synchronous path for load screens - submit and wait on the target queue.
-    VkQueue targetQueue = hasDedicatedTransfer_ ? transferQueue_ : graphicsQueue;
+    // Synchronous path - submit and wait on the target queue.
+    //
+    // The second queue of the graphics family where there is one, which is
+    // every desktop driver and never MoltenVK: Metal exposes one queue per
+    // family, so on the platform this is developed on these batches have
+    // always gone to the graphics queue, and the second-queue path has only
+    // ever run on the machines that report lost devices. Nothing here shares
+    // a resource with the frame in flight on the other queue, and the wait
+    // below finishes the batch before anything samples what it wrote - but
+    // that is an argument, and WOWEE_VK_SYNC_UPLOAD_ON_GRAPHICS=1 is the
+    // test of it: the same batches, the same waits, one queue.
+    static const bool syncOnGraphics = [] {
+        const char* v = std::getenv("WOWEE_VK_SYNC_UPLOAD_ON_GRAPHICS");
+        return v && *v && *v != '0';
+    }();
+    VkQueue targetQueue = (hasDedicatedTransfer_ && !syncOnGraphics) ? transferQueue_ : graphicsQueue;
+    static bool saidWhichQueue = false;
+    if (!saidWhichQueue) {
+        saidWhichQueue = true;
+        LOG_WARNING("Synchronous upload batches run on the ",
+                    targetQueue == graphicsQueue ? "graphics queue"
+                                                 : "second queue of the graphics family");
+    }
 
     vkEndCommandBuffer(batchCmd_);
 
@@ -3029,8 +3226,12 @@ void VkContext::endUploadBatchSync() {
         batchFence = immFence;
     }
 
-    vkQueueSubmit(targetQueue, 1, &submitInfo, batchFence);
-    vkWaitForFences(device, 1, &batchFence, VK_TRUE, UINT64_MAX);
+    // Both checked. These were the only unchecked waits between a world load
+    // and the first frame's submit, so a device lost in one of them was first
+    // reported by that submit, one stage later and with no name attached.
+    noteDeviceLost("sync upload batch submit", vkQueueSubmit(targetQueue, 1, &submitInfo, batchFence));
+    noteDeviceLost("sync upload batch wait",
+                   vkWaitForFences(device, 1, &batchFence, VK_TRUE, UINT64_MAX));
     if (batchFence != immFence) {
         vkDestroyFence(device, batchFence, nullptr);
     } else {
@@ -3069,6 +3270,9 @@ void VkContext::pollUploadBatches() {
             it = inFlightBatches_.erase(it);
             ++batchesRetired_;
         } else {
+            // VK_NOT_READY is the ordinary answer. Anything else is the device
+            // saying so through a fence nobody was going to wait on.
+            if (result != VK_NOT_READY) noteDeviceLost("upload batch fence status", result);
             ++it;
         }
     }
@@ -3078,7 +3282,8 @@ void VkContext::waitAllUploads() {
     VkCommandPool pool = hasDedicatedTransfer_ ? transferCommandPool_ : immCommandPool;
 
     for (auto& batch : inFlightBatches_) {
-        vkWaitForFences(device, 1, &batch.fence, VK_TRUE, UINT64_MAX);
+        noteDeviceLost("waitAllUploads",
+                       vkWaitForFences(device, 1, &batch.fence, VK_TRUE, UINT64_MAX));
         for (auto& raw : batch.rawStaging) {
             vkDestroyBuffer(device, raw.buffer, nullptr);
             vkFreeMemory(device, raw.memory, nullptr);

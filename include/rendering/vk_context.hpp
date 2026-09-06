@@ -153,6 +153,23 @@ public:
     /// cannot timestamp, which is checked once at device selection.
     void gpuMark(VkCommandBuffer cmd, const char* label);
     [[nodiscard]] bool gpuTimingSupported() const { return gpuTimingSupported_; }
+    /// A named point the driver reports as the last one each queue reached
+    /// when the device is lost. Nothing without
+    /// VK_NV_device_diagnostic_checkpoints, which is NVIDIA - where every
+    /// device loss on record has been. The label must be a string literal:
+    /// the driver hands the pointer back, not a copy.
+    void checkpoint(VkCommandBuffer cmd, const char* label);
+    /// Records that the device is gone and says why, once: the operation that
+    /// first saw VK_ERROR_DEVICE_LOST, then what the driver can add - the last
+    /// checkpoint each queue reached, and the faulting address and its kind
+    /// from VK_EXT_device_fault. Every other result is ignored, so callers
+    /// hand it whatever they got back.
+    void noteDeviceLost(const char* where, VkResult result);
+    /// vkDeviceWaitIdle that names its caller when it fails. Three of these
+    /// sat unchecked on the way into the world, so a device already lost
+    /// during the load surfaced a frame later as the frame's own submit.
+    VkResult waitIdle(const char* where);
+    [[nodiscard]] bool robustBufferAccessEnabled() const { return robustBufferAccessSupported_; }
     /// The last completed frame's marks, as (label, milliseconds since the
     /// previous mark). Empty until a frame has come round and been read back.
     [[nodiscard]] const std::vector<std::pair<const char*, double>>&
@@ -383,6 +400,28 @@ private:
     bool hostImageCopySupported_ = false;
     PFN_vkCopyMemoryToImageEXT copyMemoryToImage_ = nullptr;
     PFN_vkTransitionImageLayoutEXT transitionImageLayoutHost_ = nullptr;
+
+    /// Core robustBufferAccess, on wherever the device offers it. A buffer
+    /// read past its descriptor's range returns zero instead of faulting,
+    /// and a write is dropped. The one device loss this client has pinned
+    /// down was exactly that read, in the M2 instance buffer; two more from
+    /// the same reporter died the same way at the same moment without a
+    /// cause the log could name. WOWEE_VK_NO_ROBUST_BUFFERS=1 turns it off,
+    /// so a crash that stops with it on is known to be an out-of-range read.
+    bool robustBufferAccessSupported_ = false;
+
+    /// VK_EXT_device_fault and VK_NV_device_diagnostic_checkpoints, taken
+    /// when offered. Neither changes what is drawn; both only speak after the
+    /// device is lost, and between them they say which queue was doing what
+    /// and what address it touched when it died.
+    bool deviceFaultSupported_ = false;
+    bool checkpointsSupported_ = false;
+#if defined(VK_EXT_device_fault)
+    PFN_vkGetDeviceFaultInfoEXT getDeviceFaultInfo_ = nullptr;
+#endif
+    PFN_vkCmdSetCheckpointNV cmdSetCheckpoint_ = nullptr;
+    PFN_vkGetQueueCheckpointDataNV getQueueCheckpointData_ = nullptr;
+    void reportDeviceFault();
 
     VkSemaphore frameTimeline_ = VK_NULL_HANDLE;
     /// Last value signalled on frameTimeline_. Monotonic for the life of the

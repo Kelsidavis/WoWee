@@ -1157,6 +1157,7 @@ void Renderer::endFrame() {
     if (postProcessPipeline_) {
         postProcessPipeline_->executePostProcessing(
             currentCmd, currentImageIndex, camera.get(), lastDeltaTime_);
+        if (vkCtx) vkCtx->gpuMark(currentCmd, "post-process");
     }
 
     // The scene is complete: close its pass so the water refraction copy can run
@@ -1205,6 +1206,7 @@ void Renderer::endFrame() {
         // records inline here rather than into a scene-pass secondary buffer.
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), currentCmd);
         vkCmdEndRenderPass(currentCmd);
+        if (vkCtx) vkCtx->gpuMark(currentCmd, "interface");
     } else {
         LOG_ERROR("Overlay render pass missing - UI not drawn this frame");
     }
