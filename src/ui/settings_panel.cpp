@@ -27,6 +27,11 @@
 #include "rendering/camera_controller.hpp"
 #include "rendering/minimap.hpp"
 #include "rendering/terrain_manager.hpp"
+// The four the moved graphics settings reach into: doodads and particles,
+// the weather, and the sampler the texture filtering level sets.
+#include "rendering/m2_renderer.hpp"
+#include "rendering/weather.hpp"
+#include "rendering/vk_context.hpp"
 #include "rendering/wmo_renderer.hpp"
 #include "rendering/character_renderer.hpp"
 #include "game/zone_manager.hpp"
@@ -383,11 +388,9 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
     constexpr int kResCount = kNumDisplayResolutions;
     constexpr int kDefaultResW = 1920;
     constexpr int kDefaultResH = 1080;
-    // Fullscreen, vsync and shadows had constants here too. They are in the
-    // schema now, where the options panels can read them as well; ground
-    // clutter stays because it is not in the schema - the game's own Video
-    // panel drives it.
-    constexpr int kDefaultGroundClutterDensity = kDefaultGroundClutter;
+    // Fullscreen, vsync, shadows and ground clutter had constants here too.
+    // All of them are schema rows now, so the schema carries their defaults
+    // and the restore button reads them from there.
 
     int defaultResIndex = 0;
     for (int i = 0; i < kResCount; i++) {
@@ -541,18 +544,9 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                 // schema and nothing else, and that is the screen it was
                 // missing from. Ground clutter is still the game's own Video
                 // panel's on paper, and still only offered here.
-                if (ImGui::SliderInt("Ground clutter", &pendingGroundClutterDensity,
-                                     0, 150, "%d%%")) {
-                    applySettingSideEffects("groundclutter");
-                    updateGraphicsPresetFromCurrentSettings();
-                    saveCallback();
-                }
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("How many small plants, tufts and stones are scattered\n"
-                                      "over the ground, as a percentage of what the zone asks\n"
-                                      "for. 100 is as designed; above it is denser than the\n"
-                                      "original client ever drew.");
-                }
+                ImGui::Spacing();
+                ImGui::SeparatorText("Detail");
+                drawSchemaCategory("Detail", saveCallback);
 
                 // From the schema, like everything else on this tab: the four
                 // grass controls were drawn by hand here with labels and a lone
@@ -597,14 +591,12 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                 if (ImGui::Button("Restore Video Defaults", ImVec2(-1, 0))) {
                     // Three categories, because the settings window puts on one
                     // tab what the options panels put on three.
-                    for (const char* category : {"Graphics", "Upscaling", "Display"}) {
+                    for (const char* category : {"Graphics", "Detail", "Upscaling", "Display"}) {
                         restoreSchemaDefaults(category);
                     }
-                    // Ground clutter and the resolution are not in the schema:
-                    // the game's own Video panel drives both, so they are the
-                    // two still named here.
-                    pendingGroundClutterDensity = kDefaultGroundClutterDensity;
-                    applySettingSideEffects("groundclutter");
+                    // Only the resolution is outside the schema now: it is the
+                    // window's size rather than a quality setting, and applying
+                    // it goes through the window rather than the renderer.
                     pendingResIndex = defaultResIndex;
                     pendingResolutionWidth = kDefaultResW;
                     pendingResolutionHeight = kDefaultResH;
@@ -825,6 +817,10 @@ constexpr const char* kGraphicsApplyKeys[] = {
     "fsrsharpness", "framegen", "brightness", "uiopacity", "minimapsquare",
     "minimapnpcdots", "minimapclock", "minimapcoords", "latencymeter",
     "fogskyblend", "fogstrength", "sharpstars",
+    // Moved off the game's own Effects panel, so this list is now what
+    // applies them at startup; the cvar store used to do it.
+    "groundclutterdistance", "particledensity", "weatherdetail",
+    "environmentdetail", "texturefiltering",
 };
 
 /// Whether a quality preset has an opinion about this setting.
@@ -956,6 +952,11 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "grassdistance",  .asInt   = &SettingsPanel::pendingGrassDistance},
     {.key = "groundclutter",  .asInt   = &SettingsPanel::pendingGroundClutterDensity,
      .fraction = true},
+    {.key = "groundclutterdistance", .asInt = &SettingsPanel::pendingGroundClutterDistance},
+    {.key = "particledensity",   .asInt = &SettingsPanel::pendingParticleDensity},
+    {.key = "weatherdetail",     .asInt = &SettingsPanel::pendingWeatherDetail},
+    {.key = "environmentdetail", .asInt = &SettingsPanel::pendingEnvironmentDetail},
+    {.key = "texturefiltering",  .asInt = &SettingsPanel::pendingTextureFiltering},
     {.key = "effectsvolume",  .asInt   = &SettingsPanel::pendingEffectsVolume,
      .fraction = true},
 
@@ -1133,6 +1134,41 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
             if (auto* tm = renderer->getTerrainManager()) {
                 tm->setGroundClutterDensityScale(
                     static_cast<float>(pendingGroundClutterDensity) / 100.0f);
+            }
+        }
+    } else if (key == "groundclutterdistance") {
+        // The five below reach the same code the game's own Effects panel
+        // reached through LuaServices. They are settings rather than cvars
+        // now; kClientCVars keeps the cvar pointing at the same value.
+        if (renderer) {
+            if (auto* m2 = renderer->getM2Renderer())
+                m2->setGroundDetailDistance(static_cast<float>(pendingGroundClutterDistance));
+        }
+    } else if (key == "particledensity") {
+        if (renderer) {
+            if (auto* m2 = renderer->getM2Renderer())
+                m2->setParticleDensity(static_cast<float>(pendingParticleDensity) / 100.0f);
+        }
+    } else if (key == "weatherdetail") {
+        // Offered as four steps and passed on as a fraction of the full
+        // amount, which is what the weather system takes. Off is no weather.
+        if (renderer) {
+            constexpr float kWeatherSteps = 3.0f;
+            if (auto* w = renderer->getWeather())
+                w->setDensityScale(static_cast<float>(pendingWeatherDetail) / kWeatherSteps);
+        }
+    } else if (key == "environmentdetail") {
+        if (renderer) {
+            if (auto* m2 = renderer->getM2Renderer())
+                m2->setEnvironmentDetail(static_cast<float>(pendingEnvironmentDetail) / 100.0f);
+        }
+    } else if (key == "texturefiltering") {
+        // Levels rather than a sample count, each step doubling: 0 is off
+        // and 4 is the 16x every desktop card stops at.
+        if (services_.window) {
+            if (auto* ctx = services_.window->getVkContext()) {
+                const int level = std::clamp(pendingTextureFiltering, 0, 4);
+                ctx->setAnisotropyLimit(static_cast<float>(std::min(1 << level, 16)));
             }
         }
     } else if (key == "framecap") {

@@ -42,6 +42,7 @@ for _, s in ipairs(list) do byKey[s.key] = s end
 
 local kCategoryHost = {
     ["Graphics"]     = "video",
+    ["Detail"]       = "video",
     ["Grass"]        = "video",
     ["Upscaling"]    = "video",
     ["Display"]      = "video",
@@ -652,9 +653,12 @@ WOWEE_SETTINGS_ELSEWHERE = {
     -- game's panel calls it gamma, this client's own window calls it
     -- brightness, and SetGamma is what both of them end up in. A player who
     -- knows it by either word finds it.
-    { panel = "Video",             names = { "resolution", "view distance",
-                                             "ground clutter (grass)",
-                                             "gamma (brightness)" } },
+    -- View distance, ground clutter and gamma were named here and are not
+    -- any more: they are rows on this client's own Graphics, Detail and
+    -- Display pages, along with everything else the retired Effects panel
+    -- used to carry. What is left of the game's Video options is the
+    -- window itself.
+    { panel = "Video",             names = { "resolution", "interface scale" } },
     { panel = "Sound",             names = { "enable sound", "master volume", "sound effects" } },
     { panel = "Interface",         names = { "mouse look speed (sensitivity)",
                                              "the minimap clock",
@@ -1128,6 +1132,11 @@ local kRemoved = {
     -- it matches the same line pasted over and over, not the words in it.
     "InterfaceOptionsSocialPanelProfanityFilter",
 
+    -- The same anti-aliasing the schema offers, in the same four steps.
+    -- The Resolution page keeps what is genuinely the window's: the size of
+    -- it and the interface scale.
+    "VideoOptionsResolutionPanelMultiSampleDropDown",
+
     -- Effects this renderer has no reader for. Ground decals are drawn from
     -- the client's own spell-marker catalogue rather than projected, so the
     -- switch could only ever hide raid mechanics; texture and terrain
@@ -1180,6 +1189,14 @@ local kRemovedCategories = {
     -- Every row on it is a Battle.net toast, and this client has no
     -- Battle.net: the friends list answers zero for it and always will.
     "InterfaceOptionsBattlenetPanel",
+    -- The game's own graphics quality page. Every setting on it that this
+    -- renderer implements is a row in the schema now - view distance,
+    -- ground clutter and its radius, particle and weather detail, object
+    -- detail, texture filtering - and the schema's pages are hosted in this
+    -- same window, so leaving it would draw two sets of graphics controls
+    -- side by side in one list, in different words and different units.
+    -- Its remaining rows were the dead ones already hidden above.
+    "VideoOptionsEffectsPanel",
 }
 
 local removed = {}

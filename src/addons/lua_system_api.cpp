@@ -1208,6 +1208,22 @@ constexpr ClientCVarBinding kClientCVars[] = {
     // 64 doodads is the most Blizzard's slider asks for and 1.5 is the most
     // this client draws, so one of theirs is 1.5/64 of ours.
     {"groundeffectdensity",  "groundclutter", 1.5 / 64.0},
+    // The rest of what the game's own Effects panel used to drive. That
+    // panel is retired and these are rows in the schema now, but the cvars
+    // stay bound to them: an addon or a macro writing particleDensity still
+    // reaches the setting the panel shows, rather than a second store that
+    // quietly disagrees with it.
+    //
+    // The scales are the difference between a fraction and a percentage.
+    // Blizzard's particle and environment sliders run 0.1-1 and 0.5-1.5;
+    // these settings are percentages, so one of theirs is a hundred of ours.
+    {"groundeffectdist",     "groundclutterdistance"},
+    {"particledensity",      "particledensity", 100.0},
+    {"weatherdensity",       "weatherdetail"},
+    {"environmentdetail",    "environmentdetail", 100.0},
+    // Six levels on their slider and five here: theirs ends on 16x twice,
+    // every card stopping there, so the top two both land on this one's 4.
+    {"texturefilteringmode", "texturefiltering"},
     {"sound_sfxvolume",      "effectsvolume"},
     // Three that were each written out four times over - a getter and a setter
     // on LuaServices, a lambda in Application, and a branch in each of GetCVar

@@ -57,18 +57,23 @@ constexpr SettingDesc kSchema[] = {
      "How far away things still cast shadows, in yards. The shadow map\n"
      "covers this whole range, so a shorter distance also gives sharper\n"
      "shadows close to you.", "", 300},
-    // No view distance row here on purpose. The game's own Effects panel has
-    // one - it writes the farclip CVar, which kClientCVars maps to this
-    // client's viewdistance setting - and it is the place a player looks for
-    // it. A row here was added while that panel was suppressed under
-    // UiElement::GameMenu and could not be opened at all; that is no longer
-    // true, so what it left behind was two controls for one number, each
-    // showing a different value until one of them was touched.
+    {"viewdistance", "View distance", SettingKind::Float, 400, 2400, 50, "Graphics", "View",
+     "How far into the distance the world is drawn, in yards. The single\n"
+     "largest cost in the picture: terrain, buildings and creatures are all\n"
+     "drawn to this range.", "", 1900},
+    // It used to be left out, deferred to the Effects panel of the game's own
+    // Video options - as were ground clutter, its radius, brightness,
+    // particle and weather detail, environment detail and texture filtering.
+    // That panel is retired now and every one of them is a row here. There is
+    // one client, and it was drawing two sets of graphics controls into one
+    // window: this schema's pages are hosted inside VideoOptionsFrame, so the
+    // list a player saw ran Resolution, Effects, Graphics, Grass, Upscaling,
+    // Display - the first two Blizzard's and the rest ours, covering much of
+    // the same ground in different words and different units.
     //
-    // The reason it could not simply be deferred to before is that Blizzard's
-    // slider stops at 1277, the range the original renderer had. kCVarRanges
-    // gives farclip this client's own 400-2400 instead, so the native control
-    // now covers everything the engine can do.
+    // Each of the moved settings is bound to the cvar its old control wrote,
+    // in kClientCVars, so an addon or a macro that writes the cvar still
+    // reaches the same value this panel shows.
     // No water refraction row on purpose. It is not a choice any more: the
     // shoreline masks, the meniscus at the waterline and the underwater tint are
     // all written against water that refracts, and the flat fallback left them
@@ -105,20 +110,6 @@ constexpr SettingDesc kSchema[] = {
      "MSAA misses, such as leaves and grass, and softens fine texture\n"
      "a little. Most useful with MSAA off or on weaker hardware.", "", 0},
 
-    {"normalmapping", "Surface bumps (normal mapping)", SettingKind::Bool, 0, 0, 0, "Graphics", "Surfaces",
-     "Light stone, wood, cloth and metal by their surface texture, so\n"
-     "they catch the light like the real material rather than flat paint.", "", 1},
-    {"normalmapstrength", "Bump strength", SettingKind::Float, 0, 2, 0.1f, "Graphics", "",
-     "How pronounced those surface bumps look. 1 is as the textures\n"
-     "were made; higher exaggerates them.", "", 0.8f, "normalmapping"},
-    {"parallax", "Surface depth (parallax)", SettingKind::Bool, 0, 0, 0, "Graphics", "",
-     "Gives bricks, cobbles and planks real depth when seen at an\n"
-     "angle, so mortar lines sink and stones stand out.", "", 1},
-    {"parallaxquality", "Surface depth quality", SettingKind::Enum, 0, 2, 1, "Graphics", "",
-     "How finely each surface is traced for that depth: 16, 32 or 64\n"
-     "steps. Higher looks steadier up close and costs more on big walls.",
-     "Low|Medium|High", 1, "parallax"},
-
     {"lensflare", "Lens flare", SettingKind::Float, 0, 2, 0.1f, "Graphics", "Sky",
      "How strong the sun's flare is when it is in view. It warms to\n"
      "amber near the horizon for the dawn and dusk look. 0 removes it.",
@@ -127,6 +118,52 @@ constexpr SettingDesc kSchema[] = {
      "Draw the night sky's stars as crisp points. Off, they come from\n"
      "the sky's own small star texture, which goes soft at high\n"
      "resolutions.", "", 1},
+
+    // ------------------------------------------------------------------ Detail
+    //
+    // Its own page because the Graphics page is full: two columns of 384
+    // pixels, which test_settings_panel_layout measures, and Graphics uses
+    // most of them. These are the settings that describe how much of the
+    // world is drawn rather than how it is lit.
+    {"groundclutter", "Ground clutter", SettingKind::Int, 0, 150, 5, "Detail", "Ground cover",
+     "How many small plants, tufts and stones are scattered over the\n"
+     "ground, as a percentage of what the zone asks for. 100 is as\n"
+     "designed; above it is denser than the original client drew.", "", 70},
+    {"groundclutterdistance", "Ground clutter distance", SettingKind::Int, 70, 300, 10,
+     "Detail", "",
+     "How far out that clutter is drawn, in yards. Past this it simply\n"
+     "is not there, so a short distance is a visible edge on open ground.", "", 140},
+
+    {"normalmapping", "Surface bumps (normal mapping)", SettingKind::Bool, 0, 0, 0, "Detail", "Surfaces",
+     "Light stone, wood, cloth and metal by their surface texture, so\n"
+     "they catch the light like the real material rather than flat paint.", "", 1},
+    {"normalmapstrength", "Bump strength", SettingKind::Float, 0, 2, 0.1f, "Detail", "",
+     "How pronounced those surface bumps look. 1 is as the textures\n"
+     "were made; higher exaggerates them.", "", 0.8f, "normalmapping"},
+    {"parallax", "Surface depth (parallax)", SettingKind::Bool, 0, 0, 0, "Detail", "",
+     "Gives bricks, cobbles and planks real depth when seen at an\n"
+     "angle, so mortar lines sink and stones stand out.", "", 1},
+    {"parallaxquality", "Surface depth quality", SettingKind::Enum, 0, 2, 1, "Detail", "",
+     "How finely each surface is traced for that depth: 16, 32 or 64\n"
+     "steps. Higher looks steadier up close and costs more on big walls.",
+     "Low|Medium|High", 1, "parallax"},
+
+    {"particledensity", "Particle density", SettingKind::Int, 10, 100, 5, "Detail", "Effects",
+     "How many particles a spell, fire or waterfall throws, as a\n"
+     "percentage of what it asks for. Lower thins every effect at once.", "", 100},
+    {"weatherdetail", "Weather", SettingKind::Enum, 0, 3, 1, "Detail", "",
+     "How heavy rain and snow fall. Off draws no weather at all, which\n"
+     "leaves the sky and the sound of it and nothing in the air.",
+     "Off|Light|Medium|Full", 3},
+    {"environmentdetail", "Object detail", SettingKind::Int, 50, 150, 5, "Detail", "",
+     "How far out doodads - crates, bushes, lamps, fences - keep being\n"
+     "drawn, as a percentage. Lower empties the middle distance first.", "", 100},
+
+    {"texturefiltering", "Texture filtering", SettingKind::Enum, 0, 4, 1, "Detail", "Textures",
+     "How sharp textures stay when seen at a shallow angle - a road\n"
+     "ahead, a floor underfoot. Costs little on any modern card, and\n"
+     "applies to textures loaded from here on.",
+     "Off|2x|4x|8x|16x", 4},
 
     // --------------------------------------------------------------- Upscaling
     {"upscaling", "Upscaling", SettingKind::Enum, 0, 2, 1, "Upscaling", "Mode",
@@ -200,10 +237,13 @@ constexpr SettingDesc kSchema[] = {
      "nobody sees. Vertical sync already caps at the display's rate;\n"
      "use this to cap below it.",
      "Unlimited|30|60|90|120|144|240", 0},
-    // No brightness row here. The game's own Video panel has the Gamma slider,
-    // which is the same number on a different scale - GetGamma answers this
-    // setting divided by 50 - and it is where a player looks for it. Two
-    // sliders for one value showed different numbers until one was touched.
+    {"brightness", "Brightness", SettingKind::Int, 0, 100, 5, "Display", "",
+     "How bright the picture is. 50 leaves it as the zone was lit; below\n"
+     "darkens and above lifts the shadows. The game's own panel called\n"
+     "this gamma and reached the same value.", "", 50},
+    // Gamma, on the game's own panel, is this same value on another scale -
+    // GetGamma answers it divided by 50 - and both end in SetGamma, so the
+    // two cannot disagree whichever a player reaches for.
 
     // ------------------------------------------------------------------ Camera
     {"fov", "Field of view", SettingKind::Float, 45, 110, 1, "Camera", "View",

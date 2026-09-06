@@ -28,8 +28,6 @@ KNOWN = {
     "shadows": "no control: turning shadows off loses the GPU (settings_schema.cpp)",
     "waterrefraction": "not a choice: the shoreline and underwater work assume it "
                        "(settings_schema.cpp)",
-    "brightness": "driven by the video panel's brightness slider through SetGamma "
-                  "(lua_system_api.cpp)",
 }
 
 # Floors, so a regex that stops matching reports an empty world rather than a

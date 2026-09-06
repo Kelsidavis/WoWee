@@ -1776,6 +1776,15 @@ void GameScreen::saveSettings() {
     out << "auto_repair=" << (settingsPanel_.pendingAutoRepair ? 1 : 0) << "\n";
     out << "graphics_preset=" << static_cast<int>(settingsPanel_.currentGraphicsPreset) << "\n";
     out << "ground_clutter_density=" << settingsPanel_.pendingGroundClutterDensity << "\n";
+    // The five that came off the game's own Effects panel. Saved here like any
+    // other setting: reachable through a cvar is not the same as remembered,
+    // and without these they would work for the session and open on their
+    // defaults at the next login.
+    out << "ground_clutter_distance=" << settingsPanel_.pendingGroundClutterDistance << "\n";
+    out << "particle_density=" << settingsPanel_.pendingParticleDensity << "\n";
+    out << "weather_detail=" << settingsPanel_.pendingWeatherDetail << "\n";
+    out << "environment_detail=" << settingsPanel_.pendingEnvironmentDetail << "\n";
+    out << "texture_filtering=" << settingsPanel_.pendingTextureFiltering << "\n";
     out << "grass_enabled=" << (settingsPanel_.pendingGrassEnabled ? 1 : 0) << "\n";
     out << "grass_density=" << settingsPanel_.pendingGrassDensity << "\n";
     out << "grass_height=" << settingsPanel_.pendingGrassHeight << "\n";
@@ -2022,6 +2031,11 @@ void GameScreen::loadSettings() {
                 settingsPanel_.pendingGraphicsPreset = settingsPanel_.currentGraphicsPreset;
             }
             else if (key == "ground_clutter_density") settingsPanel_.pendingGroundClutterDensity = std::clamp(std::stoi(val), 0, 150);
+            else if (key == "ground_clutter_distance") settingsPanel_.pendingGroundClutterDistance = std::clamp(std::stoi(val), 70, 300);
+            else if (key == "particle_density") settingsPanel_.pendingParticleDensity = std::clamp(std::stoi(val), 10, 100);
+            else if (key == "weather_detail") settingsPanel_.pendingWeatherDetail = std::clamp(std::stoi(val), 0, 3);
+            else if (key == "environment_detail") settingsPanel_.pendingEnvironmentDetail = std::clamp(std::stoi(val), 50, 150);
+            else if (key == "texture_filtering") settingsPanel_.pendingTextureFiltering = std::clamp(std::stoi(val), 0, 4);
             else if (key == "grass_enabled") settingsPanel_.pendingGrassEnabled = (std::stoi(val) != 0);
             else if (key == "grass_density") settingsPanel_.pendingGrassDensity = std::clamp(std::stoi(val), 0, 300);
             else if (key == "grass_height") settingsPanel_.pendingGrassHeight = std::clamp(std::stoi(val), 50, 300);

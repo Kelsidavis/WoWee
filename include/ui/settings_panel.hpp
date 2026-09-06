@@ -165,6 +165,16 @@ public:
 
     // ---- Pending graphics quality ----
     int pendingGroundClutterDensity = kDefaultGroundClutter;
+    /// The five that used to live only on the game's own Effects panel,
+    /// reachable through its cvars and nowhere else. Each is bound to that
+    /// cvar in kClientCVars, so the two are one value rather than two that
+    /// can disagree - which is why they are settings here rather than
+    /// another store beside the one the panel wrote.
+    int pendingGroundClutterDistance = 140;   ///< yards
+    int pendingParticleDensity = 100;         ///< percent of what an effect asks for
+    int pendingWeatherDetail = 3;             ///< 0 none, 3 full
+    int pendingEnvironmentDetail = 100;       ///< percent
+    int pendingTextureFiltering = 4;          ///< 0 off, then 2x 4x 8x 16x
     // Grass, as percentages of the generator's own defaults. Separate from
     // ground clutter: clutter is M2 doodads with per-instance cost, grass is
     // one indirect draw, and a player who turns one down does not necessarily

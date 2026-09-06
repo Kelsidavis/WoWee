@@ -338,7 +338,7 @@ TEST_CASE("every panel the client offers still has settings on it", "[settings][
     std::set<std::string> present;
     for (const auto& d : schema()) present.insert(d.category);
 
-    for (const char* category : {"Graphics", "Grass", "Upscaling", "Display",
+    for (const char* category : {"Graphics", "Detail", "Grass", "Upscaling", "Display",
                                  "Camera", "Interface", "Minimap", "Action Bars",
                                  "Combat & HUD", "Sound", "Chat", "Gameplay"}) {
         INFO("no setting names the category " << category
@@ -351,6 +351,10 @@ TEST_CASE("every panel the client offers still has settings on it", "[settings][
     // Grass is its own page rather than three more rows under Graphics: that
     // page is full, and test_settings_panel_layout fails the moment anything
     // is added to it.
-    INFO("the schema names " << present.size() << " categories where twelve are expected");
-    CHECK(present.size() == 12);
+    // Thirteen since the graphics settings the game's own Effects panel used
+    // to carry moved here: Graphics was already using most of its two
+    // columns, so the ones describing how much of the world is drawn went to
+    // a Detail page of their own.
+    INFO("the schema names " << present.size() << " categories where thirteen are expected");
+    CHECK(present.size() == 13);
 }
