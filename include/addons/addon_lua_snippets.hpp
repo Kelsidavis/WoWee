@@ -1141,7 +1141,7 @@ local kRemoved = {
     "InterfaceOptionsMousePanelMouseSensitivitySlider",
     "InterfaceOptionsMousePanelMouseLookSpeedSlider",
     "InterfaceOptionsDisplayPanelShowClock",
-    "InterfaceOptionsNamesPanelFriends",
+    "InterfaceOptionsNamesPanelUnitNameplatesFriends",
 
     -- The same anti-aliasing the schema offers, in the same four steps.
     -- The Resolution page keeps what is genuinely the window's: the size of

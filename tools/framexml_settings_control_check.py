@@ -104,12 +104,15 @@ LUA = r'''
 local function panelOf(cat) return "WoweeOptions" .. cat:gsub("[^%w]", "") end
 
 -- cvar -> client setting, read out of kClientCVars rather than written again
--- here. Six settings have no schema row because a Blizzard control drives them
--- through one of these, so a binding that stops working is one of the game's
--- own controls going quietly dead - which is the fault the options audit was.
+-- here. Every setting on the far side is a schema row as well now; the binding
+-- is how an addon or a macro writing the CVar reaches it, so a binding that
+-- stops working is a /console line going quietly dead - which is the fault the
+-- options audit was.
 local CLIENT_CVARS = { --[[PAIRS]] }
 local cvarsReached = 0
 local bad, checked, controls, written = {}, 0, 0, 0
+local rows = {}
+for _, r in ipairs(WoweeSettingList()) do rows[r.key] = r end
 
 for _, r in ipairs(WoweeSettingList()) do
   local base = panelOf(r.category)
@@ -320,17 +323,17 @@ local searches = 0
 do
   local box, results = WoweeOptionsSearchBox, WoweeOptionsSearchResults
   local asked = {
-    -- The heading above a control names it too: this client calls the control
-    -- Multisampling and the key has no hyphen, so the word everyone else uses
-    -- matched neither.
-    {"anti-aliasing", "Multisampling"},
-    -- Settings the game's own panels drive are not in the schema, and the
-    -- search only read the schema - so it said no setting matched, two inches
-    -- above a block naming where that setting is.
-    {"view distance", "Video"},
+    -- The word everyone else uses, with its hyphen. This client called the
+    -- control Multisampling once and the key has no hyphen, so it matched
+    -- neither; the label carries both names now.
+    {"anti-aliasing", "Anti-aliasing (MSAA)"},
+    -- A setting the game's own Video page used to drive. The search only
+    -- read the schema, so it said no setting matched, two inches above a
+    -- block naming where that setting was. It is a row now.
+    {"view distance", "View distance"},
     -- One control with two names, in both directions.
     {"sensitivity", "sensitivity"},
-    {"grass", "grass"},
+    {"grass", "Grass"},
     -- The description is searched as well as the name.
     {"fps", "Frame rate limit"},
     {"edges", "FXAA"},
@@ -339,7 +342,7 @@ do
   -- version of this that asked only whether the setting appeared passed with
   -- the ranking taken out: Upscaling led on a description match and the three
   -- settings with "scale" in their names were still on the list behind it.
-  local mustLead = {{"scale", "Window scale"}, {"volume", "Music"}}
+  local mustLead = {{"scale", "Window scale"}, {"volume", "Master volume"}}
   if box and results and box.SetText then
     for _, pair in ipairs(asked) do
       box:SetText(pair[1])
@@ -415,22 +418,32 @@ do
 end
 
 -- Every CVar a Blizzard control writes, and the setting it is meant to reach.
+--
+-- Probed at the ends of the setting's own range, in the CVar's units. A row
+-- holds its value to that range - a farclip of 1 reads as the 400 yards the
+-- renderer stops at - so 1 and 0 only say anything for the bools, which have
+-- no range and are given them.
 for _, pair in ipairs(CLIENT_CVARS) do
   local cvar, key, scale = pair[1], pair[2], pair[3]
   local before = WoweeGetSetting(key)
-  for _, probe in ipairs({"1", "0"}) do
-    SetCVar(cvar, probe)
+  local row = rows[key]
+  local probes
+  if row and row.kind ~= "bool" and row.max > row.min then
+    probes = {{tostring(row.max / scale), row.max}, {tostring(row.min / scale), row.min}}
+  else
+    probes = {{"1", scale}, {"0", 0}}
+  end
+  for _, probe in ipairs(probes) do
+    SetCVar(cvar, probe[1])
     cvarsReached = cvarsReached + 1
     local got = WoweeGetSetting(key)
     -- What the setting should read is the CVar's value in the setting's units.
-    -- The two count the same thing for every pair but ground density, where a
-    -- doodad count meets a proportion.
-    local want = tonumber(probe) * scale
+    local want = probe[2]
     local same = (tonumber(got) and math.abs(tonumber(got) - want) < 0.02)
-                 or (scale == 1 and tostring(got) == probe)
+                 or (scale == 1 and tostring(got) == probe[1])
     if not same then
       bad[#bad+1] = string.format("%s: setting the CVar to %s left %s reading %s, wanted %s",
-                                  cvar, probe, key, tostring(got), tostring(want))
+                                  cvar, probe[1], key, tostring(got), tostring(want))
     end
   end
   WoweeSetSetting(key, before)
@@ -543,8 +556,8 @@ def main():
 
     # The probe is built from the table it checks, which means a row deleted
     # from kClientCVars is one fewer check rather than a failure. The floor is
-    # what catches that: nine is what the table has, and six of them are the
-    # settings with no schema row at all, whose only control is Blizzard's.
+    # what catches that: nine is what the table had when every one of them was
+    # the only way to a setting with no schema row, and it has only grown.
     pairs = clientCVarPairs()
     if len(pairs) < 9:
         print(f"kClientCVars has {len(pairs)} rows where it had nine - a binding "

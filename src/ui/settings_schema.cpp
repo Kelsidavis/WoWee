@@ -7,19 +7,17 @@ namespace ui {
 
 namespace {
 
-// Every setting this client has, except the five bound to a Blizzard control.
+// Every setting this client has.
 //
-// Those five - mouse speed, the minimap clock, friendly nameplates, ground
-// clutter and the sound effects volume - are driven from FrameXML's own Video,
-// Sound and Interface panels through kClientCVars, and listing them here as
-// well would draw a second control for the same value. The root panel names
-// them and says where they are.
-//
-// View distance was a sixth until 2026-08-13, and should not have been: the
-// Video panel that was supposed to drive it is suppressed along with the rest
-// of FrameXML's game menu, so nothing the player can open offered it. Before
-// leaving a setting out of here on the grounds that a Blizzard control has it,
-// check that the frame holding that control is not in kSuppress.
+// Including the ones FrameXML's own Video, Sound and Interface panels used to
+// drive through kClientCVars alone - mouse speed, the minimap clock, friendly
+// nameplates, ground clutter, the sound effects volume, and the rows of the
+// game's Effects page. Until 2026-09-05 those were left out of here on the
+// grounds that a Blizzard control had them, which drew the client's pages and
+// the game's own side by side in one window, in different words and different
+// units. Each is a row now. Its CVar stays bound, so an addon or a macro
+// writing the CVar reaches the same value the row shows, and the Blizzard
+// control for it is in kRemoved: two controls for one value is one too many.
 //
 // The order is the order they are read in: a category is a panel, a section is
 // a heading on it, and a setting whose section is "" continues the one above.
@@ -232,10 +230,10 @@ constexpr SettingDesc kSchema[] = {
      "Show each frame in step with the display. Removes tearing and\n"
      "caps the frame rate at the display's refresh rate.", "", 1},
     {"framecap", "Frame rate limit", SettingKind::Enum, 0, 6, 1, "Display", "",
-     "The most frames drawn each second. Unlimited runs the hardware\n"
-     "flat out, which on a laptop means heat and fan noise for frames\n"
-     "nobody sees. Vertical sync already caps at the display's rate;\n"
-     "use this to cap below it.",
+     "The most frames drawn each second - the fps cap. Unlimited runs\n"
+     "the hardware flat out, which on a laptop means heat and fan noise\n"
+     "for frames nobody sees. Vertical sync already caps at the display's\n"
+     "rate; use this to cap below it.",
      "Unlimited|30|60|90|120|144|240", 0},
     {"brightness", "Brightness", SettingKind::Int, 0, 100, 5, "Display", "",
      "How bright the picture is. 50 leaves it as the zone was lit; below\n"

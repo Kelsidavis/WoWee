@@ -5,10 +5,9 @@ Everything else here checks a setting inside one run: that a control shows it,
 that changing it writes it, that the store hears about it. None of that says the
 value comes back, and coming back is the whole of what a setting is for.
 
-Two runs of the runner over one config root is a restart. The first sets the
-settings a Blizzard control drives to values of its own; the second starts
-clean, reads its config from disk the way the client does, and says what it
-found.
+Two runs of the runner over one config root is a restart. The first moves
+every row of the schema off the value it holds; the second starts clean, reads
+its config from disk the way the client does, and says what it found.
 
 The chain being watched has three links, each fixed in its own pass and none of
 them provable from inside a single run:
@@ -31,10 +30,11 @@ what the first had saved. That looked exactly like the client losing settings.
 The comparison is exact rather than near, because every one of them is: a
 setting that came back a little different would come back a little different
 again on the next restart, and a value that walks is worse than one that jumps.
-Ground clutter is the one that has to travel furthest to stay put - 1.0 here is
-42.666667 in the units Blizzard's slider counts in - and it still returns
-exactly. Canaried by making one setting drift half a degree per save, which is
-reported by name.
+Ground clutter is the one that has to travel furthest to stay put - a whole
+percent here is 0.426667 of a doodad in the units Blizzard's slider counts in,
+and the store is not handed the rounded echo - and it still returns exactly.
+Canaried by making one setting drift half a degree per save, which is reported
+by name.
 
 Needs build/bin/framexml_run and an extracted interface, and skips rather than
 fails without them.
@@ -53,32 +53,16 @@ DATA = ROOT / "Data"
 INTERFACE = ROOT / "Data/interface"
 CONFIG_ROOT = ROOT / "logs/settings_restart_config"
 
-# The six a Blizzard control drives that have no schema row of their own - they
-# are driven by that control instead, which is why they have none. Set in the
-# first run and expected back in the second, on values inside every range
-# involved and different from the defaults, so a setting that quietly went back
-# to one is visible.
+# Every row of the schema, moved off whatever it holds. They live in
+# settings.cfg, which is the file the client writes when it closes and reads
+# when it opens; the ones a CVar is bound to ride the CVar store as well, and
+# have to come back through both.
 #
-# Only those six. invertmouse, autoloot and vsync are driven by a CVar and are
-# schema rows as well, so the walk below sets them after this does and these
-# expectations would be of a value that had since moved on.
-WANTED = {
-    "groundclutter": 1.0,
-    "mousespeed": 0.4,
-    "viewdistance": 1700,
-    "effectsvolume": 0.35,
-    # The bools too. They travel the same chain and are where its arithmetic is
-    # least like the numbers': a bool cannot hold half of anything, and the
-    # store has to carry the value the setting actually took rather than the one
-    # it was offered. Each of these is the opposite of its default, so a setting
-    # that quietly went back to it is the failure.
-    "minimapclock": 1,
-    "friendlyplates": 0,
-}
-
-# Every row of the schema as well, moved off whatever it holds. The nine above
-# ride the CVar store; these live in settings.cfg, which is the file the client
-# writes when it closes and reads when it opens.
+# Until 2026-09-05 six of them - ground clutter, mouse speed, view distance,
+# the effects volume, the minimap clock and friendly nameplates - had no schema
+# row and were set here by name, on values of their own. They are rows now, so
+# the walk reaches them like any other, and a value set by name first would
+# only be one the walk had since moved on from.
 SCHEMA_LUA = r"""
 local moved = {}
 for _, r in ipairs(WoweeSettingList()) do
@@ -105,18 +89,11 @@ for _, r in ipairs(WoweeSettingList()) do
 end
 """
 
-FIRST = ('local before = {} ' +
-         "".join(f'before[#before+1] = "{k}=" .. tostring(WoweeGetSetting("{k}")) '
-                 for k in WANTED) +
-         "".join(f'WoweeSetSetting("{k}", "{v}") ' for k, v in WANTED.items()) +
-         SCHEMA_LUA +
-         'error("QQ" .. "BEFORE " .. table.concat(before, " ") .. " ~ " .. '
-         'table.concat(moved, " "))')
-SECOND = ('local out = {} ' +
-          "".join(f'out[#out+1] = "{k}=" .. tostring(WoweeGetSetting("{k}")) '
-                  for k in WANTED) +
+FIRST = (SCHEMA_LUA +
+         'error("QQ" .. "BEFORE " .. table.concat(moved, " "))')
+SECOND = ('local out = {} '
           'for _, r in ipairs(WoweeSettingList()) do '
-          'out[#out+1] = r.key .. "=" .. tostring(WoweeGetSetting(r.key)) end ' +
+          'out[#out+1] = r.key .. "=" .. tostring(WoweeGetSetting(r.key)) end '
           'error("QQ" .. "RESTART " .. table.concat(out, " "))')
 
 
@@ -143,35 +120,18 @@ def main():
         print("the runner did not finish - no restart was made.")
         return 1
 
-    # What they were before the first run set them. A wanted value that is
-    # already the default would come back whether anything persisted or not:
-    # friendlyplates was written here as 1 and defaults to 1, so that one key
-    # was passing on a value it had never moved off.
-    started, schemaLeft = {}, {}
+    # What the first run left every row on, which is what the second must find.
+    schemaLeft = {}
     for line in (first.stdout + first.stderr).splitlines():
         at = line.find("QQ" + "BEFORE ")
         if at != -1:
-            head, _, tail = line[at + len("QQBEFORE "):].partition(" ~ ")
-            for item in head.split():
-                name, _, value = item.partition("=")
-                started[name] = value
-            for item in tail.split():
+            for item in line[at + len("QQBEFORE "):].split():
                 name, _, value = item.partition("=")
                 schemaLeft[name] = value
             break
-
-    stuck = []
-    for key, want in WANTED.items():
-        was = started.get(key)
-        if was is None:
-            continue
-        try:
-            same = abs(float(was) - float(want)) <= 0.001
-        except ValueError:
-            same = was == str(want)
-        if same:
-            stuck.append(f"{key}: asked for {want}, which is what it already was - "
-                         "this one would come back whether anything persisted or not")
+    if not schemaLeft:
+        print("the first run said nothing - no setting was moved.")
+        return 1
 
     payload = None
     for line in (second.stdout + second.stderr).splitlines():
@@ -189,19 +149,7 @@ def main():
         came[name] = value
 
     lost = []
-    for key, want in WANTED.items():
-        got = came.get(key)
-        if got is None:
-            lost.append(f"{key}: the second run had no value for it at all")
-            continue
-        try:
-            near = abs(float(got) - float(want)) <= 0.0001
-        except ValueError:
-            near = False
-        if not near:
-            lost.append(f"{key}: set to {want} and came back as {got}")
-
-    # And every schema row, against what the first run left it on.
+    # Every schema row, against what the first run left it on.
     for key, left in sorted(schemaLeft.items()):
         got = came.get(key)
         if got is None:
@@ -214,9 +162,7 @@ def main():
         if not near:
             lost.append(f"{key}: left on {left} and came back as {got}")
 
-    lost.extend(stuck)
-    print(f"{len(WANTED)} settings a Blizzard control drives and "
-          f"{len(schemaLeft)} rows of the schema, set in one run and read in the next.\n")
+    print(f"{len(schemaLeft)} rows of the schema, set in one run and read in the next.\n")
     for entry in lost:
         print(f"  {entry}")
 

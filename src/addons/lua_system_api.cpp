@@ -4834,6 +4834,13 @@ constexpr CVarRange kCVarRanges[] = {
     // Renderer::setViewDistance clamps to, so the control now covers exactly
     // what the client can do and nothing it cannot.
     {"farclip", 400.0f, 2400.0f},
+    // Texture filtering. The shipped slider counts Blizzard's six modes -
+    // bilinear and trilinear before the anisotropic steps - and this client's
+    // setting is the five its samplers have, off and then 2x to 16x, so a
+    // control drawn to the shipped table hands over a 5 the setting holds to
+    // 4. The page that slider was on is retired, but this is the range any
+    // control over the CVar is drawn with.
+    {"texturefilteringmode", 0.0f, 4.0f},
     // Mouse Look Speed, over the range this client's own mouse slider uses.
     {"camerayawmovespeed", 0.05f, 1.0f},
     // Mouse Sensitivity, which writes the same setting as Mouse Look Speed
