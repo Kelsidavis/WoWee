@@ -540,17 +540,20 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         auto* fsrPost = renderer ? renderer->getPostProcessPipeline() : nullptr;
         if (renderer && fsrPost) {
 #ifdef __APPLE__
-            // FidelityFX and AMD frame generation are unsupported through the
-            // macOS MoltenVK path. Old settings files must not silently retain
-            // either feature after the controls are hidden.
-            settingsPanel_.pendingUpscalingMode = 0;
-            settingsPanel_.pendingFSR = false;
+            // Frame generation only. It is AMD's runtime and there is none on
+            // this platform, so the saved flag must not survive into a session
+            // that cannot honour it.
+            //
+            // Upscaling itself is no longer turned off here. This used to force
+            // the whole mode to Off on every start, which left the control
+            // working for the session and back at Off at the next one - and the
+            // next save wrote that Off over what the player had chosen. Neither
+            // upscaler needs the FidelityFX SDK: FSR 1 is a shader of this
+            // client's own and FSR 3 falls back to its own compute path, which
+            // is what a macOS log shows initialising. Where the device really
+            // cannot carry FSR 3, setFSR2Enabled refuses it by name and says so.
             settingsPanel_.pendingAMDFramegen = false;
-            renderer->getPostProcessPipeline()->setAmdFsr3FramegenEnabled(false);
-            renderer->setFSREnabled(false);
-            renderer->setFSR2Enabled(false);
-            settingsPanel_.fsrSettingsApplied_ = true;
-#else
+#endif
             renderer->getPostProcessPipeline()->setFSRQuality(
                 fsrScaleForChoice(settingsPanel_.pendingFSRQuality));
             renderer->getPostProcessPipeline()->setFSRSharpness(settingsPanel_.pendingFSRSharpness);
@@ -568,7 +571,6 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                 renderer->setFSR2Enabled(effectiveMode == 2);
                 settingsPanel_.fsrSettingsApplied_ = true;
             }
-#endif
         }
     }
 
