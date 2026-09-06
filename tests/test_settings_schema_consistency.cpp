@@ -340,7 +340,7 @@ TEST_CASE("every panel the client offers still has settings on it", "[settings][
 
     for (const char* category : {"Graphics", "Detail", "Grass", "Upscaling", "Display",
                                  "Camera", "Interface", "Minimap", "Action Bars",
-                                 "Combat & HUD", "Sound", "Chat", "Gameplay"}) {
+                                 "Combat & HUD", "Sound", "Sound Effects", "Chat", "Gameplay"}) {
         INFO("no setting names the category " << category
              << " any more, so that panel is empty or gone");
         CHECK(present.count(category) == 1);
@@ -355,6 +355,6 @@ TEST_CASE("every panel the client offers still has settings on it", "[settings][
     // to carry moved here: Graphics was already using most of its two
     // columns, so the ones describing how much of the world is drawn went to
     // a Detail page of their own.
-    INFO("the schema names " << present.size() << " categories where thirteen are expected");
-    CHECK(present.size() == 13);
+    INFO("the schema names " << present.size() << " categories where fourteen are expected");
+    CHECK(present.size() == 14);
 }

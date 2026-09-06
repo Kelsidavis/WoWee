@@ -62,6 +62,15 @@ public:
 
     // ---- Pending audio settings ----
     int pendingMasterVolume = 100;
+    /// The six switches the game's own Sound panel used to own. The audio
+    /// code applies them from the cvar store, so each is bound to its cvar
+    /// in kClientCVars and the panel asks for a re-apply after writing one.
+    bool pendingSoundInBackground = false;
+    bool pendingEnableMusic = true;
+    bool pendingLoopMusic = false;
+    bool pendingEnableAmbience = true;
+    bool pendingErrorSpeech = true;
+    bool pendingEnableSoundEffects = true;
     int pendingMusicVolume = 30;
     int pendingAmbientVolume = 100;
     int pendingBellVolume = 50;

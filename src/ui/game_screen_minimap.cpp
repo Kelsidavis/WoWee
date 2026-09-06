@@ -1750,6 +1750,14 @@ void GameScreen::saveSettings() {
 
     // Audio
     out << "sound_muted=" << (settingsPanel_.soundMuted_ ? 1 : 0) << "\n";
+    // The switches that came off the game's own Sound panel. Their cvars are
+    // saved too, but the settings file is what the panel opens from.
+    out << "sound_in_background=" << (settingsPanel_.pendingSoundInBackground ? 1 : 0) << "\n";
+    out << "enable_music=" << (settingsPanel_.pendingEnableMusic ? 1 : 0) << "\n";
+    out << "loop_music=" << (settingsPanel_.pendingLoopMusic ? 1 : 0) << "\n";
+    out << "enable_ambience=" << (settingsPanel_.pendingEnableAmbience ? 1 : 0) << "\n";
+    out << "error_speech=" << (settingsPanel_.pendingErrorSpeech ? 1 : 0) << "\n";
+    out << "enable_sound_effects=" << (settingsPanel_.pendingEnableSoundEffects ? 1 : 0) << "\n";
     out << "use_original_soundtrack=" << (settingsPanel_.pendingUseOriginalSoundtrack ? 1 : 0) << "\n";
     out << "master_volume=" << settingsPanel_.pendingMasterVolume << "\n";
     out << "effects_volume=" << settingsPanel_.pendingEffectsVolume << "\n";
@@ -1993,6 +2001,12 @@ void GameScreen::loadSettings() {
                     audio::AudioEngine::instance().setMasterVolume(0.0f);
                 }
             }
+            else if (key == "sound_in_background") settingsPanel_.pendingSoundInBackground = (val != "0");
+            else if (key == "enable_music") settingsPanel_.pendingEnableMusic = (val != "0");
+            else if (key == "loop_music") settingsPanel_.pendingLoopMusic = (val != "0");
+            else if (key == "enable_ambience") settingsPanel_.pendingEnableAmbience = (val != "0");
+            else if (key == "error_speech") settingsPanel_.pendingErrorSpeech = (val != "0");
+            else if (key == "enable_sound_effects") settingsPanel_.pendingEnableSoundEffects = (val != "0");
             else if (key == "use_original_soundtrack") settingsPanel_.pendingUseOriginalSoundtrack = (std::stoi(val) != 0);
             else if (key == "master_volume") settingsPanel_.pendingMasterVolume = std::clamp(std::stoi(val), 0, 100);
             else if (key == "effects_volume") settingsPanel_.pendingEffectsVolume = std::clamp(std::stoi(val), 0, 100);

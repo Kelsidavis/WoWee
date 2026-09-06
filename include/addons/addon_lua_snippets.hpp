@@ -47,6 +47,7 @@ local kCategoryHost = {
     ["Upscaling"]    = "video",
     ["Display"]      = "video",
     ["Sound"]        = "audio",
+    ["Sound Effects"] = "audio",
 }
 
 local COLUMN_X      = {16, 326}
@@ -659,10 +660,11 @@ WOWEE_SETTINGS_ELSEWHERE = {
     -- used to carry. What is left of the game's Video options is the
     -- window itself.
     { panel = "Video",             names = { "resolution", "interface scale" } },
-    { panel = "Sound",             names = { "enable sound", "master volume", "sound effects" } },
-    { panel = "Interface",         names = { "mouse look speed (sensitivity)",
-                                             "the minimap clock",
-                                             "friendly nameplates" } },
+    -- Sound had a row here and does not any more: the master volume, the mute
+    -- and the effects scale are on this client's own Sound and Sound Effects
+    -- pages, with the switches that used to sit beside them. Interface is
+    -- gone the same way - mouse sensitivity, the minimap clock and friendly
+    -- nameplates are rows on Camera, Minimap and Combat & HUD.
     { panel = "Interface, Social", names = { "chat timestamps" } },
     { panel = "Key Bindings",      names = { "every key" } },
 }
@@ -1132,6 +1134,15 @@ local kRemoved = {
     -- it matches the same line pasted over and over, not the words in it.
     "InterfaceOptionsSocialPanelProfanityFilter",
 
+    -- Three that the schema now offers, so the game's own copies would be a
+    -- second control for one value: mouse sensitivity - which that panel
+    -- offered twice over, as sensitivity and as look speed, both writing the
+    -- same setting - the minimap clock, and friendly nameplates.
+    "InterfaceOptionsMousePanelMouseSensitivitySlider",
+    "InterfaceOptionsMousePanelMouseLookSpeedSlider",
+    "InterfaceOptionsDisplayPanelShowClock",
+    "InterfaceOptionsNamesPanelFriends",
+
     -- The same anti-aliasing the schema offers, in the same four steps.
     -- The Resolution page keeps what is genuinely the window's: the size of
     -- it and the interface scale.
@@ -1197,6 +1208,12 @@ local kRemovedCategories = {
     -- side by side in one list, in different words and different units.
     -- Its remaining rows were the dead ones already hidden above.
     "VideoOptionsEffectsPanel",
+    -- The game's own Sound page, for the same reason. Its volumes and its
+    -- six switches are rows in the schema now, and the schema's two sound
+    -- pages are hosted in this same window - so leaving it drew two sets of
+    -- sound controls in one list, one of them describing a master volume
+    -- this client had already been showing beside it.
+    "AudioOptionsSoundPanel",
 }
 
 local removed = {}

@@ -1225,6 +1225,19 @@ constexpr ClientCVarBinding kClientCVars[] = {
     // every card stopping there, so the top two both land on this one's 4.
     {"texturefilteringmode", "texturefiltering"},
     {"sound_sfxvolume",      "effectsvolume"},
+    // The switches off the game's own Sound panel, now rows in the schema.
+    // Bound rather than converted because applySoundCVars reads the store:
+    // the setting writes the cvar, the panel asks for a re-apply, and the
+    // one piece of code that knows what each switch silences stays where it
+    // is. Not master, mute or the effects volume - those three are bridged
+    // through getAudioSetting already, and a second route would have the two
+    // fight over the same value.
+    {"sound_enablesoundwhengameisinbg", "soundinbackground"},
+    {"sound_enablemusic",    "enablemusic"},
+    {"sound_zonemusicnodelay", "loopmusic"},
+    {"sound_enableambience", "enableambience"},
+    {"sound_enableerrorspeech", "errorspeech"},
+    {"sound_enablesfx",      "enablesoundeffects"},
     // Three that were each written out four times over - a getter and a setter
     // on LuaServices, a lambda in Application, and a branch in each of GetCVar
     // and SetCVar - because the client had no key for them when they were
@@ -1753,6 +1766,8 @@ void noteClientSettingChanged(const std::string& settingKey, const std::string& 
         return;
     }
 }
+
+void applySoundCVarSideEffects(lua_State* L) { applySoundCVars(L); }
 
 void applyStoredCVarSideEffects(lua_State* L) {
     g_replayingStoredCVars = true;

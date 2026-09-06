@@ -276,7 +276,11 @@ constexpr SettingDesc kSchema[] = {
      "snapping straight to it.", "", 0},
     {"idleorbit", "Idle orbit", SettingKind::Bool, 0, 0, 0, "Camera", "",
      "Slowly circle the camera around you while you stand still.", "", 1},
-    {"invertmouse", "Invert mouse look", SettingKind::Bool, 0, 0, 0, "Camera", "Mouse",
+    {"mousespeed", "Mouse sensitivity", SettingKind::Float, 0.05f, 1.0f, 0.05f, "Camera", "Mouse",
+     "How far the view turns for a given movement of the mouse. The game's\n"
+     "own panel offered this twice, as sensitivity and as look speed, and\n"
+     "both wrote this one value.", "", 0.2f},
+    {"invertmouse", "Invert mouse look", SettingKind::Bool, 0, 0, 0, "Camera", "",
      "Push the mouse forward to look up, as in a flight sim.", "", 0},
 
     // --------------------------------------------------------------- Interface
@@ -308,7 +312,9 @@ constexpr SettingDesc kSchema[] = {
     // north-up in this client and the control has not worked for as long as it
     // has existed. A tickbox that unticks itself is worse here than no tickbox
     // at all, so this list does not offer one.
-    {"minimapsquare", "Square minimap", SettingKind::Bool, 0, 0, 0, "Minimap", "Appearance",
+    {"minimapclock", "Clock", SettingKind::Bool, 0, 0, 0, "Minimap", "Appearance",
+     "Show the time of day under the minimap.", "", 0},
+    {"minimapsquare", "Square minimap", SettingKind::Bool, 0, 0, 0, "Minimap", "",
      "Draw the minimap as a square rather than a circle.", "", 0},
     {"minimapnpcdots", "Nearby creature dots", SettingKind::Bool, 0, 0, 0, "Minimap", "",
      "Mark creatures near you as dots on the minimap.", "", 0},
@@ -344,8 +350,12 @@ constexpr SettingDesc kSchema[] = {
      "Action Bars", "", "Shift it up or down from the middle of the screen, in pixels.", "", 0, "showleftbar"},
 
     // ------------------------------------------------------------ Combat & HUD
+    {"friendlyplates", "Friendly nameplates", SettingKind::Bool, 0, 0, 0,
+     "Combat & HUD", "Nameplates",
+     "Show name and health bars over friendly creatures and players too,\n"
+     "rather than over hostile ones alone.", "", 0},
     {"nameplatescale", "Nameplate scale", SettingKind::Float, 0.5f, 2.0f, 0.05f,
-     "Combat & HUD", "Nameplates", "Size of the name and health bars over creatures' heads.", "", 1},
+     "Combat & HUD", "", "Size of the name and health bars over creatures' heads.", "", 1},
 
     {"dpsmeter", "Damage meter", SettingKind::Bool, 0, 0, 0, "Combat & HUD", "Trackers",
      "Show your damage and healing per second above the action bar\n"
@@ -364,36 +374,73 @@ constexpr SettingDesc kSchema[] = {
      "below a fifth.", "", 1},
 
     // ------------------------------------------------------------------- Sound
-    {"musicvolume", "Music", SettingKind::Int, 0, 100, 5, "Sound", "Music and ambience",
+    //
+    // The game's own Sound panel is retired, so its switches are rows here.
+    // Master volume, the mute and the sound-effects scale used to be written
+    // out by hand in this client's window and driven by that panel as well -
+    // one value with two controls, described differently by each.
+    //
+    // The six switches are bound to their cvars in kClientCVars, because the
+    // audio code applies them from the cvar store; writing the setting writes
+    // the store, and the panel asks for them to be re-applied.
+    {"mutesound", "Mute all sound", SettingKind::Bool, 0, 0, 0, "Sound", "Output",
+     "Silence everything at once. The speaker button beside the minimap is\n"
+     "the same switch.", "", 0},
+    {"mastervolume", "Master volume", SettingKind::Int, 0, 100, 5, "Sound", "",
+     "One scale over everything below.", "", 100},
+    {"soundinbackground", "Play while in the background", SettingKind::Bool, 0, 0, 0,
+     "Sound", "",
+     "Keep playing when another window has the focus.", "", 0},
+
+    {"enablemusic", "Enable music", SettingKind::Bool, 0, 0, 0, "Sound", "Music",
+     "Off silences the score without disturbing the volume below.", "", 1},
+    {"musicvolume", "Music volume", SettingKind::Int, 0, 100, 5, "Sound", "",
      "The zone's music. With the WoWee soundtrack on, that too.", "", 30},
     {"woweemusic", "WoWee soundtrack", SettingKind::Bool, 0, 0, 0, "Sound", "",
      "Play this client's own music in the rotation alongside the game's.", "", 1},
-    {"ambientvolume", "Ambience", SettingKind::Int, 0, 100, 5, "Sound", "",
+    {"loopmusic", "Play without gaps", SettingKind::Bool, 0, 0, 0, "Sound", "",
+     "Start the next track straight away rather than leaving the long\n"
+     "silence between them the original client had.", "", 0},
+
+    {"enableambience", "Enable ambience", SettingKind::Bool, 0, 0, 0, "Sound", "Ambience",
+     "Off silences the world's own noise without disturbing the volumes below.", "", 1},
+    {"ambientvolume", "Ambience volume", SettingKind::Int, 0, 100, 5, "Sound", "",
      "Wind, water, birds and the rest of the world's own noise.", "", 100},
     {"bellvolume", "City bells", SettingKind::Int, 0, 100, 5, "Sound", "",
      "The hour struck in the capital cities.", "", 50},
-
-    {"uivolume", "Interface", SettingKind::Int, 0, 100, 5, "Sound", "Effects",
-     "Clicks, bag sounds and window noises. Each slider here balances\n"
-     "one kind of effect against the others; the Sound Effects slider\n"
-     "in the game's own Sound panel scales them all together.", "", 100},
-    {"combatvolume", "Combat", SettingKind::Int, 0, 100, 5, "Sound", "",
-     "Weapon swings, hits, blocks and parries.", "", 100},
-    {"spellvolume", "Spells", SettingKind::Int, 0, 100, 5, "Sound", "",
-     "Casting, spell impacts and buffs landing.", "", 100},
-    {"movementvolume", "Movement", SettingKind::Int, 0, 100, 5, "Sound", "",
-     "Jumping, landing, swimming and armour rustle.", "", 100},
-    {"footstepvolume", "Footsteps", SettingKind::Int, 0, 100, 5, "Sound", "",
-     "Your own and others' footsteps, by the ground underfoot.", "", 100},
-    {"mountvolume", "Mounts", SettingKind::Int, 0, 100, 5, "Sound", "",
-     "Hoofbeats, wingbeats and mount calls.", "", 70},
-    {"activityvolume", "Activity", SettingKind::Int, 0, 100, 5, "Sound", "",
-     "Fishing, mining, forges and the rest of the world at work.", "", 100},
 
     {"npcvoicevolume", "NPC voices", SettingKind::Int, 0, 100, 5, "Sound", "Voices",
      "Greetings, farewells and quest speech from the people you talk to.", "", 100},
     {"characterspeech", "Character speech", SettingKind::Bool, 0, 0, 0, "Sound", "",
      "Your own character's grunts, greetings and emotes.", "", 1},
+    {"errorspeech", "Spoken refusals", SettingKind::Bool, 0, 0, 0, "Sound", "",
+     "Your character saying why an action was refused - \"I can't do that\n"
+     "yet\", \"Not enough rage\".", "", 1},
+
+    // ----------------------------------------------------------- Sound Effects
+    //
+    // Their own page for the reason Detail has one: nine sliders and a switch
+    // do not fit beside the rest of Sound in two columns.
+    {"enablesoundeffects", "Enable sound effects", SettingKind::Bool, 0, 0, 0,
+     "Sound Effects", "Effects",
+     "Off silences every effect below at once.", "", 1},
+    {"effectsvolume", "All effects", SettingKind::Int, 0, 100, 5, "Sound Effects", "",
+     "One scale over the seven below. This is the slider the game's own\n"
+     "Sound panel called Sound Effects.", "", 100},
+    {"uivolume", "Interface", SettingKind::Int, 0, 100, 5, "Sound Effects", "",
+     "Clicks, bag sounds and window noises.", "", 100},
+    {"combatvolume", "Combat", SettingKind::Int, 0, 100, 5, "Sound Effects", "",
+     "Weapon swings, hits, blocks and parries.", "", 100},
+    {"spellvolume", "Spells", SettingKind::Int, 0, 100, 5, "Sound Effects", "",
+     "Casting, spell impacts and buffs landing.", "", 100},
+    {"movementvolume", "Movement", SettingKind::Int, 0, 100, 5, "Sound Effects", "",
+     "Jumping, landing, swimming and armour rustle.", "", 100},
+    {"footstepvolume", "Footsteps", SettingKind::Int, 0, 100, 5, "Sound Effects", "",
+     "Your own and others' footsteps, by the ground underfoot.", "", 100},
+    {"mountvolume", "Mounts", SettingKind::Int, 0, 100, 5, "Sound Effects", "",
+     "Hoofbeats, wingbeats and mount calls.", "", 70},
+    {"activityvolume", "Activity", SettingKind::Int, 0, 100, 5, "Sound Effects", "",
+     "Fishing, mining, forges and the rest of the world at work.", "", 100},
 
     // -------------------------------------------------------------------- Chat
     //
@@ -432,11 +479,15 @@ constexpr SettingDesc kSchema[] = {
     {"autoloot", "Auto loot", SettingKind::Bool, 0, 0, 0, "Gameplay", "Looting",
      "Take everything from a corpse or chest without opening the loot\n"
      "window.", "", 0},
-    {"autosellgrey", "Sell grey items", SettingKind::Bool, 0, 0, 0, "Gameplay", "",
-     "Sell every grey (junk) item in your bags whenever you open a\n"
-     "merchant.", "", 0},
-    {"autorepair", "Repair at vendors", SettingKind::Bool, 0, 0, 0, "Gameplay", "",
-     "Repair your gear whenever you open a merchant who can.", "", 0},
+    {"autosellgrey", "Sell junk automatically", SettingKind::Bool, 0, 0, 0, "Gameplay", "",
+     "Opening any merchant sells every Poor quality item - the grey ones -\n"
+     "from your backpack and bags, and adds the coin. Nothing of another\n"
+     "colour is touched. There is no prompt and no undo, so a grey you\n"
+     "were keeping on purpose goes with the rest.", "", 0},
+    {"autorepair", "Repair automatically", SettingKind::Bool, 0, 0, 0, "Gameplay", "",
+     "Opening a merchant who repairs mends everything damaged you are\n"
+     "wearing, paid from your own coin - never the guild bank. If you\n"
+     "cannot afford the whole bill nothing is repaired and it says so.", "", 0},
 };
 
 }  // namespace

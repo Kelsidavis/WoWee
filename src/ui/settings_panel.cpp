@@ -268,58 +268,23 @@ void SettingsPanel::renderSettingsAudioTab(std::function<void()> saveCallback) {
 ImGui::Spacing();
 ImGui::BeginChild("AudioSettings", ImVec2(0, -1), true);
 
-// Helper lambda to apply audio settings
-auto applyAudioSettings = [&]() {
-    applyAudioVolumes(services_.audioCoordinator);
-    saveCallback();
-};
-
-// Mute is a saved setting that forces the master volume to zero, and until now
-// the only control for it was a 20x20 invisible button at the corner of the
-// minimap. A client that starts silent because of a flag set by a stray click
-// gives no way to find out why from the place a player looks - here.
-if (ImGui::Checkbox("Mute All Sound", &soundMuted_)) {
-    if (soundMuted_) {
-        preMuteVolume_ = audio::AudioEngine::instance().getMasterVolume();
-    }
-    applyAudioSettings();
-}
-if (ImGui::IsItemHovered())
-    ImGui::SetTooltip("Silences everything. The speaker button by the minimap does the same.");
-
-ImGui::Text("Master Volume");
-if (ImGui::SliderInt("##MasterVolume", &pendingMasterVolume, 0, 100, "%d%%")) {
-    // Raising the volume means the player wants to hear something, so it clears
-    // the mute rather than being silently ignored. Dragging this while muted
-    // used to do nothing at all, with nothing on screen saying why.
-    if (pendingMasterVolume > 0) soundMuted_ = false;
-    applyAudioSettings();
-}
-ImGui::Text("Sound Effects");
-if (ImGui::SliderInt("##EffectsVolume", &pendingEffectsVolume, 0, 100, "%d%%")) {
-    applyAudioSettings();
-}
-if (ImGui::IsItemHovered())
-    ImGui::SetTooltip("One scale over every sound below. WoW's Sound Effects slider is this one.");
-
-// The rest of the sound settings, from the schema - the same rows the
-// interface's Sound panel is built from.
-//
-// These were thirteen blocks here of label, slider, apply, hint, each naming
-// its own field and each free to describe a setting differently from the panel
-// on the other side of the bridge. Master and Sound Effects stay written out
-// because they are not in that list: the game's own Sound panel drives them,
-// and a schema row would draw a second control for each.
+// Mute, master volume and the effects scale were written out here and driven
+// by the game's own Sound panel as well - one value with two controls, each
+// describing it differently. They are schema rows now, like everything else
+// on this tab, so both surfaces read the one description.
 drawSchemaCategory("Sound", saveCallback);
+
+ImGui::Spacing();
+ImGui::SeparatorText("Sound Effects");
+drawSchemaCategory("Sound Effects", saveCallback);
 
 ImGui::EndChild();
 
 if (ImGui::Button("Restore Audio Defaults", ImVec2(-1, 0))) {
     restoreSchemaDefaults("Sound");
-    // Master is not in that list - the game's own Sound panel drives it - so
-    // it is the one value still named here.
-    pendingMasterVolume = 100;
-    applyAudioSettings();
+    restoreSchemaDefaults("Sound Effects");
+    applyAudioVolumes(services_.audioCoordinator);
+    saveCallback();
 }
 
 }
@@ -821,6 +786,11 @@ constexpr const char* kGraphicsApplyKeys[] = {
     // applies them at startup; the cvar store used to do it.
     "groundclutterdistance", "particledensity", "weatherdetail",
     "environmentdetail", "texturefiltering",
+    // The sound switches off the game's own panel. The stored cvars are
+    // replayed at startup and reach them that way too, but a setting whose
+    // only route in is the cvar behind it is one rename away from silence.
+    "soundinbackground", "enablemusic", "loopmusic", "enableambience",
+    "errorspeech", "enablesoundeffects",
 };
 
 /// Whether a quality preset has an opinion about this setting.
@@ -959,6 +929,14 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "texturefiltering",  .asInt = &SettingsPanel::pendingTextureFiltering},
     {.key = "effectsvolume",  .asInt   = &SettingsPanel::pendingEffectsVolume,
      .fraction = true},
+    {.key = "mastervolume",  .asInt  = &SettingsPanel::pendingMasterVolume},
+    {.key = "mutesound",     .asBool = &SettingsPanel::soundMuted_},
+    {.key = "soundinbackground",  .asBool = &SettingsPanel::pendingSoundInBackground},
+    {.key = "enablemusic",        .asBool = &SettingsPanel::pendingEnableMusic},
+    {.key = "loopmusic",          .asBool = &SettingsPanel::pendingLoopMusic},
+    {.key = "enableambience",     .asBool = &SettingsPanel::pendingEnableAmbience},
+    {.key = "errorspeech",        .asBool = &SettingsPanel::pendingErrorSpeech},
+    {.key = "enablesoundeffects", .asBool = &SettingsPanel::pendingEnableSoundEffects},
 
     // --- Graphics ---
     {.key = "shadows",           .asBool  = &SettingsPanel::pendingShadows},
@@ -1096,7 +1074,8 @@ const FieldBinding* findFieldBinding(const std::string& key) {
 /// speech switches the player voice manager on and off inside the same call,
 /// and the effects slider scales seven of the others.
 bool isVolumeKey(const std::string& key) {
-    return key == "effectsvolume" || key == "musicvolume" || key == "ambientvolume" ||
+    return key == "mastervolume" || key == "mutesound" ||
+           key == "effectsvolume" || key == "musicvolume" || key == "ambientvolume" ||
            key == "bellvolume" || key == "uivolume" || key == "combatvolume" ||
            key == "spellvolume" || key == "movementvolume" || key == "footstepvolume" ||
            key == "mountvolume" || key == "activityvolume" || key == "npcvoicevolume" ||
@@ -1121,6 +1100,19 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
     auto* wmo = renderer ? renderer->getWMORenderer() : nullptr;
     auto* chars = renderer ? renderer->getCharacterRenderer() : nullptr;
 
+    // The switches the game's own Sound panel used to own. Writing the setting
+    // has already written the cvar behind it - see noteClientSettingChanged -
+    // and this is what re-reads them. applySoundCVars is where the knowledge
+    // of what each one silences lives, so it stays the only copy.
+    if (key == "soundinbackground" || key == "enablemusic" || key == "loopmusic" ||
+        key == "enableambience" || key == "errorspeech" || key == "enablesoundeffects") {
+        if (services_.addonManager) {
+            if (auto* engine = services_.addonManager->getLuaEngine()) {
+                if (auto* L = engine->getState()) addons::applySoundCVarSideEffects(L);
+            }
+        }
+        return;
+    }
     if (key == "viewdistance") {
         if (renderer) renderer->setViewDistance(pendingViewDistance);
     } else if (key == "shadows") {
