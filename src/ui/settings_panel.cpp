@@ -525,6 +525,11 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                         window->applyResolution(pendingResolutionWidth, pendingResolutionHeight);
                         saveCallback();
                     }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("The size of the window, or of the picture in fullscreen.\n"
+                                          "Applies at once. To draw the world smaller than this\n"
+                                          "and scale it up, use Upscaling below instead.");
+                    }
                 }
 
                 ImGui::Spacing();
@@ -536,43 +541,27 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                 // schema and nothing else, and that is the screen it was
                 // missing from. Ground clutter is still the game's own Video
                 // panel's on paper, and still only offered here.
-                if (ImGui::SliderInt("Ground Clutter Density", &pendingGroundClutterDensity,
+                if (ImGui::SliderInt("Ground clutter", &pendingGroundClutterDensity,
                                      0, 150, "%d%%")) {
                     applySettingSideEffects("groundclutter");
                     updateGraphicsPresetFromCurrentSettings();
                     saveCallback();
                 }
-
-                // Under its own heading rather than loose among the graphics
-                // rows: "Grass" beside "Grass Density" reads as a label for the
-                // slider rather than a control of its own, and was missed.
-                ImGui::Spacing();
-                ImGui::SeparatorText("Grass (experimental)");
-                if (ImGui::Checkbox("Enable grass (experimental)", &pendingGrassEnabled)) {
-                    applySettingSideEffects("grassenabled");
-                    saveCallback();
-                }
-                if (ImGui::SliderInt("Grass Density", &pendingGrassDensity,
-                                     0, 300, "%d%%")) {
-                    applySettingSideEffects("grassdensity");
-                    saveCallback();
-                }
-                if (ImGui::SliderInt("Grass Height", &pendingGrassHeight,
-                                     50, 300, "%d%%")) {
-                    applySettingSideEffects("grassheight");
-                    saveCallback();
-                }
-                if (ImGui::SliderInt("Grass Distance", &pendingGrassDistance,
-                                     30, 2000, "%d yd")) {
-                    applySettingSideEffects("grassdistance");
-                    saveCallback();
-                }
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("How far out grass draws. Past 45 yards the field\n"
-                                      "thins with distance, so long ranges cost blades\n"
-                                      "slowly, and each blade grows in gently as you\n"
-                                      "approach it.");
+                    ImGui::SetTooltip("How many small plants, tufts and stones are scattered\n"
+                                      "over the ground, as a percentage of what the zone asks\n"
+                                      "for. 100 is as designed; above it is denser than the\n"
+                                      "original client ever drew.");
                 }
+
+                // From the schema, like everything else on this tab: the four
+                // grass controls were drawn by hand here with labels and a lone
+                // tooltip of their own, so the interface's options page and this
+                // window explained the same sliders differently, and three of
+                // them not at all. The schema's own heading follows.
+                ImGui::Spacing();
+                ImGui::SeparatorText("Grass");
+                drawSchemaCategory("Grass", saveCallback);
 
                 ImGui::Spacing();
                 ImGui::SeparatorText("Upscaling");
@@ -732,7 +721,10 @@ void SettingsPanel::drawSchemaCategory(const char* category,
             }
             case SettingKind::Float: {
                 float v = static_cast<float>(std::atof(current.c_str()));
-                if (ImGui::SliderFloat(d.label, &v, d.minValue, d.maxValue, "%.2f")) {
+                // Whole-number steps read as whole numbers: a shadow distance of
+                // "300.00" yards or a field of view of "70.00" degrees is noise.
+                const char* format = d.step >= 1.0f ? "%.0f" : "%.2f";
+                if (ImGui::SliderFloat(d.label, &v, d.minValue, d.maxValue, format)) {
                     changed = setSettingValue(d.key, settingNumberText(v));
                 }
                 break;
