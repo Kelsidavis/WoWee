@@ -912,10 +912,10 @@ void Renderer::applyMsaaChange() {
 
     // Set new MSAA and recreate swapchain (render pass, depth, MSAA image, framebuffers)
     vkCtx->setMsaaSamples(samples);
-    if (!vkCtx->recreateSwapchain(window->getWidth(), window->getHeight())) {
+    if (!vkCtx->recreateSwapchain(window->getDrawableWidth(), window->getDrawableHeight())) {
         LOG_ERROR("MSAA change failed - reverting to 1x");
         vkCtx->setMsaaSamples(VK_SAMPLE_COUNT_1_BIT);
-        (void)vkCtx->recreateSwapchain(window->getWidth(), window->getHeight());
+        (void)vkCtx->recreateSwapchain(window->getDrawableWidth(), window->getDrawableHeight());
     }
 
     // Recreate all sub-renderer pipelines (they embed sample count from render pass)
@@ -1033,8 +1033,10 @@ void Renderer::beginFrame() {
     // Handle swapchain recreation if needed
     if (vkCtx->isSwapchainDirty()) {
         // Skip recreation while window is minimized (0×0 extent is a Vulkan spec violation)
-        if (window->getWidth() == 0 || window->getHeight() == 0) return;
-        (void)vkCtx->recreateSwapchain(window->getWidth(), window->getHeight());
+        // Pixels, like the extent below: a window with a surface behind it is
+        // never rebuilt from the size the desktop places it at.
+        if (window->getDrawableWidth() == 0 || window->getDrawableHeight() == 0) return;
+        (void)vkCtx->recreateSwapchain(window->getDrawableWidth(), window->getDrawableHeight());
         // Rebuild water resources that reference swapchain extent/views
         if (waterRenderer) {
             waterRenderer->recreatePipelines();

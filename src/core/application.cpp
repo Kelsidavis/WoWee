@@ -1337,8 +1337,10 @@ void Application::run() {
                 }
             } else if (event.type == SDL_APP_DIDENTERFOREGROUND) {
                 if (window && window->getVkContext()) {
+                    // Pixels: a surface is built at the drawable size, which
+                    // is not the window size on a high density display.
                     int w = 0, h = 0;
-                    SDL_GetWindowSize(window->getSDLWindow(), &w, &h);
+                    SDL_Vulkan_GetDrawableSize(window->getSDLWindow(), &w, &h);
                     if (!window->getVkContext()->restoreSurface(
                             window->getSDLWindow(), w, h)) {
                         LOG_ERROR("Resuming without a surface; the client cannot draw");

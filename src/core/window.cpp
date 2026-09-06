@@ -160,6 +160,20 @@ bool Window::initialize() {
 
     // Create Vulkan window (no GL attributes needed)
     Uint32 flags = SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN;
+#ifdef __APPLE__
+    // Draw at the display's own pixels rather than at its points.
+    //
+    // Without this a window on a Retina panel gets a surface the size of the
+    // window in points and the display stretches it: on a 14-inch MacBook Pro
+    // the whole client rendered into 1512x982 and was blown up to 3024x1964,
+    // which is every edge and every glyph softened, permanently, with no
+    // setting to say so. With it the surface is the full 3024x1964.
+    //
+    // Apple only on purpose. It is the platform where a point is not a pixel
+    // for this client; the swapchain now asks SDL for the drawable size
+    // either way, so the two agree wherever they are already equal.
+    flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+#endif
     if (config.fullscreen) {
         flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
     }
@@ -189,6 +203,15 @@ bool Window::initialize() {
     }
 
     setWindowIcon();
+
+    // Before the swapchain, which is sized from it.
+    SDL_GetWindowSize(window, &width, &height);
+    refreshDrawableSize();
+    if (drawableWidth != width || drawableHeight != height) {
+        LOG_WARNING("Window is ", width, "x", height, " points on a ",
+                    drawableWidth, "x", drawableHeight,
+                    " pixel surface - the world is drawn at the pixel size.");
+    }
 
     // Initialize Vulkan context
     vkContext = std::make_unique<rendering::VkContext>();
@@ -276,6 +299,7 @@ void Window::setFullscreen(bool enable) {
         }
         fullscreen = true;
         SDL_GetWindowSize(window, &width, &height);
+        refreshDrawableSize();
     } else {
         if (SDL_SetWindowFullscreen(window, 0) != 0) {
             LOG_WARNING("Failed to exit fullscreen: ", SDL_GetError());
@@ -298,6 +322,18 @@ void Window::setVsync(bool enable) {
         vkContext->markSwapchainDirty();
     }
     LOG_INFO("VSync ", enable ? "enabled" : "disabled");
+}
+
+void Window::refreshDrawableSize() {
+    if (!window) { drawableWidth = width; drawableHeight = height; return; }
+    int dw = 0, dh = 0;
+    SDL_Vulkan_GetDrawableSize(window, &dw, &dh);
+    // A minimised window answers zero, and a swapchain of zero is a spec
+    // violation - so the last good size stands until there is a real one.
+    if (dw > 0 && dh > 0) {
+        drawableWidth = dw;
+        drawableHeight = dh;
+    }
 }
 
 void Window::applyResolution(int w, int h) {
@@ -331,6 +367,7 @@ void Window::applyResolution(int w, int h) {
                          ": the chosen ", w, "x", h, " is a different shape");
                 if (SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP) == 0) {
                     SDL_GetWindowSize(window, &width, &height);
+        refreshDrawableSize();
                     if (vkContext) vkContext->markSwapchainDirty();
                 }
                 return;
@@ -359,6 +396,7 @@ void Window::applyResolution(int w, int h) {
             return;
         }
         SDL_GetWindowSize(window, &width, &height);
+        refreshDrawableSize();
         if (vkContext) {
             vkContext->markSwapchainDirty();
         }
@@ -390,6 +428,7 @@ void Window::applyResolution(int w, int h) {
     }
     SDL_SetWindowSize(window, wantW, wantH);
     SDL_GetWindowSize(window, &width, &height);
+    refreshDrawableSize();
     // What the window actually is, not what was wanted.
     windowedWidth = width;
     windowedHeight = height;

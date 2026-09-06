@@ -1,4 +1,6 @@
 #include "rendering/loading_screen.hpp"
+
+#include <SDL2/SDL_vulkan.h>
 #include "rendering/vk_context.hpp"
 #include "core/logger.hpp"
 #include <imgui.h>
@@ -426,8 +428,11 @@ void LoadingScreen::render() {
     if (vkCtx) {
         // Handle window resize: recreate swapchain before acquiring an image
         if (vkCtx->isSwapchainDirty() && sdlWindow) {
+            // The surface, in pixels. SDL_GetWindowSize answers points, and
+            // on a high density display rebuilding at those halves the
+            // swapchain under a loading screen that is drawn full width.
             int w = 0, h = 0;
-            SDL_GetWindowSize(sdlWindow, &w, &h);
+            SDL_Vulkan_GetDrawableSize(sdlWindow, &w, &h);
             if (w > 0 && h > 0) {
                 (void)vkCtx->recreateSwapchain(w, h);
             }

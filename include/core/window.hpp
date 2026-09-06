@@ -41,9 +41,23 @@ public:
     [[nodiscard]] bool shouldClose() const { return shouldCloseFlag; }
     void setShouldClose(bool value) { shouldCloseFlag = value; }
 
+    /// The window, in the units the desktop places windows in.
+    ///
+    /// Points, not pixels, and on a high density display the two differ: a
+    /// 14-inch MacBook Pro is 3024x1964 pixels and 1512x982 points. Every
+    /// mouse position and every interface coordinate is in these, so this is
+    /// what the interface asks for - and what a window can be sized to.
     [[nodiscard]] int getWidth() const { return width; }
     [[nodiscard]] int getHeight() const { return height; }
-    void setSize(int w, int h) { width = w; height = h; }
+    /// The surface behind it, in pixels. What the swapchain has to be.
+    ///
+    /// Equal to the size above wherever a point is a pixel, which is every
+    /// platform this runs on but macOS. There it is twice it, and rendering
+    /// at the point size means drawing a 1512-wide picture and letting the
+    /// display stretch it over 3024 - which is what this client did.
+    [[nodiscard]] int getDrawableWidth() const { return drawableWidth; }
+    [[nodiscard]] int getDrawableHeight() const { return drawableHeight; }
+    void setSize(int w, int h) { width = w; height = h; refreshDrawableSize(); }
     [[nodiscard]] float getAspectRatio() const { return static_cast<float>(width) / height; }
     [[nodiscard]] bool isFullscreen() const { return fullscreen; }
     [[nodiscard]] bool isVsyncEnabled() const { return vsync; }
@@ -72,6 +86,11 @@ private:
 
     int width;
     int height;
+    /// Refreshed with the size, never set by hand: SDL is the only thing
+    /// that knows what the surface behind the window came out as.
+    int drawableWidth = 0;
+    int drawableHeight = 0;
+    void refreshDrawableSize();
     int windowedWidth = 0;
     int windowedHeight = 0;
     bool fullscreen = false;
