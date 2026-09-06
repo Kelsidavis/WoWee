@@ -426,10 +426,6 @@ bool Application::initialize() {
         luaSvc.getClientSetting = [uim = uiManager.get()](const std::string& key) {
             return uim ? uim->getGameScreen().getSettingsPanel().settingValue(key) : std::string{};
         };
-        luaSvc.setCameraMaxDistanceFactor = [this](float factor) {
-            if (!renderer) return;
-            if (auto* cam = renderer->getCameraController()) cam->setMaxDistanceFactor(factor);
-        };
         luaSvc.quitApplication = [this]() {
             LOG_INFO("Exit Game with no session to leave - closing");
             if (window) window->setShouldClose(true);
@@ -672,12 +668,6 @@ bool Application::initialize() {
         };
         luaSvc.setMinimapRotate = [r = renderer.get()](bool rotate) {
             if (auto* mm = r ? r->getMinimap() : nullptr) mm->setRotateWithCamera(rotate);
-        };
-        luaSvc.getChatBubblesShown = [uim = uiManager.get()]() -> bool {
-            return uim ? uim->getGameScreen().getChatPanel().bubblesShown() : true;
-        };
-        luaSvc.setChatBubblesShown = [uim = uiManager.get()](bool shown) {
-            if (uim) uim->getGameScreen().getChatPanel().setBubblesShown(shown);
         };
         luaSvc.getFullscreen = [uim = uiManager.get()]() -> bool {
             return uim ? uim->getGameScreen().getFullscreen() : false;

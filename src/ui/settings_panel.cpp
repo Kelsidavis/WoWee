@@ -379,6 +379,7 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                 cameraController->setPivotHeight(pendingPivotHeight);
                 cameraController->setIdleOrbitEnabled(pendingIdleCameraOrbit);
                 cameraController->setSmoothCameraFollow(pendingSmoothCameraFollow);
+                cameraController->setMaxDistanceFactor(cameraDistanceFactor(pendingCameraMaxDistance));
             }
         }
         pendingResIndex = 0;
@@ -783,6 +784,12 @@ constexpr const char* kGraphicsPresetKeys[] = {
 /// of these is applied it is a number the panel displays and nothing else,
 /// which is why the graphics settings saved from the login screen did nothing
 /// until a slider was touched.
+// The cameramaxdistance row stops at 50 yards, which has to be where the
+// camera itself stops; see cameraDistanceFactor in the header.
+static_assert(cameraDistanceFactor(50) - rendering::CameraController::kMaxDistanceFactorLimit < 0.001f &&
+              rendering::CameraController::kMaxDistanceFactorLimit - cameraDistanceFactor(50) < 0.001f,
+              "the cameramaxdistance row's 50 yards is not the camera's own limit");
+
 constexpr const char* kGraphicsApplyKeys[] = {
     "viewdistance", "shadows", "shadowdistance", "antialiasing", "fxaa",
     "normalmapping", "normalmapstrength", "parallax", "parallaxquality",
@@ -985,6 +992,7 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "fov",             .asFloat = &SettingsPanel::pendingFov},
     {.key = "camerashake",     .asFloat = &SettingsPanel::pendingCameraShake},
     {.key = "camerastiffness", .asFloat = &SettingsPanel::pendingCameraStiffness},
+    {.key = "cameramaxdistance", .asInt = &SettingsPanel::pendingCameraMaxDistance},
     {.key = "pivotheight",     .asFloat = &SettingsPanel::pendingPivotHeight},
     {.key = "smoothfollow",    .asBool  = &SettingsPanel::pendingSmoothCameraFollow},
     {.key = "idleorbit",       .asBool  = &SettingsPanel::pendingIdleCameraOrbit},
@@ -1044,6 +1052,7 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "autoloot",     .asBool = &SettingsPanel::pendingAutoLoot},
     {.key = "autosellgrey", .asBool = &SettingsPanel::pendingAutoSellGrey},
     {.key = "autorepair",   .asBool = &SettingsPanel::pendingAutoRepair},
+    {.key = "secureabilitytoggle", .asBool = &SettingsPanel::pendingSecureAbilityToggle},
 };
 
 /// The same, for the settings that belong to the chat panel rather than to
@@ -1063,6 +1072,8 @@ constexpr ChatFieldBinding kChatFieldBindings[] = {
     {"joinlocaldefense", &ChatSettings::autoJoinLocalDefense},
     {"joinlfg",          &ChatSettings::autoJoinLFG},
     {"joinlocal",        &ChatSettings::autoJoinLocal},
+    {"chatbubbles",      &ChatSettings::showBubbles},
+    {"chatbubblesparty", &ChatSettings::partyBubbles},
     // Chat's appearance is deliberately absent. Timestamps, the font size, the
     // background and the fade are all fields of this struct too, and all four
     // drive the chat panel this client draws - which is not drawn at all while
@@ -1194,6 +1205,10 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
         if (cameraController) cameraController->setMouseSensitivity(pendingMouseSensitivity);
     } else if (key == "camerastiffness") {
         if (cameraController) cameraController->setCameraSmoothSpeed(pendingCameraStiffness);
+    } else if (key == "cameramaxdistance") {
+        if (cameraController) {
+            cameraController->setMaxDistanceFactor(cameraDistanceFactor(pendingCameraMaxDistance));
+        }
     } else if (key == "smoothfollow") {
         if (cameraController) cameraController->setSmoothCameraFollow(pendingSmoothCameraFollow);
     } else if (key == "pivotheight") {
@@ -1408,8 +1423,7 @@ namespace {
 /// time. The consumers that clamp for themselves, like the multisampling table,
 /// were what kept it from being worse than wrong.
 ///
-/// Keys with no schema row are returned untouched: six settings are bound to a
-/// CVar instead and have no row to declare a range.
+/// Keys with no schema row are returned untouched.
 double clampedToSchema(const std::string& key, double value) {
     std::size_t count = 0;
     const SettingDesc* schema = clientSettingsSchema(count);
@@ -1437,6 +1451,11 @@ bool SettingsPanel::setSettingValue(const std::string& key, const std::string& v
     if (const ChatFieldBinding* c = findChatFieldBinding(key)) {
         if (!chatSettings_) return false;
         chatSettings_->*(c->asBool) = on;
+        // The store too, as below: the speech-bubble rows are bound to the
+        // CVars the Social page's boxes wrote, and returned early past the
+        // write-back until the control check said a change here was undone
+        // at the next start.
+        addons::noteClientSettingChanged(key, settingValue(key));
         return true;
     }
     const FieldBinding* b = findFieldBinding(key);

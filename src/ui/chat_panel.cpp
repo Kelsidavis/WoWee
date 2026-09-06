@@ -84,6 +84,9 @@ void ChatPanel::registerAllCommands() {
 
 // renderBubbles delegates to ChatBubbleManager (Phase 1.4)
 void ChatPanel::renderBubbles(game::GameHandler& gameHandler) {
+    // The setting is the chat panel's; the manager only needs to know. Told
+    // every frame rather than on change, so there is no change to miss.
+    bubbleManager_.setBubblesShown(settings.showBubbles);
     bubbleManager_.render(gameHandler, services_);
 }
 

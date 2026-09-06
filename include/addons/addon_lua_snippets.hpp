@@ -1143,6 +1143,35 @@ local kRemoved = {
     "InterfaceOptionsDisplayPanelShowClock",
     "InterfaceOptionsNamesPanelUnitNameplatesFriends",
 
+    -- More of the same, since the schema's pages sit in this window too. Each
+    -- of these writes a value the schema shows on a row of its own: vertical
+    -- sync, windowed mode and gamma on the Display page, gamma as brightness;
+    -- invert mouse, camera style, follow speed and max camera distance on
+    -- Camera; auto loot and the secure ability toggle on Gameplay; the four
+    -- extra bars on Action Bars, where Bottom Right drove nothing at all; and
+    -- chat style and both speech-bubble boxes on Chat.
+    "VideoOptionsResolutionPanelVSync",
+    "VideoOptionsResolutionPanelWindowed",
+    "VideoOptionsResolutionPanelGammaSlider",
+    "InterfaceOptionsMousePanelInvertMouse",
+    "InterfaceOptionsCameraPanelStyleDropDown",
+    "InterfaceOptionsCameraPanelFollowSpeedSlider",
+    "InterfaceOptionsCameraPanelMaxDistanceSlider",
+    "InterfaceOptionsControlsPanelAutoLootCorpse",
+    "InterfaceOptionsActionBarsPanelBottomLeft",
+    "InterfaceOptionsActionBarsPanelBottomRight",
+    "InterfaceOptionsActionBarsPanelRight",
+    "InterfaceOptionsActionBarsPanelRightTwo",
+    "InterfaceOptionsActionBarsPanelSecureAbilityToggle",
+    "InterfaceOptionsSocialPanelChatBubbles",
+    "InterfaceOptionsSocialPanelPartyChat",
+    "InterfaceOptionsSocialPanelChatStyle",
+    -- Two the client never reads. It draws its own bars, whole, and its own
+    -- buttons take the dragging; the lock and the always-show are for
+    -- FrameXML's bars, which are not the ones on screen.
+    "InterfaceOptionsActionBarsPanelLockActionBars",
+    "InterfaceOptionsActionBarsPanelAlwaysShowActionBars",
+
     -- The same anti-aliasing the schema offers, in the same four steps.
     -- The Resolution page keeps what is genuinely the window's: the size of
     -- it and the interface scale.
@@ -1214,6 +1243,15 @@ local kRemovedCategories = {
     -- sound controls in one list, one of them describing a master volume
     -- this client had already been showing beside it.
     "AudioOptionsSoundPanel",
+    -- Three Interface pages with nothing left on them once the controls
+    -- above are gone: Mouse kept only invert mouse, Camera only the three
+    -- the schema's Camera page has, and ActionBars only bars the schema's
+    -- Action Bars page toggles and two switches for bars this client does
+    -- not draw. Each would have sat beside the schema's page of the same
+    -- name, twice in one list.
+    "InterfaceOptionsMousePanel",
+    "InterfaceOptionsCameraPanel",
+    "InterfaceOptionsActionBarsPanel",
 }
 
 local removed = {}
@@ -1264,22 +1302,14 @@ local function closeGap(f)
     end
 end
 
--- Anchors closing the gap cannot work out on its own, because the panel has two
--- columns and one of them is anchored to the other.
---
--- The resolution panel puts the windowed-mode checkbox to the *right* of
--- vertical sync, 164 across, which in the stock layout is clear space under the
--- UI scale slider. Vertical sync hung off the refresh-rate dropdown, so
--- removing that dropdown pulls vertical sync up a row and takes windowed mode
--- with it - into the slider, on top of it. Closing the gap is right for
--- everything under the removed control in the same column and wrong for
--- anything beside it.
---
--- Windowed mode moves into the left column instead, under vertical sync, where
--- three removed checkboxes have left exactly the room for it.
+-- Anchors closing the gap cannot work out on its own, because a panel can have
+-- two columns with one anchored to the other. This held the windowed-mode
+-- checkbox, which the resolution panel puts to the *right* of vertical sync
+-- and which closing the gap under the removed refresh-rate dropdown pushed
+-- into the UI scale slider. Both boxes are retired now - the Display page has
+-- fullscreen and vertical sync - so nothing is moved, and the machinery stays
+-- for the next control that has to be.
 local kMoved = {
-    { "VideoOptionsResolutionPanelWindowed", "TOPLEFT",
-      "VideoOptionsResolutionPanelVSync", "BOTTOMLEFT", 0, -4 },
 }
 
 -- Resolved by name once, like kRemoved: a move that silently anchors nothing is

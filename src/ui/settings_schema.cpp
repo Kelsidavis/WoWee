@@ -257,12 +257,18 @@ constexpr SettingDesc kSchema[] = {
      "How much the view moves on its own: spell effects, thunder, and\n"
      "the sway while drunk. 0 stops it. Walking crooked while drunk is\n"
      "not affected - that happens to your character, not the picture.", "", 1.0f},
-    // No extended-zoom switch here. The game's own Camera panel has Max Camera
-    // Distance, which is the same setting expressed as a multiple rather than
-    // as a choice between two positions - and it wrote a CVar nothing read
-    // while this checkbox did the work. kCVarRanges widens that slider past the
-    // shipped ceiling of 2, so it reaches everywhere the checkbox used to and
-    // every distance in between.
+    // Max Camera Distance was the game's own Camera page's until 2026-09-06,
+    // when it was the one control on that page not already a row here - the
+    // other two, follow speed and camera style, wrote camerastiffness and
+    // smoothfollow. In yards rather than the multiple of 22 the game's slider
+    // counted in; kClientCVars scales cameraDistanceMaxFactor by 22 for an
+    // addon or a macro that still writes it. Before either there was an
+    // extended-zoom checkbox of this client's own, a choice between two
+    // positions where this is every distance between them.
+    {"cameramaxdistance", "Max camera distance", SettingKind::Int, 22, 50, 1, "Camera", "",
+     "How far back the camera can be pulled, in yards. 22 is what the\n"
+     "original client gives; further out shows more of a fight and less\n"
+     "of your character.", "", 22},
     {"camerastiffness", "Camera follow speed", SettingKind::Float, 5, 100, 1, "Camera", "",
      "How quickly the camera catches up when you move or turn. Higher\n"
      "is tighter and steadier; lower trails behind and feels floaty.", "", 30},
@@ -472,6 +478,14 @@ constexpr SettingDesc kSchema[] = {
      "Finding people for dungeons, quests and raids.", "", 1},
     {"joinlocal", "Local", SettingKind::Bool, 0, 0, 0, "Chat", "",
      "The realm's Local channel, on realms that provide one.", "", 1},
+    // Speech bubbles were the game's own Social page's, two boxes among chat
+    // options FrameXML reads for itself. These two the client reads - the
+    // bubbles are drawn here - so they are rows. Party bubbles want both.
+    {"chatbubbles", "Speech bubbles", SettingKind::Bool, 0, 0, 0, "Chat", "Bubbles",
+     "Float what is said and yelled nearby over the speaker's head.", "", 1},
+    {"chatbubblesparty", "Party chat in bubbles", SettingKind::Bool, 0, 0, 0, "Chat", "",
+     "Float party and raid chat over the speaker's head as well.",
+     "", 0, "chatbubbles"},
 
     // ---------------------------------------------------------------- Gameplay
     {"autoloot", "Auto loot", SettingKind::Bool, 0, 0, 0, "Gameplay", "Looting",
@@ -486,6 +500,13 @@ constexpr SettingDesc kSchema[] = {
      "Opening a merchant who repairs mends everything damaged you are\n"
      "wearing, paid from your own coin - never the guild bank. If you\n"
      "cannot afford the whole bill nothing is repaired and it says so.", "", 0},
+    // Secure Ability Toggle was on the game's own ActionBars page, the one
+    // control there this client reads: the guard is in the client's own
+    // attack handling, and FrameXML's action buttons are not the ones drawn.
+    {"secureabilitytoggle", "Ignore a double tap on Attack", SettingKind::Bool, 0, 0, 0,
+     "Gameplay", "Combat",
+     "A second press of Attack within half a second is ignored, so a\n"
+     "double tap cannot switch auto-attack straight back off.", "", 0},
 };
 
 }  // namespace

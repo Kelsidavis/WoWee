@@ -1782,6 +1782,7 @@ void GameScreen::saveSettings() {
     out << "auto_loot=" << (settingsPanel_.pendingAutoLoot ? 1 : 0) << "\n";
     out << "auto_sell_grey=" << (settingsPanel_.pendingAutoSellGrey ? 1 : 0) << "\n";
     out << "auto_repair=" << (settingsPanel_.pendingAutoRepair ? 1 : 0) << "\n";
+    out << "secure_ability_toggle=" << (settingsPanel_.pendingSecureAbilityToggle ? 1 : 0) << "\n";
     out << "graphics_preset=" << static_cast<int>(settingsPanel_.currentGraphicsPreset) << "\n";
     out << "ground_clutter_density=" << settingsPanel_.pendingGroundClutterDensity << "\n";
     // The five that came off the game's own Effects panel. Saved here like any
@@ -1826,6 +1827,7 @@ void GameScreen::saveSettings() {
     out << "mouse_sensitivity=" << settingsPanel_.pendingMouseSensitivity << "\n";
     out << "invert_mouse=" << (settingsPanel_.pendingInvertMouse ? 1 : 0) << "\n";
     out << "camera_stiffness=" << settingsPanel_.pendingCameraStiffness << "\n";
+    out << "camera_max_distance=" << settingsPanel_.pendingCameraMaxDistance << "\n";
     out << "camera_pivot_height=" << settingsPanel_.pendingPivotHeight << "\n";
     out << "camera_smooth_follow=" << (settingsPanel_.pendingSmoothCameraFollow ? 1 : 0) << "\n";
     out << "fov=" << settingsPanel_.pendingFov << "\n";
@@ -1844,6 +1846,8 @@ void GameScreen::saveSettings() {
     out << "chat_autojoin_localdefense=" << (chatPanel_.chatAutoJoinLocalDefense ? 1 : 0) << "\n";
     out << "chat_autojoin_lfg=" << (chatPanel_.chatAutoJoinLFG ? 1 : 0) << "\n";
     out << "chat_autojoin_local=" << (chatPanel_.chatAutoJoinLocal ? 1 : 0) << "\n";
+    out << "chat_bubbles=" << (chatPanel_.chatShowBubbles ? 1 : 0) << "\n";
+    out << "chat_bubbles_party=" << (chatPanel_.chatPartyBubbles ? 1 : 0) << "\n";
 
     out.close();
 
@@ -2039,6 +2043,7 @@ void GameScreen::loadSettings() {
             else if (key == "auto_loot") settingsPanel_.pendingAutoLoot = (std::stoi(val) != 0);
             else if (key == "auto_sell_grey") settingsPanel_.pendingAutoSellGrey = (std::stoi(val) != 0);
             else if (key == "auto_repair") settingsPanel_.pendingAutoRepair = (std::stoi(val) != 0);
+            else if (key == "secure_ability_toggle") settingsPanel_.pendingSecureAbilityToggle = (std::stoi(val) != 0);
             else if (key == "graphics_preset") {
                 int presetVal = std::clamp(std::stoi(val), 0, 4);
                 settingsPanel_.currentGraphicsPreset = static_cast<SettingsPanel::GraphicsPreset>(presetVal);
@@ -2091,6 +2096,7 @@ void GameScreen::loadSettings() {
             else if (key == "mouse_sensitivity") settingsPanel_.pendingMouseSensitivity = std::clamp(std::stof(val), 0.05f, 1.0f);
             else if (key == "invert_mouse") settingsPanel_.pendingInvertMouse = (std::stoi(val) != 0);
             else if (key == "camera_stiffness") settingsPanel_.pendingCameraStiffness = std::clamp(std::stof(val), 5.0f, 100.0f);
+            else if (key == "camera_max_distance") settingsPanel_.pendingCameraMaxDistance = std::clamp(std::stoi(val), 22, 50);
             else if (key == "camera_pivot_height") settingsPanel_.pendingPivotHeight = std::clamp(std::stof(val), 0.0f, 3.0f);
             else if (key == "camera_smooth_follow") settingsPanel_.pendingSmoothCameraFollow = (std::stoi(val) != 0);
             // No apply here: this runs from the constructor, where there is
@@ -2110,6 +2116,8 @@ void GameScreen::loadSettings() {
             else if (key == "chat_autojoin_localdefense") chatPanel_.chatAutoJoinLocalDefense = (std::stoi(val) != 0);
             else if (key == "chat_autojoin_lfg") chatPanel_.chatAutoJoinLFG = (std::stoi(val) != 0);
             else if (key == "chat_autojoin_local") chatPanel_.chatAutoJoinLocal = (std::stoi(val) != 0);
+            else if (key == "chat_bubbles") chatPanel_.chatShowBubbles = (std::stoi(val) != 0);
+            else if (key == "chat_bubbles_party") chatPanel_.chatPartyBubbles = (std::stoi(val) != 0);
         } catch (...) {}
     }
 

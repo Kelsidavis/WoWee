@@ -749,17 +749,6 @@ static void pushCvarDefault(lua_State* L, const std::string& n) {
              n == "sound_ambiencevolume") {
         lua_pushstring(L, "1");
     }
-    // Windowed, as one - the way round the checkbox is labelled. Answered from
-    // the window only as a *default*, below the store, unlike the settings this
-    // client owns outright: gxWindow is applied by RestartGx after the panel
-    // has written it, so between the tick and the Okay the stored value is the
-    // truth and the window is still the old state. Asking the window first
-    // would have made RestartGx read back what it was about to set.
-    else if (n == "gxwindow") {
-        auto* svc = getLuaServices(L);
-        const bool full = (svc && svc->getFullscreen) ? svc->getFullscreen() : false;
-        lua_pushstring(L, full ? "0" : "1");
-    }
     // Both at their maximum, because this client has no lower setting to be
     // at. miniaudio mixes every voice it is given at the device's own rate:
     // there is no channel cap to raise and no quality tier to pick. Falling
@@ -1199,14 +1188,8 @@ constexpr ClientCVarBinding kClientCVars[] = {
     {"mousespeed",           "mousespeed"},
     {"showclock",            "minimapclock"},
     {"nameplateshowfriends", "friendlyplates"},
-    // Deliberately not gxWindow. It is answered further down, from the store
-    // first and the window only as a default - RestartGx applies it after the
-    // panel has written it, so between the tick and the Okay the stored value
-    // is the truth and the window is still showing the old state. A binding
-    // here would sit above the store and hand RestartGx back what it was about
-    // to set.
-    // 64 doodads is the most Blizzard's slider asks for and 1.5 is the most
-    // this client draws, so one of theirs is 1.5/64 of ours.
+    // Not gxWindow: it is the fullscreen row the other way round, which a scale
+    // cannot say, so GetCVar and SetCVar carry it by hand.
     // 64 doodads is the most Blizzard's slider asks for and 150 percent the
     // most this client draws, so one of theirs is 150/64 of ours. It was
     // 1.5/64 while the setting travelled as a fraction; the setting is the
@@ -1254,6 +1237,15 @@ constexpr ClientCVarBinding kClientCVars[] = {
     // as well as within one. The branch it replaces wrote the handler directly
     // and never saved.
     {"autolootdefault",      "autoloot"},
+    // How far back the camera may be pulled. The row counts yards; the CVar
+    // the game's slider wrote counts multiples of the 22 the original client
+    // gives, so a 1 here is 22 there and the slider's 2 is 44.
+    {"cameradistancemaxfactor", "cameramaxdistance", 22.0},
+    // Read by the client's own attack handling, not by FrameXML's buttons.
+    {"secureabilitytoggle",  "secureabilitytoggle"},
+    // The bubbles are drawn by this client, so both boxes are its own.
+    {"chatbubbles",          "chatbubbles"},
+    {"chatbubblesparty",     "chatbubblesparty"},
 };
 // NOLINTEND(modernize-use-designated-initializers)
 
@@ -1316,9 +1308,13 @@ static int lua_GetCVar(lua_State* L) {
             lua_pushstring(L, svc->getMinimapRotate() ? "1" : "0");
             return 1;
         }
-    } else if (n == "chatbubbles") {
-        if (auto* svc = getLuaServices(L); svc && svc->getChatBubblesShown) {
-            lua_pushstring(L, svc->getChatBubblesShown() ? "1" : "0");
+    } else if (n == "gxwindow") {
+        // The schema's fullscreen row the other way round: 1 is windowed. The
+        // Windowed box on the Resolution page is retired for that row, and
+        // RestartGx reads this on Okay - so it has to be the window's live
+        // state, not a store nothing writes any more.
+        if (auto* svc = getLuaServices(L); svc && svc->getFullscreen) {
+            lua_pushstring(L, svc->getFullscreen() ? "0" : "1");
             return 1;
         }
     } else if (n == "sound_mastervolume" || n == "sound_musicvolume" ||
@@ -1555,13 +1551,6 @@ static void applyCVarSideEffects(lua_State* L, const std::string& key,
     // gives, which is what the tick means: use a scale of mine rather than the
     // default. It did nothing at all before - the box moved and the interface
     // stayed exactly as it was, at whatever scale had been set.
-    // How far back the camera may be pulled. Straight to the camera rather than
-    // through a client setting, so there is one control for it and not two.
-    if (key == "cameradistancemaxfactor") {
-        if (auto* svc = getLuaServices(L); svc && svc->setCameraMaxDistanceFactor) {
-            svc->setCameraMaxDistanceFactor(static_cast<float>(std::atof(value.c_str())));
-        }
-    }
     // Camera Following Style, whose one meaningful distinction here is its
     // first option: "Never adjust camera" against the three that do. The
     // client has the same switch already, reached from its own panel, so this
@@ -1575,6 +1564,14 @@ static void applyCVarSideEffects(lua_State* L, const std::string& key,
     if (key == "chatstyle" && !g_replayingStoredCVars) {
         if (auto* svc = getLuaServices(L); svc && svc->setClientSetting) {
             svc->setClientSetting("chatboxvisible", value == "classic" ? "0" : "1");
+        }
+    }
+    // Windowed mode, which is the fullscreen row the other way round. Applied
+    // to the row at once rather than left for RestartGx: with the Resolution
+    // page's box retired, an addon's write is the only kind there is.
+    if (key == "gxwindow" && !g_replayingStoredCVars) {
+        if (auto* svc = getLuaServices(L); svc && svc->setClientSetting) {
+            svc->setClientSetting("fullscreen", value == "0" ? "1" : "0");
         }
     }
     if (key == "camerasmoothstyle") {
@@ -1713,9 +1710,6 @@ static void applyCVarSideEffects(lua_State* L, const std::string& key,
             svc->setMinimapRotate(value != "0");
     } else if (key == "autoselfcast") {
         if (auto* gh = getGameHandler(L)) gh->setAutoSelfCast(value != "0");
-    } else if (key == "chatbubbles") {
-        if (auto* svc = getLuaServices(L); svc && svc->setChatBubblesShown)
-            svc->setChatBubblesShown(value != "0");
     }
 }
 

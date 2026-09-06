@@ -26,6 +26,11 @@ struct ChatSettings;
  * graphics preset logic.  Save/load remains in GameScreen since
  * it serialises cross-cutting state (chat, quest tracker, etc.).
  */
+/// The cameramaxdistance row counts yards; the CVar the game's own slider wrote,
+/// cameraDistanceMaxFactor, counts multiples of the 22 the original client
+/// gives, which is the scale on that row of kClientCVars.
+inline constexpr float cameraDistanceFactor(int yards) { return static_cast<float>(yards) / 22.0f; }
+
 class SettingsPanel {
 public:
     /// Push every graphics setting loaded from the config file to the thing
@@ -95,6 +100,7 @@ public:
     float pendingMouseSensitivity = 0.2f;
     bool pendingInvertMouse = false;
     float pendingCameraStiffness = 30.0f;  // Camera smooth speed (higher = tighter, less sway)
+    int pendingCameraMaxDistance = 22;     // Yards; the CVar counts multiples of this default
     float pendingPivotHeight = 1.6f;       // Camera pivot height above feet (lower = less detached feel)
     bool pendingSmoothCameraFollow = false; // Keep lerping while turning (floaty, detached follow)
     float pendingFov = 70.0f;
@@ -152,6 +158,7 @@ public:
     bool pendingAutoLoot = false;
     bool pendingAutoSellGrey = false;
     bool pendingAutoRepair = false;
+    bool pendingSecureAbilityToggle = false;
     bool pendingIdleCameraOrbit = true;
 
     // ---- Pending soundtrack ----

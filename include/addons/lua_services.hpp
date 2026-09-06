@@ -33,14 +33,6 @@ struct LuaServices {
     std::function<std::vector<std::string>()> clientChatCommandNames;
     std::function<bool(const std::string&, const std::string&)> runClientChatCommand;
 
-    /// How far back the camera may be pulled, as a multiple of the original
-    /// client's limit - the game's Max Camera Distance slider.
-    ///
-    /// A callback rather than a renderer pointer, because this file is given
-    /// services rather than the application: the one thing it needs here is
-    /// this number reaching the camera.
-    std::function<void(float)> setCameraMaxDistanceFactor;
-
     /// How far the ground cover is drawn - the game's Ground Clutter Radius.
     std::function<void(float)> setGroundDetailDistance;
 
@@ -222,11 +214,6 @@ struct LuaServices {
     /// Whether the minimap turns with the camera, for rotateMinimap.
     std::function<bool()> getMinimapRotate;
     std::function<void(bool)> setMinimapRotate;
-
-    /// Speech bubbles over players' heads, for chatBubbles. The interface
-    /// options have always had the checkbox; nothing was behind it.
-    std::function<bool()> getChatBubblesShown;
-    std::function<void(bool)> setChatBubblesShown;
 
     /// Whether looking up drags the view down, for mouseInvertPitch.
     ///

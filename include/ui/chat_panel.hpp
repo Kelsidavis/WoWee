@@ -114,6 +114,8 @@ public:
     bool& chatAutoJoinLocalDefense = settings.autoJoinLocalDefense;
     bool& chatAutoJoinLFG          = settings.autoJoinLFG;
     bool& chatAutoJoinLocal        = settings.autoJoinLocal;
+    bool& chatShowBubbles          = settings.showBubbles;
+    bool& chatPartyBubbles         = settings.partyBubbles;
 
     /** Spell icon lookup callback - set by GameScreen each frame before render(). */
     std::function<VkDescriptorSet(uint32_t, pipeline::AssetManager*)> getSpellIcon;
@@ -204,12 +206,6 @@ private:
 
     // ---- Chat bubbles (delegated to ChatBubbleManager) ----
     ChatBubbleManager bubbleManager_;
-public:
-    /// The chatBubbles setting, which the interface options own. Forwarded
-    /// rather than exposing the manager: the panel is what the outside holds.
-    [[nodiscard]] bool bubblesShown() const { return bubbleManager_.bubblesShown(); }
-    void setBubblesShown(bool shown) { bubbleManager_.setBubblesShown(shown); }
-private:
 
     // ---- Helpers ----
     void sendChatMessage(game::GameHandler& gameHandler);

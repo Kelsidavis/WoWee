@@ -32,11 +32,12 @@ public:
     /// How far back the camera may be pulled, as a multiple of the original
     /// client's own limit.
     ///
-    /// This was a switch between two constants, driven by a checkbox of this
-    /// client's own, while the game's Camera panel had the slider the setting
-    /// actually belongs to - Max Camera Distance - writing a CVar nothing read.
-    /// One control now, and it is that one; kCVarRanges widens its range from
-    /// the shipped 2 to whatever this client can reach.
+    /// Max Camera Distance, as a multiple of the 22 yards the original client
+    /// gives. The schema's cameramaxdistance row counts the yards themselves
+    /// and kClientCVars scales cameraDistanceMaxFactor - the CVar the game's
+    /// own slider wrote, before that page was retired - onto it. Before both
+    /// there was an extended-zoom checkbox of this client's own, a switch
+    /// between two constants where this is every distance between them.
     void setMaxDistanceFactor(float factor) {
         maxDistanceFactor_ = std::clamp(factor, 1.0f, kMaxDistanceFactorLimit);
     }

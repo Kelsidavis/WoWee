@@ -73,9 +73,25 @@ def body(text, signature):
     return rest[: end.start()] if end else rest
 
 
+CHAT_PANEL = ROOT / "include/ui/chat_panel.hpp"
+
+
+def chatAliases():
+    """ChatSettings member -> the reference ChatPanel names it by.
+
+    The saver and loader write the reference, not the member, so a binding is
+    reached under either name. Read from the header rather than spelled here:
+    the rule used to be "autoJoin becomes chatAutoJoin", which was every alias
+    there was until the speech-bubble rows arrived under names of their own.
+    """
+    out = {}
+    for m in re.finditer(r'\b\w+&\s+(\w+)\s*=\s*settings\.(\w+)\s*;', CHAT_PANEL.read_text()):
+        out[m.group(2)] = m.group(1)
+    return out
+
+
 def mentions(where, member):
-    alias = member.replace("autoJoin", "chatAutoJoin")
-    return member in where or alias in where
+    return member in where or chatAliases().get(member, member) in where
 
 
 def main():
