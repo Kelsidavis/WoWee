@@ -2811,18 +2811,52 @@ static int lua_SetBagPortraitTexture(lua_State* L) {
 /// calls below can reach it.
 static bool heldWireSlot(uint8_t& bag, uint8_t& slot) {
     const auto& held = cursorItemSlot();
-    if (held.bag < 0 && !held.equipped) return false;
     if (held.equipped) {
         bag = 0xFF;
         slot = static_cast<uint8_t>(held.slot - 1);
-    } else if (held.bag == 0) {
+        return true;
+    }
+    if (held.bag == 0) {   // the backpack
         bag = 0xFF;
         slot = static_cast<uint8_t>(game::slots::backpackWireSlot(held.slot - 1));
-    } else {
+        return true;
+    }
+    if (held.bag >= 1 && held.bag <= game::slots::kWornBagCount) {
         bag = static_cast<uint8_t>(game::slots::wornBagContainer(held.bag - 1));
         slot = static_cast<uint8_t>(held.slot - 1);
+        return true;
     }
-    return true;
+    // The bank, which this knew nothing about: it named the backpack, the
+    // four worn bags and the paperdoll, and answered no to everything else.
+    //
+    // So a bag picked up in the bank and dropped on a bank bag slot was
+    // refused before anything looked at where it was going, and the button
+    // fell through to opening whatever was already there. Every route in was
+    // affected - PutItemInBag, PutItemInBackpack - which is why a bag could
+    // be dragged out of the bank and not into it.
+    //
+    // The bank's own squares are player inventory slots, so they go as the
+    // equipment container and a wire slot, the same shape the backpack uses.
+    // A bank bag is a container of its own, like a worn one.
+    //
+    // Tested on the slot as well as the container: an empty cursor is
+    // recorded as container -1 with slot 0, and the bank is container -1
+    // with a slot from one up, so the container alone cannot tell an item
+    // taken from the bank from no item at all.
+    if (held.bag == kBankContainer && held.slot >= 1) {
+        bag = 0xFF;
+        slot = static_cast<uint8_t>(game::slots::bankGeneralWireSlot(held.slot - 1));
+        return true;
+    }
+    if (isBankBagContainer(held.bag)) {
+        bag = static_cast<uint8_t>(
+            game::slots::bankBagContainer(held.bag - kFirstBankBagContainer));
+        slot = static_cast<uint8_t>(held.slot - 1);
+        return true;
+    }
+    // An empty cursor, or an item with no source a swap can name - one
+    // picked up off an action bar, which is a reference rather than the item.
+    return false;
 }
 
 /// PutItemInBag(inventoryID) - put what the cursor is holding into that bag.
