@@ -69,4 +69,18 @@ inline float fsrScaleForChoice(int choice) {
 inline constexpr int kMsaaChoiceCount = 4;
 inline constexpr int kFsrQualityChoiceCount = 4;
 
+/// Which choice a sample count is, or the nearest one below it.
+///
+/// The inverse of msaaSamplesForChoice, for when a device grants less than
+/// was asked: Apple silicon stops at 4x, so the 8x this offers has to come
+/// back as the choice actually in force rather than leave the control naming
+/// a mode the client is not using.
+inline int msaaChoiceForSamples(VkSampleCountFlagBits samples) {
+    int best = 0;
+    for (int i = 0; i < kMsaaChoiceCount; ++i) {
+        if (msaaSamplesForChoice(i) <= samples) best = i;
+    }
+    return best;
+}
+
 }  // namespace wowee::ui

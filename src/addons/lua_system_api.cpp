@@ -1207,7 +1207,11 @@ constexpr ClientCVarBinding kClientCVars[] = {
     // to set.
     // 64 doodads is the most Blizzard's slider asks for and 1.5 is the most
     // this client draws, so one of theirs is 1.5/64 of ours.
-    {"groundeffectdensity",  "groundclutter", 1.5 / 64.0},
+    // 64 doodads is the most Blizzard's slider asks for and 150 percent the
+    // most this client draws, so one of theirs is 150/64 of ours. It was
+    // 1.5/64 while the setting travelled as a fraction; the setting is the
+    // percentage the panel shows now, and this is the one place that knows.
+    {"groundeffectdensity",  "groundclutter", 150.0 / 64.0},
     // The rest of what the game's own Effects panel used to drive. That
     // panel is retired and these are rows in the schema now, but the cvars
     // stay bound to them: an addon or a macro writing particleDensity still
@@ -1224,7 +1228,8 @@ constexpr ClientCVarBinding kClientCVars[] = {
     // Six levels on their slider and five here: theirs ends on 16x twice,
     // every card stopping there, so the top two both land on this one's 4.
     {"texturefilteringmode", "texturefiltering"},
-    {"sound_sfxvolume",      "effectsvolume"},
+    // Their slider is 0 to 1 and this setting is a percentage.
+    {"sound_sfxvolume",      "effectsvolume", 100.0},
     // The switches off the game's own Sound panel, now rows in the schema.
     // Bound rather than converted because applySoundCVars reads the store:
     // the setting writes the cvar, the panel asks for a re-apply, and the

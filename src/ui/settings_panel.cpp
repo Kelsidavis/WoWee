@@ -903,15 +903,17 @@ namespace {
 /// Adding a setting meant remembering both. This is the fact once; both
 /// directions read it.
 ///
-/// Exactly one of the three pointers is set. `fraction` marks the values that
-/// travel as a fraction of what the field holds, which is how a CVar carries a
-/// percentage.
+/// Exactly one of the three pointers is set.
+///
+/// There was a `fraction` flag here for the two settings that crossed the
+/// bridge as 0-1 while their field held 0-100. Both are schema rows now and
+/// travel in the units their slider declares; the cvar keeps its own through
+/// the scale in kClientCVars, which is the one place that conversion lives.
 struct FieldBinding {
     const char* key;
     bool  SettingsPanel::* asBool  = nullptr;
     int   SettingsPanel::* asInt   = nullptr;
     float SettingsPanel::* asFloat = nullptr;
-    bool  fraction = false;
 };
 
 constexpr FieldBinding kFieldBindings[] = {
@@ -929,15 +931,21 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "grassdensity",   .asInt   = &SettingsPanel::pendingGrassDensity},
     {.key = "grassheight",    .asInt   = &SettingsPanel::pendingGrassHeight},
     {.key = "grassdistance",  .asInt   = &SettingsPanel::pendingGrassDistance},
-    {.key = "groundclutter",  .asInt   = &SettingsPanel::pendingGroundClutterDensity,
-     .fraction = true},
+    // Not a fraction any more. These two crossed the bridge as 0-1.5 and 0-1
+    // while their fields held 0-150 and 0-100, which was invisible while the
+    // only control for them was drawn here from the field. They are schema
+    // rows now, and a schema row is read and written through the bridge - so
+    // a slider declared 0-150 was showing 0.7 and writing a value the field
+    // then multiplied by a hundred and clamped. The cvar keeps its own units
+    // through the scale in kClientCVars, which is where that conversion
+    // belongs: one place, named, rather than two that have to agree.
+    {.key = "groundclutter",  .asInt   = &SettingsPanel::pendingGroundClutterDensity},
     {.key = "groundclutterdistance", .asInt = &SettingsPanel::pendingGroundClutterDistance},
     {.key = "particledensity",   .asInt = &SettingsPanel::pendingParticleDensity},
     {.key = "weatherdetail",     .asInt = &SettingsPanel::pendingWeatherDetail},
     {.key = "environmentdetail", .asInt = &SettingsPanel::pendingEnvironmentDetail},
     {.key = "texturefiltering",  .asInt = &SettingsPanel::pendingTextureFiltering},
-    {.key = "effectsvolume",  .asInt   = &SettingsPanel::pendingEffectsVolume,
-     .fraction = true},
+    {.key = "effectsvolume",  .asInt   = &SettingsPanel::pendingEffectsVolume},
     {.key = "mastervolume",  .asInt  = &SettingsPanel::pendingMasterVolume},
     {.key = "mutesound",     .asBool = &SettingsPanel::soundMuted_},
     {.key = "soundinbackground",  .asBool = &SettingsPanel::pendingSoundInBackground},
@@ -1205,7 +1213,27 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
         applyGraphicsPreset(pendingGraphicsPreset);
     } else if (key == "antialiasing") {
         if (renderer) {
-            renderer->setMsaaSamples(msaaSamplesForChoice(pendingAntiAliasing));
+            // Clamped here as well as inside the renderer, so the control ends
+            // up showing what is actually in force.
+            //
+            // Apple silicon stops at 4x. Choosing 8x was clamped silently and,
+            // when 4x was already running, changed nothing at all - so the
+            // dropdown sat on a mode the client was not using and reads as a
+            // setting that does nothing. The same is true of any device whose
+            // ceiling is below the four this offers.
+            const VkSampleCountFlagBits want = msaaSamplesForChoice(pendingAntiAliasing);
+            VkSampleCountFlagBits allowed = want;
+            if (auto* ctx = renderer->getVkContext()) {
+                allowed = std::min(want, ctx->getMaxUsableSampleCount());
+            }
+            if (allowed != want) {
+                const int granted = msaaChoiceForSamples(allowed);
+                LOG_WARNING("Anti-aliasing ", static_cast<int>(want),
+                            "x is more than this GPU offers; using ",
+                            static_cast<int>(allowed), "x");
+                pendingAntiAliasing = granted;
+            }
+            renderer->setMsaaSamples(allowed);
         }
     } else if (key == "fxaa") {
         if (post) post->setFXAAEnabled(pendingFXAA);
@@ -1361,10 +1389,10 @@ std::string SettingsPanel::settingValue(const std::string& key) const {
     if (b->asBool)  return this->*(b->asBool) ? "1" : "0";
     if (b->asInt) {
         const int v = this->*(b->asInt);
-        return settingNumberText(b->fraction ? v / 100.0 : static_cast<double>(v));
+        return settingNumberText(static_cast<double>(v));
     }
     const float v = this->*(b->asFloat);
-    return settingNumberText(b->fraction ? v / 100.0f : v);
+    return settingNumberText(v);
 }
 
 namespace {
@@ -1416,9 +1444,9 @@ bool SettingsPanel::setSettingValue(const std::string& key, const std::string& v
     if (b->asBool) {
         this->*(b->asBool) = on;
     } else if (b->asInt) {
-        this->*(b->asInt) = static_cast<int>(clampedToSchema(key, b->fraction ? v * 100.0 : v) + 0.5);
+        this->*(b->asInt) = static_cast<int>(clampedToSchema(key, v) + 0.5);
     } else {
-        this->*(b->asFloat) = static_cast<float>(clampedToSchema(key, b->fraction ? v * 100.0 : v));
+        this->*(b->asFloat) = static_cast<float>(clampedToSchema(key, v));
     }
     applySettingSideEffects(key);
     // And the CVar store, for the settings a Blizzard control also drives. It
