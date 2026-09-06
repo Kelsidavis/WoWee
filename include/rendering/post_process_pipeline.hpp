@@ -188,6 +188,12 @@ private:
         AllocatedImage sceneDepthResolve{}; // Depth resolve (MSAA + depth resolve)
         VkFramebuffer sceneFramebuffer = VK_NULL_HANDLE;
         VkSampler sceneSampler         = VK_NULL_HANDLE;
+        /// sceneColor as a single-sampled colour target of its own. While the
+        /// temporal upscaler owns the scene this image is otherwise idle, so
+        /// RCAS sharpens into it and FXAA then reads it from its usual
+        /// descriptor - the two run in sequence instead of FXAA standing in
+        /// for the sharpening.
+        VkFramebuffer sharpenFramebuffer = VK_NULL_HANDLE;
 
         // FXAA fullscreen pipeline
         VkPipeline           pipeline          = VK_NULL_HANDLE;

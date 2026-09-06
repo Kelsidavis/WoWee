@@ -218,35 +218,44 @@ bool PostProcessPipeline::executePostProcessing(VkCommandBuffer cmd, uint32_t im
                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
         }
 
-        // FSR3+FXAA combined: re-point FXAA's descriptor to the FSR3 temporal output
-        // so renderFXAAPass() applies spatial AA on the temporally-stabilized frame.
-        // This must happen outside the render pass (descriptor updates are CPU-side).
-        // Use per-frame descriptor set to avoid race with in-flight command buffers.
-        uint32_t fxaaFrameIdx = vkCtx_->getCurrentFrame();
-        if (needsFXAAPass() && fxaa_.descSet[fxaaFrameIdx] && fxaa_.sceneSampler) {
-            VkImageView fsr3OutputView = VK_NULL_HANDLE;
-            if (fsr2_.useAmdBackend) {
-                if (fsr2_.amdFsr3FramegenRuntimeActive && fsr2_.framegenOutput.image)
-                    fsr3OutputView = fsr2_.framegenOutput.imageView;
-                else if (fsr2_.history[fsr2_.currentHistory].image)
-                    fsr3OutputView = fsr2_.history[fsr2_.currentHistory].imageView;
-            } else if (fsr2_.history[fsr2_.currentHistory].image) {
-                fsr3OutputView = fsr2_.history[fsr2_.currentHistory].imageView;
-            }
-            if (fsr3OutputView) {
-                VkDescriptorImageInfo imgInfo{};
-                imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imgInfo.imageView   = fsr3OutputView;
-                imgInfo.sampler     = fxaa_.sceneSampler;
-                VkWriteDescriptorSet write{};
-                write.sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                write.dstSet           = fxaa_.descSet[fxaaFrameIdx];
-                write.dstBinding       = 0;
-                write.descriptorCount  = 1;
-                write.descriptorType   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                write.pImageInfo       = &imgInfo;
-                vkUpdateDescriptorSets(vkCtx_->getDevice(), 1, &write, 0, nullptr);
-            }
+        // With FXAA on as well, the two run in sequence: RCAS sharpens the
+        // upscaler's output into FXAA's own full-resolution scene image, which
+        // is idle while the upscaler owns the scene, and FXAA reads that from
+        // its usual descriptor and writes the swapchain. FXAA used to stand in
+        // for the sharpening pass instead, with a weak unsharp mask of its own,
+        // which gave up the distant detail the temporal upscaler is for.
+        const uint32_t fxaaFrameIdx = vkCtx_->getCurrentFrame();
+        const bool fxaaAfterSharpen = needsFXAAPass() && fxaa_.pipeline &&
+                                      fxaa_.descSet[fxaaFrameIdx] && fxaa_.sharpenFramebuffer &&
+                                      fxaa_.sceneColor.image;
+        if (fxaaAfterSharpen) {
+            VkRenderPassBeginInfo sharpenRp{};
+            sharpenRp.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            sharpenRp.renderPass = vkCtx_->getOverlayClearRenderPass();
+            sharpenRp.framebuffer = fxaa_.sharpenFramebuffer;
+            sharpenRp.renderArea.offset = {.x = 0, .y = 0};
+            sharpenRp.renderArea.extent = vkCtx_->getSwapchainExtent();
+            VkClearValue sharpenClear[1]{};
+            sharpenClear[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+            sharpenRp.clearValueCount = 1;
+            sharpenRp.pClearValues = sharpenClear;
+            vkCmdBeginRenderPass(currentCmd_, &sharpenRp, VK_SUBPASS_CONTENTS_INLINE);
+            VkExtent2D sharpenExt = vkCtx_->getSwapchainExtent();
+            VkViewport sharpenVp{};
+            sharpenVp.width = static_cast<float>(sharpenExt.width);
+            sharpenVp.height = static_cast<float>(sharpenExt.height);
+            sharpenVp.maxDepth = 1.0f;
+            vkCmdSetViewport(currentCmd_, 0, 1, &sharpenVp);
+            VkRect2D sharpenSc{};
+            sharpenSc.extent = sharpenExt;
+            vkCmdSetScissor(currentCmd_, 0, 1, &sharpenSc);
+            renderFSR2Sharpen();
+            vkCmdEndRenderPass(currentCmd_);
+            // The pass leaves it in PRESENT_SRC; FXAA samples it as read-only.
+            transitionImageLayout(currentCmd_, fxaa_.sceneColor.image,
+                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
         }
 
         // Begin swapchain render pass at full resolution for sharpening + ImGui
@@ -277,32 +286,12 @@ bool PostProcessPipeline::executePostProcessing(VkCommandBuffer cmd, uint32_t im
         sc.extent = ext;
         vkCmdSetScissor(currentCmd_, 0, 1, &sc);
 
-        // When FXAA is also enabled: apply FXAA on the FSR3 temporal output instead
-        // of RCAS sharpening. FXAA descriptor is temporarily pointed to the FSR3
-        // history buffer (which is already in SHADER_READ_ONLY_OPTIMAL). This gives
-        // FSR3 temporal stability + FXAA spatial edge smoothing ("ultra quality native").
-        if (needsFXAAPass() && fxaa_.pipeline && fxaa_.descSet[fxaaFrameIdx]) {
+        if (fxaaAfterSharpen) {
+            // Over the sharpened image RCAS just wrote.
             renderFXAAPass();
         } else {
             // Draw RCAS sharpening from accumulated history buffer
             renderFSR2Sharpen();
-        }
-
-        // Restore this frame's FXAA descriptor to its normal scene color source
-        // so standalone FXAA frames are not affected by the FSR3 history pointer.
-        if (needsFXAAPass() && fxaa_.descSet[fxaaFrameIdx] && fxaa_.sceneSampler && fxaa_.sceneColor.imageView) {
-            VkDescriptorImageInfo restoreInfo{};
-            restoreInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            restoreInfo.imageView   = fxaa_.sceneColor.imageView;
-            restoreInfo.sampler     = fxaa_.sceneSampler;
-            VkWriteDescriptorSet restoreWrite{};
-            restoreWrite.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            restoreWrite.dstSet          = fxaa_.descSet[fxaaFrameIdx];
-            restoreWrite.dstBinding      = 0;
-            restoreWrite.descriptorCount = 1;
-            restoreWrite.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            restoreWrite.pImageInfo      = &restoreInfo;
-            vkUpdateDescriptorSets(vkCtx_->getDevice(), 1, &restoreWrite, 0, nullptr);
         }
 
         // Maintain frame bookkeeping
@@ -411,13 +400,11 @@ void PostProcessPipeline::destroyAllResources() {
 
 void PostProcessPipeline::setFXAAEnabled(bool enabled) {
     if (fxaa_.enabled == enabled) return;
-    // FXAA is a post-process AA pass intended to supplement FSR temporal output.
-    // It conflicts with MSAA (which resolves AA during the scene render pass), so
-    // refuse to enable FXAA when hardware MSAA is active.
-    if (enabled && vkCtx_ && vkCtx_->getMsaaSamples() > VK_SAMPLE_COUNT_1_BIT) {
-        LOG_INFO("FXAA: blocked while MSAA is active - disable MSAA first");
-        return;
-    }
+    // Not refused under multisampling any more. It used to be, at info level,
+    // so the switch in the panel turned on and nothing happened. Over an MSAA
+    // resolve FXAA has little left to find and softens what it touches, which
+    // is why no preset combines them - but that is the player's to weigh, and
+    // a control that says one thing and does another is worse than either.
     fxaa_.enabled = enabled;
     if (!enabled) {
         fxaa_.needsRecreate = true;  // defer destruction to next beginFrame()
@@ -1724,6 +1711,24 @@ bool PostProcessPipeline::initFXAAResources() {
         return false;
     }
 
+    // The same image as a colour target of its own, for RCAS to sharpen into
+    // when the temporal upscaler and FXAA are both on. Through the overlay
+    // clear pass, which is single-sampled and colour-only in this format.
+    if (vkCtx_->getOverlayClearRenderPass() != VK_NULL_HANDLE) {
+        VkFramebufferCreateInfo sharpenFb{};
+        sharpenFb.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        sharpenFb.renderPass = vkCtx_->getOverlayClearRenderPass();
+        sharpenFb.attachmentCount = 1;
+        sharpenFb.pAttachments = &fxaa_.sceneColor.imageView;
+        sharpenFb.width = ext.width;
+        sharpenFb.height = ext.height;
+        sharpenFb.layers = 1;
+        if (vkCreateFramebuffer(device, &sharpenFb, nullptr, &fxaa_.sharpenFramebuffer) != VK_SUCCESS) {
+            LOG_WARNING("FXAA: no sharpen target; with the upscaler on, FXAA runs without RCAS");
+            fxaa_.sharpenFramebuffer = VK_NULL_HANDLE;
+        }
+    }
+
     // Sampler
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1849,6 +1854,7 @@ void PostProcessPipeline::destroyFXAAResources() {
     if (fxaa_.descPool)       { vkDestroyDescriptorPool(device, fxaa_.descPool, nullptr);       fxaa_.descPool = VK_NULL_HANDLE; for (auto& s : fxaa_.descSet) s = VK_NULL_HANDLE; }
     destroy(device, fxaa_.descSetLayout);
     if (fxaa_.sceneFramebuffer) { vkDestroyFramebuffer(device, fxaa_.sceneFramebuffer, nullptr); fxaa_.sceneFramebuffer = VK_NULL_HANDLE; }
+    if (fxaa_.sharpenFramebuffer) { vkDestroyFramebuffer(device, fxaa_.sharpenFramebuffer, nullptr); fxaa_.sharpenFramebuffer = VK_NULL_HANDLE; }
     fxaa_.sceneSampler = VK_NULL_HANDLE; // Owned by VkContext sampler cache
     destroyImage(device, alloc, fxaa_.sceneDepthResolve);
     destroyImage(device, alloc, fxaa_.sceneMsaaColor);
@@ -1865,10 +1871,10 @@ void PostProcessPipeline::renderFXAAPass() {
     vkCmdBindDescriptorSets(currentCmd_, VK_PIPELINE_BIND_POINT_GRAPHICS,
                             fxaa_.pipelineLayout, 0, 1, &fxaa_.descSet[fi], 0, nullptr);
 
-    // Pass rcpFrame + sharpness + effect flag (vec4, 16 bytes).
-    // When FSR2/FSR3 is active alongside FXAA, forward FSR2's sharpness so the
-    // post-FXAA unsharp-mask step restores the crispness that FXAA's blur removes.
-    float sharpness = fsr2_.enabled ? fsr2_.sharpness : 0.0f;
+    // Pass rcpFrame + sharpness + effect flag (vec4, 16 bytes). The sharpness
+    // slot drove an unsharp mask that stood in for RCAS while FXAA replaced
+    // it under the upscaler; RCAS runs ahead of FXAA now, so it stays at zero.
+    const float sharpness = 0.0f;
     float pc[4] = {
         1.0f / static_cast<float>(ext.width),
         1.0f / static_cast<float>(ext.height),
