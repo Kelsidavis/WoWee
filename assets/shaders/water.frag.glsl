@@ -23,6 +23,8 @@ layout(push_constant) uniform Push {
     float liquidBasicType;
     vec2 screenSize;  // size of the target being drawn into
     vec2 depthRange;  // the camera's own near and far, for linearising SceneDepth
+    float sceneValid; // 1 once the refraction capture holds a frame, 0 before it
+    float pad0, pad1, pad2;
 } push;
 
 layout(set = 1, binding = 0) uniform WaterMaterial {
@@ -369,9 +371,12 @@ void main() {
     float depthFade = 1.0 - exp(-verticalDepth * 0.15);
     vec3 waterBody = mix(shallowColor, deepColor, depthFade);
 
-    // Detect if scene history is available (scene data captured for refraction)
-    float sceneBrightness = dot(sceneRefract, vec3(0.299, 0.587, 0.114));
-    bool hasSceneData = (sceneBrightness > 0.003);
+    // Whether the refraction capture holds a frame is a fact the renderer
+    // knows, handed in as one. It used to be inferred per pixel from the
+    // captured colour being brighter than 0.003, so every dark pixel in the
+    // scene - a cave mouth, the night - flipped that pixel of water onto the
+    // no-refraction path, and the two paths speckled against each other.
+    bool hasSceneData = push.sceneValid > 0.5;
 
     // Animated caustic shimmer - only without refraction (refraction already provides movement)
     if (!hasSceneData) {
@@ -475,9 +480,11 @@ void main() {
     // it aliases sooner - fade it out over the near half of the detail range,
     // otherwise flattening the normals just leaves the sparkle field behind as
     // the visible pattern.
-    float sparkleNoise = fbmNoise(FragPos.xy * 4.0 + time * 0.5, time * 1.5);
-    float sparkle = pow(max(sparkleNoise - 0.55, 0.0) / 0.45, 3.0) * shimmerStrength * 0.10;
-    specular += sparkle * lightColor.rgb * (1.0 - smoothstep(150.0, 700.0, dist));
+    if (dist < 700.0) {  // where the fade below still leaves any of it
+        float sparkleNoise = fbmNoise(FragPos.xy * 4.0 + time * 0.5, time * 1.5);
+        float sparkle = pow(max(sparkleNoise - 0.55, 0.0) / 0.45, 3.0) * shimmerStrength * 0.10;
+        specular += sparkle * lightColor.rgb * (1.0 - smoothstep(150.0, 700.0, dist));
+    }
 
     // ============================================================
     // Subsurface scattering
@@ -507,7 +514,11 @@ void main() {
     // Only on terrain water (waveAmp > 0); WMO water (canals, indoor)
     // has waveAmp == 0 and should not show shoreline interaction.
     // ============================================================
-    if (basicType < 1.5 && shoreDepth > 0.001 && push.waveAmp > 0.0) {
+    // The mask below is zero past 0.9 of depth, so nothing here draws beyond
+    // it; without that bound the block ran on every water pixel with a bed
+    // under it, which is the whole lake, and multiplied its five cellular
+    // fields by nothing.
+    if (basicType < 1.5 && shoreDepth > 0.001 && shoreDepth < 0.9 && push.waveAmp > 0.0) {
         // How far out from the waterline foam reaches, in yards of depth.
         // Halved from 1.8 once the depth being measured was the real one:
         // against a depth ten times too shallow this had been tuned by eye
@@ -645,7 +656,9 @@ void main() {
     // ============================================================
     // Wave crest foam (ocean only) - particle-based
     // ============================================================
-    if (basicType > 0.5 && basicType < 1.5 && push.waveAmp > 0.0) {
+    // Only on a crest: the mask is zero below half wave height, and the
+    // cellular field it would multiply is the expensive part.
+    if (basicType > 0.5 && basicType < 1.5 && push.waveAmp > 0.0 && WaveOffset > 0.5) {
         float crestMask = smoothstep(0.5, 1.0, WaveOffset);
         vec2 crestWarp = vec2(
             noiseValue(FragPos.xy * 1.8 + time * 0.1) - 0.5,

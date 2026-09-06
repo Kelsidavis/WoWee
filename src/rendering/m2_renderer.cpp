@@ -308,8 +308,11 @@ bool M2Renderer::buildMainPassPipelines(VkDescriptorSetLayout perFrameLayout) {
             .setVertexInput({m2Binding}, m2Attrs)
             .setTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
             .setRasterization(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE)
-            .setDepthTest(!skyMode_, skyMode_ ? false : depthWrite,
-                          skyMode_ ? VK_COMPARE_OP_ALWAYS : VK_COMPARE_OP_LESS_OR_EQUAL)
+            // The sky model tests depth but never writes it. Its vertices are
+            // pushed to the far plane, so the test is what lets ground drawn
+            // before it occlude it, and a write would put the far plane over
+            // everything drawn after.
+            .setDepthTest(true, skyMode_ ? false : depthWrite, VK_COMPARE_OP_LESS_OR_EQUAL)
             .setColorBlendAttachment(blendState)
             .setMultisample(vkCtx_->getMsaaSamples());
         // MSAA alpha-to-coverage dithers the shader's sharpened cutout alpha

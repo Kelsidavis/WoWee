@@ -31,7 +31,9 @@ VkPipeline Celestial::buildPipeline(VkDevice device,
         .setVertexInput({binding}, attrs)
         .setTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
         .setRasterization(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE)
-        .setNoDepthTest() // Sky layer: celestials always render (skybox doesn't write depth)
+        // On the far plane and tested, never written: the ground is drawn before
+        // the sky now, and this is what keeps the sun behind a mountain.
+        .setDepthTest(true, false, VK_COMPARE_OP_LESS_OR_EQUAL)
         .setColorBlendAttachment(PipelineBuilder::blendAdditive())
         .setMultisample(vkCtx_->getMsaaSamples())
         .setLayout(pipelineLayout_)

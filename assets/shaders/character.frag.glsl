@@ -55,13 +55,20 @@ layout(location = 0) out vec4 outColor;
 
 const int PREVIEW_SIMPLE_TEXTURE_MODE = -31336;
 
-const float SHADOW_TEXEL = 1.0 / 4096.0;
+// One texel of the shadow map, handed in by the renderer. The map is 512,
+// 1024, 2048 or 4096 a side by the quality setting; this used to be a
+// constant for 4096, so at 512 the filter taps all landed inside one texel
+// and the bias shrank eightfold. The fallback covers a per-frame block that
+// never filled the slot in, such as the character preview's.
+float shadowTexel() {
+    return shadowParams.z > 0.0 ? shadowParams.z : 1.0 / 4096.0;
+}
 
 float sampleShadowPCF(sampler2DShadow smap, vec3 coords) {
     float shadow = 0.0;
     for (int x = -1; x <= 1; ++x) {
         for (int y = -1; y <= 1; ++y) {
-            shadow += texture(smap, vec3(coords.xy + vec2(x, y) * SHADOW_TEXEL, coords.z));
+            shadow += texture(smap, vec3(coords.xy + vec2(x, y) * shadowTexel(), coords.z));
         }
     }
     return shadow / 9.0;
@@ -71,9 +78,13 @@ vec3 localLightContribution(vec3 pos, vec3 normal, vec3 albedo) {
     vec3 sum = vec3(0.0);
     for (int i = 0; i < min(localLightMeta.x, 64); ++i) {
         vec3 toLight = localLightPosRadius[i].xyz - pos;
-        float dist = length(toLight);
         float radius = localLightPosRadius[i].w;
-        if (dist >= radius || radius <= 0.0) continue;
+        // Rejected on the squared distance, before the square root and the
+        // divide: most of the sixty-four are out of range of any one pixel,
+        // and this is what each of them costs.
+        float distSq = dot(toLight, toLight);
+        if (radius <= 0.0 || distSq >= radius * radius) continue;
+        float dist = sqrt(distSq);
         float attenuation = 1.0 - dist / radius;
         attenuation *= attenuation;
         float wrappedDiffuse = 0.22 + 0.78 * max(dot(normal, toLight / max(dist, 0.001)), 0.0);
@@ -171,19 +182,26 @@ vec2 parallaxOcclusionMap(vec2 uv, vec3 viewDirTS, float lodFactor) {
     P = clamp(P, vec2(-maxOffset), vec2(maxOffset));
     vec2 deltaUV = P / float(numSamples);
 
+    // The mip level is chosen once, from the undisplaced UV, and used for
+    // every sample in the march. Inside the loop the UV differs from one
+    // pixel to the next by how many steps each has taken, so the implicit
+    // derivatives were noise and the level chosen from them was too - which
+    // showed as sparkle on relief at distance and cost a gradient fetch
+    // per sample on top.
+    float lod = textureQueryLod(uNormalHeightMap, uv).x;
     vec2 currentUV = uv;
-    float currentDepthMapValue = 1.0 - texture(uNormalHeightMap, currentUV).a;
+    float currentDepthMapValue = 1.0 - textureLod(uNormalHeightMap, currentUV, lod).a;
 
     for (int i = 0; i < 64; i++) {
         if (i >= numSamples || currentLayerDepth >= currentDepthMapValue) break;
         currentUV -= deltaUV;
-        currentDepthMapValue = 1.0 - texture(uNormalHeightMap, currentUV).a;
+        currentDepthMapValue = 1.0 - textureLod(uNormalHeightMap, currentUV, lod).a;
         currentLayerDepth += layerDepth;
     }
 
     vec2 prevUV = currentUV + deltaUV;
     float afterDepth = currentDepthMapValue - currentLayerDepth;
-    float beforeDepth = (1.0 - texture(uNormalHeightMap, prevUV).a) - currentLayerDepth + layerDepth;
+    float beforeDepth = (1.0 - textureLod(uNormalHeightMap, prevUV, lod).a) - currentLayerDepth + layerDepth;
     float weight = afterDepth / (afterDepth - beforeDepth + 0.0001);
     vec2 result = mix(currentUV, prevUV, weight);
 
@@ -214,6 +232,11 @@ void main() {
     }
 
     float lodFactor = computeLodFactor();
+    // Gradients of the authored UV, taken here where every pixel of the quad
+    // still agrees on them. Parallax moves the UV by a different amount per
+    // pixel, and a mip level chosen from the moved UV flickers.
+    vec2 uvDx = dFdx(TexCoord);
+    vec2 uvDy = dFdy(TexCoord);
 
     vec3 vertexNormal = safeNormalize(Normal, vec3(0.0, 0.0, 1.0));
     if (!gl_FrontFacing) vertexNormal = -vertexNormal;
@@ -244,7 +267,7 @@ void main() {
         finalUV = parallaxOcclusionMap(TexCoord, viewDirTS, lodFactor);
     }
 
-    vec4 texColor = texture(uTexture, finalUV);
+    vec4 texColor = textureGrad(uTexture, finalUV, uvDx, uvDy);
     // Repair dark DXT fringes on alpha-cut character textures such as hair.
     // Transparent edge texels can carry black/garbage RGB even when alpha is
     // valid; pull color from a coarser mip and trust the source more as alpha
@@ -286,7 +309,7 @@ void main() {
     // Compute normal (with normal mapping if enabled)
     vec3 norm = vertexNormal;
     if (useNormalMap) {
-        vec3 mapNormal = texture(uNormalHeightMap, finalUV).rgb * 2.0 - 1.0;
+        vec3 mapNormal = textureGrad(uNormalHeightMap, finalUV, uvDx, uvDy).rgb * 2.0 - 1.0;
         mapNormal.xy *= normalMapStrength;
         mapNormal = safeNormalize(mapNormal, vec3(0.0, 0.0, 1.0));
         vec3 worldNormal = safeNormalize(TBN * mapNormal, vertexNormal);
@@ -311,7 +334,7 @@ void main() {
 
         float shadow = 1.0;
         if (shadowParams.x > 0.5) {
-            float normalOffset = SHADOW_TEXEL * 2.0 * (1.0 - abs(dot(norm, ldir)));
+            float normalOffset = shadowTexel() * 2.0 * (1.0 - abs(dot(norm, ldir)));
             vec3 biasedPos = FragPos + norm * normalOffset;
             vec4 lsPos = lightSpaceMatrix * vec4(biasedPos, 1.0);
             vec3 proj = lsPos.xyz / lsPos.w;

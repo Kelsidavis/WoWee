@@ -30,5 +30,8 @@ void main() {
     TexCoord = aTexCoord;
     // Sky object: remove camera translation so celestial bodies are at infinite distance
     mat4 rotView = mat4(mat3(view));
-    gl_Position = projection * rotView * push.model * vec4(aPos, 1.0);
+    vec4 clip = projection * rotView * push.model * vec4(aPos, 1.0);
+    // On the far plane, as the clouds are, so the depth test the sky is now
+    // drawn under rejects it wherever the world has already been drawn.
+    gl_Position = vec4(clip.xy, clip.w, clip.w);
 }

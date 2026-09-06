@@ -61,5 +61,7 @@ void main() {
         kAngularRadius * push.viewportHeight * projection[1][1] * sizeScale,
         1.5, 5.0);
 
-    gl_Position = projection * rotView * vec4(aPos, 1.0);
+    vec4 clip = projection * rotView * vec4(aPos, 1.0);
+    // On the far plane, so the world drawn before the sky occludes it.
+    gl_Position = vec4(clip.xy, clip.w, clip.w);
 }

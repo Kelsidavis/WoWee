@@ -465,7 +465,10 @@ void Renderer::updatePerFrameUBO() {
     currentFrameData.lightSpaceMatrix = lightSpaceMatrix;
     // Scale shadow bias proportionally to ortho extent to avoid acne at close range / gaps at far range
     float shadowBias = glm::clamp(0.8f * (shadowDistance_ / 300.0f), 0.0f, 1.0f);
-    currentFrameData.shadowParams = glm::vec4(shadowsEnabled ? 1.0f : 0.0f, shadowBias, 0.0f, 0.0f);
+    // z carries one texel of the shadow map. The shaders used to hold that as
+    // a constant for 4096, and the map is 512 to 4096 by the quality level.
+    currentFrameData.shadowParams = glm::vec4(shadowsEnabled ? 1.0f : 0.0f, shadowBias,
+                                              1.0f / static_cast<float>(SHADOW_MAP_SIZE), 0.0f);
 
     for (uint32_t i = 0; i < MAX_LOCAL_LIGHTS; ++i) {
         currentFrameData.localLightPosRadius[i] = glm::vec4(0.0f);
@@ -2653,9 +2656,17 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
         // --- Execute all secondary buffers in correct draw order ---
         VkCommandBuffer validCmds[6];
         uint32_t numCmds = 0;
-        validCmds[numCmds++] = secondaryCmds_[SEC_SKY][frameIdx];
+        // Terrain first, then the sky. Every sky layer sits on the far plane
+        // and depth-tests against what is already there, so drawing it after
+        // the ground skips the clouds' noise on every pixel a hill covers,
+        // which outdoors is most of them. Only the terrain goes ahead of it:
+        // it is the one pass that is opaque throughout. Buildings carry
+        // blended windows and doodads carry leaves and particles, and blended
+        // pixels leave no depth behind, so a sky drawn after them would paint
+        // over whichever of them stood against it.
         if (terrainRenderer && camera && terrainEnabled && !skipTerrain)
             validCmds[numCmds++] = secondaryCmds_[SEC_TERRAIN][frameIdx];
+        validCmds[numCmds++] = secondaryCmds_[SEC_SKY][frameIdx];
         if (wmoRenderer && camera && !skipWMO)
             validCmds[numCmds++] = secondaryCmds_[SEC_WMO][frameIdx];
         validCmds[numCmds++] = secondaryCmds_[SEC_SELECTION][frameIdx];
@@ -2668,20 +2679,6 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
 
     } else {
         // ── Fallback: single-threaded inline recording (original path) ──
-
-        if (skySystem && camera && !skipSky) {
-            const rendering::SkyParams skyParams = rendering::skyParamsFromLighting(
-                timeOfDay,
-                gameHandler ? gameHandler->getGameTime() : -1.0f,
-                gameHandler ? gameHandler->getWeatherIntensity() : 0.0f,
-                lightingManager ? &lightingManager->getLightingParams() : nullptr,
-                useOriginalSkybox);
-            skySystem->render(currentCmd, perFrameSet, *camera, skyParams);
-            if (useOriginalSkybox) {
-                skyboxModelRenderer_->prepareRender(frameIdx, *camera);
-                skyboxModelRenderer_->render(currentCmd, perFrameSet, *camera);
-            }
-        }
 
         if (terrainRenderer && camera && terrainEnabled && !skipTerrain) {
             auto terrainStart = std::chrono::steady_clock::now();
@@ -2697,6 +2694,22 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
             grassRenderer_->render(currentCmd, vkCtx->getCurrentFrame(), perFrameSet);
             if (vkCtx) vkCtx->gpuMark(currentCmd, "grass");
         }
+
+        // Sky after the ground, for the reason given on the parallel path.
+        if (skySystem && camera && !skipSky) {
+            const rendering::SkyParams skyParams = rendering::skyParamsFromLighting(
+                timeOfDay,
+                gameHandler ? gameHandler->getGameTime() : -1.0f,
+                gameHandler ? gameHandler->getWeatherIntensity() : 0.0f,
+                lightingManager ? &lightingManager->getLightingParams() : nullptr,
+                useOriginalSkybox);
+            skySystem->render(currentCmd, perFrameSet, *camera, skyParams);
+            if (useOriginalSkybox) {
+                skyboxModelRenderer_->prepareRender(frameIdx, *camera);
+                skyboxModelRenderer_->render(currentCmd, perFrameSet, *camera);
+            }
+        }
+
 
         if (wmoRenderer && camera && !skipWMO) {
             wmoRenderer->prepareRender();

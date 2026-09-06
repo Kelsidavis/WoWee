@@ -49,13 +49,20 @@ layout(location = 7) flat in float vHighlight;
 
 layout(location = 0) out vec4 outColor;
 
-const float SHADOW_TEXEL = 1.0 / 4096.0;
+// One texel of the shadow map, handed in by the renderer. The map is 512,
+// 1024, 2048 or 4096 a side by the quality setting; this used to be a
+// constant for 4096, so at 512 the filter taps all landed inside one texel
+// and the bias shrank eightfold. The fallback covers a per-frame block that
+// never filled the slot in, such as the character preview's.
+float shadowTexel() {
+    return shadowParams.z > 0.0 ? shadowParams.z : 1.0 / 4096.0;
+}
 
 float sampleShadowPCF(sampler2DShadow smap, vec3 coords) {
     float shadow = 0.0;
     for (int x = -1; x <= 1; ++x) {
         for (int y = -1; y <= 1; ++y) {
-            shadow += texture(smap, vec3(coords.xy + vec2(x, y) * SHADOW_TEXEL, coords.z));
+            shadow += texture(smap, vec3(coords.xy + vec2(x, y) * shadowTexel(), coords.z));
         }
     }
     return shadow / 9.0;
@@ -65,9 +72,13 @@ vec3 localLightContribution(vec3 pos, vec3 normal, vec3 albedo) {
     vec3 sum = vec3(0.0);
     for (int i = 0; i < min(localLightMeta.x, 64); ++i) {
         vec3 toLight = localLightPosRadius[i].xyz - pos;
-        float dist = length(toLight);
         float radius = localLightPosRadius[i].w;
-        if (dist >= radius || radius <= 0.0) continue;
+        // Rejected on the squared distance, before the square root and the
+        // divide: most of the sixty-four are out of range of any one pixel,
+        // and this is what each of them costs.
+        float distSq = dot(toLight, toLight);
+        if (radius <= 0.0 || distSq >= radius * radius) continue;
+        float dist = sqrt(distSq);
         float attenuation = 1.0 - dist / radius;
         attenuation *= attenuation;
         float wrappedDiffuse = 0.22 + 0.78 * max(dot(normal, toLight / max(dist, 0.001)), 0.0);
@@ -209,7 +220,7 @@ void main() {
         }
 
         if (shadowParams.x > 0.5) {
-            float normalOffset = SHADOW_TEXEL * 2.0 * (1.0 - abs(dot(norm, ldir)));
+            float normalOffset = shadowTexel() * 2.0 * (1.0 - abs(dot(norm, ldir)));
             vec3 biasedPos = FragPos + norm * normalOffset;
             vec4 lsPos = lightSpaceMatrix * vec4(biasedPos, 1.0);
             vec3 proj = lsPos.xyz / lsPos.w;

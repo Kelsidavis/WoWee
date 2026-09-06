@@ -42,13 +42,20 @@ layout(location = 3) in vec2 LayerUV;
 
 layout(location = 0) out vec4 outColor;
 
-const float SHADOW_TEXEL = 1.0 / 4096.0;
+// One texel of the shadow map, handed in by the renderer. The map is 512,
+// 1024, 2048 or 4096 a side by the quality setting; this used to be a
+// constant for 4096, so at 512 the filter taps all landed inside one texel
+// and the bias shrank eightfold. The fallback covers a per-frame block that
+// never filled the slot in, such as the character preview's.
+float shadowTexel() {
+    return shadowParams.z > 0.0 ? shadowParams.z : 1.0 / 4096.0;
+}
 
 float sampleShadowPCF(sampler2DShadow smap, vec3 coords) {
     float shadow = 0.0;
     for (int x = -1; x <= 1; ++x) {
         for (int y = -1; y <= 1; ++y) {
-            shadow += texture(smap, vec3(coords.xy + vec2(x, y) * SHADOW_TEXEL, coords.z));
+            shadow += texture(smap, vec3(coords.xy + vec2(x, y) * shadowTexel(), coords.z));
         }
     }
     return shadow / 9.0;
@@ -58,9 +65,13 @@ vec3 localLightContribution(vec3 pos, vec3 normal, vec3 albedo) {
     vec3 sum = vec3(0.0);
     for (int i = 0; i < min(localLightMeta.x, 64); ++i) {
         vec3 toLight = localLightPosRadius[i].xyz - pos;
-        float dist = length(toLight);
         float radius = localLightPosRadius[i].w;
-        if (dist >= radius || radius <= 0.0) continue;
+        // Rejected on the squared distance, before the square root and the
+        // divide: most of the sixty-four are out of range of any one pixel,
+        // and this is what each of them costs.
+        float distSq = dot(toLight, toLight);
+        if (radius <= 0.0 || distSq >= radius * radius) continue;
+        float dist = sqrt(distSq);
         float attenuation = 1.0 - dist / radius;
         attenuation *= attenuation;
         float wrappedDiffuse = 0.22 + 0.78 * max(dot(normal, toLight / max(dist, 0.001)), 0.0);
@@ -81,17 +92,17 @@ float sampleAlpha(sampler2D tex, vec2 uv) {
     float blurWeight = 1.0 - smoothstep(1.0 / 64.0, 8.0 / 64.0, border);
     float center = texture(tex, uv).r;
     if (blurWeight < 0.001) return center;
-    vec2 texel = vec2(1.0 / 64.0);
-    float avg = center;
-    avg += texture(tex, uv + vec2(-texel.x, 0.0)).r;
-    avg += texture(tex, uv + vec2( texel.x, 0.0)).r;
-    avg += texture(tex, uv + vec2(0.0, -texel.y)).r;
-    avg += texture(tex, uv + vec2(0.0,  texel.y)).r;
-    avg += texture(tex, uv + vec2(-texel.x, -texel.y)).r;
-    avg += texture(tex, uv + vec2( texel.x, -texel.y)).r;
-    avg += texture(tex, uv + vec2(-texel.x,  texel.y)).r;
-    avg += texture(tex, uv + vec2( texel.x,  texel.y)).r;
-    avg *= 1.0 / 9.0;
+    // Four taps at half-texel offsets, not nine at whole ones. The sampler
+    // is linear, so each tap already averages a 2x2 block, and the four
+    // together cover the same 3x3 footprint as a tent rather than a box.
+    // The band this runs in is 44% of every chunk, on the pass that
+    // covers most of the screen, so the tap count is what this costs.
+    vec2 h = vec2(0.5 / 64.0);
+    float avg = texture(tex, uv + vec2(-h.x, -h.y)).r
+              + texture(tex, uv + vec2( h.x, -h.y)).r
+              + texture(tex, uv + vec2(-h.x,  h.y)).r
+              + texture(tex, uv + vec2( h.x,  h.y)).r;
+    avg *= 0.25;
     return mix(center, avg, blurWeight);
 }
 
@@ -138,13 +149,18 @@ void main() {
 
     vec3 lightDir2 = normalize(-lightDir.xyz);
     vec3 ambient = ambientColor.rgb * finalColor.rgb;
-    float diff = max(abs(dot(norm, lightDir2)), 0.2);
+    // Lambert, as every other surface has it. This took abs() of the angle
+    // and floored it at 0.2, so a slope turned from the sun was lit as one
+    // turned toward it, and hills had no shape at low sun. The ambient term
+    // is what keeps the shaded side from black, as it does for the models
+    // standing on it.
+    float diff = max(dot(norm, lightDir2), 0.0);
     vec3 diffuse = diff * lightColor.rgb * finalColor.rgb;
 
     float shadow = 1.0;
     if (shadowParams.x > 0.5) {
         vec3 ldir = normalize(-lightDir.xyz);
-        float normalOffset = SHADOW_TEXEL * 2.0 * (1.0 - abs(dot(norm, ldir)));
+        float normalOffset = shadowTexel() * 2.0 * (1.0 - abs(dot(norm, ldir)));
         vec3 biasedPos = FragPos + norm * normalOffset;
         vec4 lsPos = lightSpaceMatrix * vec4(biasedPos, 1.0);
         vec3 proj = lsPos.xyz / lsPos.w;

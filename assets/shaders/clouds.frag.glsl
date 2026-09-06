@@ -32,12 +32,17 @@ float gradientNoise(vec2 p) {
     return mix(mix(a, b, u.x), mix(c, d, u.x), u.y) * 0.5 + 0.5;
 }
 
-float fbm(vec2 p) {
+// Octave count per call: the shape and its sun-ward re-sample keep all five,
+// because the self-shadow is their difference and the two have to match.
+// The warp, the erosion and the cirrus are modulators on top of it, and
+// their fourth and fifth octaves were below a pixel from any distance the
+// sky is seen at. Seven evaluations a pixel became about five.
+float fbm(vec2 p, int octaves) {
     float val = 0.0;
     float amp = 0.5;
     // Rotate between octaves so ridge artifacts don't align to the axes
     const mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < octaves; i++) {
         val += amp * gradientNoise(p);
         p = rot * p * 2.02;
         amp *= 0.5;
@@ -63,17 +68,17 @@ void main() {
 
     // --- Cumulus layer: domain-warped FBM for billowy, irregular shapes ---
     vec2 p = uv * 0.8 + wind;
-    vec2 q = vec2(fbm(p), fbm(p + vec2(5.2, 1.3)));
-    float shape = fbm(p + q * 1.4);
+    vec2 q = vec2(fbm(p, 4), fbm(p + vec2(5.2, 1.3), 4));
+    float shape = fbm(p + q * 1.4, 5);
 
     // Coverage: density opens the threshold; erosion breaks up the edges
     float coverage = smoothstep(0.42 - density * 0.22, 0.74 - density * 0.10, shape);
-    float erosion = fbm(uv * 3.1 + wind * 1.6 + q);
+    float erosion = fbm(uv * 3.1 + wind * 1.6 + q, 3);
     float cumulus = coverage * smoothstep(0.22, 0.55, erosion + coverage * 0.4);
 
     // --- Cirrus layer: thin, stretched, faster-drifting streaks ---
     vec2 cuv = vec2(uv.x * 0.32, uv.y * 1.5) + wind * 1.8 + vec2(3.7, 9.1);
-    float cirrus = fbm(cuv) * fbm(cuv * 2.3 + 4.0);
+    float cirrus = fbm(cuv, 3) * fbm(cuv * 2.3 + 4.0, 3);
     cirrus = smoothstep(0.16, 0.5, cirrus) * 0.30 * (0.35 + 0.65 * density);
 
     float cloud = clamp(cumulus + cirrus * (1.0 - cumulus), 0.0, 1.0);
@@ -91,7 +96,7 @@ void main() {
 
     // Self-shadowing: re-sample the shape a step toward the sun; if the cloud
     // is denser upstream, this point sits in its own shadow.
-    float towardSun = fbm(p + q * 1.4 + sunDir.xy * 0.35);
+    float towardSun = fbm(p + q * 1.4 + sunDir.xy * 0.35, 5);
     float shadow = clamp(1.0 - (towardSun - shape) * 2.2, 0.35, 1.0);
 
     // Thick cores read darker - sunlight doesn't penetrate deep cloud
