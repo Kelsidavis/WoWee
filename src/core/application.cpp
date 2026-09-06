@@ -80,6 +80,7 @@
 #include "pipeline/spell_icon_paths.hpp"
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_vulkan.h>
 #include <cstdlib>
 #include <climits>
 #include <algorithm>
