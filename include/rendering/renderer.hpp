@@ -218,6 +218,9 @@ private:
     /// it can be recorded after the water rather than under it. Must run before
     /// the spray's pipelines are built, and again whenever they are rebuilt.
     void syncSwimEffectsTargetPass();
+    /// syncSwimEffectsTargetPass, then rebuild the spray or the minimap if the
+    /// answer moved either of them. Runs from beginFrame every frame, once the
+    /// post-process target for the frame is settled; free when nothing moved.
     void refreshSwimEffectsPass();
 
     /// True when the spray's pipelines were built for the water continuation

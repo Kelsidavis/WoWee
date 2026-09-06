@@ -1014,6 +1014,12 @@ void Renderer::beginFrame() {
     // Post-process resource management (§4.3 - delegates to PostProcessPipeline)
     if (postProcessPipeline_) postProcessPipeline_->manageResources();
 
+    // The target that call may have just created or destroyed decides where
+    // the water draws, and with it where the spray and the minimap go. Asked
+    // again here, after the answer can have changed, rather than only at the
+    // anti-aliasing rebuild that runs before the target exists.
+    refreshSwimEffectsPass();
+
     // Handle swapchain recreation if needed
     if (vkCtx->isSwapchainDirty()) {
         // Skip recreation while window is minimized (0×0 extent is a Vulkan spec violation)
@@ -3584,17 +3590,31 @@ void Renderer::setupWater1xPass() {
     refreshSwimEffectsPass();
 }
 
-// Rebuild the spray's pipelines if the pass it should draw into has changed.
-// Only ever called with no frames in flight; recreatePipelines() destroys the
-// old pipelines outright rather than deferring them.
+// Re-decide where the spray and the minimap draw, and rebuild whichever one
+// the answer moved.
+//
+// Called between frames only: recreatePipelines() destroys the old pipelines
+// outright rather than deferring them, so the wait below is what keeps that
+// off a frame in flight. Free when nothing changed, which is every frame but
+// a handful, so beginFrame runs it too. The decision depends on whether the
+// post-process target exists, and that target is created lazily on the frame
+// after the anti-aliasing rebuild that first made the decision. With MSAA and
+// FXAA together the rebuild chose the single-sample water pass, the FXAA
+// target then moved the water back into the scene pass, and the minimap and
+// the spray - still flagged for a pass that no longer ran - were drawn
+// nowhere at all. The same happened, in either direction, whenever FXAA was
+// toggled in the settings.
 void Renderer::refreshSwimEffectsPass() {
-    if (!swimEffects || !vkCtx) return;
-    const bool wasWithWater = swimEffectsDrawWithWater_;
+    if (!vkCtx) return;
+    const bool sprayWasWithWater = swimEffectsDrawWithWater_;
+    const bool minimapWasWithWater = minimapDrawsWithWater_;
     syncSwimEffectsTargetPass();
-    if (swimEffectsDrawWithWater_ != wasWithWater) {
-        vkDeviceWaitIdle(vkCtx->getDevice());
-        swimEffects->recreatePipelines();
-    }
+    const bool sprayMoved = swimEffects && swimEffectsDrawWithWater_ != sprayWasWithWater;
+    const bool minimapMoved = minimap && minimapDrawsWithWater_ != minimapWasWithWater;
+    if (!sprayMoved && !minimapMoved) return;
+    vkDeviceWaitIdle(vkCtx->getDevice());
+    if (sprayMoved) swimEffects->recreatePipelines();
+    if (minimapMoved) minimap->recreatePipelines();
 }
 
 // ========================= Multithreaded Secondary Command Buffers =========================
