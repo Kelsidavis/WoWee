@@ -488,14 +488,24 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                         resItems[i] = resBuf[i];
                     }
                     if (ImGui::Combo("Resolution", &pendingResIndex, resItems, kResCount)) {
-                        pendingResolutionWidth = kResolutions[pendingResIndex][0];
-                        pendingResolutionHeight = kResolutions[pendingResIndex][1];
-                        window->applyResolution(pendingResolutionWidth, pendingResolutionHeight);
+                        window->applyResolution(kResolutions[pendingResIndex][0],
+                                                kResolutions[pendingResIndex][1]);
+                        // Read back rather than assumed. A window cannot be
+                        // larger than the space the desktop has for it, so a
+                        // choice above that is granted smaller - and storing
+                        // the choice instead left the dropdown naming a size
+                        // the window never had, with every larger entry
+                        // looking like it did nothing.
+                        pendingResolutionWidth = window->getWidth();
+                        pendingResolutionHeight = window->getHeight();
+                        pendingResIndex = ui::displayResolutionIndexFor(
+                            pendingResolutionWidth, pendingResolutionHeight);
                         saveCallback();
                     }
                     if (ImGui::IsItemHovered()) {
                         ImGui::SetTooltip("The size of the window, or of the picture in fullscreen.\n"
-                                          "Applies at once. To draw the world smaller than this\n"
+                                          "Applies at once, and settles on the largest size the display\n"
+                                          "has room for. To draw the world smaller than the window\n"
                                           "and scale it up, use Upscaling below instead.");
                     }
                 }
@@ -507,8 +517,7 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                 // drawSchemaCategory above rather than here - the options
                 // panels the FrameXML interface builds are generated from the
                 // schema and nothing else, and that is the screen it was
-                // missing from. Ground clutter is still the game's own Video
-                // panel's on paper, and still only offered here.
+                // missing from. Ground clutter followed it there.
                 ImGui::Spacing();
                 ImGui::SeparatorText("Detail");
                 drawSchemaCategory("Detail", saveCallback);

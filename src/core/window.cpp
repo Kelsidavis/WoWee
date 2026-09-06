@@ -1,5 +1,7 @@
 #include "core/window.hpp"
 
+#include <algorithm>
+
 #include <cmath>
 #include "core/env.hpp"
 #include "core/logger.hpp"
@@ -363,10 +365,42 @@ void Window::applyResolution(int w, int h) {
         LOG_INFO("Fullscreen resolution applied: ", width, "x", height);
         return;
     }
-    SDL_SetWindowSize(window, w, h);
+    // Windowed. What is asked for and what is granted are not the same
+    // thing, and this used to record the request either way.
+    //
+    // A window is sized in screen points, not pixels, and macOS will not
+    // make one larger than the space it has: on a laptop whose desktop is
+    // 1728x1117 points, asking for 1920x1080 gives a window clamped to the
+    // usable area, and asking for 2560x1440 gives the same clamped window
+    // again. The panel then wrote the number it had asked for into the
+    // config, so the dropdown showed a resolution the window never had,
+    // every larger choice looked identical, and the setting read as broken.
+    // Nothing said so: this path logged nothing at all.
+    //
+    // Clamped here rather than left to the platform, so the number stored is
+    // one the window can actually be, and said out loud when it bites.
+    int wantW = w;
+    int wantH = h;
+    const int displayIndex = SDL_GetWindowDisplayIndex(window);
+    SDL_Rect usable{};
+    if (displayIndex >= 0 && SDL_GetDisplayUsableBounds(displayIndex, &usable) == 0 &&
+        usable.w > 0 && usable.h > 0) {
+        wantW = std::min(wantW, usable.w);
+        wantH = std::min(wantH, usable.h);
+    }
+    SDL_SetWindowSize(window, wantW, wantH);
     SDL_GetWindowSize(window, &width, &height);
-    windowedWidth = w;
-    windowedHeight = h;
+    // What the window actually is, not what was wanted.
+    windowedWidth = width;
+    windowedHeight = height;
+    if (width != w || height != h) {
+        LOG_WARNING("Window resolution ", w, "x", h, " was not available: the window is ",
+                    width, "x", height, ". A window is sized in screen points, and this "
+                    "display offers ", usable.w, "x", usable.h, " of them - on a high "
+                    "density screen that is half its pixels or fewer.");
+    } else {
+        LOG_INFO("Window resolution applied: ", width, "x", height);
+    }
     if (vkContext) {
         vkContext->markSwapchainDirty();
     }
