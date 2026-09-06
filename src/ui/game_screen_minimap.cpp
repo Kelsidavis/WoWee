@@ -1738,6 +1738,7 @@ void GameScreen::saveSettings() {
     out << "action_bar_scale=" << settingsPanel_.pendingActionBarScale << "\n";
     out << "nameplate_scale=" << settingsPanel_.nameplateScale_ << "\n";
     out << "show_friendly_nameplates=" << (settingsPanel_.showFriendlyNameplates_ ? 1 : 0) << "\n";
+    out << "show_enemy_nameplates=" << (settingsPanel_.showEnemyNameplates_ ? 1 : 0) << "\n";
     out << "show_action_bar2=" << (settingsPanel_.pendingShowActionBar2 ? 1 : 0) << "\n";
     out << "action_bar2_offset_x=" << settingsPanel_.pendingActionBar2OffsetX << "\n";
     out << "action_bar2_offset_y=" << settingsPanel_.pendingActionBar2OffsetY << "\n";
@@ -1911,20 +1912,13 @@ void GameScreen::loadSettings() {
                                windowUiScaleRange().second);
                 windowScaleLoaded = true;
             } else if (key == "minimap_rotate") {
-                // Deliberately not honoured: the saved value is read and
-                // dropped, and every run starts north-up.
-                //
-                // It has been this way since "Stabilize transports and correct
-                // minimap orientation", so north-up is a correction rather than
-                // a default someone picked - which is why this stays until the
-                // rotated map has been looked at on screen. Retail remembers
-                // the choice, so this is a difference from it, not a copy.
-                //
-                // The toggle in the minimap's own menu still works; it is
-                // session-only, and now says so by leaving the setting where
-                // the panel and the file can see it.
-                settingsPanel_.minimapRotate_ = false;
-                settingsPanel_.pendingMinimapRotate = false;
+                // Honoured since 2026-09-06. It was read and dropped before,
+                // every run starting north-up, until the rotated map had been
+                // looked at on screen; the minimap's own menu had been turning
+                // it within a session all along, and the row now saves it.
+                const bool rotate = (std::stoi(val) != 0);
+                settingsPanel_.minimapRotate_ = rotate;
+                settingsPanel_.pendingMinimapRotate = rotate;
             } else if (key == "minimap_square") {
                 int v = std::stoi(val);
                 settingsPanel_.minimapSquare_ = (v != 0);
@@ -1978,6 +1972,8 @@ void GameScreen::loadSettings() {
                 settingsPanel_.nameplateScale_ = std::clamp(std::stof(val), 0.5f, 2.0f);
             } else if (key == "show_friendly_nameplates") {
                 settingsPanel_.showFriendlyNameplates_ = (std::stoi(val) != 0);
+            } else if (key == "show_enemy_nameplates") {
+                settingsPanel_.showEnemyNameplates_ = (std::stoi(val) != 0);
             } else if (key == "show_action_bar2") {
                 settingsPanel_.pendingShowActionBar2 = (std::stoi(val) != 0);
             } else if (key == "action_bar2_offset_x") {

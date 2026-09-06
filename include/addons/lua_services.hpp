@@ -203,18 +203,6 @@ struct LuaServices {
     /// the one that survives either way, being its own zone.
     std::function<bool()> isOnOutdoorPvpObjective;
 
-    /// Nameplates over hostile and neutral units, for nameplateShowEnemies.
-    ///
-    /// There is no counterpart for nameplateShowFriends: this client always
-    /// draws player names and has no switch for them, so that CVar is stored
-    /// and answered but changes nothing.
-    std::function<bool()> getNameplatesShown;
-    std::function<void(bool)> setNameplatesShown;
-
-    /// Whether the minimap turns with the camera, for rotateMinimap.
-    std::function<bool()> getMinimapRotate;
-    std::function<void(bool)> setMinimapRotate;
-
     /// Whether looking up drags the view down, for mouseInvertPitch.
     ///
     /// There is deliberately no counterpart for mouseSpeed, which sits beside

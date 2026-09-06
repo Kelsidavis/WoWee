@@ -265,6 +265,7 @@ public:
     // ---- Config toggles (read by GameScreen rendering, edited by Interface tab) ----
     float nameplateScale_ = 1.0f; // Scale multiplier for nameplate bar dimensions
     bool showFriendlyNameplates_ = true;  // Shift+V toggles friendly player nameplates
+    bool showEnemyNameplates_ = true;     // V toggles nameplates over hostile and neutral units
     bool showDPSMeter_ = false;
     bool showCooldownTracker_ = false;
     bool showRareTracker_ = false;  // Mark nearby spawned rares/rare-elites on both maps

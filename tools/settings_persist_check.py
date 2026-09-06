@@ -49,8 +49,21 @@ EXPECTED = {
 }
 
 
+# A row, from its key to its closing brace. Rows on the game's own store -
+# "cvar:", "click:" and "lua:" in their store field - have no field of this
+# client's and are not the file's to keep; see SettingDesc::store.
+SCHEMA_ROW_TEXT = re.compile(
+    r'\{(?:\.\w+\s*=\s*)?"([a-z0-9]+)",\s*(?:\.\w+\s*=\s*)?"[^"]*",\s*(?:\.\w+\s*=\s*)?SettingKind::.*?\},\n',
+    re.S)
+STORED = re.compile(r'"(cvar|click|lua):')
+
+
+def field_backed_keys(text):
+    return [m.group(1) for m in SCHEMA_ROW_TEXT.finditer(text) if not STORED.search(m.group(0))]
+
+
 def schema_keys(text):
-    return re.findall(r'\{(?:\.\w+\s*=\s*)?"([a-z0-9]+)",\s*(?:\.\w+\s*=\s*)?"[^"]*",\s*(?:\.\w+\s*=\s*)?SettingKind::', text)
+    return field_backed_keys(text)
 
 
 def bindings(text):

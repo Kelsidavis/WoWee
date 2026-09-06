@@ -64,8 +64,17 @@ CONFIG_ROOT = ROOT / "logs/settings_restart_config"
 # the walk reaches them like any other, and a value set by name first would
 # only be one the walk had since moved on from.
 SCHEMA_LUA = r"""
+-- Not the rows the server keeps - the cloak and the helm, on a "lua:" store -
+-- which this runner has no server to keep them with.
+local function rows()
+  local out = {}
+  for _, r in ipairs(WoweeSettingList()) do
+    if not tostring(r.store or ""):find("^lua:") then out[#out+1] = r end
+  end
+  return out
+end
 local moved = {}
-for _, r in ipairs(WoweeSettingList()) do
+for _, r in ipairs(rows()) do
   local now = tonumber(WoweeGetSetting(r.key))
   local want
   if r.kind == "bool" then
@@ -84,7 +93,7 @@ end
 -- went past. Choosing a quality preset sets nine other settings, and changing
 -- any of those moves the preset to Custom - so graphicspreset was recorded as
 -- Low and was Custom by the end, through no fault of the saving.
-for _, r in ipairs(WoweeSettingList()) do
+for _, r in ipairs(rows()) do
   moved[#moved+1] = r.key .. "=" .. tostring(WoweeGetSetting(r.key))
 end
 """
@@ -93,7 +102,8 @@ FIRST = (SCHEMA_LUA +
          'error("QQ" .. "BEFORE " .. table.concat(moved, " "))')
 SECOND = ('local out = {} '
           'for _, r in ipairs(WoweeSettingList()) do '
-          'out[#out+1] = r.key .. "=" .. tostring(WoweeGetSetting(r.key)) end '
+          'if not tostring(r.store or ""):find("^lua:") then '
+          'out[#out+1] = r.key .. "=" .. tostring(WoweeGetSetting(r.key)) end end '
           'error("QQ" .. "RESTART " .. table.concat(out, " "))')
 
 

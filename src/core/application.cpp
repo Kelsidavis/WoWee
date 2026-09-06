@@ -474,6 +474,7 @@ bool Application::initialize() {
             std::size_t count = 0;
             const auto* schema = ui::clientSettingsSchema(count);
             for (std::size_t i = 0; i < count; ++i) {
+                if (schema[i].store[0] != '\0') continue;  // answered by the game's own store
                 if (luaSvc.getClientSetting(schema[i].key).empty()) {
                     LOG_WARNING("Setting '", schema[i].key, "' (", schema[i].label,
                                 ") is in the schema but nothing answers it - its "
@@ -631,12 +632,6 @@ bool Application::initialize() {
         luaSvc.takeScreenshot = [uim = uiManager.get()]() {
             if (uim) uim->getGameScreen().takeScreenshot();
         };
-        luaSvc.getNameplatesShown = [uim = uiManager.get()]() -> bool {
-            return uim ? uim->getGameScreen().getShowNameplates() : true;
-        };
-        luaSvc.setNameplatesShown = [uim = uiManager.get()](bool shown) {
-            if (uim) uim->getGameScreen().setShowNameplates(shown);
-        };
         luaSvc.getBarberStyleInfo = [uim = uiManager.get(), gh = gameHandler.get()](
                 int selector, std::string& name, bool& isCurrent) -> bool {
             if (!uim || !gh) return false;
@@ -661,13 +656,6 @@ bool Application::initialize() {
         };
         luaSvc.isPlayerIndoors = [r = renderer.get()]() -> bool {
             return r && r->isPlayerIndoors();
-        };
-        luaSvc.getMinimapRotate = [r = renderer.get()]() -> bool {
-            auto* mm = r ? r->getMinimap() : nullptr;
-            return mm && mm->isRotateWithCamera();
-        };
-        luaSvc.setMinimapRotate = [r = renderer.get()](bool rotate) {
-            if (auto* mm = r ? r->getMinimap() : nullptr) mm->setRotateWithCamera(rotate);
         };
         luaSvc.getFullscreen = [uim = uiManager.get()]() -> bool {
             return uim ? uim->getGameScreen().getFullscreen() : false;

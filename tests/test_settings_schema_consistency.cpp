@@ -339,8 +339,9 @@ TEST_CASE("every panel the client offers still has settings on it", "[settings][
     for (const auto& d : schema()) present.insert(d.category);
 
     for (const char* category : {"Graphics", "Detail", "Grass", "Upscaling", "Display",
-                                 "Camera", "Interface", "Minimap", "Action Bars",
-                                 "Combat & HUD", "Sound", "Sound Effects", "Chat", "Gameplay"}) {
+                                 "Camera", "Interface", "Minimap", "Action Bars", "HUD",
+                                 "Combat", "Names", "Combat Text", "Unit Frames",
+                                 "Sound", "Sound Effects", "Chat", "Gameplay"}) {
         INFO("no setting names the category " << category
              << " any more, so that panel is empty or gone");
         CHECK(present.count(category) == 1);
@@ -355,6 +356,6 @@ TEST_CASE("every panel the client offers still has settings on it", "[settings][
     // to carry moved here: Graphics was already using most of its two
     // columns, so the ones describing how much of the world is drawn went to
     // a Detail page of their own.
-    INFO("the schema names " << present.size() << " categories where fourteen are expected");
-    CHECK(present.size() == 14);
+    INFO("the schema names " << present.size() << " categories where eighteen are expected");
+    CHECK(present.size() == 18);
 }

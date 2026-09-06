@@ -2,6 +2,7 @@
 // Extracted from lua_engine.cpp as part of §5.1 (Tame LuaEngine).
 #include "game/item_text.hpp"
 #include "addons/lua_api_helpers.hpp"
+#include "addons/lua_api_registrations.hpp"
 // For fireEvent: paging has to reach the frames as well as the addons.
 #include "addons/lua_engine.hpp"
 #include "game/inventory_slots.hpp"
@@ -1451,6 +1452,13 @@ static int lua_SetModifiedClick(lua_State* L) {
     lua_pushstring(L, binding);
     lua_setfield(L, -2, act.c_str());
     lua_pop(L, 1);
+    // And the store, so it comes back next time. Bindings.xml rewrites the
+    // table with its defaults at every load, and SaveBindings writes keys,
+    // not clicks: nothing else kept the self-cast, focus-cast and auto-loot
+    // keys past the session they were set in.
+    std::string stored = "modifiedclick_" + act;
+    for (char& c : stored) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    setStoredCVar(stored, binding);
     return 0;
 }
 

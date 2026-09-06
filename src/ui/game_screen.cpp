@@ -632,7 +632,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
     // ---- New UI elements ----
     auto spellIconFn = [this](uint32_t id, pipeline::AssetManager* am) { return getSpellIcon(id, am); };
     combatUI_.renderCooldownTracker(gameHandler, settingsPanel_, spellIconFn);
-    renderNameplates(gameHandler);  // player names always shown; NPC plates gated by showNameplates_
+    renderNameplates(gameHandler);  // player names always shown; NPC plates gated by the enemyplates row
     combatUI_.playSoundsForNewChat(gameHandler);
     // Blizzard_CombatText draws its own once it is loaded, which happens the
     // moment the player touches the float-mode dropdown in the interface
@@ -1654,7 +1654,7 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 if (ImGui::GetIO().KeyShift)
                     settingsPanel_.showFriendlyNameplates_ = !settingsPanel_.showFriendlyNameplates_;
                 else
-                    showNameplates_ = !showNameplates_;
+                    settingsPanel_.showEnemyNameplates_ = !settingsPanel_.showEnemyNameplates_;
             }
 
             if (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_WORLD_MAP)) {

@@ -88,8 +88,16 @@ void SettingsPanel::renderSettingsInterfaceTab(const std::function<void()>& save
     }
 
     ImGui::Spacing();
-    ImGui::SeparatorText("Combat & HUD");
-    drawSchemaCategory("Combat & HUD", saveCallback);
+    ImGui::SeparatorText("HUD");
+    drawSchemaCategory("HUD", saveCallback);
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("Names");
+    drawSchemaCategory("Names", saveCallback);
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("Combat");
+    drawSchemaCategory("Combat", saveCallback);
 
     ImGui::EndChild();
 }
@@ -655,6 +663,9 @@ void SettingsPanel::drawSchemaCategory(const char* category,
     for (std::size_t i = 0; i < count; ++i) {
         const auto& d = schema[i];
         if (std::string(d.category) != category) continue;
+        // A row on the game's own store is the interface's to show; this
+        // window has no CVar to read and is not on screen while it is.
+        if (d.store[0] != '\0') continue;
         if (d.section[0] != '\0' && d.section != heading) {
             heading = d.section;
             ImGui::SeparatorText(d.section);
@@ -741,6 +752,7 @@ void SettingsPanel::restoreSchemaDefaults(const char* category) {
     for (std::size_t i = 0; i < count; ++i) {
         const auto& d = schema[i];
         if (category && std::string(d.category) != category) continue;
+        if (d.store[0] != '\0') continue;
         setSettingValue(d.key, settingNumberText(d.defaultValue));
     }
 }
@@ -796,7 +808,7 @@ constexpr const char* kGraphicsApplyKeys[] = {
     "groundclutter", "grassenabled", "grassdensity", "grassheight",
     "grassdistance", "waterrefraction", "upscaling", "fsrquality",
     "fsrsharpness", "framegen", "brightness", "uiopacity", "minimapsquare",
-    "minimapnpcdots", "minimapclock", "minimapcoords", "latencymeter",
+    "minimapnpcdots", "minimapclock", "minimapcoords", "minimaprotate", "latencymeter",
     "fogskyblend", "fogstrength", "sharpstars",
     // Moved off the game's own Effects panel, so this list is now what
     // applies them at startup; the cvar store used to do it.
@@ -934,6 +946,7 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "mousespeed",     .asFloat = &SettingsPanel::pendingMouseSensitivity},
     {.key = "minimapclock",   .asBool  = &SettingsPanel::pendingShowMinimapClock},
     {.key = "friendlyplates", .asBool  = &SettingsPanel::showFriendlyNameplates_},
+    {.key = "enemyplates",    .asBool  = &SettingsPanel::showEnemyNameplates_},
     {.key = "grassenabled",   .asBool  = &SettingsPanel::pendingGrassEnabled},
     {.key = "grassdensity",   .asInt   = &SettingsPanel::pendingGrassDensity},
     {.key = "grassheight",    .asInt   = &SettingsPanel::pendingGrassHeight},
@@ -1012,6 +1025,7 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "minimapsquare",  .asBool = &SettingsPanel::pendingMinimapSquare},
     {.key = "minimapnpcdots", .asBool = &SettingsPanel::pendingMinimapNpcDots},
     {.key = "minimapcoords",  .asBool = &SettingsPanel::pendingShowMinimapCoordinates},
+    {.key = "minimaprotate",  .asBool  = &SettingsPanel::pendingMinimapRotate},
 
     // --- Action bars ---
     {.key = "actionbarscale",  .asFloat = &SettingsPanel::pendingActionBarScale},
@@ -1217,6 +1231,11 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
         if (cameraController) cameraController->setIdleOrbitEnabled(pendingIdleCameraOrbit);
     } else if (key == "uiopacity") {
         uiOpacity_ = static_cast<float>(pendingUiOpacity) / 100.0f;
+    } else if (key == "minimaprotate") {
+        minimapRotate_ = pendingMinimapRotate;
+        if (renderer) {
+            if (auto* mm = renderer->getMinimap()) mm->setRotateWithCamera(pendingMinimapRotate);
+        }
     } else if (key == "minimapsquare") {
         minimapSquare_ = pendingMinimapSquare;
         if (renderer) {

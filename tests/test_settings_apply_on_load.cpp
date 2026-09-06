@@ -558,6 +558,9 @@ TEST_CASE("every setting in the schema can be set", "[settings]") {
     const wowee::ui::SettingDesc* rows = wowee::ui::clientSettingsSchema(count);
     REQUIRE(count > 0);
     for (std::size_t i = 0; i < count; ++i) {
+        // A row on the game's own store is set through that store, not
+        // through setSettingValue; see SettingDesc::store.
+        if (rows[i].store[0] != '\0') continue;
         INFO(rows[i].key << " is offered by the schema and setSettingValue has"
                             " nowhere to put it - the control answers false");
         CHECK(reachable.count(rows[i].key) == 1);

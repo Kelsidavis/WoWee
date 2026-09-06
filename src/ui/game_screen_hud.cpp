@@ -965,7 +965,7 @@ void GameScreen::renderNameplates(game::GameHandler& gameHandler) {
         // The current target ALWAYS gets a nameplate so it's clear what is
         // selected even with nameplates toggled off.
         if (isPlayer && !isHostile && !settingsPanel_.showFriendlyNameplates_ && !isTarget) continue;
-        if ((!isPlayer || isHostile) && !showNameplates_ && !isTarget) continue;
+        if ((!isPlayer || isHostile) && !settingsPanel_.showEnemyNameplates_ && !isTarget) continue;
 
         // Totems answer to their own two settings on top of the above, which
         // is how the real client has it: the defaults show an enemy's totems

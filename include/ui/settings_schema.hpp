@@ -82,6 +82,27 @@ struct SettingDesc {
     /// anti-aliasing dropdown while FSR 3 was doing its own - controls that
     /// answer, save, and change nothing.
     const char* enabledWhen = "";
+    /// Where the value lives, when it is not a field of this client's own.
+    ///
+    /// "" is a field of SettingsPanel or ChatSettings, reached through the
+    /// binding tables and saved in settings.cfg. The rest are the game's own
+    /// stores: the rows that came off FrameXML's Interface pages read and
+    /// write them exactly as the controls there did, so the interface sees
+    /// the same CVar and the same CVAR_UPDATE it always has.
+    ///
+    ///   "cvar:NAME"     the CVar store, through GetCVar and SetCVar
+    ///   "click:ACTION"  a modified click - GetModifiedClick and SetModifiedClick
+    ///   "lua:GET|SET"   two globals: GET() answers it and SET(v) applies it.
+    ///                   The cloak and the helm, which the server keeps.
+    const char* store = "";
+    /// Enum rows on a store: what each choice is kept as, '|'-separated in
+    /// the order of `choices`. "" keeps the index, as a field does. Blizzard's
+    /// dropdowns kept words - "none", "ALT" - and the interface reads those.
+    const char* values = "";
+    /// Lua run after a store is written, with the new value in `v`: what the
+    /// game's own control did beyond writing its CVar - the global the
+    /// interface reads, and the refresh that made the change show.
+    const char* after = "";
 };
 
 /// Whether `enabledWhen` is satisfied, given a way to read the other setting.

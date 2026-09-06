@@ -1246,6 +1246,11 @@ constexpr ClientCVarBinding kClientCVars[] = {
     // The bubbles are drawn by this client, so both boxes are its own.
     {"chatbubbles",          "chatbubbles"},
     {"chatbubblesparty",     "chatbubblesparty"},
+    // Both owned by the client and turned by a key or a menu as well as by
+    // the row - which is why each has a field, and why the field is what
+    // the CVar answers from.
+    {"nameplateshowenemies", "enemyplates"},
+    {"rotateminimap",        "minimaprotate"},
 };
 // NOLINTEND(modernize-use-designated-initializers)
 
@@ -1294,21 +1299,11 @@ static int lua_GetCVar(lua_State* L) {
     // drawn, and invisible.
     std::string n(name);
     toLowerInPlace(n);
-    // Asked of the client before the store, for the two settings it also owns.
-    // The V key toggles nameplates and the settings panel turns the minimap,
-    // neither of which goes through SetCVar; answering from the store would
-    // report whatever the interface last wrote, which by then is a guess.
-    if (n == "nameplateshowenemies") {
-        if (auto* svc = getLuaServices(L); svc && svc->getNameplatesShown) {
-            lua_pushstring(L, svc->getNameplatesShown() ? "1" : "0");
-            return 1;
-        }
-    } else if (n == "rotateminimap") {
-        if (auto* svc = getLuaServices(L); svc && svc->getMinimapRotate) {
-            lua_pushstring(L, svc->getMinimapRotate() ? "1" : "0");
-            return 1;
-        }
-    } else if (n == "gxwindow") {
+    // Asked of the client before the store, for the settings it owns outright.
+    // Enemy nameplates and the minimap's rotation used to be here too - the V
+    // key and the minimap's menu turn them without SetCVar - and are rows
+    // bound in kClientCVars now, which answers from the row the same way.
+    if (n == "gxwindow") {
         // The schema's fullscreen row the other way round: 1 is windowed. The
         // Windowed box on the Resolution page is retired for that row, and
         // RestartGx reads this on Okay - so it has to be the window's live
@@ -1700,16 +1695,24 @@ static void applyCVarSideEffects(lua_State* L, const std::string& key,
         applySoundCVars(L);
     }
     else if (key.rfind("sound_", 0) == 0) applySoundCVars(L);
-    // The two other CVars this client can act on. "0" is the only false value
-    // a CVar carries - and it arrives as a string, which in Lua would be true.
-    else if (key == "nameplateshowenemies") {
-        if (auto* svc = getLuaServices(L); svc && svc->setNameplatesShown)
-            svc->setNameplatesShown(value != "0");
-    } else if (key == "rotateminimap") {
-        if (auto* svc = getLuaServices(L); svc && svc->setMinimapRotate)
-            svc->setMinimapRotate(value != "0");
-    } else if (key == "autoselfcast") {
+    // The one other CVar this client acts on. "0" is the only false value a
+    // CVar carries - and it arrives as a string, which in Lua would be true.
+    else if (key == "autoselfcast") {
         if (auto* gh = getGameHandler(L)) gh->setAutoSelfCast(value != "0");
+    }
+    // A modified click, kept in the store so it survives a restart. The Lua
+    // table the click handlers read is written here as well, both when the
+    // store is replayed at start-up - after Bindings.xml has put the defaults
+    // in it - and when an addon writes the CVar itself.
+    else if (key.rfind("modifiedclick_", 0) == 0) {
+        std::string action = key.substr(14);
+        for (char& c : action) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        lua_getglobal(L, "__WoweeModifiedClick");
+        if (lua_istable(L, -1)) {
+            lua_pushstring(L, value.c_str());
+            lua_setfield(L, -2, action.c_str());
+        }
+        lua_pop(L, 1);
     }
 }
 
@@ -4649,6 +4652,7 @@ static int lua_WoweeSettingList(lua_State* L) {
         lua_pushstring(L, d.choices);  lua_setfield(L, -2, "choices");
         lua_pushnumber(L, d.defaultValue); lua_setfield(L, -2, "default");
         lua_pushstring(L, d.enabledWhen);  lua_setfield(L, -2, "enabledwhen");
+        lua_pushstring(L, d.store);        lua_setfield(L, -2, "store");
         lua_rawseti(L, -2, static_cast<int>(i) + 1);
     }
     return 1;
@@ -4675,10 +4679,126 @@ static int lua_WoweeOpenURL(lua_State* L) {
     return 1;
 }
 
+// The schema row behind a key, or nullptr.
+static const ui::SettingDesc* schemaRow(const std::string& key) {
+    std::size_t count = 0;
+    const auto* schema = ui::clientSettingsSchema(count);
+    for (std::size_t i = 0; i < count; ++i) {
+        if (key == schema[i].key) return &schema[i];
+    }
+    return nullptr;
+}
+
+static std::vector<std::string> splitBar(const char* text) {
+    std::vector<std::string> out;
+    std::string all = text ? text : "";
+    for (std::size_t at = 0; ; ) {
+        const std::size_t bar = all.find('|', at);
+        out.push_back(all.substr(at, bar == std::string::npos ? bar : bar - at));
+        if (bar == std::string::npos) break;
+        at = bar + 1;
+    }
+    return out;
+}
+
+// One Lua global called with the arguments already pushed, its one result
+// left as a string. Empty when the global is not a function or raised.
+static std::string callGlobal(lua_State* L, const char* name, int nargs) {
+    // The function has to sit under its arguments.
+    lua_getglobal(L, name);
+    if (!lua_isfunction(L, -1)) {
+        lua_pop(L, 1 + nargs);
+        return {};
+    }
+    lua_insert(L, -(nargs + 1));
+    std::string out;
+    if (lua_pcall(L, nargs, 1, 0) == 0) {
+        if (lua_isboolean(L, -1)) out = lua_toboolean(L, -1) ? "1" : "0";
+        else if (const char* text = lua_tostring(L, -1)) out = text;
+    } else {
+        LOG_WARNING("Setting store: ", name, " raised: ",
+                    lua_tostring(L, -1) ? lua_tostring(L, -1) : "?");
+    }
+    lua_pop(L, 1);
+    return out;
+}
+
+// A row on a store - see SettingDesc::store - read in the units its control
+// shows: the index of its choice for an enum with `values`, the raw text
+// otherwise. What the game's own control read.
+static std::string readStoredSetting(lua_State* L, const ui::SettingDesc& row) {
+    const std::string store = row.store;
+    std::string raw;
+    if (store.rfind("cvar:", 0) == 0) {
+        lua_pushstring(L, store.c_str() + 5);
+        raw = callGlobal(L, "GetCVar", 1);
+    } else if (store.rfind("click:", 0) == 0) {
+        lua_pushstring(L, store.c_str() + 6);
+        raw = callGlobal(L, "GetModifiedClick", 1);
+    } else if (store.rfind("lua:", 0) == 0) {
+        const std::string spec = store.substr(4);
+        raw = callGlobal(L, spec.substr(0, spec.find('|')).c_str(), 0);
+    }
+    if (row.values[0] == '\0') return raw;
+    const auto values = splitBar(row.values);
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        if (values[i] == raw) return std::to_string(i);
+    }
+    return ui::settingNumberText(row.defaultValue);
+}
+
+// And written, the way the control wrote it: the CVar, then the global the
+// interface reads and the refresh that shows it, from `after` with the new
+// value in `v`.
+static void writeStoredSetting(lua_State* L, const ui::SettingDesc& row, const std::string& value) {
+    std::string stored = value;
+    if (row.values[0] != '\0') {
+        const auto values = splitBar(row.values);
+        const int last = static_cast<int>(values.size()) - 1;
+        const int index = std::clamp(static_cast<int>(std::atof(value.c_str()) + 0.5), 0, last);
+        stored = values[static_cast<std::size_t>(index)];
+    }
+    const std::string store = row.store;
+    if (store.rfind("cvar:", 0) == 0) {
+        lua_pushstring(L, store.c_str() + 5);
+        lua_pushstring(L, stored.c_str());
+        callGlobal(L, "SetCVar", 2);
+    } else if (store.rfind("click:", 0) == 0) {
+        lua_pushstring(L, store.c_str() + 6);
+        lua_pushstring(L, stored.c_str());
+        callGlobal(L, "SetModifiedClick", 2);
+    } else if (store.rfind("lua:", 0) == 0) {
+        const std::string spec = store.substr(4);
+        const std::size_t bar = spec.find('|');
+        if (bar != std::string::npos) {
+            lua_pushboolean(L, stored != "0" ? 1 : 0);
+            callGlobal(L, spec.substr(bar + 1).c_str(), 1);
+        }
+    }
+    if (row.after[0] == '\0') return;
+    std::string quoted = "\"";
+    for (char c : stored) {
+        if (c == '\\' || c == '"') quoted += '\\';
+        quoted += c;
+    }
+    quoted += '"';
+    const std::string chunk = "local v = " + quoted + "\n" + row.after;
+    if (luaL_loadstring(L, chunk.c_str()) != 0 || lua_pcall(L, 0, 0, 0) != 0) {
+        LOG_WARNING("Setting '", row.key, "': after-write Lua failed: ",
+                    lua_tostring(L, -1) ? lua_tostring(L, -1) : "?");
+        lua_pop(L, 1);
+    }
+}
+
 // WoweeGetSetting(key) / WoweeSetSetting(key, value) - the values behind that
-// list. Strings both ways, as a CVar is.
+// list. Strings both ways, as a CVar is. A row on a store is answered from
+// the store; the rest from the client's own fields.
 static int lua_WoweeGetSetting(lua_State* L) {
     const char* key = luaL_checkstring(L, 1);
+    if (const auto* row = schemaRow(key); row && row->store[0] != '\0') {
+        lua_pushstring(L, readStoredSetting(L, *row).c_str());
+        return 1;
+    }
     auto* svc = getLuaServices(L);
     if (svc && svc->getClientSetting) {
         lua_pushstring(L, svc->getClientSetting(key).c_str());
@@ -4693,6 +4813,10 @@ static int lua_WoweeSetSetting(lua_State* L) {
     if (lua_isboolean(L, 2)) value = lua_toboolean(L, 2) ? "1" : "0";
     else if (lua_isstring(L, 2) || lua_isnumber(L, 2)) value = lua_tostring(L, 2);
     else value = "0";
+    if (const auto* row = schemaRow(key); row && row->store[0] != '\0') {
+        writeStoredSetting(L, *row, value);
+        return 0;
+    }
     if (auto* svc = getLuaServices(L); svc && svc->setClientSetting) {
         svc->setClientSetting(key, value);
     }

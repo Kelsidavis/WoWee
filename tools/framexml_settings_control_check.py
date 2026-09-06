@@ -113,8 +113,20 @@ local cvarsReached = 0
 local bad, checked, controls, written = {}, 0, 0, 0
 local rows = {}
 for _, r in ipairs(WoweeSettingList()) do rows[r.key] = r end
+-- Every row but the ones the server keeps - the cloak and the helm, on a
+-- "lua:" store - which this runner has no server to keep them with. Their
+-- controls are still built; what they show is whatever no character answers.
+local serverKept = 0
+local function schemaRows()
+  local out = {}
+  for _, r in ipairs(WoweeSettingList()) do
+    if tostring(r.store or ""):find("^lua:") then serverKept = serverKept + 1
+    else out[#out+1] = r end
+  end
+  return out
+end
 
-for _, r in ipairs(WoweeSettingList()) do
+for _, r in ipairs(schemaRows()) do
   local base = panelOf(r.category)
   local panel, ctrl = _G[base], _G[base .. r.key]
   if not panel then
@@ -217,7 +229,7 @@ end
 local restored = 0
 do
   local away = {}
-  for _, r in ipairs(WoweeSettingList()) do
+  for _, r in ipairs(schemaRows()) do
     local off
     if r.kind == "bool" then off = (tostring(r.default) == "1") and "0" or "1"
     elseif r.kind == "enum" then off = tostring((tonumber(r.default) == 0) and 1 or 0)
@@ -227,7 +239,7 @@ do
   end
 
   local pressed = {}
-  for _, r in ipairs(WoweeSettingList()) do
+  for _, r in ipairs(schemaRows()) do
     local base = panelOf(r.category)
     if not pressed[base] then
       pressed[base] = true
@@ -236,7 +248,7 @@ do
     end
   end
 
-  for _, r in ipairs(WoweeSettingList()) do
+  for _, r in ipairs(schemaRows()) do
     local now, want = WoweeGetSetting(r.key), tostring(r.default)
     local same = (tonumber(now) and tonumber(want)
                   and math.abs(tonumber(now) - tonumber(want)) <= 0.001) or now == want
@@ -253,7 +265,7 @@ end
 -- before changing anything or it is asking Cancel to undo a change it never
 -- saw.
 local cancelled = 0
-for _, r in ipairs(WoweeSettingList()) do
+for _, r in ipairs(schemaRows()) do
   local base = panelOf(r.category)
   local panel, ctrl = _G[base], _G[base .. r.key]
   if panel and ctrl and r.kind == "bool" and ctrl.Click and panel.cancel then
@@ -289,7 +301,7 @@ do
     return realAdd(info, level)
   end
 
-  for _, r in ipairs(WoweeSettingList()) do
+  for _, r in ipairs(schemaRows()) do
     if r.kind == "enum" then
       local dd = _G[panelOf(r.category) .. r.key]
       if dd and dd.initialize then
@@ -453,7 +465,7 @@ end
 -- afterwards has nothing to undo: without that, accepting a change and then
 -- cancelling anything later would put the accepted change back.
 local committed = 0
-for _, r in ipairs(WoweeSettingList()) do
+for _, r in ipairs(schemaRows()) do
   local base = panelOf(r.category)
   local panel, ctrl = _G[base], _G[base .. r.key]
   if panel and ctrl and r.kind == "bool" and ctrl.Click and panel.okay and panel.cancel then
@@ -477,7 +489,7 @@ end
 -- is what these panels and any addon calling WoweeSetSetting go through, took
 -- whatever it was handed.
 local bounded = 0
-for _, r in ipairs(WoweeSettingList()) do
+for _, r in ipairs(schemaRows()) do
   if r.kind ~= "bool" then
     local before = WoweeGetSetting(r.key)
     for _, probe in ipairs({{r.max + 1000, r.max}, {r.min - 1000, r.min}}) do

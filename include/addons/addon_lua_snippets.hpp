@@ -665,7 +665,6 @@ WOWEE_SETTINGS_ELSEWHERE = {
     -- pages, with the switches that used to sit beside them. Interface is
     -- gone the same way - mouse sensitivity, the minimap clock and friendly
     -- nameplates are rows on Camera, Minimap and Combat & HUD.
-    { panel = "Interface, Social", names = { "chat timestamps" } },
     { panel = "Key Bindings",      names = { "every key" } },
 }
 
@@ -1252,6 +1251,25 @@ local kRemovedCategories = {
     "InterfaceOptionsMousePanel",
     "InterfaceOptionsCameraPanel",
     "InterfaceOptionsActionBarsPanel",
+    -- And the rest of the game's Interface pages, since 2026-09-06. Every
+    -- control on them that this client or its FrameXML reads is a row in
+    -- the schema, on the same CVar it always wrote - see SettingDesc::store
+    -- - so the list is one set of pages in one voice. Two controls did not
+    -- come across: the movable world map, which this client's own map does
+    -- not read, and the locale list, which had one entry.
+    "InterfaceOptionsControlsPanel",
+    "InterfaceOptionsCombatPanel",
+    "InterfaceOptionsDisplayPanel",
+    "InterfaceOptionsObjectivesPanel",
+    "InterfaceOptionsSocialPanel",
+    "InterfaceOptionsNamesPanel",
+    "InterfaceOptionsCombatTextPanel",
+    "InterfaceOptionsStatusTextPanel",
+    "InterfaceOptionsUnitFramePanel",
+    "InterfaceOptionsBuffsPanel",
+    "InterfaceOptionsFeaturesPanel",
+    "InterfaceOptionsHelpPanel",
+    "InterfaceOptionsLanguagesPanel",
 }
 
 local removed = {}
@@ -1369,6 +1387,27 @@ for _, frameName in ipairs({ "AudioOptionsFrameCategoryFrame", "VideoOptionsFram
     local catFrame = _G[frameName]
     if catFrame and OptionsCategoryFrame_Update then
         OptionsCategoryFrame_Update(catFrame)
+    end
+end
+
+-- The Interface frame opens to Controls by name when nothing was open, and
+-- Controls is retired: it would show a page the list no longer offers, every
+-- box on it live. Sent to the root panel instead, whichever retired page is
+-- asked for.
+if type(InterfaceOptionsFrame_OpenToCategory) == "function" then
+    local retired = {}
+    for _, name in ipairs(kRemovedCategories) do
+        local p = _G[name]
+        if p then
+            retired[p] = true
+            if p.name then retired[p.name] = true end
+        end
+    end
+    local open = InterfaceOptionsFrame_OpenToCategory
+    InterfaceOptionsFrame_OpenToCategory = function(panel, ...)
+        local root = rawget(_G, "WoweeOptionsRoot")
+        if retired[panel] and root then panel = root end
+        return open(panel, ...)
     end
 end
 

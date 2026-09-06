@@ -288,6 +288,17 @@ constexpr SettingDesc kSchema[] = {
      "Push the mouse forward to look up, as in a flight sim.", "", 0},
 
     // --------------------------------------------------------------- Interface
+    //
+    // From here to Gameplay, the rows on a store - see SettingDesc::store -
+    // came off the game's own Interface pages on 2026-09-06: Controls,
+    // Combat, Display, Objectives, Social, Names, Combat Text, Status Text,
+    // Unit Frames, Buffs, Features and Help. Those pages are retired, and
+    // every control on them that this client or its FrameXML reads is a row
+    // here, written exactly as the control wrote it: the same CVar, the
+    // global the interface reads in `after`, and the refresh that made it
+    // show. The rows without a store are this client's own and were here
+    // before. Not carried over: the movable world map, which this client's
+    // own map does not read, and the locale list, which has one entry.
     {"uiopacity", "Window opacity", SettingKind::Int, 20, 100, 5, "Interface", "Windows",
      "How solid this client's own windows are: settings, meters and\n"
      "the like. 100 is opaque.", "", 65},
@@ -309,13 +320,41 @@ constexpr SettingDesc kSchema[] = {
      "Open each bag in its own window, rather than all in one.", "", 1},
     {"showkeyring", "Show keyring", SettingKind::Bool, 0, 0, 0, "Interface", "",
      "Show the key ring button beside the bags.", "", 1},
+    {"freebagslots", "Free space on the backpack", SettingKind::Bool, 0, 0, 0, "Interface", "",
+     "Count the empty slots across all your bags on the backpack button.",
+     "", 0, "", "cvar:displayFreeBagSlots"},
+
+    {"enhancedtooltips", "Enhanced tooltips", SettingKind::Bool, 0, 0, 0, "Interface", "Tooltips",
+     "Fuller tooltips on abilities: what one does in words, not only\n"
+     "its numbers.", "", 1, "", "cvar:UberTooltips"},
+    {"beginnertips", "Beginner tips", SettingKind::Bool, 0, 0, 0, "Interface", "",
+     "Explain the basics in tooltips - what each part of the interface\n"
+     "is for. Worth turning off once you know.", "", 1, "", "cvar:showNewbieTips",
+     "", "SHOW_NEWBIE_TIPS = v"},
+    {"colorblindmode", "Colourblind mode", SettingKind::Bool, 0, 0, 0, "Interface", "",
+     "Say a unit's reaction and an item's quality in words in tooltips,\n"
+     "rather than by colour alone, and add cues elsewhere.", "", 0,
+     "", "cvar:colorblindMode", "",
+     "ENABLE_COLORBLIND_MODE = v "
+     "if WatchFrame_Update then WatchFrame_Update() end "
+     "if IsAddOnLoaded and IsAddOnLoaded('Blizzard_AchievementUI') "
+     "and AchievementFrame_ForceUpdate then AchievementFrame_ForceUpdate() end"},
+    {"showitemlevel", "Item level in tooltips", SettingKind::Bool, 0, 0, 0, "Interface", "",
+     "Show an item's level in its tooltip.", "", 1, "", "cvar:showItemLevel"},
+
+    {"equipmentmanager", "Equipment manager", SettingKind::Bool, 0, 0, 0, "Interface", "Character sheet",
+     "Save sets of gear on the character sheet and swap between them\n"
+     "in one click.", "", 0, "", "cvar:equipmentManager"},
+    {"previewtalents", "Preview talent changes", SettingKind::Bool, 0, 0, 0, "Interface", "",
+     "Lay talent points out on the talent sheet before spending them,\n"
+     "and confirm them all at once.", "", 1, "", "cvar:previewTalents"},
 
     // ----------------------------------------------------------------- Minimap
-    // Rotate-with-camera is deliberately absent. The settings window still
-    // draws that checkbox and its handler pins it back off - the minimap is
-    // north-up in this client and the control has not worked for as long as it
-    // has existed. A tickbox that unticks itself is worse here than no tickbox
-    // at all, so this list does not offer one.
+    // Rotate-with-camera was deliberately absent until 2026-09-06: the loader
+    // dropped the saved value and every run started north-up, pending a look
+    // at the rotated map on screen. It is a row now, saved like the rest -
+    // the game's Display page that offered it is retired, and the minimap's
+    // own menu had been turning it within a session all along.
     {"minimapclock", "Clock", SettingKind::Bool, 0, 0, 0, "Minimap", "Appearance",
      "Show the time of day under the minimap.", "", 0},
     {"minimapsquare", "Square minimap", SettingKind::Bool, 0, 0, 0, "Minimap", "",
@@ -324,6 +363,9 @@ constexpr SettingDesc kSchema[] = {
      "Mark creatures near you as dots on the minimap.", "", 0},
     {"minimapcoords", "Coordinates", SettingKind::Bool, 0, 0, 0, "Minimap", "",
      "Show your map coordinates under the minimap.", "", 0},
+    {"minimaprotate", "Rotate with the camera", SettingKind::Bool, 0, 0, 0, "Minimap", "",
+     "Turn the minimap so the way you are facing is up, rather than\n"
+     "north. The minimap's own menu has this too.", "", 0},
 
     // ------------------------------------------------------------- Action Bars
     // Up to 2, not 1.5: a slot is 48 pixels times this, and the scale a
@@ -353,29 +395,246 @@ constexpr SettingDesc kSchema[] = {
     {"leftbaroffsety", "Left side bar: move up", SettingKind::Float, -400, 400, 10,
      "Action Bars", "", "Shift it up or down from the middle of the screen, in pixels.", "", 0, "showleftbar"},
 
-    // ------------------------------------------------------------ Combat & HUD
-    {"friendlyplates", "Friendly nameplates", SettingKind::Bool, 0, 0, 0,
-     "Combat & HUD", "Nameplates",
-     "Show name and health bars over friendly creatures and players too,\n"
-     "rather than over hostile ones alone.", "", 0},
-    {"nameplatescale", "Nameplate scale", SettingKind::Float, 0.5f, 2.0f, 0.05f,
-     "Combat & HUD", "", "Size of the name and health bars over creatures' heads.", "", 1},
-
-    {"dpsmeter", "Damage meter", SettingKind::Bool, 0, 0, 0, "Combat & HUD", "Trackers",
+    // --------------------------------------------------------------------- HUD
+    // Combat & HUD until 2026-09-06, when the fighting rows went to a Combat
+    // page of their own and the nameplate rows to Names, and the game's own
+    // Buffs page came here.
+    {"dpsmeter", "Damage meter", SettingKind::Bool, 0, 0, 0, "HUD", "Trackers",
      "Show your damage and healing per second above the action bar\n"
      "while you are in combat.", "", 0},
-    {"cooldowntracker", "Cooldown tracker", SettingKind::Bool, 0, 0, 0, "Combat & HUD", "",
+    {"cooldowntracker", "Cooldown tracker", SettingKind::Bool, 0, 0, 0, "HUD", "",
      "Show your longer cooldowns counting down beside the action bar.", "", 0},
-    {"raretracker", "Rare tracker", SettingKind::Bool, 0, 0, 0, "Combat & HUD", "",
+    {"raretracker", "Rare tracker", SettingKind::Bool, 0, 0, 0, "HUD", "",
      "Mark rare creatures near you on the minimap and the world map.", "", 0},
-    {"chesttracker", "Chest tracker", SettingKind::Bool, 0, 0, 0, "Combat & HUD", "",
+    {"chesttracker", "Chest tracker", SettingKind::Bool, 0, 0, 0, "HUD", "",
      "Mark treasure chests near you on the minimap.", "", 0},
 
-    {"damageflash", "Damage flash", SettingKind::Bool, 0, 0, 0, "Combat & HUD", "Screen effects",
+    {"damageflash", "Damage flash", SettingKind::Bool, 0, 0, 0, "HUD", "Screen effects",
      "Flash a red edge around the screen when you take a hit.", "", 1},
     {"lowhealthvignette", "Low health warning", SettingKind::Bool, 0, 0, 0,
-     "Combat & HUD", "", "Pulse a red edge around the screen while your health is\n"
+     "HUD", "", "Pulse a red edge around the screen while your health is\n"
      "below a fifth.", "", 1},
+    {"screenedgeflash", "Low health edge flash", SettingKind::Bool, 0, 0, 0, "HUD", "",
+     "The game's own red flash at the screen's edge while your health\n"
+     "is low - beside the warning above, which is this client's.", "", 0,
+     "", "cvar:screenEdgeFlash"},
+
+    {"buffdurations", "Time left under buffs", SettingKind::Bool, 0, 0, 0, "HUD", "Buffs",
+     "Count down the time left under each buff icon.", "", 1,
+     "", "cvar:buffDurations", "",
+     "SHOW_BUFF_DURATIONS = v if BuffFrame_UpdatePositions then BuffFrame_UpdatePositions() end"},
+    {"dispellabledebuffs", "Highlight debuffs you can remove", SettingKind::Bool, 0, 0, 0, "HUD", "",
+     "Frame the debuffs on your target that one of your spells can\n"
+     "dispel.", "", 1, "", "cvar:showDispelDebuffs", "", "SHOW_DISPELLABLE_DEBUFFS = v"},
+    {"castablebuffs", "Only buffs you can cast", SettingKind::Bool, 0, 0, 0, "HUD", "",
+     "On the target frame, show only the buffs you could cast yourself.",
+     "", 0, "", "cvar:showCastableBuffs", "", "SHOW_CASTABLE_BUFFS = v"},
+    {"castabledebuffs", "Only debuffs you cast", SettingKind::Bool, 0, 0, 0, "HUD", "",
+     "On the target frame, show only the debuffs that are yours.", "", 0,
+     "", "cvar:showCastableDebuffs", "", "SHOW_CASTABLE_DEBUFFS = v"},
+
+    // ------------------------------------------------------------------ Combat
+    // The game's Combat page, less the nameplate rows, which are on Names with
+    // the rest of the nameplates. The double-tap guard was on its ActionBars
+    // page and is read by this client's own attack handling.
+    {"assistattack", "Attack on assist", SettingKind::Bool, 0, 0, 0, "Combat", "Attacking",
+     "Start attacking when /assist hands you a hostile target.", "", 0,
+     "", "cvar:assistAttack"},
+    {"stopautoattack", "Stop attacking when the target changes", SettingKind::Bool, 0, 0, 0,
+     "Combat", "",
+     "Picking a new target ends your auto-attack rather than carrying it\n"
+     "over.", "", 0, "", "cvar:stopAutoAttackOnTargetChange"},
+    {"secureabilitytoggle", "Ignore a double tap on Attack", SettingKind::Bool, 0, 0, 0,
+     "Combat", "",
+     "A second press of Attack within half a second is ignored, so a\n"
+     "double tap cannot switch auto-attack straight back off.", "", 0},
+
+    {"autoselfcast", "Cast helpful spells on yourself", SettingKind::Bool, 0, 0, 0, "Combat", "Casting",
+     "A helpful spell cast with no friendly target goes on you, rather\n"
+     "than waiting for one.", "", 0, "", "cvar:autoSelfCast"},
+    {"selfcastkey", "Self cast key", SettingKind::Enum, 0, 3, 1, "Combat", "",
+     "Hold this while casting to put the spell on yourself, whatever is\n"
+     "targeted.", "None|Alt|Ctrl|Shift", 1, "", "click:SELFCAST", "NONE|ALT|CTRL|SHIFT"},
+    {"focuscastkey", "Focus cast key", SettingKind::Enum, 0, 3, 1, "Combat", "",
+     "Hold this while casting to put the spell on your focus target\n"
+     "instead.", "None|Alt|Ctrl|Shift", 0, "", "click:FOCUSCAST", "NONE|ALT|CTRL|SHIFT"},
+
+    {"targetoftarget", "Target of target", SettingKind::Bool, 0, 0, 0, "Combat", "Target",
+     "A small frame beside the target's, showing what it is targeting.",
+     "", 0, "", "cvar:showTargetOfTarget", "", "SHOW_TARGET_OF_TARGET = v"},
+    {"targetoftargetwhen", "Show it", SettingKind::Enum, 0, 4, 1, "Combat", "",
+     "When that frame is worth the room.",
+     "Always|In a raid|In a party|Solo|In a raid or party", 0, "targetoftarget",
+     "cvar:targetOfTargetMode", "5|1|2|3|4", "SHOW_TARGET_OF_TARGET_STATE = v"},
+    {"targetcastbar", "Cast bar on the target frame", SettingKind::Bool, 0, 0, 0, "Combat", "",
+     "Show what your target is casting under its frame.", "", 1,
+     "", "cvar:showTargetCastbar"},
+
+    // ------------------------------------------------------------------- Names
+    // The game's Names page, whole, and the nameplate rows that were on
+    // Combat & HUD. The names over heads are this client's own drawing, which
+    // picks its CVar by what the unit is; the plates are its own too.
+    {"myname", "My name", SettingKind::Bool, 0, 0, 0, "Names", "Names over heads",
+     "Your own name over your head.", "", 0, "", "cvar:UnitNameOwn"},
+    {"npcnames", "NPC names", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Names over creatures you can talk to, and over hostile ones.", "", 1,
+     "", "cvar:UnitNameNPC"},
+    {"critternames", "Critters and vanity pets", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Names over rabbits, squirrels and the pets that only follow you.",
+     "", 1, "", "cvar:UnitNameNonCombatCreatureName"},
+    {"guildnames", "Guild names", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Players' guilds under their names.", "", 1, "", "cvar:UnitNamePlayerGuild"},
+    {"playertitles", "Titles", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Players' titles with their names.", "", 1, "", "cvar:UnitNamePlayerPVPTitle"},
+    {"friendlynames", "Friendly players", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Names over players on your side.", "", 1, "", "cvar:UnitNameFriendlyPlayerName"},
+    {"friendlypetnames", "Friendly pets", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Names over their pets.", "", 1, "", "cvar:UnitNameFriendlyPetName"},
+    {"friendlyguardiannames", "Friendly guardians", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Names over their guardians - summoned helpers that fight.", "", 1,
+     "", "cvar:UnitNameFriendlyGuardianName"},
+    {"friendlytotemnames", "Friendly totems", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Names over their totems.", "", 1, "", "cvar:UnitNameFriendlyTotemName"},
+    {"enemynames", "Enemy players", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Names over players of the other faction.", "", 1, "", "cvar:UnitNameEnemyPlayerName"},
+    {"enemypetnames", "Enemy pets", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Names over their pets.", "", 1, "", "cvar:UnitNameEnemyPetName"},
+    {"enemyguardiannames", "Enemy guardians", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Names over their guardians.", "", 1, "", "cvar:UnitNameEnemyGuardianName"},
+    {"enemytotemnames", "Enemy totems", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Names over their totems.", "", 1, "", "cvar:UnitNameEnemyTotemName"},
+
+    {"friendlyplates", "Friendly nameplates", SettingKind::Bool, 0, 0, 0, "Names", "Nameplates",
+     "Name and health bars over friendly players and creatures, not\n"
+     "only hostile ones. Shift+V toggles this too.", "", 0},
+    {"friendlypetplates", "Friendly pets", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Plates over friendly pets.", "", 1, "friendlyplates", "cvar:nameplateShowFriendlyPets"},
+    {"friendlyguardianplates", "Friendly guardians", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Plates over friendly guardians.", "", 1, "friendlyplates",
+     "cvar:nameplateShowFriendlyGuardians"},
+    {"friendlytotemplates", "Friendly totems", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Plates over friendly totems.", "", 0, "friendlyplates", "cvar:nameplateShowFriendlyTotems"},
+    {"enemyplates", "Enemy nameplates", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Name and health bars over hostile players and creatures. The V\n"
+     "key toggles this too.", "", 1},
+    {"enemypetplates", "Enemy pets", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Plates over enemy pets.", "", 1, "enemyplates", "cvar:nameplateShowEnemyPets"},
+    {"enemyguardianplates", "Enemy guardians", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Plates over enemy guardians.", "", 1, "enemyplates", "cvar:nameplateShowEnemyGuardians"},
+    {"enemytotemplates", "Enemy totems", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Plates over enemy totems.", "", 1, "enemyplates", "cvar:nameplateShowEnemyTotems"},
+    {"nameplateoverlap", "Let nameplates overlap", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Plates over units standing in a line may cover each other. Off,\n"
+     "each is pushed clear of the others.", "", 0, "", "cvar:nameplateAllowOverlap"},
+    {"nameplateclasscolours", "Class colours for enemy players", SettingKind::Bool, 0, 0, 0,
+     "Names", "", "Colour an enemy player's health bar by their class.", "", 0,
+     "", "cvar:ShowClassColorInNameplate"},
+    {"nameplatecastbar", "Cast bar on the target's plate", SettingKind::Bool, 0, 0, 0, "Names", "",
+     "Show what your target is casting under its nameplate.", "", 1,
+     "", "cvar:showVKeyCastbar"},
+    {"nameplatescale", "Nameplate scale", SettingKind::Float, 0.5f, 2.0f, 0.05f, "Names", "",
+     "Size of the name and health bars over creatures' heads.", "", 1},
+
+    // ------------------------------------------------------------- Combat Text
+    // Blizzard_CombatText's own switches, which the game's page held. The six
+    // engine-side rows that page also had are not here: this client floats
+    // its own damage and healing and reads none of them.
+    {"combattext", "Floating combat text", SettingKind::Bool, 0, 0, 0, "Combat Text", "Over your character",
+     "Float the notices below over your character as they happen.", "", 1,
+     "", "cvar:enableCombatText", "", "SHOW_COMBAT_TEXT = v"},
+    {"combattextmode", "Direction", SettingKind::Enum, 0, 2, 1, "Combat Text", "",
+     "Which way the text moves.", "Scroll up|Scroll down|Arc", 0, "combattext",
+     "cvar:combatTextFloatMode", "1|2|3",
+     "COMBAT_TEXT_FLOAT_MODE = v "
+     "if CombatText_UpdateDisplayedMessages then CombatText_UpdateDisplayedMessages() end"},
+    {"fctdodgeparrymiss", "Dodges, parries and misses", SettingKind::Bool, 0, 0, 0, "Combat Text", "",
+     "Say when a swing at you missed, and why.", "", 1, "combattext",
+     "cvar:fctDodgeParryMiss", "", "COMBAT_TEXT_SHOW_DODGE_PARRY_MISS = v"},
+    {"fctdamagereduction", "Damage reduction", SettingKind::Bool, 0, 0, 0, "Combat Text", "",
+     "How much of a hit your armour, resistances and absorbs took off.",
+     "", 0, "combattext", "cvar:fctDamageReduction", "", "COMBAT_TEXT_SHOW_RESISTANCES = v"},
+    {"fctrepchanges", "Reputation changes", SettingKind::Bool, 0, 0, 0, "Combat Text", "",
+     "Reputation gained and lost.", "", 0, "combattext",
+     "cvar:fctRepChanges", "", "COMBAT_TEXT_SHOW_REPUTATION = v"},
+    {"fctreactives", "Reactive abilities", SettingKind::Bool, 0, 0, 0, "Combat Text", "",
+     "When an ability that needs a trigger - a dodge, a critical - comes\n"
+     "up.", "", 0, "combattext", "cvar:fctReactives", "", "COMBAT_TEXT_SHOW_REACTIVES = v"},
+    {"fctfriendlyhealers", "Friendly healer names", SettingKind::Bool, 0, 0, 0, "Combat Text", "",
+     "Who healed you, with the amount.", "", 0, "combattext",
+     "cvar:fctFriendlyHealers", "", "COMBAT_TEXT_SHOW_FRIENDLY_NAMES = v"},
+    {"fctcombatstate", "Entering and leaving combat", SettingKind::Bool, 0, 0, 0, "Combat Text", "",
+     "A notice as a fight starts and as it ends.", "", 0, "combattext",
+     "cvar:fctCombatState", "", "COMBAT_TEXT_SHOW_COMBAT_STATE = v"},
+    {"fctcombopoints", "Combo points", SettingKind::Bool, 0, 0, 0, "Combat Text", "",
+     "Each combo point as it is earned.", "", 0, "combattext",
+     "cvar:fctComboPoints", "", "COMBAT_TEXT_SHOW_COMBO_POINTS = v"},
+    {"fctlowmanahealth", "Low health and mana", SettingKind::Bool, 0, 0, 0, "Combat Text", "",
+     "A warning as either runs low.", "", 1, "combattext",
+     "cvar:fctLowManaHealth", "", "COMBAT_TEXT_SHOW_LOW_HEALTH_MANA = v"},
+    {"fctenergygains", "Energy gains", SettingKind::Bool, 0, 0, 0, "Combat Text", "",
+     "Mana, rage, energy and runic power as it comes in.", "", 0, "combattext",
+     "cvar:fctEnergyGains", "", "COMBAT_TEXT_SHOW_ENERGIZE = v"},
+    {"fctperiodicenergygains", "Periodic energy gains", SettingKind::Bool, 0, 0, 0, "Combat Text", "",
+     "The same for the trickle from regeneration and effects over time.",
+     "", 0, "combattext", "cvar:fctPeriodicEnergyGains", "", "COMBAT_TEXT_SHOW_PERIODIC_ENERGIZE = v"},
+    {"fcthonorgains", "Honor gained", SettingKind::Bool, 0, 0, 0, "Combat Text", "",
+     "Honor as it is earned.", "", 0, "combattext",
+     "cvar:fctHonorGains", "", "COMBAT_TEXT_SHOW_HONOR_GAINED = v"},
+    {"fctauras", "Auras gained and lost", SettingKind::Bool, 0, 0, 0, "Combat Text", "",
+     "Each buff and debuff as it lands on you and as it fades.", "", 0, "combattext",
+     "cvar:fctAuras", "", "COMBAT_TEXT_SHOW_AURAS = v COMBAT_TEXT_SHOW_AURA_FADE = v"},
+
+    // ------------------------------------------------------------- Unit Frames
+    // The game's Unit Frames and Status Text pages, and the threat rows from
+    // its Display page - all of it about the frames FrameXML draws.
+    {"partybackground", "Background behind the party", SettingKind::Bool, 0, 0, 0,
+     "Unit Frames", "Party", "A dark panel behind the party frames.", "", 0,
+     "", "cvar:showPartyBackground", "", "SHOW_PARTY_BACKGROUND = v"},
+    {"hidepartyinraid", "Hide the party in a raid", SettingKind::Bool, 0, 0, 0, "Unit Frames", "",
+     "Show only the raid frames while you are in one.", "", 0,
+     "", "cvar:hidePartyInRaid", "", "HIDE_PARTY_INTERFACE = v"},
+    {"partypets", "Party members' pets", SettingKind::Bool, 0, 0, 0, "Unit Frames", "",
+     "A small frame under each party member for their pet.", "", 1,
+     "", "cvar:showPartyPets", "", "SHOW_PARTY_PETS = v"},
+
+    {"arenaframes", "Arena enemy frames", SettingKind::Bool, 0, 0, 0, "Unit Frames", "Arena",
+     "Frames for the other team in an arena match.", "", 0,
+     "", "cvar:showArenaEnemyFrames", "", "SHOW_ARENA_ENEMY_FRAMES = v"},
+    {"arenapets", "Their pets", SettingKind::Bool, 0, 0, 0, "Unit Frames", "",
+     "Frames for the other team's pets as well.", "", 1, "arenaframes",
+     "cvar:showArenaEnemyPets", "", "SHOW_ARENA_ENEMY_PETS = v"},
+
+    {"fullsizefocus", "Full-size focus frame", SettingKind::Bool, 0, 0, 0, "Unit Frames", "Focus",
+     "Draw the focus frame at the target frame's size rather than\n"
+     "smaller.", "", 0, "", "cvar:fullSizeFocusFrame"},
+
+    {"playerstatustext", "On your frame", SettingKind::Bool, 0, 0, 0, "Unit Frames",
+     "Health and power numbers", "Write the numbers on your own health and power bars.", "", 1,
+     "", "cvar:playerStatusText"},
+    {"petstatustext", "On your pet's frame", SettingKind::Bool, 0, 0, 0, "Unit Frames", "",
+     "The same on your pet's bars.", "", 1, "", "cvar:petStatusText"},
+    {"partystatustext", "On party frames", SettingKind::Bool, 0, 0, 0, "Unit Frames", "",
+     "The same on each party member's bars.", "", 1, "", "cvar:partyStatusText"},
+    {"targetstatustext", "On the target frame", SettingKind::Bool, 0, 0, 0, "Unit Frames", "",
+     "The same on your target's bars.", "", 1, "", "cvar:targetStatusText"},
+    {"statustextpercent", "As percentages", SettingKind::Bool, 0, 0, 0, "Unit Frames", "",
+     "Percentages rather than the amounts.", "", 0, "", "cvar:statusTextPercentage"},
+    {"xpbartext", "On the experience bar", SettingKind::Bool, 0, 0, 0, "Unit Frames", "",
+     "Write your experience on the bar, not only when the mouse is\n"
+     "over it.", "", 0, "", "cvar:xpBarText"},
+
+    {"threatwarning", "Threat warning", SettingKind::Enum, 0, 3, 1, "Unit Frames", "Threat",
+     "When to flash the target frame as a creature turns on you.",
+     "Never|In dungeons and raids|In a party|Always", 3, "", "cvar:threatWarning", "0|1|2|3"},
+    {"threatpercent", "Threat as a percentage", SettingKind::Bool, 0, 0, 0, "Unit Frames", "",
+     "Show how close you are to pulling your target off whoever has it.",
+     "", 0, "", "cvar:threatShowNumeric", "",
+     "if InterfaceOptionsDisplayPanelShowAggroPercentage_SetFunc then "
+     "InterfaceOptionsDisplayPanelShowAggroPercentage_SetFunc() end"},
+    {"threatsounds", "Threat sounds", SettingKind::Bool, 0, 0, 0, "Unit Frames", "",
+     "Play a sound as your threat rises to the next level.", "", 0,
+     "", "cvar:threatPlaySounds"},
+
 
     // ------------------------------------------------------------------- Sound
     //
@@ -466,6 +725,32 @@ constexpr SettingDesc kSchema[] = {
      "Keep the chat input box on screen so it can be clicked into.\n"
      "Off, it appears when you press Enter and hides when you send.",
      "", 1},
+    {"clicktofocus", "Click anywhere to type", SettingKind::Bool, 0, 0, 0, "Chat", "",
+     "A click anywhere in the chat window puts the cursor in the input\n"
+     "box, not only a click on the box.", "", 0, "", "cvar:wholeChatWindowClickable"},
+    {"chatmousescroll", "Scroll with the mouse wheel", SettingKind::Bool, 0, 0, 0, "Chat", "",
+     "The wheel scrolls the chat window while the mouse is over it.", "", 1,
+     "", "cvar:chatMouseScroll", "",
+     "if InterfaceOptionsSocialPanelChatMouseScroll_SetScrolling then "
+     "InterfaceOptionsSocialPanelChatMouseScroll_SetScrolling(v) end"},
+    {"removechatdelay", "No delay before links light up", SettingKind::Bool, 0, 0, 0, "Chat", "",
+     "Item and player links answer the moment the mouse is over them,\n"
+     "rather than after a pause.", "", 0, "", "cvar:removeChatDelay", "",
+     "REMOVE_CHAT_DELAY = v"},
+
+    {"chattimestamps", "Timestamps", SettingKind::Enum, 0, 4, 1, "Chat", "Messages",
+     "Put the time in front of each line.",
+     "None|3:45|3:45:12|3:45 pm|3:45:12 pm", 0, "", "cvar:showTimestamps",
+     "none|%I:%M |%I:%M:%S |%I:%M %p |%I:%M:%S %p ",
+     "if v == 'none' then CHAT_TIMESTAMP_FORMAT = nil else CHAT_TIMESTAMP_FORMAT = v end"},
+    {"spamfilter", "Drop repeated lines", SettingKind::Bool, 0, 0, 0, "Chat", "",
+     "A line pasted again a moment later by the same player is not\n"
+     "shown.", "", 1, "", "cvar:spamFilter"},
+    {"lootrollmessages", "Every loot roll", SettingKind::Bool, 0, 0, 0, "Chat", "",
+     "Say each player's roll on an item, not only who won it.", "", 1,
+     "", "cvar:showLootSpam"},
+    {"guildmemberalerts", "Guild members coming and going", SettingKind::Bool, 0, 0, 0, "Chat", "",
+     "A line when a guild member logs in or out.", "", 1, "", "cvar:guildMemberNotify"},
 
     {"joingeneral", "General", SettingKind::Bool, 0, 0, 0, "Chat", "Channels to join",
      "Everyone in your current zone.", "", 1},
@@ -478,6 +763,9 @@ constexpr SettingDesc kSchema[] = {
      "Finding people for dungeons, quests and raids.", "", 1},
     {"joinlocal", "Local", SettingKind::Bool, 0, 0, 0, "Chat", "",
      "The realm's Local channel, on realms that provide one.", "", 1},
+    {"joinguildrecruitment", "GuildRecruitment", SettingKind::Bool, 0, 0, 0, "Chat", "",
+     "Guilds looking for members, and players looking for a guild.", "", 0,
+     "", "cvar:guildRecruitmentChannel"},
     // Speech bubbles were the game's own Social page's, two boxes among chat
     // options FrameXML reads for itself. These two the client reads - the
     // bubbles are drawn here - so they are rows. Party bubbles want both.
@@ -491,6 +779,13 @@ constexpr SettingDesc kSchema[] = {
     {"autoloot", "Auto loot", SettingKind::Bool, 0, 0, 0, "Gameplay", "Looting",
      "Take everything from a corpse or chest without opening the loot\n"
      "window.", "", 0},
+    {"autolootkey", "Auto loot key", SettingKind::Enum, 0, 3, 1, "Gameplay", "",
+     "Hold this while opening a corpse to do the opposite of the setting\n"
+     "above, for that one corpse.", "None|Alt|Ctrl|Shift", 3, "",
+     "click:AUTOLOOTTOGGLE", "NONE|ALT|CTRL|SHIFT"},
+    {"lootatmouse", "Loot window at the mouse", SettingKind::Bool, 0, 0, 0, "Gameplay", "",
+     "Open the loot window where the mouse is, rather than in its usual\n"
+     "place.", "", 0, "", "cvar:lootUnderMouse", "", "LOOT_UNDER_MOUSE = v"},
     {"autosellgrey", "Sell junk automatically", SettingKind::Bool, 0, 0, 0, "Gameplay", "",
      "Opening any merchant sells every Poor quality item - the grey ones -\n"
      "from your backpack and bags, and adds the coin. Nothing of another\n"
@@ -503,10 +798,38 @@ constexpr SettingDesc kSchema[] = {
     // Secure Ability Toggle was on the game's own ActionBars page, the one
     // control there this client reads: the guard is in the client's own
     // attack handling, and FrameXML's action buttons are not the ones drawn.
-    {"secureabilitytoggle", "Ignore a double tap on Attack", SettingKind::Bool, 0, 0, 0,
-     "Gameplay", "Combat",
-     "A second press of Attack within half a second is ignored, so a\n"
-     "double tap cannot switch auto-attack straight back off.", "", 0},
+
+    {"groundclearstarget", "Clicking the ground clears the target", SettingKind::Bool, 0, 0, 0,
+     "Gameplay", "Controls",
+     "A click on nothing drops your target. Off, the target stays until\n"
+     "you pick another - what the game calls sticky targeting.", "", 1,
+     "", "cvar:deselectOnClick"},
+    {"autodismount", "Dismount to cast in flight", SettingKind::Bool, 0, 0, 0, "Gameplay", "",
+     "Casting on a flying mount dismounts you first, rather than\n"
+     "refusing the cast.", "", 0, "", "cvar:autoDismountFlying"},
+    {"autoclearafk", "Leave Away on moving", SettingKind::Bool, 0, 0, 0, "Gameplay", "",
+     "Moving or talking takes you out of Away.", "", 1, "", "cvar:autoClearAFK"},
+    {"blocktrades", "Refuse trade requests", SettingKind::Bool, 0, 0, 0, "Gameplay", "",
+     "Trade requests are refused before their window opens, and chat\n"
+     "says so.", "", 0, "", "cvar:blockTrades"},
+
+    {"instantquesttext", "Show quest text at once", SettingKind::Bool, 0, 0, 0, "Gameplay", "Quests",
+     "Quest text appears whole, rather than being revealed line by\n"
+     "line.", "", 0, "", "cvar:questFadingDisable", "", "QUEST_FADING_DISABLE = v"},
+    {"autotrackquests", "Track a quest when you accept it", SettingKind::Bool, 0, 0, 0,
+     "Gameplay", "", "A new quest goes straight onto the objectives tracker.", "", 1,
+     "", "cvar:autoQuestWatch", "", "AUTO_QUEST_WATCH = v"},
+    {"widerquesttracker", "Wider objectives tracker", SettingKind::Bool, 0, 0, 0, "Gameplay", "",
+     "Give the tracker more room across, so long objectives fit on one\n"
+     "line.", "", 0, "", "cvar:watchFrameWidth", "",
+     "WATCH_FRAME_WIDTH = v if WatchFrame_SetWidth then WatchFrame_SetWidth(v) end"},
+
+    {"showcloak", "Show your cloak", SettingKind::Bool, 0, 0, 0, "Gameplay", "Character",
+     "Wear your cloak where others can see it. The server keeps this,\n"
+     "so it follows the character rather than the client.", "", 1,
+     "", "lua:ShowingCloak|ShowCloak"},
+    {"showhelm", "Show your helm", SettingKind::Bool, 0, 0, 0, "Gameplay", "",
+     "The same for the helm.", "", 1, "", "lua:ShowingHelm|ShowHelm"},
 };
 
 }  // namespace
