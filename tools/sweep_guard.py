@@ -581,10 +581,13 @@ CHECKS = [
     # rather than remembering - 2.7s. Thirty-three, down from sixty-six as the
     # windows that reached them were handed over, and all triaged in the tool:
     # callback wiring, the glue screen, the 3D world, five with a bound
-    # FrameXML equivalent, and window state FrameXML replaces whole. The
-    # thirty-fourth is the one to look at.
+    # FrameXML equivalent, and window state FrameXML replaces whole. Thirty-
+    # four since 2026-09-20: getUpdateCheck, which the login screen reads to
+    # say a newer release exists. FrameXML has no equivalent because the
+    # release it is talking about is this client, not the game. The thirty-
+    # fifth is the one to look at.
     ("framexml_unreachable_verbs.py",
-     r"^(\d+) verbs this client's own windows can reach", 33,
+     r"^(\d+) verbs this client's own windows can reach", 34,
      "verbs only this client's own windows could reach"),
     # Emote tokens FrameXML can hand DoEmote that it cannot answer. One,
     # named "unused", which is a placeholder in FrameXML's own list. It was

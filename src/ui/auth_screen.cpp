@@ -9,6 +9,7 @@
 #include "pipeline/asset_inventory.hpp"
 #include "core/config_paths.hpp"
 #include "core/logger.hpp"
+#include "core/open_url.hpp"
 #include "core/version.hpp"
 #include "core/window.hpp"
 #include "rendering/renderer.hpp"
@@ -427,15 +428,21 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
         // And beside it, if GitHub has a newer one. Next to the version
         // rather than in the card: it is about the program, not about
         // logging in, and the card is the busiest thing on the screen
-        // already. Nothing is downloaded - this is the whole of it.
-        if (const std::string newer =
-                core::Application::getInstance().getUpdateCheck().newerVersion();
-            !newer.empty()) {
+        // already. Nothing is downloaded - clicking it opens the release
+        // page and the player decides from there.
+        const core::UpdateCheck& updates = core::Application::getInstance().getUpdateCheck();
+        if (const std::string newer = updates.newerVersion(); !newer.empty()) {
             const std::string note = "  -  " + newer + " is available";
             const ImVec2 beside(at.x + ui_.textWidth(core::kVersionString, size), at.y);
             ui_.text(ImVec2(beside.x + 1.0f, beside.y + 1.0f), note.c_str(), size,
                      IM_COL32(0, 0, 0, 150));
-            ui_.text(beside, note.c_str(), size, IM_COL32(0xF6, 0xD9, 0x6B, 0xE0));
+            if (ui_.link("update", beside, note.c_str(), size,
+                         IM_COL32(0xF6, 0xD9, 0x6B, 0xE0))) {
+                // openExternalUrl refuses anything that is not a plain
+                // http(s) URL, which is the standard every caller is held to
+                // - this one comes off the network like a chat link does.
+                core::openExternalUrl(updates.releaseUrl());
+            }
         }
         ui_.setLayer(PaperLayer::Page);
     }
