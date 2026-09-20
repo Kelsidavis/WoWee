@@ -1370,7 +1370,11 @@ if(APPLE)
     target_link_libraries(wowee PRIVATE "-framework Foundation")
 endif()
 if(WIN32)
-    target_link_libraries(wowee PRIVATE ws2_32)
+    # winmm: timeBeginPeriod/timeEndPeriod, which the frame pacer uses to ask
+    # for a 1ms sleep granularity. Windows defaults to a 15.6ms timer tick -
+    # more than two whole frames at 144Hz - and without this the link fails
+    # on __imp_timeBeginPeriod rather than the cap simply being coarse.
+    target_link_libraries(wowee PRIVATE ws2_32 winmm)
     # SDL2main provides WinMain entry point on Windows
     if(TARGET SDL2::SDL2main)
         target_link_libraries(wowee PRIVATE SDL2::SDL2main)

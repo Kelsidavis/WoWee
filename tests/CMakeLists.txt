@@ -1467,6 +1467,10 @@ wowee_add_test(test_frame_pacer
     SOURCES test_frame_pacer.cpp
             ${CMAKE_SOURCE_DIR}/src/core/frame_pacer.cpp
             ${TEST_COMMON_SOURCES})
+if(WIN32)
+    # Same winmm the client links, for the same two timer calls.
+    target_link_libraries(test_frame_pacer PRIVATE winmm)
+endif()
 
 # ── test_update_check ────────────────────────────────────────
 # Version ordering for the update notice. No network: the ordering is the
