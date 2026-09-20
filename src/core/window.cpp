@@ -328,7 +328,11 @@ void Window::setVsync(bool enable) {
         vkContext->setVsync(enable);
         vkContext->markSwapchainDirty();
     }
-    LOG_INFO("VSync ", enable ? "enabled" : "disabled");
+    // WARNING, not INFO: this build logs INFO nowhere, so the one line that
+    // would say who turned vsync off never appeared. Vsync is set from four
+    // places and a stale one overriding a fresh one is invisible otherwise.
+    LOG_WARNING("VSync ", enable ? "enabled" : "disabled",
+                " (requested by the caller; swapchain marked dirty)");
 }
 
 void Window::refreshDrawableSize() {

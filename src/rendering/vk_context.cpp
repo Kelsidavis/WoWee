@@ -1183,6 +1183,16 @@ bool VkContext::createSwapchain(int width, int height) {
         builder.add_fallback_present_mode(VK_PRESENT_MODE_FIFO_RELAXED_KHR);
     }
 
+    // Said when it changes, not on every rebuild: a window being dragged
+    // rebuilds the swapchain repeatedly and this would bury the log. A
+    // present mode is the difference between a frame rate held at the
+    // refresh and one that runs past it, so the changes are worth a line.
+    if (loggedPresentVsync_ != (vsync_ ? 1 : 0)) {
+        loggedPresentVsync_ = vsync_ ? 1 : 0;
+        LOG_WARNING("Swapchain present mode now ",
+                    vsync_ ? "FIFO (vsync on)" : "IMMEDIATE (vsync off)");
+    }
+
     auto swapRet = builder.build();
 
     if (!swapRet) {
@@ -2555,6 +2565,16 @@ bool VkContext::recreateSwapchain(int width, int height) {
         builder.set_desired_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR);
         builder.add_fallback_present_mode(VK_PRESENT_MODE_MAILBOX_KHR);
         builder.add_fallback_present_mode(VK_PRESENT_MODE_FIFO_RELAXED_KHR);
+    }
+
+    // Said when it changes, not on every rebuild: a window being dragged
+    // rebuilds the swapchain repeatedly and this would bury the log. A
+    // present mode is the difference between a frame rate held at the
+    // refresh and one that runs past it, so the changes are worth a line.
+    if (loggedPresentVsync_ != (vsync_ ? 1 : 0)) {
+        loggedPresentVsync_ = vsync_ ? 1 : 0;
+        LOG_WARNING("Swapchain present mode now ",
+                    vsync_ ? "FIFO (vsync on)" : "IMMEDIATE (vsync off)");
     }
 
     auto swapRet = builder.build();

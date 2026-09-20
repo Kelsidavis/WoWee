@@ -373,6 +373,9 @@ private:
     bool surfaceLost_ = false;
     bool deviceLost_ = false;
     bool vsync_ = true;
+    /// The vsync state the present-mode line last reported, so a rebuild
+    /// that changes nothing says nothing. -1 until the first swapchain.
+    int loggedPresentVsync_ = -1;
 
     // Per-frame resources
     FrameData frames[MAX_FRAMES_IN_FLIGHT];
