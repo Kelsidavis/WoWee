@@ -1461,6 +1461,33 @@ wowee_test_link_glm(test_open_format_emitter)
 add_test(NAME open_format_emitter COMMAND test_open_format_emitter)
 register_test_target(test_open_format_emitter)
 
+# ── test_update_check ────────────────────────────────────────
+# Version ordering for the update notice. No network: the ordering is the
+# part that decides whether anybody is told anything.
+add_executable(test_update_check
+    test_update_check.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/update_check.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/https_get.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/config_paths.cpp
+    ${TEST_COMMON_SOURCES}
+)
+target_include_directories(test_update_check PRIVATE
+    ${TEST_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_BINARY_DIR}/generated   # version.hpp, written by wowee_version
+)
+if(TARGET wowee_version)
+    add_dependencies(test_update_check wowee_version)
+endif()
+target_include_directories(test_update_check SYSTEM PRIVATE
+    ${TEST_SYSTEM_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/extern/nlohmann
+)
+target_link_libraries(test_update_check PRIVATE catch2_main OpenSSL::SSL OpenSSL::Crypto)
+wowee_test_link_glm(test_update_check)
+add_test(NAME update_check COMMAND test_update_check)
+register_test_target(test_update_check)
+
 # ── test_extract_progress ────────────────────────────────────
 # Extraction is the long stage of a build, and the only one that can say how
 # far through it is. Needs StormLib: it builds a real archive to extract.

@@ -11,6 +11,7 @@
 #include "game/character.hpp"
 #include "game/game_services.hpp"
 #include "pipeline/asset_inventory.hpp"
+#include "core/update_check.hpp"
 #include "pipeline/blp_loader.hpp"
 #include <memory>
 #include <map>
@@ -104,6 +105,9 @@ public:
     /// What assets were found at startup. Taken once, because it walks the
     /// override tree and no screen should do that while it is being drawn.
     const pipeline::AssetInventory& getAssetInventory() const { return assetInventory_; }
+    /// Whether GitHub has a newer release than this build, asked once at
+    /// startup. The login screen reads it; nothing else needs to.
+    const UpdateCheck& getUpdateCheck() const { return updateCheck_; }
     pipeline::DBCLayout* getDBCLayout() { return dbcLayout_.get(); }
     bool setAssetExpansionOverride(const std::string& id);
     [[nodiscard]] const std::string& getAssetExpansionOverride() const { return assetExpansionOverrideId_; }
@@ -207,6 +211,7 @@ private:
     /// What assets were found at startup, so the login screen can say so
     /// rather than every screen finding out separately.
     pipeline::AssetInventory assetInventory_;
+    UpdateCheck updateCheck_;
 
 
     int stageStatFrames_ = 0;

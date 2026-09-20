@@ -207,6 +207,10 @@ public:
     int pendingGrassDistance = 150;  // 30-2000 yards; density thins past 45
     int pendingAntiAliasing = 1;  // 0=Off, 1=2x, 2=4x, 3=8x
     bool pendingFXAA = false;     // FXAA post-process (combinable with MSAA)
+    /// Ask GitHub at startup whether there is a newer release. On by
+    /// default: a bug reported against a version fixed weeks ago costs both
+    /// sides the whole exchange to find that out.
+    bool pendingCheckForUpdates = true;
     bool pendingNormalMapping = true;   // on by default
     float pendingNormalMapStrength = 0.8f;  // 0.0-2.0
     float pendingLensFlare = 1.0f;          // 0.0-2.0, sun flare strength

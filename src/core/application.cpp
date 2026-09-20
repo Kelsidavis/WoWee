@@ -366,6 +366,12 @@ bool Application::initialize() {
 #endif
     }
 
+    // Ask whether there is a newer WoWee, on a thread of its own. Started
+    // here rather than earlier so a build that has just been told it has no
+    // assets is not also waiting on a socket; it answers into the login
+    // screen whenever it answers, and nothing waits for it.
+    updateCheck_.start();
+
     // Load the tables this expansion's protocol is described by.
     if (gameHandler && expansionRegistry_) {
         if (auto* profile = expansionRegistry_->getActive()) {

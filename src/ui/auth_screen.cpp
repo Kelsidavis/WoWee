@@ -423,6 +423,20 @@ void AuthScreen::render(auth::AuthHandler& authHandler) {
         ui_.text(ImVec2(at.x + 1.0f, at.y + 1.0f), core::kVersionString, size,
                  IM_COL32(0, 0, 0, 150));
         ui_.text(at, core::kVersionString, size, IM_COL32(0xEC, 0xE2, 0xCC, 0xC8));
+
+        // And beside it, if GitHub has a newer one. Next to the version
+        // rather than in the card: it is about the program, not about
+        // logging in, and the card is the busiest thing on the screen
+        // already. Nothing is downloaded - this is the whole of it.
+        if (const std::string newer =
+                core::Application::getInstance().getUpdateCheck().newerVersion();
+            !newer.empty()) {
+            const std::string note = "  -  " + newer + " is available";
+            const ImVec2 beside(at.x + ui_.textWidth(core::kVersionString, size), at.y);
+            ui_.text(ImVec2(beside.x + 1.0f, beside.y + 1.0f), note.c_str(), size,
+                     IM_COL32(0, 0, 0, 150));
+            ui_.text(beside, note.c_str(), size, IM_COL32(0xF6, 0xD9, 0x6B, 0xE0));
+        }
         ui_.setLayer(PaperLayer::Page);
     }
 

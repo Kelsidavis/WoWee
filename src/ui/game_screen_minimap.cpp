@@ -1731,6 +1731,7 @@ void GameScreen::saveSettings() {
     out << "show_minimap_clock=" << (settingsPanel_.pendingShowMinimapClock ? 1 : 0) << "\n";
     out << "show_minimap_coordinates=" << (settingsPanel_.pendingShowMinimapCoordinates ? 1 : 0) << "\n";
     out << "show_latency_meter=" << (settingsPanel_.pendingShowLatencyMeter ? 1 : 0) << "\n";
+    out << "check_for_updates=" << (settingsPanel_.pendingCheckForUpdates ? 1 : 0) << "\n";
     out << "show_dps_meter=" << (settingsPanel_.showDPSMeter_ ? 1 : 0) << "\n";
     {
         // Only written once the user has dragged it; otherwise the meter keeps
@@ -2088,6 +2089,7 @@ void GameScreen::loadSettings() {
             else if (key == "water_refraction") settingsPanel_.pendingWaterRefraction = (std::stoi(val) != 0);
             else if (key == "antialiasing") settingsPanel_.pendingAntiAliasing = std::clamp(std::stoi(val), 0, 3);
             else if (key == "fxaa") settingsPanel_.pendingFXAA = (std::stoi(val) != 0);
+            else if (key == "check_for_updates") settingsPanel_.pendingCheckForUpdates = (std::stoi(val) != 0);
             else if (key == "normal_mapping") settingsPanel_.pendingNormalMapping = (std::stoi(val) != 0);
             else if (key == "normal_map_strength") settingsPanel_.pendingNormalMapStrength = std::clamp(std::stof(val), 0.0f, 2.0f);
             else if (key == "lens_flare") settingsPanel_.pendingLensFlare = std::clamp(std::stof(val), 0.0f, 2.0f);
