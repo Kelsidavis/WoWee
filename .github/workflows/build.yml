@@ -475,7 +475,7 @@ jobs:
           mingw-w64-clang-aarch64-clang
           mingw-w64-clang-aarch64-ninja
           mingw-w64-clang-aarch64-pkgconf
-          mingw-w64-clang-aarch64-SDL3
+          mingw-w64-clang-aarch64-sdl3
           mingw-w64-clang-aarch64-glm
           mingw-w64-clang-aarch64-openssl
           mingw-w64-clang-aarch64-zlib
@@ -601,7 +601,7 @@ jobs:
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-ninja
           mingw-w64-x86_64-pkgconf
-          mingw-w64-x86_64-SDL3
+          mingw-w64-x86_64-sdl3
           mingw-w64-x86_64-glm
           mingw-w64-x86_64-openssl
           mingw-w64-x86_64-zlib

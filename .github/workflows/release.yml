@@ -457,7 +457,7 @@ jobs:
       run: |
         packages=(
           "${PREFIX}-cmake" "${COMPILER_PACKAGE}" "${PREFIX}-ninja"
-          "${PREFIX}-pkgconf" "${PREFIX}-SDL3" "${PREFIX}-glm"
+          "${PREFIX}-pkgconf" "${PREFIX}-sdl3" "${PREFIX}-glm"
           "${PREFIX}-openssl" "${PREFIX}-zlib" "${PREFIX}-ffmpeg"
           "${PREFIX}-unicorn" "${PREFIX}-vulkan-loader"
           "${PREFIX}-vulkan-headers" "${PREFIX}-shaderc"
