@@ -2159,7 +2159,14 @@ public:
     void setQuestTracked(uint32_t questId, bool tracked) {
         const bool changed = tracked ? trackedQuestIds_.insert(questId).second
                                      : trackedQuestIds_.erase(questId) > 0;
-        if (changed) saveCharacterConfig();
+        if (changed) {
+            saveCharacterConfig();
+            // WatchFrame is purely event-driven and never polls native state,
+            // so a change here is invisible to it until something else happens
+            // to fire QUEST_LOG_UPDATE (e.g. the quest log's own track/untrack
+            // button, which calls WatchFrame_Update() directly).
+            fireAddonEvent("QUEST_LOG_UPDATE", {});
+        }
     }
     const std::unordered_set<uint32_t>& getTrackedQuestIds() const;
     /// The quests whose objective areas the world map shades.

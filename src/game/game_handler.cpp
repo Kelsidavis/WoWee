@@ -582,6 +582,12 @@ void GameHandler::updateTimers(float deltaTime) {
         if (resyncQuestLogFromServerSlots(true)) {
             pendingLoginQuestResync_ = false;
             pendingLoginQuestResyncTimeout_ = 0.0f;
+            // trackedQuestIds_ was restored from the character config earlier
+            // at login, before addons were guaranteed loaded, so that restore
+            // may never have reached WatchFrame. This is the first point after
+            // world entry where both the quest log and the tracked-quest set
+            // are known settled, so force the one redraw the tracker needs.
+            fireAddonEvent("QUEST_LOG_UPDATE", {});
         } else if (pendingLoginQuestResyncTimeout_ <= 0.0f) {
             pendingLoginQuestResync_ = false;
             pendingLoginQuestResyncTimeout_ = 0.0f;
