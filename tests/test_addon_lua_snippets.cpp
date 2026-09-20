@@ -14,10 +14,13 @@
 extern "C" {
 #include "lauxlib.h"
 #include "lua.h"
+#include "lualib.h"
 }
 
 #include <cstring>
+#include <initializer_list>
 #include <string>
+#include <utility>
 
 #include "addons/addon_lua_snippets.hpp"
 
@@ -39,7 +42,86 @@ std::string compileError(const char* chunk, const char* name) {
     return err;
 }
 
+/// Run several chunks in one state, and answer with what the last one returned.
+///
+/// More than parsing, and still short of framexml_run: enough of Lua to run a
+/// snippet against stand-ins for the frames it reaches for. A failure comes
+/// back as the Lua error, so the message says which chunk and which line.
+std::string runChunks(std::initializer_list<std::pair<const char*, const char*>> chunks) {
+    lua_State* L = luaL_newstate();
+    REQUIRE(L != nullptr);
+    // Only what the snippets under test use: pairs, ipairs, type and rawget
+    // from the base library, insert and remove from the table one.
+    lua_pushcfunction(L, luaopen_base);
+    lua_call(L, 0, 0);
+    lua_pushcfunction(L, luaopen_table);
+    lua_pushstring(L, LUA_TABLIBNAME);
+    lua_call(L, 1, 0);
+
+    std::string result;
+    for (const auto& [chunk, name] : chunks) {
+        if (luaL_loadbuffer(L, chunk, std::strlen(chunk), name) != 0 ||
+            lua_pcall(L, 0, 1, 0) != 0) {
+            const char* message = lua_tostring(L, -1);
+            lua_close(L);
+            return std::string(name) + ": " + (message ? message : "(no message)");
+        }
+        const char* value = lua_tostring(L, -1);
+        result = value ? value : "";
+        lua_pop(L, 1);
+    }
+    lua_close(L);
+    return result;
+}
+
+/// The options machinery the removal snippet walks, cut down to what it calls.
+constexpr const char* kFakeOptionsPanelLua = R"LUA(
+local function frame(name, parent)
+    local f = {
+        _name = name, _parent = parent, _hidden = false, _hooks = {},
+        GetName = function(self) return self._name end,
+        GetParent = function(self) return self._parent end,
+        GetChildren = function(self) return unpack(self._children or {}) end,
+        Hide = function(self) self._hidden = true end,
+        HookScript = function(self, script, fn) self._hooks[script] = fn end,
+    }
+    _G[name] = f
+    if parent then
+        parent._children = parent._children or {}
+        table.insert(parent._children, f)
+    end
+    return f
+end
+
+local panel = frame("VideoOptionsResolutionPanel")
+-- The retired checkbox, and one control that stays: the removal has to take
+-- the first out of the commit list and leave the second in it.
+local vsync = frame("VideoOptionsResolutionPanelVSync", panel)
+local scale = frame("VideoOptionsResolutionPanelUIScaleSlider", panel)
+panel.controls = { vsync, scale }
+)LUA";
+
 }  // namespace
+
+TEST_CASE("a retired control leaves the panel's commit list", "[addonlua]") {
+    // Hiding a control is not retiring it. VideoOptionsPanel_Okay walks
+    // panel.controls and writes every entry's cached value back to its cvar,
+    // changed or not - so the hidden vertical-sync checkbox replayed the value
+    // it read at load over the Display page's own row, and pressing Okay on the
+    // video window turned vertical sync off again each time it was switched on.
+    const std::string result = runChunks({
+        {kFakeOptionsPanelLua, "FakeOptionsPanel"},
+        {wowee::addons::kRemovedControlsLua, "RemovedControls"},
+        {R"LUA(
+            local panel = VideoOptionsResolutionPanel
+            local names = ""
+            for _, c in ipairs(panel.controls) do names = names .. c:GetName() .. " " end
+            return names .. "| hidden=" .. tostring(VideoOptionsResolutionPanelVSync._hidden)
+        )LUA",
+         "Check"},
+    });
+    CHECK(result == "VideoOptionsResolutionPanelUIScaleSlider | hidden=true");
+}
 
 TEST_CASE("the options panel script parses", "[addonlua]") {
     // Twelve categories of check button, slider and dropdown, built from the

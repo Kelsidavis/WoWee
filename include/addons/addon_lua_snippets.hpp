@@ -1387,12 +1387,41 @@ local function applyMoves()
     end
 end
 
+-- Take the removed controls out of the panel lists that commit them.
+--
+-- Hiding a control does not retire it. VideoOptionsPanel_Okay and
+-- BlizzardOptionsPanel_OkayControl walk panel.controls and write each entry's
+-- cached value back to its cvar whether or not it changed, so pressing Okay on
+-- the video window replayed the vertical-sync checkbox's value from load time
+-- over the Display page's own row: turn vertical sync on, press Okay, and
+-- gxVSync came back as "0" and switched it off again. Windowed mode and gamma
+-- sat behind the same loop.
+local function unregisterRemoved()
+    for f in pairs(removed) do
+        local owner = f.GetParent and f:GetParent()
+        local guard = 0
+        while owner and guard < 8 do
+            guard = guard + 1
+            local list = owner.controls
+            if type(list) == "table" then
+                for i = #list, 1, -1 do
+                    if removed[list[i]] then table.remove(list, i) end
+                end
+            end
+            owner = owner.GetParent and owner:GetParent() or nil
+        end
+    end
+end
+
 local panels = {}
 local function applyRemoval()
     for f in pairs(removed) do
         local panel = f.GetParent and f:GetParent()
         if panel then panels[panel] = true end
     end
+    -- Repeated on every refresh, like the hiding: a panel that re-registers its
+    -- controls would otherwise put them back in the commit loop.
+    unregisterRemoved()
     for panel in pairs(panels) do
         if panel.GetChildren then
             for _, child in ipairs({ panel:GetChildren() }) do
