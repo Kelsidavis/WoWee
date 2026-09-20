@@ -27,15 +27,6 @@ namespace fs = std::filesystem;
 /// The log pane, once a build is running.
 constexpr float kLogHeight = 200.0f;
 
-/// Button sizes are written in the units ImGui's own thirteen-pixel face was
-/// laid out against. The client draws this panel at the scale its login card
-/// uses, so the text grows and a fixed box clips it - "Save what I have as a
-/// pack" came out as "...as a pac".
-ImVec2 buttonSize(float wide, float high) {
-    const float k = ImGui::GetFontSize() / 13.0f;
-    return ImVec2(wide * k, high * k);
-}
-
 void wrapped(const char* text) {
     ImGui::PushTextWrapPos(ImGui::GetContentRegionAvail().x);
     ImGui::TextUnformatted(text);
@@ -417,8 +408,21 @@ void drawRun(App& app) {
                     profileAvailable(profile, haveGame(app), haveBorrow(app),
                                      haveLater(app), nullptr);
 
+    // The row is fitted to the width there is rather than to a set of widths
+    // that happen to add up on one window. Fixed boxes overran the right
+    // edge of the card once the client began drawing this at its own scale,
+    // and would again at any size nobody had looked at. The numbers below
+    // are the proportions the row is divided in, not pixels.
+    const bool showStop = app.job.running();
+    const float stopWeight = showStop ? 90.0f : 0.0f;
+    const float weights = 180.0f + stopWeight + 170.0f + 260.0f;
+    const float gaps = ImGui::GetStyle().ItemSpacing.x * (showStop ? 3.0f : 2.0f);
+    const float unit = std::max(0.0f, ImGui::GetContentRegionAvail().x - gaps) / weights;
+    const float high = 32.0f * (ImGui::GetFontSize() / 13.0f);
+    const auto share = [&](float weight) { return ImVec2(weight * unit, high); };
+
     ImGui::BeginDisabled(!ok || busy);
-    if (ImGui::Button("Build my assets", buttonSize(180, 32))) {
+    if (ImGui::Button("Build my assets", share(180.0f))) {
         std::string out = app.outputDir;
         if (out.empty()) out = (fs::current_path() / "Data").string();
         // The folder the scan found the archives in, not the one that was
@@ -437,9 +441,12 @@ void drawRun(App& app) {
     }
     ImGui::EndDisabled();
 
-    if (app.job.running()) {
+    // showStop, not a fresh query: the widths above were divided on its
+    // value, and a job finishing between there and here would drop the
+    // button while its share of the row stayed reserved.
+    if (showStop) {
         ImGui::SameLine();
-        if (ImGui::Button("Stop", buttonSize(90, 32))) app.job.cancel();
+        if (ImGui::Button("Stop", share(90.0f))) app.job.cancel();
     }
 
     // Installing somebody else's pack asks nothing about your game, so it is
@@ -447,7 +454,7 @@ void drawRun(App& app) {
     // point at and nothing to choose.
     ImGui::SameLine();
     ImGui::BeginDisabled(busy);
-    if (ImGui::Button("Install a pack...", buttonSize(170, 32))) {
+    if (ImGui::Button("Install a pack...", share(170.0f))) {
         std::string chosen;
         if (app.picker.ask(PickWhat::File, "Choose a pack to install", app.outputDir,
                            ".zip", &chosen)) {
@@ -468,7 +475,7 @@ void drawRun(App& app) {
                                  ? "Save all " + std::to_string(inside.size()) +
                                        " as one pack"
                                  : std::string("Save what I have as a pack");
-    if (ImGui::Button(save.c_str(), buttonSize(260, 32))) {
+    if (ImGui::Button(save.c_str(), share(260.0f))) {
         startPack(app, profile.id);
     }
     ImGui::EndDisabled();
