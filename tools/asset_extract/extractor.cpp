@@ -680,40 +680,6 @@ static std::vector<std::string> discoverArchives(const std::string& mpqDirIn,
     return result;
 }
 
-// Extract the (listfile) from an MPQ archive into a set of filenames
-static void extractInternalListfile(HANDLE hMpq, std::set<std::string>& out) {
-    HANDLE hFile = nullptr;
-    if (!SFileOpenFileEx(hMpq, "(listfile)", 0, &hFile)) return;
-
-    DWORD size = SFileGetFileSize(hFile, nullptr);
-    if (size == SFILE_INVALID_SIZE || size == 0) {
-        SFileCloseFile(hFile);
-        return;
-    }
-
-    std::vector<char> buf(size);
-    DWORD bytesRead = 0;
-    if (!SFileReadFile(hFile, buf.data(), size, &bytesRead, nullptr)) {
-        SFileCloseFile(hFile);
-        return;
-    }
-    SFileCloseFile(hFile);
-
-    // Parse newline/CR-delimited entries
-    std::string entry;
-    for (DWORD i = 0; i < bytesRead; ++i) {
-        if (buf[i] == '\n' || buf[i] == '\r') {
-            if (!entry.empty()) {
-                out.insert(std::move(entry));
-                entry.clear();
-            }
-        } else {
-            entry += buf[i];
-        }
-    }
-    if (!entry.empty()) out.insert(std::move(entry));
-}
-
 std::vector<std::string> Extractor::archiveChain(const std::string& mpqDir,
                                                  const std::string& expansion,
                                                  const std::string& locale) {

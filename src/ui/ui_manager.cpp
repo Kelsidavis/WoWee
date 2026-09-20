@@ -23,6 +23,10 @@ namespace ui {
 
 UIManager::UIManager() {
     // Create screen instances
+#ifdef WOWEE_HAVE_ASSET_PANEL
+    // Before any asset system exists, which is the state it is there for.
+    firstRunScreen = std::make_unique<FirstRunScreen>();
+#endif
     authScreen = std::make_unique<AuthScreen>();
     realmScreen = std::make_unique<RealmScreen>();
     characterCreateScreen = std::make_unique<CharacterCreateScreen>();
@@ -374,6 +378,14 @@ void UIManager::render(core::AppState appState, auth::AuthHandler* authHandler, 
 
     // Render appropriate screen based on application state
     switch (appState) {
+        case core::AppState::FIRST_RUN:
+#ifdef WOWEE_HAVE_ASSET_PANEL
+            // The same backdrop the other pre-game screens draw, so this does
+            // not look like a different program.
+            if (authScreen) authScreen->drawBackdrop();
+            if (firstRunScreen) firstRunScreen->render();
+#endif
+            break;
         case core::AppState::AUTHENTICATION:
             if (authHandler) {
                 authScreen->render(*authHandler);

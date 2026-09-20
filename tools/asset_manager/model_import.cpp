@@ -182,17 +182,6 @@ std::vector<std::string> texturePaths(const std::vector<uint8_t>& body,
     return out;
 }
 
-std::string modelName(const std::vector<uint8_t>& body) {
-    if (body.size() < 16) return {};
-    const uint32_t length = readLE32(body.data() + 8);
-    const uint32_t at = readLE32(body.data() + 12);
-    if (length == 0 || at + length > body.size()) return {};
-    std::string name(reinterpret_cast<const char*>(body.data() + at), length);
-    const std::size_t nul = name.find('\0');
-    if (nul != std::string::npos) name.resize(nul);
-    return name;
-}
-
 bool writeFile(const fs::path& path, const uint8_t* data, std::size_t size) {
     std::error_code ec;
     fs::create_directories(path.parent_path(), ec);

@@ -54,7 +54,11 @@ enum class AppState {
     CHARACTER_CREATION,
     CHARACTER_SELECTION,
     IN_GAME,
-    DISCONNECTED
+    DISCONNECTED,
+    /// Nothing extracted yet, so the asset builder is shown instead of a
+    /// login nobody can get through. Last rather than first because the log
+    /// prints these by number, and inserting one renumbers every old line.
+    FIRST_RUN
 };
 
 class Application {

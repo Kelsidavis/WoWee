@@ -24,20 +24,8 @@ namespace {
 
 namespace fs = std::filesystem;
 
-/// ImGui's built-in face is drawn at thirteen pixels. Everything here was laid
-/// out against that, so it is the height the atlas is scaled from rather than a
-/// size worth changing.
-constexpr float kBaseFontSize = 13.0f;
-
-/// FRIZQT draws smaller than ImGui's built-in face at the same nominal height,
-/// so asking for thirteen of it puts noticeably smaller text into controls
-/// sized for thirteen. This is the height that matches.
-constexpr float kFrizqtRatio = 1.25f;
-
 /// The log pane, once a build is running.
 constexpr float kLogHeight = 200.0f;
-
-/// Everything the window remembers between frames.
 
 void wrapped(const char* text) {
     ImGui::PushTextWrapPos(ImGui::GetContentRegionAvail().x);
@@ -46,7 +34,9 @@ void wrapped(const char* text) {
 }
 
 void dimmed(const char* text) {
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.62f, 0.62f, 0.62f, 1.0f));
+    // The theme's own disabled tone, so this reads on a dark window and on
+    // the client's cream page alike rather than being grey on both.
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
     wrapped(text);
     ImGui::PopStyleColor();
 }
@@ -129,8 +119,7 @@ void drawGame(App& app) {
 
     if (!app.gameScan.note.empty()) {
         const bool good = haveGame(app);
-        ImGui::PushStyleColor(ImGuiCol_Text, good ? ImVec4(0.35f, 0.78f, 0.45f, 1.0f)
-                                                  : ImVec4(0.85f, 0.65f, 0.30f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Text, good ? app.goodColor : app.warnColor);
         wrapped(app.gameScan.note.c_str());
         ImGui::PopStyleColor();
     } else {
@@ -150,7 +139,7 @@ void drawGame(App& app) {
         // client picks between them at its login screen. Saying what is already
         // there is what makes that visible: otherwise a second game built into
         // the same place looks like it overwrote the first.
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.35f, 0.78f, 0.45f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Text, app.goodColor);
         wrapped("Already here:");
         ImGui::PopStyleColor();
         ImGui::Indent();
@@ -238,7 +227,7 @@ void drawUpgrades(App& app) {
         if (upgrade.source != Source::None && upgrade.source != asked) {
             asked = upgrade.source;
             if (!usable) {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.65f, 0.30f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Text, app.warnColor);
                 wrapped(why.c_str());
                 ImGui::PopStyleColor();
             }
@@ -256,7 +245,7 @@ void drawUpgrades(App& app) {
                 dimmed("Reads its file table - about a second.");
             }
             if (!app.cascError.empty() && upgrade.source == Source::Later) {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.88f, 0.42f, 0.38f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Text, app.errorColor);
                 wrapped(app.cascError.c_str());
                 ImGui::PopStyleColor();
             }

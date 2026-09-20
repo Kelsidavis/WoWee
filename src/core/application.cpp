@@ -355,6 +355,15 @@ bool Application::initialize() {
         }
     } else {
         LOG_WARNING(assetInventory_.troubleText());
+#ifdef WOWEE_HAVE_ASSET_PANEL
+        // Assigned rather than set through setState: several of the
+        // subsystems its entry actions touch do not exist yet this early,
+        // and setState returns early when the state is unchanged anyway.
+        // The rest of initialize() still runs - it is all null-tolerant, and
+        // the login screen is what comes after a build and a reopen.
+        state = AppState::FIRST_RUN;
+        LOG_WARNING("No assets found - opening the asset builder instead of the login screen");
+#endif
     }
 
     // Load the tables this expansion's protocol is described by.
@@ -1967,6 +1976,10 @@ void Application::setState(AppState newState) {
 
     // Handle state transitions
     switch (newState) {
+        case AppState::FIRST_RUN:
+            // Nothing to enter: the screen builds what is missing and the
+            // client is reopened afterwards.
+            break;
         case AppState::AUTHENTICATION:
             // Show auth screen
             break;
@@ -3759,6 +3772,12 @@ void Application::update(float deltaTime) {
     // Update based on current state
     updateCheckpoint = "state switch";
     switch (state) {
+        case AppState::FIRST_RUN:
+            // Drawn, not driven: the extraction runs on its own thread and
+            // the screen reads its progress while laying itself out.
+            updateCheckpoint = "first_run: enter";
+            break;
+
         case AppState::AUTHENTICATION:
             updateCheckpoint = "auth: enter";
             if (authHandler) {

@@ -969,6 +969,7 @@ set(WOWEE_SOURCES
     src/ui/ui_raid_icons.cpp
     src/ui/ui_texture_load.cpp
     src/ui/auth_screen.cpp
+    src/ui/first_run_screen.cpp
     src/ui/realm_screen.cpp
     src/ui/character_create_screen.cpp
     src/ui/character_screen.cpp
@@ -1874,6 +1875,67 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR AND SDL2_FOUND AND EXISTS ${IMGUI_D
     message(STATUS "  wowee_assets window: ENABLED")
 else()
     message(STATUS "  wowee_assets window: DISABLED (needs StormLib, SDL2 and extern/imgui)")
+endif()
+
+# ---- The same panel, inside the client ----
+#
+# Somebody who has just installed WoWee and has extracted nothing reaches a
+# login screen it cannot get past: the callbacks that would carry them
+# through are the ones that need assets, so they can type an account and
+# nothing happens. The program that fixes that was a separate executable they
+# had to know to go and find. The client carries it now, drawn from the same
+# panel.cpp the window draws, through its own Vulkan-backed ImGui.
+#
+# Gated on what the window is gated on. Without StormLib there is nothing to
+# extract with, and a client built without it should still be a client - the
+# screen is compiled out and the old behaviour stands.
+if(TARGET wowee AND STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR AND EXISTS ${IMGUI_DIR}/imgui.cpp)
+    target_sources(wowee PRIVATE
+        tools/asset_manager/panel.cpp
+        tools/asset_manager/profiles.cpp
+        tools/asset_manager/install_scan.cpp
+        tools/asset_manager/install_probe.cpp
+        tools/asset_manager/job.cpp
+        tools/asset_manager/casc.cpp
+        tools/asset_manager/texture_ops.cpp
+        tools/asset_manager/upscale.cpp
+        tools/asset_manager/pack.cpp
+        tools/asset_manager/model_import.cpp
+        tools/asset_manager/model_source.cpp
+        tools/asset_manager/folder_picker.cpp
+        tools/asset_extract/extractor.cpp
+        tools/asset_extract/path_mapper.cpp
+        tools/asset_extract/manifest_writer.cpp
+        tools/asset_extract/open_format_emitter.cpp
+    )
+    # The same per-platform choice the window makes, for the same reasons.
+    if(APPLE)
+        target_sources(wowee PRIVATE tools/asset_manager/folder_picker_mac.mm)
+        # SKIP_PRECOMPILE_HEADERS: the client's objcxx PCH is built without
+        # ARC and this file needs it on, which the compiler refuses to mix.
+        set_source_files_properties(tools/asset_manager/folder_picker_mac.mm
+            PROPERTIES COMPILE_FLAGS "-fobjc-arc" SKIP_PRECOMPILE_HEADERS ON)
+        target_link_libraries(wowee PRIVATE
+            "-framework AppKit" "-framework UniformTypeIdentifiers")
+    elseif(WIN32)
+        target_sources(wowee PRIVATE tools/asset_manager/folder_picker_win.cpp)
+        target_link_libraries(wowee PRIVATE ole32 shell32)
+    else()
+        target_sources(wowee PRIVATE tools/asset_manager/folder_picker_none.cpp)
+    endif()
+    target_include_directories(wowee PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/tools/asset_manager
+        ${CMAKE_CURRENT_SOURCE_DIR}/tools/asset_extract
+        ${STORMLIB_INCLUDE_DIR}
+    )
+    # renderer.cpp already compiles stb_image_write for its screenshots, and
+    # open_format_emitter.cpp compiles it for every other binary it is in.
+    target_compile_definitions(wowee PRIVATE
+        WOWEE_HAVE_ASSET_PANEL WOWEE_STB_IMAGE_WRITE_PROVIDED)
+    wowee_link_stormlib(wowee)
+    message(STATUS "  asset panel in the client: ENABLED")
+else()
+    message(STATUS "  asset panel in the client: DISABLED (needs StormLib and extern/imgui)")
 endif()
 
 # ---- Tool: dbc_to_csv (DBC → CSV text) ----

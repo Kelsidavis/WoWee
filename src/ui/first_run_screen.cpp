@@ -1,0 +1,125 @@
+#include "ui/first_run_screen.hpp"
+
+#ifdef WOWEE_HAVE_ASSET_PANEL
+
+#include "imgui.h"
+#include "ui/paper_ui.hpp"
+
+namespace wowee::ui {
+
+namespace {
+
+/// Wide enough for a path and the Browse button beside it without the field
+/// collapsing, and short enough to leave the backdrop visible around it.
+constexpr float kCardWidth = 900.0f;
+constexpr float kCardMargin = 60.0f;
+
+ImVec4 fromU32(ImU32 colour) { return ImGui::ColorConvertU32ToFloat4(colour); }
+
+/// Dress ImGui as the page the rest of the pre-game screens are drawn on.
+///
+/// The panel is ImGui widgets and the login card is PaperUI's own drawing, so
+/// the two cannot share code - but they can share a palette. Without this the
+/// builder is a slate-grey box sitting on hand-drawn paper, which reads as a
+/// different program that happened to open.
+int pushPaperStyle(const PaperTheme& theme) {
+    const ImVec4 paper = fromU32(theme.paperTop);
+    const ImVec4 edge = fromU32(theme.paperEdge);
+    const ImVec4 ink = fromU32(theme.ink);
+    const ImVec4 field = fromU32(theme.fieldFill);
+    const ImVec4 red = fromU32(theme.crayonRed);
+
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, paper);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, paper);
+    ImGui::PushStyleColor(ImGuiCol_Border, edge);
+    ImGui::PushStyleColor(ImGuiCol_Text, ink);
+    ImGui::PushStyleColor(ImGuiCol_TextDisabled, fromU32(theme.pencil));
+    ImGui::PushStyleColor(ImGuiCol_TitleBg, fromU32(theme.paperBottom));
+    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, fromU32(theme.paperBottom));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, field);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, fromU32(theme.highlighter));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, fromU32(theme.highlighter));
+    // Tan rather than the crayon red the login card's own button is filled
+    // with. That button draws its own light text over the red; ImGui has one
+    // text colour for everything in the window, so a red fill here would put
+    // dark ink on red and the labels stop being readable.
+    ImGui::PushStyleColor(ImGuiCol_Button, fromU32(theme.photoMat));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, fromU32(theme.highlighter));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, fromU32(theme.paperEdge));
+    ImGui::PushStyleColor(ImGuiCol_CheckMark, red);
+    ImGui::PushStyleColor(ImGuiCol_Header, fromU32(theme.highlighter));
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, fromU32(theme.highlighter));
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, fromU32(theme.highlighter));
+    ImGui::PushStyleColor(ImGuiCol_Separator, edge);
+    ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab, edge);
+    ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered, fromU32(theme.inkSoft));
+    ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive, fromU32(theme.inkSoft));
+    return 23;
+}
+
+}  // namespace
+
+FirstRunScreen::FirstRunScreen() {
+    assets::initPanelDefaults(app_);
+    // The crayons, so the panel's own three accents are drawn in the same
+    // hand as everything around them. Its defaults are for a dark window.
+    const PaperTheme theme;
+    app_.goodColor = fromU32(theme.crayonGreen);
+    app_.warnColor = fromU32(theme.crayonRedDim);
+    app_.errorColor = fromU32(theme.crayonRed);
+}
+
+bool FirstRunScreen::render() {
+    const PaperTheme theme;
+    const int pushed = pushPaperStyle(theme);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 20.0f));
+
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const float width = std::min(kCardWidth, viewport->WorkSize.x - kCardMargin * 2.0f);
+    const float height = viewport->WorkSize.y - kCardMargin * 2.0f;
+
+    ImGui::SetNextWindowPos(
+        ImVec2(viewport->WorkPos.x + (viewport->WorkSize.x - width) * 0.5f,
+               viewport->WorkPos.y + kCardMargin));
+    ImGui::SetNextWindowSize(ImVec2(width, height));
+    ImGui::Begin("Before you can play", nullptr,
+                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+    // Why this screen is in the way, said once at the top. Without it the
+    // panel reads as a tool that opened for no reason.
+    ImGui::TextWrapped(
+        "WoWee has no game assets yet, so there is nothing to log in to. Point it at a "
+        "World of Warcraft installation you own and it will build what it needs. "
+        "Nothing is written into that installation.");
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    assets::drawPanel(app_);
+
+    const bool done = assets::finishedSuccessfully(app_);
+    if (done) {
+        ImGui::Spacing();
+        // Restart rather than carrying on into the game from here. The asset
+        // manager, the DBC tables, the model and terrain loaders and the
+        // addon environment are all built once during startup from a data
+        // path that was empty at the time, and the interface's glyph atlas
+        // cannot be rebuilt mid-session either. Reopening is one line to say
+        // and nothing to go wrong; re-running all of that in place is not.
+        ImGui::TextWrapped("Assets built. Close WoWee and open it again to play.");
+    }
+
+    ImGui::End();
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(pushed);
+    return done;
+}
+
+}  // namespace wowee::ui
+
+#endif  // WOWEE_HAVE_ASSET_PANEL

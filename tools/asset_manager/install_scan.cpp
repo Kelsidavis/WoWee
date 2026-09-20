@@ -12,21 +12,6 @@ namespace {
 
 namespace fs = std::filesystem;
 
-std::string lower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return value;
-}
-
-int countArchives(const fs::path& dir) {
-    std::error_code ec;
-    int found = 0;
-    for (fs::directory_iterator it(dir, ec), end; it != end && !ec; it.increment(ec)) {
-        if (lower(it->path().extension().string()) == ".mpq") ++found;
-    }
-    return found;
-}
-
 bool looksLikeCasc(const fs::path& dir) {
     std::error_code ec;
     // Data/data holds the .idx indices and the numbered blobs; Data/indices is

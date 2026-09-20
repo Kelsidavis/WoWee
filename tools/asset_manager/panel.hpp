@@ -16,6 +16,8 @@
 #include <thread>
 #include <vector>
 
+#include "imgui.h"
+
 #include "folder_picker.hpp"
 #include "install_scan.hpp"
 #include "job.hpp"
@@ -42,6 +44,14 @@ struct App {
     /// Which row opened the in-window browser, so its answer goes back to the
     /// field that asked. Zero when nothing is being browsed.
     int pendingPick = 0;
+
+    /// The three accents the panel says things in, set by whoever is drawing
+    /// it. The standalone window is dark and the client's page is cream, and
+    /// a green that reads on one does not read on the other. These are the
+    /// dark ones; the client replaces them with its own crayons.
+    ImVec4 goodColor{0.35f, 0.78f, 0.45f, 1.0f};
+    ImVec4 warnColor{0.85f, 0.65f, 0.30f, 1.0f};
+    ImVec4 errorColor{0.88f, 0.42f, 0.38f, 1.0f};
 
     Job job;
     bool started = false;
