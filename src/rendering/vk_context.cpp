@@ -385,8 +385,16 @@ bool VkContext::createInstance(SDL_Window* window) {
     vkb::InstanceBuilder builder;
     builder.set_app_name("Wowee")
            .set_app_version(VK_MAKE_VERSION(1, 0, 0))
-           .require_api_version(1, 2, 0)
-           .set_minimum_instance_version(1, 1, 0);
+           // 1.3, which is what synchronization2 and dynamic rendering are
+           // core in. The floor was 1.2 because MoltenVK advertised 1.2 with
+           // the extensions bolted on, and requiring 1.3 would have dropped
+           // the platform this is developed on; MoltenVK reports 1.3 now, so
+           // that reason has expired. The cost is hardware that reports only
+           // 1.2 - old Mesa, pre-13 Android, old vendor drivers on Windows -
+           // which no longer starts, and is told why by
+           // reportUnsuitableDevices.
+           .require_api_version(1, 3, 0)
+           .set_minimum_instance_version(1, 3, 0);
 
     for (auto ext : sdlExts) {
         builder.enable_extension(ext);
@@ -654,11 +662,11 @@ bool VkContext::createLogicalDevice() {
     // after it is constructed changes vkbPhysicalDevice_ and not the copy the
     // builder creates the device from. That is how synchronization2 came to
     // log as enabled while vkCmdPipelineBarrier2KHR would not resolve.
-    sync2IsCore_ = (deviceApiVersion_ >= VK_API_VERSION_1_3 &&
-                    instanceApiVersion_ >= VK_API_VERSION_1_3);
-    const bool sync2Available =
-        sync2IsCore_ || vkbPhysicalDevice_.enable_extension_if_present(
-                            VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    // Device selection already refused anything below 1.3, so this is a
+    // check on a driver that answered one version and behaves like another
+    // rather than a branch the build expects to take.
+    const bool sync2Available = deviceApiVersion_ >= VK_API_VERSION_1_3 &&
+                                instanceApiVersion_ >= VK_API_VERSION_1_3;
     const bool amdCoherentAvailable = vkbPhysicalDevice_.enable_extension_if_present(
         VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME);
     // VK_EXT_host_image_copy. Lets pixels go straight into an image from host
@@ -747,21 +755,18 @@ bool VkContext::createLogicalDevice() {
         deviceBuilder.add_pNext(&enabled12);
     }
 
-    // VK_KHR_synchronization2, taken when the device offers it and skipped
-    // when it does not. Core in Vulkan 1.3, but MoltenVK advertises 1.2 with
-    // the extension present, so requiring 1.3 would drop the platform this is
-    // developed on for a feature it actually has.
-    // Two ways in, because a 1.3 device has it in core and need not advertise
-    // the extension string at all, while a 1.2 device only has the extension.
-    // Checking one and not the other would take the legacy path on hardware
-    // that supports it natively.
+    // synchronization2, which is core at the 1.3 this build now requires -
+    // so there is no extension to ask for and no legacy device to ask it of.
+    // The feature still has to be enabled explicitly, and the entry point is
+    // still checked for below, because a driver advertising a version is not
+    // the same as one that resolves every symbol in it.
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2Features{};
     sync2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
     if (sync2Available) {
         sync2Features.synchronization2 = VK_TRUE;
         deviceBuilder.add_pNext(&sync2Features);
         synchronization2Supported_ = true;
-        LOG_INFO("Enabling synchronization2 (", sync2IsCore_ ? "core 1.3" : "KHR extension", ")");
+        LOG_INFO("Enabling synchronization2 (core 1.3)");
     } else {
         LOG_INFO("synchronization2 not available - barriers use the legacy entry point");
     }
@@ -853,19 +858,18 @@ bool VkContext::createLogicalDevice() {
     auto vkbDevice = devRet.value();
     device = vkbDevice.device;
 
-    // Resolved once here rather than per barrier. The KHR entry point is the
-    // one to ask for: on a 1.2 instance the promoted vkCmdPipelineBarrier2
-    // name is not loadable even when the extension is present.
+    // Resolved once here rather than per barrier. The core name, since the
+    // instance is 1.3: the KHR alias was needed only while a 1.2 instance
+    // might have the extension without the promoted symbol.
     if (synchronization2Supported_) {
-        cmdPipelineBarrier2_ = reinterpret_cast<PFN_vkCmdPipelineBarrier2KHR>(
-            vkGetDeviceProcAddr(device,
-                sync2IsCore_ ? "vkCmdPipelineBarrier2" : "vkCmdPipelineBarrier2KHR"));
+        cmdPipelineBarrier2_ = reinterpret_cast<PFN_vkCmdPipelineBarrier2>(
+            vkGetDeviceProcAddr(device, "vkCmdPipelineBarrier2"));
         if (cmdPipelineBarrier2_ == nullptr) {
             // Advertised but not loadable. Nothing to do but take the legacy
             // path, which every barrier already falls back to.
             synchronization2Supported_ = false;
-            LOG_WARNING("VK_KHR_synchronization2 enabled but vkCmdPipelineBarrier2KHR "
-                        "did not resolve - using the legacy entry point");
+            LOG_WARNING("synchronization2 enabled but vkCmdPipelineBarrier2 did "
+                        "not resolve - using the legacy entry point");
         }
     }
     setPipelineBarrier2Fn(cmdPipelineBarrier2_);

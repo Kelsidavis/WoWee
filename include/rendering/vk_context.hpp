@@ -393,8 +393,6 @@ private:
     /// back to a legacy vkCmdPipelineBarrier when this is false.
     bool synchronization2Supported_ = false;
     /// Whether it came from core 1.3 rather than the extension. Decides which
-    /// entry point name resolves - the promoted one is not loadable on 1.2.
-    bool sync2IsCore_ = false;
     PFN_vkCmdPipelineBarrier2KHR cmdPipelineBarrier2_ = nullptr;
 
     /// VK_EXT_host_image_copy. When present, pixels go from host memory into
