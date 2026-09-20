@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "imgui.h"
+#include "core/application.hpp"
 #include "ui/paper_ui.hpp"
 
 namespace wowee::ui {
@@ -112,19 +113,39 @@ bool FirstRunScreen::render() {
         ImVec2(viewport->WorkPos.x + (viewport->WorkSize.x - width) * 0.5f,
                viewport->WorkPos.y + margin));
     ImGui::SetNextWindowSize(ImVec2(width, height));
-    ImGui::Begin("Before you can play", nullptr,
+    // Two ways in want two titles, and "###" keeps one window identity
+    // behind them so the scroll position does not reset when it changes.
+    const bool alreadyHaveAssets =
+        core::Application::getInstance().getAssetInventory().anyUsable();
+    ImGui::Begin(alreadyHaveAssets ? "Game assets###firstrun"
+                                   : "Before you can play###firstrun", nullptr,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
     // Text and everything ImGui sizes from it - field heights, button
     // heights, the log pane - come up together.
     ImGui::SetWindowFontScale(scale);
 
-    // Why this screen is in the way, said once at the top. Without it the
-    // panel reads as a tool that opened for no reason.
-    ImGui::TextWrapped(
-        "WoWee has no game assets yet, so there is nothing to log in to. Point it at a "
-        "World of Warcraft installation you own and it will build what it needs. "
-        "Nothing is written into that installation.");
+    // Two ways in, and they need different sentences. A first run arrives
+    // here because there is nothing to play with; somebody who came from the
+    // login screen already has a game and wants another, and telling them
+    // they have no assets would be wrong.
+    if (alreadyHaveAssets) {
+        // And a way back, which a first run neither needs nor should have:
+        // there is nowhere for it to go.
+        if (ImGui::Button("Back to login")) {
+            core::Application::getInstance().setState(core::AppState::AUTHENTICATION);
+        }
+        ImGui::Spacing();
+        ImGui::TextWrapped(
+            "Build another game into the same folder, or rebuild what is already there. "
+            "The client offers everything it finds at the login screen. Nothing is "
+            "written into the installation you build from.");
+    } else {
+        ImGui::TextWrapped(
+            "WoWee has no game assets yet, so there is nothing to log in to. Point it at a "
+            "World of Warcraft installation you own and it will build what it needs. "
+            "Nothing is written into that installation.");
+    }
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
@@ -140,7 +161,7 @@ bool FirstRunScreen::render() {
         // path that was empty at the time, and the interface's glyph atlas
         // cannot be rebuilt mid-session either. Reopening is one line to say
         // and nothing to go wrong; re-running all of that in place is not.
-        ImGui::TextWrapped("Assets built. Close WoWee and open it again to play.");
+        ImGui::TextWrapped("Assets built. Close WoWee and open it again to use them.");
     }
 
     ImGui::End();

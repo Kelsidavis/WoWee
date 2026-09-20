@@ -555,6 +555,9 @@ void AuthScreen::renderCard(auth::AuthHandler& authHandler, float screenW, float
             advancedH += smallRow + px(kRowGap);             // the one line instead
         }
         if (codeInAdvanced) advancedH += fieldRow + px(kRowGap);
+#ifdef WOWEE_HAVE_ASSET_PANEL
+        advancedH += smallRow + px(kRowGap);             // the assets link
+#endif
     }
 
     // The title, its rule and the gap under it, measured once and laid out from
@@ -902,6 +905,27 @@ void AuthScreen::renderCard(auth::AuthHandler& authHandler, float screenW, float
             if (ui_.field("pin", a, b, pinCode_, opts).submitted) submit = true;
             col.gap(px(kRowGap));
         }
+
+#ifdef WOWEE_HAVE_ASSET_PANEL
+        // The way back to the asset builder once there is already something
+        // installed. It is the screen a first run opens on, and without a
+        // door to it from here the only way to add a second game - or to
+        // rebuild the one that is there - was to go and find the separate
+        // program that draws the same panel.
+        {
+            // A link rather than a button, and nothing explaining it. With
+            // this section open the card is already the tallest thing on the
+            // screen - a button's worth of height pushed the footer off the
+            // bottom edge - and the panel it opens says all of this at the
+            // top of itself. Same shape as the disclosure above it.
+            const char* label = "add or rebuild assets...";
+            const float w = ui_.textWidth(label, smallSize);
+            if (ui_.link("assets", ImVec2(centreX - w * 0.5f, col.y), label, smallSize)) {
+                core::Application::getInstance().setState(core::AppState::FIRST_RUN);
+            }
+            col.gap(smallRow + px(kRowGap));
+        }
+#endif
     }
 
     // ---- footer ----------------------------------------------------------
