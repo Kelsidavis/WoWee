@@ -101,6 +101,21 @@ struct App {
     /// written from the packing thread and read while laying the window out.
     mutable std::mutex packMutex;
     bool offeredSave = false;
+    /// The pack or import in flight, held rather than detached.
+    ///
+    /// Both workers write through this App for as long as they run. Detached,
+    /// closing the window during one left it writing into an App that main had
+    /// already destroyed. One thread covers both because the buttons that
+    /// start them are disabled while either is running.
+    std::thread packThread;
+
+    /// Same shape as ~Job: ask the worker to stop, then wait for it. The body
+    /// runs before any member above is destroyed, so the thread is gone before
+    /// what it writes to is.
+    ~App() {
+        packCancel.store(true);
+        if (packThread.joinable()) packThread.join();
+    }
 };
 
 void wrapped(const char* text) {
@@ -383,7 +398,10 @@ void startPack(App& app, const std::string& profileId) {
         std::lock_guard<std::mutex> lock(app.packMutex);
         app.packNote = "Packing...";
     }
-    std::thread([&app, out, dest, name]() {
+    // Joined, not detached. The button above is disabled while either worker
+    // runs, so anything still joinable here has already finished.
+    if (app.packThread.joinable()) app.packThread.join();
+    app.packThread = std::thread([&app, out, dest, name]() {
         PackResult result = writePack(
             out, dest, name,
             [&app](std::size_t done, std::size_t total) {
@@ -405,7 +423,7 @@ void startPack(App& app, const std::string& profileId) {
             app.packNote = line;
         }
         app.packing.store(false);
-    }).detach();
+    });
 }
 
 /// Install a pack somebody else built, into the same tree a build writes to.
@@ -427,7 +445,8 @@ void startImport(App& app, const std::string& zipPath) {
         app.packNote = "Installing " + (info.name.empty() ? std::string("a pack") : info.name) +
                        " - " + std::to_string(info.files) + " files...";
     }
-    std::thread([&app, zipPath, out]() {
+    if (app.packThread.joinable()) app.packThread.join();
+    app.packThread = std::thread([&app, zipPath, out]() {
         PackResult result = readPack(
             zipPath, out,
             [&app](std::size_t done, std::size_t total) {
@@ -447,7 +466,7 @@ void startImport(App& app, const std::string& zipPath) {
             app.packNote = line;
         }
         app.importing.store(false);
-    }).detach();
+    });
 }
 
 /// How much of the window the actions need reserved at the bottom.
@@ -632,11 +651,23 @@ float displayScale(SDL_Window* window, SDL_Renderer* renderer) {
     return std::max(1.0f, float(pixelWidth) / float(windowWidth));
 }
 
+/// A startup failure, said somewhere it will be seen.
+///
+/// This is a windowed program on Windows, so it has no console to print to:
+/// stderr goes nowhere and a double-click on a machine that cannot open a
+/// window looked exactly like nothing happening at all. SDL's own box needs no
+/// platform code and works before SDL_Init, so the one case that has no window
+/// yet is covered too.
+void startupFailure(const char* what) {
+    std::fprintf(stderr, "%s\n", what);
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "WoWee Asset Manager", what, nullptr);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        std::fprintf(stderr, "SDL could not start: %s\n", SDL_GetError());
+        startupFailure((std::string("SDL could not start: ") + SDL_GetError()).c_str());
         return 1;
     }
 
@@ -654,7 +685,7 @@ int main(int argc, char** argv) {
         "WoWee Asset Manager", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         wide, high, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (window == nullptr) {
-        std::fprintf(stderr, "Could not open a window: %s\n", SDL_GetError());
+        startupFailure((std::string("Could not open a window: ") + SDL_GetError()).c_str());
         SDL_Quit();
         return 1;
     }
@@ -666,7 +697,7 @@ int main(int argc, char** argv) {
         renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
     }
     if (renderer == nullptr) {
-        std::fprintf(stderr, "Could not draw: %s\n", SDL_GetError());
+        startupFailure((std::string("Could not draw: ") + SDL_GetError()).c_str());
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
@@ -823,7 +854,10 @@ int main(int argc, char** argv) {
         SDL_RenderPresent(renderer);
     }
 
+    // Both workers are told to stop here and waited for in ~App, so they wind
+    // down while SDL is being torn down rather than after it.
     app.job.cancel();
+    app.packCancel.store(true);
     ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
