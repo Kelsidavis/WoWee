@@ -1191,10 +1191,21 @@ void ChatHandler::fireChatEvent(const MessageChatData& msg) {
     // one thing the callback that used to announce these as well did better,
     // and it is here now so nothing was lost when that went.
     const int channelIndex = getChannelIndex(msg.channelName);
+    // arg2 is the name the interface prints, and for a whisper the player
+    // sent that is who it went to, not who wrote it: CHAT_WHISPER_INFORM_GET
+    // is "To %s: " and reads the same argument CHAT_WHISPER_GET does. The
+    // other announce path already does this; this one did not, and this is
+    // the path an outgoing whisper actually takes - the server's echo is
+    // dropped in favour of the local row made on send - so every whisper the
+    // player sent came back addressed to the player.
+    const std::string& shownName =
+        (msg.type == ChatType::WHISPER_INFORM && !msg.receiverName.empty())
+            ? msg.receiverName
+            : senderName;
     owner_.addonEventCallbackRef()(eventName, {
-        msg.message, senderName,
+        msg.message, shownName,
         owner_.getLanguageName(static_cast<uint32_t>(msg.language)),
-        msg.channelName, senderName, "", "0", std::to_string(channelIndex),
+        msg.channelName, msg.receiverName, "", "0", std::to_string(channelIndex),
         msg.channelName, "0", "0", guidBuf
     });
 }
