@@ -1,5 +1,19 @@
 # Changelog
 
+## [v3.1.30] - 2026-09-20
+
+### Added
+- **The asset builder is in the client.** Somebody who installs WoWee and has extracted nothing reaches a login screen they cannot get past: the callbacks that carry a login through are the ones that need assets, so an account could be typed and nothing happened. The client now opens the builder instead, drawn from the same panel the standalone `wowee_assets` window draws - the whole of it is ImGui against the job and scan code, so one source serves both, one through SDL_Renderer and one through the client's Vulkan. It is styled as the page it stands on: cream paper, brown ink, the login card's own crayons, and sized by the figure that card sizes itself by, having first come out at ImGui's fixed thirteen pixels and read as fine print beside it. A build still wants the client reopened afterwards - the asset manager, the DBC tables, the model and terrain loaders and the addon environment are all built once at startup from a path that was empty, and the glyph atlas cannot be rebuilt mid-session
+- **"more options" on the login screen reaches it too.** The builder was only ever seen on a first run, so adding a second game to the same folder, or rebuilding the one that is there, meant going and finding a separate program. Opened this way it offers a way back and says what it is for; a first run has nowhere to go back to and does not
+- **Extraction says how far along it is.** It is the long stage of a build - minutes on a real game - and the bar counted whole stages, so it sat on a boundary throughout and read as a hang. The extractor reports every 128 files and once at the end, the bar fills within the stage, and the log names a figure every few thousand files so there is something moving to look at
+- **ChromieCraft is in the server list.** It is the server this client is developed against, and its address was something to go and look up
+
+### Fixed
+- **The login screen asked for an account on a server it never named.** Which realm you are logging into is the question that comes before who you are, and it sat three rows down behind "more options" - while a first run defaulted the address to `localhost`, a server nobody new has. The list is in the card now, above the account it belongs with, and carries the servers this client is known to work against. Choosing "somewhere else" still opens the address box, which is all that stays behind the disclosure
+- **A whisper you sent came back addressed to you.** FrameXML prints one with `CHAT_WHISPER_INFORM_GET` - "To %s: " - which reads the second argument of the chat event, and that argument was the sender. On your own whisper the sender is you. There are two paths that announce a message and only one had been fixed; the one that had not is the one an outgoing whisper actually takes, the server's own echo being dropped in favour of the row the client makes on send
+- **The first step of a build described the build rather than the choice.** "Where is your game?" over "the World of Warcraft folder you want to build from" names what the program then does with the answer. Somebody deciding which of two installations to point at is choosing whose art and sounds they will be looking at, and it says so
+- **The builder's last button ran past the edge of the card.** Its three buttons had fixed widths that added up inside the standalone window and stopped adding up once the client drew the panel larger. They are shares of the width available now, so the row fits whatever it is given
+
 ## [v3.1.29] - 2026-09-20
 
 ### Fixed
