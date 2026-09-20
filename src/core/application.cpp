@@ -1396,11 +1396,11 @@ void Application::run() {
             // a black screen it never came back from. SDL sends these on the
             // same thread as the loop, so the teardown happens before the
             // window is gone rather than after.
-            if (event.type == SDL_APP_WILLENTERBACKGROUND) {
+            if (event.type == SDL_EVENT_WILL_ENTER_BACKGROUND) {
                 if (window && window->getVkContext()) {
                     window->getVkContext()->releaseSurface();
                 }
-            } else if (event.type == SDL_APP_DIDENTERFOREGROUND) {
+            } else if (event.type == SDL_EVENT_DID_ENTER_FOREGROUND) {
                 if (window && window->getVkContext()) {
                     // Pixels: a surface is built at the drawable size, which
                     // is not the window size on a high density display.
