@@ -27,6 +27,15 @@ namespace fs = std::filesystem;
 /// The log pane, once a build is running.
 constexpr float kLogHeight = 200.0f;
 
+/// Button sizes are written in the units ImGui's own thirteen-pixel face was
+/// laid out against. The client draws this panel at the scale its login card
+/// uses, so the text grows and a fixed box clips it - "Save what I have as a
+/// pack" came out as "...as a pac".
+ImVec2 buttonSize(float wide, float high) {
+    const float k = ImGui::GetFontSize() / 13.0f;
+    return ImVec2(wide * k, high * k);
+}
+
 void wrapped(const char* text) {
     ImGui::PushTextWrapPos(ImGui::GetContentRegionAvail().x);
     ImGui::TextUnformatted(text);
@@ -379,7 +388,9 @@ void startImport(App& app, const std::string& zipPath) {
 /// matter least.
 float actionsHeight(const App& app) {
     const ImGuiStyle& style = ImGui::GetStyle();
-    float height = 32.0f + style.ItemSpacing.y * 2.0f + style.FramePadding.y * 2.0f;
+    // The button row, at whatever size the buttons themselves came out.
+    const float k = ImGui::GetFontSize() / 13.0f;
+    float height = 32.0f * k + style.ItemSpacing.y * 2.0f + style.FramePadding.y * 2.0f;
     {
         std::lock_guard<std::mutex> lock(app.packMutex);
         if (!app.packNote.empty()) height += ImGui::GetTextLineHeightWithSpacing();
@@ -387,7 +398,7 @@ float actionsHeight(const App& app) {
     if (app.started) {
         height += ImGui::GetFrameHeightWithSpacing();        // the progress bar
         height += ImGui::GetTextLineHeightWithSpacing();     // what it is doing
-        height += kLogHeight + style.ItemSpacing.y * 2.0f;
+        height += kLogHeight * k + style.ItemSpacing.y * 2.0f;
     }
     return height;
 }
@@ -402,7 +413,7 @@ void drawRun(App& app) {
                                      haveLater(app), nullptr);
 
     ImGui::BeginDisabled(!ok || busy);
-    if (ImGui::Button("Build my assets", ImVec2(180, 32))) {
+    if (ImGui::Button("Build my assets", buttonSize(180, 32))) {
         std::string out = app.outputDir;
         if (out.empty()) out = (fs::current_path() / "Data").string();
         // The folder the scan found the archives in, not the one that was
@@ -423,7 +434,7 @@ void drawRun(App& app) {
 
     if (app.job.running()) {
         ImGui::SameLine();
-        if (ImGui::Button("Stop", ImVec2(90, 32))) app.job.cancel();
+        if (ImGui::Button("Stop", buttonSize(90, 32))) app.job.cancel();
     }
 
     // Installing somebody else's pack asks nothing about your game, so it is
@@ -431,7 +442,7 @@ void drawRun(App& app) {
     // point at and nothing to choose.
     ImGui::SameLine();
     ImGui::BeginDisabled(busy);
-    if (ImGui::Button("Install a pack...", ImVec2(170, 32))) {
+    if (ImGui::Button("Install a pack...", buttonSize(170, 32))) {
         std::string chosen;
         if (app.picker.ask(PickWhat::File, "Choose a pack to install", app.outputDir,
                            ".zip", &chosen)) {
@@ -452,7 +463,7 @@ void drawRun(App& app) {
                                  ? "Save all " + std::to_string(inside.size()) +
                                        " as one pack"
                                  : std::string("Save what I have as a pack");
-    if (ImGui::Button(save.c_str(), ImVec2(260, 32))) {
+    if (ImGui::Button(save.c_str(), buttonSize(260, 32))) {
         startPack(app, profile.id);
     }
     ImGui::EndDisabled();
@@ -472,7 +483,8 @@ void drawRun(App& app) {
         }
 
         ImGui::Spacing();
-        if (ImGui::BeginChild("log", ImVec2(0, kLogHeight), ImGuiChildFlags_Borders)) {
+        const float logHigh = kLogHeight * (ImGui::GetFontSize() / 13.0f);
+        if (ImGui::BeginChild("log", ImVec2(0, logHigh), ImGuiChildFlags_Borders)) {
             for (const std::string& line : app.job.log()) {
                 ImGui::TextUnformatted(line.c_str());
             }
@@ -506,10 +518,9 @@ bool finishedSuccessfully(const App& app) {
 }
 
 void drawPanel(App& app) {
-    dimmed("Builds the assets this client reads out of a World of Warcraft "
-           "install you own. Nothing is written into the install itself.");
-    ImGui::Spacing();
-
+    // No standing header here: the standalone window and the client each say
+    // why the panel is in front of somebody, and they do not say the same
+    // thing. Drawn here it was said twice in the client.
     // The questions scroll; the button that answers them does not. With
     // everything in one scrolling page, adding a line anywhere above pushed
     // Build off the bottom of the window - the one control the whole

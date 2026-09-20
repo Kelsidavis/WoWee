@@ -4,6 +4,7 @@
 #include <vector>
 #include <atomic>
 #include <cstdint>
+#include <functional>
 
 namespace wowee {
 namespace tools {
@@ -42,6 +43,18 @@ public:
         bool emitWom = false;          // M2 (+skin) → WOM side-files
         bool emitWob = false;          // WMO (+groups) → WOB side-files
         bool emitTerrain = false;      // ADT → WHM + WOT + WOC side-files
+
+        /// Called as files come out, with how many are done and how many
+        /// there are. Optional, and throttled by the caller of it rather
+        /// than by whoever supplies it - a real extraction is hundreds of
+        /// thousands of files and a lock per file would cost more than the
+        /// extraction.
+        ///
+        /// Without this the only sign of life during the longest stage of a
+        /// build was a line of stdout nobody reads: the window's progress
+        /// bar counts whole stages, so it sat still for minutes and read as
+        /// a hang. Same shape as writePack's.
+        std::function<void(std::size_t done, std::size_t total)> onProgress;
     };
 
     struct Stats {

@@ -2,6 +2,8 @@
 
 #ifdef WOWEE_HAVE_ASSET_PANEL
 
+#include <algorithm>
+
 #include "imgui.h"
 #include "ui/paper_ui.hpp"
 
@@ -11,10 +13,25 @@ namespace {
 
 /// Wide enough for a path and the Browse button beside it without the field
 /// collapsing, and short enough to leave the backdrop visible around it.
-constexpr float kCardWidth = 900.0f;
-constexpr float kCardMargin = 60.0f;
+/// Both are in the same units the login card is laid out in, and scaled by
+/// the same figure below.
+constexpr float kCardWidth = 700.0f;
+constexpr float kCardMargin = 40.0f;
 
 ImVec4 fromU32(ImU32 colour) { return ImGui::ColorConvertU32ToFloat4(colour); }
+
+/// The figure the login card sizes itself by, so this screen is drawn at the
+/// same size as the one it stands in front of.
+///
+/// ImGui's own layout is in pixels and its built-in face is thirteen of them,
+/// which on the display this was written on is about two thirds the height of
+/// the card's smallest text - so the panel came out as fine print beside it.
+/// A share of the window rather than a count of pixels, for the reason
+/// AuthScreen gives where this is copied from.
+float screenScale() {
+    const ImVec2 screen = ImGui::GetIO().DisplaySize;
+    return std::clamp(std::min(screen.x / 1280.0f, screen.y / 760.0f), 0.62f, 2.6f);
+}
 
 /// Dress ImGui as the page the rest of the pre-game screens are drawn on.
 ///
@@ -34,7 +51,10 @@ int pushPaperStyle(const PaperTheme& theme) {
     ImGui::PushStyleColor(ImGuiCol_PopupBg, paper);
     ImGui::PushStyleColor(ImGuiCol_Border, edge);
     ImGui::PushStyleColor(ImGuiCol_Text, ink);
-    ImGui::PushStyleColor(ImGuiCol_TextDisabled, fromU32(theme.pencil));
+    // inkSoft rather than pencil: pencil is the card's faintest tone, chosen
+    // for short hints beside something darker. Whole paragraphs are set in
+    // this, and at that length it stops being readable.
+    ImGui::PushStyleColor(ImGuiCol_TextDisabled, fromU32(theme.inkSoft));
     ImGui::PushStyleColor(ImGuiCol_TitleBg, fromU32(theme.paperBottom));
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, fromU32(theme.paperBottom));
     ImGui::PushStyleColor(ImGuiCol_FrameBg, field);
@@ -73,22 +93,31 @@ FirstRunScreen::FirstRunScreen() {
 
 bool FirstRunScreen::render() {
     const PaperTheme theme;
+    const float scale = screenScale();
     const int pushed = pushPaperStyle(theme);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 20.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f * scale, 20.0f * scale));
+    // Room to breathe, at the same scale. ImGui's defaults are tight for a
+    // form somebody is reading rather than a debug panel.
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f * scale, 7.0f * scale));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(7.0f * scale, 5.0f * scale));
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    const float width = std::min(kCardWidth, viewport->WorkSize.x - kCardMargin * 2.0f);
-    const float height = viewport->WorkSize.y - kCardMargin * 2.0f;
+    const float margin = kCardMargin * scale;
+    const float width = std::min(kCardWidth * scale, viewport->WorkSize.x - margin * 2.0f);
+    const float height = viewport->WorkSize.y - margin * 2.0f;
 
     ImGui::SetNextWindowPos(
         ImVec2(viewport->WorkPos.x + (viewport->WorkSize.x - width) * 0.5f,
-               viewport->WorkPos.y + kCardMargin));
+               viewport->WorkPos.y + margin));
     ImGui::SetNextWindowSize(ImVec2(width, height));
     ImGui::Begin("Before you can play", nullptr,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
+    // Text and everything ImGui sizes from it - field heights, button
+    // heights, the log pane - come up together.
+    ImGui::SetWindowFontScale(scale);
 
     // Why this screen is in the way, said once at the top. Without it the
     // panel reads as a tool that opened for no reason.
@@ -115,7 +144,7 @@ bool FirstRunScreen::render() {
     }
 
     ImGui::End();
-    ImGui::PopStyleVar(3);
+    ImGui::PopStyleVar(5);
     ImGui::PopStyleColor(pushed);
     return done;
 }
