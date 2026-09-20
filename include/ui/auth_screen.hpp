@@ -81,6 +81,10 @@ private:
         std::string passwordHash;  // SHA1 hex (UPPER(user):UPPER(pass))
         std::string expansionId;   // "wotlk", "tbc", "classic", "turtle", ...
         std::string assetProfileId; // empty=match protocol, "legacy"=root manifest
+        /// What to call it in the list, for the servers this client already
+        /// knows about. Empty for one somebody typed in themselves, which has
+        /// no name beyond its address.
+        std::string label;
     };
 
     // UI state
@@ -174,6 +178,13 @@ private:
     bool loginInfoLoaded = false;
 
     static std::string makeServerKey(const std::string& host, int port);
+    /// How one reads in the server list: its name if this client knows one,
+    /// its address otherwise, and the account already saved against it.
+    static std::string serverRowLabel(const ServerProfile& s);
+    /// Put the servers this client is known to work against into the list, so
+    /// that a first run offers somewhere to actually connect to rather than a
+    /// blank address box and a realmlist to go and look up.
+    void seedKnownServers();
     void selectServerProfile(int index);
     void upsertCurrentServerProfile(bool includePasswordHash);
     [[nodiscard]] std::string currentExpansionId() const;
