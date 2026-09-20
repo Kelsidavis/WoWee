@@ -44,7 +44,7 @@
 #include "core/app_clock.hpp"
 #include "core/window.hpp"
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "game/expansion_profile.hpp"
 #include "core/coordinates.hpp"
 #include "rendering/world_map/coordinate_projection.hpp"
@@ -3580,20 +3580,20 @@ static int lua_GetWeaponEnchantInfo(lua_State* L) {
 /// falsely, because a shift-click means something different from a click and
 /// FrameXML asks these on every button press.
 static int lua_IsShiftKeyDown(lua_State* L) {
-    lua_pushboolean(L, (SDL_GetModState() & KMOD_SHIFT) != 0);
+    lua_pushboolean(L, (SDL_GetModState() & SDL_KMOD_SHIFT) != 0);
     return 1;
 }
 static int lua_IsControlKeyDown(lua_State* L) {
-    lua_pushboolean(L, (SDL_GetModState() & KMOD_CTRL) != 0);
+    lua_pushboolean(L, (SDL_GetModState() & SDL_KMOD_CTRL) != 0);
     return 1;
 }
 static int lua_IsAltKeyDown(lua_State* L) {
-    lua_pushboolean(L, (SDL_GetModState() & KMOD_ALT) != 0);
+    lua_pushboolean(L, (SDL_GetModState() & SDL_KMOD_ALT) != 0);
     return 1;
 }
 static int lua_IsModifierKeyDown(lua_State* L) {
     const SDL_Keymod m = SDL_GetModState();
-    lua_pushboolean(L, (m & (KMOD_SHIFT | KMOD_CTRL | KMOD_ALT)) != 0);
+    lua_pushboolean(L, (m & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT)) != 0);
     return 1;
 }
 

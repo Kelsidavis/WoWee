@@ -34,7 +34,7 @@
 #include "game/transport_manager.hpp"
 #include "game/world.hpp"
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -614,13 +614,12 @@ void WorldLoader::loadMapGeometry(uint32_t mapId, const std::string& mapName,
                 app_.beatWatchdog();
                 SDL_Event event;
                 while (SDL_PollEvent(&event)) {
-                    if (event.type == SDL_QUIT) {
+                    if (event.type == SDL_EVENT_QUIT) {
                         window_->setShouldClose(true);
                         loadingScreen->shutdown();
                         return;
                     }
-                    if (event.type == SDL_WINDOWEVENT &&
-                        event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    if (event.type == SDL_EVENT_WINDOW_RESIZED) {
                         int w = event.window.data1;
                         int h = event.window.data2;
                         window_->setSize(w, h);
@@ -729,13 +728,12 @@ void WorldLoader::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
     auto showProgress = [&](const char* msg, float progress) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
+            if (event.type == SDL_EVENT_QUIT) {
                 window_->setShouldClose(true);
                 loadingScreen.shutdown();
                 return;
             }
-            if (event.type == SDL_WINDOWEVENT &&
-                event.window.event == SDL_WINDOWEVENT_RESIZED) {
+            if (event.type == SDL_EVENT_WINDOW_RESIZED) {
                 int w = event.window.data1;
                 int h = event.window.data2;
                 window_->setSize(w, h);
@@ -1070,13 +1068,12 @@ void WorldLoader::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
         while (true) {
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
-                if (event.type == SDL_QUIT) {
+                if (event.type == SDL_EVENT_QUIT) {
                     window_->setShouldClose(true);
                     if (loadingScreenOk) loadingScreen.shutdown();
                     return;
                 }
-                if (event.type == SDL_WINDOWEVENT &&
-                    event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                if (event.type == SDL_EVENT_WINDOW_RESIZED) {
                     int w = event.window.data1;
                     int h = event.window.data2;
                     window_->setSize(w, h);

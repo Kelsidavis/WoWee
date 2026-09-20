@@ -99,9 +99,9 @@ TEST_CASE("no button is given two jobs and no job two buttons") {
         CHECK(buttons.insert(static_cast<int>(binding.button)).second);
         CHECK(keys.insert(static_cast<int>(binding.key)).second);
         CHECK(binding.button >= 0);
-        CHECK(binding.button < SDL_CONTROLLER_BUTTON_MAX);
+        CHECK(binding.button < SDL_GAMEPAD_BUTTON_COUNT);
         CHECK(binding.key > SDL_SCANCODE_UNKNOWN);
-        CHECK(binding.key < SDL_NUM_SCANCODES);
+        CHECK(binding.key < SDL_SCANCODE_COUNT);
         // Every row is shown to a player, so every row needs a name.
         REQUIRE(binding.what != nullptr);
         CHECK(binding.what[0] != '\0');
@@ -237,19 +237,19 @@ TEST_CASE("a pad is told what its own buttons are called") {
     // way round, so the bottom button - the one this client jumps on - is
     // printed B, and telling a Switch player to press A would send them to
     // the button that closes windows.
-    CHECK(std::string(padButtonLabel(SDL_CONTROLLER_BUTTON_A, Kind::Xbox)) == "A");
-    CHECK(std::string(padButtonLabel(SDL_CONTROLLER_BUTTON_A, Kind::PlayStation)) == "Cross");
-    CHECK(std::string(padButtonLabel(SDL_CONTROLLER_BUTTON_A, Kind::Nintendo)) == "B");
-    CHECK(std::string(padButtonLabel(SDL_CONTROLLER_BUTTON_B, Kind::Nintendo)) == "A");
-    CHECK(std::string(padButtonLabel(SDL_CONTROLLER_BUTTON_X, Kind::Nintendo)) == "Y");
-    CHECK(std::string(padButtonLabel(SDL_CONTROLLER_BUTTON_Y, Kind::Nintendo)) == "X");
+    CHECK(std::string(padButtonLabel(SDL_GAMEPAD_BUTTON_SOUTH, Kind::Xbox)) == "A");
+    CHECK(std::string(padButtonLabel(SDL_GAMEPAD_BUTTON_SOUTH, Kind::PlayStation)) == "Cross");
+    CHECK(std::string(padButtonLabel(SDL_GAMEPAD_BUTTON_SOUTH, Kind::Nintendo)) == "B");
+    CHECK(std::string(padButtonLabel(SDL_GAMEPAD_BUTTON_EAST, Kind::Nintendo)) == "A");
+    CHECK(std::string(padButtonLabel(SDL_GAMEPAD_BUTTON_WEST, Kind::Nintendo)) == "Y");
+    CHECK(std::string(padButtonLabel(SDL_GAMEPAD_BUTTON_NORTH, Kind::Nintendo)) == "X");
 
     // The Deck keeps the Xbox letters and adds four on the back.
-    CHECK(std::string(padButtonLabel(SDL_CONTROLLER_BUTTON_A, Kind::SteamDeck)) == "A");
-    CHECK(std::string(padButtonLabel(SDL_CONTROLLER_BUTTON_PADDLE1, Kind::SteamDeck)) == "L4");
-    CHECK(std::string(padButtonLabel(SDL_CONTROLLER_BUTTON_PADDLE2, Kind::SteamDeck)) == "R4");
-    CHECK(std::string(padButtonLabel(SDL_CONTROLLER_BUTTON_PADDLE3, Kind::SteamDeck)) == "L5");
-    CHECK(std::string(padButtonLabel(SDL_CONTROLLER_BUTTON_PADDLE4, Kind::SteamDeck)) == "R5");
+    CHECK(std::string(padButtonLabel(SDL_GAMEPAD_BUTTON_SOUTH, Kind::SteamDeck)) == "A");
+    CHECK(std::string(padButtonLabel(SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1, Kind::SteamDeck)) == "L4");
+    CHECK(std::string(padButtonLabel(SDL_GAMEPAD_BUTTON_LEFT_PADDLE1, Kind::SteamDeck)) == "R4");
+    CHECK(std::string(padButtonLabel(SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2, Kind::SteamDeck)) == "L5");
+    CHECK(std::string(padButtonLabel(SDL_GAMEPAD_BUTTON_LEFT_PADDLE2, Kind::SteamDeck)) == "R5");
 
     // A pad SDL has no family for still gets a name for every button, or the
     // settings panel would list a scheme with holes in it.
@@ -282,11 +282,11 @@ TEST_CASE("every bound button has a name a player would recognise") {
     }
     // And the two that are not in the table, because they go through ImGui
     // rather than through a scancode, are still named.
-    CHECK(std::string(wowee::ui::padButtonLabel(SDL_CONTROLLER_BUTTON_B,
+    CHECK(std::string(wowee::ui::padButtonLabel(SDL_GAMEPAD_BUTTON_EAST,
                                                wowee::core::Gamepad::Kind::Xbox)) == "B");
-    CHECK(std::string(wowee::ui::padButtonLabel(SDL_CONTROLLER_BUTTON_START,
+    CHECK(std::string(wowee::ui::padButtonLabel(SDL_GAMEPAD_BUTTON_START,
                                                wowee::core::Gamepad::Kind::Xbox)) == "Start");
-    CHECK(std::string(wowee::ui::padButtonLabel(SDL_CONTROLLER_BUTTON_BACK,
+    CHECK(std::string(wowee::ui::padButtonLabel(SDL_GAMEPAD_BUTTON_BACK,
                                                wowee::core::Gamepad::Kind::Xbox)) == "Back");
 }
 
@@ -334,20 +334,20 @@ TEST_CASE("every pad button has a binding name of its own") {
     // The names are saved in bindings.cfg and compared as strings, so two
     // buttons sharing one would be bound together.
     std::set<std::string> names;
-    for (int b = 0; b < SDL_CONTROLLER_BUTTON_TOUCHPAD; ++b) {
+    for (int b = 0; b < SDL_GAMEPAD_BUTTON_TOUCHPAD; ++b) {
         INFO(b);
-        const std::string name = wowee::ui::padKeyName(static_cast<SDL_GameControllerButton>(b));
+        const std::string name = wowee::ui::padKeyName(static_cast<SDL_GamepadButton>(b));
         REQUIRE_FALSE(name.empty());
         CHECK(name.rfind("PAD", 0) == 0);
         CHECK(names.insert(name).second);
     }
     // The touchpad click is the pointer's, and is not bindable.
-    CHECK(std::string(wowee::ui::padKeyName(SDL_CONTROLLER_BUTTON_TOUCHPAD)).empty());
+    CHECK(std::string(wowee::ui::padKeyName(SDL_GAMEPAD_BUTTON_TOUCHPAD)).empty());
     // Retail's spelling.
-    CHECK(std::string(wowee::ui::padKeyName(SDL_CONTROLLER_BUTTON_A)) == "PAD1");
-    CHECK(std::string(wowee::ui::padKeyName(SDL_CONTROLLER_BUTTON_Y)) == "PAD4");
-    CHECK(std::string(wowee::ui::padKeyName(SDL_CONTROLLER_BUTTON_DPAD_UP)) == "PADDUP");
-    CHECK(std::string(wowee::ui::padKeyName(SDL_CONTROLLER_BUTTON_START)) == "PADFORWARD");
+    CHECK(std::string(wowee::ui::padKeyName(SDL_GAMEPAD_BUTTON_SOUTH)) == "PAD1");
+    CHECK(std::string(wowee::ui::padKeyName(SDL_GAMEPAD_BUTTON_NORTH)) == "PAD4");
+    CHECK(std::string(wowee::ui::padKeyName(SDL_GAMEPAD_BUTTON_DPAD_UP)) == "PADDUP");
+    CHECK(std::string(wowee::ui::padKeyName(SDL_GAMEPAD_BUTTON_START)) == "PADFORWARD");
 }
 
 TEST_CASE("a button bound to a command the client polls presses the key it polls") {
@@ -371,16 +371,16 @@ TEST_CASE("a button bound to a command the client polls presses the key it polls
 TEST_CASE("binding a button to what the default scheme gave it changes nothing") {
     // A player who binds X to ACTIONBUTTON1 in the panel has asked for what X
     // already did, and must get the same key rather than a different one.
-    const std::map<SDL_GameControllerButton, std::string> sameCommand = {
-        {SDL_CONTROLLER_BUTTON_A,             "JUMP"},
-        {SDL_CONTROLLER_BUTTON_X,             "ACTIONBUTTON1"},
-        {SDL_CONTROLLER_BUTTON_Y,             "ACTIONBUTTON2"},
-        {SDL_CONTROLLER_BUTTON_DPAD_UP,       "ACTIONBUTTON3"},
-        {SDL_CONTROLLER_BUTTON_DPAD_RIGHT,    "ACTIONBUTTON4"},
-        {SDL_CONTROLLER_BUTTON_DPAD_DOWN,     "ACTIONBUTTON5"},
-        {SDL_CONTROLLER_BUTTON_DPAD_LEFT,     "ACTIONBUTTON6"},
-        {SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, "TARGETNEARESTENEMY"},
-        {SDL_CONTROLLER_BUTTON_LEFTSTICK,     "TOGGLEAUTORUN"},
+    const std::map<SDL_GamepadButton, std::string> sameCommand = {
+        {SDL_GAMEPAD_BUTTON_SOUTH,             "JUMP"},
+        {SDL_GAMEPAD_BUTTON_WEST,             "ACTIONBUTTON1"},
+        {SDL_GAMEPAD_BUTTON_NORTH,             "ACTIONBUTTON2"},
+        {SDL_GAMEPAD_BUTTON_DPAD_UP,       "ACTIONBUTTON3"},
+        {SDL_GAMEPAD_BUTTON_DPAD_RIGHT,    "ACTIONBUTTON4"},
+        {SDL_GAMEPAD_BUTTON_DPAD_DOWN,     "ACTIONBUTTON5"},
+        {SDL_GAMEPAD_BUTTON_DPAD_LEFT,     "ACTIONBUTTON6"},
+        {SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, "TARGETNEARESTENEMY"},
+        {SDL_GAMEPAD_BUTTON_LEFT_STICK,     "TOGGLEAUTORUN"},
     };
     const auto bindings = wowee::ui::padBindings();
     for (std::size_t i = 0; i < bindings.size(); ++i) {
@@ -423,8 +423,8 @@ TEST_CASE("the rows with no command are the ones the interface has no word for")
             commandless.insert(static_cast<int>(row.button));
         }
     }
-    CHECK(commandless.count(SDL_CONTROLLER_BUTTON_LEFTSHOULDER) == 1);
-    CHECK(commandless.count(SDL_CONTROLLER_BUTTON_RIGHTSTICK) == 1);
+    CHECK(commandless.count(SDL_GAMEPAD_BUTTON_LEFT_SHOULDER) == 1);
+    CHECK(commandless.count(SDL_GAMEPAD_BUTTON_RIGHT_STICK) == 1);
     CHECK(commandless.size() == 2);
 
     // And every extra has one: a paddle is an action slot and the share

@@ -15,10 +15,11 @@
 /// It uses SDL2 and Dear ImGui, both of which the client already carries, and
 /// calls Extractor::run in this process. Nothing is shelled out to.
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <cstdlib>
 #include <ctime>
 #include <filesystem>
@@ -29,8 +30,8 @@
 #include <vector>
 
 #include "imgui.h"
-#include "backends/imgui_impl_sdl2.h"
-#include "backends/imgui_impl_sdlrenderer2.h"
+#include "backends/imgui_impl_sdl3.h"
+#include "backends/imgui_impl_sdlrenderer3.h"
 
 // The implementation is already compiled into open_format_emitter.cpp.
 #include "stb_image_write.h"
@@ -74,13 +75,27 @@ constexpr int kShotFrame = 8;
 void writeScreenshot(SDL_Renderer* renderer, const char* path) {
     int width = 0;
     int height = 0;
-    if (SDL_GetRendererOutputSize(renderer, &width, &height) != 0) return;
-    std::vector<uint8_t> pixels(std::size_t(width) * std::size_t(height) * 4);
-    if (SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_ABGR8888,
-                             pixels.data(), width * 4) != 0) {
+    if (!SDL_GetCurrentRenderOutputSize(renderer, &width, &height)) return;
+    // SDL3 hands back a surface of its own rather than filling a buffer in
+    // a format of the caller's choosing, so the conversion is a second step.
+    SDL_Surface* shot = SDL_RenderReadPixels(renderer, nullptr);
+    if (shot == nullptr) {
         std::fprintf(stderr, "could not read the window back: %s\n", SDL_GetError());
         return;
     }
+    SDL_Surface* rgba = SDL_ConvertSurface(shot, SDL_PIXELFORMAT_ABGR8888);
+    SDL_DestroySurface(shot);
+    if (rgba == nullptr) {
+        std::fprintf(stderr, "could not convert the screenshot: %s\n", SDL_GetError());
+        return;
+    }
+    std::vector<uint8_t> pixels(std::size_t(width) * std::size_t(height) * 4);
+    for (int row = 0; row < height; ++row) {
+        std::memcpy(pixels.data() + std::size_t(row) * std::size_t(width) * 4,
+                    static_cast<const uint8_t*>(rgba->pixels) + std::size_t(row) * rgba->pitch,
+                    std::size_t(width) * 4);
+    }
+    SDL_DestroySurface(rgba);
     if (stbi_write_png(path, width, height, 4, pixels.data(), width * 4) == 0) {
         std::fprintf(stderr, "could not write %s\n", path);
         return;
@@ -131,7 +146,7 @@ float displayScale(SDL_Window* window, SDL_Renderer* renderer) {
     int windowWidth = 0;
     int pixelWidth = 0;
     SDL_GetWindowSize(window, &windowWidth, nullptr);
-    if (SDL_GetRendererOutputSize(renderer, &pixelWidth, nullptr) != 0) return 1.0f;
+    if (!SDL_GetCurrentRenderOutputSize(renderer, &pixelWidth, nullptr)) return 1.0f;
     if (windowWidth <= 0 || pixelWidth <= 0) return 1.0f;
     return std::max(1.0f, float(pixelWidth) / float(windowWidth));
 }
@@ -151,7 +166,9 @@ void startupFailure(const char* what) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    // SDL3 answers true on success where SDL2 answered 0: this test is
+    // inverted from what it was, not renamed.
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
         startupFailure((std::string("SDL could not start: ") + SDL_GetError()).c_str());
         return 1;
     }
@@ -161,26 +178,28 @@ int main(int argc, char** argv) {
     // leaves, so a laptop does not open a window taller than its screen.
     int wide = 980;
     int high = 900;
-    if (SDL_Rect usable; SDL_GetDisplayUsableBounds(0, &usable) == 0) {
+    if (SDL_Rect usable; SDL_GetDisplayUsableBounds(SDL_GetPrimaryDisplay(), &usable)) {
         wide = std::min(wide, std::max(640, usable.w - 80));
         high = std::min(high, std::max(520, usable.h - 80));
     }
 
     SDL_Window* window = SDL_CreateWindow(
-        "WoWee Asset Manager", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        wide, high, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+        "WoWee Asset Manager", wide, high,
+        SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (window == nullptr) {
         startupFailure((std::string("Could not open a window: ") + SDL_GetError()).c_str());
         SDL_Quit();
         return 1;
     }
 
-    SDL_Renderer* renderer = SDL_CreateRenderer(
-        window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+    // SDL3 picks the driver by name and has no flags: acceleration is the
+    // default, and vsync is asked for after the fact.
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr);
     if (renderer == nullptr) {
         // Software is slower and perfectly adequate for a form with a log in it.
-        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+        renderer = SDL_CreateRenderer(window, SDL_SOFTWARE_RENDERER);
     }
+    if (renderer != nullptr) SDL_SetRenderVSync(renderer, 1);
     if (renderer == nullptr) {
         startupFailure((std::string("Could not draw: ") + SDL_GetError()).c_str());
         SDL_DestroyWindow(window);
@@ -232,8 +251,8 @@ int main(int argc, char** argv) {
     }
     io.FontGlobalScale = 1.0f / scale;
 
-    ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
-    ImGui_ImplSDLRenderer2_Init(renderer);
+    ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
+    ImGui_ImplSDLRenderer3_Init(renderer);
 
     rescan(app);
 
@@ -244,22 +263,22 @@ int main(int argc, char** argv) {
     while (!quit) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            ImGui_ImplSDL2_ProcessEvent(&event);
-            if (event.type == SDL_QUIT) quit = true;
-            if (event.type == SDL_WINDOWEVENT &&
-                event.window.event == SDL_WINDOWEVENT_CLOSE &&
+            ImGui_ImplSDL3_ProcessEvent(&event);
+            if (event.type == SDL_EVENT_QUIT) quit = true;
+            if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
                 event.window.windowID == SDL_GetWindowID(window)) {
                 quit = true;
             }
-            if (event.type == SDL_DROPFILE && event.drop.file != nullptr) {
-                std::snprintf(app.gameDir, sizeof(app.gameDir), "%s", event.drop.file);
-                SDL_free(event.drop.file);
+            // SDL3 owns the dropped string and frees it after the event, so
+            // it is copied rather than taken.
+            if (event.type == SDL_EVENT_DROP_FILE && event.drop.data != nullptr) {
+                std::snprintf(app.gameDir, sizeof(app.gameDir), "%s", event.drop.data);
                 rescan(app);
             }
         }
 
-        ImGui_ImplSDLRenderer2_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
+        ImGui_ImplSDLRenderer3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -287,10 +306,10 @@ int main(int argc, char** argv) {
         // Re-read every frame: a window dragged between a Retina display and an
         // ordinary one changes this without resizing.
         const float now = displayScale(window, renderer);
-        SDL_RenderSetScale(renderer, now, now);
+        SDL_SetRenderScale(renderer, now, now);
         SDL_SetRenderDrawColor(renderer, 24, 24, 28, 255);
         SDL_RenderClear(renderer);
-        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
+        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
 
         // A picture of the window, written once and then done with. What this
         // looks like cannot be checked by reading it, and a bug report about a
@@ -312,8 +331,8 @@ int main(int argc, char** argv) {
     // down while SDL is being torn down rather than after it.
     app.job.cancel();
     app.packCancel.store(true);
-    ImGui_ImplSDLRenderer2_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
+    ImGui_ImplSDLRenderer3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

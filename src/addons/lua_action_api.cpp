@@ -20,7 +20,7 @@
 #include "game/pet_action.hpp"
 #include "imgui.h"
 #include <optional>
-#include <SDL2/SDL_keyboard.h>
+#include <SDL3/SDL_keyboard.h>
 
 namespace wowee::addons {
 
@@ -1327,9 +1327,9 @@ static int lua_AutoEquipCursorItem(lua_State* L) {
 // owns the mouse. lua_system_api registers the same three names against
 // SDL_GetModState; these agree with it now instead of racing it, and the
 // duplicate Is*KeyDown bindings that used to live here are gone with them.
-static bool shiftHeld() { return (SDL_GetModState() & KMOD_SHIFT) != 0; }
-static bool ctrlHeld()  { return (SDL_GetModState() & KMOD_CTRL)  != 0; }
-static bool altHeld()   { return (SDL_GetModState() & KMOD_ALT)   != 0; }
+static bool shiftHeld() { return (SDL_GetModState() & SDL_KMOD_SHIFT) != 0; }
+static bool ctrlHeld()  { return (SDL_GetModState() & SDL_KMOD_CTRL)  != 0; }
+static bool altHeld()   { return (SDL_GetModState() & SDL_KMOD_ALT)   != 0; }
 
 
 /// What bindings.xml declares for a modified-click action, or empty.

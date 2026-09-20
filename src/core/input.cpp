@@ -15,21 +15,24 @@ void Input::update() {
     previousMousePosition = mousePosition;
 
     // Get current keyboard state
-    const Uint8* keyState = SDL_GetKeyboardState(nullptr);
+    // bool per key in SDL3, where SDL2 gave a byte.
+    const bool* keyState = SDL_GetKeyboardState(nullptr);
     for (int i = 0; i < NUM_KEYS; ++i) {
         currentKeyState[i] = keyState[i] || virtualKeyState[i];
     }
 
     // Get current mouse state
-    int mouseX, mouseY;
-    Uint32 mouseState = SDL_GetMouseState(&mouseX, &mouseY);
-    mousePosition = glm::vec2(static_cast<float>(mouseX), static_cast<float>(mouseY));
+    // Floats in SDL3: the pointer can sit between pixels on a scaled display.
+    float mouseX = 0.0f;
+    float mouseY = 0.0f;
+    const SDL_MouseButtonFlags mouseState = SDL_GetMouseState(&mouseX, &mouseY);
+    mousePosition = glm::vec2(mouseX, mouseY);
 
-    // SDL_BUTTON(x) is defined as (1 << (x-1)), so button indices are 1-based.
-    // SDL_BUTTON(0) is undefined behavior (negative shift). Start at 1.
+    // SDL_BUTTON_MASK(x) is defined as (1 << (x-1)), so button indices are 1-based.
+    // SDL_BUTTON_MASK(0) is undefined behavior (negative shift). Start at 1.
     currentMouseState[0] = false;
     for (int i = 1; i < NUM_MOUSE_BUTTONS; ++i) {
-        currentMouseState[i] = ((mouseState & SDL_BUTTON(i)) != 0) || virtualMouseState[i];
+        currentMouseState[i] = ((mouseState & SDL_BUTTON_MASK(i)) != 0) || virtualMouseState[i];
     }
 
     // Calculate mouse delta

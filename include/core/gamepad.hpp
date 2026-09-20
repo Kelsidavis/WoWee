@@ -17,7 +17,7 @@
  * needs a platform test.
  */
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 
 #include <array>
@@ -91,7 +91,7 @@ public:
     /// every button this client answers goes through core::Input's virtual
     /// keys, and that is where an edge is worked out - a second copy of the
     /// same reasoning would be one more thing to keep in step.
-    [[nodiscard]] bool held(SDL_GameControllerButton button) const;
+    [[nodiscard]] bool held(SDL_GamepadButton button) const;
 
     /// One finger on the pad's touch surface. Position runs 0 to 1 across and
     /// down from the top-left corner, as SDL reports it.
@@ -123,7 +123,7 @@ public:
     /// Whether this pad actually has a button. SDL's mapping says so, which
     /// is how the paddles and the share button are offered only to the pads
     /// that have them rather than bound into the air on the ones that do not.
-    [[nodiscard]] bool hasButton(SDL_GameControllerButton button) const;
+    [[nodiscard]] bool hasButton(SDL_GamepadButton button) const;
 
     /// Whether the pad has a touch surface. PlayStation pads do; most others
     /// do not, and read as no finger down.
@@ -154,7 +154,7 @@ private:
     Gamepad& operator=(const Gamepad&) = delete;
 
     /// Opens the device at a joystick index, if nothing is open already.
-    void openDevice(int joystickIndex);
+    void openDevice(SDL_JoystickID joystickIndex);
     /// Closes whatever is open and forgets its state, so a disconnected pad
     /// cannot leave a button held down forever.
     void closeDevice();
@@ -164,14 +164,14 @@ private:
 
     /// Works out the family from SDL's own type, falling back to the USB
     /// vendor and product for the pads SDL has no type for.
-    [[nodiscard]] static Kind kindOf(SDL_GameController* pad);
+    [[nodiscard]] static Kind kindOf(SDL_Gamepad* pad);
 
-    SDL_GameController* pad_ = nullptr;
+    SDL_Gamepad* pad_ = nullptr;
     Kind kind_ = Kind::Unknown;
     SDL_JoystickID instanceId_ = -1;
     std::string name_;
 
-    static constexpr int kButtonCount = SDL_CONTROLLER_BUTTON_MAX;
+    static constexpr int kButtonCount = SDL_GAMEPAD_BUTTON_COUNT;
     std::array<bool, kButtonCount> current_{};
 
     /// The first touch surface's fingers. Two, because that is what a

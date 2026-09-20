@@ -199,7 +199,7 @@ void EditorApp::run() {
         viewport_.update(dt);
 
         ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
         ui_.render(*this);
@@ -285,9 +285,9 @@ void EditorApp::shutdown() {
 void EditorApp::processEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        ImGui_ImplSDL2_ProcessEvent(&event);
+        ImGui_ImplSDL3_ProcessEvent(&event);
 
-        if (event.type == SDL_QUIT) {
+        if (event.type == SDL_EVENT_QUIT) {
             // Confirm-on-quit fires for any unsaved change - terrain edits OR
             // object/NPC/quest changes (autoSavePendingChanges_).
             bool dirty = terrainEditor_.hasUnsavedChanges() || autoSavePendingChanges_;
@@ -299,8 +299,8 @@ void EditorApp::processEvents() {
             }
         }
 
-        if (event.type == SDL_WINDOWEVENT) {
-            if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+        if ((event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST)) {
+            if (event.type == SDL_EVENT_WINDOW_RESIZED) {
                 window_->setSize(event.window.data1, event.window.data2);
                 window_->getVkContext()->markSwapchainDirty();
             }
@@ -308,9 +308,9 @@ void EditorApp::processEvents() {
 
         auto& io = ImGui::GetIO();
 
-        if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
-            if (event.type == SDL_KEYDOWN) {
-                auto sc = event.key.keysym.scancode;
+        if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
+            if (event.type == SDL_EVENT_KEY_DOWN) {
+                auto sc = event.key.scancode;
                 if (sc == SDL_SCANCODE_F3) setWireframe(!isWireframe());
                 if (sc == SDL_SCANCODE_F5) saveBookmark("");
                 if (sc == SDL_SCANCODE_HOME) centerOnTerrain();
@@ -343,7 +343,7 @@ void EditorApp::processEvents() {
                     if (sc == SDL_SCANCODE_T) startGizmoMode(TransformMode::Scale);
                     if (sc == SDL_SCANCODE_X) setGizmoAxis(TransformAxis::X);
                     if (sc == SDL_SCANCODE_Y) setGizmoAxis(TransformAxis::Y);
-                    if (sc == SDL_SCANCODE_Z && !(event.key.keysym.mod & KMOD_CTRL))
+                    if (sc == SDL_SCANCODE_Z && !(event.key.mod & SDL_KMOD_CTRL))
                         setGizmoAxis(TransformAxis::Z);
                     if (sc == SDL_SCANCODE_ESCAPE) {
                         viewport_.getGizmo().endDrag();
@@ -366,22 +366,22 @@ void EditorApp::processEvents() {
                         objectsDirty_ = true; autoSavePendingChanges_ = true;
                     }
                 }
-                if (sc == SDL_SCANCODE_S && (event.key.keysym.mod & KMOD_CTRL))
+                if (sc == SDL_SCANCODE_S && (event.key.mod & SDL_KMOD_CTRL))
                     quickSave();
-                if (sc == SDL_SCANCODE_E && (event.key.keysym.mod & KMOD_CTRL) &&
-                    (event.key.keysym.mod & KMOD_SHIFT) && terrain_.isLoaded()) {
+                if (sc == SDL_SCANCODE_E && (event.key.mod & SDL_KMOD_CTRL) &&
+                    (event.key.mod & SDL_KMOD_SHIFT) && terrain_.isLoaded()) {
                     exportContentPack("output/" + loadedMap_ + ".wcp");
                 }
-                if (sc == SDL_SCANCODE_N && (event.key.keysym.mod & KMOD_CTRL))
+                if (sc == SDL_SCANCODE_N && (event.key.mod & SDL_KMOD_CTRL))
                     ui_.openNewTerrainDialog();
-                if (sc == SDL_SCANCODE_O && (event.key.keysym.mod & KMOD_CTRL))
+                if (sc == SDL_SCANCODE_O && (event.key.mod & SDL_KMOD_CTRL))
                     ui_.openLoadDialog();
-                if (sc == SDL_SCANCODE_A && (event.key.keysym.mod & KMOD_CTRL)) {
+                if (sc == SDL_SCANCODE_A && (event.key.mod & SDL_KMOD_CTRL)) {
                     objectPlacer_.selectAll();
                     showToast("Selected " + std::to_string(objectPlacer_.selectionCount()) + " objects");
                 }
                 // Ctrl+D = duplicate selected object or NPC, offset by (10,10) on the ground.
-                if (sc == SDL_SCANCODE_D && (event.key.keysym.mod & KMOD_CTRL)) {
+                if (sc == SDL_SCANCODE_D && (event.key.mod & SDL_KMOD_CTRL)) {
                     if (auto* sel = objectPlacer_.getSelected()) {
                         std::string dupPath = sel->path;
                         glm::vec3 dupPos = sel->position + glm::vec3(10.0f, 10.0f, 0.0f);
@@ -406,7 +406,7 @@ void EditorApp::processEvents() {
                 // W: add patrol waypoint at cursor for the selected NPC (no modifiers,
                 // editor must be in NPC mode and an NPC must be selected with Patrol behavior).
                 if (sc == SDL_SCANCODE_W && mode_ == EditorMode::NPC &&
-                    !(event.key.keysym.mod & (KMOD_CTRL | KMOD_ALT | KMOD_SHIFT))) {
+                    !(event.key.mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_SHIFT))) {
                     auto* sel = npcSpawner_.getSelected();
                     if (sel && sel->behavior == CreatureBehavior::Patrol &&
                         terrainEditor_.brush().isActive()) {
@@ -418,14 +418,14 @@ void EditorApp::processEvents() {
                     }
                 }
                 // Ctrl+Y = Redo (alternate binding)
-                if (sc == SDL_SCANCODE_Y && (event.key.keysym.mod & KMOD_CTRL)) {
+                if (sc == SDL_SCANCODE_Y && (event.key.mod & SDL_KMOD_CTRL)) {
                     if (terrainEditor_.history().canRedo()) {
                         terrainEditor_.redo();
                         showToast("Redo");
                     }
                 }
-                if (sc == SDL_SCANCODE_Z && (event.key.keysym.mod & KMOD_CTRL)) {
-                    bool isRedo = (event.key.keysym.mod & KMOD_SHIFT) != 0;
+                if (sc == SDL_SCANCODE_Z && (event.key.mod & SDL_KMOD_CTRL)) {
+                    bool isRedo = (event.key.mod & SDL_KMOD_SHIFT) != 0;
                     if (isRedo) {
                         if (terrainEditor_.history().canRedo()) {
                             terrainEditor_.redo();
@@ -454,7 +454,7 @@ void EditorApp::processEvents() {
                 camera_.processKeyEvent(event.key);
         }
 
-        if (event.type == SDL_MOUSEMOTION && !io.WantCaptureMouse) {
+        if (event.type == SDL_EVENT_MOUSE_MOTION && !io.WantCaptureMouse) {
             // Gizmo drag takes priority over camera
             auto& giz = viewport_.getGizmo();
             if (event.motion.state & SDL_BUTTON_MMASK) {
@@ -505,9 +505,9 @@ void EditorApp::processEvents() {
             }
         }
 
-        if ((event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && !io.WantCaptureMouse) {
+        if ((event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP) && !io.WantCaptureMouse) {
             // Right-click on selected objects = context menu
-            if (event.button.button == SDL_BUTTON_RIGHT && event.type == SDL_MOUSEBUTTONDOWN) {
+            if (event.button.button == SDL_BUTTON_RIGHT && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
                 auto& giz = viewport_.getGizmo();
                 if (giz.isDragging()) {
                     giz.endDrag();
@@ -517,7 +517,7 @@ void EditorApp::processEvents() {
                 } else {
                     camera_.processMouseButton(event.button);
                 }
-            } else if (event.button.button == SDL_BUTTON_RIGHT && event.type == SDL_MOUSEBUTTONUP) {
+            } else if (event.button.button == SDL_BUTTON_RIGHT && event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
                 if (!objectPlacer_.getSelected() && !npcSpawner_.getSelected())
                     camera_.processMouseButton(event.button);
             } else {
@@ -531,10 +531,10 @@ void EditorApp::processEvents() {
             if (event.button.button == SDL_BUTTON_LEFT && terrain_.isLoaded()) {
                 auto& giz = viewport_.getGizmo();
                 // End gizmo drag on left click
-                if (giz.isDragging() && event.type == SDL_MOUSEBUTTONDOWN) {
+                if (giz.isDragging() && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
                     giz.endDrag();
                     giz.setMode(TransformMode::None);
-                } else if (event.type == SDL_MOUSEBUTTONDOWN) {
+                } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
                     // Pending crater placement: take precedence over the
                     // mode-based click handling below so the next click
                     // anywhere on terrain spawns the crater instead of
@@ -562,7 +562,7 @@ void EditorApp::processEvents() {
                     }
                     // Path point capture (river/road tool)
                     // Alt+click eyedropper in paint mode
-                    if (mode_ == EditorMode::Paint && (SDL_GetModState() & KMOD_ALT)) {
+                    if (mode_ == EditorMode::Paint && (SDL_GetModState() & SDL_KMOD_ALT)) {
                         if (terrainEditor_.brush().isActive()) {
                             std::string picked = texturePainter_.pickTextureAt(
                                 terrainEditor_.brush().getPosition());
@@ -589,8 +589,8 @@ void EditorApp::processEvents() {
                         }
                     }
                     // Ctrl+click = select (Ctrl+Shift+click = add to selection)
-                    else if ((event.key.keysym.mod & KMOD_CTRL) || (SDL_GetModState() & KMOD_CTRL)) {
-                        bool additive = (SDL_GetModState() & KMOD_SHIFT) != 0;
+                    else if ((event.key.mod & SDL_KMOD_CTRL) || (SDL_GetModState() & SDL_KMOD_CTRL)) {
+                        bool additive = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
                         auto ext = window_->getVkContext()->getSwapchainExtent();
                         rendering::Ray ray = camera_.getCamera().screenToWorldRay(
                             static_cast<float>(event.button.x),
@@ -618,7 +618,7 @@ void EditorApp::processEvents() {
                         if (terrainEditor_.raycastTerrain(ray, hitPos)) {
                             // Plain left-click near an existing NPC selects it instead of
                             // placing a duplicate. Shift+click forces placement.
-                            bool forcePlace = (event.key.keysym.mod & KMOD_SHIFT) != 0;
+                            bool forcePlace = (event.key.mod & SDL_KMOD_SHIFT) != 0;
                             int hit = forcePlace ? -1 : npcSpawner_.selectAt(hitPos, 4.0f);
                             if (hit < 0) {
                                 auto& tmpl = npcSpawner_.getTemplate();
@@ -647,7 +647,7 @@ void EditorApp::processEvents() {
                         if (mode_ == EditorMode::Sculpt || mode_ == EditorMode::Paint)
                             terrainEditor_.beginStroke();
                     }
-                } else if (event.type == SDL_MOUSEBUTTONUP) {
+                } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
                     painting_ = false;
                     if (mode_ == EditorMode::Sculpt || mode_ == EditorMode::Paint)
                         terrainEditor_.endStroke();
@@ -655,7 +655,7 @@ void EditorApp::processEvents() {
             }
 
             // Middle click = select object
-            if (event.button.button == SDL_BUTTON_MIDDLE && event.type == SDL_MOUSEBUTTONDOWN) {
+            if (event.button.button == SDL_BUTTON_MIDDLE && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
                 if (mode_ == EditorMode::PlaceObject && terrain_.isLoaded()) {
                     auto ext = window_->getVkContext()->getSwapchainExtent();
                     auto& io2 = ImGui::GetIO();
@@ -667,11 +667,11 @@ void EditorApp::processEvents() {
             }
         }
 
-        if (event.type == SDL_MOUSEWHEEL && !io.WantCaptureMouse) {
+        if (event.type == SDL_EVENT_MOUSE_WHEEL && !io.WantCaptureMouse) {
             // Ctrl+wheel rotates the placement preview instead of zooming the camera.
             // Step 15 deg, Shift makes it 5 deg for finer control.
-            bool ctrl = (SDL_GetModState() & KMOD_CTRL) != 0;
-            bool shift = (SDL_GetModState() & KMOD_SHIFT) != 0;
+            bool ctrl = (SDL_GetModState() & SDL_KMOD_CTRL) != 0;
+            bool shift = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
             if (ctrl && (mode_ == EditorMode::PlaceObject || mode_ == EditorMode::NPC)) {
                 float step = shift ? 5.0f : 15.0f;
                 if (mode_ == EditorMode::PlaceObject) {
@@ -2071,7 +2071,7 @@ void EditorApp::initImGui() {
     colors[ImGuiCol_ButtonHovered] = ImVec4(0.30f, 0.35f, 0.50f, 1.00f);
     colors[ImGuiCol_ButtonActive] = ImVec4(0.20f, 0.24f, 0.36f, 1.00f);
 
-    ImGui_ImplSDL2_InitForVulkan(window_->getSDLWindow());
+    ImGui_ImplSDL3_InitForVulkan(window_->getSDLWindow());
 
     ImGui_ImplVulkan_InitInfo initInfo{};
     initInfo.ApiVersion = VK_API_VERSION_1_1;
@@ -2093,7 +2093,7 @@ void EditorApp::initImGui() {
 void EditorApp::shutdownImGui() {
     if (!imguiInitialized_) return;
     ImGui_ImplVulkan_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
     imguiInitialized_ = false;
 }

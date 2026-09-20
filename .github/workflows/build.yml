@@ -47,7 +47,6 @@ jobs:
           cmake \
           build-essential \
           pkg-config \
-          libsdl2-dev \
           libglm-dev \
           libssl-dev \
           zlib1g-dev \
@@ -61,6 +60,21 @@ jobs:
           libunicorn-dev \
           libx11-dev
         sudo apt-get install -y libstorm-dev || true
+
+    - name: Build SDL3 from source
+      run: |
+        # Ubuntu 24.04 has no libsdl3-dev: SDL3 landed in 25.04. Built here
+        # the way StormLib already is, rather than pinning the job to a newer
+        # runner image for one package.
+        set -euo pipefail
+        git clone --depth 1 --branch release-3.2.24 \
+          https://github.com/libsdl-org/SDL.git /tmp/SDL3
+        cmake -S /tmp/SDL3 -B /tmp/SDL3/build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF
+        cmake --build /tmp/SDL3/build --parallel "$(nproc)"
+        sudo cmake --install /tmp/SDL3/build
+        sudo ldconfig
 
     - name: Configure
       run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DWOWEE_BUILD_TESTS=ON
@@ -136,7 +150,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        brew install cmake pkg-config sdl2 glm openssl@3 zlib ffmpeg unicorn \
+        brew install cmake pkg-config sdl3 glm openssl@3 zlib ffmpeg unicorn \
           stormlib vulkan-loader vulkan-headers molten-vk shaderc
 
     - name: Configure
@@ -247,10 +261,9 @@ jobs:
         cp -L "${MOLTENVK_PREFIX}/lib/libMoltenVK.dylib" \
           Wowee.app/Contents/Frameworks/libMoltenVK.dylib
 
-        # Homebrew's sdl2 formula is sdl2-compat, which loads SDL3 with dlopen
-        # instead of an LC_LOAD_DYLIB command. The recursive Mach-O walker
-        # cannot discover that runtime-only dependency, so bundle it explicitly
-        # at the @loader_path location sdl2-compat probes on macOS.
+        # Copied explicitly although the client now links SDL3 directly and
+        # the Mach-O walker below would find it: the walker rewrites what it
+        # finds, and having the dylib already in place keeps that one step.
         SDL3_PREFIX="$(brew --prefix sdl3)"
         cp -L "${SDL3_PREFIX}/lib/libSDL3.dylib" \
           Wowee.app/Contents/Frameworks/libSDL3.dylib
@@ -273,7 +286,6 @@ jobs:
         # copy only the referenced install names, and rewrite the whole graph.
         python3 tools/macos/bundle_dependencies.py \
           --app Wowee.app \
-          --search-dir "$(brew --prefix sdl2)/lib" \
           --search-dir "$(brew --prefix sdl3)/lib" \
           --search-dir "$(brew --prefix vulkan-loader)/lib" \
           --search-dir "$(brew --prefix openssl@3)/lib" \
@@ -453,7 +465,7 @@ jobs:
           mingw-w64-clang-aarch64-clang
           mingw-w64-clang-aarch64-ninja
           mingw-w64-clang-aarch64-pkgconf
-          mingw-w64-clang-aarch64-SDL2
+          mingw-w64-clang-aarch64-SDL3
           mingw-w64-clang-aarch64-glm
           mingw-w64-clang-aarch64-openssl
           mingw-w64-clang-aarch64-zlib
@@ -579,7 +591,7 @@ jobs:
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-ninja
           mingw-w64-x86_64-pkgconf
-          mingw-w64-x86_64-SDL2
+          mingw-w64-x86_64-SDL3
           mingw-w64-x86_64-glm
           mingw-w64-x86_64-openssl
           mingw-w64-x86_64-zlib

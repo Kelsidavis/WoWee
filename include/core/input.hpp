@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <array>
 #include <glm/glm.hpp>
 
@@ -52,7 +52,7 @@ private:
     Input(const Input&) = delete;
     Input& operator=(const Input&) = delete;
 
-    static constexpr int NUM_KEYS = SDL_NUM_SCANCODES;
+    static constexpr int NUM_KEYS = SDL_SCANCODE_COUNT;
     static constexpr int NUM_MOUSE_BUTTONS = 8;
 
     std::array<bool, NUM_KEYS> currentKeyState = {};

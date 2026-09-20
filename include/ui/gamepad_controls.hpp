@@ -34,7 +34,7 @@
  * fingers down is a right click.
  */
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 #include "core/gamepad.hpp"
 #include <glm/glm.hpp>
@@ -61,7 +61,7 @@ namespace ui {
 /// It is the default only - a button the player has bound in the interface's
 /// key binding panel does what that binding says instead.
 struct PadBinding {
-    SDL_GameControllerButton button;
+    SDL_GamepadButton button;
     SDL_Scancode key;      ///< what core::Input is told is held
     const char* what;      ///< what a person reads on the settings panel
     /// The interface's own name for what this does - "ACTIONBUTTON3" - or ""
@@ -102,7 +102,7 @@ struct PadBinding {
 /// strings are "a", "dpup", "leftshoulder", which is a protocol rather than
 /// something to put on a settings panel. Returns an empty string for a button
 /// nothing binds, which is how the settings panel knows not to list it.
-[[nodiscard]] const char* padButtonLabel(SDL_GameControllerButton button,
+[[nodiscard]] const char* padButtonLabel(SDL_GamepadButton button,
                                          core::Gamepad::Kind kind);
 
 /// The buttons only some pads have, and what they do when they are there.
@@ -118,7 +118,7 @@ struct PadBinding {
 /// Retail's spelling, since the names are saved in bindings.cfg and compared
 /// as strings. The touchpad click has none: it is the pointer's click, and a
 /// binding on it would leave a trackpad that cannot click.
-[[nodiscard]] const char* padKeyName(SDL_GameControllerButton button);
+[[nodiscard]] const char* padKeyName(SDL_GamepadButton button);
 
 /// The key the client polls for a binding command it performs itself, or
 /// SDL_SCANCODE_UNKNOWN when it does not read that command from a scancode.
@@ -290,7 +290,7 @@ private:
     void routeButtons();
     /// Whether a button is down with nothing bound to it, so the default
     /// scheme's meaning for it applies.
-    [[nodiscard]] bool schemeHeld(SDL_GameControllerButton button) const;
+    [[nodiscard]] bool schemeHeld(SDL_GamepadButton button) const;
     /// The right stick, as the mouse pointer, and two buttons as its clicks.
     void applyPointer(float deltaTime);
     /// Holds a mouse button and remembers that this is what is holding it.
@@ -331,7 +331,7 @@ private:
 
     /// Which sources are holding each key down, so that letting go clears
     /// those and only those.
-    std::array<std::uint8_t, SDL_NUM_SCANCODES> heldKeys_{};
+    std::array<std::uint8_t, SDL_SCANCODE_COUNT> heldKeys_{};
 
     /// How a held button is being answered, decided as it went down and kept
     /// until it comes up - a binding changed mid-press applies from the next.
@@ -341,9 +341,9 @@ private:
         int imguiKey = 0;                          ///< a command the client reads through ImGui
         bool escape = false;                       ///< the game menu, which has a chain of its own
     };
-    std::array<ButtonRoute, SDL_CONTROLLER_BUTTON_MAX> routes_{};
+    std::array<ButtonRoute, SDL_GAMEPAD_BUTTON_COUNT> routes_{};
     /// Which buttons were down last frame, so each press is looked up once.
-    std::array<bool, SDL_CONTROLLER_BUTTON_MAX> buttonWasDown_{};
+    std::array<bool, SDL_GAMEPAD_BUTTON_COUNT> buttonWasDown_{};
     /// The ImGui keys routed buttons are holding, released as they let go.
     std::vector<int> imguiKeysDown_;
     PadKeyRouter keyRouter_;

@@ -50,7 +50,7 @@ void GamepadControls::setLookDegreesPerSecond(float degrees) {
 }
 
 void GamepadControls::holdKey(SDL_Scancode key, bool held, std::uint8_t source) {
-    if (key <= SDL_SCANCODE_UNKNOWN || key >= SDL_NUM_SCANCODES) return;
+    if (key <= SDL_SCANCODE_UNKNOWN || key >= SDL_SCANCODE_COUNT) return;
     const auto i = static_cast<std::size_t>(key);
     // A key this is not holding is left alone. Two things can drive the same
     // virtual key - a phone's on-screen stick is the other - and whichever of
@@ -173,11 +173,13 @@ void GamepadControls::setPointerMode(bool on) {
     if (!on) return;
     // Starts where the pointer already is rather than at the middle of the
     // screen, so turning it on twice does not throw away where it was left.
-    int x = 0;
-    int y = 0;
-    SDL_GetMouseState(&x, &y);
-    pointerX_ = static_cast<float>(x);
-    pointerY_ = static_cast<float>(y);
+    float fx = 0.0f;
+    float fy = 0.0f;
+    SDL_GetMouseState(&fx, &fy);
+    const int x = static_cast<int>(fx);
+    const int y = static_cast<int>(fy);
+    pointerX_ = fx;
+    pointerY_ = fy;
     if (window_ && (x == 0 && y == 0)) {
         int w = 0;
         int h = 0;
@@ -218,12 +220,12 @@ void GamepadControls::applyTouchpad() {
     // Starts from where the cursor really is. The touchpad works outside
     // pointer mode too, so the stored position can be stale - left from the
     // last time the stick moved it, with a real mouse used since.
-    int x = 0;
-    int y = 0;
-    SDL_GetMouseState(&x, &y);
-    if (std::abs(x - static_cast<int>(pointerX_)) > 1 || std::abs(y - static_cast<int>(pointerY_)) > 1) {
-        pointerX_ = static_cast<float>(x);
-        pointerY_ = static_cast<float>(y);
+    float fx = 0.0f;
+    float fy = 0.0f;
+    SDL_GetMouseState(&fx, &fy);
+    if (std::abs(fx - pointerX_) > 1.0f || std::abs(fy - pointerY_) > 1.0f) {
+        pointerX_ = fx;
+        pointerY_ = fy;
     }
     const glm::vec2 step = touchStep(slide, static_cast<float>(w));
     pointerX_ = std::clamp(pointerX_ + step.x, 0.0f, static_cast<float>(w - 1));
@@ -233,7 +235,7 @@ void GamepadControls::applyTouchpad() {
 
 void GamepadControls::applyClicks() {
     const auto& pad = core::gamepad();
-    if (!pad.held(SDL_CONTROLLER_BUTTON_TOUCHPAD)) {
+    if (!pad.held(SDL_GAMEPAD_BUTTON_TOUCHPAD)) {
         touchClickButton_ = 0;
     } else if (touchClickButton_ == 0) {
         touchClickButton_ = pad.touch(1).down ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
@@ -248,24 +250,24 @@ void GamepadControls::applyClicks() {
     // pointer's, whatever they are bound to. The default scheme's own entries
     // for them live in the binding table now, so asking whether they are
     // still unbound would answer no and leave the pointer with no click.
-    const bool left = (pointerMode_ && pad.held(SDL_CONTROLLER_BUTTON_A)) ||
+    const bool left = (pointerMode_ && pad.held(SDL_GAMEPAD_BUTTON_SOUTH)) ||
                       touchClickButton_ == SDL_BUTTON_LEFT;
-    const bool right = (pointerMode_ && pad.held(SDL_CONTROLLER_BUTTON_X)) ||
+    const bool right = (pointerMode_ && pad.held(SDL_GAMEPAD_BUTTON_WEST)) ||
                        touchClickButton_ == SDL_BUTTON_RIGHT;
     holdMouseButton(SDL_BUTTON_LEFT, left);
     holdMouseButton(SDL_BUTTON_RIGHT, right);
 }
 
-bool GamepadControls::schemeHeld(SDL_GameControllerButton button) const {
-    if (button < 0 || button >= SDL_CONTROLLER_BUTTON_MAX) return false;
+bool GamepadControls::schemeHeld(SDL_GamepadButton button) const {
+    if (button < 0 || button >= SDL_GAMEPAD_BUTTON_COUNT) return false;
     return core::gamepad().held(button) &&
            routes_[static_cast<std::size_t>(button)].kind == PadKeyAnswer::Kind::Unbound;
 }
 
 void GamepadControls::routeButtons() {
     const auto& pad = core::gamepad();
-    for (int b = 0; b < SDL_CONTROLLER_BUTTON_MAX; ++b) {
-        const auto button = static_cast<SDL_GameControllerButton>(b);
+    for (int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT; ++b) {
+        const auto button = static_cast<SDL_GamepadButton>(b);
         const auto i = static_cast<std::size_t>(b);
         const bool down = pad.held(button);
         const bool wasDown = buttonWasDown_[i];
@@ -306,13 +308,13 @@ void GamepadControls::applyButtons() {
     // Worked out whole before any key is held, because two buttons can want
     // the same key - X by default, and a D-pad bound to ACTIONBUTTON1 - and
     // one of them letting go must not release the other.
-    std::array<bool, SDL_NUM_SCANCODES> wanted{};
+    std::array<bool, SDL_SCANCODE_COUNT> wanted{};
     for (const PadBinding& row : padBindings()) {
         // A and X are the pointer's two clicks while it is up. Jumping and
         // casting from the same press would fire a spell at whatever was
         // under the cursor every time a window was clicked.
-        if (pointerMode_ && (row.button == SDL_CONTROLLER_BUTTON_A ||
-                             row.button == SDL_CONTROLLER_BUTTON_X)) {
+        if (pointerMode_ && (row.button == SDL_GAMEPAD_BUTTON_SOUTH ||
+                             row.button == SDL_GAMEPAD_BUTTON_WEST)) {
             continue;
         }
         if (schemeHeld(row.button)) wanted[static_cast<std::size_t>(row.key)] = true;
@@ -331,19 +333,19 @@ void GamepadControls::applyButtons() {
     // KeybindingManager, which asks ImGui. A virtual scancode never reaches
     // it, so this one goes on ImGui's own queue - once down, once up, because
     // ImGui counts the repeats itself.
-    bool escape = schemeHeld(SDL_CONTROLLER_BUTTON_B) || schemeHeld(SDL_CONTROLLER_BUTTON_START);
+    bool escape = schemeHeld(SDL_GAMEPAD_BUTTON_EAST) || schemeHeld(SDL_GAMEPAD_BUTTON_START);
     // The panels KeybindingManager answers ask ImGui too, for the same reason.
     std::vector<int> imguiWanted;
 
-    for (int b = 0; b < SDL_CONTROLLER_BUTTON_MAX; ++b) {
-        const auto button = static_cast<SDL_GameControllerButton>(b);
+    for (int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT; ++b) {
+        const auto button = static_cast<SDL_GamepadButton>(b);
         // The pointer's two clicks outrank whatever the button is bound to,
         // for as long as the pointer is up. A and X are the click and the
         // right click there, and the defaults now sit in the binding table
         // like any other binding - so without this, raising the pointer and
         // clicking would jump and cast as well.
-        if (pointerMode_ && (button == SDL_CONTROLLER_BUTTON_A ||
-                             button == SDL_CONTROLLER_BUTTON_X)) {
+        if (pointerMode_ && (button == SDL_GAMEPAD_BUTTON_SOUTH ||
+                             button == SDL_GAMEPAD_BUTTON_WEST)) {
             continue;
         }
         const ButtonRoute& route = routes_[static_cast<std::size_t>(b)];
@@ -432,20 +434,20 @@ void GamepadControls::update(float deltaTime) {
         // pad in and is wondering whether the client saw it has exactly one
         // place to look, and that log is warnings only.
         const auto kind = pad.kind();
-        const auto name = [kind](SDL_GameControllerButton button) {
+        const auto name = [kind](SDL_GamepadButton button) {
             return padButtonLabel(button, kind);
         };
         LOG_WARNING("Gamepad: ", pad.describe(),
                     " - left stick moves, right stick looks, triggers zoom, ",
-                    name(SDL_CONTROLLER_BUTTON_A), " jumps, ",
-                    name(SDL_CONTROLLER_BUTTON_B), " closes, ",
-                    name(SDL_CONTROLLER_BUTTON_X), "/", name(SDL_CONTROLLER_BUTTON_Y),
+                    name(SDL_GAMEPAD_BUTTON_SOUTH), " jumps, ",
+                    name(SDL_GAMEPAD_BUTTON_EAST), " closes, ",
+                    name(SDL_GAMEPAD_BUTTON_WEST), "/", name(SDL_GAMEPAD_BUTTON_NORTH),
                     " and the D-pad are actions 1-6, hold ",
-                    name(SDL_CONTROLLER_BUTTON_LEFTSHOULDER), " for 7-12, ",
-                    name(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER), " targets, ",
-                    name(SDL_CONTROLLER_BUTTON_LEFTSTICK), " autoruns, ",
-                    name(SDL_CONTROLLER_BUTTON_BACK), " gives you a pointer",
-                    pad.hasButton(SDL_CONTROLLER_BUTTON_PADDLE1)
+                    name(SDL_GAMEPAD_BUTTON_LEFT_SHOULDER), " for 7-12, ",
+                    name(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER), " targets, ",
+                    name(SDL_GAMEPAD_BUTTON_LEFT_STICK), " autoruns, ",
+                    name(SDL_GAMEPAD_BUTTON_BACK), " gives you a pointer",
+                    pad.hasButton(SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1)
                         ? ", the back buttons are actions 7-10"
                         : "",
                     pad.hasTouchpad() ? ", and the touchpad is a trackpad - click it, or click "
@@ -475,7 +477,7 @@ void GamepadControls::update(float deltaTime) {
     // edge rather than while held: it is a mode, and a mode that lasted only
     // as long as a thumb could hold a button would be no use for buying from
     // a vendor.
-    const bool toggle = schemeHeld(SDL_CONTROLLER_BUTTON_BACK);
+    const bool toggle = schemeHeld(SDL_GAMEPAD_BUTTON_BACK);
     if (toggle && !pointerToggleWasDown_) {
         setPointerMode(!pointerMode_);
         // At warning, because the two modes look identical apart from the

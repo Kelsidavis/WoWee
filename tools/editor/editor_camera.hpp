@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rendering/camera.hpp"
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 #include <cmath>
 

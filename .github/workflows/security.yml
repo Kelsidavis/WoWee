@@ -34,8 +34,7 @@ jobs:
             cmake \
             build-essential \
             pkg-config \
-            libsdl2-dev \
-            libglm-dev \
+              libglm-dev \
             libssl-dev \
             zlib1g-dev \
             libvulkan-dev \
@@ -48,6 +47,22 @@ jobs:
             libunicorn-dev \
             libx11-dev
           sudo apt-get install -y libstorm-dev || true
+
+      - name: Build SDL3 from source
+        run: |
+          # Ubuntu 24.04 has no libsdl3-dev: SDL3 landed in 25.04. Built here
+          # the way StormLib already is, rather than pinning the job to a
+          # newer runner image for one package.
+          set -euo pipefail
+          git clone --depth 1 --branch release-3.2.24 \
+            https://github.com/libsdl-org/SDL.git /tmp/SDL3
+          cmake -S /tmp/SDL3 -B /tmp/SDL3/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF
+          cmake --build /tmp/SDL3/build --parallel "$(nproc)"
+          sudo cmake --install /tmp/SDL3/build
+          sudo ldconfig
+
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -106,8 +121,7 @@ jobs:
             cmake \
             build-essential \
             pkg-config \
-            libsdl2-dev \
-            libglm-dev \
+              libglm-dev \
             libssl-dev \
             zlib1g-dev \
             libvulkan-dev \
@@ -120,6 +134,22 @@ jobs:
             libunicorn-dev \
             libx11-dev
           sudo apt-get install -y libstorm-dev || true
+
+      - name: Build SDL3 from source
+        run: |
+          # Ubuntu 24.04 has no libsdl3-dev: SDL3 landed in 25.04. Built here
+          # the way StormLib already is, rather than pinning the job to a
+          # newer runner image for one package.
+          set -euo pipefail
+          git clone --depth 1 --branch release-3.2.24 \
+            https://github.com/libsdl-org/SDL.git /tmp/SDL3
+          cmake -S /tmp/SDL3 -B /tmp/SDL3/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF
+          cmake --build /tmp/SDL3/build --parallel "$(nproc)"
+          sudo cmake --install /tmp/SDL3/build
+          sudo ldconfig
+
 
       - name: Configure (ASan/UBSan)
         run: |

@@ -18,7 +18,7 @@
 #include <set>
 #include <cstdlib>
 // The clipboard, for paste and copy in an edit box.
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include "addons/lua_api_helpers.hpp"
 #include "addons/lua_handler_globals.hpp"
 #include "addons/lua_api_registrations.hpp"

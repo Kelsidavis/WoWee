@@ -267,33 +267,22 @@ endif()
 
 # Find required packages
 #
-# Android has no system SDL2, so it is fetched and built with the client. SDL's
-# own CMake provides the same SDL2::SDL2 target find_package would, so nothing
+# Android has no system SDL, so it is fetched and built with the client. SDL's
+# own CMake provides the same SDL3::SDL3 target find_package would, so nothing
 # downstream changes.
 #
-# Pinned to the last SDL2 release rather than to what the desktop packages
-# carry: 2.30 calls ALooper_pollAll, which NDK 28 marks unavailable, so it does
-# not compile against a current NDK at all.
+# SDL3 installs its headers as <SDL3/SDL.h>, which is the spelling the sources
+# use, so unlike the SDL2 build there is no include shim to arrange here.
 if(ANDROID)
     include(FetchContent)
-    set(SDL_SHARED ON  CACHE BOOL "" FORCE)   # SDLActivity loads libSDL2.so
+    set(SDL_SHARED ON  CACHE BOOL "" FORCE)   # SDLActivity loads libSDL3.so
     set(SDL_STATIC OFF CACHE BOOL "" FORCE)
     set(SDL_TEST   OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(SDL2
+    FetchContent_Declare(SDL3
         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG        release-2.32.10
+        GIT_TAG        release-3.2.24
         GIT_SHALLOW    TRUE)
-    FetchContent_MakeAvailable(SDL2)
-
-    # This client includes <SDL2/SDL.h>, the layout the Linux and macOS packages
-    # install. SDL's own build tree puts the headers at the top of include/, so
-    # a directory holding one link named SDL2 makes the same spelling work
-    # without touching the 30-odd files that use it.
-    set(WOWEE_SDL2_COMPAT_INC ${CMAKE_BINARY_DIR}/sdl2-compat-include)
-    file(MAKE_DIRECTORY ${WOWEE_SDL2_COMPAT_INC})
-    file(CREATE_LINK ${sdl2_SOURCE_DIR}/include ${WOWEE_SDL2_COMPAT_INC}/SDL2
-         SYMBOLIC COPY_ON_ERROR)
-    include_directories(${WOWEE_SDL2_COMPAT_INC})
+    FetchContent_MakeAvailable(SDL3)
 
     # Header-only, and there is no system copy to find on Android.
     FetchContent_Declare(glm
@@ -315,7 +304,7 @@ if(ANDROID)
     set_source_files_properties(src/audio/audio_engine.cpp PROPERTIES
                                 COMPILE_OPTIONS "-Wno-unused-parameter")
 else()
-    find_package(SDL2 REQUIRED)
+    find_package(SDL3 REQUIRED CONFIG)
 endif()
 find_package(Vulkan QUIET)
 if(NOT Vulkan_FOUND)
@@ -555,7 +544,7 @@ if(EXISTS ${IMGUI_DIR})
         ${IMGUI_DIR}/imgui_tables.cpp
         ${IMGUI_DIR}/imgui_widgets.cpp
         ${IMGUI_DIR}/imgui_demo.cpp
-        ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
         ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
     )
     # SYSTEM: vendored, so -Werror on wowee does not police it.
@@ -563,7 +552,7 @@ if(EXISTS ${IMGUI_DIR})
         ${IMGUI_DIR}
         ${IMGUI_DIR}/backends
     )
-    target_link_libraries(imgui PUBLIC SDL2::SDL2 Vulkan::Vulkan ${CMAKE_DL_LIBS})
+    target_link_libraries(imgui PUBLIC SDL3::SDL3 Vulkan::Vulkan ${CMAKE_DL_LIBS})
 else()
     message(WARNING "ImGui not found in extern/imgui. Clone it with:")
     message(WARNING "  git clone https://github.com/ocornut/imgui.git extern/imgui")
@@ -1342,7 +1331,7 @@ endif()
 
 # Link libraries
 target_link_libraries(wowee PRIVATE
-    SDL2::SDL2
+    SDL3::SDL3
     Vulkan::Vulkan
     OpenSSL::SSL
     OpenSSL::Crypto
@@ -1374,11 +1363,10 @@ if(WIN32)
     # for a 1ms sleep granularity. Windows defaults to a 15.6ms timer tick -
     # more than two whole frames at 144Hz - and without this the link fails
     # on __imp_timeBeginPeriod rather than the cap simply being coarse.
+    #
+    # No SDL main library: SDL3 folds the WinMain shim into SDL3::SDL3, where
+    # SDL2 kept it in a separate SDL2main.
     target_link_libraries(wowee PRIVATE ws2_32 winmm)
-    # SDL2main provides WinMain entry point on Windows
-    if(TARGET SDL2::SDL2main)
-        target_link_libraries(wowee PRIVATE SDL2::SDL2main)
-    endif()
 endif()
 
 # Link ImGui if available
@@ -1791,19 +1779,19 @@ endif()
 #
 # SDL's own renderer rather than Vulkan or GL: this draws a form and a log, and
 # the backend that needs no API choice is the one that builds everywhere.
-if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR AND SDL2_FOUND AND EXISTS ${IMGUI_DIR}/imgui.cpp)
+if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR AND SDL3_FOUND AND EXISTS ${IMGUI_DIR}/imgui.cpp)
     add_library(imgui_sdlrenderer STATIC
         ${IMGUI_DIR}/imgui.cpp
         ${IMGUI_DIR}/imgui_draw.cpp
         ${IMGUI_DIR}/imgui_tables.cpp
         ${IMGUI_DIR}/imgui_widgets.cpp
-        ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
-        ${IMGUI_DIR}/backends/imgui_impl_sdlrenderer2.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_sdlrenderer3.cpp
     )
     target_include_directories(imgui_sdlrenderer SYSTEM PUBLIC
         ${IMGUI_DIR} ${IMGUI_DIR}/backends
     )
-    target_link_libraries(imgui_sdlrenderer PUBLIC SDL2::SDL2)
+    target_link_libraries(imgui_sdlrenderer PUBLIC SDL3::SDL3)
 
     # WIN32: a windowed program rather than a console one, so double-clicking
     # it in Explorer opens the window and nothing else. Without it Windows
@@ -1862,9 +1850,8 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR AND SDL2_FOUND AND EXISTS ${IMGUI_D
         # SDL.h redefines main, and SDL2main is what supplies the WinMain that
         # calls it. Without this the link ends at "undefined reference to
         # WinMain" - which the client and the editor both already link for.
-        if(TARGET SDL2::SDL2main)
-            target_link_libraries(wowee_assets PRIVATE SDL2::SDL2main)
-        endif()
+        # SDL3 has no separate main library: the WinMain shim is in
+        # SDL3::SDL3 itself.
     else()
         target_sources(wowee_assets PRIVATE tools/asset_manager/folder_picker_none.cpp)
     endif()
@@ -2501,7 +2488,7 @@ target_include_directories(wowee_editor SYSTEM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/extern/vk-bootstrap/src
 )
 target_link_libraries(wowee_editor PRIVATE
-    SDL2::SDL2
+    SDL3::SDL3
     Vulkan::Vulkan
     Threads::Threads
     ZLIB::ZLIB
@@ -2527,9 +2514,7 @@ if(APPLE)
 endif()
 if(WIN32)
     target_link_libraries(wowee_editor PRIVATE ws2_32)
-    if(TARGET SDL2::SDL2main)
-        target_link_libraries(wowee_editor PRIVATE SDL2::SDL2main)
-    endif()
+    # SDL3 has no separate main library; see the client target.
 endif()
 if(NOT MSVC)
     # The editor's CLI handlers share a `(int& i, int argc, char** argv)`
