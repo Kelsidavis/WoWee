@@ -4109,17 +4109,53 @@ void Renderer::renderShadowPass() {
     b1Dep.pImageMemoryBarriers = &b1;
     cmdPipelineBarrier2(currentCmd, b1Dep);
 
-    // Begin shadow render pass
-    VkRenderPassBeginInfo rpInfo{};
-    rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    rpInfo.renderPass = shadowRenderPass;
-    rpInfo.framebuffer = shadowFramebuffer[frame];
-    rpInfo.renderArea = {.offset = {.x = 0, .y = 0}, .extent = {.width = SHADOW_MAP_SIZE, .height = SHADOW_MAP_SIZE}};
-    VkClearValue clear{};
-    clear.depthStencil = {.depth = 1.0f, .stencil = 0};
-    rpInfo.clearValueCount = 1;
-    rpInfo.pClearValues = &clear;
-    vkCmdBeginRenderPass(currentCmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+    // Begin the shadow pass, one way or the other.
+    //
+    // The first pass converted to dynamic rendering, and the one with least
+    // to lose by it: one attachment, no colour, no resolve, a single
+    // begin/end, and pipelines nothing else shares. Its render pass declared
+    // an EXTERNAL->0 dependency covering the same fragment-read to
+    // depth-write hazard that barrier 1 above already covers explicitly, so
+    // nothing is lost by dropping the implicit half - the layout it wants is
+    // the layout b1 leaves it in.
+    const bool dynamicRendering = vkCtx->useDynamicRendering();
+    // Said once, at warning level, because a bug report arrives with a
+    // warnings-only log and "are the shadows drawn the new way" is the first
+    // question this change makes anyone ask. A line here answers it without
+    // a second run.
+    static bool saidWhichPath = false;
+    if (!saidWhichPath) {
+        saidWhichPath = true;
+        LOG_WARNING("Shadow pass records with ",
+                    dynamicRendering ? "vkCmdBeginRendering" : "a VkRenderPass");
+    }
+    if (dynamicRendering) {
+        VkRenderingAttachmentInfo depthAttach{};
+        depthAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        depthAttach.imageView = shadowDepthView[frame];
+        depthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depthAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        depthAttach.clearValue.depthStencil = {.depth = 1.0f, .stencil = 0};
+
+        VkRenderingInfo renderInfo{};
+        renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        renderInfo.renderArea = {.offset = {.x = 0, .y = 0}, .extent = {.width = SHADOW_MAP_SIZE, .height = SHADOW_MAP_SIZE}};
+        renderInfo.layerCount = 1;
+        renderInfo.pDepthAttachment = &depthAttach;
+        vkCmdBeginRendering(currentCmd, &renderInfo);
+    } else {
+        VkRenderPassBeginInfo rpInfo{};
+        rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        rpInfo.renderPass = shadowRenderPass;
+        rpInfo.framebuffer = shadowFramebuffer[frame];
+        rpInfo.renderArea = {.offset = {.x = 0, .y = 0}, .extent = {.width = SHADOW_MAP_SIZE, .height = SHADOW_MAP_SIZE}};
+        VkClearValue clear{};
+        clear.depthStencil = {.depth = 1.0f, .stencil = 0};
+        rpInfo.clearValueCount = 1;
+        rpInfo.pClearValues = &clear;
+        vkCmdBeginRenderPass(currentCmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+    }
 
     VkViewport vp{.x = 0, .y = 0, .width = static_cast<float>(SHADOW_MAP_SIZE), .height = static_cast<float>(SHADOW_MAP_SIZE), .minDepth = 0.0f, .maxDepth = 1.0f};
     vkCmdSetViewport(currentCmd, 0, 1, &vp);
@@ -4145,7 +4181,11 @@ void Renderer::renderShadowPass() {
     }
     }  // drawCasters
 
-    vkCmdEndRenderPass(currentCmd);
+    if (dynamicRendering) {
+        vkCmdEndRendering(currentCmd);
+    } else {
+        vkCmdEndRenderPass(currentCmd);
+    }
 
     // Barrier 2: DEPTH_STENCIL_ATTACHMENT_OPTIMAL → SHADER_READ_ONLY_OPTIMAL
     VkImageMemoryBarrier2 b2{};

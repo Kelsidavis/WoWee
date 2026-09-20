@@ -72,6 +72,22 @@ public:
     // Render pass
     PipelineBuilder& setRenderPass(VkRenderPass renderPass, uint32_t subpass = 0);
 
+    /// The attachment formats a pass records with, for a pipeline that will be
+    /// bound inside vkCmdBeginRendering rather than a VkRenderPass.
+    ///
+    /// The two are exclusive and Vulkan says so: a pipeline carries either a
+    /// compatible render pass or a VkPipelineRenderingCreateInfo, and binding
+    /// one built for a render pass inside a dynamic rendering scope is invalid
+    /// however alike the attachments are. Calling this clears the render pass
+    /// and calling setRenderPass clears these, so the last one named wins
+    /// rather than both being sent and the driver choosing.
+    ///
+    /// A depth-only pass passes an empty colour list; VK_FORMAT_UNDEFINED is
+    /// how "no depth" is spelled, which is also the default.
+    PipelineBuilder& setRenderingFormats(const std::vector<VkFormat>& colorFormats,
+                                         VkFormat depthFormat = VK_FORMAT_UNDEFINED,
+                                         VkFormat stencilFormat = VK_FORMAT_UNDEFINED);
+
     // Dynamic state
     PipelineBuilder& setDynamicStates(const std::vector<VkDynamicState>& states);
 
@@ -108,6 +124,14 @@ private:
     VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
     VkRenderPass renderPass_ = VK_NULL_HANDLE;
     uint32_t subpass_ = 0;
+    /// Set only for a pipeline meant for dynamic rendering; mutually
+    /// exclusive with renderPass_ above. Empty colour list with an undefined
+    /// depth format means neither was asked for, which is a render pass
+    /// pipeline.
+    bool useDynamicRendering_ = false;
+    std::vector<VkFormat> colorFormats_;
+    VkFormat depthFormat_ = VK_FORMAT_UNDEFINED;
+    VkFormat stencilFormat_ = VK_FORMAT_UNDEFINED;
     std::vector<VkDynamicState> dynamicStates_;
     VkPipelineCreateFlags flags_ = 0;
     VkPipeline basePipelineHandle_ = VK_NULL_HANDLE;
@@ -200,6 +224,11 @@ inline VkVertexInputBindingDescription perVertexBinding(uint32_t stride,
     return description;
 }
 
+/// The format the shadow map is created with, and so the only one a pipeline
+/// recording into it under dynamic rendering can name. Renderer's attachment
+/// description says the same thing; they have to agree.
+inline constexpr VkFormat kShadowDepthFormat = VK_FORMAT_D32_SFLOAT;
+
 /// The depth-only pipeline every renderer draws its shadow pass with.
 ///
 /// Four of them built it: characters, M2 doodads, WMOs and terrain. The state
@@ -215,9 +244,10 @@ inline VkPipeline buildShadowPipeline(
         const VkPipelineShaderStageCreateInfo& fragStage,
         const VkVertexInputBindingDescription& binding,
         const std::vector<VkVertexInputAttributeDescription>& attributes,
-        VkPipelineLayout layout, VkRenderPass renderPass) {
-    return PipelineBuilder()
-        .setShaders(vertStage, fragStage)
+        VkPipelineLayout layout, VkRenderPass renderPass,
+        bool dynamicRendering) {
+    PipelineBuilder builder;
+    builder.setShaders(vertStage, fragStage)
         .setVertexInput({binding}, attributes)
         .setTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
         .setRasterization(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE)
@@ -225,9 +255,17 @@ inline VkPipeline buildShadowPipeline(
         .setDepthBias(0.05f, 0.20f)
         .setNoColorAttachment()
         .setLayout(layout)
-        .setRenderPass(renderPass)
-        .setDynamicStates(viewportAndScissorDynamic())
-        .build(device, cache);
+        .setDynamicStates(viewportAndScissorDynamic());
+    // Which of the two the shadow pass will record with, asked of the context
+    // by the caller. A separate argument rather than a null render pass,
+    // because a null one already means "shadows are not available" to the
+    // five places in Renderer that gate on it.
+    if (dynamicRendering) {
+        builder.setRenderingFormats({}, kShadowDepthFormat);
+    } else {
+        builder.setRenderPass(renderPass);
+    }
+    return builder.build(device, cache);
 }
 
 

@@ -99,6 +99,23 @@ PipelineBuilder& PipelineBuilder::setLayout(VkPipelineLayout layout) {
 PipelineBuilder& PipelineBuilder::setRenderPass(VkRenderPass renderPass, uint32_t subpass) {
     renderPass_ = renderPass;
     subpass_ = subpass;
+    // The other half of the exclusion described on setRenderingFormats.
+    useDynamicRendering_ = false;
+    colorFormats_.clear();
+    depthFormat_ = VK_FORMAT_UNDEFINED;
+    stencilFormat_ = VK_FORMAT_UNDEFINED;
+    return *this;
+}
+
+PipelineBuilder& PipelineBuilder::setRenderingFormats(const std::vector<VkFormat>& colorFormats,
+                                                      VkFormat depthFormat,
+                                                      VkFormat stencilFormat) {
+    colorFormats_ = colorFormats;
+    depthFormat_ = depthFormat;
+    stencilFormat_ = stencilFormat;
+    useDynamicRendering_ = true;
+    renderPass_ = VK_NULL_HANDLE;
+    subpass_ = 0;
     return *this;
 }
 
@@ -200,6 +217,21 @@ VkPipeline PipelineBuilder::build(VkDevice device, VkPipelineCache cache) const 
     pipelineInfo.basePipelineIndex = -1;
     pipelineInfo.renderPass = renderPass_;
     pipelineInfo.subpass = subpass_;
+
+    // A dynamic rendering pipeline carries its attachment formats instead of a
+    // render pass, and leaves renderPass VK_NULL_HANDLE. Declared out here so
+    // it outlives the create call, which reads the chain.
+    VkPipelineRenderingCreateInfo renderingInfo{};
+    if (useDynamicRendering_) {
+        renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorFormats_.size());
+        renderingInfo.pColorAttachmentFormats =
+            colorFormats_.empty() ? nullptr : colorFormats_.data();
+        renderingInfo.depthAttachmentFormat = depthFormat_;
+        renderingInfo.stencilAttachmentFormat = stencilFormat_;
+        renderingInfo.pNext = pipelineInfo.pNext;
+        pipelineInfo.pNext = &renderingInfo;
+    }
 
     VkPipeline pipeline = VK_NULL_HANDLE;
     if (vkCreateGraphicsPipelines(device, cache, 1, &pipelineInfo,

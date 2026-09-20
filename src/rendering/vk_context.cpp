@@ -661,6 +661,19 @@ bool VkContext::selectPhysicalDevice() {
     return true;
 }
 
+bool VkContext::useDynamicRendering() const {
+    // WOWEE_VK_NO_DYNAMIC_RENDERING=1 keeps the converted passes on their
+    // VkRenderPass, the way WOWEE_VK_NO_UPLOAD_BATCH keeps uploads off the
+    // batch path. Read once: this is asked per pipeline build and once per
+    // pass per frame, and an answer that could change between the two would
+    // be a pipeline bound in the wrong kind of scope.
+    static const bool disabled = [] {
+        const char* v = std::getenv("WOWEE_VK_NO_DYNAMIC_RENDERING");
+        return v && *v && *v != '0';
+    }();
+    return dynamicRenderingSupported_ && !disabled;
+}
+
 bool VkContext::createLogicalDevice() {
     // Every enable_extension_if_present has to happen before this line.
     // vkb::DeviceBuilder takes the physical device by value, so a call made

@@ -3287,7 +3287,8 @@ bool CharacterRenderer::initializeShadow(VkRenderPass shadowRenderPass) {
         device, vkCtx_->getPipelineCache(),
         vertShader.stageInfo(VK_SHADER_STAGE_VERTEX_BIT),
         fragShader.stageInfo(VK_SHADER_STAGE_FRAGMENT_BIT),
-        vertBind, vertAttrs, shadowPipelineLayout_, shadowRenderPass);
+        vertBind, vertAttrs, shadowPipelineLayout_, shadowRenderPass,
+        vkCtx_->useDynamicRendering());
 
     vertShader.destroy();
     fragShader.destroy();

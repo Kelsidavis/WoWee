@@ -262,6 +262,16 @@ public:
     /// VkRenderPass. Core at the 1.3 this build requires, so false here means
     /// a driver that reports a version it does not implement.
     [[nodiscard]] bool isDynamicRenderingSupported() const { return dynamicRenderingSupported_; }
+    /// Whether the passes that have been converted should actually record
+    /// with vkCmdBeginRendering this run.
+    ///
+    /// Support is not the whole question: WOWEE_VK_NO_DYNAMIC_RENDERING=1
+    /// keeps them on their render passes, which is how the two are compared
+    /// on a driver that renders one of them wrong. Both halves of a pass have
+    /// to ask this and agree - a pipeline built against a VkRenderPass cannot
+    /// be bound inside a vkCmdBeginRendering scope, and the reverse is just
+    /// as invalid - so it is one answer rather than a decision made twice.
+    [[nodiscard]] bool useDynamicRendering() const;
     [[nodiscard]] PFN_vkCmdPipelineBarrier2KHR cmdPipelineBarrier2Fn() const { return cmdPipelineBarrier2_; }
 
     /// Whether a texture can be uploaded without a staging buffer.
