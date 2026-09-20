@@ -301,6 +301,20 @@ int main(int argc, char** argv) {
     if (opts.mpqDir.empty() || opts.outputDir.empty()) {
         std::cerr << "Error: --mpq-dir and --output are required\n\n";
         printUsage(argv[0]);
+#ifdef _WIN32
+        if (argc == 1) {
+            // Double-clicked from Explorer rather than run from an existing
+            // console: argv is just the program name, this branch is the
+            // only one reachable, and Explorer's console dies with this
+            // process the moment main() returns - taking the message above
+            // with it before anyone can read it. This tool is meant to be
+            // run from extract_assets.ps1/.bat, not double-clicked, so this
+            // pause is the one chance a double-clicking user gets to see why
+            // nothing happened.
+            std::cout << "\nPress Enter to close this window...";
+            std::cin.get();
+        }
+#endif
         return 1;
     }
 
