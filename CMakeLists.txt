@@ -1804,6 +1804,7 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR AND SDL2_FOUND AND EXISTS ${IMGUI_D
         # on the Start menu entry the installer makes for it. Empty off Windows.
         ${WOWEE_PLATFORM_SOURCES}
         tools/asset_manager/main.cpp
+        tools/asset_manager/panel.cpp
         tools/asset_manager/profiles.cpp
         tools/asset_manager/install_scan.cpp
         tools/asset_manager/install_probe.cpp
