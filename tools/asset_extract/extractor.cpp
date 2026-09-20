@@ -473,7 +473,7 @@ static std::unordered_map<std::string, std::string> buildCaseMap(const std::stri
 // Discover archive files with expansion-specific and locale-aware loading
 static std::vector<std::string> discoverArchives(const std::string& mpqDirIn,
                                                   const std::string& expansion,
-                                                  const std::string& locale) {
+                                                  const std::string& localeIn) {
     std::vector<std::string> result;
 
     // The folder that was handed over, or the Data folder inside it.
@@ -506,6 +506,28 @@ static std::vector<std::string> discoverArchives(const std::string& mpqDirIn,
                     }
                 }
             }
+        }
+    }
+
+    // The locale folder sits beside the archives, so which locale this is can
+    // only be asked once the Data folder above has been found.
+    //
+    // Nothing else asked at all: the GUI never sets a locale, and the command
+    // line detects one against the folder it was handed - which is the game
+    // folder as often as Data, and the locale folder is not in that one. With
+    // no locale the whole locale sequence below is skipped, and those archives
+    // are where DBFilesClient and Interface live: the extraction ran to the
+    // end, wrote world and character and creature, and came out with no DBCs
+    // and no FrameXML.
+    std::string locale = localeIn;
+    if (locale.empty()) {
+        locale = Extractor::detectLocale(mpqDir);
+        if (!locale.empty()) {
+            std::cout << "Using locale archives: " << locale << "\n";
+        } else {
+            std::cerr << "Warning: no locale folder beside the archives in " << mpqDir
+                      << " - DBFilesClient and Interface come from the locale archives, "
+                         "so an extraction without one is missing both.\n";
         }
     }
 

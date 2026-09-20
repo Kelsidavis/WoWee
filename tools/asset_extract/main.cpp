@@ -347,12 +347,14 @@ int main(int argc, char** argv) {
                      "Cataclysm server;\n      see docs/plan-cataclysm.md.\n";
     }
 
-    // Auto-detect locale if not specified
+    // Auto-detect locale if not specified. Nothing is said when none is found
+    // here: this looks in the folder that was named, which may be the game
+    // folder rather than Data, and the extractor asks again against the Data
+    // folder it resolves - so it is the one that knows whether a locale is
+    // really absent, and it warns there.
     if (locale.empty() || locale == "auto") {
         locale = wowee::tools::Extractor::detectLocale(opts.mpqDir);
-        if (locale.empty()) {
-            std::cerr << "Warning: No locale directory found, skipping locale-specific archives\n";
-        } else {
+        if (!locale.empty()) {
             std::cout << "Auto-detected locale: " << locale << "\n";
         }
     }
