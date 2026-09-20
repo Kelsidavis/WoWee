@@ -6,6 +6,7 @@
 
 #include <catch_amalgamated.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <thread>
@@ -94,6 +95,25 @@ TEST_CASE("a frame already over budget is not delayed further", "[pacing]") {
     CHECK(FramePacer::nowNs() - before < 2'000'000);
 }
 
+/// The best a plain sleep to this deadline manages on the machine running the
+/// test.
+///
+/// The overshoot bound below is measured against this rather than written
+/// down. A desktop returns from a sleep about a millisecond late; a shared CI
+/// runner was seen three milliseconds late on every attempt, which is the
+/// scheduler's quantum and nothing the pacer can undercut. A constant either
+/// fails there or proves nothing here. Best of several, because the worst of
+/// several on a loaded machine is unbounded.
+std::int64_t plainSleepOvershootNs(std::int64_t budgetNs) {
+    std::int64_t best = budgetNs;
+    for (int i = 0; i < 5; ++i) {
+        const std::int64_t start = FramePacer::nowNs();
+        std::this_thread::sleep_for(std::chrono::nanoseconds(budgetNs));
+        best = std::min(best, FramePacer::nowNs() - start - budgetNs);
+    }
+    return std::max<std::int64_t>(best, 0);
+}
+
 TEST_CASE("the cap holds a 144Hz frame to its budget", "[pacing]") {
     constexpr std::int64_t kFrameNs = 1'000'000'000LL / 144;   // 6'944'444
 
@@ -103,18 +123,34 @@ TEST_CASE("the cap holds a 144Hz frame to its budget", "[pacing]") {
     (void)pacer.tickNs();
     for (int i = 0; i < 3; ++i) { pacer.waitForCap(144); (void)pacer.tickNs(); }
 
+    std::int64_t bestOvershoot = kFrameNs;
     for (int i = 0; i < 5; ++i) {
         const std::int64_t start = pacer.lastTickNs();
         pacer.waitForCap(144);
         (void)pacer.tickNs();
         const std::int64_t took = pacer.lastTickNs() - start;
 
-        // Never short: returning early is the cap failing to cap.
+        // Never short, every time: returning early is the cap failing to cap,
+        // and it is also what dropping the spin at the end of the wait would
+        // do - so this is the check that holds the spin in place.
         CHECK(took >= kFrameNs);
-        // And not long. A plain sleep_for overshoots by about a millisecond,
-        // which is what the spin at the end exists to avoid - so the margin
-        // here is tighter than that on purpose. Generous enough for a loaded
-        // CI machine, tight enough that losing the spin fails this.
-        CHECK(took < kFrameNs + 2'000'000);
+        bestOvershoot = std::min(bestOvershoot, took - kFrameNs);
+    }
+
+    // And not long. Sleeping the whole budget and taking the overshoot on top
+    // is the mistake the learned margin and the spin exist to avoid, so the
+    // bar is a fraction of what that mistake costs on this machine.
+    const std::int64_t plain = plainSleepOvershootNs(kFrameNs);
+    INFO("best overshoot " << bestOvershoot << "ns, plain sleep " << plain << "ns");
+    if (plain < 1'500'000) {
+        CHECK(bestOvershoot < std::max<std::int64_t>(plain / 4, 200'000));
+    } else {
+        // A shared runner whose scheduler quantum is wider than the margin
+        // being measured - three milliseconds on every attempt, on the macOS
+        // CI machine. Nothing about the spin is provable against a clock that
+        // coarse, and a fixed bound here only fails the run. What is left to
+        // ask is that the cap is not worse than the sleep it is built on.
+        WARN("sleeps land " << plain << "ns late here; the tight bound is not testable");
+        CHECK(bestOvershoot < 2 * plain);
     }
 }
