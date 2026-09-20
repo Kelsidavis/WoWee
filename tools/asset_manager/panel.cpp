@@ -121,10 +121,15 @@ std::vector<std::string> installedDetail(const std::string& dataRoot) {
 }
 
 void drawGame(App& app) {
-    ImGui::SeparatorText("1.  Where is your game?");
-    folderRow(app, "The World of Warcraft folder you want to build from",
+    ImGui::SeparatorText("1.  Which game's assets do you want to use?");
+    // Named for what is being chosen rather than for what this program then
+    // does with it. "The folder you want to build from" describes the build;
+    // somebody deciding which of two installations to point at is choosing
+    // whose art and sounds they are going to be looking at.
+    folderRow(app, "The World of Warcraft installation to take them from",
               app.gameDir, sizeof(app.gameDir), PickWhat::Folder,
-              "Choose your World of Warcraft folder", app.picker, app.pendingPick, 1);
+              "Choose the World of Warcraft installation to use", app.picker,
+              app.pendingPick, 1);
 
     if (!app.gameScan.note.empty()) {
         const bool good = haveGame(app);
@@ -167,7 +172,7 @@ void drawBase(App& app) {
     ImGui::SeparatorText("2.  Which game does your server run?");
 
     if (!haveGame(app)) {
-        dimmed("Choose your game folder above first.");
+        dimmed("Choose the installation above first.");
         return;
     }
 
