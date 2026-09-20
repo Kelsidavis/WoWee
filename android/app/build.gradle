@@ -25,11 +25,17 @@ def gitVersion = {
 
 // Android wants a monotonic integer. major*10000 + minor*100 + patch keeps the
 // ordering of the tags it comes from.
+//
+// Never below 1: gradle refuses a versionCode of 0 outright, and the 0.0.0 the
+// fallback above returns computes to exactly that. So the no-tags path the
+// comment there describes could not configure at all - a checkout without
+// tags, which is what a shallow CI clone and a source tarball both are.
 def gitVersionCode = {
     def parts = gitVersion.tokenize('.')
     if (parts.size() < 3) return 1
     try {
-        return parts[0].toInteger() * 10000 + parts[1].toInteger() * 100 + parts[2].toInteger()
+        def code = parts[0].toInteger() * 10000 + parts[1].toInteger() * 100 + parts[2].toInteger()
+        return Math.max(1, code)
     } catch (Exception ignored) {
         return 1
     }
