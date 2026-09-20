@@ -63,6 +63,11 @@ private:
     std::string currentLabel_;
     std::size_t currentIndex_ = 0;
 
+    /// How far through the stage now running, 0 to 1, for a stage that can
+    /// say. Only extraction can: it is also the long one, and counting whole
+    /// stages left the bar still for minutes in the middle of it.
+    std::atomic<float> stageFraction_{0.0f};
+
     std::thread thread_;
     std::atomic<bool> running_{false};
     std::atomic<bool> finished_{false};

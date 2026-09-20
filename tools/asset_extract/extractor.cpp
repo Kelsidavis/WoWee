@@ -987,6 +987,16 @@ bool Extractor::run(const Options& opts) {
                 std::cout << "\r  Extracted " << done << " / " << totalFiles << " files..."
                           << std::flush;
             }
+            // And to whoever is watching a window rather than a terminal.
+            // Every value of `done` is produced exactly once - the increment
+            // above is atomic - so the modulo fires on one thread only, and
+            // the callback is left to do its own locking. More often than
+            // the line above because a progress bar that moves in thousandths
+            // of the whole reads as stuck on a small extraction.
+            if (opts.onProgress && done % 128 == 0) {
+                opts.onProgress(static_cast<std::size_t>(done),
+                                static_cast<std::size_t>(totalFiles));
+            }
         }
     };
 
@@ -1008,6 +1018,12 @@ bool Extractor::run(const Options& opts) {
     auto extracted = stats.filesExtracted.load();
     auto failed = stats.filesFailed.load();
     auto skipped = stats.filesSkipped.load();
+    // The last one, so a bar that has been counting in 128s arrives at the
+    // end rather than stopping just short of it.
+    if (opts.onProgress) {
+        opts.onProgress(static_cast<std::size_t>(totalFiles),
+                        static_cast<std::size_t>(totalFiles));
+    }
     std::cout << "\n  Extracted " << extracted << " files ("
               << stats.bytesExtracted.load() / (1024 * 1024) << " MB), "
               << skipped << " skipped, "

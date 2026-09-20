@@ -1482,6 +1482,43 @@ endif()
 
 # ── Unit tests (Catch2) ──────────────────────────────────────
 if(WOWEE_BUILD_TESTS)
+# Defined here rather than beside the tools that use it: tests/ is added
+# below and a CMake function has to exist before the directory that calls
+# it is processed.
+# Everything a StormLib consumer has to link besides StormLib itself.
+#
+# A static libstorm leaves its own dependencies to whoever links it: bzip2
+# everywhere, and on Windows LibTomCrypt, LibTomMath and wininet as well. This
+# was written out once per tool, so mpq_build linked what asset_extract needed
+# minus the Windows half and failed to link there with fifteen undefined
+# symbols - md5_init, ltc_mp, InternetOpenA - none of which name StormLib.
+function(wowee_link_stormlib target)
+    target_link_libraries(${target} PRIVATE ${STORMLIB_LIBRARY} ZLIB::ZLIB Threads::Threads)
+    if(NOT WIN32)
+        find_library(BZ2_LIB NAMES bz2 bzip2)
+        if(BZ2_LIB)
+            target_link_libraries(${target} PRIVATE ${BZ2_LIB})
+        endif()
+    else()
+        find_library(WININET_LIB wininet)
+        find_library(BZ2_LIB bz2)
+        find_library(TOMCRYPT_LIB NAMES tomcrypt libtomcrypt)
+        find_library(TOMMATH_LIB NAMES tommath libtommath)
+        if(WININET_LIB)
+            target_link_libraries(${target} PRIVATE ${WININET_LIB})
+        endif()
+        if(BZ2_LIB)
+            target_link_libraries(${target} PRIVATE ${BZ2_LIB})
+        endif()
+        if(TOMCRYPT_LIB AND TOMMATH_LIB)
+            target_link_libraries(${target} PRIVATE ${TOMCRYPT_LIB} ${TOMMATH_LIB})
+        else()
+            message(FATAL_ERROR
+                "Static StormLib on Windows requires LibTomCrypt and LibTomMath")
+        endif()
+    endif()
+endfunction()
+
     enable_testing()
     add_subdirectory(tests)
 endif()
@@ -1668,39 +1705,6 @@ if(WOWEE_BUILD_FRAMEXML_RUN)
     endif()
 endif()
 
-# Everything a StormLib consumer has to link besides StormLib itself.
-#
-# A static libstorm leaves its own dependencies to whoever links it: bzip2
-# everywhere, and on Windows LibTomCrypt, LibTomMath and wininet as well. This
-# was written out once per tool, so mpq_build linked what asset_extract needed
-# minus the Windows half and failed to link there with fifteen undefined
-# symbols - md5_init, ltc_mp, InternetOpenA - none of which name StormLib.
-function(wowee_link_stormlib target)
-    target_link_libraries(${target} PRIVATE ${STORMLIB_LIBRARY} ZLIB::ZLIB Threads::Threads)
-    if(NOT WIN32)
-        find_library(BZ2_LIB NAMES bz2 bzip2)
-        if(BZ2_LIB)
-            target_link_libraries(${target} PRIVATE ${BZ2_LIB})
-        endif()
-    else()
-        find_library(WININET_LIB wininet)
-        find_library(BZ2_LIB bz2)
-        find_library(TOMCRYPT_LIB NAMES tomcrypt libtomcrypt)
-        find_library(TOMMATH_LIB NAMES tommath libtommath)
-        if(WININET_LIB)
-            target_link_libraries(${target} PRIVATE ${WININET_LIB})
-        endif()
-        if(BZ2_LIB)
-            target_link_libraries(${target} PRIVATE ${BZ2_LIB})
-        endif()
-        if(TOMCRYPT_LIB AND TOMMATH_LIB)
-            target_link_libraries(${target} PRIVATE ${TOMCRYPT_LIB} ${TOMMATH_LIB})
-        else()
-            message(FATAL_ERROR
-                "Static StormLib on Windows requires LibTomCrypt and LibTomMath")
-        endif()
-    endif()
-endfunction()
 
 # ---- Tool: mpq_build (loose files → MPQ) ----
 # The reverse of asset_extract, and not for WoWee, which reads loose files: for

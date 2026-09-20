@@ -1461,6 +1461,44 @@ wowee_test_link_glm(test_open_format_emitter)
 add_test(NAME open_format_emitter COMMAND test_open_format_emitter)
 register_test_target(test_open_format_emitter)
 
+# ── test_extract_progress ────────────────────────────────────
+# Extraction is the long stage of a build, and the only one that can say how
+# far through it is. Needs StormLib: it builds a real archive to extract.
+if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR)
+    add_executable(test_extract_progress
+        test_extract_progress.cpp
+        ${CMAKE_SOURCE_DIR}/tools/asset_extract/extractor.cpp
+        ${CMAKE_SOURCE_DIR}/tools/asset_extract/path_mapper.cpp
+        ${CMAKE_SOURCE_DIR}/tools/asset_extract/manifest_writer.cpp
+        ${CMAKE_SOURCE_DIR}/tools/asset_extract/open_format_emitter.cpp
+        ${CMAKE_SOURCE_DIR}/src/pipeline/dbc_loader.cpp
+        ${CMAKE_SOURCE_DIR}/src/pipeline/blp_loader.cpp
+        ${CMAKE_SOURCE_DIR}/src/pipeline/dds_loader.cpp
+        ${CMAKE_SOURCE_DIR}/src/pipeline/m2_loader.cpp
+        ${CMAKE_SOURCE_DIR}/src/pipeline/wmo_loader.cpp
+        ${CMAKE_SOURCE_DIR}/src/pipeline/adt_loader.cpp
+        ${CMAKE_SOURCE_DIR}/src/pipeline/wowee_model.cpp
+        ${CMAKE_SOURCE_DIR}/src/pipeline/wowee_building.cpp
+        ${CMAKE_SOURCE_DIR}/src/pipeline/wowee_collision.cpp
+        ${CMAKE_SOURCE_DIR}/src/rendering/m2_model_classifier.cpp
+        ${TEST_COMMON_SOURCES}
+    )
+    target_include_directories(test_extract_progress PRIVATE
+        ${TEST_INCLUDE_DIRS}
+        ${CMAKE_SOURCE_DIR}
+        ${STORMLIB_INCLUDE_DIR}
+    )
+    target_include_directories(test_extract_progress SYSTEM PRIVATE
+        ${TEST_SYSTEM_INCLUDE_DIRS}
+        ${CMAKE_SOURCE_DIR}/extern/nlohmann
+    )
+    target_link_libraries(test_extract_progress PRIVATE catch2_main)
+    wowee_test_link_glm(test_extract_progress)
+    wowee_link_stormlib(test_extract_progress)
+    add_test(NAME extract_progress COMMAND test_extract_progress)
+    register_test_target(test_extract_progress)
+endif()
+
 # ── test_camera ──────────────────────────────────────────────
 wowee_add_test(test_camera
     SOURCES test_camera.cpp

@@ -1,5 +1,7 @@
 #include "job.hpp"
 
+#include <algorithm>
+#include <atomic>
 #include <filesystem>
 #include <memory>
 
@@ -105,7 +107,12 @@ float Job::progress() const {
     if (stages_.empty()) return 0.0f;
     std::size_t done = 0;
     for (const JobStage& stage : stages_) done += stage.done ? 1 : 0;
-    return static_cast<float>(done) / static_cast<float>(stages_.size());
+    const float whole = 1.0f / static_cast<float>(stages_.size());
+    // Whole stages, plus however far into the one running. Without the
+    // second term the bar sat on a stage boundary for the length of an
+    // extraction - minutes, on a real game - and read as a hang.
+    const float within = std::clamp(stageFraction_.load(), 0.0f, 1.0f) * whole;
+    return static_cast<float>(done) * whole + within;
 }
 
 void Job::run(Profile profile, std::string gameDir, std::string secondDir,
@@ -132,6 +139,9 @@ void Job::run(Profile profile, std::string gameDir, std::string secondDir,
             currentLabel_ = stage.label;
         }
 
+        // Each stage starts from nothing; only extraction ever moves it.
+        stageFraction_.store(0.0f);
+
         say("");
         say("=== [" + std::to_string(i + 1) + "/" + std::to_string(total) + "] " + stage.label);
 
@@ -153,6 +163,27 @@ void Job::run(Profile profile, std::string gameDir, std::string secondDir,
             opts.expansionSubdir = true;
             say("    reading " + gameDir);
             say("    writing " + outputDir + "/expansions/" + step.expansion);
+            // Called from an extraction worker, so it touches the atomic
+            // directly and leaves say() - which takes the lock - to the
+            // occasional line.
+            // Atomic because two workers can be inside this at once: each
+            // value of `done` reaches it on one thread, but neighbouring
+            // values can arrive on different ones at the same moment.
+            auto saidAt = std::make_shared<std::atomic<std::size_t>>(0);
+            opts.onProgress = [this, saidAt](std::size_t done, std::size_t totalFiles) {
+                if (totalFiles == 0) return;
+                stageFraction_.store(static_cast<float>(done) /
+                                     static_cast<float>(totalFiles));
+                // A line every few thousand files: enough that the log is
+                // visibly alive over a long extraction, and rare enough that
+                // it is not itself the cost. The exchange means only the
+                // thread that wins writes the line.
+                std::size_t want = saidAt->load();
+                if (done >= want && saidAt->compare_exchange_strong(want, done + 5000)) {
+                    say("    " + std::to_string(done) + " / " +
+                        std::to_string(totalFiles) + " files");
+                }
+            };
             try {
                 ok = tools::Extractor::run(opts);
             } catch (const std::exception& exc) {
