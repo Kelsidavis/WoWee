@@ -14,10 +14,12 @@ namespace ui {
 
 float TouchControls::stickRadius() const {
     if (cachedRadius_ > 0.0f) return cachedRadius_;
-    float diagonalDpi = 0.0f;
+    // SDL3 dropped SDL_GetDisplayDPI for a content scale, which is the same
+    // number this was deriving: dpi over Android's 160 baseline is 1x.
     float density = 2.0f;
-    if (SDL_GetDisplayDPI(0, &diagonalDpi, nullptr, nullptr) == 0 && diagonalDpi > 0.0f) {
-        density = diagonalDpi / 160.0f;  // Android's own baseline for 1x
+    if (const float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+        scale > 0.0f) {
+        density = scale;
     }
     cachedRadius_ = kStickRadiusDp * std::max(density, 1.0f);
     return cachedRadius_;
@@ -53,8 +55,8 @@ void TouchControls::setMovementKeys(bool forward, bool back, bool left, bool rig
 
 void TouchControls::handleEvent(const SDL_Event& event, int windowWidth, int windowHeight) {
     if (!inWorld_) return;
-    if (event.type != SDL_FINGERDOWN && event.type != SDL_FINGERMOTION &&
-        event.type != SDL_FINGERUP) {
+    if (event.type != SDL_EVENT_FINGER_DOWN && event.type != SDL_EVENT_FINGER_MOTION &&
+        event.type != SDL_EVENT_FINGER_UP) {
         return;
     }
 
@@ -62,9 +64,9 @@ void TouchControls::handleEvent(const SDL_Event& event, int windowWidth, int win
     const float h = static_cast<float>(std::max(windowHeight, 1));
     const float x = event.tfinger.x * w;
     const float y = event.tfinger.y * h;
-    const SDL_FingerID id = event.tfinger.fingerId;
+    const SDL_FingerID id = event.tfinger.fingerID;
 
-    if (event.type == SDL_FINGERDOWN) {
+    if (event.type == SDL_EVENT_FINGER_DOWN) {
         // The interface is asked first, so a bag or an action button drawn over
         // the corner still gets the press. A stick that ate those would be
         // maddening, and the corner is only a default.
@@ -96,7 +98,7 @@ void TouchControls::handleEvent(const SDL_Event& event, int windowWidth, int win
         return;
     }
 
-    if (event.type == SDL_FINGERUP) {
+    if (event.type == SDL_EVENT_FINGER_UP) {
         if (id == stickFingerId_) {
             stickFingerId_ = kNoFinger;
             stickX_ = stickY_ = 0.0f;
@@ -112,7 +114,7 @@ void TouchControls::handleEvent(const SDL_Event& event, int windowWidth, int win
         return;
     }
 
-    // SDL_FINGERMOTION
+    // SDL_EVENT_FINGER_MOTION
     if (id == stickFingerId_) {
         const float radius = stickRadius();
         stickX_ = std::clamp((x - stickOriginX_) / radius, -1.0f, 1.0f);
@@ -150,10 +152,11 @@ void TouchControls::handleEvent(const SDL_Event& event, int windowWidth, int win
     // as a wheel event so it goes through the same clamping and the same
     // setting as a wheel, rather than reaching into the camera here.
     SDL_Event wheel{};
-    wheel.type = SDL_MOUSEWHEEL;
+    wheel.type = SDL_EVENT_MOUSE_WHEEL;
     wheel.wheel.timestamp = SDL_GetTicks();
-    wheel.wheel.y = moved > 0.0f ? 1 : -1;
-    wheel.wheel.preciseY = moved / kPinchPixelsPerNotch;
+    // One float axis in SDL3: the integer y and the precise one were the
+    // same measurement at two precisions, and only the finer one survived.
+    wheel.wheel.y = moved / kPinchPixelsPerNotch;
     SDL_PushEvent(&wheel);
 }
 

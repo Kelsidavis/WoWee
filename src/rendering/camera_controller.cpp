@@ -3213,18 +3213,19 @@ void CameraController::processMouseButton(const SDL_MouseButtonEvent& event) {
     bool uiWantsMouse = ImGui::GetIO().WantCaptureMouse || ui::frameXmlOwnsMouse();
 
     if (event.button == SDL_BUTTON_LEFT) {
-        leftMouseDown = (event.state == SDL_PRESSED) && !uiWantsMouse;
-        if (event.state == SDL_PRESSED && event.clicks >= 2) {
+        leftMouseDown = (event.down) && !uiWantsMouse;
+        if (event.down && event.clicks >= 2) {
             autoRunning = false;
         }
     }
     if (event.button == SDL_BUTTON_RIGHT) {
-        rightMouseDown = (event.state == SDL_PRESSED) && !uiWantsMouse;
+        rightMouseDown = (event.down) && !uiWantsMouse;
     }
 
     bool anyDown = leftMouseDown || rightMouseDown;
     if (anyDown && !mouseButtonDown) {
-        SDL_SetRelativeMouseMode(SDL_TRUE);
+        // SDL3 captures per window rather than globally. The focused window is the one the player is pointing at, and relative mode means nothing for any other - so that is the one to ask.
+        SDL_SetWindowRelativeMouseMode(SDL_GetKeyboardFocus(), true);
         // Throw away the delta the switch itself makes. Entering relative
         // mode hands over the movement since the last relative read, which on
         // a press is everything the cursor did on its way to the thing being
@@ -3236,7 +3237,7 @@ void CameraController::processMouseButton(const SDL_MouseButtonEvent& event) {
         dragOffsetX_ = 0.0f;
         dragOffsetY_ = 0.0f;
     } else if (!anyDown && mouseButtonDown) {
-        SDL_SetRelativeMouseMode(SDL_FALSE);
+        SDL_SetWindowRelativeMouseMode(SDL_GetKeyboardFocus(), false);
         rotateArmed_ = false;
     }
     mouseButtonDown = anyDown;
@@ -3249,8 +3250,8 @@ void CameraController::releaseMouseCapture() {
     rotateArmed_ = false;
     dragOffsetX_ = 0.0f;
     dragOffsetY_ = 0.0f;
-    SDL_SetRelativeMouseMode(SDL_FALSE);
-    SDL_ShowCursor(SDL_ENABLE);
+    SDL_SetWindowRelativeMouseMode(SDL_GetKeyboardFocus(), false);
+    SDL_ShowCursor();
 }
 
 void CameraController::resetAngles() {

@@ -55,7 +55,7 @@ void EditorCamera::processMouseWheel(float delta, bool shiftHeld) {
 }
 
 void EditorCamera::processKeyEvent(const SDL_KeyboardEvent& event) {
-    bool pressed = (event.type == SDL_KEYDOWN);
+    bool pressed = (event.type == SDL_EVENT_KEY_DOWN);
     switch (event.keysym.scancode) {
         case SDL_SCANCODE_W: keyW_ = pressed; break;
         case SDL_SCANCODE_A: keyA_ = pressed; break;
@@ -71,9 +71,9 @@ void EditorCamera::processKeyEvent(const SDL_KeyboardEvent& event) {
 
 void EditorCamera::processMouseButton(const SDL_MouseButtonEvent& event) {
     if (event.button == SDL_BUTTON_RIGHT)
-        rightMouseDown_ = (event.type == SDL_MOUSEBUTTONDOWN);
+        rightMouseDown_ = (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
     if (event.button == SDL_BUTTON_MIDDLE)
-        middleMouseDown_ = (event.type == SDL_MOUSEBUTTONDOWN);
+        middleMouseDown_ = (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
 }
 
 void EditorCamera::processMiddleMouseMotion(int dx, int dy, const glm::vec3& pivotPoint) {

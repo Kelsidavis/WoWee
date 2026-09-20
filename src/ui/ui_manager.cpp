@@ -4,7 +4,7 @@
 #include "ui/imgui_theme.hpp"
 #include "ui/interface_fonts.hpp"
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <algorithm>
 #include <filesystem>
 #include <chrono>
@@ -15,7 +15,7 @@
 #include "game/game_handler.hpp"
 #include "rendering/vk_context.hpp"
 #include <imgui.h>
-#include <imgui_impl_sdl2.h>
+#include <imgui_impl_sdl3.h>
 #include <imgui_impl_vulkan.h>
 
 namespace wowee {
@@ -60,10 +60,13 @@ constexpr float kMinLogicalHeight = 620.0f;
 
 float interfaceScale([[maybe_unused]] SDL_Window* window) {
 #ifdef __ANDROID__
-    float diagonalDpi = 0.0f;
+    // SDL3 dropped SDL_GetDisplayDPI and answers with a content scale
+    // instead, which is the same number this was deriving: dpi over
+    // Android's 160 baseline is what the platform already calls 1x.
     float density = 2.0f;  // No answer from SDL; a phone is still not a monitor.
-    if (SDL_GetDisplayDPI(0, &diagonalDpi, nullptr, nullptr) == 0 && diagonalDpi > 0.0f) {
-        density = diagonalDpi / 160.0f;  // Android's own baseline for 1x.
+    if (const float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+        scale > 0.0f) {
+        density = scale;
     }
 
     // Density is what makes the text legible and the controls big enough to
@@ -115,7 +118,7 @@ bool UIManager::initialize(core::Window* win) {
     }
 
     // Initialize ImGui for SDL2 + Vulkan
-    ImGui_ImplSDL2_InitForVulkan(window->getSDLWindow());
+    ImGui_ImplSDL3_InitForVulkan(window->getSDLWindow());
 
     ImGui_ImplVulkan_InitInfo initInfo{};
     initInfo.ApiVersion = VK_API_VERSION_1_1;
@@ -339,7 +342,7 @@ void UIManager::shutdown() {
         }
 
         ImGui_ImplVulkan_Shutdown();
-        ImGui_ImplSDL2_Shutdown();
+        ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
         imguiInitialized = false;
     }
@@ -351,7 +354,7 @@ void UIManager::update([[maybe_unused]] float deltaTime) {
 
     // Start ImGui frame
     ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 }
 
@@ -475,7 +478,7 @@ void UIManager::finishImGuiFrame() {
 
 void UIManager::processEvent(const SDL_Event& event) {
     if (imguiInitialized) {
-        ImGui_ImplSDL2_ProcessEvent(&event);
+        ImGui_ImplSDL3_ProcessEvent(&event);
     }
 }
 

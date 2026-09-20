@@ -11,7 +11,7 @@
 
 #include "core/data_paths.hpp"
 #include <string>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif

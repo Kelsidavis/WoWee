@@ -1,13 +1,13 @@
 #include "rendering/loading_screen.hpp"
 
-#include <SDL2/SDL_vulkan.h>
+#include <SDL3/SDL_vulkan.h>
 #include "rendering/vk_context.hpp"
 #include "core/logger.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <imgui_impl_vulkan.h>
-#include <imgui_impl_sdl2.h>
-#include <SDL2/SDL.h>
+#include <imgui_impl_sdl3.h>
+#include <SDL3/SDL.h>
 #include <random>
 #include <chrono>
 #include <cstdio>
@@ -348,7 +348,7 @@ void LoadingScreen::render() {
     float screenH = io.DisplaySize.y;
 
     ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 
     // Invisible fullscreen window
@@ -432,7 +432,7 @@ void LoadingScreen::render() {
             // on a high density display rebuilding at those halves the
             // swapchain under a loading screen that is drawn full width.
             int w = 0, h = 0;
-            SDL_Vulkan_GetDrawableSize(sdlWindow, &w, &h);
+            SDL_GetWindowSizeInPixels(sdlWindow, &w, &h);
             if (w > 0 && h > 0) {
                 (void)vkCtx->recreateSwapchain(w, h);
             }

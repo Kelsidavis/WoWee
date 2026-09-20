@@ -22,7 +22,7 @@
 #include "pipeline/dbc_layout.hpp"
 #include "core/logger.hpp"
 #include <imgui.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <algorithm>
 #include <cstdio>
 #include <cstring>

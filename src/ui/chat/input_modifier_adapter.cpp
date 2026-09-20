@@ -2,7 +2,7 @@
 // Phase 4.3 of chat_panel_ref.md.
 #include "ui/chat/input_modifier_adapter.hpp"
 #include "core/input.hpp"
-#include <SDL2/SDL_scancode.h>
+#include <SDL3/SDL_scancode.h>
 
 namespace wowee { namespace ui {
 

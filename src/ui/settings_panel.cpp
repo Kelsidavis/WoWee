@@ -163,12 +163,12 @@ void SettingsPanel::renderSettingsGameplayTab(const std::function<void()>& saveC
             listRow(row);
         }
         ImGui::BulletText("%s or %s: close a window, or the game menu",
-                          padButtonLabel(SDL_CONTROLLER_BUTTON_B, kind),
-                          padButtonLabel(SDL_CONTROLLER_BUTTON_START, kind));
+                          padButtonLabel(SDL_GAMEPAD_BUTTON_EAST, kind),
+                          padButtonLabel(SDL_GAMEPAD_BUTTON_START, kind));
         ImGui::BulletText("%s: the pointer - then %s clicks and %s right-clicks",
-                          padButtonLabel(SDL_CONTROLLER_BUTTON_BACK, kind),
-                          padButtonLabel(SDL_CONTROLLER_BUTTON_A, kind),
-                          padButtonLabel(SDL_CONTROLLER_BUTTON_X, kind));
+                          padButtonLabel(SDL_GAMEPAD_BUTTON_BACK, kind),
+                          padButtonLabel(SDL_GAMEPAD_BUTTON_SOUTH, kind),
+                          padButtonLabel(SDL_GAMEPAD_BUTTON_WEST, kind));
         if (core::gamepad().hasTouchpad()) {
             ImGui::BulletText("Touchpad: a trackpad - click it, or with two "
                               "fingers to right-click");

@@ -9,7 +9,7 @@
 #include "core/logger.hpp"
 #include "pipeline/blp_loader.hpp"
 #include <VkBootstrap.h>
-#include <SDL2/SDL_vulkan.h>
+#include <SDL3/SDL_vulkan.h>
 #include <imgui_impl_vulkan.h>
 #include <algorithm>
 #include <cstring>
@@ -93,7 +93,7 @@ bool VkContext::initialize(SDL_Window* window) {
     createPipelineCache();
 
     int w, h;
-    SDL_Vulkan_GetDrawableSize(window, &w, &h);
+    SDL_GetWindowSizeInPixels(window, &w, &h);
     if (!createSwapchain(w, h)) return false;
 
     if (!createCommandPools()) return false;
@@ -375,12 +375,16 @@ VkSampler VkContext::getOrCreateSampler(const VkSamplerCreateInfo& info) {
     return sampler;
 }
 
-bool VkContext::createInstance(SDL_Window* window) {
+// The window is no longer needed to ask which instance extensions SDL
+// wants - SDL3 answers for the process - but the signature is this class's
+// own and its caller has the window to hand either way.
+bool VkContext::createInstance([[maybe_unused]] SDL_Window* window) {
     // Get required SDL extensions
     unsigned int sdlExtCount = 0;
-    SDL_Vulkan_GetInstanceExtensions(window, &sdlExtCount, nullptr);
-    std::vector<const char*> sdlExts(sdlExtCount);
-    SDL_Vulkan_GetInstanceExtensions(window, &sdlExtCount, sdlExts.data());
+    // SDL3 hands back its own array rather than filling one in two passes,
+    // and the list is not per window any more.
+    const char* const* sdlExtNames = SDL_Vulkan_GetInstanceExtensions(&sdlExtCount);
+    std::vector<const char*> sdlExts(sdlExtNames, sdlExtNames + sdlExtCount);
 
     vkb::InstanceBuilder builder;
     builder.set_app_name("Wowee")
@@ -444,7 +448,8 @@ bool VkContext::createInstance(SDL_Window* window) {
 }
 
 bool VkContext::createSurface(SDL_Window* window) {
-    if (!SDL_Vulkan_CreateSurface(window, instance, &surface)) {
+    // SDL3 takes a host allocator here; nullptr keeps Vulkan's own.
+    if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
         LOG_ERROR("Failed to create Vulkan surface: ", SDL_GetError());
         return false;
     }
