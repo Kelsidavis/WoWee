@@ -464,10 +464,13 @@ void UIManager::finishImGuiFrame() {
     // Read after the frame is built, so it reflects the box the player just
     // touched rather than the one they touched last frame.
     if (const bool wantsText = ImGui::GetIO().WantTextInput; wantsText != softKeyboardUp_) {
+        // Both take the window in SDL3, text input being per-window there
+        // rather than global.
+        SDL_Window* sdlWindow = window ? window->getSDLWindow() : nullptr;
         if (wantsText) {
-            SDL_StartTextInput();
+            SDL_StartTextInput(sdlWindow);
         } else {
-            SDL_StopTextInput();
+            SDL_StopTextInput(sdlWindow);
         }
         softKeyboardUp_ = wantsText;
     }
