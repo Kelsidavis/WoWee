@@ -7,6 +7,36 @@
 #include <string>
 #include <cstring>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include <shellapi.h>
+
+/// Open the asset manager window instead, when this was double-clicked.
+///
+/// Somebody who finds this in the install folder and runs it wants their
+/// assets built, not a usage message - and Explorer's console closes with the
+/// process, so they never see one anyway. The window beside it does the same
+/// job and asks for the folders rather than expecting them as flags.
+static bool startAssetManager() {
+    wchar_t self[MAX_PATH];
+    const DWORD length = GetModuleFileNameW(nullptr, self, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH) return false;
+
+    const std::filesystem::path beside = std::filesystem::path(self).parent_path();
+    const std::filesystem::path gui = beside / L"wowee_assets.exe";
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(gui, ec)) return false;
+
+    // Over 32 is ShellExecute's success threshold; anything at or below it is
+    // one of its error codes.
+    const auto result = reinterpret_cast<INT_PTR>(ShellExecuteW(
+        nullptr, L"open", gui.c_str(), nullptr, beside.c_str(), SW_SHOWNORMAL));
+    return result > 32;
+}
+#endif
+
 static void printUsage(const char* prog) {
     std::cout << "Usage: " << prog << " --mpq-dir <path> --output <path> [options]\n"
               << "\n"
@@ -54,6 +84,13 @@ static void printUsage(const char* prog) {
 }
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+    // Nothing on the command line means Explorer, not a shell. Hand the
+    // person the window rather than a usage message their console closes
+    // before they can read. Falls through to that message when the window is
+    // not installed beside this.
+    if (argc == 1 && startAssetManager()) return 0;
+#endif
     wowee::tools::Extractor::Options opts;
     std::string expansion;
     std::string locale;
@@ -303,15 +340,14 @@ int main(int argc, char** argv) {
         printUsage(argv[0]);
 #ifdef _WIN32
         if (argc == 1) {
-            // Double-clicked from Explorer rather than run from an existing
-            // console: argv is just the program name, this branch is the
-            // only one reachable, and Explorer's console dies with this
-            // process the moment main() returns - taking the message above
-            // with it before anyone can read it. This tool is meant to be
-            // run from extract_assets.ps1/.bat, not double-clicked, so this
-            // pause is the one chance a double-clicking user gets to see why
-            // nothing happened.
-            std::cout << "\nPress Enter to close this window...";
+            // Double-clicked, and the asset manager window was not beside
+            // this to hand over to. Explorer's console dies with the process,
+            // so without this pause the message above is gone before anyone
+            // can read it and the whole thing looks like it did nothing.
+            std::cout << "\nwowee_assets.exe, the window that does this "
+                         "without any of the above, was not found next to "
+                         "this program.\n"
+                      << "\nPress Enter to close this window...";
             std::cin.get();
         }
 #endif

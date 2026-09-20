@@ -1755,6 +1755,11 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR)
         ${CMAKE_CURRENT_SOURCE_DIR}/extern
     )
     wowee_link_stormlib(asset_extract)
+    if(WIN32)
+        # ShellExecuteW, for handing a double-click over to the asset manager
+        # window instead of printing a usage message at a console that closes.
+        target_link_libraries(asset_extract PRIVATE shell32)
+    endif()
     set_target_properties(asset_extract PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     )
@@ -1788,7 +1793,13 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR AND SDL2_FOUND AND EXISTS ${IMGUI_D
     )
     target_link_libraries(imgui_sdlrenderer PUBLIC SDL2::SDL2)
 
-    add_executable(wowee_assets
+    # WIN32: a windowed program rather than a console one, so double-clicking
+    # it in Explorer opens the window and nothing else. Without it Windows
+    # gives this a console too, and the asset manager came up beside a black
+    # cmd box it never writes to. SDL2main supplies the WinMain that needs,
+    # and the keyword is ignored everywhere but Windows. Startup failures go
+    # to a message box now that there is no console to print them to.
+    add_executable(wowee_assets WIN32
         # The icon resource, so this is not a blank executable in Explorer and
         # on the Start menu entry the installer makes for it. Empty off Windows.
         ${WOWEE_PLATFORM_SOURCES}
