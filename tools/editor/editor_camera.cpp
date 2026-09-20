@@ -56,7 +56,7 @@ void EditorCamera::processMouseWheel(float delta, bool shiftHeld) {
 
 void EditorCamera::processKeyEvent(const SDL_KeyboardEvent& event) {
     bool pressed = (event.type == SDL_EVENT_KEY_DOWN);
-    switch (event.keysym.scancode) {
+    switch (event.scancode) {
         case SDL_SCANCODE_W: keyW_ = pressed; break;
         case SDL_SCANCODE_A: keyA_ = pressed; break;
         case SDL_SCANCODE_S: keyS_ = pressed; break;

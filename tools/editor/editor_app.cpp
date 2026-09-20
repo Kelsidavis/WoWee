@@ -20,7 +20,7 @@
 #include "pipeline/terrain_mesh.hpp"
 #include "core/logger.hpp"
 #include <imgui.h>
-#include <imgui_impl_sdl2.h>
+#include <imgui_impl_sdl3.h>
 #include <imgui_impl_vulkan.h>
 #include <algorithm>
 #include <chrono>
