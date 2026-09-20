@@ -522,10 +522,20 @@ jobs:
     - name: Bundle DLLs
       shell: msys2 {0}
       run: |
-        ldd build/bin/wowee.exe \
-          | awk '/=> \// { print $3 }' \
-          | grep -iv '^/c/Windows' \
-          | xargs -I{} sh -c 'cp -n "{}" build/bin/ 2>/dev/null || true'
+        # Every program that ships, not the client alone. The asset tools are
+        # how anybody gets data to run the client with, and a configure that
+        # quietly disabled them - StormLib or SDL2 not found - produced a
+        # package with neither and said nothing. Their DLLs were assumed to be
+        # a subset of the client's rather than collected.
+        test -x build/bin/wowee.exe
+        test -x build/bin/asset_extract.exe
+        test -x build/bin/wowee_assets.exe
+        for exe in build/bin/wowee.exe build/bin/asset_extract.exe build/bin/wowee_assets.exe; do
+          ldd "$exe" \
+            | awk '/=> \// { print $3 }' \
+            | grep -iv '^/c/Windows' \
+            | xargs -I{} sh -c 'cp -n "{}" build/bin/ 2>/dev/null || true'
+        done
 
     - name: Package (ZIP)
       shell: msys2 {0}
@@ -635,10 +645,20 @@ jobs:
     - name: Bundle DLLs
       shell: msys2 {0}
       run: |
-        ldd build/bin/wowee.exe \
-          | awk '/=> \// { print $3 }' \
-          | grep -iv '^/c/Windows' \
-          | xargs -I{} sh -c 'cp -n "{}" build/bin/ 2>/dev/null || true'
+        # Every program that ships, not the client alone. The asset tools are
+        # how anybody gets data to run the client with, and a configure that
+        # quietly disabled them - StormLib or SDL2 not found - produced a
+        # package with neither and said nothing. Their DLLs were assumed to be
+        # a subset of the client's rather than collected.
+        test -x build/bin/wowee.exe
+        test -x build/bin/asset_extract.exe
+        test -x build/bin/wowee_assets.exe
+        for exe in build/bin/wowee.exe build/bin/asset_extract.exe build/bin/wowee_assets.exe; do
+          ldd "$exe" \
+            | awk '/=> \// { print $3 }' \
+            | grep -iv '^/c/Windows' \
+            | xargs -I{} sh -c 'cp -n "{}" build/bin/ 2>/dev/null || true'
+        done
 
     - name: Package (NSIS)
       shell: msys2 {0}

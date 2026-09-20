@@ -77,15 +77,14 @@ jobs:
         # Binary
         cp build/bin/wowee "${STAGING}/"
 
-        # Asset extraction tool (if built - requires StormLib)
-        if [ -f build/bin/asset_extract ]; then
-          cp build/bin/asset_extract "${STAGING}/"
-        fi
+        # Required, not copied if present: see the Windows job for what a
+        # soft check shipped.
+        test -x build/bin/asset_extract
+        cp build/bin/asset_extract "${STAGING}/"
 
         # The asset manager window, and the script for the command line.
-        if [ -f build/bin/wowee_assets ]; then
-          cp build/bin/wowee_assets "${STAGING}/"
-        fi
+        test -x build/bin/wowee_assets
+        cp build/bin/wowee_assets "${STAGING}/"
         cp extract_assets.sh "${STAGING}/"
 
         # This client's own addons, which the build puts beside the binary and
@@ -482,8 +481,12 @@ jobs:
     - name: Bundle DLLs
       shell: msys2 {0}
       run: |
-        for exe in build/bin/wowee.exe build/bin/asset_extract.exe; do
-          [ -f "$exe" ] || continue
+        # wowee_assets was missing from this list, so the window's own DLLs
+        # were only ever bundled by happening to also be the client's. All
+        # three are required: a release with no asset tools is a release
+        # nobody can get data for.
+        for exe in build/bin/wowee.exe build/bin/asset_extract.exe build/bin/wowee_assets.exe; do
+          test -x "$exe"
           ldd "$exe" \
             | awk '/=> \// { print $3 }' \
             | grep -iv '^/c/Windows' \
@@ -501,15 +504,17 @@ jobs:
         cp build/bin/wowee.exe "${STAGING}/"
         cp build/bin/*.dll "${STAGING}/" 2>/dev/null || true
 
-        # Asset extraction tool (if built - requires StormLib)
-        if [ -f build/bin/asset_extract.exe ]; then
-          cp build/bin/asset_extract.exe "${STAGING}/"
-        fi
+        # Asset extraction, required rather than copied if it happens to be
+        # there. Both of these were behind `if [ -f ]`, so a configure that
+        # quietly disabled them - StormLib or SDL2 not found - shipped a
+        # release with no way to build assets at all and nothing said so. That
+        # is how wowee_assets came to be built for weeks and packaged never.
+        test -x build/bin/asset_extract.exe
+        cp build/bin/asset_extract.exe "${STAGING}/"
 
         # The asset manager window, and the scripts for the command line.
-        if [ -f build/bin/wowee_assets.exe ]; then
-          cp build/bin/wowee_assets.exe "${STAGING}/"
-        fi
+        test -x build/bin/wowee_assets.exe
+        cp build/bin/wowee_assets.exe "${STAGING}/"
         cp extract_assets.ps1 "${STAGING}/"
         cp extract_assets.bat "${STAGING}/"
 
