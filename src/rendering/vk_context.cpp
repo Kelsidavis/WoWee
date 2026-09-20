@@ -760,6 +760,38 @@ bool VkContext::createLogicalDevice() {
     // The feature still has to be enabled explicitly, and the entry point is
     // still checked for below, because a driver advertising a version is not
     // the same as one that resolves every symbol in it.
+    // Dynamic rendering, core at 1.3 like synchronization2 above. Asked for
+    // here so the passes converted to it have the feature on; a pass still
+    // using vkCmdBeginRenderPass is unaffected either way, so this can be
+    // enabled before anything uses it.
+    //
+    // It is also what multiview stereo would be built on - VkRenderingInfo
+    // carries the viewMask - so this is the first step of that rather than a
+    // saving in its own right.
+    VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures{};
+    dynamicRenderingFeatures.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+    {
+        VkPhysicalDeviceDynamicRenderingFeatures supported{};
+        supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+        VkPhysicalDeviceFeatures2 probe{};
+        probe.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        probe.pNext = &supported;
+        vkGetPhysicalDeviceFeatures2(physicalDevice, &probe);
+        if (supported.dynamicRendering) {
+            dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
+            deviceBuilder.add_pNext(&dynamicRenderingFeatures);
+            dynamicRenderingSupported_ = true;
+            LOG_INFO("Enabling dynamic rendering (core 1.3)");
+        } else {
+            // A 1.3 device is required, so this means a driver that reports a
+            // version it does not implement. Worth a line rather than a
+            // silent fall back to render passes.
+            LOG_WARNING("Device reports 1.3 but not dynamicRendering - "
+                        "keeping render passes");
+        }
+    }
+
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2Features{};
     sync2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
     if (sync2Available) {

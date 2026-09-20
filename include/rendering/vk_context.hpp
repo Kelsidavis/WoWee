@@ -258,6 +258,10 @@ public:
     /// Whether barriers can be recorded as VkDependencyInfo. False means the
     /// same barriers still record, through the legacy entry point.
     [[nodiscard]] bool isSynchronization2Supported() const { return synchronization2Supported_; }
+    /// Whether passes may be recorded with vkCmdBeginRendering rather than a
+    /// VkRenderPass. Core at the 1.3 this build requires, so false here means
+    /// a driver that reports a version it does not implement.
+    [[nodiscard]] bool isDynamicRenderingSupported() const { return dynamicRenderingSupported_; }
     [[nodiscard]] PFN_vkCmdPipelineBarrier2KHR cmdPipelineBarrier2Fn() const { return cmdPipelineBarrier2_; }
 
     /// Whether a texture can be uploaded without a staging buffer.
@@ -392,6 +396,7 @@ private:
     /// cmdPipelineBarrier2() in vk_utils, which lowers the dependency info
     /// back to a legacy vkCmdPipelineBarrier when this is false.
     bool synchronization2Supported_ = false;
+    bool dynamicRenderingSupported_ = false;
     /// Whether it came from core 1.3 rather than the extension. Decides which
     PFN_vkCmdPipelineBarrier2KHR cmdPipelineBarrier2_ = nullptr;
 
