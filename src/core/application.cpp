@@ -1,4 +1,5 @@
 #include "core/application.hpp"
+#include "core/frame_pacer.hpp"
 #include "core/env_flag.hpp"
 #include "core/character_paths.hpp"
 #include "ui/settings_schema.hpp"
@@ -1268,7 +1269,11 @@ void Application::run() {
                     "the per-stage breakdown will be reported at warning");
     }
 
-    auto lastTime = std::chrono::high_resolution_clock::now();
+    // Integer nanoseconds off a monotonic clock, and the finest sleep the
+    // platform will give for as long as the loop runs. See frame_pacer.hpp
+    // for what each was costing at high refresh rates.
+    FramePacer pacer;
+    const SleepPrecisionScope sleepPrecision;
     beatWatchdog();
     std::atomic<int64_t>& watchdogHeartbeatMs = watchdogHeartbeatMs_;
     // Signal flag: watchdog sets this when a stall is detected, main loop
@@ -1344,26 +1349,17 @@ void Application::run() {
         // granularity is a millisecond or so, which is close enough for a
         // cap and far cheaper than spinning.
         if (window) {
-            const int capFps = window->frameCap();
-            if (capFps > 0) {
-                const std::chrono::duration<float> target(1.0f / static_cast<float>(capFps));
-                const auto elapsed = std::chrono::high_resolution_clock::now() - lastTime;
-                if (elapsed < target) {
-                    std::this_thread::sleep_for(target - elapsed);
-                }
-            }
+            pacer.waitForCap(window->frameCap());
         }
 
-        // Calculate delta time
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float> deltaTimeDuration = currentTime - lastTime;
-        float deltaTime = deltaTimeDuration.count();
-        lastTime = currentTime;
-
-        // Cap delta time to prevent large jumps
-        if (deltaTime > 0.1f) {
-            deltaTime = 0.1f;
-        }
+        // Delta, and the start of the frame the cap above will pace. Taken
+        // together from one clock reading so the two cannot disagree about
+        // where the frame began.
+        const std::int64_t deltaNs = pacer.tickNs();
+        // Capped, so a stall - a breakpoint, a swapchain rebuild, a machine
+        // coming back from sleep - does not teleport everything that
+        // integrates over it.
+        const float deltaTime = FramePacer::toSeconds(deltaNs);
 
         if (renderer && renderer->getCameraController() && ImGui::GetIO().WantCaptureMouse) {
             renderer->getCameraController()->releaseMouseCapture();

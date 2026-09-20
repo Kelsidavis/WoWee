@@ -1461,6 +1461,13 @@ wowee_test_link_glm(test_open_format_emitter)
 add_test(NAME open_format_emitter COMMAND test_open_format_emitter)
 register_test_target(test_open_format_emitter)
 
+# ── test_frame_pacer ─────────────────────────────────────────
+# Frame timing at 144Hz, where a millisecond is a seventh of the budget.
+wowee_add_test(test_frame_pacer
+    SOURCES test_frame_pacer.cpp
+            ${CMAKE_SOURCE_DIR}/src/core/frame_pacer.cpp
+            ${TEST_COMMON_SOURCES})
+
 # ── test_update_check ────────────────────────────────────────
 # Version ordering for the update notice. No network: the ordering is the
 # part that decides whether anybody is told anything.

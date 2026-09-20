@@ -605,6 +605,7 @@ set(WOWEE_SOURCES
     src/core/memory_monitor.cpp
     src/core/app_clock.cpp
     src/core/config_paths.cpp
+    src/core/frame_pacer.cpp
     src/core/https_get.cpp
     src/core/update_check.cpp
 

@@ -1,0 +1,120 @@
+/// Frame timing at high refresh rates.
+///
+/// At 60Hz a frame is 16.7ms and a millisecond of error anywhere is noise.
+/// At 144Hz the budget is 6.94ms and the same millisecond is fourteen per
+/// cent of it, which is what these check for.
+
+#include <catch_amalgamated.hpp>
+
+#include <chrono>
+#include <cstdint>
+#include <thread>
+
+#include "core/frame_pacer.hpp"
+
+using wowee::core::FramePacer;
+
+TEST_CASE("the clock moves forward and only forward", "[pacing]") {
+    const std::int64_t a = FramePacer::nowNs();
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    const std::int64_t b = FramePacer::nowNs();
+    CHECK(b > a);
+    // Two milliseconds of sleep cannot read as less than one of elapsed
+    // time on any clock worth using.
+    CHECK(b - a > 1'000'000);
+}
+
+TEST_CASE("the first tick has no previous frame to measure from", "[pacing]") {
+    FramePacer pacer;
+    CHECK(pacer.tickNs() == 0);
+}
+
+TEST_CASE("a tick measures the gap since the last one", "[pacing]") {
+    FramePacer pacer;
+    (void)pacer.tickNs();   // the baseline
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    const std::int64_t delta = pacer.tickNs();
+    CHECK(delta > 4'000'000);    // at least 4ms
+    CHECK(delta < 100'000'000);  // and not absurd
+}
+
+TEST_CASE("the frame start is the reading the delta was taken against", "[pacing]") {
+    FramePacer pacer;
+    (void)pacer.tickNs();
+    const std::int64_t first = pacer.lastTickNs();
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    (void)pacer.tickNs();
+    const std::int64_t second = pacer.lastTickNs();
+    // Not a fresh clock reading: it is the one the delta was measured from,
+    // so the cap and the delta cannot disagree about where the frame began.
+    CHECK(second > first);
+    CHECK(FramePacer::nowNs() >= second);
+}
+
+TEST_CASE("seconds come out of nanoseconds, and a stall is capped", "[pacing]") {
+    // 144Hz, to the nanosecond.
+    CHECK(FramePacer::toSeconds(6'944'444) == Catch::Approx(0.006944444f).epsilon(0.0001));
+    CHECK(FramePacer::toSeconds(16'666'667) == Catch::Approx(0.016666667f).epsilon(0.0001));
+    CHECK(FramePacer::toSeconds(0) == Catch::Approx(0.0f));
+
+    // A machine back from sleep hands over an enormous delta, and everything
+    // that integrates over it would teleport.
+    CHECK(FramePacer::toSeconds(5'000'000'000) == Catch::Approx(0.1f));
+    CHECK(FramePacer::toSeconds(5'000'000'000, 0.25f) == Catch::Approx(0.25f));
+}
+
+TEST_CASE("no cap means no wait", "[pacing]") {
+    FramePacer pacer;
+    (void)pacer.tickNs();
+    const std::int64_t start = FramePacer::nowNs();
+    pacer.waitForCap(0);
+    pacer.waitForCap(-1);
+    // Returning at all is the check; a wait here would be an unbounded one.
+    CHECK(FramePacer::nowNs() - start < 50'000'000);
+}
+
+TEST_CASE("a pacer that has never ticked has no frame to pace", "[pacing]") {
+    FramePacer pacer;
+    const std::int64_t start = FramePacer::nowNs();
+    pacer.waitForCap(144);   // no baseline yet: must not wait on lastNs_ of 0
+    CHECK(FramePacer::nowNs() - start < 2'000'000);
+}
+
+TEST_CASE("a frame already over budget is not delayed further", "[pacing]") {
+    // A frame that took 50ms has blown a 144Hz budget seven times over.
+    // Waiting any longer would turn one slow frame into two.
+    // The loop's order: tick ends a frame, the next frame's work runs, then
+    // the cap is asked to hold. No second tick - that is what would move the
+    // frame start forward and hide the overrun.
+    FramePacer pacer;
+    (void)pacer.tickNs();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));   // slow frame
+    const std::int64_t before = FramePacer::nowNs();
+    pacer.waitForCap(144);
+    CHECK(FramePacer::nowNs() - before < 2'000'000);
+}
+
+TEST_CASE("the cap holds a 144Hz frame to its budget", "[pacing]") {
+    constexpr std::int64_t kFrameNs = 1'000'000'000LL / 144;   // 6'944'444
+
+    // Several frames: the spin margin is learned, so the first one or two
+    // may still be adjusting to what this machine's sleep actually does.
+    FramePacer pacer;
+    (void)pacer.tickNs();
+    for (int i = 0; i < 3; ++i) { pacer.waitForCap(144); (void)pacer.tickNs(); }
+
+    for (int i = 0; i < 5; ++i) {
+        const std::int64_t start = pacer.lastTickNs();
+        pacer.waitForCap(144);
+        (void)pacer.tickNs();
+        const std::int64_t took = pacer.lastTickNs() - start;
+
+        // Never short: returning early is the cap failing to cap.
+        CHECK(took >= kFrameNs);
+        // And not long. A plain sleep_for overshoots by about a millisecond,
+        // which is what the spin at the end exists to avoid - so the margin
+        // here is tighter than that on purpose. Generous enough for a loaded
+        // CI machine, tight enough that losing the spin fails this.
+        CHECK(took < kFrameNs + 2'000'000);
+    }
+}
