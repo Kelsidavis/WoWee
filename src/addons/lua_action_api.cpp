@@ -40,7 +40,7 @@ namespace wowee::addons {
 // window puts one there on every left-click - PickupMerchantItem - and buying
 // is what happens when it is dropped into a bag, so without it a left-click at
 // a vendor did nothing at all and only right-click bought.
-enum class CursorType { NONE, SPELL, ITEM, ACTION, MACRO, MERCHANT, MONEY, GUILDBANK };
+enum class CursorType { NONE, SPELL, ITEM, MACRO, MERCHANT, MONEY, GUILDBANK };
 static CursorType s_cursorType = CursorType::NONE;
 static uint32_t   s_cursorId   = 0;    // spellId, itemId, or action slot
 static int        s_cursorSlot = 0;    // source slot for placement
@@ -491,10 +491,6 @@ static int lua_GetCursorInfo(lua_State* L) {
             lua_pushstring(L, "item");
             lua_pushnumber(L, s_cursorId);
             return 2;
-        case CursorType::ACTION:
-            lua_pushstring(L, "action");
-            lua_pushnumber(L, s_cursorSlot);
-            return 2;
         case CursorType::MACRO:
             lua_pushstring(L, "macro");
             lua_pushnumber(L, s_cursorId);
@@ -577,10 +573,15 @@ static int lua_PickupAction(lua_State* L) {
 
     if (hadAction) {
         // What was there goes to the cursor, whether this was a swap or a
-        // plain pick-up.
+        // plain pick-up. existing.type is never EMPTY here (hadAction), so
+        // this covers every case - CursorType::ACTION was a dead end lua_
+        // PlaceAction had no branch for, and picking a macro up off the bar
+        // fell to it by default: the macro left its slot, rode the cursor as
+        // an unplaceable "action", and vanished on drop instead of landing
+        // anywhere.
         setCursorType(L, (existing.type == game::ActionBarSlot::SPELL) ? CursorType::SPELL :
                        (existing.type == game::ActionBarSlot::ITEM)  ? CursorType::ITEM :
-                       CursorType::ACTION);
+                       CursorType::MACRO);
         s_cursorId = existing.id;
         s_cursorSlot = slot;
         // Which button, not which slot of which bag - a fourth numbering, and
@@ -603,7 +604,9 @@ static int lua_PickupAction(lua_State* L) {
             wowee::ui::frameXmlSetCursorItem(
                 info ? gh->getItemIconPath(info->displayInfoId) : std::string());
         } else {
-            wowee::ui::frameXmlSetCursorItem(std::string());
+            std::string icon = gh->getMacroIcon(existing.id);
+            if (icon.empty()) icon = "Interface\\Icons\\INV_Misc_QuestionMark";
+            wowee::ui::frameXmlSetCursorItem(icon);
         }
     } else {
         clearCursorItem(L);
