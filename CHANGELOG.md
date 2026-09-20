@@ -1,6 +1,16 @@
 # Changelog
 
-## [v3.1.30] - 2026-09-20
+## [v3.1.31] - 2026-09-20
+
+### Changed
+- **Frames are paced in integer nanoseconds off a monotonic clock.** The loop worked in float seconds taken from a millisecond timer, which at 144Hz rounds away a real part of a 6.94ms budget - and `high_resolution_clock` is wall time on libstdc++, so a clock correction landed in a frame delta as a jump or a negative. The pacer sleeps to within a margin it measures on the machine it is running on and spins the rest, rather than sleeping the whole budget and taking the overshoot on top: frame-to-frame jitter measured here went from 0.780ms to 0.074ms. Windows holds a 1ms timer period for the run
+- **The desktop build is on SDL3.** SDL2 is in maintenance, and the nanosecond clock the pacing above wants is SDL3's. Rendering came out byte-identical to the SDL2 build, which is what the migration was checked against
+- **Vulkan 1.3 is the target.** synchronization2 and dynamic rendering are core there rather than extensions, so the paths that carried a core version and an extension version of each now carry one. Most hardware from the last several years has it
+- **The log says when vsync changes and when the swapchain's present mode follows.** Four things can set vsync and none of them said so, which is how the fault below stayed a guess for as long as it did
+
+### Fixed
+- **Vertical sync switched itself off again when you left the video options window.** Blizzard's video panel has a vertical-sync checkbox that this client retired in favour of the Display page's own row - but hiding a control does not retire it. Okay walks the panel's control list and writes every entry's stored value back to its CVar whether it changed or not, so the hidden checkbox replayed the value it read when the interface loaded, and that CVar is bound to the setting the Display page shows. Turn vertical sync on, press Okay, and it went off. Windowed mode and gamma sat behind the same loop. The retired controls leave the list now as well as the screen
+- **The world editor had been left behind by the SDL3 migration.** It is off the default build, so nothing compiled it until CI was told to, and it was reaching for an ImGui backend and an event field that SDL3 had moved
 
 ### Added
 - **The asset builder is in the client.** Somebody who installs WoWee and has extracted nothing reaches a login screen they cannot get past: the callbacks that carry a login through are the ones that need assets, so an account could be typed and nothing happened. The client now opens the builder instead, drawn from the same panel the standalone `wowee_assets` window draws - the whole of it is ImGui against the job and scan code, so one source serves both, one through SDL_Renderer and one through the client's Vulkan. It is styled as the page it stands on: cream paper, brown ink, the login card's own crayons, and sized by the figure that card sizes itself by, having first come out at ImGui's fixed thirteen pixels and read as fine print beside it. A build still wants the client reopened afterwards - the asset manager, the DBC tables, the model and terrain loaders and the addon environment are all built once at startup from a path that was empty, and the glyph atlas cannot be rebuilt mid-session
