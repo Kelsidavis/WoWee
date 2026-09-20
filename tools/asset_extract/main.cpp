@@ -8,8 +8,16 @@
 #include <cstring>
 
 #ifdef _WIN32
+// Guarded: CMakeLists passes both of these to every translation unit under
+// its Windows branch, and redefining one is a warning the build treats as an
+// error. Kept rather than dropped so the include below is still narrow if
+// this file is ever compiled outside that branch.
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <windows.h>
 #include <shellapi.h>
 
