@@ -1872,6 +1872,7 @@ static bool fillItemTooltipById(lua_State* L, game::GameHandler* gh,
                                 uint32_t itemId);
 static void appendRandomSuffix(wowee::ui::Widget* w, game::GameHandler* gh,
                                const game::ItemDef& item);
+static void appendDurabilityLine(wowee::ui::Widget* w, const game::ItemDef& item);
 
 /// One spell tooltip, for every path that shows one.
 ///
@@ -2834,6 +2835,29 @@ static void appendRandomSuffix(wowee::ui::Widget* w, game::GameHandler* gh,
     }
 }
 
+/// The "Durability X / Y" line the real client shows on a damageable item's
+/// tooltip. Both bag and paperdoll tooltips build from the item's template id
+/// - _WoweePopulateItemTooltip calls GetItemInfo, which knows nothing of any
+/// one instance - so this line, like the random suffix above, has to be
+/// appended from the instance separately. Colored the same way as the bag
+/// window's own durability line (item_tooltip.cpp), so the two agree.
+static void appendDurabilityLine(wowee::ui::Widget* w, const game::ItemDef& item) {
+    if (!w || item.maxDurability == 0) return;
+    const float pct = static_cast<float>(item.curDurability) /
+                       static_cast<float>(item.maxDurability);
+    wowee::ui::Widget::TooltipLine line;
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "Durability %u / %u",
+                  item.curDurability, item.maxDurability);
+    line.left = buf;
+    if (pct > 0.5f)       { line.lc[0] = 0.1f; line.lc[1] = 1.0f; line.lc[2] = 0.1f; }
+    else if (pct > 0.25f) { line.lc[0] = 1.0f; line.lc[1] = 1.0f; line.lc[2] = 0.0f; }
+    else                  { line.lc[0] = 1.0f; line.lc[1] = 0.2f; line.lc[2] = 0.2f; }
+    line.lc[3] = 1.0f;
+    line.rc[0] = line.rc[1] = line.rc[2] = line.rc[3] = 1.0f;
+    w->tooltipLines.push_back(std::move(line));
+}
+
 /// _WoweeAppendItemEnchants(self, bag, slot) - the enchants on a bag item.
 ///
 /// The bag tooltip is built in Lua and had no way to reach an item's GUID,
@@ -2931,6 +2955,11 @@ int lua_Tooltip_SetInventoryItem(lua_State* L) {
         // has named the suffix itself.
         appendRandomSuffix(w, gh, s.item);
     }
+    // Durability lives on the instance, same as the suffix above - the
+    // paperdoll's own icon tint already reads it correctly, but the tooltip
+    // never carried it, so hovering an equipped item said nothing a bag
+    // item's own ImGui tooltip already says.
+    appendDurabilityLine(w, s.item);
     // Equipment only: the guid list behind it is one per equipped slot, and a
     // bank slot's id would read off the end of it.
     if (slot <= static_cast<int>(game::EquipSlot::NUM_SLOTS)) {
