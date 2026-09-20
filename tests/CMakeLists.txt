@@ -1533,7 +1533,13 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR)
     target_link_libraries(test_extract_progress PRIVATE catch2_main)
     wowee_test_link_glm(test_extract_progress)
     wowee_link_stormlib(test_extract_progress)
-    add_test(NAME extract_progress COMMAND test_extract_progress)
+    # The one test that can skip its whole body: on Linux the archive it
+    # writes to set itself up aborts inside Ubuntu's StormLib, so the case
+    # SKIPs. Catch2 then exits 4 for "no tests ran" and ctest called that a
+    # failure. Only this test needs the flag, and only this test gets it -
+    # elsewhere an empty run is a test that lost its cases, which should fail.
+    add_test(NAME extract_progress
+             COMMAND test_extract_progress --allow-running-no-tests)
     register_test_target(test_extract_progress)
 endif()
 
