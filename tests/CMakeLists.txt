@@ -1499,6 +1499,28 @@ wowee_test_link_glm(test_update_check)
 add_test(NAME update_check COMMAND test_update_check)
 register_test_target(test_update_check)
 
+# ── test_realm_patches ───────────────────────────────────────
+# What a realm may name and where its archives may land. No network: the
+# naming and the parsing are the part that decides whether a manifest can
+# reach outside the directory its realm was given.
+add_executable(test_realm_patches
+    test_realm_patches.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/realm_patches.cpp
+    ${TEST_COMMON_SOURCES}
+)
+target_include_directories(test_realm_patches PRIVATE
+    ${TEST_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}
+)
+target_include_directories(test_realm_patches SYSTEM PRIVATE
+    ${TEST_SYSTEM_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/extern/nlohmann
+)
+target_link_libraries(test_realm_patches PRIVATE catch2_main OpenSSL::SSL OpenSSL::Crypto)
+wowee_test_link_glm(test_realm_patches)
+add_test(NAME realm_patches COMMAND test_realm_patches)
+register_test_target(test_realm_patches)
+
 # ── test_extract_progress ────────────────────────────────────
 # Extraction is the long stage of a build, and the only one that can say how
 # far through it is. Needs StormLib: it builds a real archive to extract.
