@@ -1653,7 +1653,10 @@ endif()
 #
 #     cmake -S . -B build -DWOWEE_BUILD_FRAMEXML_RUN=ON
 #     cmake --build build --target framexml_run
-#     ./build/bin/framexml_run Data 'ToggleGameMenu()'
+#     ./build/bin/framexml_run Data/expansions/wotlk 'ToggleGameMenu()'
+#
+# The expansion's directory, not the Data root: given the root it finds no
+# FrameXML, loads nothing, and reports no errors.
 option(WOWEE_BUILD_FRAMEXML_RUN
        "Build the headless FrameXML runner (tools/framexml_run.cpp)" OFF)
 if(WOWEE_BUILD_FRAMEXML_RUN)

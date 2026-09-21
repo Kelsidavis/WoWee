@@ -10,7 +10,7 @@
 //
 // Run it a second way before believing a clean report:
 //
-//     WOWEE_LUA_API_FALLBACK=0 framexml_run Data
+//     WOWEE_LUA_API_FALLBACK=0 framexml_run Data/expansions/wotlk
 //
 // By default an unknown global answers with a stand-in rather than nil, which
 // keeps a file alive past a name nothing implements - and hides that it was
@@ -40,9 +40,12 @@
 // the interface rather than in the data, which is what the swallowed errors
 // are.
 //
-//     framexml_run <assetPath> [expression ...]
+//     framexml_run <expansionDir> [expression ...]
 //
-//     framexml_run Data 'ToggleGameMenu()' 'ChatFrame1EditBox:Show()'
+//     framexml_run Data/expansions/wotlk 'ToggleGameMenu()' 'ChatFrame1EditBox:Show()'
+//
+// The expansion's directory, not the Data root: given the root it finds no
+// FrameXML, loads nothing, and reports no errors.
 //
 // Errors are collected rather than printed as they happen, so the load and
 // each expression are reported separately: an error during load is a different
@@ -96,8 +99,8 @@ int main(int argc, char** argv) {
     wowee::core::setEnvVar("WOWEE_LOG_FILE", "framexml_run.log", false);
     if (argc < 2) {
         std::fprintf(stderr,
-                     "usage: framexml_run <assetPath> [expression ...]\n"
-                     "  e.g. framexml_run Data 'ToggleGameMenu()'\n");
+                     "usage: framexml_run <expansionDir> [expression ...]\n"
+                     "  e.g. framexml_run Data/expansions/wotlk 'ToggleGameMenu()'\n");
         return 2;
     }
     const std::string assetPath = argv[1];
