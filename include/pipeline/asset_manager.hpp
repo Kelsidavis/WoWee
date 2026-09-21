@@ -147,11 +147,6 @@ public:
     [[nodiscard]] std::vector<uint8_t> readFileOptional(const std::string& path) const;
 
     /**
-     * Get loaded DBC count
-     */
-    [[nodiscard]] size_t getLoadedDBCCount() const { return dbcCache.size(); }
-
-    /**
      * Get file cache stats
      */
     [[nodiscard]] size_t getFileCacheSize() const { return fileCacheTotalBytes; }
@@ -199,6 +194,10 @@ private:
     mutable std::atomic<uint64_t> baseFallbackHits_{0};
 
     // (resolveFile moved to public - declaration above.)
+
+    // dbcCache under cacheMutex. The load between them runs unlocked.
+    [[nodiscard]] std::shared_ptr<DBCFile> cachedDBC(const std::string& name) const;
+    std::shared_ptr<DBCFile> cacheDBC(const std::string& name, std::shared_ptr<DBCFile> dbc);
 
     // Guards fileCache, dbcCache, fileCacheTotalBytes, fileCacheAccessCounter, and
     // fileCacheBudget.  Shared lock for read-only cache lookups (readFile cache hit,

@@ -452,10 +452,9 @@ std::shared_ptr<DBCFile> AssetManager::loadDBC(const std::string& name) {
         return nullptr;
     }
 
-    auto it = dbcCache.find(name);
-    if (it != dbcCache.end()) {
+    if (auto cached = cachedDBC(name)) {
         LOG_DEBUG("DBC already loaded (cached): ", name);
-        return it->second;
+        return cached;
     }
 
     LOG_DEBUG("Loading DBC: ", name);
@@ -604,16 +603,33 @@ std::shared_ptr<DBCFile> AssetManager::loadDBC(const std::string& name) {
         return nullptr;
     }
 
-    dbcCache[name] = dbc;
-
+    dbc = cacheDBC(name, std::move(dbc));
     LOG_INFO("Loaded DBC: ", name, " (", dbc->getRecordCount(), " records)");
     return dbc;
 }
 
-std::shared_ptr<DBCFile> AssetManager::loadDBCOptional(const std::string& name) {
-    // Check cache first
+// The lookup and the insert each take cacheMutex, and the load between them
+// does not: readFile takes the same lock, and it is not recursive. loadDBC is
+// called off the main thread - the entity spawner reads CharSections on a
+// worker - so an unlocked find could walk the table while an insert rehashed
+// it.
+std::shared_ptr<DBCFile> AssetManager::cachedDBC(const std::string& name) const {
+    std::shared_lock<std::shared_mutex> lock(cacheMutex);
     auto it = dbcCache.find(name);
-    if (it != dbcCache.end()) return it->second;
+    return it != dbcCache.end() ? it->second : nullptr;
+}
+
+// Two threads can load the same table between their lookups and their
+// inserts. The first one in is kept and both callers get it, so there is one
+// copy of each table rather than whichever finished last.
+std::shared_ptr<DBCFile> AssetManager::cacheDBC(const std::string& name,
+                                                std::shared_ptr<DBCFile> dbc) {
+    std::lock_guard<std::shared_mutex> lock(cacheMutex);
+    return dbcCache.emplace(name, std::move(dbc)).first->second;
+}
+
+std::shared_ptr<DBCFile> AssetManager::loadDBCOptional(const std::string& name) {
+    if (auto cached = cachedDBC(name)) return cached;
 
     // Try binary DBC
     std::vector<uint8_t> dbcData;
@@ -654,7 +670,7 @@ std::shared_ptr<DBCFile> AssetManager::loadDBCOptional(const std::string& name) 
         return nullptr;
     }
 
-    dbcCache[name] = dbc;
+    dbc = cacheDBC(name, std::move(dbc));
     LOG_INFO("Loaded optional DBC: ", name, " (", dbc->getRecordCount(), " records)");
     return dbc;
 }

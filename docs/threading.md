@@ -74,7 +74,7 @@ follow.
 | Variable                | Guard            | Notes |
 |-------------------------|------------------|-------|
 | `fileCache`             | `cacheMutex` (shared_mutex) | `shared_lock` for reads, `lock_guard` for writes/eviction |
-| `dbcCache`              | *partial*        | Cleared under `cacheMutex`, but `loadDBC()` / `loadDBCOptional()` look up and insert without it (see Known Limitations) |
+| `dbcCache`              | `cacheMutex`     | `shared_lock` for the lookup, `lock_guard` for the insert; the load between them is unlocked, and the first table inserted for a name is the one every caller gets |
 | `fileCacheTotalBytes`   | `cacheMutex`     | Written under exclusive lock only |
 | `fileCacheAccessCounter`| `cacheMutex`     | Written under exclusive lock only |
 | `fileCacheHits`         | `std::atomic`    | Incremented after releasing cacheMutex |
@@ -195,8 +195,3 @@ follow.
   touch it) and reset by `clearCache()`, so it approximates cached misses since
   the last clear.
 
-* `AssetManager::dbcCache` is only locked when it is cleared.  `loadDBC()` and
-  `loadDBCOptional()` find and insert without `cacheMutex`, and `loadDBC()` is
-  reached off the main thread from the NPC composite task in
-  `EntitySpawner` (`entity_spawner.cpp`, `CharSections.dbc`), so that lookup
-  can race an insert made on the main thread.
