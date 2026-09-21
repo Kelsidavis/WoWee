@@ -1,5 +1,11 @@
 # Changelog
 
+## [v3.1.32] - 2026-09-20
+
+### Fixed
+- **The bottom action bar was gone.** Introduced in v3.1.31. Retiring the interface's own action bar checkboxes took them off their panel, and the panel's control list is what the interface walks to set up each control - which is where `SHOW_MULTI_ACTIONBAR_1` and its three siblings are assigned. Nothing assigned them, so the function that decides which bars to draw read nothing and drew none of them. The controls are back on their panels and keep their setup; only the cached value that made them write over the Display page is cleared
+- **Chat took nothing but the slash that opened it.** SDL2 delivered typed characters from the start and SDL3 does not - it has to be asked, per window - and the interface library this client draws its own windows with turns the asking off again whenever one of *its* text boxes loses focus. So every interface edit box got key presses and no characters: the slash appeared because the code that opens the chat box puts it there, and nothing after it arrived. Asked for now whenever one of those boxes has the keyboard
+
 ## [v3.1.31] - 2026-09-20
 
 ### Changed
