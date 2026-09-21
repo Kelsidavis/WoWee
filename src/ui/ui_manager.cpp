@@ -455,26 +455,32 @@ void UIManager::finishImGuiFrame() {
     // so the panels have to go in after this stage has drawn the world's
     // overlays - and before the draw data is closed, which is here.
     if (!imguiInitialized) return;
-#ifdef __ANDROID__
-    // The SDL backend stopped calling these deliberately (imgui #6306), because
-    // on a desktop they only pertain to IME. On Android they are what raises
-    // and lowers the on-screen keyboard, so without them a text box takes
-    // focus, shows a caret, and there is no way to type into it.
+    // Text input for the pre-game screens' own fields.
+    //
+    // Those are PaperUI controls, not ImGui text boxes. They read characters
+    // from ImGui's queue and say they want them by setting WantTextInput, and
+    // the SDL backend never sees that: it starts text input only for an ImGui
+    // box of its own. SDL2 left text input on for the whole session, so it
+    // did not matter until SDL3, which leaves it off until asked - and then
+    // the login screen's fields took focus, showed a caret, and received
+    // nothing. On Android the same call is what raises the on-screen keyboard.
     //
     // Read after the frame is built, so it reflects the box the player just
-    // touched rather than the one they touched last frame.
-    if (const bool wantsText = ImGui::GetIO().WantTextInput; wantsText != softKeyboardUp_) {
+    // touched rather than the one they touched last frame. An interface edit
+    // box asks for itself in the main loop; see Application::run.
+    if (const bool wantsText = ImGui::GetIO().WantTextInput; wantsText != textInputUp_) {
         // Both take the window in SDL3, text input being per-window there
         // rather than global.
         SDL_Window* sdlWindow = window ? window->getSDLWindow() : nullptr;
+        // Not restarted when an ImGui box already started it: a second start
+        // resets an IME composition in progress on some platforms.
         if (wantsText) {
-            SDL_StartTextInput(sdlWindow);
+            if (!SDL_TextInputActive(sdlWindow)) SDL_StartTextInput(sdlWindow);
         } else {
             SDL_StopTextInput(sdlWindow);
         }
-        softKeyboardUp_ = wantsText;
+        textInputUp_ = wantsText;
     }
-#endif
 
     ImGui::Render();
 }

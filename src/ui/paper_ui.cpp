@@ -150,9 +150,9 @@ void PaperUI::end() {
     }
 
     if (textInputWanted_) {
-        // What raises the on-screen keyboard on Android: UIManager reads this
-        // after the frame is built. Nothing else sets it now that the login
-        // screen has no ImGui text box in it.
+        // What turns SDL's text input on, and raises the on-screen keyboard on
+        // Android: UIManager reads this after the frame is built. Nothing else
+        // sets it now that the login screen has no ImGui text box in it.
         ImGui::GetIO().WantTextInput = true;
         ImGui::SetNextFrameWantCaptureKeyboard(true);
     }
