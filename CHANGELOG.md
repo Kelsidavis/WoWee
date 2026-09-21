@@ -12,6 +12,8 @@
 ### Changed
 - **The log writes your home folder as `~`.** Almost every path it records - the data folder, the config, the log itself - is under it, so a log attached to a bug report carried your account name on line after line, and it had to be removed by hand
 - **The note in the macOS disk image describes the asset builder.** It still walked through a Terminal window and a folder chooser that the builder replaced
+- **Clicks and the commands keys send to the interface are logged at debug.** Every click wrote one or two lines at warning, and opening some panels wrote a dozen lines of Lua, so the lines that point at a fault were buried. A click a frame refused still says why at warning, and `WOWEE_LOG_LEVEL=debug` brings the rest back
+- **The missing-API report no longer names the raid browser's list.** `LFRRaidList` is a variable the interface sets itself the first time the browser is filled and reads, guarded, before that - it is nil in the real client at that point too. It is counted with the other names the interface reads while they are nil by design
 
 ## [v3.1.33] - 2026-09-21
 
