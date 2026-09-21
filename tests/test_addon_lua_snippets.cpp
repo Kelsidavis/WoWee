@@ -94,33 +94,66 @@ local function frame(name, parent)
 end
 
 local panel = frame("VideoOptionsResolutionPanel")
--- The retired checkbox, and one control that stays: the removal has to take
--- the first out of the commit list and leave the second in it.
+-- The retired checkbox, and one control that stays.
 local vsync = frame("VideoOptionsResolutionPanelVSync", panel)
 local scale = frame("VideoOptionsResolutionPanelUIScaleSlider", panel)
 panel.controls = { vsync, scale }
+
+-- Both carry what BlizzardOptionsPanel_SetupControl would have left on them:
+-- the cached value the Okay loops commit, and for the action bar boxes the
+-- uvar naming a global FrameXML reads. A retired control has to lose the
+-- first and keep the second.
+vsync.value = "0"
+vsync.uvar = "GX_VSYNC"
+scale.value = "1"
+
+local bars = frame("InterfaceOptionsActionBarsPanel")
+local bottomLeft = frame("InterfaceOptionsActionBarsPanelBottomLeft", bars)
+bottomLeft.value = "1"
+bottomLeft.uvar = "SHOW_MULTI_ACTIONBAR_1"
+bars.controls = { bottomLeft }
 )LUA";
 
 }  // namespace
 
-TEST_CASE("a retired control leaves the panel's commit list", "[addonlua]") {
+TEST_CASE("a retired control commits nothing and keeps its place", "[addonlua]") {
     // Hiding a control is not retiring it. VideoOptionsPanel_Okay walks
     // panel.controls and writes every entry's cached value back to its cvar,
     // changed or not - so the hidden vertical-sync checkbox replayed the value
     // it read at load over the Display page's own row, and pressing Okay on the
     // video window turned vertical sync off again each time it was switched on.
+    //
+    // Both halves are asserted here because fixing the first by unregistering
+    // the control broke the second, and shipped: BlizzardOptionsPanel_SetupControl
+    // runs only over panel.controls, and it is what assigns the uvar globals, so
+    // the action bar checkboxes leaving the list left SHOW_MULTI_ACTIONBAR_1 nil
+    // and the player with no bottom action bar.
     const std::string result = runChunks({
         {kFakeOptionsPanelLua, "FakeOptionsPanel"},
         {wowee::addons::kRemovedControlsLua, "RemovedControls"},
         {R"LUA(
-            local panel = VideoOptionsResolutionPanel
-            local names = ""
-            for _, c in ipairs(panel.controls) do names = names .. c:GetName() .. " " end
-            return names .. "| hidden=" .. tostring(VideoOptionsResolutionPanelVSync._hidden)
+            local vsync = VideoOptionsResolutionPanelVSync
+            local scale = VideoOptionsResolutionPanelUIScaleSlider
+            local bar = InterfaceOptionsActionBarsPanelBottomLeft
+            local listed = ""
+            for _, c in ipairs(VideoOptionsResolutionPanel.controls) do
+                listed = listed .. c:GetName() .. " "
+            end
+            return "listed=" .. listed
+                .. "| vsync.value=" .. tostring(vsync.value)
+                .. " scale.value=" .. tostring(scale.value)
+                .. " bar.value=" .. tostring(bar.value)
+                .. " bar.uvar=" .. tostring(bar.uvar)
+                .. " hidden=" .. tostring(vsync._hidden)
         )LUA",
          "Check"},
     });
-    CHECK(result == "VideoOptionsResolutionPanelUIScaleSlider | hidden=true");
+    // The retired boxes keep their place on the panel, so setup still reaches
+    // them, and lose only the value the Okay loops would have written back.
+    CHECK(result ==
+          "listed=VideoOptionsResolutionPanelVSync VideoOptionsResolutionPanelUIScaleSlider "
+          "| vsync.value=nil scale.value=1 bar.value=nil "
+          "bar.uvar=SHOW_MULTI_ACTIONBAR_1 hidden=true");
 }
 
 TEST_CASE("the options panel script parses", "[addonlua]") {

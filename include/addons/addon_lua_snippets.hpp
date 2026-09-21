@@ -1387,7 +1387,7 @@ local function applyMoves()
     end
 end
 
--- Take the removed controls out of the panel lists that commit them.
+-- Stop the removed controls committing, without taking them off their panel.
 --
 -- Hiding a control does not retire it. VideoOptionsPanel_Okay and
 -- BlizzardOptionsPanel_OkayControl walk panel.controls and write each entry's
@@ -1396,20 +1396,20 @@ end
 -- over the Display page's own row: turn vertical sync on, press Okay, and
 -- gxVSync came back as "0" and switched it off again. Windowed mode and gamma
 -- sat behind the same loop.
-local function unregisterRemoved()
+--
+-- Clearing the cached value is what stops that. Both loops read newValue, then
+-- value, and do nothing when neither is set.
+--
+-- Taking the control out of panel.controls also stops it, and is wrong:
+-- BlizzardOptionsPanel_SetupControl runs only for controls in that list, and
+-- it is what assigns the uvar globals. SHOW_MULTI_ACTIONBAR_1 to _4 are four
+-- of them, so unregistering the action bar checkboxes left
+-- MultiActionBar_Update reading nil and the bottom bars gone. The list is
+-- where a control is set up; only the value is what commits it.
+local function silenceRemoved()
     for f in pairs(removed) do
-        local owner = f.GetParent and f:GetParent()
-        local guard = 0
-        while owner and guard < 8 do
-            guard = guard + 1
-            local list = owner.controls
-            if type(list) == "table" then
-                for i = #list, 1, -1 do
-                    if removed[list[i]] then table.remove(list, i) end
-                end
-            end
-            owner = owner.GetParent and owner:GetParent() or nil
-        end
+        f.value = nil
+        f.newValue = nil
     end
 end
 
@@ -1419,9 +1419,9 @@ local function applyRemoval()
         local panel = f.GetParent and f:GetParent()
         if panel then panels[panel] = true end
     end
-    -- Repeated on every refresh, like the hiding: a panel that re-registers its
-    -- controls would otherwise put them back in the commit loop.
-    unregisterRemoved()
+    -- Repeated on every refresh, like the hiding: the panel's own OnEvent runs
+    -- SetupControl and puts a value back, and this hook runs after it.
+    silenceRemoved()
     for panel in pairs(panels) do
         if panel.GetChildren then
             for _, child in ipairs({ panel:GetChildren() }) do
