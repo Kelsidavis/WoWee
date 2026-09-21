@@ -1335,6 +1335,14 @@ void WidgetRenderer::reportOverflowingText(WidgetTree& tree) {
         const Widget* w = tree.get(static_cast<uint32_t>(id));
         if (!w || w->kind != WidgetKind::FontString) continue;
         if (!w->autoSized || w->text.empty() || w->rectW <= 0.0f) continue;
+        // On screen only. A hidden label's rect is whatever it was last solved
+        // to, and the full pass does not solve hidden frames - so one measured
+        // on demand while its page was still being built keeps that answer.
+        // The retired voice chat page was reported at every login this way:
+        // its message was measured inside a one-unit frame during OnLoad, the
+        // frame was then sized to the text, and the page was never shown to
+        // lay out again.
+        if (!w->visible) continue;
 
         // Against the width this label was measured to need, not against a
         // fresh measurement: a label stretched between two anchors is given
