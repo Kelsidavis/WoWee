@@ -870,8 +870,18 @@ int lua_Region_GetWidth(lua_State* L) {
     const bool staleAutoSize =
         w && w->kind == wowee::ui::WidgetKind::FontString && w->autoSized &&
         !w->text.empty() && w->text != w->measuredText;
+    // Nor does one declared with no anchors and no size. The layout places it
+    // over its whole parent - that is where it draws, centred - but that rect
+    // is borrowed, not a width it was given, and FrameXML reads this to size
+    // the parent from the text: AudioOptionsVoicePanelDisabledMessage's
+    // OnLoad does self:SetWidth(Text:GetWidth()). Answering the one-unit
+    // parent it was sitting in kept that frame one unit wide, so its tooltip
+    // could only be found by hovering a single column of the words.
+    const bool widthBorrowed =
+        w && w->kind == wowee::ui::WidgetKind::FontString && w->anchors.empty() &&
+        w->width <= 0.0f;
     if (w && !w->text.empty() && w->kind == wowee::ui::WidgetKind::FontString &&
-        (staleAutoSize || (w->rectW <= 0.0f && w->width <= 0.0f))) {
+        (staleAutoSize || widthBorrowed || (w->rectW <= 0.0f && w->width <= 0.0f))) {
         // A font string that was never given a width is as wide as its text.
         // That is what WoW answers, and the interface sizes things from it:
         // PanelTemplates_TabResize builds a tab's width out of
