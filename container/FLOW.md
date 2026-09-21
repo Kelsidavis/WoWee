@@ -44,11 +44,13 @@ run-{platform}.sh/.ps1
 |------|------|-----|
 | 1 | `apt-get install` cmake, ninja-build, build-essential, pkg-config, git, python3 | Core build tools |
 | 2 | `apt-get install` glslang-tools, spirv-tools | Vulkan shader compilation |
-| 3 | `apt-get install` libsdl2-dev, libglm-dev, libssl-dev, zlib1g-dev | Runtime dependencies (system packages) |
+| 3 | `apt-get install` libglm-dev, libssl-dev, zlib1g-dev | Runtime dependencies (system packages) |
 | 4 | `apt-get install` libavformat-dev, libavcodec-dev, libswscale-dev, libavutil-dev | FFmpeg libraries |
 | 5 | `apt-get install` libvulkan-dev, vulkan-tools | Vulkan SDK |
 | 6 | `apt-get install` libstorm-dev, libunicorn-dev | MPQ archive + CPU emulation |
-| 7 | COPY `build-linux.sh` → `/build-platform.sh` | Container entrypoint |
+| 7 | `apt-get install` libx11-dev, libxext-dev, libxkbcommon-dev, libwayland-dev, libdecor-0-dev and the other X11 headers | What SDL3 needs to build its video backends |
+| 8 | Build SDL3 `release-3.2.24` from source and install it | Ubuntu 24.04 has no libsdl3-dev |
+| 9 | COPY `build-linux.sh` → `/build-platform.sh` | Container entrypoint |
 
 ### Container Run Steps (build-linux.sh)
 
@@ -116,7 +118,7 @@ No manual download required.
 | 10 | COPY `macos/triplets/` → `/opt/vcpkg-triplets/` | vcpkg cross-compile triplet definitions |
 | 11 | `apt-get install` file, nasm | Mach-O detection + ffmpeg x86 asm |
 | 12 | Bootstrap vcpkg → `/opt/vcpkg` | Package manager |
-| 13 | `vcpkg install` sdl2, openssl, glm, zlib, ffmpeg `--triplet arm64-osx-cross` | arm64 dependencies |
+| 13 | `vcpkg install` sdl3, openssl, glm, zlib, ffmpeg `--triplet arm64-osx-cross` | arm64 dependencies |
 | 14 | `vcpkg install` same packages `--triplet x64-osx-cross` | x86_64 dependencies |
 | 15 | `apt-get install` libvulkan-dev, glslang-tools | Vulkan headers (for compilation, not runtime) |
 | 16 | COPY `build-macos.sh` → `/build-platform.sh` | Container entrypoint |
@@ -184,7 +186,7 @@ The main CMakeLists.txt has a macOS cross-compile branch that:
 | 2 | Download + extract LLVM-MinGW (v20240619 ucrt) → `/opt/llvm-mingw` | Clang/LLD cross-compiler for Windows |
 | 3 | Add `/opt/llvm-mingw/bin` to PATH | Makes `x86_64-w64-mingw32-clang` etc. available |
 | 4 | Bootstrap vcpkg → `/opt/vcpkg` | Package manager |
-| 5 | `vcpkg install` sdl2, openssl, glm, zlib, ffmpeg `--triplet x64-mingw-static` | Static Windows dependencies |
+| 5 | `vcpkg install` sdl3, openssl, glm, zlib, ffmpeg `--triplet x64-mingw-static` | Static Windows dependencies |
 | 6 | `apt-get install` libvulkan-dev, glslang-tools | Vulkan headers + shader tools |
 | 7 | Create no-op `powershell.exe` stub | vcpkg MinGW post-build hook needs it |
 | 8 | COPY `build-windows.sh` → `/build-platform.sh` | Container entrypoint |

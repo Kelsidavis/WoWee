@@ -1364,8 +1364,8 @@ if(WIN32)
     # more than two whole frames at 144Hz - and without this the link fails
     # on __imp_timeBeginPeriod rather than the cap simply being coarse.
     #
-    # No SDL main library: SDL3 folds the WinMain shim into SDL3::SDL3, where
-    # SDL2 kept it in a separate SDL2main.
+    # No SDL main library: SDL3 has none, its WinMain shim being header-only
+    # in SDL_main.h, where SDL2 kept it in a separate SDL2main.
     target_link_libraries(wowee PRIVATE ws2_32 winmm)
 endif()
 
@@ -1771,7 +1771,7 @@ endif()
 
 # ---- Tool: wowee_assets (the asset manager window) ----
 #
-# A native window for building this client's assets: SDL2 and Dear ImGui, both
+# A native window for building this client's assets: SDL3 and Dear ImGui, both
 # of which the client already carries, and Extractor::run called in this
 # process. It replaces a Tkinter window that drove shell scripts that drove
 # Python scripts - a chain where every link was a thing to have installed, and
@@ -1796,9 +1796,9 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR AND SDL3_FOUND AND EXISTS ${IMGUI_D
     # WIN32: a windowed program rather than a console one, so double-clicking
     # it in Explorer opens the window and nothing else. Without it Windows
     # gives this a console too, and the asset manager came up beside a black
-    # cmd box it never writes to. SDL2main supplies the WinMain that needs,
-    # and the keyword is ignored everywhere but Windows. Startup failures go
-    # to a message box now that there is no console to print them to.
+    # cmd box it never writes to. The keyword is ignored everywhere but
+    # Windows. Startup failures go to a message box now that there is no
+    # console to print them to.
     add_executable(wowee_assets WIN32
         # The icon resource, so this is not a blank executable in Explorer and
         # on the Start menu entry the installer makes for it. Empty off Windows.
@@ -1847,11 +1847,8 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR AND SDL3_FOUND AND EXISTS ${IMGUI_D
     elseif(WIN32)
         target_sources(wowee_assets PRIVATE tools/asset_manager/folder_picker_win.cpp)
         target_link_libraries(wowee_assets PRIVATE ole32 shell32)
-        # SDL.h redefines main, and SDL2main is what supplies the WinMain that
-        # calls it. Without this the link ends at "undefined reference to
-        # WinMain" - which the client and the editor both already link for.
-        # SDL3 has no separate main library: the WinMain shim is in
-        # SDL3::SDL3 itself.
+        # No SDL main library to link: SDL3's WinMain shim is header-only, in
+        # SDL_main.h, where SDL2 kept it in SDL2main.
     else()
         target_sources(wowee_assets PRIVATE tools/asset_manager/folder_picker_none.cpp)
     endif()
@@ -1872,7 +1869,7 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR AND SDL3_FOUND AND EXISTS ${IMGUI_D
     install(TARGETS wowee_assets RUNTIME DESTINATION bin)
     message(STATUS "  wowee_assets window: ENABLED")
 else()
-    message(STATUS "  wowee_assets window: DISABLED (needs StormLib, SDL2 and extern/imgui)")
+    message(STATUS "  wowee_assets window: DISABLED (needs StormLib, SDL3 and extern/imgui)")
 endif()
 
 # ---- The same panel, inside the client ----
@@ -2553,7 +2550,7 @@ message(STATUS "")
 message(STATUS "Wowee Configuration:")
 message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "  SDL2: ${SDL2_VERSION}")
+message(STATUS "  SDL3: ${SDL3_VERSION}")
 message(STATUS "  OpenSSL: ${OPENSSL_VERSION}")
 message(STATUS "  ImGui: ${IMGUI_DIR}")
 message(STATUS "  ASAN: ${WOWEE_ENABLE_ASAN}")
@@ -2635,7 +2632,7 @@ chmod +x /usr/local/bin/wowee
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Wowee")
     set(CPACK_DEBIAN_PACKAGE_SECTION "games")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS
-        "libsdl2-2.0-0, libvulkan1, libssl3, zlib1g")
+        "libsdl3-0, libvulkan1, libssl3, zlib1g")
     set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
         "${CMAKE_CURRENT_BINARY_DIR}/packaging/postinst;${CMAKE_CURRENT_BINARY_DIR}/packaging/prerm")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")

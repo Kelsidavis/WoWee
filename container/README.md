@@ -110,7 +110,7 @@ container/
 Install Docker and ensure the `docker` command is available in your terminal.
 
 **Build fails on first run**  
-Some vcpkg packages (ffmpeg, SDL2) take a while to compile. Ensure you have enough RAM (4 GB+) and disk space.
+Some vcpkg packages (ffmpeg, SDL3) take a while to compile. Ensure you have enough RAM (4 GB+) and disk space.
 
 **macOS build: "could not find osxcross compiler"**  
 The Docker image may not have built correctly. Run with `--rebuild-image` to rebuild from scratch.

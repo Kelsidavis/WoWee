@@ -42,14 +42,14 @@ RUN git clone --depth 1 https://github.com/microsoft/vcpkg.git "${VCPKG_ROOT}" &
 
 ENV VCPKG_DEFAULT_TRIPLET=x64-mingw-static
 RUN "${VCPKG_ROOT}/vcpkg" install \
-        sdl2[vulkan] \
+        sdl3[vulkan] \
         openssl \
         glm \
         zlib \
         ffmpeg \
     --triplet x64-mingw-static
 
-# Vulkan SDK headers (loader is linked statically via SDL2's vulkan surface)
+# Vulkan SDK headers (loader is linked statically via SDL3's vulkan surface)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libvulkan-dev glslang-tools && \
     rm -rf /var/lib/apt/lists/*

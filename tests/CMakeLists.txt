@@ -104,7 +104,7 @@ set(TEST_COMMON_SOURCES $<TARGET_OBJECTS:wowee_test_common>)
 #
 #   wowee_add_test(test_foo SOURCES test_foo.cpp ${TEST_COMMON_SOURCES})
 #
-# Tests that also need SDL2, OpenSSL or Vulkan keep their own block: the link
+# Tests that also need SDL3, OpenSSL or Vulkan keep their own block: the link
 # set is the interesting part of those.
 function(wowee_add_test target)
     cmake_parse_arguments(ARG "" "" "SOURCES" ${ARGN})
@@ -1614,7 +1614,7 @@ add_test(NAME gamepad COMMAND test_gamepad)
 register_test_target(test_gamepad)
 
 # ── test_camera_pivot ────────────────────────────────────────
-# Header-only: the pivot arithmetic is a static member, so this needs SDL2's
+# Header-only: the pivot arithmetic is a static member, so this needs SDL3's
 # headers (camera_controller.hpp includes them) but none of its symbols.
 add_executable(test_camera_pivot test_camera_pivot.cpp ${TEST_COMMON_SOURCES})
 target_include_directories(test_camera_pivot PRIVATE ${TEST_INCLUDE_DIRS})

@@ -112,7 +112,7 @@ RUN git clone --depth 1 https://github.com/microsoft/vcpkg.git "${VCPKG_ROOT}" &
 
 # Pre-install deps for both arches; the launcher script picks the right one at run time.
 RUN "${VCPKG_ROOT}/vcpkg" install \
-        sdl2[vulkan] \
+        sdl3[vulkan] \
         openssl \
         glm \
         zlib \
@@ -121,7 +121,7 @@ RUN "${VCPKG_ROOT}/vcpkg" install \
     --overlay-triplets=/opt/vcpkg-triplets
 
 RUN "${VCPKG_ROOT}/vcpkg" install \
-        sdl2[vulkan] \
+        sdl3[vulkan] \
         openssl \
         glm \
         zlib \

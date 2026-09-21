@@ -12,7 +12,7 @@
 /// directory away and nothing said so. A tool that installs the game's assets
 /// should not itself need an install.
 ///
-/// It uses SDL2 and Dear ImGui, both of which the client already carries, and
+/// It uses SDL3 and Dear ImGui, both of which the client already carries, and
 /// calls Extractor::run in this process. Nothing is shelled out to.
 
 #include <SDL3/SDL.h>

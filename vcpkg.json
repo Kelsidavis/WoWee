@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "dependencies": [
     {
-      "name": "sdl2",
+      "name": "sdl3",
       "features": [ "vulkan" ]
     },
     "openssl",

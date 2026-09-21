@@ -9,7 +9,7 @@ arch=('x86_64')
 url="https://github.com/Kelsidavis/WoWee"
 license=('MIT')
 depends=(
-  'sdl2'              # Windowing and event loop
+  'sdl3'              # Windowing and event loop
   'vulkan-icd-loader' # Vulkan runtime (GPU driver communication)
   'openssl'           # SRP6a auth protocol (key exchange + RC4 encryption)
   'zlib'              # Network packet decompression and Warden module inflate
