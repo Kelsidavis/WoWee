@@ -118,11 +118,17 @@ private:
     /// Draw a string that may carry WoW's inline colour markup, as runs.
     /// wrapWidth of zero draws one line, which is what an auto-sized label
     /// and a tooltip row want; a positive one breaks the text to fit.
-    void drawMarkupText(ImDrawList* dl, ImFont* font, float size, ImVec2 at,
+    /// Answers the height it drew, in pixels.
+    float drawMarkupText(ImDrawList* dl, ImFont* font, float size, ImVec2 at,
                         uint32_t fallback, float alpha, const std::string& text,
                         float wrapWidth = 0.0f, bool nonSpaceWrap = false,
                         const char* justifyH = nullptr, bool forceColor = false,
                         WidgetTree* linkSink = nullptr, uint32_t linkOwner = 0);
+    /// A SimpleHTML page holding a document rather than a string: its blocks
+    /// stacked down the frame, text justified per block and each picture on a
+    /// line of its own. See simple_html.hpp.
+    void drawSimpleHtml(ImDrawList* dl, WidgetTree& tree, const Widget& w,
+                        float ws, float x0, float y0, float x1);
     /// Screen height and interface scale of the pass in flight, so a link rect
     /// can be filed in the coordinates the click will arrive in.
     float linkScreenH_ = 0.0f;

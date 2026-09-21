@@ -429,9 +429,9 @@ struct Widget {
     /// one, which is why a letter opened to a blank page: the words were set
     /// and stored, and nothing drew text for anything but a FontString.
     ///
-    /// The markup is ignored. Real SimpleHTML parses a subset of HTML and this
-    /// draws the text as it stands, which is right for the pages the game
-    /// actually ships - they are plain text with line breaks.
+    /// Text that opens with <HTML> is read as a document - paragraphs,
+    /// headings, breaks and pictures, see simple_html.hpp - and anything else
+    /// is drawn as it stands, which is what most letters and books are.
     bool  isSimpleHtml = false;
     /// A scrolling message frame keeps its own lines rather than a single
     /// string: chat is a list that grows at one end and falls off the other,

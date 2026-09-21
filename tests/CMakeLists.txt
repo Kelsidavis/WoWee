@@ -1294,6 +1294,18 @@ target_link_libraries(test_text_markup PRIVATE catch2_main)
 add_test(NAME text_markup COMMAND test_text_markup)
 register_test_target(test_text_markup)
 
+# ── test_simple_html ─────────────────────────────────────────
+add_executable(test_simple_html
+    test_simple_html.cpp
+)
+target_include_directories(test_simple_html PRIVATE ${TEST_INCLUDE_DIRS})
+target_include_directories(test_simple_html SYSTEM PRIVATE
+    ${TEST_SYSTEM_INCLUDE_DIRS}
+)
+target_link_libraries(test_simple_html PRIVATE catch2_main)
+add_test(NAME simple_html COMMAND test_simple_html)
+register_test_target(test_simple_html)
+
 # ── test_link_hit ────────────────────────────────────────────
 add_executable(test_link_hit
     test_link_hit.cpp

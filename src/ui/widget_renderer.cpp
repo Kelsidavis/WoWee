@@ -1,6 +1,7 @@
 #include <cstring>
 #include "ui/widget_renderer.hpp"
 #include "ui/text_markup.hpp"
+#include "ui/simple_html.hpp"
 #include "ui/link_hit.hpp"
 #include "ui/text_wrap.hpp"
 #include <deque>
@@ -572,12 +573,12 @@ void WidgetRenderer::sizeArtAndText(WidgetTree& tree) {
 
 
 
-void WidgetRenderer::drawMarkupText(ImDrawList* dl, ImFont* font, float size,
-                                    ImVec2 at, uint32_t fallback, float alpha,
-                                    const std::string& text, float wrapWidth,
-                                    bool nonSpaceWrap, const char* justifyH,
-                                    bool forceColor, WidgetTree* linkSink,
-                                    uint32_t linkOwner) {
+float WidgetRenderer::drawMarkupText(ImDrawList* dl, ImFont* font, float size,
+                                     ImVec2 at, uint32_t fallback, float alpha,
+                                     const std::string& text, float wrapWidth,
+                                     bool nonSpaceWrap, const char* justifyH,
+                                     bool forceColor, WidgetTree* linkSink,
+                                     uint32_t linkOwner) {
     const auto lines = wrapText(parseMarkup(text), wrapWidth, nonSpaceWrap,
                                 [&](const std::string& piece) {
                                     return font->CalcTextSizeA(size, FLT_MAX, 0.0f,
@@ -657,6 +658,74 @@ void WidgetRenderer::drawMarkupText(ImDrawList* dl, ImFont* font, float size,
             x += runW;
         }
         y += lineH;
+    }
+    return y - at.y;
+}
+
+void WidgetRenderer::drawSimpleHtml(ImDrawList* dl, WidgetTree& tree,
+                                    const Widget& w, float ws,
+                                    float x0, float y0, float x1) {
+    ImFont* font = interfaceFaceOrDefault(w.fontFace);
+    const float size = interfaceFontSize(w.fontHeight) * ws;
+    const float boxW = x1 - x0;
+    const float wrapW = boxW > size ? boxW : 0.0f;
+    float y = y0;
+    for (const HtmlBlock& b : parseSimpleHtml(w.text)) {
+        const std::string& align = b.align.empty() ? w.justifyH : b.align;
+        if (b.kind == HtmlBlock::Kind::Image) {
+            // The size the tag asked for, the picture's own where it asked
+            // nothing, and the other side in proportion where it gave one.
+            float iw = 0.0f, ih = 0.0f;
+            textureSize(b.src, iw, ih);
+            float dw = b.width, dh = b.height;
+            if (dw <= 0.0f && dh <= 0.0f) { dw = iw; dh = ih; }
+            else if (dw <= 0.0f) dw = ih > 0.0f ? dh * iw / ih : dh;
+            else if (dh <= 0.0f) dh = iw > 0.0f ? dw * ih / iw : dw;
+            dw *= ws;
+            dh *= ws;
+            if (dw <= 0.0f || dh <= 0.0f) {
+                // Nothing to size it by: the tag gave no size and the file
+                // could not be read. Said once, or it is just a gap.
+                static std::set<std::string> saidPicture;
+                if (saidPicture.insert(b.src).second) {
+                    LOG_WARNING("SimpleHTML '", w.name.empty() ? "(unnamed)" : w.name,
+                                "': picture '", b.src, "' does not resolve and "
+                                "the tag gives no size, so it is left out");
+                }
+                continue;
+            }
+            // Never wider than the page, and narrowed in proportion so the
+            // picture is smaller rather than squashed.
+            if (boxW > 0.0f && dw > boxW) { dh *= boxW / dw; dw = boxW; }
+            float ix = x0;
+            if (align == "CENTER") ix = x0 + (boxW - dw) * 0.5f;
+            else if (align == "RIGHT") ix = x1 - dw;
+            VkDescriptorSet tex = resident(b.src);
+            if (tex != kMissing) {
+                dl->AddImage(reinterpret_cast<ImTextureID>(tex), ImVec2(ix, y),
+                             ImVec2(ix + dw, y + dh), ImVec2(0, 0), ImVec2(1, 1),
+                             IM_COL32(255, 255, 255,
+                                      static_cast<int>(w.alpha * 255.0f)));
+            }
+            y += dh;
+            continue;
+        }
+        if (w.hasShadow) {
+            float sc[4] = {w.shadowColor[0], w.shadowColor[1],
+                           w.shadowColor[2], w.shadowColor[3]};
+            drawMarkupText(dl, font, size,
+                           ImVec2(x0 + w.shadowX * ws, y - w.shadowY * ws),
+                           packColor(sc, w.alpha * w.shadowColor[3]), w.alpha,
+                           b.text, wrapW, false, align.c_str(), true);
+        }
+        float h = drawMarkupText(dl, font, size, ImVec2(x0, y),
+                                 packColor(w.color, w.alpha), w.alpha, b.text,
+                                 wrapW, false, align.c_str(), false, &tree, w.id);
+        // A break at the end of a block finishes its last line rather than
+        // opening another: "text<BR/></P>" is one line, and a lone <BR/>
+        // between paragraphs is one blank line, not two.
+        if (!b.text.empty() && b.text.back() == '\n') h -= size * 1.2f;
+        y += h;
     }
 }
 
@@ -2079,6 +2148,17 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
             wantMarkup(line.right);
         }
         for (const auto& m : w->messages) wantMarkup(m.text);
+        // A page's pictures are named in its HTML, which is neither a field
+        // of their own nor a |T escape, so neither of the above sees them.
+        if (w->isSimpleHtml && looksLikeSimpleHtml(w->text)) {
+            for (const HtmlBlock& b : parseSimpleHtml(w->text)) {
+                if (b.kind != HtmlBlock::Kind::Image) continue;
+                if (static_cast<int>(wanted.size()) >= kUploadsPerFrame) break;
+                if (cachedTexture(b.src, false)) continue;
+                markupPaths.push_back(b.src);
+                want(markupPaths.back());
+            }
+        }
         if (w->kind == WidgetKind::Frame) {
             if (w->hasBackdrop) { want(w->bgFile); want(w->edgeFile); }
             if (w->isStatusBar) want(w->barTexture);
@@ -2512,7 +2592,9 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                                 ", visible=", w->visible ? 1 : 0);
                 }
             }
-            if (w->isSimpleHtml && !w->text.empty()) {
+            if (w->isSimpleHtml && looksLikeSimpleHtml(w->text)) {
+                drawSimpleHtml(dl, tree, *w, ws, x0, y0, x1);
+            } else if (w->isSimpleHtml && !w->text.empty()) {
                 ImFont* font = interfaceFaceOrDefault(w->fontFace);
                 const float size = interfaceFontSize(w->fontHeight) * ws;
                 const float wrapW = (x1 - x0) > size ? (x1 - x0) : 0.0f;
