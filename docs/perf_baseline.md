@@ -2,6 +2,10 @@
 
 > Phase 0.3 deliverable. Measurements taken before any optimization work.
 > Re-run after each phase to quantify improvement.
+>
+> **Status:** the scenario numbers below were never recorded, and frame-time
+> work has landed since (v3.1.24 took the frame from 19.7ms to 15.5ms - see
+> CHANGELOG.md), so whatever is recorded now is not a pre-optimization baseline.
 
 ## Tracy Profiler Integration
 
@@ -29,16 +33,18 @@ When enabled, zero-cost zone markers instrument the following critical paths.
 | `Renderer::renderWorld` | src/rendering/renderer.cpp | Main world draw call |
 | `Renderer::renderShadowPass` | src/rendering/renderer.cpp | Shadow depth pass |
 | `PostProcess::execute` | src/rendering/post_process_pipeline.cpp | FSR/FXAA post-process |
+| `HiZSystem::buildPyramid` | src/rendering/hiz_system.cpp | Hi-Z depth pyramid build dispatch |
 | `M2::computeBoneMatrices` | src/rendering/m2_renderer_internal.h | CPU skeletal animation |
 | `M2Renderer::update` | src/rendering/m2_renderer_render.cpp | M2 instance update + culling |
 | `TerrainManager::update` | src/rendering/terrain_manager.cpp | Terrain streaming logic |
 | `TerrainManager::processReadyTiles` | src/rendering/terrain_manager.cpp | GPU tile uploads |
+| `TerrainManager::processPendingUnloads` | src/rendering/terrain_manager.cpp | Time-budgeted tile unloads |
 | `ADTLoader::load` | src/pipeline/adt_loader.cpp | ADT binary parsing |
-| `AssetManager::loadTexture` | src/pipeline/asset_manager.cpp | BLP texture loading |
+| `AssetManager::loadTexture` | src/pipeline/asset_manager.cpp | Texture loading (DDS or PNG override, else BLP) |
 | `AssetManager::loadDBC` | src/pipeline/asset_manager.cpp | DBC data file loading |
 | `WorldSocket::update` | src/network/world_socket.cpp | Network packet dispatch |
 
-`FrameMark` placed at frame boundary in Application::update to track FPS.
+`FrameMark` placed at the frame boundary in the `Application::run` main loop, just before `update()`, to track FPS.
 
 ### How to Profile
 
@@ -54,6 +60,26 @@ cd bin && ./wowee
 # Connect with Tracy profiler GUI (separate download from https://github.com/wolfpld/tracy/releases)
 # Or capture from CLI: tracy-capture -o trace.tracy
 ```
+
+### Without Tracy
+
+The client also measures itself, with no build option needed:
+
+- `WOWEE_FRAME_PROFILE=1` - every 10 seconds, logs the average and worst
+  time of each CPU stage of the frame and the GPU's per-pass timestamps from
+  the last completed frame, at warning level instead of info.
+- `WOWEE_PASS_ABLATION=1` - switches the world passes (terrain, grass, WMO,
+  M2, ground clutter, far doodads, characters, sky, shadows) off one at a time
+  for a few seconds each, with a baseline at both ends, and logs what the
+  frame did without each. Stand still outdoors until the table is logged.
+- `WOWEE_SINGLE_THREAD_RECORD=1` - records the world inline on the main thread
+  instead of into parallel secondary command buffers, so each pass gets its
+  own GPU mark (grass is otherwise counted inside terrain).
+
+On MoltenVK a GPU timestamp resolves to the render pass containing it, so
+every mark inside the scene pass reads the same clock: the first holds the
+whole pass and the rest read near zero. The frame profile says so when it
+sees it. Use the ablation run to attribute the scene pass there.
 
 ## Baseline Scenarios
 

@@ -39,13 +39,19 @@ AzerothCore/ChromieCraft, TrinityCore, MaNGOS, and Turtle WoW 1.18.
 
 ## What works
 
-- Vulkan terrain, WMO, M2, water/lava, particles, lighting, shadows, weather,
-  and asynchronous world streaming
+- Vulkan 1.3 terrain, WMO, M2, water/lava, particles, lighting, shadows,
+  weather, and asynchronous world streaming
 - SRP6 authentication, RC4 header encryption, and protocol handling for all
   three supported expansions
 - Character creation and selection, movement, transports, combat, spells,
   talents, inventory, banks, vendors, trainers, quests, loot, mail, auction
   house, gossip, chat, parties, pets, maps, and taxi travel
+- Blizzard's own FrameXML interface, loaded from your game data and drawn by
+  the client; addons in the game's `Interface\AddOns` folder load too
+- An asset builder, inside the client and as the standalone `wowee_assets`
+  window, that extracts your own game installation
+- Keyboard and mouse, or a game controller with Xbox, PlayStation, Nintendo
+  and Steam Deck button names
 - Zone and city music, tavern and weather ambience, footsteps, mounts, combat,
   spell and NPC voice audio
 - Optional Warden module execution through Unicorn Engine x86 emulation
@@ -58,23 +64,28 @@ client. See [Known limitations](#known-limitations) before reporting a bug.
 ### Experimental components
 
 The world editor and AMD FSR3 frame generation are early developer features.
-Their interfaces, formats, runtime requirements, and behavior may change. FSR2
-upscaling is available, but graphics acceleration features are still under
-active development and should not be treated as release-critical functionality.
+Their interfaces, formats, runtime requirements, and behavior may change. Frame
+generation is only built when `WOWEE_ENABLE_AMD_FSR3_FRAMEGEN` is turned on
+with AMD's SDK under `extern/`. FSR 1 and FSR 3 upscaling are built in, but
+graphics acceleration features are still under active development and should
+not be treated as release-critical functionality. Grass is marked experimental
+in the settings.
 
 ## Quick start
 
 ### 1. Install dependencies
 
-Unicorn enables Warden execution. StormLib is needed by the asset extractor,
-but is not required by the client at runtime.
+The desktop build uses SDL3 and needs a Vulkan 1.3 driver (MoltenVK on
+macOS). Unicorn enables Warden execution. StormLib is needed by
+`asset_extract`, the `wowee_assets` window and the asset builder inside the
+client; without it the client still builds, with those left out.
 
 <details>
 <summary>Ubuntu / Debian</summary>
 
 ```bash
 sudo apt install build-essential cmake pkg-config git \
-  libsdl2-dev libglm-dev libssl-dev zlib1g-dev libx11-dev \
+  libsdl3-dev libglm-dev libssl-dev zlib1g-dev libx11-dev \
   libvulkan-dev vulkan-tools glslc \
   libavformat-dev libavcodec-dev libswscale-dev libavutil-dev
 
@@ -83,6 +94,9 @@ sudo apt install libunicorn-dev
 sudo apt install libstorm-dev
 ```
 
+`libsdl3-dev` is in Ubuntu 25.04 and Debian 13 onward. On Ubuntu 24.04, build
+SDL3 from source and install it, as CI does with `release-3.2.24`.
+
 </details>
 
 <details>
@@ -90,14 +104,14 @@ sudo apt install libstorm-dev
 
 ```bash
 sudo dnf install gcc-c++ cmake pkgconf-pkg-config git \
-  SDL2-devel glm-devel openssl-devel zlib-devel libX11-devel \
+  SDL3-devel glm-devel openssl-devel zlib-devel libX11-devel \
   vulkan-devel vulkan-tools glslc ffmpeg-devel
 
 # Optional: Warden execution
 sudo dnf install unicorn-devel
 ```
 
-For `asset_extract`, build [StormLib](https://github.com/ladislav-zezula/StormLib)
+For the asset tools, build [StormLib](https://github.com/ladislav-zezula/StormLib)
 from source if it is unavailable in your enabled Fedora repositories.
 
 </details>
@@ -107,13 +121,13 @@ from source if it is unavailable in your enabled Fedora repositories.
 
 ```bash
 sudo pacman -S base-devel cmake pkgconf git \
-  sdl2-compat glm openssl zlib libx11 \
+  sdl3 glm openssl zlib libx11 \
   vulkan-headers vulkan-icd-loader vulkan-tools shaderc \
   ffmpeg
 ```
 
 Install `unicorn` for optional Warden execution. StormLib is not in the official
-repositories; install `stormlib-git` from the AUR if you need `asset_extract`.
+repositories; install `stormlib-git` from the AUR if you need the asset tools.
 
 </details>
 
@@ -123,7 +137,7 @@ repositories; install `stormlib-git` from the AUR if you need `asset_extract`.
 Vulkan runs through MoltenVK.
 
 ```bash
-brew install cmake pkg-config sdl2 glm openssl@3 zlib ffmpeg \
+brew install cmake pkg-config sdl3 glm openssl@3 zlib ffmpeg \
   vulkan-loader vulkan-headers molten-vk shaderc
 
 # Optional: Warden execution and MPQ extraction
@@ -145,14 +159,25 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ```
 
-The optional `build.sh` and `build.ps1` helpers fetch supported AMD SDK sources
-when needed. A plain CMake build works without them and uses the internal
-fallback when optional SDK components are unavailable.
+The `build.sh` and `build.ps1` helpers run the same build and also clone AMD's
+FidelityFX SDKs into `extern/`. Those are only used when `WOWEE_ENABLE_AMD_FSR2`
+or `WOWEE_ENABLE_AMD_FSR3_FRAMEGEN` is turned on, and both are off by default;
+the client's own FSR 1 and FSR 3 upscaling need neither.
 
 ### 3. Extract game data
 
-WoWee does not read MPQs at runtime. Extract a legally obtained client into a
-loose-file `Data/` tree with a generated `manifest.json`:
+WoWee does not read MPQs at runtime. It needs a loose-file tree with a
+generated `manifest.json`, extracted from a legally obtained client.
+
+The asset builder does this. When the client starts and finds nothing
+extracted, it opens the builder instead of the login screen; later it is under
+**more options** → **add or rebuild assets...** on the login screen, and it is
+also the standalone `wowee_assets` window. Point it at your World of Warcraft
+folder and it extracts into the per-user data directory the client reads.
+Reopen the client when a build finishes. See [the asset manager](docs/asset-manager.md)
+for upgrades, packs, and several games in one folder.
+
+From a terminal, the scripts extract into `Data/` in the checkout:
 
 ```bash
 # Linux / macOS
@@ -174,8 +199,20 @@ Data/
     └── wotlk/manifest.json
 ```
 
-The login-screen **Assets** selector normally follows the selected server's
-expansion. It can be overridden per saved server profile.
+The login-screen **Assets** selector appears once more than one set is
+installed. It normally follows the selected server's expansion and can be
+overridden per saved server profile.
+
+The client looks for data in this order:
+
+1. `WOW_DATA_PATH`, if set
+2. The per-user data directory, if it holds an extraction:
+   `~/Library/Application Support/Wowee/Data` on macOS,
+   `%LOCALAPPDATA%\Wowee\Data` on Windows, and `$XDG_DATA_HOME/wowee/Data`
+   (default `~/.local/share/wowee/Data`) on Linux
+3. `Data/` in the working directory, which on Linux and macOS is the
+   executable's own directory. CMake links `build/bin/Data` to the checkout's
+   `Data/` on Linux and macOS; on Windows `build.ps1` makes a junction
 
 To store data elsewhere:
 
@@ -183,14 +220,21 @@ To store data elsewhere:
 export WOW_DATA_PATH=/path/to/extracted/Data
 ```
 
-The [Asset Pipeline GUI](docs/asset-pipeline-gui.md) provides extraction,
-texture-pack management, ordering, and override controls.
-
 ### 4. Run
 
 ```bash
 ./build/bin/wowee
 ```
+
+Choose a server from the login screen's **Server** list, which carries
+ChromieCraft and every server you have logged into. **Somewhere else...** opens
+the address and port fields under **more options**, where the expansion is
+chosen too.
+
+Once at startup the client asks GitHub whether a newer release exists and, if
+so, shows its tag beside the version on the login screen. Nothing is
+downloaded; **Check for new versions** under Interface → WoWee → Interface
+turns it off.
 
 If a MaNGOS realm advertises a world address that is unreachable from your LAN,
 override only the host; the advertised port is preserved:
@@ -309,32 +353,61 @@ custom binary and catalog formats.
 
 | Input | Action |
 |---|---|
-| `W` `A` `S` `D` | Move |
+| `W` `S` | Move forward and back |
+| `A` `D` | Turn; strafe while the right mouse button is held |
+| `Q` `E` | Strafe |
 | Mouse | Look or orbit camera |
 | Left click | Target or interact |
 | `Tab` | Cycle targets |
 | `1`–`0`, `-`, `=` | Action-bar slots 1–12 |
 | `B` / `C` / `P` / `N` | Bags / character / spellbook / talents |
-| `L` / `M` / `O` | Quest log / map / guild roster |
+| `L` / `M` / `O` / `H` | Quest log / map / social / player vs player |
 | `Enter` or `/` | Open chat |
 | `/unstuck` | Recover when terrain or WMO collision traps the character |
-| `Escape` | Close windows or deselect |
-| `F1` / `F4` | Performance HUD / shadows |
+| `Escape` | Close windows, deselect, or open the game menu |
+| `F1` | Performance HUD (debug builds only) |
+
+Keys are listed and can be rebound in the game's **Key Bindings** panel, from
+the menu `Escape` opens.
 
 On Android the same actions are driven by
 [touch controls](#touch-controls).
 
-Graphics presets and individual controls are available under **Video
-Settings**. Shadows and MSAA have the largest performance cost; FSR2 can improve
-frame rate on supported hardware.
+### Controller
+
+A controller works on every platform the client runs on. The left stick moves,
+the right stick looks and the triggers zoom. The bottom face button jumps and
+the right one, like Start, acts as `Escape`. The other two face buttons and the
+D-pad are action slots 1–6; hold the left bumper for 7–12. The right bumper
+targets the nearest enemy, clicking the left stick toggles autorun, and clicking
+the right stick sits (or dives while swimming). Back paddles - a Steam Deck's
+L4, R4, L5 and R5, an Elite pad's P1 to P4, a DualSense Edge's - take slots
+7–10 with nothing held.
+
+**Back** switches the right stick to moving the pointer, for looting, gossip
+and vendors: the bottom face button clicks and the left one right-clicks.
+
+Buttons are named as the pad in hand names them - A, Cross or B for the same
+button on Xbox, PlayStation and Nintendo pads - and the scheme is listed in the
+**Key Bindings** panel, where it can be rebound. Look speed, inversion and
+deadzone are under Interface → WoWee → Camera. A pad SDL does not recognise
+can be described in a `gamecontrollerdb.txt` in the per-user data directory.
+
+### Settings
+
+Escape opens the game menu. This client's own settings sit under a **WoWee**
+heading in the game's **Video**, **Sound** and **Interface** panels: Graphics,
+Detail, Grass, Upscaling and Display under Video, with the quality preset on
+Graphics. View distance, shadow distance and MSAA have the largest performance
+cost; FSR 1 or FSR 3 upscaling can improve frame rate on weaker hardware.
 
 ## Soundtrack
 
 The client carries music of its own: the login theme, the track taverns open
 their rotation on, and zone rotations that play alongside whatever your game
 data provides - Elwynn, the Barrens, Booty Bay, Lordaeron, Stormwind and
-Ironforge among them. **WoWee soundtrack** under Sound settings turns it off
-and leaves the zone music to the game's own files.
+Ironforge among them. **WoWee soundtrack** under Sound → WoWee → Sound turns it
+off and leaves the zone music to the game's own files.
 
 <p align="center">
   <a href="https://kelsidavis.bandcamp.com/album/wowee-soundtrack">
@@ -358,7 +431,7 @@ download small.
 - [Complete Build Instructions](BUILD_INSTRUCTIONS.md)
 - [Server Setup](docs/server-setup.md)
 - [Project Status](docs/status.md)
-- [Asset Pipeline GUI](docs/asset-pipeline-gui.md)
+- [Asset Manager](docs/asset-manager.md) and [Upgraded Assets](docs/upgraded-assets.md)
 
 ### Internals
 
@@ -370,9 +443,10 @@ download small.
 
 ## Development and CI
 
-WoWee uses C++20 and CMake 3.15+. GitHub Actions builds Linux x86-64/ARM64,
-Windows x86-64/ARM64, and macOS ARM64 releases. Security checks include CodeQL,
-Semgrep, AddressSanitizer, and UndefinedBehaviorSanitizer.
+WoWee uses C++20, CMake 3.15+, SDL3 and Vulkan 1.3. GitHub Actions builds
+Linux x86-64/ARM64, Windows x86-64/ARM64, macOS ARM64/x86-64 and Android arm64
+releases. Security checks include CodeQL, Semgrep, AddressSanitizer, and
+UndefinedBehaviorSanitizer.
 
 The codebase is split into focused rendering, networking, gameplay, asset, UI,
 audio, and editor modules. Start with the [architecture guide](docs/architecture.md)
@@ -380,12 +454,16 @@ before making broad changes.
 
 ## Known limitations
 
-- The Warden RSA modulus is a placeholder; module execution otherwise works
-  through Unicorn x86 emulation.
+- Warden modules are checked against Blizzard's signing key. A realm that
+  signs its own module needs that key set as `wardenRsaModulus` in the
+  expansion's `expansion.json`.
+- Shadows are held on: switching them off loses the GPU device, so the control
+  is gone until that is fixed.
 - Terrain/WMO transitions are a longstanding regression area. Character floor
   selection can occasionally prefer the wrong surface or leave the character
-  stuck. Enter `/unstuck` in chat to recover, then include the location and
-  relevant log lines in a bug report.
+  stuck. Enter `/unstuck` in chat to recover, press `F8` to write the floor data
+  at your position to the log, then include the location and relevant log lines
+  in a bug report.
 - Long rotational Northrend transport paths can occasionally show spline-wrap
   glitches.
 - World-map zone hover has edge cases near continent boundaries.
@@ -395,7 +473,7 @@ before making broad changes.
   The client returns to the login screen as it does on any disconnect.
 - On Android the FrameXML interface is drawn at native size and reads small. The
   client's own panels scale with display density, and **Window scale** under
-  Interface settings reaches 3x.
+  Interface → WoWee → Interface reaches 3x.
 
 When reporting a bug, include the relevant client log lines, expansion, server
 core, and reproduction steps.

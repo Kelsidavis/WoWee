@@ -1,5 +1,11 @@
 # Cataclysm Support Plan
 
+> **Status note, 2026-09-21.** One item from step 5 is done: the extractor archive list in §3.
+> `asset_extract` recognises a 4.3.4 client and applies its `wow-update-base` archives in build
+> order (`a89bc545`, `tools/asset_extract/extractor.cpp:387-397`, `:559-648`). It was built to
+> borrow that client's art, not for a Cata client. Split ADTs, the new MCNK sub-chunks and WDB2
+> are not done, and update-object is still next.
+
 **Status:** steps 1 to 3 in progress. A 4.3.4.15595 core runs at `/media/k/vbox/wowee-cata`
 (The-Cataclysm-Preservation-Project, since upstream deleted its 4.3.4 branch). The bit primitive is
 in `network::Packet`, the trap in section 5 is closed, and the 109 per-opcode movement layouts are

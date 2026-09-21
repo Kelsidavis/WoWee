@@ -34,15 +34,16 @@ Continuously tries to parse packets from the receive buffer:
 
 ```cpp
 void TCPSocket::tryParsePackets() {
-    while (receiveBuffer.size() >= 1) {
+    while (!receiveBuffer.empty()) {
         uint8_t opcode = receiveBuffer[0];
         size_t expectedSize = getExpectedPacketSize(opcode);
 
         if (expectedSize == 0) break;  // Need more data
         if (receiveBuffer.size() < expectedSize) break;  // Incomplete
 
-        // Parse and deliver complete packet
+        // Parse and deliver complete packet (data includes the opcode byte)
         Packet packet(opcode, packetData);
+        receiveBuffer.erase(receiveBuffer.begin(), receiveBuffer.begin() + expectedSize);
         if (packetCallback) {
             packetCallback(packet);
         }
@@ -60,18 +61,30 @@ size_t TCPSocket::getExpectedPacketSize(uint8_t opcode) {
         case 0x00:  // LOGON_CHALLENGE response
             // Dynamic parsing based on status byte
             if (status == 0x00) {
-                // Parse g_len and N_len to determine total size
-                return 36 + gLen + 1 + nLen + 32 + 16 + 1;
+                // Parse g_len, N_len and the security flags to determine total size
+                size_t baseSize = 36 + gLen + 1 + nLen + 32 + 16 + 1;
+                size_t extra = 0;
+                if (secFlags & 0x01) extra += 20;  // PIN: seed(4) + salt(16)
+                if (secFlags & 0x02) extra += 12;  // Matrix card
+                if (secFlags & 0x04) extra += 1;   // Authenticator
+                return baseSize + extra;
             } else {
                 return 3;  // Failure response
             }
 
         case 0x01:  // LOGON_PROOF response
-            return (status == 0x00) ? 22 : 2;
+            if (status == 0x00) {
+                // Length depends on the build (see below)
+                if (receiveBuffer.size() >= 32) return 32;
+                if (receiveBuffer.size() >= 28) return 28;
+                if (receiveBuffer.size() >= 26) return 26;
+                return 0;
+            }
+            return (receiveBuffer.size() >= 4) ? 4 : 2;  // Failure
 
         case 0x10:  // REALM_LIST response
-            // TODO: Parse size field
-            return 0;
+            // opcode(1) + size(2, little-endian) + payload(size)
+            return 1 + 2 + size;
     }
 }
 ```
@@ -82,9 +95,10 @@ size_t TCPSocket::getExpectedPacketSize(uint8_t opcode) {
 
 **Success Response:**
 ```
-Dynamic size based on g and N lengths
-Typical: ~343 bytes (with 256-byte N)
-Minimum: ~119 bytes (with 32-byte N)
+Dynamic size based on g and N lengths and the security flags
+Typical: 119 bytes (1-byte g, 32-byte N, no security flags)
++20 bytes for a PIN (flag 0x01), +12 for a matrix card (0x02),
++1 for an authenticator (0x04)
 ```
 
 **Failure Response:**
@@ -97,14 +111,24 @@ opcode(1) + unknown(1) + status(1)
 
 **Success Response:**
 ```
-Fixed: 22 bytes
-opcode(1) + status(1) + M2(20)
+Build >= 8089:     32 bytes
+opcode(1) + status(1) + M2(20) + accountFlags(4) + surveyId(4) + loginFlags(2)
+Build 6299-8088:   28 bytes (no accountFlags)
+Build < 6299:      26 bytes (no accountFlags, no loginFlags)
 ```
+
+The socket does not know the build, so it takes 32 bytes when that many are buffered, then 28, then 26.
 
 **Failure Response:**
 ```
-Fixed: 2 bytes
-opcode(1) + status(1)
+2 bytes: opcode(1) + status(1)
+Some servers send 4; up to 4 are consumed when buffered
+```
+
+#### REALM_LIST Response (0x10)
+
+```
+Variable: opcode(1) + size(2, little-endian) + payload(size)
 ```
 
 ## Integration with AuthHandler
@@ -134,7 +158,7 @@ void AuthHandler::update(float deltaTime) {
                  ▼
 ┌─────────────────────────────────────────────┐
 │  TCPSocket::update()                        │
-│  - Calls recv() to get raw bytes            │
+│  - Calls recv() until it would block        │
 │  - Appends to receiveBuffer                 │
 └────────────────┬────────────────────────────┘
                  │
@@ -183,7 +207,7 @@ void TCPSocket::send(const Packet& packet) {
     sendData.insert(sendData.end(), data.begin(), data.end());
 
     // Send complete packet
-    ::send(sockfd, sendData.data(), sendData.size(), 0);
+    net::portableSend(sockfd, sendData.data(), sendData.size());
 }
 ```
 
@@ -206,17 +230,19 @@ If opcode is not recognized:
 ### Connection Loss
 
 If server disconnects:
-- `recv()` returns 0
+- `recv()` returns 0, or fails with a connection-closed error
+- Bytes received earlier in the same `update()` are parsed first
 - Logs: "Connection closed by server"
 - Calls `disconnect()`
 - Clears receive buffer
+- `AuthHandler::update()` then fails the login with "Disconnected by auth server" unless it was already authenticated or holding the realm list
 
 ### Receive Errors
 
 If `recv()` fails:
-- Checks errno (ignores EAGAIN/EWOULDBLOCK)
-- Logs error message
-- Disconnects on fatal errors
+- Checks `net::lastError()` (ignores would-block)
+- Logs "Receive failed: ..."
+- Disconnects
 
 ## Performance
 
@@ -228,7 +254,7 @@ If `recv()` fails:
 - Max size: Limited by available memory
 
 **Typical Usage:**
-- Auth packets: 3-343 bytes
+- Auth packets: 2-152 bytes, plus the realm list, which grows with the number of realms
 - Buffer rarely exceeds 1 KB
 - Immediate parsing prevents buildup
 
@@ -244,36 +270,20 @@ If `recv()` fails:
 - Parsed packets: Temporary, delivered to callback
 - No memory leaks (RAII with std::vector)
 
-## Future Enhancements
-
-### Realm List Support
-
-```cpp
-case 0x10:  // REALM_LIST response
-    // Read size field at offset 1-2
-    if (receiveBuffer.size() >= 3) {
-        uint16_t size = readUInt16LE(&receiveBuffer[1]);
-        return 1 + size;  // opcode + payload
-    }
-    return 0;
-```
+## World Server Framing
 
 ### World Server Protocol
 
-World server uses different framing:
-- Encrypted packets
-- 4-byte header (incoming)
-- 6-byte header (outgoing)
-- Different size calculation
-
-**Solution:** Create `WorldSocket` subclass with different `getExpectedPacketSize()`.
+World server uses different framing, implemented in `WorldSocket` (`include/network/world_socket.hpp`, `src/network/world_socket.cpp`), a separate `Socket` subclass rather than a `TCPSocket` one:
+- Encrypted headers once `initEncryption()` has run after CMSG_AUTH_SESSION
+- 4-byte header (incoming): size (2, big-endian, includes the opcode) + opcode (2, little-endian)
+- 6-byte header (outgoing): size (2, big-endian) + opcode (4, little-endian)
+- Packet bodies stay plaintext
+- Received on a background pump thread (`WOWEE_NET_ASYNC_PUMP`, on by default) and dispatched to the packet callback from `update()`
 
 ### Compression
 
-Some packets may be compressed:
-- Detect compression flag
-- Decompress before parsing
-- Pass uncompressed to callback
+The auth protocol has no compressed packets. On the world side compression is per opcode and handled by the game code that reads the packet, not by the socket: `SMSG_COMPRESSED_UPDATE_OBJECT` in `src/game/entity_controller.cpp` and `SMSG_COMPRESSED_MOVES` in `src/game/movement_handler.cpp`.
 
 ## Testing
 
@@ -287,7 +297,7 @@ void testPacketFraming() {
     socket.setPacketCallback([&](const Packet& packet) {
         received = true;
         assert(packet.getOpcode() == 0x01);
-        assert(packet.getSize() == 22);
+        assert(packet.getSize() == 32);
     });
 
     // Simulate receiving LOGON_PROOF response
@@ -297,11 +307,16 @@ void testPacketFraming() {
         // M2 (20 bytes)
         0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
         0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
-        0x11, 0x12, 0x13, 0x14
+        0x11, 0x12, 0x13, 0x14,
+        0x00, 0x00, 0x00, 0x00,  // account flags
+        0x00, 0x00, 0x00, 0x00,  // survey id
+        0x00, 0x00               // login flags
     };
 
     // Inject into socket's receiveBuffer
-    // (In real code, this comes from recv())
+    // (In real code, this comes from recv(). receiveBuffer and
+    // tryParsePackets() are private, so a real test needs a hook;
+    // there is no framing test in tests/ today.)
     socket.receiveBuffer = testData;
     socket.tryParsePackets();
 
@@ -340,8 +355,9 @@ Logger::getInstance().setLogLevel(LogLevel::DEBUG);
 
 **Output:**
 ```
-[DEBUG] Received 343 bytes from server
-[DEBUG] Parsing packet: opcode=0x00 size=343 bytes
+[DEBUG] Received 119 bytes from server
+[DEBUG] Parsing packet: opcode=0x0 size=119 bytes
+[INFO ] Auth pkt 0x0 (119B): 0000...
 [DEBUG] Handling LOGON_CHALLENGE response
 ```
 
@@ -367,14 +383,14 @@ A: Server sent unsupported packet type. Add to `getExpectedPacketSize()`.
 
 1. **Auth Protocol Only**
    - Only supports auth server packets (opcodes 0x00, 0x01, 0x10)
-   - World server requires separate implementation
+   - World server framing is `WorldSocket`'s (see World Server Framing)
 
 2. **No Encryption**
    - Packets are plaintext
    - World server requires header encryption
 
 3. **Single-threaded**
-   - All parsing happens in main thread
+   - All parsing happens in main thread, from `AuthHandler::update()`
    - Sufficient for typical usage
 
 ### Not Limitations
@@ -397,4 +413,4 @@ The authentication system can now reliably communicate with WoW 3.3.5a servers!
 
 ---
 
-**Status:** ✅ Auth-protocol framing is complete and exercised against AzerothCore, TrinityCore, Mangos, and Turtle WoW. World-protocol framing (with header encryption) lives in `WorldSocket` and is not described here - see "Auth Protocol Only" under Current Limitations.
+**Status:** ✅ Auth-protocol framing is complete and exercised against AzerothCore, TrinityCore, Mangos, and Turtle WoW. World-protocol framing (with header encryption) lives in `WorldSocket` and is only outlined here - see World Server Framing.

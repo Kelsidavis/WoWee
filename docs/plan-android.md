@@ -1,5 +1,14 @@
 # Android Port Plan
 
+> **Status note, 2026-09-21.** The status line and §6 predate the device work. Phase 2 is done:
+> the client reached the login screen (`c560a842`) and then the world (`5dba636e`) on a Pixel 9a,
+> merged in `4e940730`. Most of phase 4 has landed: an on-screen stick, finger steering,
+> two-finger zoom and tap to target and interact (`2df1bb25`, `src/ui/touch_controls.cpp`), and
+> text boxes raise the soft keyboard (`5dba636e`). Of phase 5, the release workflow builds and
+> publishes the APK (`2df1bb25`, `.github/workflows/release.yml:572`) and the README says how to
+> get game data onto a phone (`3da67d60`); the storage importer is not written. SDL is now SDL3,
+> fetched at `release-3.2.24` (`CMakeLists.txt:281-283`), where §1 and §5 say SDL2.
+
 **Status:** phase 1 done. `libwowee.so` builds for `arm64-v8a` and the desktop build is unchanged.
 Next: phase 2, the Activity and a first run. Branch `android`.
 **Target:** a real phone or tablet, touch-driven, installed as an APK.

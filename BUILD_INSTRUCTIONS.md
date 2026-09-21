@@ -2,6 +2,10 @@
 
 This document provides platform-specific build instructions for WoWee.
 
+The desktop client is built on **SDL3** and needs a **Vulkan 1.3** driver at
+runtime (MoltenVK on macOS). A device that reports only Vulkan 1.2 is refused at
+startup, and the log lists every device the loader offered with its version.
+
 ---
 
 ## 🐧 Linux (Ubuntu / Debian)
@@ -12,18 +16,40 @@ This document provides platform-specific build instructions for WoWee.
 sudo apt update
 sudo apt install -y \
   build-essential cmake pkg-config git \
-  libsdl2-dev libglm-dev \
+  libglm-dev \
   libssl-dev zlib1g-dev \
   libvulkan-dev vulkan-tools glslc \
   libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
   libx11-dev
 ```
 
+SDL3 is packaged as `libsdl3-dev` on Ubuntu 25.04 and later and on Debian 13:
+
+```bash
+sudo apt install -y libsdl3-dev
+```
+
+Ubuntu 24.04 has no SDL3 package. Build it from source the way CI does, with
+the X11 and Wayland headers it builds against:
+
+```bash
+sudo apt install -y \
+  libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev \
+  libxss-dev libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev
+
+git clone --depth 1 --branch release-3.2.24 https://github.com/libsdl-org/SDL.git /tmp/SDL3
+cmake -S /tmp/SDL3 -B /tmp/SDL3/build -DCMAKE_BUILD_TYPE=Release \
+  -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF
+cmake --build /tmp/SDL3/build --parallel "$(nproc)"
+sudo cmake --install /tmp/SDL3/build
+sudo ldconfig
+```
+
 Optional features:
 
 ```bash
 sudo apt install -y libunicorn-dev  # Warden execution
-sudo apt install -y libstorm-dev    # asset_extract
+sudo apt install -y libstorm-dev    # asset tools (see Asset Extraction below)
 ```
 
 ---
@@ -35,7 +61,7 @@ sudo apt install -y libstorm-dev    # asset_extract
 ```bash
 sudo pacman -S --needed \
   base-devel cmake pkgconf git \
-  sdl2-compat glm openssl zlib libx11 \
+  sdl3 glm openssl zlib libx11 \
   vulkan-headers vulkan-icd-loader vulkan-tools shaderc \
   ffmpeg
 ```
@@ -45,7 +71,7 @@ sudo pacman -S --needed \
 > available by name on Arch - install `vulkan-headers` and `vulkan-icd-loader` explicitly.
 
 Install `unicorn` for optional Warden execution. StormLib is available from the
-AUR as `stormlib-git` if you need `asset_extract`.
+AUR as `stormlib-git` if you need the asset tools.
 
 ---
 
@@ -75,13 +101,30 @@ cmake --build build -j"$(nproc)"
 
 ### Asset Extraction (Linux)
 
-After building, extract assets from your WoW client:
+The client needs assets built from your own World of Warcraft installation.
+With StormLib installed the build produces three ways to do it, all driving the
+same extractor:
 
-```bash
-./extract_assets.sh /path/to/WoW/Data wotlk
-```
+- **The client itself.** Started with nothing extracted, it opens the asset
+  builder instead of the login screen. Once assets exist, **more options** →
+  **add or rebuild assets...** on the login screen opens it again.
+- **The asset manager window**, `build/bin/wowee_assets`. It takes the game
+  folder, a later client and the destination as optional arguments
+  (`wowee_assets [game folder] [later client] [destination]`); see
+  [`docs/asset-manager.md`](docs/asset-manager.md).
+- **The script**, for the command line:
 
-Supports `classic`, `turtle`, `tbc`, `wotlk` targets (auto-detected if omitted).
+  ```bash
+  ./extract_assets.sh /path/to/WoW/Data wotlk
+  ```
+
+  Supports `classic`, `turtle`, `tbc`, `wotlk` targets (auto-detected if omitted).
+
+The builder and `wowee_assets` write to the per-user data directory by
+default, `$XDG_DATA_HOME/wowee/Data` (or `~/.local/share/wowee/Data`). The
+script writes to `Data/` in the checkout, which `build.sh` links into
+`build/bin`. At startup the client uses `WOW_DATA_PATH` if it is set, then the
+per-user directory if it holds an extraction, then `Data/` in its own directory.
 
 ---
 
@@ -92,7 +135,7 @@ Supports `classic`, `turtle`, `tbc`, `wotlk` targets (auto-detected if omitted).
 Vulkan on macOS uses the Vulkan loader plus MoltenVK's Vulkan-to-Metal driver.
 
 ```bash
-brew install cmake pkg-config sdl2 glm openssl@3 zlib ffmpeg \
+brew install cmake pkg-config sdl3 glm openssl@3 zlib ffmpeg \
   vulkan-loader vulkan-headers molten-vk shaderc
 ```
 
@@ -100,13 +143,7 @@ Optional features:
 
 ```bash
 brew install unicorn  # Warden execution
-brew install stormlib # asset_extract
-```
-
-Optional (for creating redistributable `.app` bundles):
-
-```bash
-brew install dylibbundler
+brew install stormlib # asset tools (see Asset Extraction below)
 ```
 
 ### Clone & Build
@@ -130,9 +167,9 @@ stamped with the build machine's own OS version and will not launch on anything
 older. That is fine for a local build.
 
 Release CI does not rely on that default — it pins `13.0` and bundles every
-non-system dylib into the `.app`, so shipped DMGs are not limited to whatever
-the runner happened to be on. To reproduce a release-like build locally, pass
-the same flag:
+non-system dylib into the `.app` (`tools/macos/bundle_dependencies.py`), so
+shipped DMGs are not limited to whatever the runner happened to be on. To
+reproduce a release-like build locally, pass the same flag:
 
 ```bash
 cmake -S . -B build -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 ...
@@ -146,7 +183,12 @@ flag, that makes the shipped app run on 13.0.
 
 ### Asset Extraction (macOS)
 
-The script will auto-build `asset_extract` if needed (requires `stormlib`).
+The same three routes as on Linux: the client opens the asset builder when
+nothing is extracted (and from **more options** → **add or rebuild assets...**
+afterwards), `build/bin/wowee_assets` is the standalone window, and the script
+works from the command line. All three need `stormlib`.
+
+The script will auto-build `asset_extract` if needed.
 It automatically detects Homebrew and passes the correct paths to CMake.
 
 ```bash
@@ -155,11 +197,20 @@ It automatically detects Homebrew and passes the correct paths to CMake.
 
 Supports `classic`, `turtle`, `tbc`, `wotlk` targets (auto-detected if omitted).
 
+The builder and `wowee_assets` write to
+`~/Library/Application Support/Wowee/Data` by default; the script writes to
+`Data/` in the checkout.
+
 ### Running a downloaded macOS release
 
 GitHub release DMGs are Developer ID signed, notarized by Apple, and stapled.
 Gatekeeper should accept a release downloaded from the official WoWee GitHub
 repository without an **Open Anyway** exception.
+
+The DMG holds `Wowee.app` and `Wowee Asset Extractor.app`. `Wowee.app` carries
+`asset_extract` and the `wowee_assets` window, and the extractor app opens that
+window. Assets are written to `~/Library/Application Support/Wowee/Data`,
+outside the signed bundle, so they survive an upgrade.
 
 Maintainers can find the CI credential contract and verification commands in
 [`docs/macos-distribution.md`](docs/macos-distribution.md).
@@ -169,7 +220,7 @@ Maintainers can find the CI credential contract and verification commands in
 ## 🪟 Windows (MSYS2 - Recommended)
 
 MSYS2 provides the normal client dependencies as pre-built packages. StormLib
-is built separately only when the optional asset extractor is needed.
+is built separately only when the optional asset tools are needed.
 
 ### Install MSYS2
 
@@ -183,7 +234,7 @@ pacman -S --needed \
   mingw-w64-x86_64-gcc \
   mingw-w64-x86_64-ninja \
   mingw-w64-x86_64-pkgconf \
-  mingw-w64-x86_64-SDL2 \
+  mingw-w64-x86_64-sdl3 \
   mingw-w64-x86_64-glm \
   mingw-w64-x86_64-openssl \
   mingw-w64-x86_64-zlib \
@@ -195,9 +246,10 @@ pacman -S --needed \
   git
 ```
 
-The normal client does not require StormLib. To build `asset_extract`, install
-the static-link dependencies and build StormLib using the same configuration as
-CI:
+The normal client does not require StormLib. To build the asset tools
+(`asset_extract`, `wowee_assets`, `mpq_build` and the client's built-in asset
+builder), install the static-link dependencies and build StormLib using the
+same configuration as CI:
 
 ```bash
 pacman -S --needed \
@@ -237,7 +289,7 @@ For users who prefer Visual Studio over MSYS2.
 ### vcpkg Dependencies
 
 ```powershell
-vcpkg install sdl2 glm openssl zlib ffmpeg stormlib --triplet x64-windows
+vcpkg install "sdl3[vulkan]" glm openssl zlib ffmpeg stormlib --triplet x64-windows
 ```
 
 ### Clone
@@ -261,7 +313,12 @@ cmake --build build --config Release
 
 ## 🪟 Asset Extraction (Windows)
 
-After building (via either MSYS2 or Visual Studio), extract assets from your WoW client:
+With StormLib available, the client opens the asset builder when nothing is
+extracted, and `wowee_assets.exe` in `build\bin` is the standalone window. Both
+write to `%LOCALAPPDATA%\Wowee\Data` by default. Double-clicking `asset_extract.exe` hands
+over to `wowee_assets.exe` when it sits beside it.
+
+From the command line, after building (via either MSYS2 or Visual Studio):
 
 ```powershell
 .\extract_assets.ps1 "C:\Games\WoW-3.3.5a\Data"
@@ -269,6 +326,26 @@ After building (via either MSYS2 or Visual Studio), extract assets from your WoW
 
 Or double-click `extract_assets.bat` and provide the path when prompted.
 You can also specify an expansion: `.\extract_assets.ps1 "C:\Games\WoW\Data" wotlk`
+
+The script writes to `Data\` in the checkout.
+
+---
+
+## ⚙️ Build Options
+
+Pass these to the configure step as `-D<option>=ON|OFF`.
+
+| Option | Default | What it does |
+|---|---|---|
+| `WOWEE_BUILD_TESTS` | `ON` | Builds the Catch2 unit tests (see [TESTING.md](TESTING.md)) |
+| `WOWEE_WARNINGS_AS_ERRORS` | `ON` | Treats compiler warnings as errors in the client |
+| `WOWEE_ENABLE_ASAN` | `OFF` | AddressSanitizer + UBSan on the client and the tests |
+| `WOWEE_SHADER_DEBUG_INFO` | `OFF` | Compiles shaders unoptimised with debug info, so GPU validation can name a line. Rewrites the tracked `.spv` files in place |
+| `WOWEE_BUILD_EDITOR` | `OFF` | Adds the standalone world editor to the default build. Without it, `cmake --build build --target wowee_editor` still builds it on demand |
+| `WOWEE_BUILD_FRAMEXML_RUN` | `OFF` | Builds `framexml_run`, the headless FrameXML runner (see [TESTING.md](TESTING.md)). Compiles the client a second time |
+| `WOWEE_ENABLE_AMD_FSR2` | `OFF` | AMD FidelityFX FSR2 SDK backend, when the SDK is under `extern/` |
+| `WOWEE_ENABLE_AMD_FSR3_FRAMEGEN` | `OFF` | AMD FidelityFX SDK FSR3 frame generation probe, when the SDK is under `extern/` |
+| `WOWEE_BUILD_AMD_FSR3_RUNTIME` | `OFF` | Builds AMD's native FidelityFX Vulkan runtime from `extern/FidelityFX-SDK/Kits` |
 
 ---
 
@@ -280,10 +357,16 @@ You can also specify an expansion: `.\extract_assets.ps1 "C:\Games\WoW\Data" wot
   ```bash
   git submodule update --init --recursive
   ```
-- AMD FSR2 SDK is fetched automatically by `build.sh` / `rebuild.sh` / `build.ps1` / `rebuild.ps1` from:
-  - `https://github.com/GPUOpen-Effects/FidelityFX-FSR2.git`
-  - target path: `extern/FidelityFX-FSR2`
-- AMD backend is enabled when SDK headers and Vulkan permutation headers are available.
-- If upstream SDK checkout is missing generated Vulkan permutation headers, CMake bootstraps them from:
+- The client's own upscaling (FSR 1 and the FSR 3 temporal upscaler) is
+  in-tree and needs no external SDK.
+- The AMD FidelityFX backends are off by default and are compiled only with
+  the `WOWEE_ENABLE_AMD_*` options above. `build.sh` / `rebuild.sh` /
+  `build.ps1` / `rebuild.ps1` still fetch both SDKs when they are missing:
+  - `https://github.com/GPUOpen-Effects/FidelityFX-FSR2.git` into `extern/FidelityFX-FSR2`
+  - `https://github.com/Kelsidavis/FidelityFX-SDK.git` into `extern/FidelityFX-SDK`
+    (`WOWEE_FFX_SDK_REPO` and `WOWEE_FFX_SDK_REF` choose another repository or ref)
+- With `WOWEE_ENABLE_AMD_FSR2=ON`, if the SDK checkout is missing its generated
+  Vulkan permutation headers, CMake bootstraps them from:
   - `third_party/fsr2_vk_permutations`
-- If SDK headers are missing, the build uses the internal FSR2 fallback path.
+- With `WOWEE_ENABLE_AMD_FSR2=ON` and no SDK headers, CMake warns and the
+  build uses the internal FSR2 fallback path.

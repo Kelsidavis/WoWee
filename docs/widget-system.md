@@ -16,6 +16,8 @@ original interface rather than imitating it.
 |---|---|---|
 | Widget tree, anchors, draw order, hit testing | `src/ui/widget_tree.cpp` | No Vulkan or ImGui, so the layout rules are testable without a device |
 | Drawing, texture cache, backdrops, status bars | `src/ui/widget_renderer.cpp` | Reads `Interface\` art through the existing asset path |
+| Inline markup and wrapping | `include/ui/text_markup.hpp`, `include/ui/text_wrap.hpp` | `\|c`/`\|r` colour, `\|H` links, `\|T` textures, `\|n` and `\|\|`; header-only and free of ImGui, so the parse and the wrap are tested without a font |
+| SimpleHTML documents | `include/ui/simple_html.hpp` | The subset item text is written in; drawn by `WidgetRenderer::drawSimpleHtml` |
 | XML reader | `src/ui/xml_parser.cpp` | Enough for FrameXML: CDATA, comments, both quote styles |
 | XML to Lua | `src/ui/framexml_emitter.cpp` | Emits the calls a script would make |
 | Lua bindings | `src/addons/lua_engine.cpp` | Frames and regions are Lua tables carrying a `__wid` handle |
@@ -29,6 +31,11 @@ sits at that point", so one anchor plus a size places a frame and two opposing
 anchors give the size as well. That is what `SetAllPoints` relies on, and how
 most of FrameXML sizes its backgrounds without ever stating a size.
 
+The layout pass places only what is shown. A hidden frame's descendants are
+marked hidden and left where they were - of some 28,000 widgets FrameXML
+builds, a few hundred are visible at once - and a script that asks a hidden
+frame for its size is answered by resolving that frame on demand.
+
 ## Why XML becomes Lua
 
 The alternative was to build widgets from C++ while walking the XML, which would
@@ -40,12 +47,15 @@ emitter's output is a string a test can read without a Lua state.
 
 ## Environment switches
 
-Both are off by default. Both exist because the work they enable is not finished.
+Both are on by default. FrameXML loads unless `WOWEE_LOAD_FRAMEXML=0`, and the
+fallback follows it unless `WOWEE_LUA_API_FALLBACK` is set either way.
 
-### `WOWEE_LUA_API_FALLBACK=1`
+### `WOWEE_LUA_API_FALLBACK`
 
 Unknown globals answer with a no-op instead of erroring, and every name asked
-for is logged once and listed at shutdown.
+for is logged once and listed at shutdown. A list of counting functions
+FrameXML uses as loop limits - `GetNumTrackingTypes` and the like - answer zero
+instead, since a nil loop limit is an error.
 
 This is how a large body of Lua gets brought up: rather than guessing which of
 the missing functions matter, run it and collect the ones it actually reaches.
@@ -54,9 +64,11 @@ It has a real cost. Code that checks whether a function exists before using it -
 which addons do constantly - sees everything as present and takes branches meant
 for a different client. Names in `SCREAMING_SNAKE_CASE` are treated as constants
 and still come back nil, because handing a function to something expecting a
-number turns a missing value into a confusing type error further away.
+number turns a missing value into a confusing type error further away. So do
+names with a digit in them, `Blizzard_` addon namespaces and the frames of
+load-on-demand panels: FrameXML tests all three for presence.
 
-### `WOWEE_LOAD_FRAMEXML=1`
+### `WOWEE_LOAD_FRAMEXML`
 
 Loads the original interface from `Interface/FrameXML/FrameXML.toc`, in the
 order that manifest states, before any addon. It turns the fallback above on by
@@ -71,9 +83,7 @@ All 139 files in the manifest now load, in around 380ms.
     FrameXML: 13 Lua files and 126 XML files loaded, 0 failed in 377ms
 
 That is the whole original interface built against this client's widget tree.
-What remains is behaviour rather than loading: frames exist, are laid out and
-are named the way FrameXML expects, but the API behind them mostly answers with
-what the absence of a feature looks like.
+What remains is behaviour rather than loading, and the tools below measure it.
 
 ### Whether an event actually arrives
 
@@ -91,13 +101,13 @@ Ask the script.
 
     tools/framexml_api_gap.py <path to Interface/FrameXML>
 
-reports 1,142 names FrameXML calls that this client does not define, out of
-4,217 it calls in total and 2,724 it defines itself as it loads. That ranking
-counts static call sites, though, and most are never reached.
+reports 49 names FrameXML and Blizzard's own addons call that this client does
+not define, out of 5,296 they call in total and 3,797 they define themselves.
+That ranking counts static call sites, though, and most are never reached.
 
 The measurement that matters is a run with the fallback off:
 
-    WOWEE_LUA_API_FALLBACK=0 WOWEE_LOAD_FRAMEXML=1 ./wowee
+    WOWEE_LUA_API_FALLBACK=0 ./wowee
 
 With the fallback on, a missing name answers and the gap is invisible. With it
 off, the log names every one FrameXML actually reached - which is how the list
@@ -107,8 +117,8 @@ Two tools check the front half of the pipeline, and neither has been the
 constraint for some time: `tools/framexml_compile_check.cpp` asks Lua whether
 every generated file compiles (140/140), and the emitter has unit tests in
 `tests/test_framexml.cpp` covering the XML features that were silently absent -
-template inheritance, `parentKey`, `id`, `<ScrollChild>`, button art, handler
-argument names, and `$parent` through unnamed frames.
+template inheritance, `parentKey`, `id`, button art, handler argument names,
+and `$parent` through unnamed frames.
 
 ## Replacing one element at a time
 
@@ -152,23 +162,36 @@ move is not visible.
 ## Known gaps
 
 - Type is drawn from the game's own faces - FRIZQT, MORPHEUS, SKURRI, ARIALN
-  and FRIENDS - at the size and colour FrameXML's 42 font objects specify. Each
+  and FRIENDS - at the size and colour FrameXML's 149 font objects specify. Each
   face is built into the atlas at one size and scaled, so a heading is the right
   face rather than the right rasterisation. Outlines are drawn by offsetting
   copies of the glyphs, which is what the effect amounts to at these sizes.
-- `EditBox` takes text, keeps a caret and fires OnTextChanged, OnEnterPressed
-  and the focus handlers. It has no selection, no clipboard and no scrolling
-  past its own width. `Slider` drags and reports its value; `Cooldown` sweeps.
+- `EditBox` takes text, keeps a caret and fires OnTextChanged, OnEnterPressed,
+  OnEscapePressed, OnTabPressed, OnSpacePressed and the focus handlers.
+  HighlightText sets a selection the next keystroke replaces, though nothing
+  draws it; Ctrl+C and Ctrl+V reach the clipboard; the arrow keys walk the lines
+  given to AddHistoryLine; a `multiLine` box takes return as a line break. It
+  does not scroll past its own width. Typed characters arrive only while SDL
+  text input is on, which SDL3 has to be asked for per window and ImGui's
+  backend turns off whenever one of its own fields loses focus, so the
+  application asks again on every frame an edit box has the keyboard. `Slider`
+  drags and reports its value; `Cooldown` sweeps.
+- SimpleHTML reads the subset item text is written in: `HTML` and `BODY` as
+  wrappers, `H1`-`H3` and `P` as blocks with an optional align, `BR`, `IMG` with
+  its size and align, and `A` as a link. Any other tag is dropped and its text
+  kept, and a heading draws in the frame's own font - nothing in FrameXML gives
+  a SimpleHTML a heading font. Text that does not open with `<HTML>` is drawn as
+  it stands.
 - The texture cache never evicts, and cannot yet: `uploadImGuiTexture` has no
   counterpart, so releasing one would mean tracking its image and memory and
   destroying them only once the GPU is done. `Interface\` art is small, bounded
   and reused, so this grows to a few hundred entries and stops; a session that
   loaded art from many addons would keep growing.
 - The widget method set in `lua_engine.cpp` is enumerated rather than derived.
-  A method outside it answers nil instead of doing nothing, which for an addon
-  is an error rather than a shrug. Every such name is recorded once as
-  `widget:Name`, so the gap shows up in the shutdown report rather than as a
-  mystery; adding it to the set is a one-line fix.
+  A name in it with no binding behind it answers with a no-op; a method outside
+  it answers nil instead of doing nothing, which for an addon is an error rather
+  than a shrug. Both are recorded once, so the gap shows up in the shutdown
+  report rather than as a mystery; adding a name to the set is a one-line fix.
 - Blend modes are honoured only far enough to tell "added" apart from "drawn
   over". `alphaMode="ADD"` art carries no alpha channel of its own - it is a
   glow on black - so it is uploaded as a second copy of the image with its
@@ -194,6 +217,9 @@ unset.
   - which separates "AddImage does not work here" from "these textures are bad".
 - `WOWEE_LUA_API_FALLBACK=0` turns off the stub that answers unknown globals,
   so the log names every API FrameXML actually reached.
+- `WOWEE_WIDGET_TRACE=1` makes the missing-API report name the object that
+  reached each no-op method as well as the method. It builds a closure on every
+  such lookup, so it is for a session run to read that report.
 - `WOWEE_EVENT_TRACE=UNIT_HEALTH,UNIT_MANA` reports each of those events and how
   many frames received it. An event that never arrives and an event nobody
   listens for look identical from outside - the frame simply does not change -
@@ -207,13 +233,19 @@ visible widget that landed outside the display, whoever owns it - a frame in
 the wrong place is only findable by name if you can guess the name, and the
 thing that looks wrong is rarely the thing you would have thought to check.
 
-The missing-API report at shutdown separates three things that are not the
-same, and writes the full list to `missing_api.txt` beside the log:
+The missing-API report at shutdown separates things that are not the same, and
+writes the full list to `missing_api.txt` in the config directory, naming the
+path in the log:
 
 - names still undefined, which is the real gap;
-- names read before the file defining them had loaded, which is normal;
+- names the interface asks for and never defines itself, which are nil in the
+  real client too;
 - names built from an existing frame's, which are parts that frame may or may
-  not have. FrameXML asks for these constantly and guards them properly.
+  not have. FrameXML asks for these constantly and guards them properly;
+- fields read off a widget before anything set them;
+- names read before the file defining them had loaded, which is normal;
+- widget methods that answered with a no-op.
 
-The third category was 183 of 222 on one session. Reading the report without
-that split says close to the opposite of the truth.
+On a headless load of the whole interface the frame parts were 253 of 286
+names and the real gap was none. Reading the report without that split says
+close to the opposite of the truth.

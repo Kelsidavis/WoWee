@@ -3,22 +3,25 @@
 ## Build Setup
 
 See [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md) for full platform-specific details.
-The short version: CMake + Make on Linux/macOS, MSYS2 on Windows.
+The short version: CMake on Linux/macOS, MSYS2 on Windows. The desktop build needs
+SDL3 and a Vulkan 1.3 driver.
 
 ```
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
-make -C build -j$(nproc)
+cmake --build build -j
 ```
+
+Warnings are errors in the client by default (`WOWEE_WARNINGS_AS_ERRORS=ON`).
+The world editor and the headless `framexml_run` tool are off the default build;
+see the build options table in BUILD_INSTRUCTIONS.md.
 
 ## Code Style
 
 - **C++20**. Use `#pragma once` for include guards.
-- Namespaces: `wowee::game`, `wowee::rendering`, `wowee::rendering::world_map`, `wowee::ui`, `wowee::ui::chat`, `wowee::math`, `wowee::core`, `wowee::network`.
-- Conventional commit messages in imperative mood:
-  - `feat:` new feature
-  - `fix:` bug fix
-  - `refactor:` code restructuring with no behavior change
-  - `perf:` performance improvement
+- Namespaces: `wowee::game`, `wowee::rendering`, `wowee::rendering::world_map`, `wowee::ui`, `wowee::ui::chat`, `wowee::addons`, `wowee::pipeline`, `wowee::audio`, `wowee::auth`, `wowee::math`, `wowee::core`, `wowee::network`.
+- Commit messages are a short, lower-case subject prefixed with the area it
+  touches, in imperative mood, e.g. `vulkan: record the shadow pass with dynamic rendering`
+  or `ui: parse SimpleHTML item text and draw its images`.
 - Prefer `constexpr` over `static const` for compile-time data.
 - Mark functions whose return value should not be ignored with `[[nodiscard]]`.
 
@@ -27,7 +30,7 @@ make -C build -j$(nproc)
 1. Branch from `master`.
 2. Keep commits focused -- one logical change per commit.
 3. Describe *what* changed and *why* in the PR description.
-4. Ensure the project compiles cleanly before submitting.
+4. Ensure the project compiles cleanly (warnings are errors) and `./test.sh --test` passes before submitting.
 5. Manual testing against a WoW 3.3.5a server (e.g. AzerothCore/ChromieCraft) is expected
    for gameplay-affecting changes.
 
@@ -37,13 +40,17 @@ See [docs/architecture.md](docs/architecture.md) for the full picture. Key names
 
 | Namespace | Responsibility |
 |---|---|
-| `wowee::game` | Game state, packet handling (`GameHandler`), opcode dispatch, spline parsing |
+| `wowee::game` | Game state, packet handling (`GameHandler` and its domain handlers), opcode dispatch, spline parsing |
 | `wowee::rendering` | Vulkan renderer, M2/WMO/terrain, sky system |
 | `wowee::rendering::world_map` | Modular world map (16 components: facade, compositor, layers, etc.) |
-| `wowee::ui` | ImGui windows and HUD (`GameScreen`) |
+| `wowee::ui` | Login and settings screens, the FrameXML emitter and widget renderer, HUD (`GameScreen`) |
 | `wowee::ui::chat` | Modular chat system (15+ components: commands, markup, macros, etc.) |
+| `wowee::addons` | Lua engine, addon manager and the Lua API FrameXML calls |
+| `wowee::pipeline` | Asset manager and the DBC, BLP, M2, WMO and ADT loaders |
+| `wowee::audio` | Audio engine and sound managers |
+| `wowee::auth` | SRP-6a login and the realm list |
 | `wowee::math` | Reusable math modules (CatmullRomSpline) |
-| `wowee::core` | Coordinates, math, utilities |
+| `wowee::core` | Application, window, logging, config and data paths |
 | `wowee::network` | Connection, `Packet` read/write API |
 
 ## Packet Handlers
@@ -52,15 +59,20 @@ The standard pattern for adding a new server packet handler:
 
 1. Define a `struct FooData` holding the parsed fields.
 2. Write `void GameHandler::handleFoo(network::Packet& packet)` to parse into `FooData`.
-3. Register it in the dispatch table: `registerHandler(LogicalOpcode::SMSG_FOO, &GameHandler::handleFoo)`.
+3. Register it in the dispatch table in `src/game/game_handler_packets.cpp`
+   (`registerCoreOpcodes` or `registerRemainingOpcodes`):
+   `registerHandler(Opcode::SMSG_FOO, &GameHandler::handleFoo)`.
 
-Helper variants: `registerWorldHandler` (requires `isInWorld()`), `registerSkipHandler` (discard),
-`registerErrorHandler` (log warning).
+`registerSkipHandler(Opcode::SMSG_FOO)` registers an opcode that is read and discarded.
+Handlers that need more than a member call are written straight into `dispatchTable_`
+as lambdas. The domain handlers (`ChatHandler`, `CombatHandler`, `EntityController`
+and the rest) register their own opcodes in their `registerOpcodes(DispatchTable&)`.
 
 ## Testing
 
-31 unit-test suites cover core systems, animation, transport/spline, world map, and chat.
-See [TESTING.md](TESTING.md) for the full guide. Run with `./test.sh --test`.
+About two hundred ctest suites cover core systems, packets, assets, the interface,
+animation, transport/spline, world map, and chat, alongside Python sweeps over the
+interface. See [TESTING.md](TESTING.md) for the full guide. Run with `./test.sh --test`.
 Manual testing against WoW 3.3.5a private servers (primarily ChromieCraft/AzerothCore)
 is expected for gameplay-affecting changes.
 
@@ -94,9 +106,13 @@ is expected for gameplay-affecting changes.
 | File / Directory | What it does |
 |---|---|
 | `include/game/game_handler.hpp` | Central game state and all packet handler declarations |
-| `src/game/game_handler.cpp` | Packet dispatch registration and handler implementations |
+| `src/game/game_handler.cpp` | `GameHandler` construction and handler implementations |
+| `src/game/game_handler_packets.cpp` | Packet dispatch registration |
 | `include/network/packet.hpp` | `Packet` class -- the read/write API every handler uses |
 | `include/ui/game_screen.hpp` | Main gameplay UI screen (ImGui) |
+| `src/addons/` | Lua engine and the API FrameXML runs against |
+| `src/ui/framexml_emitter.cpp` | Turns FrameXML's XML into the Lua that builds its frames |
+| `src/ui/settings_schema.cpp` | Every client setting, from which the options pages are generated |
 | `src/ui/chat/` | Modular chat system (commands, markup, macros, tab completion) |
 | `src/rendering/world_map/` | Modular world map (facade, compositor, layers, coordinate projection) |
 | `src/math/spline.cpp` | Reusable CatmullRomSpline math |

@@ -32,10 +32,10 @@ This guide demonstrates the complete authentication flow in wowee, from connecti
 └─────────────────────────────────────────────┘
          ↓
 ┌─────────────────────────────────────────────┐
-│ 4. READY FOR CHARACTER OPERATIONS           │
-│    🎯 CMSG_CHAR_ENUM (next step)            │
-│    🎯 Character selection                   │
-│    🎯 CMSG_PLAYER_LOGIN                     │
+│ 4. CHARACTER OPERATIONS                     │
+│    ✅ CMSG_CHAR_ENUM (sent on AUTH_OK)      │
+│    ✅ Character selection                   │
+│    ✅ CMSG_PLAYER_LOGIN                     │
 └─────────────────────────────────────────────┘
 ```
 
@@ -44,6 +44,7 @@ This guide demonstrates the complete authentication flow in wowee, from connecti
 ```cpp
 #include "auth/auth_handler.hpp"
 #include "game/game_handler.hpp"
+#include "game/game_services.hpp"
 #include "core/logger.hpp"
 #include <iostream>
 #include <thread>
@@ -68,6 +69,7 @@ int main() {
     std::string accountName = "MYACCOUNT";
     std::string selectedRealmAddress;
     uint16_t selectedRealmPort;
+    uint32_t selectedRealmId = 0;
 
     // Connect to auth server
     if (!authHandler.connect("logon.myserver.com", 3724)) {
@@ -118,6 +120,7 @@ int main() {
 
                 selectedRealmAddress = host;
                 selectedRealmPort = port;
+                selectedRealmId = realm.id;
                 gotRealms = true;
             } else {
                 std::cerr << "Invalid realm address format" << std::endl;
@@ -160,7 +163,9 @@ int main() {
     std::cout << "Connecting to: " << selectedRealmAddress << ":"
               << selectedRealmPort << std::endl;
 
-    game::GameHandler gameHandler;
+    // Renderer, audio and asset manager; the client's Application fills these
+    game::GameServices services;
+    game::GameHandler gameHandler(services);
 
     // Set up world connection callbacks
     bool worldSuccess = false;
@@ -180,7 +185,8 @@ int main() {
             selectedRealmPort,
             sessionKey,         // 40-byte session key from auth server
             accountName,        // Same account name
-            12340               // WoW 3.3.5a build
+            12340,              // WoW 3.3.5a build
+            selectedRealmId     // Realm id from the realm list
         )) {
         std::cerr << "Failed to initiate world server connection" << std::endl;
         return 1;
@@ -208,14 +214,10 @@ int main() {
     std::cout << "✅ Realm list: Received" << std::endl;
     std::cout << "✅ World server: Connected" << std::endl;
     std::cout << "✅ Encryption: Initialized" << std::endl;
-    std::cout << "\n🎮 Ready to request character list!" << std::endl;
 
-    // TODO: Next steps:
-    // - Send CMSG_CHAR_ENUM
-    // - Receive SMSG_CHAR_ENUM
-    // - Display characters
-    // - Send CMSG_PLAYER_LOGIN
-    // - Enter world!
+    // GameHandler sent CMSG_CHAR_ENUM itself on AUTH_OK. Once the state
+    // reaches CHAR_LIST_RECEIVED, gameHandler.getCharacters() holds the list
+    // and gameHandler.selectCharacter(guid) sends CMSG_PLAYER_LOGIN.
 
     // Keep connection alive
     std::cout << "\nPress Ctrl+C to exit..." << std::endl;
@@ -257,6 +259,8 @@ authHandler.authenticate("MYACCOUNT", "mypassword");
 - Server verifies and returns M2
 - Session key (40 bytes) is generated
 
+If the challenge's security flags ask for a PIN (0x01) or an authenticator code (0x04), the handler stops in `PIN_REQUIRED` or `AUTHENTICATOR_REQUIRED` until `submitSecurityCode()` supplies it, or takes it up front from the `authenticate(user, pass, pin)` overload.
+
 **Session Key Computation:**
 ```
 S = (B - k*g^x)^(a + u*x) mod N
@@ -293,13 +297,14 @@ uint16_t port = std::stoi(realm.address.substr(colonPos + 1));
 #### 3.1 Connect to World Server
 
 ```cpp
-game::GameHandler gameHandler;
+game::GameHandler gameHandler(services);
 gameHandler.connect(
     host,           // e.g., "localhost"
     port,           // e.g., 8085
     sessionKey,     // 40 bytes from auth server
     accountName,    // Same account
-    12340           // Build number
+    12340,          // Build number
+    realm.id        // Realm id; some servers reject 0
 );
 ```
 
@@ -316,7 +321,10 @@ Opcode: 0x01EC (SMSG_AUTH_CHALLENGE)
 Data:
   uint32 unknown1 (always 1)
   uint32 serverSeed (random)
+  uint8  seeds[32] (not used)
 ```
+
+`AuthChallengeParser` also accepts the 4-byte TBC form and the 36-byte classic form, both of which start with the server seed.
 
 **Client receives:**
 - Parses server seed
@@ -329,14 +337,20 @@ Data:
 Opcode: 0x01ED (CMSG_AUTH_SESSION)
 Data:
   uint32 build (12340)
-  uint32 unknown (0)
+  uint32 loginServerId (0)
   string account (null-terminated, uppercase)
-  uint32 unknown (0)
+  uint32 loginServerType (0)
   uint32 clientSeed (random)
-  uint32 unknown (0) x5
+  uint32 regionId (0)
+  uint32 battlegroupId (0)
+  uint32 realmId (from the realm list)
+  uint64 dosResponse (0)
   uint8  authHash[20] (SHA1)
-  uint32 addonCRC (0)
+  uint32 addonInfoSize (uncompressed size)
+  uint8  addonInfo[] (zlib: uint32 addonCount 0, uint32 clientTime 0)
 ```
+
+Builds up to 8606 (TBC) send the shorter layout: build, realm id, account, client seed, hash, addon info.
 
 **Auth hash computation (CRITICAL):**
 ```cpp
@@ -357,10 +371,12 @@ SHA1(
 **IMMEDIATELY after sending CMSG_AUTH_SESSION:**
 
 ```cpp
-socket->initEncryption(sessionKey);
+socket->initEncryption(sessionKey, build);
 ```
 
-**What happens:**
+The build picks the header cipher: 5875 and below use the vanilla XOR cipher, 5876 to 8606 the CMaNGOS TBC HMAC-XOR cipher, and anything later RC4 as below.
+
+**What happens (RC4):**
 ```
 1. encryptHash = HMAC-SHA1(ENCRYPT_KEY, sessionKey)  // 20 bytes
 2. decryptHash = HMAC-SHA1(DECRYPT_KEY, sessionKey)  // 20 bytes
@@ -388,17 +404,18 @@ DECRYPT_KEY = {0xCC, 0x98, 0xAE, 0x04, 0xE8, 0x97, 0xEA, 0xCA,
 **Server sends (ENCRYPTED header):**
 ```
 Header (4 bytes, encrypted):
-  uint16 size (big-endian)
-  uint16 opcode 0x01EE (big-endian)
+  uint16 size (big-endian, includes the opcode)
+  uint16 opcode 0x01EE (little-endian)
 
-Body (1 byte, plaintext):
-  uint8 result (0x00 = success)
+Body (plaintext):
+  uint8 result (0x0C = AUTH_OK)
+  ... (billing and expansion fields, not read)
 ```
 
 **Client receives:**
 - Decrypts header with RC4
 - Parses result code
-- If 0x00: SUCCESS!
+- If 0x0C (AUTH_OK): state goes to `READY` and `CMSG_CHAR_ENUM` is sent
 - Otherwise: Error message
 
 ### Phase 4: Ready for Game
@@ -407,7 +424,7 @@ At this point:
 - ✅ Session established
 - ✅ Encryption active
 - ✅ All future packets have encrypted headers
-- 🎯 Ready for character operations
+- ✅ Character list requested
 
 ## Error Handling
 
@@ -416,13 +433,16 @@ At this point:
 ```cpp
 authHandler.setOnFailure([](const std::string& reason) {
     // Possible reasons:
-    // - "ACCOUNT_INVALID"
-    // - "PASSWORD_INVALID"
-    // - "ALREADY_ONLINE"
-    // - "BUILD_INVALID"
+    // - "LOGON_CHALLENGE failed: Account not found - check your username"
+    // - "LOGON_CHALLENGE failed: This account is already logged in"
+    // - "LOGON_CHALLENGE failed: version mismatch (client v3.3.5 build 12340, auth protocol 8)"
+    // - "Login failed: <result>" (LOGON_PROOF rejected, e.g. a wrong password)
+    // - "Disconnected by auth server"
     // etc.
 });
 ```
+
+`lastFailureWasProtocol()` is true when the failure looks like an auth protocol mismatch rather than bad credentials, so the caller can retry with another protocol version.
 
 ### World Server Errors
 
@@ -430,63 +450,20 @@ authHandler.setOnFailure([](const std::string& reason) {
 gameHandler.setOnFailure([](const std::string& reason) {
     // Possible reasons:
     // - "Connection failed"
-    // - "Authentication failed: ALREADY_LOGGING_IN"
-    // - "Authentication failed: SESSION_EXPIRED"
+    // - "Authentication failed: ALREADY_LOGGING_IN - Already logging in"
+    // - "Authentication failed: SESSION_EXPIRED - Session has expired"
     // etc.
 });
 ```
 
 ## Testing
 
-### Unit Test Example
+### Unit Tests
 
-```cpp
-void testCompleteAuthFlow() {
-    // Mock auth server
-    MockAuthServer authServer(3724);
+There is no mock auth or world server in the tree; the handlers are exercised against live servers. The pieces they are built from have tests of their own:
 
-    // Real auth handler
-    auth::AuthHandler auth;
-    auth.connect("localhost", 3724);
-
-    bool success = false;
-    std::vector<uint8_t> key;
-
-    auth.setOnSuccess([&](const std::vector<uint8_t>& sessionKey) {
-        success = true;
-        key = sessionKey;
-    });
-
-    auth.authenticate("TEST", "TEST");
-
-    // Wait for result
-    while (auth.getState() == auth::AuthState::CHALLENGE_SENT ||
-           auth.getState() == auth::AuthState::PROOF_SENT) {
-        auth.update(0.016f);
-    }
-
-    assert(success);
-    assert(key.size() == 40);
-
-    // Now test world server
-    MockWorldServer worldServer(8085);
-
-    game::GameHandler game;
-    game.connect("localhost", 8085, key, "TEST", 12340);
-
-    bool worldSuccess = false;
-    game.setOnSuccess([&worldSuccess]() {
-        worldSuccess = true;
-    });
-
-    while (game.getState() != game::WorldState::READY &&
-           game.getState() != game::WorldState::FAILED) {
-        game.update(0.016f);
-    }
-
-    assert(worldSuccess);
-}
-```
+- `tests/test_srp.cpp` (`ctest -R srp`): SRP6a sizes, a non-zero A, different passwords giving different M1, and M2 rejection
+- `tests/test_realm_list.cpp` (`ctest -R realm_list`): REALM_LIST parsing across the vanilla and TBC/WotLK layouts, and the LOGON_PROOF legacy and PIN layouts
 
 ## Common Issues
 
@@ -532,14 +509,14 @@ After successful world authentication:
 
 1. **Character Enumeration**
    ```cpp
-   // Send CMSG_CHAR_ENUM (0x0037)
-   // Receive SMSG_CHAR_ENUM (0x003B)
-   // Display character list
+   // CMSG_CHAR_ENUM (0x0037) is sent by GameHandler on AUTH_OK
+   // SMSG_CHAR_ENUM (0x003B) fills gameHandler.getCharacters()
+   // requestCharacterList() asks again
    ```
 
 2. **Enter World**
    ```cpp
-   // Send CMSG_PLAYER_LOGIN (0x003D) with character GUID
+   // gameHandler.selectCharacter(guid) sends CMSG_PLAYER_LOGIN (0x003D)
    // Receive SMSG_LOGIN_VERIFY_WORLD (0x0236)
    // Now in game!
    ```

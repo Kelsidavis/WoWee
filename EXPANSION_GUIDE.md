@@ -9,15 +9,23 @@ WoWee supports four World of Warcraft expansion profiles in a unified codebase u
 - **Wrath of the Lich King (WotLK) 3.3.5a** - Second expansion
 - **Turtle WoW 1.18** - Custom Vanilla-based server with extended content
 
+Each profile is a directory under `Data/expansions/` (`classic`, `tbc`, `wotlk`,
+`turtle`). `Data/expansions/cata` carries no `expansion.json`, so Cataclysm is not
+a server profile; a 4.3.4 client can still be read as an asset source by
+`asset_extract --expansion cata` and the asset builder.
+
 ## Architecture Overview
 
 The multi-expansion support is built on the **Expansion Profile** system:
 
 1. **ExpansionProfile** (`include/game/expansion_profile.hpp`) - Metadata about each expansion
-   - Defines protocol version, data paths, asset locations
-   - Specifies which packet parsers to use
+   - Read from `Data/expansions/<id>/expansion.json` by `ExpansionRegistry`
+   - Defines version, build, protocol version, data path, races and classes,
+     and optionally the realm's Warden signing key (`wardenRsaModulus`)
 
-2. **Packet Parsers** - Expansion-specific message handling
+2. **Packet Parsers** (`include/game/packet_parsers.hpp`) - Expansion-specific message handling
+   - `createPacketParsers(id)` picks `ClassicPacketParsers`, `TurtlePacketParsers`,
+     `TbcPacketParsers` or `WotlkPacketParsers`
    - `packet_parsers_classic.cpp` - Vanilla 1.12 / Turtle WoW message parsing
    - `packet_parsers_tbc.cpp` - TBC 2.4.3 message parsing
    - Default (WotLK 3.3.5a) parsers in `game_handler.cpp` and domain handlers
@@ -26,21 +34,32 @@ The multi-expansion support is built on the **Expansion Profile** system:
    - Loaded from `update_fields.json` in expansion data directory
    - Defines UNIT_END, OBJECT_END, field indices for stats/health/mana
 
+4. **Opcodes and DBC layouts** - `opcodes.json` (which may `_extends` another
+   profile's) and `dbc_layouts.json` in the same directory
+
+`Application::loadExpansionTables()` (`src/core/application.cpp`) loads the
+opcode table, update fields, packet parsers and DBC layouts together, at startup
+and again whenever the active expansion changes.
+
 ## How to Use Different Expansions
 
 ### At Startup
 
-WoWee auto-detects the expansion based on:
-1. Realm list response (protocol version)
-2. Server build number
-3. Update field count
+`ExpansionRegistry::initialize()` scans `Data/expansions/*/expansion.json` and
+picks the active profile from what is installed, not from the server:
+1. WotLK, if WotLK assets are extracted
+2. Otherwise the newest profile with extracted assets (a `manifest.json` in its directory)
+3. Otherwise WotLK
+
+Each saved server on the login screen remembers its expansion, so choosing
+that server switches to it.
 
 ### Manual Selection
 
-Choose the expansion in the auth/realm screen at launch. The selection
-calls `ExpansionRegistry::setActive(id)` (see `src/ui/auth_screen.cpp`)
-which loads the matching opcode table, update-field layout, and DBC
-layout for that expansion.
+Choose the expansion under **more options** on the login screen. The selection
+calls `ExpansionRegistry::setActive(id)` and then `Application::reloadExpansionData()`
+(see `src/ui/auth_screen.cpp`), which loads the matching opcode table,
+update-field layout, packet parsers and DBC layout for that expansion.
 
 ## Key Differences Between Expansions
 
@@ -68,9 +87,13 @@ layout for that expansion.
 
 ## Adding Support for Another Expansion
 
-1. Create new expansion profile entry in `expansion_profile.cpp`
-2. Add packet parser file (`packet_parsers_*.cpp`) for message variants
-3. Create update_fields.json with correct field layout
+1. Create `Data/expansions/<id>/expansion.json` with the profile (copy an
+   existing one for the fields)
+2. Add `opcodes.json`, `update_fields.json` and `dbc_layouts.json` beside it
+3. Add a packet parser class (`packet_parsers_*.cpp`, declared in
+   `include/game/packet_parsers.hpp`) for message variants and return it from
+   `createPacketParsers()`. Without one the client logs an error and falls back
+   to WotLK's parsers
 4. Test realm connection and character loading
 
 ## Code Patterns
@@ -112,7 +135,8 @@ bool TbcPacketParsers::parseXxx(network::Packet& packet, XxxData& data) {
 
 ### "Unknown packet" Warnings
 - Expansion-specific opcodes may not be registered
-- Check packet parser registration in `game_handler.cpp`
+- Check the opcode's entry in the profile's `opcodes.json` and its handler
+  registration in `src/game/game_handler_packets.cpp`
 - Verify expansion profile is active
 
 ### Packet Parsing Failures
@@ -123,6 +147,8 @@ bool TbcPacketParsers::parseXxx(network::Packet& packet, XxxData& data) {
 ## References
 
 - `include/game/expansion_profile.hpp` - Expansion metadata
+- `include/game/packet_parsers.hpp` - Parser classes and `createPacketParsers()`
+- `Data/expansions/<id>/` - Per-expansion `expansion.json`, `opcodes.json`, `update_fields.json`, `dbc_layouts.json`
 - `include/game/game_utils.hpp` - `isActiveExpansion()`, `isClassicLikeExpansion()`, `isPreWotlk()`
 - `src/game/packet_parsers_classic.cpp` / `packet_parsers_tbc.cpp` - Expansion-specific parsing
 - `docs/status.md` - Current feature support

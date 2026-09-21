@@ -1,5 +1,15 @@
 # GPU-Driven Grass — Phased Implementation Plan
 
+> **Status note, 2026-09-21.** §4 was last updated before the following landed. The population
+> rebuild left open at the end of Phase 3 no longer risks a stall: it still runs on the main
+> thread, but `GrassPopulationBuilder` walks a bounded number of lattice cells per frame
+> (`include/pipeline/grass_population.hpp:135-149`, `bd1b9f79`). Part of Phase 7 is done:
+> distance density falloff without popping, through an octave lattice and per-blade fades
+> (`b5d57b38`), and switches that turn the frustum and distance culls off,
+> `WOWEE_GRASS_NOCULL` and `WOWEE_GRASS_NODIST` (`src/rendering/grass_renderer.cpp:502-503`).
+> The `PerformanceHUD` counters, the mask, density and profile views, the wind and interaction
+> toggles and the spec §43 sweep are not done.
+
 **Status:** Phases 1 through 6 complete. Next: Phase 7.
 **Branch:** `grass`
 **Spec:** [`docs/grass-spec.md`](grass-spec.md) — every `spec §N` below refers to a numbered

@@ -35,12 +35,12 @@ struct Realm {
     uint8_t id;                // Realm ID
 
     // Version info (conditional - only if flags & 0x04)
-    uint8_t majorVersion;      // Major version (e.g., 3)
-    uint8_t minorVersion;      // Minor version (e.g., 3)
-    uint8_t patchVersion;      // Patch version (e.g., 5)
-    uint16_t build;            // Build number (e.g., 12340 for 3.3.5a)
+    uint8_t majorVersion = 0;  // Major version (e.g., 3)
+    uint8_t minorVersion = 0;  // Minor version (e.g., 3)
+    uint8_t patchVersion = 0;  // Patch version (e.g., 5)
+    uint16_t build = 0;        // Build number (e.g., 12340 for 3.3.5a)
 
-    bool hasVersionInfo() const { return (flags & 0x04) != 0; }
+    [[nodiscard]] bool hasVersionInfo() const { return (flags & 0x04) != 0; }
 };
 ```
 
@@ -217,7 +217,7 @@ int main() {
             std::cout << "Realm: " << selectedRealm.name << std::endl;
             std::cout << "Address: " << selectedRealm.address << std::endl;
 
-            // TODO: Parse address and connect to world server
+            // Next: parse the address and connect to the world server
             // Example: "localhost:8085" -> host="localhost", port=8085
         }
     }
@@ -285,6 +285,30 @@ For each realm:
     1 byte:    Patch version
     2 bytes:   Build (uint16, little-endian)
 ```
+
+**Vanilla layout:**
+
+Vanilla-family servers send a different shape, which differs only at the front:
+
+```
+Header:
+  Byte 7:      Realm count (uint8)
+
+For each realm:
+  4 bytes:     Icon (uint32)
+               (no Lock byte)
+  1 byte:      Flags
+  ... the rest as above
+```
+
+`RealmListResponseParser::parse(packet, response, legacyVanillaLayout)` reads
+whichever the caller asks for. The login screen asks for the vanilla layout
+when the active expansion is `classic` or `turtle`, or its protocol version is
+3 or lower (`ClientInfo::legacyVanillaRealmList`), since vmangos-derived 1.12
+realms speak auth protocol 8 while still sending the vanilla entries. If a
+modern-layout parse comes out with an empty realm name, the entry is re-read as
+vanilla and the log warns `Realm list entry looked shifted; retrying as vanilla
+layout`.
 
 **Packet Framing:**
 
@@ -366,6 +390,8 @@ enum class AuthState {
     CONNECTED,                 // Connected, ready for auth
     CHALLENGE_SENT,           // LOGON_CHALLENGE sent
     CHALLENGE_RECEIVED,       // LOGON_CHALLENGE response received
+    PIN_REQUIRED,             // Server asked for a PIN
+    AUTHENTICATOR_REQUIRED,   // Server asked for an authenticator code
     PROOF_SENT,               // LOGON_PROOF sent
     AUTHENTICATED,            // Authentication successful, can request realms
     REALM_LIST_REQUESTED,     // REALM_LIST request sent
@@ -384,7 +410,7 @@ CONNECTED
 CHALLENGE_SENT
     ↓ (server response)
 CHALLENGE_RECEIVED
-    ↓ (automatic)
+    ↓ (automatic, or submitSecurityCode() after PIN_REQUIRED / AUTHENTICATOR_REQUIRED)
 PROOF_SENT
     ↓ (server response)
 AUTHENTICATED
@@ -474,11 +500,35 @@ auth.authenticate("user", "pass");
 
 **Cause:** Server sent unexpected packet or packet framing failed.
 
-**Solution:** Enable debug logging to see raw packet data:
+**Solution:** Enable debug logging to see raw packet data, either by running the
+client with `WOWEE_LOG_LEVEL=debug` or in code:
 
 ```cpp
 Logger::getInstance().setLogLevel(LogLevel::DEBUG);
 ```
+
+### 4. Realm Address Unreachable on a LAN
+
+**Cause:** The server advertises a public address in its `realmlist` table, and
+the router does not route that address back inside the LAN.
+
+**Solution:** Fix the realm's address on the server, or run the client with
+`WOWEE_REALM_HOST_OVERRIDE=<local address>`. The client then connects to that
+host with the realm's advertised port.
+
+## In the Client
+
+The client wires this up in `src/ui/auth_screen.cpp` and
+`src/core/ui_screen_callback_handler.cpp`:
+
+- The login card's **Server** list holds every server logged into before and
+  ChromieCraft (`logon.chromiecraft.com`, port 3724, WotLK), which is added on
+  every start if missing. **Somewhere else...** opens the Address and Port
+  fields under **more options**.
+- After authentication the realm screen shows the realm list. Choosing a realm
+  splits its address at the colon (port 8085 when there is none), applies
+  `WOWEE_REALM_HOST_OVERRIDE` if set, and connects to the world server with the
+  session key and the realm's ID.
 
 ## Next Steps
 

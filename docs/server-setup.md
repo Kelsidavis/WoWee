@@ -8,20 +8,21 @@
 
 ## Overview
 
-The wowee client is pre-configured to connect to a local WoW 3.3.5a private server. This guide explains how to set up and test with popular server emulators like TrinityCore or AzerothCore.
+The wowee client's server list starts with ChromieCraft, the public WotLK server it is developed against. This guide explains how to set up and test with a local WoW 3.3.5a server from popular emulators like TrinityCore or AzerothCore, and point the client at it.
 
 ## Default Configuration
 
-The authentication screen comes with local server defaults:
+The login card asks for the server first, then the account:
 
 | Setting | Default Value | Description |
 |---------|---------------|-------------|
-| **Hostname** | localhost | Localhost (your machine) |
-| **Port** | 3724 | Standard auth server port |
-| **Username** | (empty) | Your account username |
+| **Server** | ChromieCraft (`logon.chromiecraft.com:3724`, WotLK) | Every server you have logged into is listed too; **Somewhere else...** is for any other address |
+| **Address** | (the chosen server's) | Under **more options**; placeholder `logon.example.com` |
+| **Port** | 3724 | Under **more options**; an empty box means 3724 |
+| **Account** | (empty) | Your account username |
 | **Password** | (empty) | Your account password |
 
-These values can be changed in the UI before connecting.
+A server you log into is saved to the list with its account and expansion.
 
 ## Server Requirements
 
@@ -221,16 +222,18 @@ cd /path/to/wowee
 
 ### 2. Login Screen
 
-You'll see the authentication screen with default values:
-- **Hostname:** localhost (already set)
-- **Port:** 3724 (already set)
-- **Username:** (enter your account username)
+The **Server** list opens on ChromieCraft. For a local server:
+- **Server:** choose **Somewhere else...**, which opens **more options**
+- **Address:** `localhost`
+- **Port:** 3724 (the default)
+- **Expansion:** the one your server runs, under **more options**
+- **Account:** (enter your account username)
 - **Password:** (enter your account password)
 
 ### 3. Connect
 
 1. Enter your credentials (e.g., `testuser` / `testpass`)
-2. Click **Connect**
+2. Click **Log In**
 3. You should see "Authentication successful!"
 4. Select your realm from the realm list
 5. Create or select a character
@@ -358,16 +361,21 @@ sudo ufw allow 8085  # World server
 ```
 
 **4. In wowee:**
-- Change hostname to your server's local IP (e.g., <your-lan-ip>)
+- Choose **Somewhere else...** in the Server list
+- Under **more options**, set Address to your server's local IP (e.g., <your-lan-ip>)
 - Keep port as 3724
-- Connect
+- Log In
+
+If the realm list hands the client a public address that your router cannot
+reach from inside the LAN, set `WOWEE_REALM_HOST_OVERRIDE=<your-lan-ip>` when
+starting wowee. It replaces the realm's host and keeps its port.
 
 ### Remote Server Testing
 
 For testing with a remote server (VPS, dedicated server):
 
-**Client configuration:**
-- **Hostname:** server.example.com or remote IP
+**Client configuration (Somewhere else... → more options):**
+- **Address:** server.example.com or remote IP
 - **Port:** 3724 (or custom port)
 
 **Server configuration:**
@@ -384,13 +392,27 @@ UPDATE realmlist SET address='your.server.ip' WHERE id=1;
 
 The client needs access to extracted WoW data (terrain, models, textures) indexed by `manifest.json`.
 
-If you have a fresh WoW install (MPQs only), extract once with:
+If you have a fresh WoW install (MPQs only), build the assets once. Started with
+nothing extracted, the client opens its asset builder; `wowee_assets` is the
+same builder as a separate window. Both write to the per-user data directory by
+default, which the client finds on its own:
+
+- macOS: `~/Library/Application Support/Wowee/Data`
+- Linux: `$XDG_DATA_HOME/wowee/Data` (or `~/.local/share/wowee/Data`)
+- Windows: `%LOCALAPPDATA%\Wowee\Data`
+
+Or from the command line, which writes to `Data/` in the checkout:
 
 ```bash
 ./extract_assets.sh /path/to/WoW-3.3.5a/Data wotlk
 ```
 
+See [BUILD_INSTRUCTIONS.md](../BUILD_INSTRUCTIONS.md) for all three.
+
 ### Setting WOW_DATA_PATH
+
+Only needed when the data is somewhere other than the per-user directory or
+`Data/` beside the client. `WOW_DATA_PATH` takes precedence over both.
 
 ```bash
 # Linux/Mac
@@ -410,12 +432,22 @@ cd /path/to/wowee
 Your extracted data directory should contain (example):
 ```
 Data/
-├── manifest.json
-├── interface/
-├── sound/
-├── world/
 └── expansions/
+    └── wotlk/
+        ├── expansion.json
+        ├── opcodes.json
+        ├── update_fields.json
+        ├── dbc_layouts.json
+        ├── manifest.json
+        ├── dbfilesclient/
+        ├── interface/
+        ├── sound/
+        └── world/
 ```
+
+Each game built into the same folder gets its own directory under
+`expansions/`; with more than one installed, the login screen offers an
+**Assets** choice.
 
 ## Testing Features
 
@@ -423,10 +455,9 @@ Data/
 
 Once connected and in-world, test client features:
 
-**Camera Controls:**
-- **WASD** - Move camera
+**Movement:**
+- **WASD** - Move the character
 - **Mouse** - Look around
-- **Shift** - Move faster
 
 **UI/Gameplay Windows:**
 - **B** - Toggle bags
@@ -438,12 +469,12 @@ Once connected and in-world, test client features:
 - **O** - Toggle guild roster
 
 **Debug Features:**
-- **F1** - Toggle performance HUD
-- **F4** - Toggle shadows
+- **F1** - Toggle performance HUD (debug builds only)
+- **F8** - Write the WMO floor data at your position to the log
 
 ### Performance Monitoring
 
-Press **F1** to show/hide the performance HUD which displays:
+In a debug build, press **F1** to show/hide the performance HUD which displays:
 - **FPS** - Frames per second (color-coded: green=60+, yellow=30-60, red=<30)
 - **Frame time** - Milliseconds per frame
 - **Renderer stats** - Draw calls, triangles
@@ -508,8 +539,8 @@ Rate.Player.Haste = 1
 
 ### Client Performance
 
-- Keep performance HUD (F1) enabled to monitor FPS
-- Reduce quality/effects from Settings if FPS drops
+- Keep performance HUD (F1, debug builds) enabled to monitor FPS
+- Reduce quality/effects from Settings (Escape → Video) if FPS drops
 
 ## Security Notes
 
@@ -570,9 +601,10 @@ export WOW_DATA_PATH="/path/to/extracted/Data"
 ```
 
 4. **Connect:**
-- Username: `demo`
+- Server: **Somewhere else...**, Address `localhost` under **more options**
+- Account: `demo`
 - Password: `demopass`
-- Click Connect
+- Click Log In
 
 5. **Test Features:**
 - Create a character
@@ -596,7 +628,7 @@ server shutdown 10
 - [ ] Realmlist configured with correct address
 - [ ] Account created with proper credentials
 - [ ] Firewall allows ports 3724 and 8085
-- [ ] WOW_DATA_PATH set correctly (if using MPQ assets)
+- [ ] Assets extracted to the per-user data directory, or WOW_DATA_PATH set to where they are
 - [ ] Client can resolve hostname (localhost for localhost)
 
 ## Next Steps
@@ -606,12 +638,12 @@ Once you have a working local server connection:
 2. Validate packet handling
 3. Test character creation and login
 4. Verify world entry and movement
-5. Test rendering with real terrain data (requires WOW_DATA_PATH)
+5. Test rendering with real terrain data (requires extracted assets)
 6. Profile performance with actual game data
 
 ---
 
 **Status**: Ready for local server testing
-**Last Updated**: 2026-03-30
-**Client Version**: v1.9.1-preview
+**Last Updated**: 2026-09-21
+**Client Version**: v3.1.32
 **Server Compatibility**: Vanilla 1.12, TBC 2.4.3, WotLK 3.3.5a (12340), Turtle WoW 1.18

@@ -12,30 +12,47 @@ The sky rendering system in wowee follows World of Warcraft's WotLK (3.3.5a) arc
 
 ```
 SkySystem (coordinator)
-├── Skybox (M2 model, AUTHORITATIVE - includes baked stars)
-├── StarField (procedural, DEBUG/FALLBACK ONLY)
+├── Skybox (fullscreen gradient from the DBC sky colours - underlay)
+├── StarField (procedural points: debug, "Sharp stars", or fallback when no sky M2)
 ├── Celestial (sun + White Lady + Blue Child)
 ├── Clouds (atmospheric layer)
 └── LensFlare (sun glow effect)
+
+Renderer
+└── skyboxModelRenderer_ (M2Renderer in sky mode - the original client's sky M2,
+                          AUTHORITATIVE - includes baked stars, clouds, planets)
 ```
 
 ### Rendering Pipeline
 
 ```
 LightingManager (DBC-driven)
-  ↓ Light.dbc + LightParams.dbc + time-of-day bands
+  ↓ Light.dbc + LightParams.dbc + LightIntBand/LightFloatBand time-of-day bands
   ↓ produces: directionalDir, diffuseColor, skyColors, cloudDensity, fogDensity
+  ↓ also resolves the active LightSkybox model path
   ↓
-SkyParams (interface struct)
-  ↓ adds: gameTime, skyboxModelId, skyboxHasStars
+skyParamsFromLighting() → SkyParams (interface struct)
+  ↓ adds: gameTime, weatherIntensity, useOriginalSkybox, sunOcclusion
   ↓
-SkySystem::render(camera, params)
-  ├─→ Skybox first (far plane, camera-locked)
-  ├─→ StarField (ONLY if debugMode OR skybox missing)
+SkySystem::render(cmd, perFrameSet, camera, params)
+  ├─→ Skybox (gradient, far plane)
+  ├─→ if a sky M2 is active and no procedural stars: stop here
+  ├─→ StarField (debug, "Sharp stars", or no sky M2)
   ├─→ Celestial (sun + 2 moons, uses directionalDir + gameTime)
-  ├─→ Clouds (atmospheric layer)
-  └─→ LensFlare (screen-space sun glow)
+  ├─→ Clouds (atmospheric layer, density raised by weather)
+  └─→ LensFlare (screen-space sun glow, attenuated by sunOcclusion)
+  ↓
+Renderer draws the sky M2 (skyboxModelRenderer_) over the gradient
 ```
+
+The sky is recorded after the terrain and before WMOs, doodads and characters.
+Every sky layer sits on the far plane and depth-tests without writing, so pixels
+a hill covers are skipped. Only the terrain goes first because it is the one
+fully opaque pass; blended windows and leaves leave no depth to test against.
+
+LightIntBand channels read by `LightingManager` (`LightParamsProfile::ColorChannel`):
+0 is the sunlight (`diffuseColor`), 1 the ambient, 2-5 the sky gradient
+(top, middle, band 1, band 2), 6 the sky's smog layer and 7 the fog.
 
 ---
 
@@ -48,7 +65,7 @@ Azeroth has **two moons** visible in the night sky, both significant to the worl
 #### **White Lady** (Primary Moon)
 - **Appearance**: Larger, brighter, pale white color (RGB: 0.8, 0.85, 1.0)
 - **Size**: 40-unit diameter billboard
-- **Intensity**: Full brightness (1.0)
+- **Intensity**: Full brightness (1.0), scaled by how dark the DBC sky is
 - **Lore**: Tied to Elune, the Night Elf moon goddess
 - **Cycle**: 30 game days per phase cycle (~12 real-world hours)
 
@@ -66,17 +83,24 @@ Azeroth has **two moons** visible in the night sky, both significant to the worl
   - Full intensity: 21:00 - 3:00 (night)
   - Fade out: 3:00 - 5:00 (dawn)
 - **Day hours**: 5:00 - 19:00 (moons not rendered)
+- **Sky darkness gate**: `SkySystem::render` passes a night factor of
+  `1 - smoothstep(0.08, 0.25, luminance(skyTopColor))`; both moons are skipped
+  below 0.01. The DBC sky can stay daylight-bright well past 19:00, and a
+  full-brightness moon on a blue sky reads as a second sun
 
 ### The Sun
 
 - **Positioning**: Driven by `LightingManager::directionalDir`
   - Placement: `sunPosition = -directionalDir * 800` (light comes FROM sun)
-  - Fallback: Time-based arc if no lighting manager (sunrise 6:00, peak 12:00, sunset 18:00)
-- **Color**: Uses `LightingManager::diffuseColor` (DBC-driven, changes with time-of-day)
-  - Sunrise/sunset: Orange/red tones
-  - Midday: Bright yellow-white
-- **Size**: 50-unit diameter billboard
-- **Visibility**: 5:00 - 19:00 with intensity fade at transitions
+  - `Celestial::renderSun` draws the disc along `directionalDir` instead when
+    `-directionalDir` points below the horizon
+  - The lens flare uses `sunDirectionFromLightDir()` (`sun_direction.hpp`),
+    which keeps a sun below the horizon below it
+  - Without a lighting manager, `SkyParams`' default `directionalDir` is used
+- **Color**: Uses `LightingManager::diffuseColor` (DBC-driven, changes with time-of-day),
+  mixed 52% toward a warm (1.0, 0.88, 0.55)
+- **Size**: 95-unit diameter billboard
+- **Visibility**: 5:00 - 19:00, fading in over 5:00-6:00 and out over 18:00-19:00
 
 ---
 
@@ -104,6 +128,11 @@ whiteLadyPhase = computePhaseFromGameTime(gameTime, 30.0f);  // 30 game days
 blueChildPhase = computePhaseFromGameTime(gameTime, 27.0f);  // 27 game days
 ```
 
+**Units mismatch:** the formula takes `gameTime` as seconds, but the value the
+renderer passes is `GameHandler::getGameTime()`, the server's hour of day
+(0-24, set from the login time packet). Divided by 1440 and 30, a whole day
+moves the phase by under 0.001, so both moons stay at new moon.
+
 ### Phase Representation
 
 - **Value range**: 0.0 - 1.0
@@ -127,17 +156,28 @@ If `gameTime < 0.0` (server time unavailable):
 
 ### Camera-Locked Behavior (WoW Standard)
 
-```cpp
-// Vertex shader transformation
-mat4 viewNoTranslation = mat4(mat3(view));  // Strip translation, keep rotation
-gl_Position = projection * viewNoTranslation * vec4(aPos, 1.0);
-gl_Position = gl_Position.xyww;  // Force far plane depth
+The gradient is a fullscreen triangle with no mesh (`skybox.vert.glsl`); the
+fragment shader rebuilds each pixel's view ray from the projection and the
+view's rotation only:
+
+```glsl
+// skybox.vert.glsl
+gl_Position = vec4(TexCoord * 2.0 - 1.0, 1.0, 1.0);  // depth = 1.0 (far plane)
+
+// skybox.frag.glsl
+vec3 viewDir = vec3(ndcX / projection[0][0], ndcY / abs(projection[1][1]), -1.0);
+vec3 worldDir = normalize(transpose(mat3(view)) * viewDir);  // rotation only
+float elev = worldDir.z;  // zenith / mid / horizon bands blend on elevation
 ```
+
+Stars, sun, moons and clouds put `z = w` in clip space for the same result.
+The original sky M2 is re-centred on the camera every frame
+(`Renderer::update`).
 
 **Why this works:**
 - ✅ **Translation ignored**: Sky centered on camera (doesn't "swim" when moving)
 - ✅ **Rotation applied**: Sky follows camera look direction (feels "attached to view")
-- ✅ **Far plane depth**: Always renders behind world geometry
+- ✅ **Far plane depth**: Depth test `LESS_OR_EQUAL` with depth writes off, so it shows only where nothing nearer was drawn
 - ✅ **Celestial sphere illusion**: Stars/sky appear infinitely distant
 
 ### Time-Based Sky Drift (Optional)
@@ -155,7 +195,7 @@ skyDomeMatrix = rotate(skyDomeMatrix, skyYawRotation, vec3(0, 0, 1));  // Yaw on
 - Northrend: `0.00002` rad/sec (subtle drift, aurora-like)
 - Static zones: `0.0` (no rotation)
 
-**Implementation status:** Not yet active (waiting for M2 skybox loading)
+**Implementation status:** Not implemented. The original sky M2s animate on their own clock.
 
 ---
 
@@ -192,20 +232,28 @@ struct SkyProfile {
 - Procedural stars over skybox stars = double stars, visual clash
 - Different zones have dramatically different skies (Outland purple nebulae, Northrend auroras)
 
-**Correct gating logic:**
+**Correct gating logic** (`SkySystem::render`):
 ```cpp
 bool renderProceduralStars = false;
-if (debugSkyMode) {
+if (debugSkyMode_) {
     renderProceduralStars = true;  // Debug: force for testing fog/cloud attenuation
-} else if (proceduralStarsEnabled) {
+} else if (proceduralStarsEnabled_) {
+    renderProceduralStars = true;  // "Sharp stars": replace the sky model's star layer
+} else if (!params.useOriginalSkybox) {
     renderProceduralStars = !params.skyboxHasStars;  // Fallback ONLY if skybox missing
 }
 ```
 
 **skyboxHasStars flag:**
-- Set to `true` when M2 skybox loaded and has star layer (query materials/textures)
-- Set to `false` for gradient skybox (placeholder, no baked stars)
-- Prevents procedural stars from "leaking" once real skyboxes load
+- `skyParamsFromLighting()` sets it to the same value as `useOriginalSkybox`:
+  `true` while a sky M2 is loaded, `false` for the gradient alone
+- Prevents procedural stars from "leaking" over a real skybox's baked stars
+
+**Sharp stars** (Graphics setting `sharpstars`, `Renderer::setSharpStars`) is the
+one sanctioned case of both: it turns procedural stars on and calls
+`M2Renderer::setSuppressBakedStars`, which skips batches `M2ModelClassifier`
+marks as a sky model's star-point layer. The baked layer is one 256x256 DXT
+texture stretched over the dome and goes soft at high resolutions.
 
 ### ❌ DO NOT: Universal Dual Moon Setup
 
@@ -228,6 +276,10 @@ if (dualMoonMode_ && mapUsesAzerothSky) {
 }
 ```
 
+**Current state:** `Celestial::render` checks `dualMoonMode_` alone. It defaults
+to `true` and nothing calls `setDualMoonMode`, so whenever Celestial draws, it
+draws both moons, on every map.
+
 ---
 
 ## Integration Points
@@ -240,7 +292,7 @@ struct SkyParams {
     glm::vec3 directionalDir;   // From LightingManager (sun direction)
     glm::vec3 sunColor;          // From LightingManager (DBC diffuse color)
 
-    // Sky colors (for skybox tinting/blending, future)
+    // Sky colors (gradient bands; top also gates moon visibility)
     glm::vec3 skyTopColor;
     glm::vec3 skyMiddleColor;
     glm::vec3 skyBand1Color;
@@ -250,16 +302,33 @@ struct SkyParams {
     float cloudDensity;          // 0-1, from LightingManager
     float fogDensity;            // 0-1, from LightingManager
     float horizonGlow;           // 0-1, atmospheric scattering
+    float weatherIntensity;      // 0-1, rain/snow (thickens clouds, attenuates lens flare)
+    float sunOcclusion;          // 0 clear to 1 blocked, line of sight to the sun
 
     // Time
     float timeOfDay;             // 0-24 hours (for sun/moon visibility)
-    float gameTime;              // Server time in seconds (for moon phases)
+    float gameTime;              // Server hour of day, -1 = none (for moon phases)
 
-    // Skybox control (future: LightSkybox.dbc)
-    uint32_t skyboxModelId;      // Which M2 skybox to load
+    // Skybox control
+    uint32_t skyboxModelId;      // Always 0; the model path comes from LightingManager
     bool skyboxHasStars;         // Does skybox include baked stars?
+    bool useOriginalSkybox;      // Original camera-centered client M2 is active
 };
 ```
+
+The renderer fills it with `skyParamsFromLighting()`
+(`include/rendering/sky_params_from_lighting.hpp`), shared by the parallel and
+inline recording paths, then sets `sunOcclusion`.
+
+### Lens Flare Occlusion
+
+`Renderer::sampleSunOcclusion()` answers 1 (blocked) when the sun is below the
+horizon, when the camera is inside a WMO, when a WMO bounding-box raycast toward
+the sun hits within 600 yards, or when a geometric march of terrain heights
+(steps growing by 1.4x out to 600 yards) finds ground above the ray.
+`Renderer::update` eases `sunOcclusion_` toward that answer over a quarter
+second so a hill edge does not snap the flare on and off. `LensFlare::render`
+also weakens the flare near the horizon and under fog, cloud and weather.
 
 ### Star Occlusion by Weather
 
@@ -280,7 +349,7 @@ if (intensity <= 0.01f) {
 
 ---
 
-## Future: M2 Skybox System
+## M2 Skybox System
 
 ### LightSkybox.dbc Integration
 
@@ -296,14 +365,22 @@ Environments\Stars\*.m2 (actual sky dome models)
 ```
 
 **Skybox Loading Flow:**
-1. Query `lightParamsId` from active light volume(s)
-2. Look up `skyboxId` in LightParams.dbc
-3. Load M2 model path from LightSkybox.dbc
-4. Load/cache M2 skybox model
-5. Query model materials → set `skyboxHasStars = true` if star textures found
-6. Render skybox, disable procedural stars
+1. `LightingManager` walks the in-range light volumes in weight order, picking
+   each one's LightParams row (by weather and underwater state), and takes the
+   first LightSkybox model path; the current sky is kept while any volume
+   naming it still has weight. Indoors there is no sky model
+2. `LightingManager::getActiveSkyboxPath()` returns that path
+3. `Renderer::ensureSkyboxModel()` (from `Renderer::update`) loads it, trying
+   `.m2` for a `.mdx`/`.mdl` name, plus its skin
+4. The old sky stays up until the new model has been read and validated; a path
+   that fails is remembered and not retried
+5. `skyboxModelRenderer_`, an `M2Renderer` with `setSkyMode(true)`, draws it
+   (depth-tested, no depth writes, no collision)
+6. `WOWEE_NO_SKY_M2=1` skips the sky model and leaves the procedural sky
 
-### Skybox Transition Blending
+### Skybox Transition Blending (not implemented)
+
+Sky models are swapped whole when the active path changes.
 
 **Problem:** Hard swaps between skyboxes at zone boundaries look bad
 
@@ -324,7 +401,7 @@ if (activeVolumes.size() >= 2) {
 
 **Result:** Smooth crossfade between zone skies, no popping
 
-### SkyProfile Configuration
+### SkyProfile Configuration (not implemented)
 
 **Per-map/continent settings:**
 
@@ -381,10 +458,13 @@ std::map<uint32_t, SkyProfile> skyProfiles = {
 - [x] Sun positioning from lighting `directionalDir`
 - [x] Star occlusion by cloud/fog density
 - [x] SkyParams interface for lighting integration
+- [x] Original client sky M2s via LightParams → LightSkybox, on every map that names one
+- [x] Sky model star layer identified and replaced by point stars ("Sharp stars")
+- [x] Sky drawn after terrain, depth-tested on the far plane
+- [x] Lens flare occlusion (WMO interior, WMO raycast, terrain march)
 
 ### 🚧 Future Enhancements
-- [ ] Load M2 skybox models (parse LightSkybox.dbc)
-- [ ] Query M2 materials to detect baked stars
+- [ ] Moon phases from a game time in the units the formula expects
 - [ ] Skybox transition blending (weighted crossfade)
 - [ ] SkyProfile per map/continent
 - [ ] Time-based sky rotation (optional drift)
@@ -402,12 +482,17 @@ std::map<uint32_t, SkyProfile> skyProfiles = {
 - `src/rendering/celestial.cpp` - Moon phase calculations, rendering
 - `include/rendering/starfield.hpp` - Procedural star fallback
 - `src/rendering/starfield.cpp` - Star intensity + occlusion
-- `include/rendering/skybox.hpp` - Camera-locked sky dome
-- `src/rendering/skybox.cpp` - Sky dome vertex shader
+- `include/rendering/skybox.hpp` - Fullscreen sky gradient
+- `src/rendering/skybox.cpp` - Gradient pipeline and push constants
+- `assets/shaders/skybox.vert.glsl`, `skybox.frag.glsl` - Fullscreen triangle, view-ray gradient
+- `include/rendering/clouds.hpp` / `src/rendering/clouds.cpp` - Cloud layer
+- `include/rendering/lens_flare.hpp` / `src/rendering/lens_flare.cpp` - Sun flare
+- `include/rendering/sun_direction.hpp` - Sun direction from the light direction
 
 **Integration Points:**
-- `src/rendering/renderer.cpp` - Populates SkyParams from LightingManager
-- `include/rendering/lighting_manager.hpp` - Provides directionalDir, colors, fog/cloud
+- `include/rendering/sky_params_from_lighting.hpp` - Builds SkyParams from LightingManager
+- `src/rendering/renderer.cpp` - Records the sky after terrain, loads and draws the sky M2 (`ensureSkyboxModel`), samples sun occlusion
+- `include/rendering/lighting_manager.hpp` - Provides directionalDir, colors, fog/cloud, active skybox path
 
 ---
 

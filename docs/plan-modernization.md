@@ -1,5 +1,15 @@
 # Codebase Modernization — Phased Plan
 
+> **Status note, 2026-09-21.** The status line below does not mention Phase 9, which is half
+> done. Vulkan 1.3 is required (`src/rendering/vk_context.cpp:400`, `0b0ea01c`), and every barrier
+> is written as a `VkDependencyInfo` through `cmdPipelineBarrier2` (`c38ac49b`); the one
+> `vkCmdPipelineBarrier` left is that helper's fallback for a driver whose `vkCmdPipelineBarrier2`
+> does not resolve (`src/rendering/vk_utils.cpp:230`). Dynamic rendering is enabled (`a16c8a56`),
+> but only the shadow pass records with it (`adb0139f`), keeping its `VkRenderPass` for
+> `WOWEE_VK_NO_DYNAMIC_RENDERING=1`; every other pass is still a `VkRenderPass`, and all 12
+> `vkCreateRenderPass` calls remain. Phase 10 has not started: `.clang-tidy` still has
+> `WarningsAsErrors: ''`.
+
 **Status:** Phases 1, 3, 5, 6, 7 and the timeline-semaphore half of 8 complete. Phases 2 and 4 cancelled. Next: Phase 10.
 **Scope:** code quality and modernity, codebase-wide. Not a performance effort. Where a phase
 happens to help performance that is a side effect, and no phase here is justified by it.
