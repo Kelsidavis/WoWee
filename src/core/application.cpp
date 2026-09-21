@@ -1373,6 +1373,27 @@ void Application::run() {
         // the draw, further down this same iteration, is the only reader.
         ui::clearInterfaceConsumedKeys();
         ui::ageChatSlashEcho();
+
+        // Ask for text input while one of the interface's edit boxes has the
+        // keyboard.
+        //
+        // SDL2 delivered SDL_TEXTINPUT from the start and nothing had to ask.
+        // SDL3 does not - and ImGui's backend calls SDL_StopTextInput every
+        // time one of *its* fields loses focus - so after the migration a chat
+        // box opened on slash and then took nothing: the slash is inserted by
+        // the code that opens the box, and not one character after it arrived.
+        // Asserted per frame rather than on a focus change because the backend
+        // can turn it off again at any point.
+        if (window && addonManager_ && addonsLoaded_) {
+            if (auto* engine = addonManager_->getLuaEngine();
+                engine && engine->editBoxHasFocus()) {
+                if (SDL_Window* sdlWindow = window->getSDLWindow();
+                    sdlWindow && !SDL_TextInputActive(sdlWindow)) {
+                    SDL_StartTextInput(sdlWindow);
+                }
+            }
+        }
+
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             // Connected and disconnected, which is all the pad needs from the
