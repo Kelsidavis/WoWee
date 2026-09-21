@@ -375,6 +375,22 @@ TEST_CASE("a missing texture drawn as a second layer still refuses the model") {
     CHECK_FALSE(box.has("creature/thing/thing.m2"));
 }
 
+TEST_CASE("a leftover name on a creature-skin slot is not fetched or refused") {
+    Sandbox box;
+    box.installed("creature/boar/boar.m2", 100, {{11, ""}});
+
+    FakeSource source;
+    // The client fills type 11 from CreatureDisplayInfo and never loads a name
+    // found there - Legion's boar carries one for a file this install lacks.
+    source.files["creature/boar/boar.m2"] =
+        wrap(makeBody(274, 900, {{11, "Creature\\Boar\\Maehne.blp"}}), {1}, {});
+    source.ids[1] = makeSkin({{0, 1}});
+
+    const ImportResult result = run(source, box);
+    CHECK(result.written == 1);
+    CHECK(result.missingTextures == 0);
+}
+
 TEST_CASE("a texture is written at the spelling extraction uses") {
     Sandbox box;
     box.installed("creature/thing/thing.m2", 100);
@@ -514,4 +530,42 @@ TEST_CASE("fewer monster skins than the data can dress is fine too") {
     source.ids[1] = makeSkin({{0, 1}});
 
     CHECK(run(source, box).written == 1);
+}
+
+TEST_CASE("an earlier import's missing texture no batch draws is cleared") {
+    // What the pipeline before this importer left behind: a model in override/
+    // naming a reflection map that was never brought over.
+    Sandbox box;
+    const fs::path dir = box.root / "override" / "creature" / "frog";
+    fs::create_directories(dir);
+    const std::vector<uint8_t> body = makeBody(264, 900, {
+        {11, ""},
+        {0, "Creature\\Frog2\\oldglass.blp"},     // missing, drawn by nothing
+        {0, "Creature\\Frog\\Shine.blp"},         // missing, and a batch draws it
+        {0, "Creature\\Frog\\Here.blp"},          // present
+    });
+    std::ofstream(dir / "frog.m2", std::ios::binary)
+        .write(reinterpret_cast<const char*>(body.data()), std::streamsize(body.size()));
+    const std::vector<uint8_t> skin = makeSkin({{0, 1}, {2, 1}, {3, 1}});
+    std::ofstream(dir / "frog00.skin", std::ios::binary)
+        .write(reinterpret_cast<const char*>(skin.data()), std::streamsize(skin.size()));
+    fs::create_directories(box.root / "creature" / "frog");
+    std::ofstream(box.root / "creature" / "frog" / "here.blp") << "x";
+
+    const RepairResult result = repairImportedTextures(box.root.string());
+    CHECK(result.modelsLooked == 1);
+    CHECK(result.modelsRepaired == 1);
+    CHECK(result.namesCleared == 1);
+    CHECK(result.leftDrawn == 1);
+
+    std::ifstream in(dir / "frog.m2", std::ios::binary);
+    const std::vector<uint8_t> after((std::istreambuf_iterator<char>(in)),
+                                     std::istreambuf_iterator<char>());
+    const uint32_t textureAt = get32(after, 84);
+    CHECK(get32(after, textureAt + 1 * 16 + 8) == 0);   // cleared
+    CHECK(get32(after, textureAt + 2 * 16 + 8) != 0);   // drawn: kept
+    CHECK(get32(after, textureAt + 3 * 16 + 8) != 0);   // present: kept
+
+    // Run again and there is nothing left to do.
+    CHECK(repairImportedTextures(box.root.string()).modelsRepaired == 0);
 }

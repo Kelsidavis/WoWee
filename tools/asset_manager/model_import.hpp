@@ -75,6 +75,29 @@ struct ImportResult {
 };
 
 
+struct RepairResult {
+    std::size_t modelsLooked = 0;
+    std::size_t modelsRepaired = 0;
+    std::size_t namesCleared = 0;
+    std::size_t leftDrawn = 0;   ///< a missing texture a batch draws: left as it is
+};
+
+/// Clear the names of textures that exist nowhere from models already in the
+/// override directory, where no batch draws them.
+///
+/// For imports made before the importer refused half-arrived models - the
+/// pipeline it replaced wrote a sixth of its models naming reflection maps it
+/// never fetched. Nothing draws those slots, so nothing looks wrong, but the
+/// client goes looking for every one each time the model loads and warns that
+/// it is not there. A slot a batch does draw is left alone: clearing it would
+/// hide the missing file rather than fix it, and it is counted instead.
+///
+/// A texture resolves when a file is at its path, lowercased, under the
+/// override directory or the extraction. Something only a fallback directory
+/// holds reads as missing here, which costs nothing - only a slot nothing
+/// draws is ever cleared.
+RepairResult repairImportedTextures(const std::string& expansionDir);
+
 /// Convert what is worth converting under one path prefix.
 ///
 /// `betterRatio` is how much larger a later model must be to be worth taking;

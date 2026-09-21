@@ -212,6 +212,18 @@ void Job::run(Profile profile, std::string gameDir, std::string secondDir,
             const std::string expansionDir =
                 (fs::path(outputDir) / "expansions" / profile.expansion).string();
 
+            // What earlier imports left behind, before adding to them.
+            const RepairResult repaired = repairImportedTextures(expansionDir);
+            if (repaired.modelsRepaired > 0 || repaired.leftDrawn > 0) {
+                say("    " + std::to_string(repaired.namesCleared) +
+                    " missing texture names cleared from " +
+                    std::to_string(repaired.modelsRepaired) + " earlier imports that never draw them" +
+                    (repaired.leftDrawn > 0
+                         ? "; " + std::to_string(repaired.leftDrawn) +
+                               " that are drawn were left as they are"
+                         : std::string()));
+            }
+
             std::unique_ptr<ModelSource> source;
             CascStorage storage;
             std::string error;

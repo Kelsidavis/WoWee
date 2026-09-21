@@ -4,6 +4,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <set>
 
@@ -149,6 +150,11 @@ bool anyBatchSamples(const std::vector<uint8_t>& skin, const std::vector<uint8_t
 /// The texture files a model names for itself, the slot each is in, and which
 /// of its slots it left unnamed while claiming to name them.
 ///
+/// Type 0 only, for the names. Every other type is a slot the client fills -
+/// the monster skins from CreatureDisplayInfo, the body from CharSections - and
+/// it never loads a name found on one, so a leftover path there is neither a
+/// file to fetch nor a reason to refuse the model.
+///
 /// Types 11 to 13 are the creature skin, filled from CreatureDisplayInfo at
 /// draw time, so an empty name there is correct. Type 0 is the model naming its
 /// own file, and an empty name there means it named it by id through a chunk
@@ -178,10 +184,11 @@ std::vector<std::string> texturePaths(const std::vector<uint8_t>& body,
             const std::size_t nul = name.find('\0');
             if (nul != std::string::npos) name.resize(nul);
         }
+        if (kind != 0) continue;
         if (!name.empty()) {
             out.push_back(name);
             if (namedSlots) namedSlots->push_back(i);
-        } else if (kind == 0 && unnamedOwn) {
+        } else if (unnamedOwn) {
             unnamedOwn->push_back(i);
         }
     }
@@ -293,6 +300,73 @@ std::size_t indexLocalModels(const std::string& expansionDir,
         }
     }
     return found.size();
+}
+
+RepairResult repairImportedTextures(const std::string& expansionDir) {
+    RepairResult result;
+    const fs::path root(expansionDir);
+    const fs::path overrides = root / "override";
+    std::error_code ec;
+    if (!fs::is_directory(overrides, ec)) return result;
+
+    auto resolves = [&](const std::string& name) {
+        std::string relative = lower(name);
+        std::replace(relative.begin(), relative.end(), '\\', '/');
+        std::error_code existsEc;
+        return fs::is_regular_file(overrides / relative, existsEc) ||
+               fs::is_regular_file(root / relative, existsEc);
+    };
+    auto readAll = [](const fs::path& p) {
+        std::ifstream in(p, std::ios::binary);
+        return std::vector<uint8_t>((std::istreambuf_iterator<char>(in)),
+                                    std::istreambuf_iterator<char>());
+    };
+
+    for (fs::recursive_directory_iterator it(overrides, ec), end; it != end && !ec;
+         it.increment(ec)) {
+        std::error_code fileEc;
+        if (!it->is_regular_file(fileEc)) continue;
+        const fs::path path = it->path();
+        if (path.filename().string().rfind("._", 0) == 0) continue;
+        if (lower(path.extension().string()) != ".m2") continue;
+
+        std::vector<uint8_t> body = readAll(path);
+        // Wrath's layout only: every offset below is where 264 keeps it, and
+        // that is what the importer writes.
+        if (body.size() < kTextureCombosOffset + 4 || std::memcmp(body.data(), "MD20", 4) != 0 ||
+            readLE32(body.data() + 4) < kWotlkVersion) {
+            continue;
+        }
+        ++result.modelsLooked;
+
+        std::vector<std::size_t> namedSlots;
+        const std::vector<std::string> names = texturePaths(body, nullptr, &namedSlots);
+        std::vector<std::size_t> missing;
+        for (std::size_t t = 0; t < names.size(); ++t) {
+            if (!resolves(names[t])) missing.push_back(namedSlots[t]);
+        }
+        if (missing.empty()) continue;
+
+        // The first skin, the one the importer's own test reads. A model with
+        // no skin beside it is not something to reason about.
+        const std::string stem = path.stem().string();
+        const std::vector<uint8_t> skin = readAll(path.parent_path() / (stem + "00.skin"));
+        if (skin.empty()) continue;
+
+        const uint32_t textureAt = readLE32(body.data() + kTexturesOffset);
+        std::size_t cleared = 0;
+        for (std::size_t slot : missing) {
+            if (anyBatchSamples(skin, body, {slot})) { ++result.leftDrawn; continue; }
+            writeLE32(body.data() + textureAt + slot * 16 + 8, 0);    // name length
+            writeLE32(body.data() + textureAt + slot * 16 + 12, 0);   // name offset
+            ++cleared;
+        }
+        if (cleared == 0) continue;
+        if (!writeFile(path, body.data(), body.size())) continue;
+        ++result.modelsRepaired;
+        result.namesCleared += cleared;
+    }
+    return result;
 }
 
 ImportResult importModels(ModelSource& source, const std::string& expansionDir,
