@@ -94,6 +94,25 @@ inline bool holdsExtraction(const std::filesystem::path& dataRoot) {
     return !installedExpansions(dataRoot).empty();
 }
 
+/// The data folders something the extraction wrote may be under, most likely
+/// first: the one the client is reading - WOW_DATA_PATH, which startup points
+/// at the per-user folder when an extraction is there - and then Data/ beside
+/// the client. The same folder is not named twice.
+///
+/// For the lookups that name a file under the data folder by hand rather than
+/// through the asset manager. Those looked in Data/ alone, which is not where
+/// the asset builder writes, so an extraction it made was never found by them.
+inline std::vector<std::string> extractionRoots() {
+    namespace fs = std::filesystem;
+    std::vector<std::string> roots;
+    if (const char* d = std::getenv("WOW_DATA_PATH"); d != nullptr && *d != '\0') {
+        roots.emplace_back(d);
+    }
+    std::error_code ec;
+    if (roots.empty() || !fs::equivalent(roots.front(), "Data", ec)) roots.emplace_back("Data");
+    return roots;
+}
+
 /// Copy this client's own description of each expansion into a data root
 /// that holds an extraction of it. Returns how many files it wrote.
 ///

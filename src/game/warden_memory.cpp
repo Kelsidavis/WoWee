@@ -1,5 +1,6 @@
 #include "game/warden_memory.hpp"
 #include "core/logger.hpp"
+#include "core/data_paths.hpp"
 #include <chrono>
 #include <fstream>
 #include <cstring>
@@ -628,10 +629,15 @@ std::string WardenMemory::findWowExe(uint16_t build) const {
             candidateDirs.push_back(std::string(home) + "/twmoa_1180");
         }
     }
-    candidateDirs.emplace_back("Data/expansions/turtle/misc");
-    candidateDirs.emplace_back("Data/expansions/classic/misc");
-    candidateDirs.emplace_back("Data/misc");
-    candidateDirs.emplace_back("Data/expansions/turtle/overlay/misc");
+    // Under the data folder being read as well as Data/ beside the client: an
+    // extraction made by the asset builder is in the per-user folder, and
+    // looking beside the client alone never found its executable.
+    for (const std::string& root : core::extractionRoots()) {
+        candidateDirs.push_back(root + "/expansions/turtle/misc");
+        candidateDirs.push_back(root + "/expansions/classic/misc");
+        candidateDirs.push_back(root + "/misc");
+        candidateDirs.push_back(root + "/expansions/turtle/overlay/misc");
+    }
 
     const char* candidateExes[] = { "WoW.exe", "TurtleWoW.exe", "Wow.exe", "wow.exe" };
 

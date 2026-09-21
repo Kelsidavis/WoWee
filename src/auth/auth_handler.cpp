@@ -4,6 +4,7 @@
 #include "network/tcp_socket.hpp"
 #include "network/packet.hpp"
 #include "core/logger.hpp"
+#include "core/data_paths.hpp"
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -312,17 +313,21 @@ void AuthHandler::sendLogonProof() {
         }
         // Expansion-isolated extraction layouts. Select narrowly so a Wrath or
         // stock Classic executable can never be used for a Turtle integrity hash.
-        if (clientInfo.majorVersion == 1 && clientInfo.minorVersion == 18) {
-            candidateDirs.emplace_back("Data/expansions/turtle/misc");
-        } else if (clientInfo.build <= 6005) {
-            candidateDirs.emplace_back("Data/expansions/classic/misc");
-        } else if (clientInfo.build <= 8606) {
-            candidateDirs.emplace_back("Data/expansions/tbc/misc");
-        } else {
-            candidateDirs.emplace_back("Data/expansions/wotlk/misc");
+        const char* expansion =
+            (clientInfo.majorVersion == 1 && clientInfo.minorVersion == 18) ? "turtle"
+            : (clientInfo.build <= 6005) ? "classic"
+            : (clientInfo.build <= 8606) ? "tbc"
+            : "wotlk";
+        // Under the data folder being read as well as Data/ beside the client.
+        // The extractor caches the executable in expansions/<id>/misc of
+        // wherever it wrote, and the asset builder writes to the per-user
+        // folder - so looking beside the client alone never found it.
+        const std::vector<std::string> roots = core::extractionRoots();
+        for (const auto& root : roots) {
+            candidateDirs.push_back(root + "/expansions/" + expansion + "/misc");
         }
         // Legacy flat extraction layout.
-        candidateDirs.emplace_back("Data/misc");
+        for (const auto& root : roots) candidateDirs.push_back(root + "/misc");
         // Common turtle repack location used in this workspace
         if (const char* home = std::getenv("HOME")) {
             if (home && *home) {
@@ -333,7 +338,12 @@ void AuthHandler::sendLogonProof() {
 
         const char* candidateExes[] = { "WoW.exe", "TurtleWoW.exe", "Wow.exe", "wow.exe" };
         bool ok = false;
-        std::string lastErr;
+        // The reason worth reporting: where the executable was first expected,
+        // unless some candidate got further than that - an executable found
+        // with a companion DLL missing says more than the last place it was
+        // not. The last error alone named a folder in Downloads on every run.
+        std::string reason;
+        bool reasonIsMissingExe = true;
         for (const auto& dir : candidateDirs) {
             for (const char* exe : candidateExes) {
                 std::string err;
@@ -343,12 +353,19 @@ void AuthHandler::sendLogonProof() {
                     ok = true;
                     break;
                 }
-                lastErr = err;
+                std::string exePath = dir;
+                if (!exePath.empty() && exePath.back() != '/') exePath += '/';
+                exePath += exe;
+                const bool missingExe = (err == "missing: " + exePath);
+                if (reason.empty() || (reasonIsMissingExe && !missingExe)) {
+                    reason = err;
+                    reasonIsMissingExe = missingExe;
+                }
             }
             if (ok) break;
         }
         if (!ok) {
-            LOG_WARNING("Integrity hash not computed (", lastErr,
+            LOG_WARNING("Integrity hash not computed (", reason,
                         "). Server may reject classic clients without it. "
                         "Set WOWEE_INTEGRITY_DIR to your client folder.");
         }

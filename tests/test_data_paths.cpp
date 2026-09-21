@@ -16,6 +16,7 @@
 #include <string>
 
 #include "core/data_paths.hpp"
+#include "core/env.hpp"
 
 namespace fs = std::filesystem;
 using namespace wowee::core;
@@ -176,4 +177,26 @@ TEST_CASE("an install that is its own data root copies nothing") {
     CHECK(syncClientTables(box.root, box.root) == 0);
     CHECK(syncClientTables("", box.root) == 0);
     CHECK(syncClientTables(box.root, "/no/such/place") == 0);
+}
+
+TEST_CASE("the data folder being read is searched before the one beside the client") {
+    // The integrity hash and Warden's copy of the executable looked in Data/
+    // alone, and the asset builder writes to the per-user folder - so an
+    // extraction it made was never found by either.
+    const char* saved = std::getenv("WOW_DATA_PATH");
+    const std::string restore = saved ? saved : "";
+
+    Sandbox data;
+    setEnvVar("WOW_DATA_PATH", data.root.string().c_str());
+    auto roots = extractionRoots();
+    REQUIRE(roots.size() == 2);
+    CHECK(roots[0] == data.root.string());
+    CHECK(roots[1] == "Data");
+
+    unsetEnvVar("WOW_DATA_PATH");
+    roots = extractionRoots();
+    REQUIRE(roots.size() == 1);
+    CHECK(roots[0] == "Data");
+
+    if (saved) setEnvVar("WOW_DATA_PATH", restore.c_str());
 }
