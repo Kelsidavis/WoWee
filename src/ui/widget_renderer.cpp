@@ -1530,9 +1530,20 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
             }
         }
 
+        // The whole report at warning when somebody typed /fxcheck, and at
+        // debug when it runs by itself at load and on entering the world: two
+        // screens of frame states on every session, in a log whose warnings are
+        // meant to be the things worth reading. WOWEE_LOG_LEVEL=debug brings the
+        // automatic ones back.
+        const core::LogLevel checkLevel =
+            askedFor ? core::LogLevel::WARNING : core::LogLevel::DEBUG;
+        auto report = [checkLevel](auto&&... parts) {
+            core::Logger::getInstance().at(checkLevel,
+                                           std::forward<decltype(parts)>(parts)...);
+        };
         const std::vector<std::string> wanted = frameXmlCheckFrames();
         if (!wanted.empty()) {
-            LOG_WARNING("FrameXML takeover check ", when, ", on ", screenW, "x", screenH,
+            report("FrameXML takeover check ", when, ", on ", screenW, "x", screenH,
                         " px (scale ", s, "):");
             // Anything that landed off the screen, whoever it belongs to.
             //
@@ -1550,10 +1561,10 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
                 const float t = (w->bottom + w->rectH) * s;
                 if (l < screenW && r > 0.0f && b < screenH && t > 0.0f) continue;
                 if (++offscreen > 12) break;
-                LOG_WARNING("  OFF SCREEN ", w->name, " rect=(", w->left, ",",
+                report("  OFF SCREEN ", w->name, " rect=(", w->left, ",",
                             w->bottom, " ", w->rectW, "x", w->rectH, ")");
             }
-            if (offscreen > 12) LOG_WARNING("  ... and more");
+            if (offscreen > 12) report("  ... and more");
 
             // Shown, and no size to be shown at.
             //
@@ -1583,11 +1594,11 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
                     if (w->width <= 0.0f && w->height <= 0.0f) continue;
                     if (w->rectW > 0.0f && w->rectH > 0.0f) continue;
                     if (++flat > 10) break;
-                    LOG_WARNING("  NO SIZE ", w->name, " asks for ", w->width,
+                    report("  NO SIZE ", w->name, " asks for ", w->width,
                                 "x", w->height, " and resolves to ", w->rectW,
                                 "x", w->rectH, " (scale ", w->effScale, ")");
                 }
-                if (flat > 10) LOG_WARNING("  ... and more");
+                if (flat > 10) report("  ... and more");
             }
 
             // Visible, named, and anchored to nothing.
@@ -1620,7 +1631,7 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
                     // intended.
                     if (name == "UIParent" || name == "WorldFrame") continue;
                     if (++dupes > 10) break;
-                    LOG_WARNING("  DUPLICATE ", name, " - ", count,
+                    report("  DUPLICATE ", name, " - ", count,
                                 " visible widgets share this name");
                 }
             }
@@ -1644,7 +1655,7 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
                     if (!w || !w->visible || w->kind != WidgetKind::FontString) continue;
                     if (w->text.size() < 3 || texts[w->text] < 2) continue;
                     ++pairs;
-                    LOG_WARNING("  SAME TEXT \"", w->text, "\" on ",
+                    report("  SAME TEXT \"", w->text, "\" on ",
                                 w->name.empty() ? "(unnamed)" : w->name.c_str(),
                                 " rect=(", w->left, ",", w->bottom, " ",
                                 w->rectW, "x", w->rectH, ")");
@@ -1681,7 +1692,7 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
                                                        b->rectW * b->rectH);
                         if (smaller <= 0.0f || (ox * oy) < smaller * 0.5f) continue;
                         ++overlaps;
-                        LOG_WARNING("  OVERLAPPING LABELS ",
+                        report("  OVERLAPPING LABELS ",
                                     a->name.empty() ? "(unnamed)" : a->name.c_str(),
                                     " \"", a->text, "\" over ",
                                     b->name.empty() ? "(unnamed)" : b->name.c_str(),
@@ -1707,7 +1718,7 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
                     const bool hasWords = !w->text.empty() || !w->editText.empty() ||
                                           !w->tooltipLines.empty();
                     if (!hasWords) continue;
-                    LOG_WARNING("  OVER THE ARROWS ",
+                    report("  OVER THE ARROWS ",
                                 w->name.empty() ? "(unnamed)" : w->name.c_str(),
                                 " kind=", static_cast<int>(w->kind),
                                 " text=\"", w->text, "\" edit=\"", w->editText,
@@ -1733,7 +1744,7 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
                     if (w->left > sheet->left + sheet->rectW) continue;
                     if (w->bottom > sheet->bottom + sheet->rectH) continue;
                     ++listed;
-                    LOG_WARNING("  SHEET LABEL ",
+                    report("  SHEET LABEL ",
                                 w->name.empty() ? "(unnamed)" : w->name.c_str(),
                                 " \"", w->text, "\" rect=(", w->left, ",", w->bottom,
                                 " ", w->rectW, "x", w->rectH, ")");
@@ -1747,10 +1758,10 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
                     const std::string tabName = "CharacterFrameTab" + std::to_string(i);
                     const Widget* tab = tree.findByName(tabName);
                     if (!tab) {
-                        LOG_WARNING("  SHEET TAB ", tabName, " NOT BUILT");
+                        report("  SHEET TAB ", tabName, " NOT BUILT");
                         continue;
                     }
-                    LOG_WARNING("  SHEET TAB ", tabName,
+                    report("  SHEET TAB ", tabName,
                                 tab->shown ? " shown" : " HIDDEN",
                                 tab->enabled ? " enabled" : " DISABLED",
                                 " rect=(", tab->left, ",", tab->bottom,
@@ -1770,10 +1781,10 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
                     if (w->rectW >= screenW / s - 1.0f) continue;
                 }
                 if (++orphans > 10) break;
-                LOG_WARNING("  UNANCHORED ", w->name, " rect=(", w->left, ",",
+                report("  UNANCHORED ", w->name, " rect=(", w->left, ",",
                             w->bottom, " ", w->rectW, "x", w->rectH, ")");
             }
-            if (orphans > 10) LOG_WARNING("  ... and more");
+            if (orphans > 10) report("  ... and more");
 
             // The next elements, so readiness can be judged before the
             // client's own version is hidden and there is no way back within
@@ -1788,7 +1799,7 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
             for (const std::string& name : all) {
                 const bool candidate = (index++ >= firstCandidate);
                 if (askedFor && candidate && index == firstCandidate + 1) {
-                    LOG_WARNING("  -- not handed over yet, for readiness --");
+                    report("  -- not handed over yet, for readiness --");
                 }
                 const Widget* w = tree.findByName(name);
                 if (!w) {
@@ -1798,10 +1809,10 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
                     // pass it is not worth a line at all.
                     if (frameXmlBuiltOnDemand(name)) {
                         if (askedFor) {
-                            LOG_WARNING("  ", name, " - not built yet (created when needed)");
+                            report("  ", name, " - not built yet (created when needed)");
                         }
                     } else {
-                        LOG_WARNING("  ", name, " - NOT BUILT");
+                        report("  ", name, " - NOT BUILT");
                     }
                     continue;
                 }
@@ -1879,7 +1890,7 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
                      w->externalTexture == 0 && !w->texturePath.empty() &&
                      resident(w->texturePath, w->blendAdd) == kMissing);
                 if (!askedFor && !troubled) { ++quiet; continue; }
-                LOG_WARNING("  ", name,
+                report("  ", name,
                             (w->visible ? " shown" : " HIDDEN"), mouse, kindName, anchors,
                             stack, bar, label, slice,
                             (w->rectW <= 0.0f || w->rectH <= 0.0f ? " NOSIZE" : ""),
@@ -1904,7 +1915,7 @@ void WidgetRenderer::reportWidgetDiagnostics(WidgetTree& tree,
                             (w->texturePath.empty() ? "" : " tex="), w->texturePath);
             }
             if (quiet > 0) {
-                LOG_WARNING("  and ", quiet, " more built, sized and on screen"
+                report("  and ", quiet, " more built, sized and on screen"
                             " (/fxcheck for the full roll call)");
             }
         }

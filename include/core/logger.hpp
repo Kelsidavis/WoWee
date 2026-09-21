@@ -64,6 +64,14 @@ public:
         log(LogLevel::ERROR, format(std::forward<Args>(args)...));
     }
 
+    /// At a level decided at run time: a report that is loud when somebody
+    /// asked for it and quiet when it runs on its own.
+    template<typename... Args>
+    void at(LogLevel level, Args&&... args) {
+        if (!shouldLog(level)) return;
+        log(level, format(std::forward<Args>(args)...));
+    }
+
     template<typename... Args>
     void fatal(Args&&... args) {
         if (!shouldLog(LogLevel::FATAL)) return;
