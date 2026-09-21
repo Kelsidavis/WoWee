@@ -10,6 +10,7 @@
 #include <iterator>
 #include <ranges>
 #include "core/local_time.hpp"
+#include "core/log_privacy.hpp"
 #include <cstdio>
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -126,13 +127,19 @@ void Logger::ensureFile() {
         if (fileStream.is_open()) {
             // Said on the console, because the file it names is the one thing
             // someone reading this needs and it is not where they will look.
-            std::fprintf(stderr, "wowee: writing the log to %s\n", at.string().c_str());
+            std::fprintf(stderr, "wowee: writing the log to %s\n",
+                         redactHome(at.string(), homeDirectory()).c_str());
         }
     }
     lastFlushTime_ = std::chrono::steady_clock::now();
 }
 
-void Logger::emitLineLocked(LogLevel level, const std::string& message) {
+void Logger::emitLineLocked(LogLevel level, const std::string& rawMessage) {
+    // Every destination below gets the home directory as "~" - see
+    // log_privacy.hpp. Read once: it does not change while the client runs.
+    static const std::string home = homeDirectory();
+    const std::string message = redactHome(rawMessage, home);
+
     // Get current time
     auto now = std::chrono::system_clock::now();
     auto time = std::chrono::system_clock::to_time_t(now);

@@ -197,6 +197,11 @@ wowee_add_test(test_asset_inventory
 wowee_add_test(test_data_paths
     SOURCES test_data_paths.cpp)
 
+# ── test_log_privacy ────────────────────────────────────────
+# The home directory, and with it the account name, written as ~ in the log.
+wowee_add_test(test_log_privacy
+    SOURCES test_log_privacy.cpp)
+
 # ── test_asset_profiles ─────────────────────────────────────
 # The asset sets on offer. Pinned because the upgrades used to be written per
 # base and so were only ever offered on Wrath, and because the plan's ordering
