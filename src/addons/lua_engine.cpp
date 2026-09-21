@@ -9478,12 +9478,13 @@ void LuaEngine::reportMissingApi() const {
     // them correctly absent, which is a report whose number means the opposite
     // of what it says. They are counted apart rather than dropped: a genuinely
     // missing sub-frame would hide here too, and the count is where it shows.
-    // Three names the interface asks for that the interface itself never
-    // provides, and that nothing here should.
+    // Names the interface reads while they are nil, by its own design, and
+    // that nothing here should provide.
     //
-    // Checked by grepping Data/interface for a definition of each: there is
-    // none, so they are nil in the real client too and Blizzard's own code is
-    // written around that.
+    // Checked by grepping Data/interface for each: the first two are never
+    // defined, and the last two are variables the interface sets itself, later
+    // than its first read. All four are nil in the real client at that read,
+    // and Blizzard's own code is written around it.
     //
     //   CaptureBar_Hide                 worldstateframe.lua does
     //                                   `onHide = CaptureBar_Hide`, which
@@ -9498,12 +9499,19 @@ void LuaEngine::reportMissingApi() const {
     //                                   and assigns it later; reading it before
     //                                   then is reading a variable that has not
     //                                   been set, which is what it is for.
+    //   LFRRaidList                     the raid browser's list, assigned by
+    //                                   LFRQueueFrame_Update the first time the
+    //                                   browser is filled. lfrframe.lua reads it
+    //                                   before that, guarded - `not LFRRaidList
+    //                                   or LFRRaidList[1]` - and a session that
+    //                                   never opens the browser never sets it.
     //
     // Counted apart rather than dropped, for the same reason the frame parts
     // are: the headline number is meant to be actionable, and three permanent
     // entries in it teach whoever reads it that the number is always three.
     static constexpr const char* kNeverDefinedByBlizzard[] = {
         "CaptureBar_Hide", "OptionsFrame_ToggleSubCategories", "ZonePVPType",
+        "LFRRaidList",
     };
     std::vector<std::string> partsOfFrames;
     std::vector<std::string> blizzardsOwn;
@@ -9541,7 +9549,7 @@ void LuaEngine::reportMissingApi() const {
                 partsOfFrames.size(), " were optional parts of frames that do "
                 "exist, and ", widgetFields.size(), " were fields read off a "
                 "widget before anything set them, and ", blizzardsOwn.size(),
-                " the interface asks for and never defines itself)");
+                " the interface reads while they are nil by its own design)");
     }
     std::string line;
     for (const auto& n : realGaps) {
@@ -9561,8 +9569,8 @@ void LuaEngine::reportMissingApi() const {
     const std::string path = core::getConfigRoot() + "/missing_api.txt";
     if (std::ofstream out(path); out) {
         for (const auto& n : realGaps) out << n << "\n";
-        out << "\n-- the interface asks for these and never defines them; "
-               "they are nil in the real client too --\n";
+        out << "\n-- the interface reads these while they are nil, by its own "
+               "design; they are nil in the real client too --\n";
         for (const auto& n : blizzardsOwn) out << n << "\n";
         out << "\n-- optional parts of frames that exist, correctly absent --\n";
         for (const auto& n : partsOfFrames) out << n << "\n";

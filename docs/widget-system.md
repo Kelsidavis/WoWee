@@ -238,8 +238,9 @@ writes the full list to `missing_api.txt` in the config directory, naming the
 path in the log:
 
 - names still undefined, which is the real gap;
-- names the interface asks for and never defines itself, which are nil in the
-  real client too;
+- names the interface reads while they are nil by its own design - never
+  defined, or set by the interface later than its first read - which are nil
+  in the real client too;
 - names built from an existing frame's, which are parts that frame may or may
   not have. FrameXML asks for these constantly and guards them properly;
 - fields read off a widget before anything set them;
