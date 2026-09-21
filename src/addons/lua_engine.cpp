@@ -1252,12 +1252,25 @@ static float scrollRange(wowee::ui::WidgetTree& tree, uint32_t id, bool vertical
     return over > 0.0f ? over : 0.0f;
 }
 
+/// A scroll offset from a script, with NaN read as no offset.
+///
+/// The clamp below cannot catch one: NaN is neither under zero nor over the
+/// range, so it was stored as it came. FrameXML hands one over honestly - the
+/// chat dock sizes its tabs from its scroll frame's width before it has
+/// anchored that frame, gets a tab size of zero, divides by it, and scrolls to
+/// zero times the result. The scroll child then sat at x = NaN, and so would
+/// every tab placed in it.
+float scrollOffsetArg(lua_State* L, int index) {
+    const double v = luaL_optnumber(L, index, 0.0);
+    return std::isnan(v) ? 0.0f : static_cast<float>(v);
+}
+
 int lua_ScrollFrame_SetVerticalScroll(lua_State* L) {
     auto* tree = wowee::addons::getWidgetTree(L);
     const uint32_t id = widgetIdOf(L, 1);
     if (!tree || id == 0) return 0;
     if (auto* w = tree->get(id)) {
-        const float v = static_cast<float>(luaL_optnumber(L, 2, 0.0));
+        const float v = scrollOffsetArg(L, 2);
         const float max = scrollRange(*tree, id, true);
         const float clamped = (v < 0.0f) ? 0.0f : (v > max ? max : v);
         const bool moved = (clamped != w->scrollY);
@@ -1275,7 +1288,7 @@ int lua_ScrollFrame_SetHorizontalScroll(lua_State* L) {
     const uint32_t id = widgetIdOf(L, 1);
     if (!tree || id == 0) return 0;
     if (auto* w = tree->get(id)) {
-        const float v = static_cast<float>(luaL_optnumber(L, 2, 0.0));
+        const float v = scrollOffsetArg(L, 2);
         const float max = scrollRange(*tree, id, false);
         const float clamped = (v < 0.0f) ? 0.0f : (v > max ? max : v);
         const bool moved = (clamped != w->scrollX);
