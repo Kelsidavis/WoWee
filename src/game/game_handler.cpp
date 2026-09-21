@@ -2984,10 +2984,12 @@ void GameHandler::runInterfaceCommand(const std::string& lua) const {
         LOG_WARNING("interface command dropped, no interface yet: ", lua);
         return;
     }
-    // At warning level, because the file log filters info out by default and
-    // this is the line that separates "the key never arrived" from "the key
-    // arrived and the interface did nothing with it".
-    LOG_WARNING("interface command: ", lua);
+    // At debug level: it is every key and every panel the client opens, and
+    // some commands are a dozen lines of Lua. The two lines that matter at
+    // warning are the ones either side - dropped for want of an interface, and
+    // failed when it ran. WOWEE_LOG_LEVEL=debug separates "the key never
+    // arrived" from "it arrived and the interface did nothing with it".
+    LOG_DEBUG("interface command: ", lua);
     interfaceCommand_(lua);
 }
 

@@ -10508,7 +10508,9 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
         if (answer != lastAnswer && now - lastPress > 1.0) {
             lastPress = now;
             lastAnswer = answer;
-            LOG_WARNING("WidgetInput: press at (", x, ",", y, ") hit ", answer);
+            // Debug: one line per click in ordinary play. A click that lands
+            // and is refused still says so at warning, from the release below.
+            LOG_DEBUG("WidgetInput: press at (", x, ",", y, ") hit ", answer);
         }
     }
 
@@ -11055,12 +11057,20 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
                 // click that is handled are different things, and the gap
                 // between them is where a button that looks right does
                 // nothing. Says which of the three conditions refused it.
+                //
+                // A refusal at warning, a click that ran at debug: the second
+                // is every click in ordinary play, and it buried the first.
                 if (pressedWid_[i] != 0 && pressed && !pressed->name.empty()) {
-                    LOG_WARNING("WidgetInput: release on ", pressed->name,
-                                pressedWid_[i] != releasedOn ? " - cursor had moved off it"
-                                : !pressed->enabled  ? " - the frame is disabled"
-                                : !takesIt           ? " - it did not register for this button"
-                                                     : " - OnClick ran");
+                    const char* why =
+                        pressedWid_[i] != releasedOn ? " - cursor had moved off it"
+                        : !pressed->enabled          ? " - the frame is disabled"
+                        : !takesIt                   ? " - it did not register for this button"
+                                                     : nullptr;
+                    if (why) {
+                        LOG_WARNING("WidgetInput: release on ", pressed->name, why);
+                    } else {
+                        LOG_DEBUG("WidgetInput: release on ", pressed->name, " - OnClick ran");
+                    }
                 }
             }
             pressedWid_[i] = 0;
