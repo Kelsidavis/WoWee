@@ -336,6 +336,23 @@ bool Application::initialize() {
     const char* dataPathEnv = std::getenv("WOW_DATA_PATH");
     std::string dataPath = dataPathEnv ? dataPathEnv : "./Data";
 
+    // The client's own expansion tables, into the extraction it is about to
+    // read them from. Without this an extraction in the per-user directory -
+    // where the asset builder writes one - had no expansion.json, so no
+    // expansion was found, no assets opened, and a login went no further. See
+    // syncClientTables.
+    {
+        std::vector<std::string> failures;
+        const int copied = core::syncClientTables("Data", dataPath, &failures);
+        if (copied > 0) {
+            LOG_WARNING("Copied ", copied, " of this client's expansion tables into ",
+                        dataPath);
+        }
+        for (const std::string& f : failures) {
+            LOG_WARNING("Could not write ", f, " - that expansion may not be found");
+        }
+    }
+
     // Scan for available expansion profiles
     expansionRegistry_->initialize(dataPath);
 

@@ -22,6 +22,8 @@
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -90,6 +92,74 @@ inline bool holdsExtraction(const std::filesystem::path& dataRoot) {
     if (dataRoot.empty()) return false;
     if (fs::is_regular_file(dataRoot / "manifest.json", ec)) return true;
     return !installedExpansions(dataRoot).empty();
+}
+
+/// Copy this client's own description of each expansion into a data root
+/// that holds an extraction of it. Returns how many files it wrote.
+///
+/// expansion.json, opcodes.json, update_fields.json and dbc_layouts.json are
+/// not game data. They ship with the client, in Data/expansions/<id>/ beside
+/// it, and they describe how this build speaks to a server - but the client
+/// reads them from the same directory as the extraction. The extractor does
+/// not write them. So an extraction made anywhere but beside the client - the
+/// per-user data directory, which is where the asset builder puts one - held
+/// no expansion.json at all: the client found no expansion to run, opened no
+/// assets, and could log in and then go no further. And one that did have
+/// them, copied in by an older build, went on answering with that build's
+/// tables after every upgrade.
+///
+/// Only expansions the data root already holds are touched, and only the
+/// files the install carries at the top of its own expansion directory. A
+/// file already identical is left alone, so an up-to-date data root costs a
+/// comparison and no writes. `installRoot` and `dataRoot` being the same
+/// directory is the development tree and a portable install, and does
+/// nothing.
+inline int syncClientTables(const std::filesystem::path& installRoot,
+                            const std::filesystem::path& dataRoot,
+                            std::vector<std::string>* failures = nullptr) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (installRoot.empty() || dataRoot.empty()) return 0;
+    if (fs::equivalent(installRoot, dataRoot, ec)) return 0;
+
+    auto contents = [](const fs::path& p, std::string& out) {
+        std::ifstream in(p, std::ios::binary);
+        if (!in) return false;
+        out.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        return true;
+    };
+
+    int written = 0;
+    const fs::path source = installRoot / "expansions";
+    for (fs::directory_iterator exp(source, ec), end; exp != end && !ec; exp.increment(ec)) {
+        std::error_code entryEc;
+        if (!exp->is_directory(entryEc)) continue;
+        const fs::path target = dataRoot / "expansions" / exp->path().filename();
+        if (!fs::is_directory(target, entryEc)) continue;
+
+        for (fs::directory_iterator file(exp->path(), entryEc), fileEnd;
+             file != fileEnd && !entryEc; file.increment(entryEc)) {
+            std::error_code fileEc;
+            if (!file->is_regular_file(fileEc)) continue;
+            if (file->path().extension() != ".json") continue;
+            // The extraction's own record of what it wrote, if an install
+            // ever carries one, is not a table and not the client's to replace.
+            if (file->path().filename() == "manifest.json") continue;
+
+            const fs::path dest = target / file->path().filename();
+            std::string want, have;
+            if (!contents(file->path(), want)) continue;
+            if (contents(dest, have) && have == want) continue;
+
+            std::ofstream out(dest, std::ios::binary | std::ios::trunc);
+            if (out && out.write(want.data(), static_cast<std::streamsize>(want.size()))) {
+                ++written;
+            } else if (failures) {
+                failures->push_back(dest.string());
+            }
+        }
+    }
+    return written;
 }
 
 }  // namespace core

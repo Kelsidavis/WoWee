@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 
 #include "core/data_paths.hpp"
@@ -112,4 +113,67 @@ TEST_CASE("a manifest at the root counts, without any expansions under it") {
     // client still reads it, so it still counts as something being there.
     CHECK(holdsExtraction(box.root));
     CHECK(installedExpansions(box.root).empty());
+}
+
+namespace {
+std::string readAll(const fs::path& p) {
+    std::ifstream in(p, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+}
+}  // namespace
+
+TEST_CASE("the client's tables reach an extraction that has none") {
+    // The report: built with the asset builder into the per-user directory,
+    // which got the game data and no expansion.json, so the client found no
+    // expansion and could not enter the world after logging in.
+    Sandbox install;
+    Sandbox data;
+    const fs::path shipped = install.root / "expansions" / "wotlk";
+    fs::create_directories(shipped);
+    std::ofstream(shipped / "expansion.json") << "{\"id\":\"wotlk\"}";
+    std::ofstream(shipped / "opcodes.json") << "{\"a\":1}";
+    data.extraction("wotlk");
+
+    CHECK(syncClientTables(install.root, data.root) == 2);
+    const fs::path got = data.root / "expansions" / "wotlk";
+    CHECK(readAll(got / "expansion.json") == "{\"id\":\"wotlk\"}");
+    CHECK(readAll(got / "opcodes.json") == "{\"a\":1}");
+    // The extraction's own manifest is not the client's to touch.
+    CHECK(readAll(got / "manifest.json") == "{\"files\":[]}");
+
+    // Up to date is no writes at all.
+    CHECK(syncClientTables(install.root, data.root) == 0);
+}
+
+TEST_CASE("an older build's table is replaced by this one's") {
+    Sandbox install;
+    Sandbox data;
+    const fs::path shipped = install.root / "expansions" / "wotlk";
+    fs::create_directories(shipped);
+    std::ofstream(shipped / "dbc_layouts.json") << "new";
+    data.extraction("wotlk");
+    std::ofstream(data.root / "expansions" / "wotlk" / "dbc_layouts.json") << "old";
+
+    CHECK(syncClientTables(install.root, data.root) == 1);
+    CHECK(readAll(data.root / "expansions" / "wotlk" / "dbc_layouts.json") == "new");
+}
+
+TEST_CASE("an expansion nobody extracted is not created") {
+    Sandbox install;
+    Sandbox data;
+    fs::create_directories(install.root / "expansions" / "classic");
+    std::ofstream(install.root / "expansions" / "classic" / "expansion.json") << "{}";
+    data.extraction("wotlk");
+
+    CHECK(syncClientTables(install.root, data.root) == 0);
+    CHECK_FALSE(fs::exists(data.root / "expansions" / "classic"));
+}
+
+TEST_CASE("an install that is its own data root copies nothing") {
+    Sandbox box;
+    box.extraction("wotlk");
+    std::ofstream(box.root / "expansions" / "wotlk" / "expansion.json") << "{}";
+    CHECK(syncClientTables(box.root, box.root) == 0);
+    CHECK(syncClientTables("", box.root) == 0);
+    CHECK(syncClientTables(box.root, "/no/such/place") == 0);
 }
