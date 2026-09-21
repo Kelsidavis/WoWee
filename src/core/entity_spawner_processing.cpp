@@ -460,8 +460,18 @@ void EntitySpawner::processCreatureSpawnQueue(bool unlimited) {
                                 who.faceId = he.faceId;
                                 who.hairStyleId = he.hairStyleId;
                                 who.hairColorId = he.hairColorId;
-                                const auto sections =
-                                    pipeline::resolveCharacterSections(csDbc.get(), csF, who);
+                                // With the same existence check the spawn uses:
+                                // the underwear rows name art that was never
+                                // shipped - every Broken male torso among it -
+                                // and without the check this prefetched a file
+                                // the spawn never asks for, and warned that it
+                                // was missing.
+                                const auto sections = pipeline::resolveCharacterSections(
+                                    csDbc.get(), csF, who,
+                                    [](const std::string& path, void* ctx) {
+                                        return static_cast<pipeline::AssetManager*>(ctx)->fileExists(path);
+                                    },
+                                    am);
                                 for (const std::string* path : {&sections.bodySkin, &sections.skinExtra,
                                                                 &sections.faceLower, &sections.faceUpper,
                                                                 &sections.hair}) {
