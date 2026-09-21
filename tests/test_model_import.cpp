@@ -333,6 +333,48 @@ TEST_CASE("a model whose texture is not in this installation is refused") {
     CHECK_FALSE(box.has("creature/thing/thing.m2"));
 }
 
+TEST_CASE("a missing texture no batch draws is cleared, not a refusal") {
+    Sandbox box;
+    box.installed("creature/frog/frog.m2", 100);
+
+    FakeSource source;
+    // Measured on real imports: a sixth of them name a reflection map in a
+    // slot no batch reaches. The frog names Creature\Frog2\oldglass.blp and
+    // draws only its creature skin.
+    source.files["creature/frog/frog.m2"] =
+        wrap(makeBody(274, 900, {{11, ""}, {0, "Creature\\Frog2\\oldglass.blp"}}), {1}, {});
+    source.ids[1] = makeSkin({{0, 1}});   // the batch draws slot 0 only
+
+    const ImportResult result = run(source, box);
+    CHECK(result.written == 1);
+    CHECK(result.missingTextures == 0);
+    CHECK(result.unusedTexturesCleared == 1);
+
+    // The name is gone from the written model, so the client does not go
+    // looking for a file that was never brought over.
+    const std::vector<uint8_t> written = box.readBack("creature/frog/frog.m2");
+    REQUIRE(written.size() > 88);
+    const uint32_t textureAt = get32(written, 84);
+    REQUIRE(written.size() >= textureAt + 32);
+    CHECK(get32(written, textureAt + 16 + 8) == 0);
+    CHECK(get32(written, textureAt + 16 + 12) == 0);
+}
+
+TEST_CASE("a missing texture drawn as a second layer still refuses the model") {
+    Sandbox box;
+    box.installed("creature/thing/thing.m2", 100);
+
+    FakeSource source;
+    source.files["creature/thing/thing.m2"] =
+        wrap(makeBody(274, 900, {{11, ""}, {0, "Creature\\Thing\\Shine.blp"}}), {1}, {});
+    source.ids[1] = makeSkin({{0, 2}});   // one batch, both layers
+
+    const ImportResult result = run(source, box);
+    CHECK(result.written == 0);
+    CHECK(result.missingTextures == 1);
+    CHECK_FALSE(box.has("creature/thing/thing.m2"));
+}
+
 TEST_CASE("a texture is written at the spelling extraction uses") {
     Sandbox box;
     box.installed("creature/thing/thing.m2", 100);

@@ -66,7 +66,8 @@ struct ImportCandidate {
 struct ImportResult {
     std::size_t written = 0;
     std::size_t refusedByGate = 0;   ///< a texture slot the client cannot fill
-    std::size_t missingTextures = 0;
+    std::size_t missingTextures = 0;  ///< a texture a batch draws, not in the install
+    std::size_t unusedTexturesCleared = 0;  ///< named, never drawn, not in the install
     std::size_t missingSkin = 0;      ///< index data that did not come with it
     std::size_t needsMoreSkins = 0;   ///< more monster skins than the DBC can fill
     std::size_t hasEmitters = 0;     ///< particle or ribbon structs that grew

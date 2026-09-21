@@ -146,17 +146,19 @@ bool anyBatchSamples(const std::vector<uint8_t>& skin, const std::vector<uint8_t
     return false;
 }
 
-/// The texture files a model names for itself, and which of its slots it left
-/// unnamed while claiming to name them.
+/// The texture files a model names for itself, the slot each is in, and which
+/// of its slots it left unnamed while claiming to name them.
 ///
 /// Types 11 to 13 are the creature skin, filled from CreatureDisplayInfo at
 /// draw time, so an empty name there is correct. Type 0 is the model naming its
 /// own file, and an empty name there means it named it by id through a chunk
 /// this does not read.
 std::vector<std::string> texturePaths(const std::vector<uint8_t>& body,
-                                      std::vector<std::size_t>* unnamedOwn) {
+                                      std::vector<std::size_t>* unnamedOwn,
+                                      std::vector<std::size_t>* namedSlots) {
     std::vector<std::string> out;
     if (unnamedOwn) unnamedOwn->clear();
+    if (namedSlots) namedSlots->clear();
     if (body.size() < kTexturesOffset + 4) return out;
 
     const uint32_t count = readLE32(body.data() + kTexturesCount);
@@ -176,8 +178,12 @@ std::vector<std::string> texturePaths(const std::vector<uint8_t>& body,
             const std::size_t nul = name.find('\0');
             if (nul != std::string::npos) name.resize(nul);
         }
-        if (!name.empty()) out.push_back(name);
-        else if (kind == 0 && unnamedOwn) unnamedOwn->push_back(i);
+        if (!name.empty()) {
+            out.push_back(name);
+            if (namedSlots) namedSlots->push_back(i);
+        } else if (kind == 0 && unnamedOwn) {
+            unnamedOwn->push_back(i);
+        }
     }
     return out;
 }
@@ -425,7 +431,8 @@ ImportResult importModels(ModelSource& source, const std::string& expansionDir,
         }
 
         std::vector<std::size_t> unnamedOwn;
-        const std::vector<std::string> textures = texturePaths(body, &unnamedOwn);
+        std::vector<std::size_t> namedSlots;
+        const std::vector<std::string> textures = texturePaths(body, &unnamedOwn, &namedSlots);
         if (!unnamedOwn.empty() && anyBatchSamples(sidecars.front().second, body, unnamedOwn)) {
             // A type 0 slot with no name is a model naming its own texture by
             // FileDataID through a chunk this does not read. The client cannot
@@ -439,23 +446,31 @@ ImportResult importModels(ModelSource& source, const std::string& expansionDir,
         // Everything is resolved before anything is written: a model whose
         // textures did not arrive is the half-written model the refusals exist
         // to prevent.
+        //
+        // Half-written means a texture something draws. Later models name
+        // files they never sample - reflection and environment maps in slots
+        // no batch reaches, a sixth of one install's worth - and the rule that
+        // excuses an unnamed slot no batch draws applies to a named one just
+        // the same. Such a slot is kept and its name cleared, so the client
+        // neither goes looking for the file nor warns that it is not there.
         std::vector<std::pair<std::string, std::vector<uint8_t>>> pending;
-        bool missing = false;
-        for (const std::string& texture : textures) {
+        std::vector<std::size_t> unfetched;
+        for (std::size_t t = 0; t < textures.size(); ++t) {
+            const std::string& texture = textures[t];
             std::string key = lower(texture);
             std::replace(key.begin(), key.end(), '\\', '/');
             if (fetched.count(key)) continue;
-            if (failedTextures.count(key)) { missing = true; break; }
+            if (failedTextures.count(key)) { unfetched.push_back(namedSlots[t]); continue; }
             std::vector<uint8_t> bytes = source.read(texture);
             if (bytes.empty()) {
                 failedTextures.insert(key);
-                missing = true;
+                unfetched.push_back(namedSlots[t]);
                 if (say) say("    texture not in this install: " + texture);
-                break;
+                continue;
             }
             pending.emplace_back(texture, std::move(bytes));
         }
-        if (missing) {
+        if (!unfetched.empty() && anyBatchSamples(sidecars.front().second, body, unfetched)) {
             ++result.missingTextures;
             continue;
         }
@@ -509,6 +524,15 @@ ImportResult importModels(ModelSource& source, const std::string& expansionDir,
 
         std::vector<uint8_t> patched = body;
         writeLE32(patched.data() + 4, kWotlkVersion);
+        if (!unfetched.empty()) {
+            const uint32_t textureAt = readLE32(patched.data() + kTexturesOffset);
+            for (std::size_t slot : unfetched) {
+                const std::size_t entry = textureAt + slot * 16;
+                writeLE32(patched.data() + entry + 8, 0);    // name length
+                writeLE32(patched.data() + entry + 12, 0);   // name offset
+            }
+            result.unusedTexturesCleared += unfetched.size();
+        }
         if (!writeFile(destination, patched.data(), patched.size())) continue;
 
         for (const auto& [path, bytes] : sidecars) {

@@ -240,15 +240,21 @@ void Job::run(Profile profile, std::string gameDir, std::string secondDir,
                     total.refusedByGate += part.refusedByGate;
                     total.missingTextures += part.missingTextures;
                     total.missingSkin += part.missingSkin;
+                    total.needsMoreSkins += part.needsMoreSkins;
+                    total.unusedTexturesCleared += part.unusedTexturesCleared;
                     total.hasEmitters += part.hasEmitters;
                     total.notBetter += part.notBetter;
                 }
                 const std::size_t refused = total.refusedByGate + total.missingTextures +
-                                            total.missingSkin;
+                                            total.missingSkin + total.needsMoreSkins;
                 say("    took " + std::to_string(total.written) + " models; left " +
                     std::to_string(total.notBetter) + " alone as no better, " +
                     std::to_string(total.hasEmitters) + " that emit particles, " +
                     std::to_string(refused) + " that would not have arrived whole");
+                if (total.unusedTexturesCleared > 0) {
+                    say("    " + std::to_string(total.unusedTexturesCleared) +
+                        " texture names cleared from models that never draw them");
+                }
                 ok = total.written > 0;
                 if (!ok) say("    nothing here improves on what is already extracted");
             }
