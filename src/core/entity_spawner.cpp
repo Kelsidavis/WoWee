@@ -872,15 +872,15 @@ std::string EntitySpawner::getModelPathForDisplayId(uint32_t displayId) const {
         return "";
     }
 
-    // Which model a humanoid display actually resolved to, once, at warning
-    // level so it shows in a default run. An asset overlay can re-point a
-    // display id at a different model, and there is no other way from outside
-    // to tell "the re-point never reached the client" from "it reached it and
-    // the model looks the same".
+    // Which model a humanoid display actually resolved to, once. An asset
+    // overlay can re-point a display id at a different model, and there is no
+    // other way from outside to tell "the re-point never reached the client"
+    // from "it reached it and the model looks the same". At debug, with the
+    // other per-creature lines: WOWEE_LOG_LEVEL=debug when that is the question.
     if (itData->second.extraDisplayId != 0 &&
         humanoidDisplayCanaryCount_ < 5) {
         ++humanoidDisplayCanaryCount_;
-        LOG_WARNING("Humanoid display ", displayId, " -> model ",
+        LOG_DEBUG("Humanoid display ", displayId, " -> model ",
                     itData->second.modelId, " -> ", itPath->second);
     }
 
@@ -1699,7 +1699,7 @@ void EntitySpawner::applyHumanoidInstanceOverrides(uint32_t instanceId, uint32_t
                                 extra.raceId, extra.sexId, 1, extra.faceId, extra.skinId, 0);
                             const std::string faceUpper = lookupCharSection(
                                 extra.raceId, extra.sexId, 1, extra.faceId, extra.skinId, 1);
-                            LOG_WARNING("NPC head detail: displayId=", displayId,
+                            LOG_DEBUG("NPC head detail: displayId=", displayId,
                                         " race=", static_cast<int>(extra.raceId),
                                         " sex=", static_cast<int>(extra.sexId),
                                         " skin=", static_cast<int>(extra.skinId),
@@ -2221,14 +2221,12 @@ void EntitySpawner::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float
                     }
                 }
             }
-            // At warning, because the log carries nothing below it, and
-            // this line is what every creature question needs first. Four
-            // separate reports this session - a bat's size, a goblin's
-            // portrait, an elemental's skin, an elemental's geometry - each
-            // began by working out which model a creature name draws, and
-            // the client already knew and was saying it where nobody looked.
-            // Sixty displays, once each.
-            LOG_WARNING("Creature display ", displayId, " (", (name.empty() ? "?" : name),
+            // What every creature question needs first - a bat's size, a
+            // goblin's portrait, an elemental's skin and an elemental's
+            // geometry each began by working out which model a creature name
+            // draws. At debug: sixty displays once each is most of a session's
+            // log, and WOWEE_LOG_LEVEL=debug brings it back for the question.
+            LOG_DEBUG("Creature display ", displayId, " (", (name.empty() ? "?" : name),
                         ", entry ", entry, ") draws ", path,
                         " at ", scale, " (server ", serverScale,
                         " x display ", dispScale,

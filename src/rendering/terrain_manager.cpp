@@ -2130,11 +2130,13 @@ void TerrainManager::generateGroundClutterPlacements(std::shared_ptr<PendingTile
     if (added > 0) {
         static int clutterLogCount = 0;
         if (clutterLogCount < 12) {
-            // At warning, with the counts beside it. Elwynn grass was
-            // reported growing in Hellfire Peninsula, and the two places that
-            // can put it there - a doodad whose model will not load, and the
-            // minimum-per-tile floor below - both report only here.
-            LOG_WARNING("Ground clutter tile [", pending->coord.x, ",", pending->coord.y,
+            // With the counts beside it. Elwynn grass was reported growing in
+            // Hellfire Peninsula, and the two places that can put it there - a
+            // doodad whose model will not load, and the minimum-per-tile floor
+            // below - both report only here. At debug: a tile that got its
+            // clutter is the ordinary case, twelve lines of it every session.
+            // A tile that got none says so at warning, below.
+            LOG_DEBUG("Ground clutter tile [", pending->coord.x, ",", pending->coord.y,
                      "] added=", added, " attempts=", attemptsTotal,
                      " proxyFallback=", proxyFallbackUsed,
                      " fallbackAdded=", fallbackAdded,
