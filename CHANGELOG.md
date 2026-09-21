@@ -1,5 +1,15 @@
 # Changelog
 
+## [v3.1.33] - 2026-09-21
+
+### Fixed
+- **A page with a picture on it showed the picture's HTML instead.** Item text comes as plain text or as a small HTML document, and the page decides which by whether it opens with `<HTML>`. This client drew every page as plain text, which is right for most letters and books and wrong for anything carrying an image or a heading - Gordawg's Imprint is one `<IMG>` tag and nothing else, and it opened to the tag spelled out on the parchment. The page reads the HTML now: paragraphs and headings with their alignment, line breaks, links, and pictures at the size the tag asks for or their own, narrowed to fit the page when they are wider than it
+- **Nothing could be typed on the login screen.** Introduced in v3.1.31. Its fields are the client's own controls rather than the interface library's text boxes, and they read what is typed from the library's queue - which only fills once SDL is asked for text input. SDL2 left that on for the whole session; SDL3 leaves it off until asked, and the one place that asked for these fields did so on Android alone, where it raises the on-screen keyboard. The fields took focus, showed a caret, and received nothing. Asked for on every platform now, and the same goes for character creation
+- **Building from the containers, the Arch PKGBUILD or the vcpkg manifest still asked for SDL2.** The move to SDL3 in v3.1.31 changed CMake and CI and left the other routes in: the container images installed SDL2 and could not configure, the PKGBUILD depended on `sdl2`, vcpkg fetched `sdl2`, and a `.deb` made with CPack depended on the SDL2 runtime rather than the library the client loads. All of them name SDL3 now, and the Linux image builds it from source, as CI does, since Ubuntu 24.04 does not package it
+
+### Changed
+- **The README and the documentation describe the client as it is.** They had fallen behind SDL3, Vulkan 1.3, the asset builder in the client, the server list, controllers and the FrameXML interface, and several said things that were never so - the SRP generator and modulus size, which key does what, where the Warden cache lives, and a set of build options, settings and environment variables that do not exist
+
 ## [v3.1.32] - 2026-09-20
 
 ### Fixed
@@ -18,6 +28,8 @@
 ### Fixed
 - **Vertical sync switched itself off again when you left the video options window.** Blizzard's video panel has a vertical-sync checkbox that this client retired in favour of the Display page's own row - but hiding a control does not retire it. Okay walks the panel's control list and writes every entry's stored value back to its CVar whether it changed or not, so the hidden checkbox replayed the value it read when the interface loaded, and that CVar is bound to the setting the Display page shows. Turn vertical sync on, press Okay, and it went off. Windowed mode and gamma sat behind the same loop. The retired controls leave the list now as well as the screen
 - **The world editor had been left behind by the SDL3 migration.** It is off the default build, so nothing compiled it until CI was told to, and it was reaching for an ImGui backend and an event field that SDL3 had moved
+
+## [v3.1.30] - 2026-09-20
 
 ### Added
 - **The asset builder is in the client.** Somebody who installs WoWee and has extracted nothing reaches a login screen they cannot get past: the callbacks that carry a login through are the ones that need assets, so an account could be typed and nothing happened. The client now opens the builder instead, drawn from the same panel the standalone `wowee_assets` window draws - the whole of it is ImGui against the job and scan code, so one source serves both, one through SDL_Renderer and one through the client's Vulkan. It is styled as the page it stands on: cream paper, brown ink, the login card's own crayons, and sized by the figure that card sizes itself by, having first come out at ImGui's fixed thirteen pixels and read as fine print beside it. A build still wants the client reopened afterwards - the asset manager, the DBC tables, the model and terrain loaders and the addon environment are all built once at startup from a path that was empty, and the glyph atlas cannot be rebuilt mid-session
