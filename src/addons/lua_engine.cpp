@@ -5358,9 +5358,11 @@ static int lua_GetScreenHeight(lua_State* L) {
 static int lua_RecordMissingApi(lua_State* L) {
     const char* name = luaL_optstring(L, 1, "");
     if (name && *name) {
-        // Once per name, so a warning here is a bounded list rather than
-        // a stream, and it is the only trace of a gap as it happens.
-        LOG_WARNING("[Lua] missing API called: ", name);
+        // At debug level. Once per name, but that is still two hundred lines
+        // on every load, nearly all of them the optional frame parts the
+        // report at shutdown counts apart - and that report names every real
+        // gap, at warning, with the full list in missing_api.txt.
+        LOG_DEBUG("[Lua] missing API called: ", name);
         missingApiNames().insert(name);
     }
     return 0;

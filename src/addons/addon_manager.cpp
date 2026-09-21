@@ -716,10 +716,11 @@ bool AddonManager::loadFrameXml(const std::string& frameXmlDir) {
         // nothing about the one case that matters - a file that never returns
         // prints nothing at all, and the load simply stops with the last
         // successful file as the only clue.
-        // At warning level because release builds drop INFO, and this is the
-        // one line that identifies a file which never returns. Noisy for 139
-        // files, and worth it only while this path is still experimental.
-        LOG_WARNING("FrameXML: loading ", filename);
+        // At debug level: 139 lines on every load, and a Lua file that stops
+        // making progress is cut off by the chunk budget above and named in
+        // the failures at the end. What is left is a hang outside Lua, and
+        // WOWEE_LOG_LEVEL=debug brings this back for that.
+        LOG_DEBUG("FrameXML: loading ", filename);
         std::string lower = filename;
         for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         const std::filesystem::path resolved = resolvePath(dir, filename);
