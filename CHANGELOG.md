@@ -1,5 +1,16 @@
 # Changelog
 
+## [v3.1.34] - 2026-09-21
+
+### Fixed
+- **A login went through and the world never loaded, after building assets with the builder.** Four files describe each expansion to the client - `expansion.json`, `opcodes.json`, `update_fields.json` and `dbc_layouts.json` - and they ship with the client rather than coming out of the game. The client reads them from the folder the extraction is in, and the extractor does not write them: only the macOS extractor app copied them across. So assets built by the builder inside the client, or by `wowee_assets` opened directly, sat in the per-user folder with no `expansion.json` beside them. The client found no expansion there, opened no assets, and could log in and go no further. It copies its own four in at every start now, replacing any that differ - which also means a copy left behind by an older build no longer goes on answering after an upgrade, the way an out-of-date `dbc_layouts.json` once took every profession window away
+- **The integrity hash and Warden looked for the game's executable only beside the client.** The extractor keeps a copy of `WoW.exe` with the assets, in the folder they were built into, and both went looking in `Data/` next to the client - which is not where the builder puts anything. Both search the data folder being read first now. The warning when nothing is found names where the executable was expected, rather than the last folder tried, which on every run was a folder in Downloads that nobody had
+- **Two threads could read and write the table cache at once.** Loading a table looked it up and stored it without the lock that guards the cache, and one caller does that off the main thread - so a lookup could walk the table while another thread's insert was rebuilding it. Both take the lock now; the load between them does not, and two threads loading the same table get the same copy
+
+### Changed
+- **The log writes your home folder as `~`.** Almost every path it records - the data folder, the config, the log itself - is under it, so a log attached to a bug report carried your account name on line after line, and it had to be removed by hand
+- **The note in the macOS disk image describes the asset builder.** It still walked through a Terminal window and a folder chooser that the builder replaced
+
 ## [v3.1.33] - 2026-09-21
 
 ### Fixed
