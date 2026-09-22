@@ -2188,6 +2188,10 @@ void GameHandler::confirmBinder() {
              std::hex, binderGuid_, std::dec);
 }
 
+void GameHandler::setFlightAirborne(bool airborne) {
+    if (movementHandler_) movementHandler_->setFlightAirborne(airborne);
+}
+
 void GameHandler::dismount() {
     if (movementHandler_) movementHandler_->dismount();
 }

@@ -306,6 +306,18 @@ glm::vec3 CameraController::sweepAgainstWalls(const glm::vec3& from, const glm::
 // The movement intent - walking, swimming, flying, jumping, falling - and the
 // swept wall collision that keeps it out of geometry. Answers the position it
 // arrived at; the floor has not been consulted yet.
+void CameraController::setFlyingActive(bool active) {
+    // Said when it changes, as take-off and landing are: whether space climbs
+    // or jumps comes down to this one flag from the server, and a report that
+    // the mount "will not fly" is otherwise a guess at whether it was sent.
+    if (active != flyingActive_) {
+        LOG_WARNING("Flight: ", active ? "the server allows flying here"
+                                       : "flying is no longer allowed");
+    }
+    flyingActive_ = active;
+    if (!active) flightAirborne_ = false;
+}
+
 glm::vec3 CameraController::moveFollowedCharacter(float /*deltaTime*/, FrameInput& f,
                                                   glm::vec3& prevTargetPos) {
     // Move the follow target (character position) instead of the camera
@@ -502,7 +514,7 @@ glm::vec3 CameraController::moveFollowedCharacter(float /*deltaTime*/, FrameInpu
         // Spacebar = swim up, X = swim down (both continuous, not a jump)
         bool diveKey = f.xDown;
         bool diveIntent = diveKey || (f.nowForward && (f.forward3D.z < -0.28f));
-        if (f.swimUpHeld) {
+        if (f.spaceHeld) {
             verticalVelocity = SWIM_BUOYANCY;
         } else if (diveKey) {
             verticalVelocity = -SWIM_BUOYANCY;
@@ -666,16 +678,25 @@ glm::vec3 CameraController::moveFollowedCharacter(float /*deltaTime*/, FrameInpu
         }
         swimming = false;
 
+        // Taking off: space, on something allowed to fly. It climbs from the
+        // first frame rather than jumping first, which is what the key means
+        // once a flying mount is under the player.
+        if (flyingActive_ && !flightAirborne_ && f.spaceHeld) {
+            flightAirborne_ = true;
+            LOG_WARNING("Flight: took off");
+        }
+
         // Player-controlled flight (flying mount / druid Flight Form):
         // Use 3D pitch-following movement with no gravity or grounding.
-        if (flyingActive_) {
+        if (flyingActive_ && flightAirborne_) {
             grounded = true;  // suppress fall-damage checks
             verticalVelocity = 0.0f;
             jumpBufferTimer = 0.0f;
             coyoteTimer = 0.0f;
 
-            // Forward/back follows camera 3D direction (same as swim)
-            glm::vec3 flyFwd = glm::normalize(f.forward3D);
+            // Forward/back along the mount's facing at the flight pitch - see
+            // flightForward. The camera's own look direction is not it.
+            glm::vec3 flyFwd = f.flightForward;
             if (glm::dot(flyFwd, flyFwd) < 1e-8f) flyFwd = f.forward;
             glm::vec3 flyMove(0.0f);
             if (f.nowForward)     flyMove += flyFwd;
@@ -685,8 +706,8 @@ glm::vec3 CameraController::moveFollowedCharacter(float /*deltaTime*/, FrameInpu
             // Space = ascend, X = descend while airborne (works on foot too,
             // e.g. .gm fly, not just on a flying mount).
             bool flyDescend = !f.uiWantsKeyboard && f.xDown;
-            if (f.nowJump)       flyMove.z += 1.0f;
-            if (flyDescend)    flyMove.z -= 1.0f;
+            if (f.spaceHeld)     flyMove.z += 1.0f;
+            if (flyDescend)      flyMove.z -= 1.0f;
             float flyMoveLenSq = glm::dot(flyMove, flyMove);
             if (flyMoveLenSq > 1e-6f) {
                 flyMove *= glm::inversesqrt(flyMoveLenSq);
@@ -772,7 +793,7 @@ glm::vec3 CameraController::moveFollowedCharacter(float /*deltaTime*/, FrameInpu
                 verticalVelocity = -2.0f;
         }
         targetPos.z += verticalVelocity * f.physicsDeltaTime;
-        } // end !flyingActive_ ground physics
+        } // end ground physics (not airborne in flight)
         } // end !inWater
     } else {
         // External follow (e.g., taxi): trust server position without grounding.
@@ -1646,7 +1667,7 @@ void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
             *groundH >= targetPos.z - 2.0f &&
             *groundH <= targetPos.z + 0.6f;
 
-        if (!swimming && !flyingActive_ && !hoverActive_ && !externalFollow_ &&
+        if (!swimming && !isFlightAirborne() && !hoverActive_ && !externalFollow_ &&
             !cachedInsideWMO && !nearStructureSpace && !standingOnStructure &&
             centerTerrainH && verticalVelocity <= 0.0f) {
             const float penetration = *centerTerrainH - targetPos.z;
@@ -1787,8 +1808,12 @@ void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
                 std::max(0.5f, std::abs(verticalVelocity) * f.physicsDeltaTime * 2.0f));
             bool airFalling = (!grounded && verticalVelocity < -5.0f
                                && dz >= -airSnapRange);
+            // Not while climbing in flight: a frame's climb at a high frame
+            // rate is less than the quarter yard this reaches down, so taking
+            // off was pulled back to the ground every frame and never left it.
             bool slopeGrace = (grounded && verticalVelocity > -1.0f &&
-                               dz >= -0.25f && dz <= stepUp * 1.5f);
+                               dz >= -0.25f && dz <= stepUp * 1.5f) &&
+                              !(isFlightAirborne() && f.spaceHeld);
 
             if (dz >= -fallCatch && (nearGround || airFalling || slopeGrace)) {
                 // HOVER: float at fixed height above ground instead of standing on it
@@ -2378,6 +2403,14 @@ void CameraController::updateThirdPersonCamera(float deltaTime, FrameInput& f) {
     glm::vec3 prevTargetPos(0.0f);
     glm::vec3 targetPos = moveFollowedCharacter(deltaTime, f, prevTargetPos);
     groundFollowedCharacter(deltaTime, f, targetPos, prevTargetPos);
+    // Landing: flying down onto real ground, or skimming it, without climbing.
+    // Grounding has just put the feet on the floor if they were within reach
+    // of it; on a floor that was actually found, that is touching down.
+    if (isFlightAirborne() && grounded && hasRealGround_ && !f.spaceHeld &&
+        std::abs(targetPos.z - lastGroundZ) < 0.3f) {
+        flightAirborne_ = false;
+        LOG_WARNING("Flight: landed");
+    }
     updateOrbitCamera(deltaTime, f, targetPos);
 }
 
@@ -2666,11 +2699,11 @@ void CameraController::update(float deltaTime) {
     bool shiftDown = !uiWantsKeyboard && (input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT));
     bool ctrlDown = !uiWantsKeyboard && (input.isKeyPressed(SDL_SCANCODE_LCTRL) || input.isKeyPressed(SDL_SCANCODE_RCTRL));
     bool nowJump = !uiWantsKeyboard && !sitting && !movementSuppressed && input.isKeyJustPressed(SDL_SCANCODE_SPACE);
-    // Swimming needs the held state, not the press edge: on land space is a
-    // one-shot jump, but in water it is continuous ascent, and an edge gave a
-    // single impulse that then bled away.
-    bool swimUpHeld = !uiWantsKeyboard && !sitting && !movementSuppressed && input.isKeyPressed(SDL_SCANCODE_SPACE);
-    bool spaceDown = !uiWantsKeyboard && !sitting && !movementSuppressed && input.isKeyPressed(SDL_SCANCODE_SPACE);
+    // Swimming and flying need the held state, not the press edge: on land
+    // space is a one-shot jump, but in water and in the air it is continuous
+    // ascent, and an edge gave a single impulse that then bled away - or, in
+    // flight, a single frame of climb per press.
+    bool spaceHeld = !uiWantsKeyboard && !sitting && !movementSuppressed && input.isKeyPressed(SDL_SCANCODE_SPACE);
 
     // Idle camera: any input resets the timer; timeout triggers a slow orbit pan
     bool anyInput = leftMouseDown || rightMouseDown || keyW || keyS || keyA || keyD || keyQ || keyE || nowJump;
@@ -2714,7 +2747,7 @@ void CameraController::update(float deltaTime) {
             }
         }
         // Suppress player movement/input during intro.
-        keyW = keyS = keyA = keyD = keyQ = keyE = nowJump = swimUpHeld = false;
+        keyW = keyS = keyA = keyD = keyQ = keyE = nowJump = spaceHeld = false;
     }
 
     // Tilde or NumLock toggles auto-run; any forward/backward key cancels it
@@ -2900,6 +2933,23 @@ void CameraController::update(float deltaTime) {
     glm::vec3 forward(std::cos(moveYawRad), std::sin(moveYawRad), 0.0f);
     glm::vec3 right(-std::sin(moveYawRad), std::cos(moveYawRad), 0.0f);
 
+    // Flight goes where the mount faces, not where the camera looks. Orbiting
+    // the camera with the left button is looking around, and it took the
+    // flight direction with it: W flew toward the camera's view, whatever the
+    // mount was pointing at. The pitch follows the camera only while the
+    // camera steers, as the facing does, and holds otherwise.
+    if (cameraDrivesFacing && !externalFollow_) {
+        const float len = glm::length(forward3D);
+        if (len > 1e-4f) {
+            flightPitchDeg_ = glm::degrees(std::asin(std::clamp(forward3D.z / len, -1.0f, 1.0f)));
+        }
+    }
+    if (!isFlightAirborne()) flightPitchDeg_ = 0.0f;
+    const float flightPitchRad = glm::radians(flightPitchDeg_);
+    const glm::vec3 flightForward(std::cos(moveYawRad) * std::cos(flightPitchRad),
+                                  std::sin(moveYawRad) * std::cos(flightPitchRad),
+                                  std::sin(flightPitchRad));
+
     // Toggle sit/crouch with X key (edge-triggered) - only when UI doesn't want keyboard
     // Blocked while mounted
     bool prevSitting = sitting;
@@ -2979,6 +3029,7 @@ void CameraController::update(float deltaTime) {
     f.forward = forward;
     f.right = right;
     f.forward3D = forward3D;
+    f.flightForward = flightForward;
     f.movement = movement;
     f.nowForward = nowForward;
     f.nowBackward = nowBackward;
@@ -2987,7 +3038,7 @@ void CameraController::update(float deltaTime) {
     f.nowTurnLeft = nowTurnLeft;
     f.nowTurnRight = nowTurnRight;
     f.nowJump = nowJump;
-    f.swimUpHeld = swimUpHeld;
+    f.spaceHeld = spaceHeld;
     f.xDown = xDown;
     f.uiWantsKeyboard = uiWantsKeyboard;
 
@@ -3043,8 +3094,10 @@ void CameraController::update(float deltaTime) {
             }
         }
 
-        // Jump
-        if (nowJump && !wasJumping && grounded) {
+        // Jump. Not in flight, where space climbs - and where grounded is held
+        // true only to keep the fall-damage checks quiet, so every press sent
+        // the server a jump from mid-air.
+        if (nowJump && !wasJumping && grounded && !isFlightAirborne()) {
             movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_JUMP));
         }
 
@@ -3076,10 +3129,11 @@ void CameraController::update(float deltaTime) {
 
     // Flight ascend/descend transitions (Space = ascend, X = descend while mounted+flying)
     if (movementCallback && !externalFollow_) {
-        const bool nowAscending = flyingActive_ && spaceDown;
-        const bool nowDescending = flyingActive_ && xDown && mounted_;
+        const bool airborne = isFlightAirborne();
+        const bool nowAscending = airborne && spaceHeld;
+        const bool nowDescending = airborne && xDown && mounted_;
 
-        if (flyingActive_) {
+        if (airborne) {
             if (nowAscending && !wasAscending_) {
                 movementCallback(static_cast<uint32_t>(game::Opcode::MSG_MOVE_START_ASCEND));
             } else if (!nowAscending && wasAscending_) {

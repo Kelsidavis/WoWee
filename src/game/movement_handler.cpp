@@ -465,6 +465,24 @@ bool MovementHandler::restoreWorldTransferFallbackIfNearOrigin(const char* conte
 // sendMovement
 // ============================================================
 
+void MovementHandler::setFlightAirborne(bool airborne) {
+    const uint32_t canFly = static_cast<uint32_t>(MovementFlags::CAN_FLY);
+    const uint32_t flying = static_cast<uint32_t>(MovementFlags::FLYING);
+    if (!(movementInfo.flags & canFly)) return;
+    const bool now = (movementInfo.flags & flying) != 0;
+    if (airborne == now) return;
+    if (airborne) {
+        movementInfo.flags |= flying;
+        return;
+    }
+    // Landed. Said with a heartbeat, which carries the flags and is never
+    // held back: the landing is otherwise only visible in the next movement
+    // packet, and a player who lands and stands still sends none.
+    movementInfo.flags &= ~(flying | static_cast<uint32_t>(MovementFlags::ASCENDING) |
+                            static_cast<uint32_t>(MovementFlags::DESCENDING));
+    sendMovement(Opcode::MSG_MOVE_HEARTBEAT);
+}
+
 void MovementHandler::sendMovement(Opcode opcode) {
     if (owner_.getState() != WorldState::IN_WORLD) {
         LOG_WARNING("Cannot send movement in state: ", (int)owner_.getState());
@@ -609,6 +627,12 @@ void MovementHandler::sendMovement(Opcode opcode) {
         case Opcode::MSG_MOVE_START_ASCEND:
             movementInfo.flags |= static_cast<uint32_t>(MovementFlags::ASCENDING);
             movementInfo.flags &= ~static_cast<uint32_t>(MovementFlags::DESCENDING);
+            // A climb with flight allowed is a take-off, and the client is
+            // the one that says so: FLYING goes out on this packet, not a
+            // frame later. See setFlightAirborne for the landing.
+            if (movementInfo.flags & static_cast<uint32_t>(MovementFlags::CAN_FLY)) {
+                movementInfo.flags |= static_cast<uint32_t>(MovementFlags::FLYING);
+            }
             break;
         case Opcode::MSG_MOVE_STOP_ASCEND:
             movementInfo.flags &= ~static_cast<uint32_t>(MovementFlags::ASCENDING);

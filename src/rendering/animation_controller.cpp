@@ -1038,7 +1038,8 @@ void AnimationController::updateMountedAnimation(float deltaTime) {
     mountIn.strafeRight = cameraController->isStrafingRight();
     mountIn.grounded = cameraController->isGrounded();
     mountIn.jumpKeyPressed = cameraController->isJumpKeyPressed();
-    mountIn.flying = cameraController->isFlyingActive();
+    // In the air, not allowed to be: on the ground a flying mount runs.
+    mountIn.flying = cameraController->isFlightAirborne();
     mountIn.swimming = cameraController->isSwimming();
     mountIn.ascending = cameraController->isAscending();
     mountIn.descending = cameraController->isDescending();

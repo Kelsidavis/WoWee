@@ -239,8 +239,19 @@ public:
     void setGravityDisabled(bool disabled) { gravityDisabled_ = disabled; }
     void setFeatherFallActive(bool active) { featherFallActive_ = active; }
     void setWaterWalkActive(bool active) { waterWalkActive_ = active; }
-    void setFlyingActive(bool active) { flyingActive_ = active; }
+    /// Permission to fly - a flying mount where flight is allowed, or .gm fly.
+    /// Not the same as being in the air: see isFlightAirborne.
+    void setFlyingActive(bool active);
     [[nodiscard]] bool isFlyingActive() const { return flyingActive_; }
+    /// In the air on it. Space takes off, and touching real ground without
+    /// climbing lands - after which the mount runs, falls and jumps like any
+    /// other until it takes off again. Flight physics, the flight animations
+    /// and the FLYING movement flag all follow this rather than permission.
+    [[nodiscard]] bool isFlightAirborne() const { return flyingActive_ && flightAirborne_; }
+    /// The pitch the player is flying at, in radians: the camera's while it
+    /// steers, and held when it does not. What the mount tilts to and what
+    /// the server is told.
+    [[nodiscard]] float getFlightPitchRad() const { return glm::radians(flightPitchDeg_); }
     [[nodiscard]] bool isAscending() const { return wasAscending_; }
     [[nodiscard]] bool isDescending() const { return wasDescending_; }
     void setHoverActive(bool active) { hoverActive_ = active; }
@@ -330,6 +341,7 @@ private:
         glm::vec3 forward{0.0f};      ///< movement axes, flattened onto XY
         glm::vec3 right{0.0f};
         glm::vec3 forward3D{0.0f};    ///< the camera's own forward, with pitch
+        glm::vec3 flightForward{0.0f};   ///< where W flies: the facing, at the flight pitch
         glm::vec3 movement{0.0f};     ///< the horizontal move this frame; the modes adjust it
         bool nowForward = false;
         bool nowBackward = false;
@@ -338,7 +350,7 @@ private:
         bool nowTurnLeft = false;
         bool nowTurnRight = false;
         bool nowJump = false;
-        bool swimUpHeld = false;
+        bool spaceHeld = false;       ///< held, not pressed: rising in water and in flight
         bool xDown = false;
         bool uiWantsKeyboard = false;
     };
@@ -775,6 +787,8 @@ private:
     bool waterWalkActive_ = false;
     // Player-controlled flight (CAN_FLY + FLYING): 3D movement, no gravity.
     bool flyingActive_ = false;
+    bool flightAirborne_ = false;
+    float flightPitchDeg_ = 0.0f;
     // Server-driven hover (HOVER flag): float at fixed height above ground.
     bool hoverActive_ = false;
     bool mounted_ = false;

@@ -3037,6 +3037,8 @@ public:
     // Positive = nose up, negative = nose down.
     void setMovementPitch(float radians) { movementInfo.pitch = radians; }
     void dismount();
+    /// In the air on a flying mount or not - see MovementHandler::setFlightAirborne.
+    void setFlightAirborne(bool airborne);
 
     /// Accept the innkeeper's offer to make this the player's home. The prompt
     /// arrives as SMSG_BINDER_CONFIRM and this is the reply.

@@ -182,6 +182,11 @@ public:
     float& timeSinceLastMoveHeartbeatRef() { return timeSinceLastMoveHeartbeat_; }
     [[nodiscard]] float getMoveHeartbeatInterval() const { return moveHeartbeatInterval_; }
     [[nodiscard]] bool isServerMovementAllowed() const { return serverMovementAllowed_; }
+    /// Whether the player is in the air on a flying mount, as the movement
+    /// code worked it out - which sets and clears FLYING, the flag the server
+    /// reads flight from. Only while flight is allowed: a FLYING the server
+    /// set by itself is left alone.
+    void setFlightAirborne(bool airborne);
     /// Where the last movement packet that went out put the player, in
     /// canonical coordinates - which is where the server has them - and false
     /// before any has.

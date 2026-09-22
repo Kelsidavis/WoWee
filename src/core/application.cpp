@@ -2551,24 +2551,33 @@ void Application::applyServerMovementState(float deltaTime) {
         // or .gm fly), not isPlayerFlying() which also needs the
         // FLYING flag the client only sets once already airborne.
         renderer->getCameraController()->setFlyingActive(gameHandler->canFly());
+        // And whether the player is up in it, which the camera worked out
+        // last frame: take-off and landing are decided where the floor is.
+        gameHandler->setFlightAirborne(renderer->getCameraController()->isFlightAirborne());
         renderer->getCameraController()->setHoverActive(gameHandler->isHovering());
 
         // Sync camera forward pitch to movement packets during flight / swimming.
         // The server writes the pitch field when FLYING or SWIMMING flags are set;
         // without this sync it would always be 0 (horizontal), causing other
         // players to see the character flying flat even when pitching up/down.
-        if (gameHandler->isPlayerFlying() || gameHandler->isSwimming()) {
+        if (gameHandler->isPlayerFlying()) {
+            // The mount's pitch, which the camera sets only while it steers -
+            // orbiting it to look around does not tilt the mount or change
+            // what the server is told.
+            const float pitchRad = renderer->getCameraController()->getFlightPitchRad();
+            gameHandler->setMovementPitch(pitchRad);
+            // Tilt the mount/character model to match flight direction
+            // (taxi flight uses setTaxiOrientationCallback for this instead)
+            if (gameHandler->isMounted()) {
+                if (auto* ac = renderer->getAnimationController()) ac->setMountPitchRoll(pitchRad, 0.0f);
+            }
+        } else if (gameHandler->isSwimming()) {
+            // A swimmer goes where the camera looks, so its pitch is the camera's.
             if (auto* cam = renderer->getCamera()) {
                 glm::vec3 fwd = cam->getForward();
                 float len = glm::length(fwd);
                 if (len > 1e-4f) {
-                    float pitchRad = std::asin(std::clamp(fwd.z / len, -1.0f, 1.0f));
-                    gameHandler->setMovementPitch(pitchRad);
-                    // Tilt the mount/character model to match flight direction
-                    // (taxi flight uses setTaxiOrientationCallback for this instead)
-                    if (gameHandler->isPlayerFlying() && gameHandler->isMounted()) {
-                        if (auto* ac = renderer->getAnimationController()) ac->setMountPitchRoll(pitchRad, 0.0f);
-                    }
+                    gameHandler->setMovementPitch(std::asin(std::clamp(fwd.z / len, -1.0f, 1.0f)));
                 }
             }
         } else if (gameHandler->isMounted()) {
