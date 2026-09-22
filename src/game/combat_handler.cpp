@@ -329,7 +329,15 @@ void CombatHandler::startAutoAttack(uint64_t targetGuid) {
     // Only dismount once this is a valid attack attempt. Doing it before the
     // target/range gate knocked the player off a mount even though no combat
     // request was sent.
+    //
+    // Never in the air, unless Auto Dismount in Flight asks for it: a hostile
+    // right-clicked from a flying mount dropped the player out of the sky.
     if (owner_.isMounted()) {
+        if (owner_.isPlayerFlying() && !owner_.isTaxiMountActive() &&
+            addons::storedCVarValue("autoDismountFlying", "0") == "0") {
+            owner_.addUIError("You can't do that while flying.");
+            return;
+        }
         owner_.dismount();
     }
 

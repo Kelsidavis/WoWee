@@ -1,5 +1,6 @@
 #include "game/game_handler.hpp"
 #include "game/reputation_standing.hpp"
+#include "addons/lua_api_registrations.hpp"
 #include "game/spell_description_eval.hpp"
 #include "game/gather_spells.hpp"
 #include "game/packed_time.hpp"
@@ -2897,6 +2898,16 @@ void GameHandler::interactWithGameObject(uint64_t guid) {
         LOG_DEBUG("[GO-DIAG] BLOCKED: already casting spellId=", spellHandler_->getCurrentCastSpellId());
         return;
     }
+    // In the air, a click is not an order to get off. A node or a chest
+    // clicked by accident from a flying mount dismounted the player there and
+    // then, and they fell out of the sky. The same rule casting follows: with
+    // Auto Dismount in Flight off - the default - it is refused, and the
+    // player stays up.
+    if (isMounted() && !isTaxiMountActive() && isPlayerFlying() &&
+        addons::storedCVarValue("autoDismountFlying", "0") == "0") {
+        addUIError("You can't do that while flying.");
+        return;
+    }
     // Always clear melee intent before GO interactions.
     stopAutoAttack();
     // And get off the mount. Opening a chest, gathering a node or using very
@@ -2904,11 +2915,25 @@ void GameHandler::interactWithGameObject(uint64_t guid) {
     // through it both looks wrong and leaves the server refusing the actions
     // that check for it.
     //
+    // Only for something within reach. The server lets an object be used from
+    // five yards or so - ten for a few kinds - and refuses anything further,
+    // so a click on one across the valley cost the mount and did nothing.
+    //
     // Not on a taxi: the flight's mount is not the player's to dismiss, and
     // there is nothing to interact with mid-flight anyway.
     if (isMounted() && !isTaxiMountActive()) {
-        LOG_DEBUG("[GO-DIAG] dismounting before interacting");
-        dismount();
+        constexpr float kGameObjectReach = 12.0f;
+        bool inReach = true;
+        if (auto entity = getEntityManager().getEntity(guid)) {
+            const float dx = movementInfo.x - entity->getX();
+            const float dy = movementInfo.y - entity->getY();
+            const float dz = movementInfo.z - entity->getZ();
+            inReach = dx * dx + dy * dy + dz * dz <= kGameObjectReach * kGameObjectReach;
+        }
+        if (inReach) {
+            LOG_DEBUG("[GO-DIAG] dismounting before interacting");
+            dismount();
+        }
     }
     // Set the pending GO guid so that:
     // 1. cancelCast() won't send CMSG_CANCEL_CAST for GO-triggered casts
