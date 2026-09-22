@@ -1047,7 +1047,7 @@ void SpellHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
                     owner_.raiseUiError("Out of range.");
                     return;
                 }
-                owner_.faceCanonicalYaw(std::atan2(-dy, dx));
+                if (owner_.isAutoFaceTarget()) owner_.faceCanonicalYaw(std::atan2(-dy, dx));
                 facingHandled = true;
             }
         }
@@ -1056,7 +1056,12 @@ void SpellHandler::castSpell(uint32_t spellId, uint64_t targetGuid) {
     // Face the target before casting any targeted spell (server checks facing arc).
     // Only send if a spell-specific block above didn't already handle facing,
     // to avoid redundant SET_FACING packets that waste bandwidth.
-    if (!facingHandled && target != 0) {
+    //
+    // Only with the Combat page's debug setting on, here and for melee above:
+    // the original client never turns the player to cast, and a target behind
+    // them is refused as not in front. Charge still turns - its dash runs
+    // along that line.
+    if (!facingHandled && target != 0 && owner_.isAutoFaceTarget()) {
         auto entity = owner_.getEntityManager().getEntity(target);
         if (entity) {
             float dx = entity->getX() - owner_.movementInfoRef().x;

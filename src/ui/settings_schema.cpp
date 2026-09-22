@@ -499,6 +499,11 @@ constexpr SettingDesc kSchema[] = {
      "Combat", "",
      "A second press of Attack within half a second is ignored, so a\n"
      "double tap cannot switch auto-attack straight back off.", "", 0},
+    {"autofacetarget", "Turn to face the target (debug)", SettingKind::Bool, 0, 0, 0,
+     "Combat", "",
+     "Turn your character toward the target when you start attacking it\n"
+     "or cast at it. Off, as in the original client, a target behind you\n"
+     "has to be faced first. A debugging aid.", "", 0},
 
     {"autoselfcast", "Cast helpful spells on yourself", SettingKind::Bool, 0, 0, 0, "Combat", "Casting",
      "A helpful spell cast with no friendly target goes on you, rather\n"

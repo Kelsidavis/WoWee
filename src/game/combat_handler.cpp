@@ -350,11 +350,16 @@ void CombatHandler::startAutoAttack(uint64_t targetGuid) {
     autoAttackOutOfRange_ = false;
     autoAttackOutOfRangeTime_ = 0.0f;
     autoAttackResendTimer_ = 0.0f;
-    // Face the target, once, on the command to attack it - the same turn the
-    // real client makes when an attack is ordered on something behind the
-    // player. This is the only place combat turns the player: it used to be
-    // re-aimed every fifth of a second for as long as the attack lasted.
-    if (auto target = owner_.getEntityManager().getEntity(targetGuid)) {
+    // Face the target, once, on the command to attack it. This is the only
+    // place combat turns the player: it used to be re-aimed every fifth of a
+    // second for as long as the attack lasted.
+    //
+    // Only with the Combat page's debug setting on. The original client does
+    // not turn the player at all; attacking something behind them is refused
+    // until they face it themselves.
+    auto target = owner_.isAutoFaceTarget() ? owner_.getEntityManager().getEntity(targetGuid)
+                                            : nullptr;
+    if (target) {
         const float toTargetX = target->getLatestX() - owner_.movementInfoRef().x;
         const float toTargetY = target->getLatestY() - owner_.movementInfoRef().y;
         if (std::abs(toTargetX) > 0.01f || std::abs(toTargetY) > 0.01f) {

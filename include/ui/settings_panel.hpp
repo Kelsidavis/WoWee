@@ -167,6 +167,8 @@ public:
     bool pendingAutoSellGrey = false;
     bool pendingAutoRepair = false;
     bool pendingSecureAbilityToggle = false;
+    /// Debug: turn to face the target on attack. See GameHandler::setAutoFaceTarget.
+    bool pendingAutoFaceTarget = false;
     bool pendingIdleCameraOrbit = true;
 
     // ---- Pending soundtrack ----

@@ -1792,6 +1792,7 @@ void GameScreen::saveSettings() {
     out << "auto_sell_grey=" << (settingsPanel_.pendingAutoSellGrey ? 1 : 0) << "\n";
     out << "auto_repair=" << (settingsPanel_.pendingAutoRepair ? 1 : 0) << "\n";
     out << "secure_ability_toggle=" << (settingsPanel_.pendingSecureAbilityToggle ? 1 : 0) << "\n";
+    out << "auto_face_target=" << (settingsPanel_.pendingAutoFaceTarget ? 1 : 0) << "\n";
     out << "graphics_preset=" << static_cast<int>(settingsPanel_.currentGraphicsPreset) << "\n";
     out << "ground_clutter_density=" << settingsPanel_.pendingGroundClutterDensity << "\n";
     // The five that came off the game's own Effects panel. Saved here like any
@@ -2057,6 +2058,7 @@ void GameScreen::loadSettings() {
             else if (key == "auto_sell_grey") settingsPanel_.pendingAutoSellGrey = (std::stoi(val) != 0);
             else if (key == "auto_repair") settingsPanel_.pendingAutoRepair = (std::stoi(val) != 0);
             else if (key == "secure_ability_toggle") settingsPanel_.pendingSecureAbilityToggle = (std::stoi(val) != 0);
+            else if (key == "auto_face_target") settingsPanel_.pendingAutoFaceTarget = (std::stoi(val) != 0);
             else if (key == "graphics_preset") {
                 int presetVal = std::clamp(std::stoi(val), 0, 4);
                 settingsPanel_.currentGraphicsPreset = static_cast<SettingsPanel::GraphicsPreset>(presetVal);

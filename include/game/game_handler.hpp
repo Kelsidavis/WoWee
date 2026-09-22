@@ -2074,6 +2074,12 @@ public:
     const LootResponseData& getCurrentLoot() const;
     void setAutoLoot(bool enabled);
     bool isAutoLoot() const;
+    /// Turn the player to face the target when an attack or a targeted spell
+    /// starts. Off by default, as the original client has it: a target behind
+    /// the player has to be faced first, and the server says so. A debugging
+    /// aid, set from the Combat page.
+    void setAutoFaceTarget(bool enabled) { autoFaceTarget_ = enabled; }
+    [[nodiscard]] bool isAutoFaceTarget() const { return autoFaceTarget_; }
     void setAutoSellGrey(bool enabled);
     bool isAutoSellGrey() const;
     void setAutoRepair(bool enabled);
@@ -4593,6 +4599,7 @@ private:
     // ---- Loot ----
     bool lootWindowOpen = false;
     bool autoLoot_ = false;
+    bool autoFaceTarget_ = false;
     bool autoSelfCast_ = true;
     bool autoSellGrey_ = false;
     bool autoRepair_ = false;

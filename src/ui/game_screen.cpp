@@ -602,6 +602,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
 
     // Apply auto-loot / auto-sell settings to GameHandler every frame (cheap bool sync)
     gameHandler.setAutoLoot(settingsPanel_.pendingAutoLoot);
+    gameHandler.setAutoFaceTarget(settingsPanel_.pendingAutoFaceTarget);
     gameHandler.setAutoSellGrey(settingsPanel_.pendingAutoSellGrey);
     gameHandler.setAutoRepair(settingsPanel_.pendingAutoRepair);
 

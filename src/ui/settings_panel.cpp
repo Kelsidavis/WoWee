@@ -1126,6 +1126,7 @@ constexpr FieldBinding kFieldBindings[] = {
 
     // --- Gameplay ---
     {.key = "autoloot",     .asBool = &SettingsPanel::pendingAutoLoot},
+    {.key = "autofacetarget", .asBool = &SettingsPanel::pendingAutoFaceTarget},
     {.key = "autosellgrey", .asBool = &SettingsPanel::pendingAutoSellGrey},
     {.key = "autorepair",   .asBool = &SettingsPanel::pendingAutoRepair},
     {.key = "secureabilitytoggle", .asBool = &SettingsPanel::pendingSecureAbilityToggle},
