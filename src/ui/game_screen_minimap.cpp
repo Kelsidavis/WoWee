@@ -1528,39 +1528,29 @@ void GameScreen::renderMinimapReadouts(const MinimapFrame& frame, game::GameHand
 
             ImGui::Separator();
 
-            // Toggle options with checkmarks
-            bool rotWithCam = minimap->isRotateWithCamera();
+            // Toggle options with checkmarks.
+            //
+            // Each goes through the setter and is saved, as the panel's own
+            // boxes are. Written to the members alone, a toggle lasted until
+            // the client closed: nothing saved it, and rotation is bound to a
+            // CVar whose stored value is applied over the file at start-up.
+            const auto toggle = [this](const char* key, bool on) {
+                settingsPanel_.setSettingValue(key, on ? "1" : "0");
+                saveSettings();
+            };
+            const bool rotWithCam = minimap->isRotateWithCamera();
             if (ImGui::MenuItem("Rotate with Camera", nullptr, rotWithCam)) {
-                // Through the setting as well as the minimap. The settings
-                // panel pushes minimapRotate_ back at the minimap whenever it
-                // refreshes, so a toggle that only told the minimap was undone
-                // by the next thing to touch settings, with nothing on screen
-                // saying why.
-                minimap->setRotateWithCamera(!rotWithCam);
-                settingsPanel_.minimapRotate_ = !rotWithCam;
-                settingsPanel_.pendingMinimapRotate = !rotWithCam;
+                toggle("minimaprotate", !rotWithCam);
             }
 
-            bool squareShape = minimap->isSquareShape();
+            const bool squareShape = minimap->isSquareShape();
             if (ImGui::MenuItem("Square Shape", nullptr, squareShape)) {
-                // Through the setting, for the same reason as Rotate above:
-                // the settings panel pushes minimapSquare_ back at the minimap
-                // when it refreshes. Every item in this menu had a version of
-                // the same fault - two told the minimap and not the setting,
-                // the third told the live member and not the saved one.
-                minimap->setSquareShape(!squareShape);
-                settingsPanel_.minimapSquare_ = !squareShape;
-                settingsPanel_.pendingMinimapSquare = !squareShape;
+                toggle("minimapsquare", !squareShape);
             }
 
-            bool npcDots = settingsPanel_.minimapNpcDots_;
+            const bool npcDots = settingsPanel_.minimapNpcDots_;
             if (ImGui::MenuItem("Show NPC Dots", nullptr, npcDots)) {
-                // Both, the way the loader sets both. This one wrote only the
-                // live member, which is not the one the file is written from -
-                // so the dots came on, stayed on for the session, saved as
-                // whatever they had been, and were put back by the next apply.
-                settingsPanel_.minimapNpcDots_ = !npcDots;
-                settingsPanel_.pendingMinimapNpcDots = !npcDots;
+                toggle("minimapnpcdots", !npcDots);
             }
 
             ImGui::EndPopup();

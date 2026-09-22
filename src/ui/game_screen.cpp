@@ -394,9 +394,9 @@ void GameScreen::render(game::GameHandler& gameHandler) {
             // soundtrack setting could be ignored for a whole run.
             if (!settingsPanel_.minimapSettingsApplied_) {
                 if (auto* minimap = renderer->getMinimap()) {
-                    settingsPanel_.minimapRotate_ = false;
-                    settingsPanel_.pendingMinimapRotate = false;
-                    minimap->setRotateWithCamera(false);
+                    // The saved rotation, not off. This forced it off at every
+                    // start, and the next save wrote the off back to the file.
+                    minimap->setRotateWithCamera(settingsPanel_.minimapRotate_);
                     minimap->setSquareShape(settingsPanel_.minimapSquare_);
                     settingsPanel_.minimapSettingsApplied_ = true;
                 }
@@ -1676,10 +1676,16 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
             }
 
             if (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_NAMEPLATES)) {
-                if (ImGui::GetIO().KeyShift)
-                    settingsPanel_.showFriendlyNameplates_ = !settingsPanel_.showFriendlyNameplates_;
-                else
-                    settingsPanel_.showEnemyNameplates_ = !settingsPanel_.showEnemyNameplates_;
+                // Through the setter and saved, like the panel's boxes. Both
+                // are bound to CVars, and the store is applied over the
+                // settings file at start-up - flipped here alone, the choice
+                // lasted until the client was closed.
+                const bool friendly = ImGui::GetIO().KeyShift;
+                const bool shown = friendly ? settingsPanel_.showFriendlyNameplates_
+                                            : settingsPanel_.showEnemyNameplates_;
+                settingsPanel_.setSettingValue(friendly ? "friendlyplates" : "enemyplates",
+                                               shown ? "0" : "1");
+                saveSettings();
             }
 
             if (KeybindingManager::getInstance().isActionPressed(KeybindingManager::Action::TOGGLE_WORLD_MAP)) {

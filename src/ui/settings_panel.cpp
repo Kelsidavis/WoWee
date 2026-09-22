@@ -124,11 +124,6 @@ void SettingsPanel::renderSettingsGameplayTab(const std::function<void()>& saveC
     ImGui::BeginChild("GameplaySettings", ImVec2(0, -1), true);
 
     ImGui::SeparatorText("Camera");
-    ImGui::SetNextItemWidth(200.0f);
-    if (ImGui::SliderFloat("Mouse Sensitivity", &pendingMouseSensitivity, 0.05f, 1.0f, "%.2f")) {
-        applySettingSideEffects("mousespeed");
-        saveCallback();
-    }
     drawSchemaCategory("Camera", saveCallback);
 
     // What the pad does, said where the pad's settings are.
@@ -212,12 +207,9 @@ void SettingsPanel::renderSettingsGameplayTab(const std::function<void()>& saveC
                                      "Gameplay", "Chat"}) {
             restoreSchemaDefaults(category);
         }
-        // Two the schema cannot hold. Mouse look speed belongs to the game's
-        // own Interface panel, and the bag scale's default depends on the
+        // One the schema cannot hold: the bag scale's default depends on the
         // display it is being shown on - a constant would make the bags small
         // on a large screen, which is what the recommendation exists to avoid.
-        pendingMouseSensitivity = 0.2f;
-        applySettingSideEffects("mousespeed");
         pendingBagScale =
             recommendedPixelScale(ImGui::GetIO().DisplaySize.y, 0.75f, 1.5f);
         applySettingSideEffects("bagscale");
@@ -919,7 +911,15 @@ void SettingsPanel::applyGraphicsPreset(GraphicsPreset preset) {
         // Each one goes to the thing it affects through the one function that
         // knows where that is, rather than through a second copy of the same
         // renderer calls written out here.
-        for (const char* key : kGraphicsPresetKeys) applySettingSideEffects(key);
+        //
+        // And to the CVar store, as setSettingValue does: view distance and
+        // ground clutter are bound to CVars, the store is applied over the
+        // settings file at start-up, and a preset that left it alone was
+        // undone at the next start.
+        for (const char* key : kGraphicsPresetKeys) {
+            applySettingSideEffects(key);
+            addons::noteClientSettingChanged(key, settingValue(key));
+        }
     }
 
     currentGraphicsPreset = preset;
