@@ -1,5 +1,25 @@
 # Changelog
 
+## [v3.1.36] - 2026-09-22
+
+### Added
+- **`wowee_assets --import-later <later install> [data folder] [expansion]`.** The asset builder's later-client step from a terminal: the repair of earlier imports, then the import over creatures, the world and items. Running it again is how models an earlier import brought get the skins their display rows name, which before could only be asked for by clicking through the window
+
+### Fixed
+- **A flying mount could not take off, and did not land.** Space jumped instead of climbing, and when it did climb, the ground check pulled the mount back to the floor every frame. Space takes off now and climbs from the first frame; flying down onto real ground lands, after which the mount runs, falls and jumps like any other. The client sets the flying flag the server reads flight from as it takes off and clears it as it lands, and says so in the log, along with whether the server allows flying where the player is
+- **Flying mounts ran and stood in the air.** The animation table numbered everything above 145 the way a later client does, so the mount's Fly and Hover were asked for by numbers 3.3.5 gives to other animations, which no mount has. IDs 146 to 505 are 3.3.5's own now, from its AnimationData.dbc, and a flying mount flies, hovers, and banks while it strafes
+- **A flying mount on the ground strafed on its in-air bank.** A flying mount's strafe animations are the lean it takes in flight, and only fliers carry them, so strafing on the ground leaned the mount over while it slid sideways. On the ground it strafes on its run
+- **Flight followed the camera, not the mount.** Orbiting the camera to look around changed where W flew. Flight goes where the mount faces, at a pitch that follows the camera only while the camera steers
+- **Clicking an object from a flying mount dismounted the player in mid-air.** A node or a chest clicked by accident, or a hostile right-clicked, took the mount away, and the player fell. With Auto Dismount in Flight off, the default, a click in the air does not dismount. Nor does a click on an object out of the server's reach, which cost the mount and did nothing
+- **The sky swapped at zone borders with a hard edge.** One zone's sky model was held until the player left its area and then replaced in a single frame, while the sky colours had been blending across the same border all along. Hellfire's nebula stopped at a line, with Terokkar's pale blue already behind it, and then popped. Each sky model now fades by the weight of the lights that name it, so the sky and its colours cross the border together. The sky's blending also runs by real time, where it used to assume sixty frames a second
+- **Telaar's quest givers and vendors would not talk to an Alliance character.** The standings the server sends leave out where each faction starts for the character's race and class, which the client has to add from Faction.dbc. Without it, an Alliance character, who starts at -1200 with the Kurenai, showed as Neutral while the server held them at Unfriendly and refused them in silence. Standings include the starting value now. The client had also called any faction with a starting standing below zero hostile, so all of Telaar came out hostile and a right-click on a quest giver attacked. A faction with a standing is hostile only while the player is at war with it, as the server says, and a unit's reaction, name colour and tooltip follow the standing
+- **An NPC's announcement named the reader, not the player it was about.** "$N has defeated the hero of the Warmaul" is heard by everyone nearby, and it was filled in with each reader's own name. It names the player the server says the line is for now, and waits for that name when the client does not know it yet. Gender and class switches in the text follow that player too
+- **Guild events came out as guild chat from yourself.** "[Guild] [You]: [Guild] Coggs has come online." They are system lines in the game's own wording now
+- **Legion mounts and creatures from an earlier asset pack wore skins that did not fit.** An earlier pack filed some models under guessed names: what it installed as the riding horse is Legion's multi-saddle horse, three thousand vertices, where the model at that path is the horse 3.3.5 ships. No skin the game names for that path can fit it. The asset builder removes such an import, so the extracted model is drawn again, and it keeps imports within a tenth of the right model's size, which are the same model with small edits
+
+### Changed
+- **An NPC that does not answer is named in the log.** A server that refuses a conversation says nothing, so a refusal looked exactly like a click that never happened. The log says when a hello got no answer, where the server has the player at that moment, when movement is being held back from the server, when a window closes by itself, and when a talk goes to a creature the server regards as Unfriendly or worse
+
 ## [v3.1.35] - 2026-09-21
 
 ### Added
