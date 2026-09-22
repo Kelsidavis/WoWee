@@ -4605,13 +4605,18 @@ void SocialHandler::handleInitializeFactions(network::Packet& packet) {
     // moved. The reputation tab drew every bar empty at Neutral however much
     // the character had earned, and so did this client's own panel and the
     // watched-faction bar, all three reading the same empty map.
+    //
+    // And each made whole: the packet carries what has been earned, and the
+    // standing is that on top of where the faction starts for this race and
+    // class. See factionBaseReputation.
     owner_.loadFactionNameCache();
     for (size_t repListId = 0; repListId < owner_.initialFactionsRef().size(); ++repListId) {
         const uint32_t factionId =
             owner_.getFactionIdByRepListId(static_cast<uint32_t>(repListId));
         if (factionId == 0) continue;
-        owner_.factionStandingsRef()[factionId] =
-            owner_.initialFactionsRef()[repListId].standing;
+        auto& standing = owner_.initialFactionsRef()[repListId].standing;
+        standing += owner_.factionBaseReputation(factionId);
+        owner_.factionStandingsRef()[factionId] = standing;
     }
     LOG_INFO("Reputation: ", owner_.initialFactionsRef().size(),
              " factions initialised, ", owner_.factionStandingsRef().size(),
@@ -4653,6 +4658,8 @@ void SocialHandler::handleSetFactionStanding(network::Packet& packet) {
                         " standing=", standing);
             continue;
         }
+        // Earned only, as at login: the whole is this on top of the start.
+        standing += owner_.factionBaseReputation(factionId);
 
         int32_t  oldStanding = 0;
         // SMSG_INITIALIZE_FACTIONS is indexed by ReputationListID and supplies the

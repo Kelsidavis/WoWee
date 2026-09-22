@@ -2784,6 +2784,13 @@ void GameHandler::loadFactionNameCache() const {
                 factionParent_[factionId] = parentId;
             }
         }
+        // The starting standing by race and class, fields 2 to 13 in every
+        // expansion's Faction.dbc.
+        if (dbc->getFieldCount() > 13) {
+            std::array<int32_t, 12> base{};
+            for (uint32_t f = 0; f < 12; ++f) base[f] = dbc->getInt32(i, 2 + f);
+            factionRepBase_[factionId] = base;
+        }
         // Build repListId ↔ factionId mapping (WotLK field 1)
         if (hasRepListField) {
             uint32_t repListId = dbc->getUInt32(i, REPLIST_FIELD);
@@ -2817,6 +2824,28 @@ void GameHandler::refreshUnitHostility() {
         auto* unit = static_cast<Unit*>(entity.get());
         unit->setHostile(isHostileFaction(unit->getFactionTemplate()));
     }
+}
+
+int32_t GameHandler::factionBaseReputation(uint32_t factionId) const {
+    loadFactionNameCache();
+    auto it = factionRepBase_.find(factionId);
+    if (it == factionRepBase_.end()) return 0;
+    const uint8_t race = getPlayerRace();
+    const uint8_t cls = getPlayerClass();
+    const uint32_t raceMask = race ? (1u << (race - 1)) : 0;
+    const uint32_t classMask = cls ? (1u << (cls - 1)) : 0;
+    const auto& f = it->second;
+    // The server's own rule, slot by slot: a slot for this race, or a
+    // class-only slot, whose class mask is this class or empty.
+    for (int slot = 0; slot < 4; ++slot) {
+        const uint32_t slotRaces = static_cast<uint32_t>(f[slot]);
+        const uint32_t slotClasses = static_cast<uint32_t>(f[4 + slot]);
+        if (((slotRaces & raceMask) != 0 || (slotRaces == 0 && slotClasses != 0)) &&
+            ((slotClasses & classMask) != 0 || slotClasses == 0)) {
+            return f[8 + slot];
+        }
+    }
+    return 0;
 }
 
 uint32_t GameHandler::getFactionIdByRepListId(uint32_t repListId) const {

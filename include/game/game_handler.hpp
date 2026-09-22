@@ -2496,6 +2496,17 @@ public:
     }
     // Returns the faction ID for a given repListId (0 if unknown)
     uint32_t getFactionIdByRepListId(uint32_t repListId) const;
+    /// Where this character's standing with a faction starts, by race and
+    /// class, from Faction.dbc.
+    ///
+    /// The part of every standing the server leaves out. SMSG_INITIALIZE_FACTIONS
+    /// and SMSG_SET_FACTION_STANDING carry what has been earned, and the client
+    /// adds this - the server's own total is the two together. Read as the
+    /// whole, every faction with a starting value came out wrong: an Alliance
+    /// character starts at -1200 with the Kurenai, so 900 earned showed as
+    /// Neutral while the server held them at Unfriendly and Telaar would not
+    /// speak to them.
+    int32_t factionBaseReputation(uint32_t factionId) const;
     // Returns the repListId for a given faction ID (0xFFFFFFFF if not found)
     uint32_t getRepListIdByFactionId(uint32_t factionId) const;
     // Shaman totems (4 slots: 0=Earth, 1=Fire, 2=Water, 3=Air)
@@ -4528,6 +4539,9 @@ private:
     mutable std::unordered_map<uint32_t, uint32_t> factionRepListToId_;
     // factionId → repListId reverse mapping
     mutable std::unordered_map<uint32_t, uint32_t> factionIdToRepList_;
+    // factionId → Faction.dbc's four race masks, four class masks and four
+    // starting values, in that order. See factionBaseReputation.
+    mutable std::unordered_map<uint32_t, std::array<int32_t, 12>> factionRepBase_;
     mutable bool factionNameCacheLoaded_ = false;
 
     // ---- Group ----
