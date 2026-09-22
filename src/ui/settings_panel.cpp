@@ -1075,6 +1075,7 @@ constexpr FieldBinding kFieldBindings[] = {
     // --- Interface ---
     {.key = "uiopacity",     .asInt   = &SettingsPanel::pendingUiOpacity},
     {.key = "windowuiscale", .asFloat = &SettingsPanel::pendingWindowUiScale},
+    {.key = "scrollspeed",   .asFloat = &SettingsPanel::pendingScrollSpeed},
     {.key = "latencymeter",  .asBool  = &SettingsPanel::pendingShowLatencyMeter},
     {.key = "checkforupdates",   .asBool  = &SettingsPanel::pendingCheckForUpdates},
     {.key = "micromenu",     .asBool  = &SettingsPanel::pendingShowMicroMenu},

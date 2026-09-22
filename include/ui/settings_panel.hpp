@@ -117,6 +117,9 @@ public:
     // ---- Pending UI / interface ----
     int pendingUiOpacity = 65;
     float pendingWindowUiScale = 1.0f;
+    /// Lines per unit of wheel travel in scrolling windows. See
+    /// LuaEngine::setWheelSensitivity.
+    float pendingScrollSpeed = 1.0f;
 
     /// What something drawn in pixels should be scaled to on a screen of a
     /// given height, before the player says otherwise.

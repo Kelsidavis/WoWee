@@ -1715,6 +1715,7 @@ void GameScreen::saveSettings() {
     // Interface
     out << "ui_opacity=" << settingsPanel_.pendingUiOpacity << "\n";
     out << "window_ui_scale=" << settingsPanel_.pendingWindowUiScale << "\n";
+    out << "scroll_speed=" << settingsPanel_.pendingScrollSpeed << "\n";
     out << "minimap_rotate=" << (settingsPanel_.pendingMinimapRotate ? 1 : 0) << "\n";
     out << "minimap_square=" << (settingsPanel_.pendingMinimapSquare ? 1 : 0) << "\n";
     out << "minimap_npc_dots=" << (settingsPanel_.pendingMinimapNpcDots ? 1 : 0) << "\n";
@@ -1927,6 +1928,8 @@ void GameScreen::loadSettings() {
                     std::clamp(std::stof(val), windowUiScaleRange().first,
                                windowUiScaleRange().second);
                 windowScaleLoaded = true;
+            } else if (key == "scroll_speed") {
+                settingsPanel_.pendingScrollSpeed = std::clamp(std::stof(val), 0.25f, 4.0f);
             } else if (key == "minimap_rotate") {
                 // Honoured since 2026-09-06. It was read and dropped before,
                 // every run starting north-up, until the rotated map had been

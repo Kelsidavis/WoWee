@@ -121,6 +121,13 @@ public:
     /// time is what happens otherwise. delta is WoW's: positive is up.
     bool dispatchMouseWheel(float x, float y, float delta);
 
+    /// How many notches a unit of wheel travel is worth in the interface's
+    /// scrolling windows. 1 is a notch per click of a wheel; a trackpad's many
+    /// small deltas add up to the same. The Interface page's scroll speed.
+    void setWheelSensitivity(float notchesPerUnit) {
+        wheelSensitivity_ = notchesPerUnit > 0.0f ? notchesPerUnit : 1.0f;
+    }
+
     /// Tells a scroll frame when the room its child has to move changed.
     ///
     /// A scroll bar sizes and enables itself from OnScrollRangeChanged, so a
@@ -420,6 +427,21 @@ private:
     void registerEventAPI();
 
 private:
+    // The wheel, gathered into whole notches; see dispatchMouseWheel.
+    float wheelSensitivity_ = 1.0f;
+    float wheelCarry_ = 0.0f;
+    // The scroll bar a wheel frame's notches were seen to move, and how far
+    // one notch moved it - signed, so it carries which way is up.
+    struct WheelBinding { uint32_t slider = 0; float perNotch = 0.0f; };
+    std::unordered_map<uint32_t, WheelBinding> wheelBindings_;
+    // The scroll bar easing toward where the wheel sent it. lastSet is the
+    // value this last gave it, so a move from anywhere else is noticed.
+    struct WheelGlide { uint32_t slider = 0; float target = 0.0f; float lastSet = 0.0f; };
+    WheelGlide wheelGlide_;
+    bool glideWheel(uint32_t wheelFrame, float notches);
+    void advanceWheelGlide(float elapsed);
+    void setSliderValue(uint32_t wid, float value);
+
     static bool uiSoundsSuppressed_;
 };
 

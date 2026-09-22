@@ -355,6 +355,9 @@ constexpr SettingDesc kSchema[] = {
     {"windowuiscale", "Window scale", SettingKind::Float, 0.75f, 3.0f, 0.05f, "Interface", "",
      "Size of the text and controls in this client's own windows. The\n"
      "game interface's own scale is in the game's Video panel.", "", 1},
+    {"scrollspeed", "Scroll speed", SettingKind::Float, 0.25f, 4.0f, 0.25f, "Interface", "",
+     "How far the mouse wheel or a trackpad scrolls text in chat, the\n"
+     "quest log and other windows. 1 is a line per click of a wheel.", "", 1.0f},
     {"latencymeter", "Latency meter", SettingKind::Bool, 0, 0, 0, "Interface", "",
      "Show your ping - the round trip to the server - beside the minimap.", "", 1},
     {"micromenu", "Micro menu buttons", SettingKind::Bool, 0, 0, 0, "Interface", "",

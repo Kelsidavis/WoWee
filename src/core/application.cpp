@@ -207,6 +207,36 @@ std::optional<float> movingEntityFloor(rendering::Renderer* renderer,
     return best;
 }
 
+/// A wheel event's travel in clicks of a clicking wheel, which is what the
+/// interface scrolls by.
+///
+/// macOS reports a trackpad or a Magic Mouse in pixels, and SDL passes those
+/// on at a tenth - a "line" per ten pixels - while a clicking wheel comes
+/// through as whole clicks. A two-finger swipe with its momentum runs to a
+/// hundred of those lines, and a scroll frame moves half a page per notch, so
+/// even at a quarter of the scroll speed one swipe went through the quest log
+/// ten pages at a time. Elsewhere a trackpad already reports in clicks.
+///
+/// A precise delta is one with a fraction, which a click never has: SDL rounds
+/// those away from zero. Pixels that happen to come to a whole ten do not have
+/// one either, so a gesture stays precise for half a second after its last
+/// fraction, and momentum keeps it going well past that.
+float wheelClicks(float delta, uint64_t timestampNs) {
+#if defined(__APPLE__)
+    constexpr float kLinesPerClick = 20.0f;
+    constexpr uint64_t kGestureGapNs = 500'000'000ull;
+    static uint64_t lastPreciseNs = 0;
+    const bool fractional = delta != std::trunc(delta);
+    if (fractional) lastPreciseNs = timestampNs;
+    const bool precise = fractional ||
+        (lastPreciseNs != 0 && timestampNs - lastPreciseNs < kGestureGapNs);
+    return precise ? delta / kLinesPerClick : delta;
+#else
+    (void)timestampNs;
+    return delta;
+#endif
+}
+
 } // namespace
 
 Application* Application::instance = nullptr;
@@ -1506,7 +1536,7 @@ void Application::run() {
                         const ImGuiIO& mio = ImGui::GetIO();
                         takenByUi = addonManager_->getLuaEngine()->dispatchMouseWheel(
                             mio.MousePos.x, mio.DisplaySize.y - mio.MousePos.y,
-                            static_cast<float>(event.wheel.y));
+                            wheelClicks(event.wheel.y, event.wheel.timestamp));
                     }
                     if (!takenByUi) {
                         renderer->getCameraController()->processMouseWheel(

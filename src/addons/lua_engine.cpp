@@ -10411,22 +10411,26 @@ bool LuaEngine::dispatchMouseWheel(float x, float y, float delta) {
     const float s = widgets_.uiScale();
     if (s > 0.0f) { x /= s; y /= s; }
 
-    // One notch, whatever the mouse said. WoW's OnMouseWheel delta is exactly
-    // 1 or -1 and FrameXML is written against that: hybridscrollframe.lua:46
-    // is `if ( delta == 1 ) then scroll up else scroll down end`, so a wheel
-    // that reported 2 or 3 - which any brisk scroll on a trackpad or a
-    // free-spinning wheel does - fell through to the else and scrolled *down*
-    // while the hand moved up.
+    // Whole notches of 1 or -1, each its own call. WoW's OnMouseWheel delta is
+    // exactly one or the other and FrameXML is written against that:
+    // hybridscrollframe.lua:46 is `if ( delta == 1 ) then scroll up else
+    // scroll down end`, so a wheel that reported 2 or 3 - which any brisk
+    // scroll on a trackpad or a free-spinning wheel does - fell through to the
+    // else and scrolled *down* while the hand moved up.
     //
-    // Down never showed it. Every negative delta fails that test too and lands
-    // in the same branch, which is the branch it wanted, so down worked at any
-    // speed and up worked only when the wheel happened to send a bare 1.
+    // How many notches is the wheel's travel scaled by the scroll speed
+    // setting, with what does not make a whole notch carried to the next
+    // event. It used to be one notch per event whatever the travel, which is
+    // right for a wheel - one event of 1.0 per click - and far too fast for a
+    // trackpad or a Magic Mouse, which send dozens of small deltas a swipe and
+    // turned each into a full line. A change of direction drops the carry, so
+    // reversing is immediate. The delta arrives in clicks of a wheel: macOS
+    // reports a trackpad in pixels, converted before this in wheelClicks.
     //
-    // Sign only, and not clamped elsewhere: the camera keeps the magnitude,
-    // because how far a zoom travels is a different question from which way a
-    // list moves.
-    delta = (delta > 0.0f) ? 1.0f : (delta < 0.0f ? -1.0f : 0.0f);
+    // The camera keeps the raw magnitude: how far a zoom travels is a
+    // different question from how many lines a list moves.
     if (delta == 0.0f) return false;
+    const float travel = delta * wheelSensitivity_;
 
     // Up from whatever is under the cursor to the first frame that asked for
     // the wheel. WoW works the same way: a scroll frame's child fills it and
@@ -10437,17 +10441,161 @@ bool LuaEngine::dispatchMouseWheel(float x, float y, float delta) {
     // started from whatever mouse-enabled child happened to be under the
     // cursor or, over the empty parts of a panel, from nothing at all. The
     // talent tree is all empty parts between its buttons.
+    //
+    // Taken even when this event made no whole notch: it is still the
+    // interface's travel, and the camera must not zoom on it.
     uint32_t wid = widgets_.hitTestWheel(x, y);
     while (wid != 0) {
         const auto* w = widgets_.get(wid);
         if (!w) break;
         if (w->wheelEnabled) {
-            callFrameScriptNumber(wid, "OnMouseWheel", delta);
+            // A frame whose scroll bar has been seen moving glides it, by
+            // fractions of a notch - see glideWheel.
+            if (glideWheel(wid, travel)) {
+                wheelCarry_ = 0.0f;
+                return true;
+            }
+            if ((travel > 0.0f) != (wheelCarry_ > 0.0f) && wheelCarry_ != 0.0f) wheelCarry_ = 0.0f;
+            wheelCarry_ += travel;
+            int notches = static_cast<int>(wheelCarry_);  // toward zero
+            wheelCarry_ -= static_cast<float>(notches);
+            // A flick of momentum scrolling can be worth dozens; a page at a
+            // time is plenty, and FrameXML runs a handler per notch.
+            constexpr int kMaxNotchesPerEvent = 10;
+            notches = std::clamp(notches, -kMaxNotchesPerEvent, kMaxNotchesPerEvent);
+            if (notches == 0) return true;
+
+            // Which scroll bar the notches move, if any: the frame's own
+            // sliders, read before and after. A scroll frame's bar is its
+            // child in every template that has one - UIPanelScrollFrame,
+            // FauxScrollFrame, HybridScrollFrame.
+            std::vector<std::pair<uint32_t, float>> sliders;
+            for (uint32_t child : w->children) {
+                const auto* c = widgets_.get(child);
+                if (c && c->objectType == "Slider") sliders.emplace_back(child, c->barValue);
+            }
+            // Heading somewhere already: step on from there, not from partway.
+            if (wheelGlide_.slider != 0) {
+                for (const auto& [slider, before] : sliders) {
+                    if (slider == wheelGlide_.slider) setSliderValue(slider, wheelGlide_.target);
+                }
+                wheelGlide_ = {};
+                for (auto& [slider, before] : sliders) before = widgets_.get(slider)->barValue;
+            }
+
+            const float step = notches > 0 ? 1.0f : -1.0f;
+            for (int i = 0; i < std::abs(notches); ++i) {
+                callFrameScriptNumber(wid, "OnMouseWheel", step);
+            }
+
+            // Exactly one moved, and landed inside its range - a stop at the
+            // end would understate a notch: that is the scroll bar, and one
+            // notch is what it moved by. Put it back and glide it there, and
+            // every later turn of the wheel over this frame glides.
+            uint32_t moved = 0;
+            float from = 0.0f;
+            int movedCount = 0;
+            for (const auto& [slider, before] : sliders) {
+                const auto* c = widgets_.get(slider);
+                if (c && c->barValue != before) { moved = slider; from = before; ++movedCount; }
+            }
+            if (movedCount == 1) {
+                const auto* c = widgets_.get(moved);
+                const float to = c->barValue;
+                if (to > c->barMin && to < c->barMax) {
+                    wheelBindings_[wid] = {moved, (to - from) / static_cast<float>(notches)};
+                }
+                setSliderValue(moved, from);
+                wheelGlide_ = {moved, to, from};
+            }
             return true;
         }
         wid = w->parent;
     }
+    // Nothing here to scroll: what was gathered belongs to no window.
+    wheelCarry_ = 0.0f;
     return false;
+}
+
+/// Scroll a frame the wheel has scrolled before by gliding its scroll bar.
+///
+/// A notch is all FrameXML knows how to scroll by - the handlers read only its
+/// sign - and a scroll frame moves half a page on one. A wheel therefore
+/// jumped half a page a click, and a trackpad, whose swipe is worth a fraction
+/// of a notch per event, could do no better than jump whenever enough of them
+/// added up to one.
+///
+/// Once a frame's notches have been seen moving its scroll bar, the bar is
+/// driven directly: the travel, in notches and fractions of one, sets where it
+/// is heading, and advanceWheelGlide eases it there a frame at a time. The
+/// bar's own OnValueChanged still does the scrolling, as it would for a drag
+/// of the thumb, so the list or text follows whatever the template does with
+/// it. Nothing is changed for a frame that has no bar - chat scrolls a line a
+/// notch and has none.
+bool LuaEngine::glideWheel(uint32_t wheelFrame, float notches) {
+    const auto it = wheelBindings_.find(wheelFrame);
+    if (it == wheelBindings_.end()) return false;
+    const WheelBinding binding = it->second;
+    const auto* bar = widgets_.get(binding.slider);
+    if (!bar || bar->parent != wheelFrame) {
+        wheelBindings_.erase(it);
+        return false;
+    }
+    const float from = wheelGlide_.slider == binding.slider ? wheelGlide_.target : bar->barValue;
+    const float lo = std::min(bar->barMin, bar->barMax);
+    const float hi = std::max(bar->barMin, bar->barMax);
+    const float target = std::clamp(from + notches * binding.perNotch, lo, hi);
+    if (wheelGlide_.slider != binding.slider) {
+        wheelGlide_ = {binding.slider, target, bar->barValue};
+    } else {
+        wheelGlide_.target = target;
+    }
+    return true;
+}
+
+void LuaEngine::advanceWheelGlide(float elapsed) {
+    if (wheelGlide_.slider == 0) return;
+    const auto* bar = widgets_.get(wheelGlide_.slider);
+    // Gone, taken hold of, or moved by something else - a drag of the thumb,
+    // the quest log jumping to a quest: that wins, and the glide stops.
+    if (!bar || holdsMousePress() || bar->barValue != wheelGlide_.lastSet) {
+        wheelGlide_ = {};
+        return;
+    }
+    // Most of the way in a tenth of a second, the rest trailing off: quick
+    // enough to keep up with the hand, slow enough to be seen moving.
+    constexpr float kRate = 22.0f;
+    const float remaining = wheelGlide_.target - bar->barValue;
+    float value = bar->barValue + remaining * (1.0f - std::exp(-kRate * elapsed));
+    if (std::abs(wheelGlide_.target - value) < 0.5f) value = wheelGlide_.target;
+    setSliderValue(wheelGlide_.slider, value);
+    const auto* after = widgets_.get(wheelGlide_.slider);
+    if (value == wheelGlide_.target || !after) {
+        wheelGlide_ = {};
+        return;
+    }
+    wheelGlide_.lastSet = after->barValue;
+}
+
+/// slider:SetValue(value), through the method so OnValueChanged fires exactly
+/// as it does for the interface's own calls.
+void LuaEngine::setSliderValue(uint32_t wid, float value) {
+    if (!L_) return;
+    lua_getglobal(L_, "__WoweeFramesByWid");
+    if (!lua_istable(L_, -1)) { lua_pop(L_, 1); return; }
+    lua_pushinteger(L_, static_cast<lua_Integer>(wid));
+    lua_rawget(L_, -2);
+    if (!lua_istable(L_, -1)) { lua_pop(L_, 2); return; }
+    lua_getfield(L_, -1, "SetValue");
+    if (!lua_isfunction(L_, -1)) { lua_pop(L_, 3); return; }
+    lua_pushvalue(L_, -2);
+    lua_pushnumber(L_, value);
+    if (lua_pcall(L_, 2, 0, 0) != 0) {
+        LOG_WARNING("Wheel glide: SetValue on ", scriptOrigin(widgets_, wid, "SetValue"),
+                    " failed: ", luaL_optstring(L_, -1, "?"));
+        lua_pop(L_, 1);
+    }
+    lua_pop(L_, 2);
 }
 
 bool LuaEngine::holdsMousePress() const {
@@ -11292,6 +11440,7 @@ void LuaEngine::dispatchOnUpdate(float elapsed) {
     if (!L_) return;
 
     drainPendingTextChanged();
+    advanceWheelGlide(elapsed);
 
     // Animations first, so a frame's own OnUpdate sees this frame's values
     // rather than the previous one's.
