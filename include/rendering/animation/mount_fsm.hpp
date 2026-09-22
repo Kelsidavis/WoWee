@@ -28,8 +28,6 @@ public:
         uint32_t jumpEnd = 0;
         uint32_t rearUp = 0;
         uint32_t run = 0;
-        uint32_t runLeft = 0;
-        uint32_t runRight = 0;
         uint32_t stand = 0;
         // Flight animations
         uint32_t flyIdle = 0;

@@ -99,10 +99,10 @@ uint32_t MountFSM::resolveGroundOrFlyAnim(const Input& in) const {
             // Mounted swimming - simplified, no per-direction mount swim anims needed here
             // (the original code used pickMountAnim with mount-specific swim IDs)
             return anims_.run ? anims_.run : anim::RUN;
-        } else if (anyStrafeLeft) {
-            return anims_.runLeft ? anims_.runLeft : (anims_.run ? anims_.run : anim::RUN);
-        } else if (anyStrafeRight) {
-            return anims_.runRight ? anims_.runRight : (anims_.run ? anims_.run : anim::RUN);
+        } else if (anyStrafeLeft || anyStrafeRight) {
+            // On the ground a mount strafes on its run. The strafe animations a
+            // mount carries are the bank a flier leans into in the air.
+            return anims_.run ? anims_.run : anim::RUN;
         } else if (in.movingBackward) {
             return anims_.run ? anims_.run : anim::RUN;
         } else {

@@ -752,17 +752,20 @@ void AnimationController::setMounted(uint32_t mountInstId, uint32_t mountDisplay
     mountAnims.jumpEnd   = discoveredEnd > 0 ? discoveredEnd : findFirst({anim::JUMP_END});
     mountAnims.rearUp    = findFirst({anim::MOUNT_SPECIAL, anim::RUN_RIGHT, anim::FALL});
     mountAnims.run       = findFirst({anim::RUN, anim::WALK});
-    mountAnims.runLeft   = findFirst({anim::RUN_LEFT});
-    mountAnims.runRight  = findFirst({anim::RUN_RIGHT});
     mountAnims.stand     = findFirst({anim::STAND});
     // Discover flight animations (flying mounts only - may all be 0 for ground mounts)
     //
-    // A 3.3.5 flying mount has two: Fly for moving, and Hover for staying put -
-    // or Fly for that too, when it has no Hover (the wyvern). It has nothing
-    // for climbing, diving, strafing or backing up, so those stay empty and
-    // the FSM falls back to these two.
+    // A 3.3.5 flying mount has Fly for moving and Hover for staying put - or
+    // Fly for that too, when it has no Hover (the wyvern) - and RunRight and
+    // RunLeft for strafing. Those two are the bank it leans into in the air:
+    // three or four seconds long, moving nothing, and carried by fliers alone -
+    // no ground mount has them - so they are strafing in flight, not on the
+    // ground. It has nothing for climbing, diving or backing up, so those stay
+    // empty and the FSM falls back.
     mountAnims.flyForward   = findFirst({anim::FLY_FORWARD});
     mountAnims.flyIdle      = findFirst({anim::FLY_IDLE, anim::FLY_FORWARD});
+    mountAnims.flyLeft      = findFirst({anim::RUN_LEFT});
+    mountAnims.flyRight     = findFirst({anim::RUN_RIGHT});
 
     // Discover idle fidget animations using proper WoW M2 metadata
     core::Logger::getInstance().debug("Scanning for fidget animations in ", sequences.size(), " sequences");
