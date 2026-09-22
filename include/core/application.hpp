@@ -407,6 +407,7 @@ private:
     // Quest marker billboard sprites (above NPCs)
     void loadQuestMarkerModels();  // Now loads BLP textures
     void updateQuestMarkers();     // Updates billboard positions
+    void updateLootSparkles();     // The glitter over corpses with loot
 };
 
 } // namespace core

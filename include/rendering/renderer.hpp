@@ -73,6 +73,7 @@ class OverlaySystem;
 class HiZSystem;
 class GrassRenderer;
 class VolumetricFog;
+class LootSparkles;
 class SunShafts;
 class ScreenCapture;
 
@@ -205,6 +206,7 @@ public:
     // Sub-system accessors (§4.2)
     AnimationController* getAnimationController() const { return animationController_.get(); }
     LevelUpEffect* getLevelUpEffect() const { return levelUpEffect.get(); }
+    LootSparkles* getLootSparkles() const { return lootSparkles_.get(); }
     ChargeEffect* getChargeEffect() const { return chargeEffect.get(); }
     SwimEffects* getSwimEffects() const { return swimEffects.get(); }
 
@@ -291,6 +293,7 @@ private:
     std::unique_ptr<SwimEffects> swimEffects;
     std::unique_ptr<MountDust> mountDust;
     std::unique_ptr<LevelUpEffect> levelUpEffect;
+    std::unique_ptr<LootSparkles> lootSparkles_;
     std::unique_ptr<ChargeEffect> chargeEffect;
     std::unique_ptr<CharacterRenderer> characterRenderer;
     std::unique_ptr<WMORenderer> wmoRenderer;

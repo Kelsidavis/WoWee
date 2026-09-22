@@ -41,6 +41,7 @@
 #include "rendering/volumetric_fog.hpp"
 #include "rendering/sun_shafts.hpp"
 #include "rendering/screen_capture.hpp"
+#include "rendering/loot_sparkles.hpp"
 #include "rendering/minimap.hpp"
 #include "rendering/world_map.hpp"
 #include "rendering/quest_marker_renderer.hpp"
@@ -720,6 +721,7 @@ bool Renderer::initialize(core::Window* win) {
         LOG_WARNING("Charge effect initialization failed (non-fatal)");
 
     levelUpEffect = std::make_unique<LevelUpEffect>();
+    lootSparkles_ = std::make_unique<LootSparkles>();
 
     // Non-fatal like the effects above: a device that cannot build the compute
     // pipeline still gets everything else, and isReady() gates both call sites.

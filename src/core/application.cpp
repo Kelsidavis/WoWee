@@ -26,6 +26,7 @@
 #include "core/logger.hpp"
 #include "core/memory_monitor.hpp"
 #include "rendering/renderer.hpp"
+#include "rendering/loot_sparkles.hpp"
 #include "rendering/vk_context.hpp"
 #include "audio/npc_voice_manager.hpp"
 #include "rendering/camera.hpp"
@@ -3811,6 +3812,9 @@ void Application::updateInGame(float deltaTime, const char*& updateCheckpoint) {
     runInGameStage("updateQuestMarkers", [&] {
         updateQuestMarkers();
     });
+    runInGameStage("updateLootSparkles", [&] {
+        updateLootSparkles();
+    });
     // Sync server run speed to camera controller
     inGameStep = "post-update sync";
     updateCheckpoint = "in_game: post-update sync";
@@ -5390,6 +5394,23 @@ void Application::loadQuestMarkerModels() {
             }
         }
     }
+}
+
+void Application::updateLootSparkles() {
+    auto* sparkles = renderer ? renderer->getLootSparkles() : nullptr;
+    if (!sparkles || !gameHandler) return;
+    // Dead and marked lootable - the flag the server sends only to a player
+    // allowed to loot the body, so a corpse tapped by someone else stays dull.
+    std::vector<rendering::LootSparkles::Corpse> corpses;
+    for (const auto& [guid, entity] : gameHandler->getEntityManager().getEntities()) {
+        if (!entity || entity->getType() != game::ObjectType::UNIT) continue;
+        const auto* unit = static_cast<const game::Unit*>(entity.get());
+        if (unit->getHealth() != 0) continue;
+        if ((unit->getDynamicFlags() & game::UNIT_DYNFLAG_LOOTABLE) == 0) continue;
+        glm::vec3 position;
+        if (getRenderPositionForGuid(guid, position)) corpses.emplace_back(guid, position);
+    }
+    sparkles->update(renderer->getM2Renderer(), assetManager.get(), corpses);
 }
 
 void Application::updateQuestMarkers() {
