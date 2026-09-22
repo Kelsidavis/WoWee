@@ -1417,6 +1417,8 @@ local function silenceRemoved()
     for f in pairs(removed) do
         f.value = nil
         f.newValue = nil
+        -- Defaults applies this one: the Windowed box's is windowed.
+        f.defaultValue = nil
     end
 end
 
@@ -1444,6 +1446,26 @@ local function applyRemoval()
 end
 
 applyRemoval()
+
+-- And immediately before the panel acts. The hooks above run when a panel is
+-- shown or hears an event - but OptionsFrame_OnShow shows the first page and
+-- only then refreshes every page, and a checkbox's refresh stores its CVar as
+-- the value. So the Windowed box came away from opening the Video window
+-- holding gxWindow as it was then. Untick full screen on the Display page,
+-- press Okay, and the replay wrote that value back - full screen again.
+-- Silencing on the way into Okay, Cancel and Defaults holds whatever order the
+-- refreshes came in.
+for panel in pairs(panels) do
+    for _, key in ipairs({ "okay", "cancel", "default" }) do
+        local original = panel[key]
+        if type(original) == "function" then
+            panel[key] = function(...)
+                silenceRemoved()
+                return original(...)
+            end
+        end
+    end
+end
 
 -- A page with nothing left on it is the same puzzle as a disabled row, so it
 -- leaves the list. The entry is the panel itself, and the list skips anything
