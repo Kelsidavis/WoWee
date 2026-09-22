@@ -10948,7 +10948,7 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
                                     target->name.empty() ? "(unnamed)"
                                                          : target->name.c_str(),
                                     dropOn == draggingWid_
-                                        ? " - the frame it was dragged from, so nothing was offered"
+                                        ? " - the frame it was dragged from; OnReceiveDrag ran"
                                         : " - OnReceiveDrag ran");
                     } else {
                         const auto* under = hit ? widgets_.get(hit) : nullptr;
@@ -10958,7 +10958,15 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
                                     " - nothing at or above it takes a drop, so the "
                                     "cursor keeps what it is carrying");
                     }
-                    if (dropOn != 0 && dropOn != draggingWid_) {
+                    // Including the frame it came from. Dragging an action off
+                    // a button and letting go over the same button is how it
+                    // goes back: the pickup emptied the slot, and only the drop
+                    // puts it there again. Skipping that frame left the action
+                    // on the cursor, where the next Escape or click on the
+                    // world removed it for good - the "I knocked it off and
+                    // cannot put it back" report. A bag slot is the same: its
+                    // OnReceiveDrag puts the item back where it was.
+                    if (dropOn != 0) {
                         callFrameScript(dropOn, "OnReceiveDrag", b.name);
                     } else if (dropOn == 0 && L_) {
                         // Let go over the world, which is how an action is

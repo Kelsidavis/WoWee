@@ -615,20 +615,23 @@ static int lua_PickupAction(lua_State* L) {
 }
 
 // PlaceAction(slot) - places cursor content into an action bar slot
+//
+// A swap, as the real one is: whatever the slot held goes onto the cursor, so
+// a bar can be rearranged by dropping one action on another and then placing
+// the one that came off. This wrote the new action over the old and cleared
+// the cursor, so the action underneath was simply gone - and it is PlaceAction
+// an action button's OnReceiveDrag calls, so every drop onto an occupied
+// button lost what was there.
+//
+// PickupAction while holding something is exactly that swap, so this is it.
+// With nothing placeable held it does nothing, and leaves the cursor alone.
 static int lua_PlaceAction(lua_State* L) {
-    auto* gh = getGameHandler(L);
-    if (!gh) return 0;
-    int slot = static_cast<int>(luaL_checknumber(L, 1));
-    if (slot < 1 || slot > static_cast<int>(gh->getActionBar().size())) return 0;
-    if (s_cursorType == CursorType::SPELL && s_cursorId != 0) {
-        gh->setActionBarSlot(slot - 1, game::ActionBarSlot::SPELL, s_cursorId);
-    } else if (s_cursorType == CursorType::ITEM && s_cursorId != 0) {
-        gh->setActionBarSlot(slot - 1, game::ActionBarSlot::ITEM, s_cursorId);
-    } else if (s_cursorType == CursorType::MACRO && s_cursorId != 0) {
-        gh->setActionBarSlot(slot - 1, game::ActionBarSlot::MACRO, s_cursorId);
-    }
-    clearCursorItem(L);
-    return 0;
+    const bool holding = s_cursorId != 0 &&
+                         (s_cursorType == CursorType::SPELL ||
+                          s_cursorType == CursorType::ITEM ||
+                          s_cursorType == CursorType::MACRO);
+    if (!holding) return 0;
+    return lua_PickupAction(L);
 }
 
 // PickupSpell(bookSlot, bookType) - picks up a spell from the spellbook
