@@ -2269,6 +2269,17 @@ static int lua_UnitReaction(lua_State* L) {
     uint64_t g1 = resolveUnitGuid(gh, u1);
     uint64_t g2 = resolveUnitGuid(gh, u2);
     if (g1 == g2) { lua_pushnumber(L, 5); return 1; } // same unit = friendly
+    // How a creature regards the player, which is the question the tooltip
+    // and the name colours ask - UnitReaction(unit, "player"). For a faction
+    // with a standing that is the standing: answered hostile-or-friendly, the
+    // Kurenai read as friendly to an Alliance player at Unfriendly, who could
+    // not then find out why Telaar would not speak to them.
+    const uint64_t me = gh->getPlayerGuid();
+    auto* unit1 = resolveUnit(L, uid1);
+    if (g2 == me && unit1 && unit1->getType() == game::ObjectType::UNIT) {
+        lua_pushnumber(L, gh->unitReactionToPlayer(*unit1));
+        return 1;
+    }
     if (unit2->isHostile()) {
         lua_pushnumber(L, 2); // hostile
     } else {
@@ -2563,14 +2574,21 @@ void registerUnitLuaAPI(lua_State* L) {
                                 t == game::InvType::TWO_HAND) ? 1 : 0);
             return 1;
         }},
-                // The colour a unit's name is drawn in: red for hostile, green
-                // for friendly, yellow for neutral. Unit frames read all four
-                // components straight into SetTextColor.
+                // The colour a unit's name is drawn in: red for hostile, orange
+                // for unfriendly, yellow for neutral, green for friendly. Unit
+                // frames read all four components straight into SetTextColor.
                 {"UnitSelectionColor", [](lua_State* L) -> int {
             const char* uid = luaL_optstring(L, 1, "player");
             auto* unit = resolveUnit(L, uid);
             float r = 0.0f, g = 1.0f, b = 0.0f;
-            if (unit && unit->isHostile()) { r = 1.0f; g = 0.0f; b = 0.0f; }
+            auto* gh = getGameHandler(L);
+            if (unit && gh && unit->getType() == game::ObjectType::UNIT) {
+                // A creature by how it regards the player, standing and all.
+                const int reaction = gh->unitReactionToPlayer(*unit);
+                if (reaction <= 2)      { r = 1.0f; g = 0.0f; }
+                else if (reaction == 3) { r = 1.0f; g = 0.5f; }
+                else if (reaction == 4) { r = 1.0f; g = 1.0f; }
+            } else if (unit && unit->isHostile()) { r = 1.0f; g = 0.0f; b = 0.0f; }
             lua_pushnumber(L, r);
             lua_pushnumber(L, g);
             lua_pushnumber(L, b);

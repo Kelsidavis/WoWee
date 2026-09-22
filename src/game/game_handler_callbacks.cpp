@@ -1,4 +1,5 @@
 #include "game/game_handler.hpp"
+#include "game/reputation_standing.hpp"
 #include "game/spell_description_eval.hpp"
 #include "game/gather_spells.hpp"
 #include "game/packed_time.hpp"
@@ -2822,6 +2823,18 @@ void GameHandler::interactWithNpc(uint64_t guid) {
                 LOG_DEBUG("interactWithNpc: 0x", std::hex, guid, std::dec,
                           " has no NPC flags; no gossip hello sent");
                 return;
+            }
+            // Sent anyway - the server is the judge - but said, because the
+            // server says nothing: an NPC whose faction regards the player as
+            // Unfriendly or worse is refused the conversation in silence.
+            if (const int reaction = unitReactionToPlayer(*unit); reaction <= 3) {
+                static std::unordered_set<uint64_t> said;
+                if (said.insert(guid).second) {
+                    LOG_WARNING("interactWithNpc: ", unit->getName(), " (faction template ",
+                                unit->getFactionTemplate(), ") regards you as ",
+                                kReputationStandings[std::max(reaction, 1) - 1].name,
+                                " - the server will not talk to you below Neutral");
+                }
             }
         }
     }

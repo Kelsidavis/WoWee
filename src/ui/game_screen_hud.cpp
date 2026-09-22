@@ -1446,6 +1446,11 @@ void GameScreen::renderNameplates(game::GameHandler& gameHandler) {
             nameColor = isHostile
                 ? IM_COL32(220, 80, 80, A(230))
                 : IM_COL32(102, 153, 255, A(230));
+        } else if (!isHostile && gameHandler.unitReactionToPlayer(*unit) == 3) {
+            // Orange - unfriendly: not attackable, and it will not talk to
+            // the player either. The Kurenai at Telaar, to an Alliance player
+            // who has not yet reached Neutral with them.
+            nameColor = IM_COL32(240, 130, 60, A(230));
         } else {
             nameColor = isHostile
                 ? IM_COL32(220,  80,  80, A(230))   // red  - hostile NPC

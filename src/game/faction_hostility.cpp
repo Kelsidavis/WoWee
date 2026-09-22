@@ -4,7 +4,6 @@
 #include "pipeline/dbc_layout.hpp"
 #include "core/logger.hpp"
 #include <unordered_map>
-#include <unordered_set>
 
 namespace wowee {
 namespace game {
@@ -43,28 +42,52 @@ void buildFactionHostilityMap(pipeline::AssetManager& assetManager, GameHandler&
         default: playerFtId = 1; break;
     }
 
-    // Build set of hostile parent faction IDs from Faction.dbc base reputation
+    // The factions a player has a standing with, and whether they start at war.
+    //
+    // For one of these the standing decides, not the groups: the game treats
+    // its units as hostile while the player is at war with the faction and as
+    // friendly otherwise. A player starts at war when their starting standing
+    // is Hostile or worse, unless the faction's flags force peace. This used to
+    // call any starting standing below zero hostile - and every Alliance race
+    // starts at -1200 with the Kurenai, Unfriendly and peace-forced, so all of
+    // Telaar came out hostile and a right-click on its quest givers attacked.
+    //
+    // At war by default only; GameHandler::isHostileFaction reads the server's
+    // own flag once the standings have arrived.
     const auto* facL = pipeline::getActiveDBCLayout() ? pipeline::getActiveDBCLayout()->getLayout("Faction") : nullptr;
     const auto* ftL = pipeline::getActiveDBCLayout() ? pipeline::getActiveDBCLayout()->getLayout("FactionTemplate") : nullptr;
-    std::unordered_set<uint32_t> hostileParentFactions;
+    struct RepFaction { uint32_t repListId = 0; bool atWar = false; };
+    std::unordered_map<uint32_t, RepFaction> repFactions;
     if (fDbc && fDbc->isLoaded()) {
         const uint32_t facID = facL ? (*facL)["ID"] : 0;
+        const uint32_t facRepList = facL ? (*facL)["ReputationListID"] : 1;
         const uint32_t facRaceMask0 = facL ? (*facL)["ReputationRaceMask0"] : 2;
         const uint32_t facBase0 = facL ? (*facL)["ReputationBase0"] : 10;
+        const uint32_t facFlags0 = facL ? (*facL)["ReputationFlags0"] : 14;
+        constexpr int32_t kHostileRankTop = -3001;  // Hostile runs -6000 to -3001
+        uint32_t atWarCount = 0;
         for (uint32_t i = 0; i < fDbc->getRecordCount(); i++) {
-            uint32_t factionId = fDbc->getUInt32(i, facID);
+            const uint32_t repListId =
+                facRepList != 0xFFFFFFFF ? fDbc->getUInt32(i, facRepList) : 0xFFFFFFFF;
+            if (repListId == 0xFFFFFFFF) continue;  // no standing to have
+            int32_t baseRep = 0;
+            uint32_t repFlags = 0;
             for (int slot = 0; slot < 4; slot++) {
                 uint32_t raceMask = fDbc->getUInt32(i, facRaceMask0 + slot);
                 if (raceMask & playerRaceMask) {
-                    int32_t baseRep = fDbc->getInt32(i, facBase0 + slot);
-                    if (baseRep < 0) {
-                        hostileParentFactions.insert(factionId);
-                    }
+                    baseRep = fDbc->getInt32(i, facBase0 + slot);
+                    if (facFlags0 != 0xFFFFFFFF) repFlags = fDbc->getUInt32(i, facFlags0 + slot);
                     break;
                 }
             }
+            const bool atWar = (repFlags & GameHandler::FACTION_FLAG_AT_WAR) != 0 ||
+                               (baseRep <= kHostileRankTop &&
+                                (repFlags & GameHandler::FACTION_FLAG_PEACE_FORCED) == 0);
+            repFactions[fDbc->getUInt32(i, facID)] = {repListId, atWar};
+            if (atWar) ++atWarCount;
         }
-        LOG_INFO("Faction.dbc: ", hostileParentFactions.size(), " factions hostile to race ", static_cast<int>(playerRace));
+        LOG_INFO("Faction.dbc: ", repFactions.size(), " factions with a standing, ",
+                 atWarCount, " at war with race ", static_cast<int>(playerRace), " from the start");
     }
 
     // Get player faction template data
@@ -98,6 +121,9 @@ void buildFactionHostilityMap(pipeline::AssetManager& assetManager, GameHandler&
     // boar hold the cast, and the server refused it as an invalid target
     // instead of the spell falling back to the caster.
     std::unordered_map<uint32_t, bool> friendlyMap;
+    // Each template whose faction carries a standing, by the server's index for
+    // that standing, so the live at-war flag can be asked for later.
+    std::unordered_map<uint32_t, uint32_t> templateRepList;
     for (uint32_t i = 0; i < ftDbc->getRecordCount(); i++) {
         uint32_t id = ftDbc->getUInt32(i, ftID);
         uint32_t parentFaction = ftDbc->getUInt32(i, ftFaction);
@@ -124,25 +150,26 @@ void buildFactionHostilityMap(pipeline::AssetManager& assetManager, GameHandler&
             }
         }
 
-        // 4. Parent faction base reputation check (Faction.dbc)
-        if (!hostile && parentFaction > 0) {
-            if (hostileParentFactions.count(parentFaction)) {
-                hostile = true;
-            }
-        }
-
-        // 5. If explicitly friendly (friendGroup includes player), override to non-hostile
+        // 4. If explicitly friendly (friendGroup includes player), override to non-hostile
         if (hostile && (friendGroup & playerFriendGroup) != 0) {
             hostile = false;
         }
 
-        factionMap[id] = hostile;
-
         // Friendly is mutual regard between the two groups, asked in both
         // directions, and never true for something already hostile.
-        const bool friendly = !hostile &&
+        bool friendly = !hostile &&
             (((friendGroup & playerFactionGroup) != 0) ||
              ((factionGroup & playerFriendGroup) != 0));
+
+        // 5. A faction with a standing overrides all of it: at war is hostile,
+        // anything else friendly. See repFactions above.
+        if (auto rep = repFactions.find(parentFaction); rep != repFactions.end()) {
+            hostile = rep->second.atWar;
+            friendly = !hostile;
+            templateRepList[id] = rep->second.repListId;
+        }
+
+        factionMap[id] = hostile;
         friendlyMap[id] = friendly;
     }
 
@@ -152,6 +179,7 @@ void buildFactionHostilityMap(pipeline::AssetManager& assetManager, GameHandler&
     for (const auto& [fid, f] : friendlyMap) { if (f) friendlyCount++; }
     LOG_INFO("Faction friendliness: ", friendlyCount, "/", friendlyMap.size(),
              " templates friendly; the rest are hostile or neutral");
+    gameHandler.setFactionTemplateRepList(std::move(templateRepList));
     gameHandler.setFactionFriendlyMap(std::move(friendlyMap));
     gameHandler.setFactionHostileMap(std::move(factionMap));
     LOG_INFO("Faction hostility for race ", static_cast<int>(playerRace), " (FT ", playerFtId, "): ",

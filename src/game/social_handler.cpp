@@ -4606,6 +4606,9 @@ void SocialHandler::handleInitializeFactions(network::Packet& packet) {
     LOG_INFO("Reputation: ", owner_.initialFactionsRef().size(),
              " factions initialised, ", owner_.factionStandingsRef().size(),
              " resolved to a faction id");
+    // Whether each faction with a standing is hostile is the at-war flag this
+    // packet carries, so units judged before it arrived are judged again.
+    owner_.refreshUnitHostility();
 }
 
 void SocialHandler::handleSetFactionStanding(network::Packet& packet) {
@@ -4678,6 +4681,7 @@ void SocialHandler::handleSetFactionAtWar(network::Packet& packet) {
             owner_.initialFactionsRef()[repListId].flags |=  GameHandler::FACTION_FLAG_AT_WAR;
         else
             owner_.initialFactionsRef()[repListId].flags &= ~GameHandler::FACTION_FLAG_AT_WAR;
+        owner_.refreshUnitHostility();
     }
 }
 

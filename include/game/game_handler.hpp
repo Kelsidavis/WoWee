@@ -1617,15 +1617,34 @@ public:
     // Faction hostility map (populated from FactionTemplate.dbc by Application)
     void setFactionHostileMap(std::unordered_map<uint32_t, bool> map) { factionHostileMap_ = std::move(map); }
     void setFactionFriendlyMap(std::unordered_map<uint32_t, bool> map) { factionFriendlyMap_ = std::move(map); }
+    /// The templates whose faction the player has a standing with, by that
+    /// standing's index in the server's list. See factionAtWarLive.
+    void setFactionTemplateRepList(std::unordered_map<uint32_t, uint32_t> map) {
+        factionTemplateRepList_ = std::move(map);
+    }
     /// Whether a beneficial spell may be aimed at this faction.
     ///
     /// Not the negation of isHostileFaction: a faction can be neither, and most
     /// wildlife is. Unknown answers false, so a spell falls back to the caster
     /// rather than being sent at something the server will refuse.
     bool isFriendlyFaction(uint32_t factionTemplateId) const {
+        if (const int atWar = factionAtWarLive(factionTemplateId); atWar >= 0) return atWar == 0;
         auto it = factionFriendlyMap_.find(factionTemplateId);
         return it != factionFriendlyMap_.end() ? it->second : false;
     }
+    /// Re-judge every unit's hostility, after the at-war state it came from
+    /// has changed. A unit's is worked out when it appears and kept.
+    void refreshUnitHostility();
+    /// How a unit regards the player, numbered as UnitReaction numbers it:
+    /// 1 hated to 8 exalted. For a faction the player has a standing with,
+    /// that standing - no better than neutral while at war - and otherwise 2
+    /// hostile, 5 friendly, 4 neither.
+    ///
+    /// Not the same question as isHostileFaction, which is whether the player
+    /// may attack it. The Kurenai are not attackable by an Alliance player at
+    /// any standing, but at Unfriendly they will not talk to one either, and
+    /// the server refuses the conversation on exactly this number.
+    [[nodiscard]] int unitReactionToPlayer(const Unit& unit) const;
 
     // Creature move callback (online mode - triggered by SMSG_MONSTER_MOVE)
     // Parameters: guid, x, y, z (canonical), duration_ms (0 = instant)
@@ -1730,14 +1749,14 @@ public:
     uint8_t lookupPlayerRace(uint64_t guid) const {
         return entityController_->lookupPlayerRace(guid);
     }
+    uint8_t lookupPlayerGender(uint64_t guid) const {
+        return entityController_->lookupPlayerGender(guid);
+    }
 
     // Look up a display name for any guid: checks playerNameCache then entity manager.
     // Returns empty string if unknown. Used by chat display to resolve names at render time.
     const std::string& lookupName(uint64_t guid) const {
         return entityController_->lookupName(guid);
-    }
-    uint8_t lookupPlayerGender(uint64_t guid) const {
-        return entityController_->lookupPlayerGender(guid);
     }
 
     uint8_t getPlayerClass() const {
@@ -3981,8 +4000,18 @@ public:
         uint32_t suffixFactor = 0;       // ITEM_FIELD_PROPERTY_SEED (random-suffix stat scale)
     };
     bool isHostileFaction(uint32_t factionTemplateId) const {
+        if (const int atWar = factionAtWarLive(factionTemplateId); atWar >= 0) return atWar == 1;
         auto it = factionHostileMap_.find(factionTemplateId);
         return it != factionHostileMap_.end() ? it->second : true;
+    }
+    /// For a template whose faction carries a standing: 1 while the server
+    /// says the player is at war with it, 0 when not, and -1 when it is not
+    /// such a template or the standings have not arrived - the maps above,
+    /// built from the starting standings, answer until then.
+    int factionAtWarLive(uint32_t factionTemplateId) const {
+        auto it = factionTemplateRepList_.find(factionTemplateId);
+        if (it == factionTemplateRepList_.end() || it->second >= initialFactions_.size()) return -1;
+        return isFactionAtWar(it->second) ? 1 : 0;
     }
 
 private:
@@ -4630,6 +4659,7 @@ private:
     // Faction hostility lookup (populated from FactionTemplate.dbc)
     std::unordered_map<uint32_t, bool> factionHostileMap_;
     std::unordered_map<uint32_t, bool> factionFriendlyMap_;
+    std::unordered_map<uint32_t, uint32_t> factionTemplateRepList_;
 
     // Vehicle (WotLK): non-zero when player is seated in a vehicle
     uint32_t vehicleId_ = 0;

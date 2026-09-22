@@ -1,4 +1,5 @@
 #include "game/game_handler.hpp"
+#include "game/reputation_standing.hpp"
 
 #include <set>
 
@@ -2794,6 +2795,28 @@ void GameHandler::loadFactionNameCache() const {
     }
     LOG_INFO("Faction.dbc: loaded ", factionNameCache_.size(), " faction names, ",
              factionRepListToId_.size(), " with reputation tracking");
+}
+
+int GameHandler::unitReactionToPlayer(const Unit& unit) const {
+    const uint32_t ft = unit.getFactionTemplate();
+    if (auto it = factionTemplateRepList_.find(ft);
+        it != factionTemplateRepList_.end() && it->second < initialFactions_.size()) {
+        const auto& standing = initialFactions_[it->second];
+        int rank = reputationStandingFor(standing.standing).id;
+        if (standing.flags & FACTION_FLAG_AT_WAR) rank = std::min(rank, 4);
+        return rank;
+    }
+    if (unit.isHostile()) return 2;
+    return isFriendlyFaction(ft) ? 5 : 4;
+}
+
+void GameHandler::refreshUnitHostility() {
+    if (factionTemplateRepList_.empty()) return;
+    for (const auto& [guid, entity] : getEntityManager().getEntities()) {
+        if (!entity || !entity->isUnit()) continue;
+        auto* unit = static_cast<Unit*>(entity.get());
+        unit->setHostile(isHostileFaction(unit->getFactionTemplate()));
+    }
 }
 
 uint32_t GameHandler::getFactionIdByRepListId(uint32_t repListId) const {
