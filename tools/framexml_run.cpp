@@ -611,6 +611,26 @@ int main(int argc, char** argv) {
             }
             continue;
         }
+        // --wheel:X,Y,DELTA turns the wheel at a point, top-origin like
+        // --mouse, through the same dispatch the client uses.
+        if (std::strncmp(argv[i], "--wheel:", 8) == 0) {
+            float mx = 0.0f, my = 0.0f, delta = 0.0f;
+            std::sscanf(argv[i] + 8, "%f,%f,%f", &mx, &my, &delta);
+            relayout();
+            bool taken = false;
+            if (auto* engine = mgr.getLuaEngine()) {
+                taken = engine->dispatchMouseWheel(mx, 1080.0f - my, delta);
+            }
+            std::printf("   wheel %.2f at %.0f,%.0f %s\n", delta, mx, my,
+                        taken ? "taken by the interface" : "not taken");
+            if (errors.size() != before) {
+                ++raised;
+                for (size_t k = before; k < errors.size(); ++k) {
+                    std::printf("   %s\n", errors[k].c_str());
+                }
+            }
+            continue;
+        }
         // --fire:EVENT sends one event through the engine's own dispatch.
         //
         // Calling a frame's OnEvent by hand tests the handler and nothing
