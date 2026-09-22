@@ -13,10 +13,12 @@
 /// What does not convert is refused rather than half-written. A model on disk
 /// that looks complete and draws white is worse than one that is not there.
 
+#include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -57,10 +59,9 @@ struct ImportCandidate {
     std::string name;
     std::string destination;   ///< game-relative path, and what to ask for
     uint32_t localVertices = 0;
-    /// How many monster-skin slots the model already here asks to be filled.
-    /// A CreatureDisplayInfo row names as many skins as the model it shipped
-    /// with wanted, so this is what the data can dress.
-    uint32_t localMonsterSkins = 0;
+    /// The file the client draws now: an import in the override directory
+    /// when there is one, the extracted model otherwise.
+    std::string localPath;
 };
 
 struct ImportResult {
@@ -69,10 +70,32 @@ struct ImportResult {
     std::size_t missingTextures = 0;  ///< a texture a batch draws, not in the install
     std::size_t unusedTexturesCleared = 0;  ///< named, never drawn, not in the install
     std::size_t missingSkin = 0;      ///< index data that did not come with it
-    std::size_t needsMoreSkins = 0;   ///< more monster skins than the DBC can fill
+    /// Dressed from CreatureDisplayInfo, and the later install has no
+    /// repainted copy of a skin the rows name - see tableSkinsByModel.
+    std::size_t dressedByTable = 0;
+    std::size_t tableSkinsBrought = 0;   ///< display-table skins written for a later model
+    std::size_t earlierImportsDressed = 0;   ///< an earlier run's import given its skins
+    std::size_t earlierImportsRemoved = 0;   ///< an earlier import that cannot be dressed
     std::size_t hasEmitters = 0;     ///< particle or ribbon structs that grew
     std::size_t notBetter = 0;
 };
+
+/// The skins each CreatureDisplayInfo row names, by the model it dresses.
+///
+/// A creature's skins are not in its model. Its display row names up to three,
+/// in columns that fill the model's MONSTER_1 to MONSTER_3 slots, and the files
+/// sit in the model's own folder. The later client kept those rows: Legion's
+/// display 19906, a Warmaul ogre, is still model 2503 dressed from
+/// creature/ogre02/ogre02skinblue512.blp - but its ogre02.m2 is a new mesh, and
+/// the file at that path was repainted for it. So a later model has to bring
+/// the later copies of these files with it, or it is dressed in art painted for
+/// the mesh it replaced.
+///
+/// Keyed by the model's path; each entry is one row's three skin paths, empty
+/// where the row names none. Paths are lowercase with forward slashes, as
+/// extraction writes them. Empty when the tables are not in `expansionDir`.
+std::map<std::string, std::vector<std::array<std::string, 3>>>
+tableSkinsByModel(const std::string& expansionDir);
 
 
 struct RepairResult {
@@ -86,17 +109,19 @@ struct RepairResult {
 /// override directory, where no batch draws them.
 ///
 /// For imports made before the importer refused half-arrived models - the
-/// pipeline it replaced wrote a sixth of its models naming reflection maps it
-/// never fetched. Nothing draws those slots, so nothing looks wrong, but the
-/// client goes looking for every one each time the model loads and warns that
-/// it is not there. A slot a batch does draw is left alone: clearing it would
-/// hide the missing file rather than fix it, and it is counted instead.
+/// pipeline it replaced wrote a sixth of its models naming textures it never
+/// fetched, mostly reflection maps. Nothing draws those slots, so nothing looks
+/// wrong, but the client goes looking for each file whenever the model loads
+/// and warns that it is not there. A missing texture a batch does draw is left
+/// alone and counted: clearing it would hide the missing file rather than fix
+/// it. (The other thing that pipeline left undone - creatures without the skins
+/// their display rows name - needs the later install, so importModels does it.)
 ///
 /// A texture resolves when a file is at its path, lowercased, under the
 /// override directory or the extraction. Something only a fallback directory
 /// holds reads as missing here, which costs nothing - only a slot nothing
 /// draws is ever cleared.
-RepairResult repairImportedTextures(const std::string& expansionDir);
+RepairResult repairEarlierImports(const std::string& expansionDir);
 
 /// Convert what is worth converting under one path prefix.
 ///

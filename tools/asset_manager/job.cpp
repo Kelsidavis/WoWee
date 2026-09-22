@@ -213,7 +213,7 @@ void Job::run(Profile profile, std::string gameDir, std::string secondDir,
                 (fs::path(outputDir) / "expansions" / profile.expansion).string();
 
             // What earlier imports left behind, before adding to them.
-            const RepairResult repaired = repairImportedTextures(expansionDir);
+            const RepairResult repaired = repairEarlierImports(expansionDir);
             if (repaired.modelsRepaired > 0 || repaired.leftDrawn > 0) {
                 say("    " + std::to_string(repaired.namesCleared) +
                     " missing texture names cleared from " +
@@ -252,13 +252,16 @@ void Job::run(Profile profile, std::string gameDir, std::string secondDir,
                     total.refusedByGate += part.refusedByGate;
                     total.missingTextures += part.missingTextures;
                     total.missingSkin += part.missingSkin;
-                    total.needsMoreSkins += part.needsMoreSkins;
+                    total.dressedByTable += part.dressedByTable;
+                    total.tableSkinsBrought += part.tableSkinsBrought;
+                    total.earlierImportsDressed += part.earlierImportsDressed;
+                    total.earlierImportsRemoved += part.earlierImportsRemoved;
                     total.unusedTexturesCleared += part.unusedTexturesCleared;
                     total.hasEmitters += part.hasEmitters;
                     total.notBetter += part.notBetter;
                 }
                 const std::size_t refused = total.refusedByGate + total.missingTextures +
-                                            total.missingSkin + total.needsMoreSkins;
+                                            total.missingSkin + total.dressedByTable;
                 say("    took " + std::to_string(total.written) + " models; left " +
                     std::to_string(total.notBetter) + " alone as no better, " +
                     std::to_string(total.hasEmitters) + " that emit particles, " +
@@ -267,7 +270,18 @@ void Job::run(Profile profile, std::string gameDir, std::string secondDir,
                     say("    " + std::to_string(total.unusedTexturesCleared) +
                         " texture names cleared from models that never draw them");
                 }
-                ok = total.written > 0;
+                if (total.tableSkinsBrought > 0) {
+                    say("    " + std::to_string(total.tableSkinsBrought) +
+                        " creature skins brought for the later meshes that wear them");
+                }
+                if (total.earlierImportsDressed > 0 || total.earlierImportsRemoved > 0) {
+                    say("    earlier imports: " + std::to_string(total.earlierImportsDressed) +
+                        " given the skins they were missing, " +
+                        std::to_string(total.earlierImportsRemoved) +
+                        " removed because nothing here can dress them");
+                }
+                ok = total.written > 0 || total.earlierImportsDressed > 0 ||
+                     total.earlierImportsRemoved > 0;
                 if (!ok) say("    nothing here improves on what is already extracted");
             }
         }

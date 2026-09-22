@@ -214,6 +214,81 @@ ImportResult run(FakeSource& source, Sandbox& box, const std::string& prefix = "
                         nullptr, kNeverCancelled);
 }
 
+/// A texture the model names for itself, and its bytes in the later install -
+/// the ordinary model, which is not dressed from anyone's table.
+const TextureSlot kOwnTexture{0, "Creature\\Thing\\Own.blp"};
+void offerOwnTexture(FakeSource& source) {
+    source.files[kOwnTexture.path] = std::vector<uint8_t>(16, 0x11);
+}
+
+void writeLE(std::vector<uint8_t>& out, uint32_t v) {
+    for (int i = 0; i < 4; ++i) out.push_back(uint8_t((v >> (i * 8)) & 0xFF));
+}
+
+/// A WDBC with `fields` columns. Each row gives its numbers; a string column
+/// is given as an index into `strings`, and written as its offset.
+void writeDbc(const fs::path& path, uint32_t fields,
+              const std::vector<std::vector<uint32_t>>& rows,
+              const std::vector<std::string>& strings) {
+    std::string block(1, '\0');
+    for (const std::string& str : strings) {
+        block += str;
+        block.push_back('\0');
+    }
+    std::vector<uint8_t> out = {'W', 'D', 'B', 'C'};
+    writeLE(out, uint32_t(rows.size()));
+    writeLE(out, fields);
+    writeLE(out, fields * 4);
+    writeLE(out, uint32_t(block.size()));
+    for (const auto& row : rows) {
+        for (uint32_t f = 0; f < fields; ++f) writeLE(out, f < row.size() ? row[f] : 0);
+    }
+    out.insert(out.end(), block.begin(), block.end());
+    fs::create_directories(path.parent_path());
+    std::ofstream(path, std::ios::binary)
+        .write(reinterpret_cast<const char*>(out.data()), std::streamsize(out.size()));
+}
+
+constexpr uint32_t kNoString = 0xFFFFFFFFu;
+
+/// CreatureModelData naming one model, and CreatureDisplayInfo rows dressing
+/// it: each row's three skin names, "" for none. Where 3.3.5 keeps them:
+/// the model path in field 2, the model id in field 1, skins in 6 to 8.
+void writeDisplayTables(Sandbox& box, const std::string& modelPath,
+                        const std::vector<std::array<std::string, 3>>& rows) {
+    writeDbc(box.root / "dbfilesclient" / "creaturemodeldata.dbc", 5,
+             {{7, 0, 1}}, {modelPath});
+    std::vector<std::string> strings;
+    std::vector<std::vector<uint32_t>> table;
+    uint32_t id = 100;
+    for (const auto& skins : rows) {
+        std::vector<uint32_t> row(11, 0);
+        row[0] = id++;
+        row[1] = 7;
+        for (int c = 0; c < 3; ++c) {
+            if (skins[c].empty()) { row[6 + c] = kNoString; continue; }
+            row[6 + c] = uint32_t(strings.size());
+            strings.push_back(skins[c]);
+        }
+        table.push_back(row);
+    }
+    // String columns become offsets: 0 is the empty string at the front.
+    std::vector<uint32_t> offsets;
+    uint32_t at = 1;
+    for (const std::string& str : strings) { offsets.push_back(at); at += uint32_t(str.size()) + 1; }
+    for (auto& row : table) {
+        for (int c = 6; c < 9; ++c) row[c] = (row[c] == kNoString) ? 0 : offsets[row[c]];
+    }
+    writeDbc(box.root / "dbfilesclient" / "creaturedisplayinfo.dbc", 11, table, strings);
+}
+
+/// A file as extraction left it, under the sandbox root.
+void extracted(Sandbox& box, const std::string& relative, uint8_t fill) {
+    const fs::path at = box.root / relative;
+    fs::create_directories(at.parent_path());
+    std::ofstream(at, std::ios::binary) << std::string(16, char(fill));
+}
+
 }  // namespace
 
 TEST_CASE("a model is found by its path, not by the name inside it") {
@@ -224,8 +299,9 @@ TEST_CASE("a model is found by its path, not by the name inside it") {
     // The name inside says ElementalEarth2 - as Legion's really does. Matching
     // on it finds nothing; matching on the path finds this.
     source.files["creature/elementalearth/elementalearth.m2"] =
-        wrap(makeBody(274, 3830, {{11, ""}}, 0, "ElementalEarth2"), {7001}, {});
+        wrap(makeBody(274, 3830, {kOwnTexture}, 0, "ElementalEarth2"), {7001}, {});
     source.ids[7001] = makeSkin({{0, 1}});
+    offerOwnTexture(source);
 
     const ImportResult result = run(source, box);
 
@@ -240,8 +316,9 @@ TEST_CASE("the model is restamped to the version this client reads") {
 
     FakeSource source;
     source.files["creature/murloc/murloc.m2"] =
-        wrap(makeBody(274, 900, {{11, ""}}), {1}, {});
+        wrap(makeBody(274, 900, {kOwnTexture}), {1}, {});
     source.ids[1] = makeSkin({{0, 1}});
+    offerOwnTexture(source);
 
     REQUIRE(run(source, box).written == 1);
 
@@ -293,28 +370,151 @@ TEST_CASE("an unnamed slot no batch draws is not a reason to refuse a model") {
     // the empty one, so refusing the model over it turns away a model that
     // draws correctly.
     source.files["creature/compy/compy.m2"] =
-        wrap(makeBody(274, 900, {{11, ""}, {0, ""}}), {1}, {});
+        wrap(makeBody(274, 900, {kOwnTexture, {0, ""}}), {1}, {});
     source.ids[1] = makeSkin({{0, 1}});   // the batch draws slot 0 only
+    offerOwnTexture(source);
 
     const ImportResult result = run(source, box);
     CHECK(result.refusedByGate == 0);
     CHECK(result.written == 1);
 }
 
-TEST_CASE("an unnamed creature-skin slot is normal and not a refusal") {
+TEST_CASE("a creature brings the skins its display rows name") {
+    // The Warmaul Reaver: Legion kept display 19906 pointing at ogre02.m2 and
+    // creature/ogre02/ogre02skinblue512.blp, and repainted that file for its
+    // new mesh. Without the repaint the new mesh wore the old skin.
+    Sandbox box;
+    box.installed("creature/ogre02/ogre02.m2", 100);
+    writeDisplayTables(box, "Creature\\Ogre02\\Ogre02.mdx",
+                       {{"Ogre02SkinBlue512", "Ogre02ShoulderBlue", ""}});
+    extracted(box, "creature/ogre02/ogre02skinblue512.blp", 0x01);
+    extracted(box, "creature/ogre02/ogre02shoulderblue.blp", 0x02);
+
+    FakeSource source;
+    source.files["creature/ogre02/ogre02.m2"] =
+        wrap(makeBody(274, 900, {{11, ""}, {12, ""}}), {1}, {});
+    source.ids[1] = makeSkin({{0, 1}, {1, 1}});
+    source.files["creature/ogre02/ogre02skinblue512.blp"] = std::vector<uint8_t>(16, 0xA1);
+    source.files["creature/ogre02/ogre02shoulderblue.blp"] = std::vector<uint8_t>(16, 0xA2);
+
+    const ImportResult result = run(source, box);
+    CHECK(result.written == 1);
+    CHECK(result.tableSkinsBrought == 2);
+    // Beside the extracted skins, not over them: the client reads the override
+    // directory first, and the extracted copy is how the next run can tell.
+    CHECK(box.has("override/creature/ogre02/ogre02skinblue512.blp"));
+    CHECK(box.has("override/creature/ogre02/ogre02shoulderblue.blp"));
+}
+
+TEST_CASE("a creature whose skin was not repainted is refused") {
+    Sandbox box;
+    box.installed("creature/thing/thing.m2", 100);
+    writeDisplayTables(box, "Creature\\Thing\\Thing.mdx", {{"ThingSkin", "", ""}});
+    extracted(box, "creature/thing/thingskin.blp", 0x05);
+
+    FakeSource source;
+    source.files["creature/thing/thing.m2"] = wrap(makeBody(274, 900, {{11, ""}}), {1}, {});
+    source.ids[1] = makeSkin({{0, 1}});
+    // The same bytes in both: the later client dresses its mesh from other
+    // files, which these rows never name.
+    source.files["creature/thing/thingskin.blp"] = std::vector<uint8_t>(16, 0x05);
+
+    const ImportResult result = run(source, box);
+    CHECK(result.written == 0);
+    CHECK(result.dressedByTable == 1);
+    CHECK_FALSE(box.has("creature/thing/thing.m2"));
+}
+
+TEST_CASE("a creature drawing a skin its rows leave empty is refused") {
+    // The boar: Legion's draws a second skin, for its mane, and 3.3.5's row
+    // names one. The mane would draw bare however the first one arrived.
+    Sandbox box;
+    box.installed("creature/boar/boar.m2", 401);
+    writeDisplayTables(box, "Creature\\Boar\\Boar.mdx", {{"BoarSkin", "", ""}});
+
+    FakeSource source;
+    source.files["creature/boar/boar.m2"] =
+        wrap(makeBody(274, 1841, {{11, ""}, {12, "maehne"}}), {1}, {});
+    source.ids[1] = makeSkin({{0, 2}});
+    source.files["creature/boar/boarskin.blp"] = std::vector<uint8_t>(16, 0x33);
+
+    const ImportResult result = run(source, box);
+    CHECK(result.written == 0);
+    CHECK(result.dressedByTable == 1);
+}
+
+TEST_CASE("a creature with no display row is refused") {
     Sandbox box;
     box.installed("creature/thing/thing.m2", 100);
 
     FakeSource source;
-    // Types 11 to 13 are filled from CreatureDisplayInfo at draw time, so the
-    // model is right not to name them.
-    source.files["creature/thing/thing.m2"] =
-        wrap(makeBody(274, 900, {{11, ""}, {12, ""}, {13, ""}}), {1}, {});
+    source.files["creature/thing/thing.m2"] = wrap(makeBody(274, 900, {{11, ""}}), {1}, {});
     source.ids[1] = makeSkin({{0, 1}});
 
     const ImportResult result = run(source, box);
-    CHECK(result.written == 1);
-    CHECK(result.refusedByGate == 0);
+    CHECK(result.written == 0);
+    CHECK(result.dressedByTable == 1);
+}
+
+TEST_CASE("an earlier import is given the skins it was missing") {
+    // What the pipeline before this one left in override/: Legion's mesh, and
+    // the extracted skins still under it.
+    Sandbox box;
+    box.installed("creature/ogre02/ogre02.m2", 900, {{11, ""}});
+    box.installed("override/creature/ogre02/ogre02.m2", 900, {{11, ""}});
+    std::ofstream(box.root / "override/creature/ogre02/ogre0200.skin", std::ios::binary)
+        << std::string(reinterpret_cast<const char*>(makeSkin({{0, 1}}).data()),
+                       makeSkin({{0, 1}}).size());
+    writeDisplayTables(box, "Creature\\Ogre02\\Ogre02.mdx", {{"Ogre02SkinBlue512", "", ""}});
+    extracted(box, "creature/ogre02/ogre02skinblue512.blp", 0x01);
+
+    FakeSource source;
+    source.files["creature/ogre02/ogre02.m2"] = wrap(makeBody(274, 900, {{11, ""}}), {1}, {});
+    source.ids[1] = makeSkin({{0, 1}});
+    source.files["creature/ogre02/ogre02skinblue512.blp"] = std::vector<uint8_t>(16, 0xA1);
+
+    // Run where the override directory is: the sandbox root is both.
+    const ImportResult result = importModels(source, box.root.string(), box.root.string(),
+                                             "creature", 1.3f, nullptr, kNeverCancelled);
+    CHECK(result.earlierImportsDressed == 1);
+    CHECK(result.tableSkinsBrought == 1);
+    CHECK(fs::exists(box.root / "override/creature/ogre02/ogre02skinblue512.blp"));
+
+    // And a second run has nothing left to bring.
+    const ImportResult again = importModels(source, box.root.string(), box.root.string(),
+                                            "creature", 1.3f, nullptr, kNeverCancelled);
+    CHECK(again.earlierImportsDressed == 0);
+    CHECK(again.earlierImportsRemoved == 0);
+}
+
+TEST_CASE("an earlier import nothing can dress is removed") {
+    Sandbox box;
+    box.installed("creature/thing/thing.m2", 900, {{11, ""}});
+    box.installed("override/creature/thing/thing.m2", 900, {{11, ""}});
+    const std::vector<uint8_t> skin = makeSkin({{0, 1}});
+    auto put = [&](const char* rel) {
+        std::ofstream(box.root / rel, std::ios::binary)
+            .write(reinterpret_cast<const char*>(skin.data()), std::streamsize(skin.size()));
+    };
+    put("override/creature/thing/thing00.skin");
+    put("override/creature/thing/thing0060-00.anim");
+    put("override/creature/thing/thingwarlord00.skin");   // another model's, kept
+    writeDisplayTables(box, "Creature\\Thing\\Thing.mdx", {{"ThingSkin", "", ""}});
+    extracted(box, "creature/thing/thingskin.blp", 0x05);
+
+    FakeSource source;
+    source.files["creature/thing/thing.m2"] = wrap(makeBody(274, 900, {{11, ""}}), {1}, {});
+    source.ids[1] = makeSkin({{0, 1}});
+    source.files["creature/thing/thingskin.blp"] = std::vector<uint8_t>(16, 0x05);
+
+    const ImportResult result = importModels(source, box.root.string(), box.root.string(),
+                                             "creature", 1.3f, nullptr, kNeverCancelled);
+    CHECK(result.earlierImportsRemoved == 1);
+    CHECK_FALSE(fs::exists(box.root / "override/creature/thing/thing.m2"));
+    CHECK_FALSE(fs::exists(box.root / "override/creature/thing/thing00.skin"));
+    CHECK_FALSE(fs::exists(box.root / "override/creature/thing/thing0060-00.anim"));
+    CHECK(fs::exists(box.root / "override/creature/thing/thingwarlord00.skin"));
+    CHECK(fs::exists(box.root / "creature/thing/thing.m2"));   // the extracted one stays
 }
 
 TEST_CASE("a model whose texture is not in this installation is refused") {
@@ -342,8 +542,9 @@ TEST_CASE("a missing texture no batch draws is cleared, not a refusal") {
     // slot no batch reaches. The frog names Creature\Frog2\oldglass.blp and
     // draws only its creature skin.
     source.files["creature/frog/frog.m2"] =
-        wrap(makeBody(274, 900, {{11, ""}, {0, "Creature\\Frog2\\oldglass.blp"}}), {1}, {});
+        wrap(makeBody(274, 900, {kOwnTexture, {0, "Creature\\Frog2\\oldglass.blp"}}), {1}, {});
     source.ids[1] = makeSkin({{0, 1}});   // the batch draws slot 0 only
+    offerOwnTexture(source);
 
     const ImportResult result = run(source, box);
     CHECK(result.written == 1);
@@ -366,8 +567,9 @@ TEST_CASE("a missing texture drawn as a second layer still refuses the model") {
 
     FakeSource source;
     source.files["creature/thing/thing.m2"] =
-        wrap(makeBody(274, 900, {{11, ""}, {0, "Creature\\Thing\\Shine.blp"}}), {1}, {});
+        wrap(makeBody(274, 900, {kOwnTexture, {0, "Creature\\Thing\\Shine.blp"}}), {1}, {});
     source.ids[1] = makeSkin({{0, 2}});   // one batch, both layers
+    offerOwnTexture(source);
 
     const ImportResult result = run(source, box);
     CHECK(result.written == 0);
@@ -385,10 +587,13 @@ TEST_CASE("a leftover name on a creature-skin slot is not fetched or refused") {
     source.files["creature/boar/boar.m2"] =
         wrap(makeBody(274, 900, {{11, "Creature\\Boar\\Maehne.blp"}}), {1}, {});
     source.ids[1] = makeSkin({{0, 1}});
+    writeDisplayTables(box, "Creature\\Boar\\Boar.mdx", {{"BoarSkin", "", ""}});
+    source.files["creature/boar/boarskin.blp"] = std::vector<uint8_t>(16, 0x33);
 
     const ImportResult result = run(source, box);
     CHECK(result.written == 1);
     CHECK(result.missingTextures == 0);
+    for (const std::string& asked : source.asked) CHECK(asked.find("Maehne") == std::string::npos);
 }
 
 TEST_CASE("a texture is written at the spelling extraction uses") {
@@ -429,8 +634,9 @@ TEST_CASE("animations are written under the names the client looks for") {
 
     FakeSource source;
     source.files["creature/thing/thing.m2"] =
-        wrap(makeBody(274, 900, {{11, ""}}), {1}, {{{0, 0, 90}}, {{61, 1, 91}}});
+        wrap(makeBody(274, 900, {kOwnTexture}), {1}, {{{0, 0, 90}}, {{61, 1, 91}}});
     source.ids[1] = makeSkin({{0, 1}});
+    offerOwnTexture(source);
     source.ids[90] = std::vector<uint8_t>(8, 0);
     source.ids[91] = std::vector<uint8_t>(8, 0);
 
@@ -446,7 +652,8 @@ TEST_CASE("an earlier installation names its skins by path instead") {
     FakeSource source;
     // No MD21 wrapper and no SFID: a pre-Warlords client keeps the skins beside
     // the model, under the names the client builds from the model's own path.
-    source.files["world/tree/tree.m2"] = makeBody(264, 897, {{11, ""}});
+    source.files["world/tree/tree.m2"] = makeBody(264, 897, {kOwnTexture});
+    offerOwnTexture(source);
     source.files["world/tree/tree00.skin"] = makeSkin({{0, 1}});
     source.files["world/tree/tree01.skin"] = makeSkin({{0, 1}});
 
@@ -486,52 +693,6 @@ TEST_CASE("only the asked-for prefix is looked at") {
     CHECK_FALSE(source.asked.empty());
 }
 
-TEST_CASE("a model wanting more monster skins than the data can dress is refused") {
-    Sandbox box;
-    // The boar, measured: the shipped one has a single monster-skin slot, and
-    // its CreatureDisplayInfo row names one skin because that is what the model
-    // it shipped with asked for.
-    box.installed("creature/boar/boar.m2", 401, {{11, ""}});
-
-    FakeSource source;
-    // Legion's carries a second, for the mane. Nothing names it here, so it
-    // would draw untextured however well the rest of the conversion went.
-    source.files["creature/boar/boar.m2"] =
-        wrap(makeBody(274, 1841, {{11, ""}, {12, "maehne"}}), {1}, {});
-    source.ids[1] = makeSkin({{0, 2}});
-
-    const ImportResult result = run(source, box);
-    CHECK(result.written == 0);
-    CHECK(result.needsMoreSkins == 1);
-    CHECK_FALSE(box.has("creature/boar/boar.m2"));
-}
-
-TEST_CASE("the same number of monster skins is fine") {
-    Sandbox box;
-    box.installed("creature/murloc/murloc.m2", 100, {{11, ""}});
-
-    FakeSource source;
-    source.files["creature/murloc/murloc.m2"] =
-        wrap(makeBody(274, 900, {{11, ""}}), {1}, {});
-    source.ids[1] = makeSkin({{0, 1}});
-
-    const ImportResult result = run(source, box);
-    CHECK(result.needsMoreSkins == 0);
-    CHECK(result.written == 1);
-}
-
-TEST_CASE("fewer monster skins than the data can dress is fine too") {
-    Sandbox box;
-    box.installed("creature/thing/thing.m2", 100, {{11, ""}, {12, ""}});
-
-    FakeSource source;
-    source.files["creature/thing/thing.m2"] =
-        wrap(makeBody(274, 900, {{11, ""}}), {1}, {});
-    source.ids[1] = makeSkin({{0, 1}});
-
-    CHECK(run(source, box).written == 1);
-}
-
 TEST_CASE("an earlier import's missing texture no batch draws is cleared") {
     // What the pipeline before this importer left behind: a model in override/
     // naming a reflection map that was never brought over.
@@ -552,7 +713,7 @@ TEST_CASE("an earlier import's missing texture no batch draws is cleared") {
     fs::create_directories(box.root / "creature" / "frog");
     std::ofstream(box.root / "creature" / "frog" / "here.blp") << "x";
 
-    const RepairResult result = repairImportedTextures(box.root.string());
+    const RepairResult result = repairEarlierImports(box.root.string());
     CHECK(result.modelsLooked == 1);
     CHECK(result.modelsRepaired == 1);
     CHECK(result.namesCleared == 1);
@@ -567,5 +728,5 @@ TEST_CASE("an earlier import's missing texture no batch draws is cleared") {
     CHECK(get32(after, textureAt + 3 * 16 + 8) != 0);   // present: kept
 
     // Run again and there is nothing left to do.
-    CHECK(repairImportedTextures(box.root.string()).modelsRepaired == 0);
+    CHECK(repairEarlierImports(box.root.string()).modelsRepaired == 0);
 }
