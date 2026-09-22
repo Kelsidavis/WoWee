@@ -62,6 +62,10 @@ public:
     float pendingFogSkyBlend = 0.7f;
     /// How much distance fog. See LightingManager::setFogStrength.
     float pendingFogStrength = 0.4f;
+    /// Volumetric fog: 0 off, 1-3 the volume's size. See VolumetricFog.
+    int pendingVolumetricFog = 2;
+    /// A multiplier on how thick that mist is. See Renderer::setVolumetricFogDensity.
+    float pendingVolumetricDensity = 1.0f;
     bool pendingWaterRefraction = true;
     int pendingBrightness = 50; // 0-100, maps to 0.0-2.0 (50 = 1.0 default)
 
@@ -217,6 +221,7 @@ public:
     int pendingFrameCap = 0;                // index into the frame-limit choices
     bool pendingPOM = true;             // on by default
     bool pendingSharpStars = true;
+    bool pendingSunShafts = true;       // screen-space rays from the sun
     int pendingPOMQuality = 1;          // 0=Low(16), 1=Medium(32), 2=High(64)
     bool pendingFSR = false;
     int pendingUpscalingMode = 0;       // 0=Off, 1=FSR1, 2=FSR3

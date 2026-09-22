@@ -1812,7 +1812,10 @@ void GameScreen::saveSettings() {
     out << "view_distance=" << settingsPanel_.pendingViewDistance << "\n";
     out << "fog_sky_blend=" << settingsPanel_.pendingFogSkyBlend << "\n";
     out << "fog_strength=" << settingsPanel_.pendingFogStrength << "\n";
+    out << "light_shafts=" << settingsPanel_.pendingVolumetricFog << "\n";
+    out << "mist_density=" << settingsPanel_.pendingVolumetricDensity << "\n";
     out << "sharp_stars=" << (settingsPanel_.pendingSharpStars ? 1 : 0) << "\n";
+    out << "sun_shafts=" << (settingsPanel_.pendingSunShafts ? 1 : 0) << "\n";
     out << "brightness=" << settingsPanel_.pendingBrightness << "\n";
     out << "water_refraction=" << (settingsPanel_.pendingWaterRefraction ? 1 : 0) << "\n";
     out << "antialiasing=" << settingsPanel_.pendingAntiAliasing << "\n";
@@ -2074,7 +2077,10 @@ void GameScreen::loadSettings() {
             else if (key == "view_distance") settingsPanel_.pendingViewDistance = std::clamp(std::stof(val), 400.0f, 2400.0f);
             else if (key == "fog_sky_blend") settingsPanel_.pendingFogSkyBlend = std::clamp(std::stof(val), 0.0f, 1.0f);
             else if (key == "fog_strength") settingsPanel_.pendingFogStrength = std::clamp(std::stof(val), 0.0f, 2.0f);
+            else if (key == "light_shafts") settingsPanel_.pendingVolumetricFog = std::clamp(std::stoi(val), 0, 3);
+            else if (key == "mist_density") settingsPanel_.pendingVolumetricDensity = std::clamp(std::stof(val), 0.0f, 3.0f);
             else if (key == "sharp_stars") settingsPanel_.pendingSharpStars = (val == "1");
+            else if (key == "sun_shafts") settingsPanel_.pendingSunShafts = (val == "1");
             // No apply here either: brightness is on the graphics load list,
             // which is walked once the renderer exists. This branch ran from
             // the constructor, where services_.renderer is still null.

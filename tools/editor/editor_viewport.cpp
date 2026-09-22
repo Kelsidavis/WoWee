@@ -1,4 +1,5 @@
 #include "editor_viewport.hpp"
+#include "rendering/volumetric_fog.hpp"
 #include "rendering/vk_context.hpp"
 #include "rendering/vk_texture.hpp"
 #include "pipeline/asset_manager.hpp"
@@ -814,7 +815,14 @@ void EditorViewport::setWireframe(bool enabled) {
 bool EditorViewport::createPerFrameResources() {
     VkDevice device = vkCtx_->getDevice();
 
-    VkDescriptorSetLayoutBinding bindings[2]{};
+    // The world shaders read a fog volume at binding 2. The editor never
+    // builds one, so every set binds the neutral volume and the block's
+    // switch stays at zero.
+    fogVolume_ = std::make_unique<rendering::VolumetricFog>();
+    if (!fogVolume_->initialize(vkCtx_)) return false;
+    const VkSampler fogSampler = fogVolume_->getSampler();
+
+    VkDescriptorSetLayoutBinding bindings[3]{};
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     bindings[0].descriptorCount = 1;
@@ -823,10 +831,15 @@ bool EditorViewport::createPerFrameResources() {
     bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     bindings[1].descriptorCount = 1;
     bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[2].binding = 2;
+    bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[2].descriptorCount = 1;
+    bindings[2].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[2].pImmutableSamplers = &fogSampler;
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2;
+    layoutInfo.bindingCount = 3;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &perFrameSetLayout_) != VK_SUCCESS)
@@ -836,7 +849,7 @@ bool EditorViewport::createPerFrameResources() {
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = MAX_FRAMES;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = MAX_FRAMES;
+    poolSizes[1].descriptorCount = MAX_FRAMES * 2;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -913,7 +926,11 @@ bool EditorViewport::createPerFrameResources() {
         shadowImgInfo.imageView = dummyShadowTexture_->getImageView();
         shadowImgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        VkWriteDescriptorSet writes[2]{};
+        VkDescriptorImageInfo fogImgInfo{};
+        fogImgInfo.imageView = fogVolume_->getNeutralView();
+        fogImgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+        VkWriteDescriptorSet writes[3]{};
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet = perFrameDescSets_[i];
         writes[0].dstBinding = 0;
@@ -926,8 +943,14 @@ bool EditorViewport::createPerFrameResources() {
         writes[1].descriptorCount = 1;
         writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         writes[1].pImageInfo = &shadowImgInfo;
+        writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[2].dstSet = perFrameDescSets_[i];
+        writes[2].dstBinding = 2;
+        writes[2].descriptorCount = 1;
+        writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[2].pImageInfo = &fogImgInfo;
 
-        vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
+        vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
     }
 
     return true;
@@ -946,6 +969,10 @@ void EditorViewport::destroyPerFrameResources() {
     if (dummyShadowTexture_) {
         dummyShadowTexture_->destroy(device, vkCtx_->getAllocator());
         dummyShadowTexture_.reset();
+    }
+    if (fogVolume_) {
+        fogVolume_->shutdown();
+        fogVolume_.reset();
     }
     if (sceneDescPool_) {
         vkDestroyDescriptorPool(device, sceneDescPool_, nullptr);

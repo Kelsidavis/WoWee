@@ -18,6 +18,8 @@ enum class AblationPass {
     Characters,
     Sky,
     Shadows,
+    VolumetricFog,
+    SunShafts,
 };
 
 const char* ablationPassName(AblationPass pass);

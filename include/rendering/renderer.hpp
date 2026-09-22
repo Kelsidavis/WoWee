@@ -71,6 +71,8 @@ class RenderGraph;
 class OverlaySystem;
 class HiZSystem;
 class GrassRenderer;
+class VolumetricFog;
+class SunShafts;
 
 class Renderer {
 public:
@@ -165,6 +167,9 @@ public:
     bool isPlayerIndoors() const { return playerIndoors_; }
     VkContext* getVkContext() const { return vkCtx; }
     VkDescriptorSetLayout getPerFrameSetLayout() const { return perFrameSetLayout; }
+    /// What a per-frame set allocated elsewhere binds at binding 2: a fog
+    /// volume of clear air, for a set whose block leaves the fog off.
+    VkImageView getNeutralFogVolumeView() const;
     VkRenderPass getShadowRenderPass() const { return shadowRenderPass; }
 
     // Third-person character follow
@@ -368,6 +373,14 @@ public:
     void logViewDistanceDiag();
     void setSharpStars(bool enabled);
     bool areSharpStars() const { return sharpStars_; }
+    /// Fog lit by the sun through the shadow map and by nearby torches: 0 is
+    /// off, 1-3 the volume's resolution. Applied at the start of the next
+    /// frame. See VolumetricFog.
+    void setVolumetricFogQuality(int quality);
+    /// A multiplier on how thick that air is; 1 is the default mist.
+    void setVolumetricFogDensity(float density) { volumetricFogDensity_ = glm::clamp(density, 0.0f, 3.0f); }
+    /// Rays streaming from the sun across the finished picture. See SunShafts.
+    void setSunShaftsEnabled(bool enabled) { sunShaftsEnabled_ = enabled; }
     int getTerrainLoadRadius() const;
     int getTerrainUnloadRadius() const { return getTerrainLoadRadius() + 3; }
     void setMsaaSamples(VkSampleCountFlagBits samples);
@@ -504,6 +517,32 @@ private:
 
     // HiZ occlusion culling - builds depth pyramid each frame
     std::unique_ptr<HiZSystem> hizSystem_;
+
+    // Volumetric fog: a froxel volume built after the shadow pass and read by
+    // every world shader through set 0 binding 2.
+    std::unique_ptr<VolumetricFog> volumetricFog_;
+    float volumetricFogDensity_ = 1.0f;
+    /// Whether this frame builds the volume, decided where the per-frame block
+    /// is written so the block's switch and the dispatch cannot disagree.
+    bool volumetricThisFrame_ = false;
+    /// The ground the mist lies on, chased toward the ground under the player.
+    float fogLayerBase_ = 0.0f;
+    bool fogLayerBaseValid_ = false;
+    /// The extinction the volume is built with, chased toward what the zone,
+    /// the weather and the hour ask for so walking indoors does not switch it.
+    float fogExtinction_ = -1.0f;
+    void renderVolumetricFog();
+    void writeFogVolumeBindings();
+    float volumetricFogExtinction() const;
+
+    // Screen-space sun shafts, built from the finished frame at the end of
+    // endFrame and added in the overlay pass ahead of the interface.
+    std::unique_ptr<SunShafts> sunShafts_;
+    bool sunShaftsEnabled_ = true;
+    /// renderWorld ran this frame. The shafts are built from the world's
+    /// picture, and a login screen or a loading screen is not one.
+    bool worldDrawnThisFrame_ = false;
+    void recordSunShafts();
 
     // GPU-driven grass: compute cull with atomic compaction feeding an
     // indirect draw, over a population generated from terrain suitability.

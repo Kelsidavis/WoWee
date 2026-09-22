@@ -896,6 +896,8 @@ set(WOWEE_SOURCES
     src/rendering/m2_model_classifier.cpp
     src/rendering/render_graph.cpp
     src/rendering/hiz_system.cpp
+    src/rendering/volumetric_fog.cpp
+    src/rendering/sun_shafts.cpp
     src/rendering/grass_renderer.cpp
     src/pipeline/adt_alpha.cpp
     src/pipeline/grass_terrain.cpp
@@ -2470,6 +2472,7 @@ add_executable(wowee_editor
     src/rendering/bone_slots.cpp
     src/rendering/normal_map.cpp
     src/rendering/frustum.cpp
+    src/rendering/volumetric_fog.cpp
 
     # Core
     src/core/window.cpp

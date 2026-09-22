@@ -1118,6 +1118,12 @@ wowee_add_test(test_frustum
     SOURCES test_frustum.cpp
             ${CMAKE_SOURCE_DIR}/src/rendering/frustum.cpp)
 
+# ── test_volumetric_fog_math ─────────────────────────────────
+# Header-only: where the fog volume's cells are, against where the shaders
+# look for them.
+wowee_add_test(test_volumetric_fog_math
+    SOURCES test_volumetric_fog_math.cpp)
+
 # ── test_packed_time ─────────────────────────────────────────
 # Header-only domain logic: the one uint32 that carries a whole date, which
 # four separate readers in this tree got wrong in four different ways.

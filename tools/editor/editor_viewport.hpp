@@ -18,7 +18,7 @@
 
 namespace wowee {
 namespace pipeline { class AssetManager; }
-namespace rendering { class VkContext; class VkTexture; }
+namespace rendering { class VkContext; class VkTexture; class VolumetricFog; }
 
 namespace editor {
 
@@ -117,6 +117,9 @@ private:
 
     std::unique_ptr<rendering::VkTexture> dummyShadowTexture_;
     VkSampler shadowSampler_ = VK_NULL_HANDLE;
+    /// Only for its neutral volume and sampler: the world shaders read a fog
+    /// volume at set 0 binding 2, and the editor builds none.
+    std::unique_ptr<rendering::VolumetricFog> fogVolume_;
 
     bool wireframe_ = false;
     float clearR_ = 0.15f, clearG_ = 0.15f, clearB_ = 0.2f;

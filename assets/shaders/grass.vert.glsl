@@ -79,6 +79,7 @@ layout(location = 2) out vec3 vRootColor;
 layout(location = 3) out vec3 vTipColor;
 layout(location = 4) out vec4 vGroundColor;   // kept for the tint strength in w
 layout(location = 5) out vec4 vHeadColor;   // rgb head colour, a = strength
+layout(location = 6) out vec3 vWorldPos;    // for the fog
 
 // Five segments, six rows of two vertices. Row 4 sits at t = 0.8, which is
 // where the head envelopes below put their bulge - a peak between rows would
@@ -378,5 +379,6 @@ void main() {
     vec3 bladeNormal = normalize(cross(across, tangent) + across * (side * 0.35));
     vNormal = normalize(mix(bladeNormal, vec3(0.0, 0.0, 1.0), 0.5));
 
+    vWorldPos = world;
     gl_Position = projection * view * vec4(world, 1.0);
 }

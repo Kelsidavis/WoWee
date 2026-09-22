@@ -23,6 +23,8 @@ constexpr AblationPass kOrder[] = {
     AblationPass::Characters,
     AblationPass::Sky,
     AblationPass::Shadows,
+    AblationPass::VolumetricFog,
+    AblationPass::SunShafts,
     AblationPass::None,
 };
 
@@ -40,6 +42,8 @@ const char* ablationPassName(AblationPass pass) {
         case AblationPass::Characters: return "characters";
         case AblationPass::Sky:        return "sky";
         case AblationPass::Shadows:    return "shadows";
+        case AblationPass::VolumetricFog: return "volumetric fog";
+        case AblationPass::SunShafts:  return "sun shafts";
     }
     return "?";
 }

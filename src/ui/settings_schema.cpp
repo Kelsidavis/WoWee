@@ -86,6 +86,13 @@ constexpr SettingDesc kSchema[] = {
      "How much distant fog is tinted toward the sky behind it, so the\n"
      "horizon does not stand out pale against a dark sky. 0 uses the\n"
      "zone's fog colour alone; 1 matches the sky.", "", 0.7f},
+    // The light shafts' own thickness. Their switch and its quality are on
+    // the Detail page; see there.
+    {"mistdensity", "Mist density", SettingKind::Float, 0, 3, 0.1f, "Graphics", "",
+     "How thick the lit mist is, when light shafts are on (Detail).\n"
+     "1 is a light haze; above it the air closes in. Rain, snow, dawn\n"
+     "and foggy zones thicken it further.",
+     "", 1.0f, "lightshafts!=0"},
 
     // Labelled for what it does, with the term of art in brackets: nobody
     // looks for "multisampling" when their edges are jagged.
@@ -116,6 +123,12 @@ constexpr SettingDesc kSchema[] = {
      "Draw the night sky's stars as crisp points. Off, they come from\n"
      "the sky's own small star texture, which goes soft at high\n"
      "resolutions.", "", 1},
+    // A check box and not a strength slider: the page has room for the one
+    // and not the other.
+    {"sunshafts", "Sun shafts", SettingKind::Bool, 0, 0, 0, "Graphics", "",
+     "Rays of light streaming from the sun through gaps in trees and\n"
+     "between buildings when you look toward it. Cheap; drawn over\n"
+     "the finished picture.", "", 1},
 
     // ------------------------------------------------------------------ Detail
     //
@@ -162,6 +175,21 @@ constexpr SettingDesc kSchema[] = {
      "ahead, a floor underfoot. Costs little on any modern card, and\n"
      "applies to textures loaded from here on.",
      "Off|2x|4x|8x|16x", 4},
+    // Its own switch rather than riding on fog thickness: the distance fog
+    // is the zone's haze and costs nothing, this is a compute pass every
+    // frame, and a player may want either without the other. Here, with the
+    // other settings that trade frames for detail, while how thick the mist
+    // is sits on the Graphics page beside the fog: both rows there put sharp
+    // stars past the bottom of its second column, and both here put the
+    // density slider thirty pixels past the bottom of this page's.
+    // Named for what it looks like, key included: "volumetric" in either put
+    // it first in a search for "volume", ahead of the master volume.
+    {"lightshafts", "Light shafts and mist", SettingKind::Enum, 0, 3, 1,
+     "Detail", "Atmosphere",
+     "Mist that light moves through: the sun casts shafts past trees\n"
+     "and buildings, and torches and lava glow in it. Higher settings\n"
+     "are sharper and cost more; Low suits weaker hardware.",
+     "Off|Low|Medium|High", 2},
 
     // --------------------------------------------------------------- Upscaling
     {"upscaling", "Upscaling", SettingKind::Enum, 0, 2, 1, "Upscaling", "Mode",

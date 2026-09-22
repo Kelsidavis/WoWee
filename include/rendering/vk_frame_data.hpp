@@ -31,6 +31,11 @@ struct GPUPerFrameData {
     glm::vec4 localLightPosRadius[MAX_LOCAL_LIGHTS];       // xyz = position, w = radius
     glm::vec4 localLightColorIntensity[MAX_LOCAL_LIGHTS];  // rgb = color, w = intensity
     glm::ivec4 localLightMeta;                             // x = active light count
+    // The fog volume at set 0 binding 2, and how to find a depth in it:
+    // x = on (0/1), y = near edge of the first slice in yards,
+    // z = 1 / ln(far / near), w = slice count. Off in the reflection pass and
+    // the character preview, which bind a neutral volume there.
+    glm::vec4 volumetricParams;
 };
 
 // Push constants for the model matrix (most common case)

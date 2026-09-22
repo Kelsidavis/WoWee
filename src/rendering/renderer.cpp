@@ -38,6 +38,8 @@
 #include "pipeline/grass_terrain.hpp"
 #include "rendering/grass_renderer.hpp"
 #include "rendering/hiz_system.hpp"
+#include "rendering/volumetric_fog.hpp"
+#include "rendering/sun_shafts.hpp"
 #include "rendering/minimap.hpp"
 #include "rendering/world_map.hpp"
 #include "rendering/quest_marker_renderer.hpp"
@@ -228,12 +230,23 @@ bool Renderer::createPerFrameResources() {
         }
     }
 
-    // --- Create descriptor set layout for set 0 (per-frame UBO + shadow sampler) ---
-    VkDescriptorSetLayoutBinding bindings[2]{};
+    // The fog's sampler and neutral volume come first: the layout below bakes
+    // the one in, and every set written below binds the other until the fog
+    // has volumes of its own.
+    volumetricFog_ = std::make_unique<VolumetricFog>();
+    if (!volumetricFog_->initialize(vkCtx)) {
+        LOG_ERROR("Failed to create the volumetric fog's sampler and neutral volume");
+        return false;
+    }
+
+    // --- Create descriptor set layout for set 0 (per-frame UBO + shadow sampler + fog volume) ---
+    VkDescriptorSetLayoutBinding bindings[3]{};
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     bindings[0].descriptorCount = 1;
-    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    // Compute as well: the fog volume is lit from this same block.
+    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT |
+                             VK_SHADER_STAGE_COMPUTE_BIT;
     bindings[1].binding = 1;
     bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     bindings[1].descriptorCount = 1;
@@ -244,10 +257,19 @@ bool Renderer::createPerFrameResources() {
     // only legal here, baked into the layout, rather than written into the
     // descriptor per frame. shadowSampler is created above this point.
     bindings[1].pImmutableSamplers = &shadowSampler;
+    // The fog volume, read per fragment by surfaces and per vertex by
+    // particles and ribbons. Immutable like binding 1, so a set allocated
+    // anywhere else - the character preview's - only has to name a view.
+    const VkSampler fogSampler = volumetricFog_->getSampler();
+    bindings[2].binding = 2;
+    bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[2].descriptorCount = 1;
+    bindings[2].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[2].pImmutableSamplers = &fogSampler;
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2;
+    layoutInfo.bindingCount = 3;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &perFrameSetLayout) != VK_SUCCESS) {
@@ -260,7 +282,7 @@ bool Renderer::createPerFrameResources() {
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = MAX_FRAMES * 2; // normal frames + reflection frames
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = MAX_FRAMES * 2;
+    poolSizes[1].descriptorCount = MAX_FRAMES * 2 * 2;  // shadow map + fog volume, per set
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -316,7 +338,13 @@ bool Renderer::createPerFrameResources() {
         shadowImgInfo.imageView = shadowDepthView[i];
         shadowImgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        VkWriteDescriptorSet writes[2]{};
+        // Neutral until the fog is switched on; writeFogVolumeBindings swaps
+        // in this slot's own volume then.
+        VkDescriptorImageInfo fogImgInfo{};
+        fogImgInfo.imageView = volumetricFog_->getVolumeView(i);
+        fogImgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+        VkWriteDescriptorSet writes[3]{};
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet = perFrameDescSets[i];
         writes[0].dstBinding = 0;
@@ -329,8 +357,14 @@ bool Renderer::createPerFrameResources() {
         writes[1].descriptorCount = 1;
         writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         writes[1].pImageInfo = &shadowImgInfo;
+        writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[2].dstSet = perFrameDescSets[i];
+        writes[2].dstBinding = 2;
+        writes[2].descriptorCount = 1;
+        writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[2].pImageInfo = &fogImgInfo;
 
-        vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
+        vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
     }
 
     // --- Create reflection per-frame UBO and descriptor set ---
@@ -378,7 +412,14 @@ bool Renderer::createPerFrameResources() {
             shadowImgInfo.imageView = shadowDepthView[i];
             shadowImgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-            VkWriteDescriptorSet writes[2]{};
+            // Always neutral: the volume is built for the camera, and the
+            // mirrored one would read it at the wrong place. The reflection's
+            // block switches the fog off.
+            VkDescriptorImageInfo fogImgInfo{};
+            fogImgInfo.imageView = volumetricFog_->getNeutralView();
+            fogImgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+            VkWriteDescriptorSet writes[3]{};
             writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writes[0].dstSet = reflPerFrameDescSet[i];
             writes[0].dstBinding = 0;
@@ -391,9 +432,21 @@ bool Renderer::createPerFrameResources() {
             writes[1].descriptorCount = 1;
             writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             writes[1].pImageInfo = &shadowImgInfo;
+            writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[2].dstSet = reflPerFrameDescSet[i];
+            writes[2].dstBinding = 2;
+            writes[2].descriptorCount = 1;
+            writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            writes[2].pImageInfo = &fogImgInfo;
 
-            vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
+            vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
         }
+    }
+
+    // The compute side. Not fatal: without it the fog simply stays off, and
+    // applyPendingQuality says so when it is asked for.
+    if (!volumetricFog_->createPipelines(perFrameSetLayout, shadowDepthView)) {
+        LOG_WARNING("Volumetric fog pipelines failed to build - volumetric fog unavailable");
     }
 
     LOG_INFO("Per-frame Vulkan resources created (shadow map ", SHADOW_MAP_SIZE, "x", SHADOW_MAP_SIZE, ")");
@@ -412,6 +465,11 @@ void Renderer::destroyPerFrameResources() {
         vmaDestroyBuffer(vkCtx->getAllocator(), reflPerFrameUBO, reflPerFrameUBOAlloc);
         reflPerFrameUBO = VK_NULL_HANDLE;
         reflPerFrameUBOMapped = nullptr;
+    }
+    // Before the layout: its compute pipeline layout was built from it.
+    if (volumetricFog_) {
+        volumetricFog_->shutdown();
+        volumetricFog_.reset();
     }
     destroy(device, sceneDescriptorPool);
     destroy(device, perFrameSetLayout);
@@ -470,6 +528,15 @@ void Renderer::updatePerFrameUBO() {
     // a constant for 4096, and the map is 512 to 4096 by the quality level.
     currentFrameData.shadowParams = glm::vec4(shadowsEnabled ? 1.0f : 0.0f, shadowBias,
                                               1.0f / static_cast<float>(SHADOW_MAP_SIZE), 0.0f);
+
+    // Whether this frame builds the fog volume. Decided here, beside the
+    // switch in the block the shaders read, and the frame graph dispatches by
+    // the same flag - so no shader reads a volume its frame did not build.
+    volumetricThisFrame_ = volumetricFog_ && volumetricFog_->isOn() &&
+                           volumetricFogDensity_ > 0.0f &&
+                           !(passAblation_ && passAblation_->skip(AblationPass::VolumetricFog));
+    currentFrameData.volumetricParams = volumetricThisFrame_ ? volumetricFog_->frameParams()
+                                                             : glm::vec4(0.0f);
 
     for (uint32_t i = 0; i < MAX_LOCAL_LIGHTS; ++i) {
         currentFrameData.localLightPosRadius[i] = glm::vec4(0.0f);
@@ -709,12 +776,21 @@ bool Renderer::initialize(core::Window* win) {
     postProcessPipeline_ = std::make_unique<PostProcessPipeline>();
     postProcessPipeline_->initialize(vkCtx);
 
+    // Not fatal: without them the picture is only missing its rays.
+    sunShafts_ = std::make_unique<SunShafts>();
+    if (!sunShafts_->initialize(vkCtx)) {
+        LOG_WARNING("Sun shafts failed to initialise - sun shafts unavailable");
+        sunShafts_->shutdown();
+        sunShafts_.reset();
+    }
+
     // Create render graph and register virtual resources
     renderGraph_ = std::make_unique<RenderGraph>();
 
     // Create overlay system (selection circle + fullscreen overlay)
     overlaySystem_ = std::make_unique<OverlaySystem>(vkCtx);
     renderGraph_->registerResource("shadow_depth");
+    renderGraph_->registerResource("volumetric_fog");
     renderGraph_->registerResource("reflection_texture");
     renderGraph_->registerResource("scene_color");
     renderGraph_->registerResource("scene_depth");
@@ -756,6 +832,11 @@ void Renderer::shutdown() {
     if (worldMap) {
         worldMap->shutdown();
         worldMap.reset();
+    }
+
+    if (sunShafts_) {
+        sunShafts_->shutdown();
+        sunShafts_.reset();
     }
 
     LOG_DEBUG("Renderer::shutdown - skySystem...");
@@ -1056,6 +1137,8 @@ void Renderer::beginFrame() {
         }
     }
 
+    worldDrawnThisFrame_ = false;
+
     // Apply deferred MSAA change between frames (before any rendering state is used)
     if (msaaChangePending_) {
         applyMsaaChange();
@@ -1066,6 +1149,10 @@ void Renderer::beginFrame() {
         // driver answers by losing the device.
         if (vkCtx) vkCtx->resetFrameSyncState();
     }
+
+    // A fog quality change builds or frees its volumes, which the per-frame
+    // sets bind - so between frames, before this one's set is used.
+    if (volumetricFog_ && volumetricFog_->applyPendingQuality()) writeFogVolumeBindings();
 
     // Retire finished upload batches every frame.
     //
@@ -1257,6 +1344,10 @@ void Renderer::endFrame() {
             vkCtx->getCurrentFrame());
     }
 
+    // The picture is finished and out of every pass that drew it: the one
+    // point where the shafts can copy it down, before the overlay pass opens.
+    recordSunShafts();
+
     const auto& overlayFbs = vkCtx->getOverlayFramebuffers();
     if (vkCtx->getOverlayRenderPass() != VK_NULL_HANDLE && currentImageIndex < overlayFbs.size()) {
         VkRenderPassBeginInfo overlayRp{};
@@ -1275,6 +1366,9 @@ void Renderer::endFrame() {
         VkRect2D sc{};
         sc.extent = ext;
         vkCmdSetScissor(currentCmd, 0, 1, &sc);
+
+        // Under the interface, over everything else.
+        if (sunShafts_) sunShafts_->composite(currentCmd, vkCtx->getCurrentFrame());
 
         // ImGui's pipelines are built against the overlay pass, so it always
         // records inline here rather than into a scene-pass secondary buffer.
@@ -2562,6 +2656,7 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
     if (skipAll) return;
 
     worldDrawnLastFrame_ = true;
+    worldDrawnThisFrame_ = true;
 
     auto renderStart = std::chrono::steady_clock::now();
     lastTerrainRenderMs = 0.0;
@@ -4030,6 +4125,8 @@ void Renderer::renderReflectionPass() {
     glm::vec3 reflPos = camPos;
     reflPos.z = 2.0f * waterHeight - reflPos.z;
     reflData.viewPos = glm::vec4(reflPos, 1.0f);
+    // The fog volume is the camera's; its sets here bind the neutral one.
+    reflData.volumetricParams = glm::vec4(0.0f);
     std::memcpy(reflPerFrameUBOMapped, &reflData, sizeof(GPUPerFrameData));
 
     // Begin reflection render pass (clears to black; scene rendered if pipeline-compatible)
@@ -4108,8 +4205,9 @@ void Renderer::renderShadowPass() {
                        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     b1.image = shadowDepthImage[frame];
     b1.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
+    // The fog's compute pass reads the map as well as the fragment shaders.
     VkPipelineStageFlags srcStage = (shadowDepthLayout_[frame] == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-        ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+        ? (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT)
         : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     b1.srcStageMask = srcStage;
     VkDependencyInfo b1Dep{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
@@ -4200,7 +4298,8 @@ void Renderer::renderShadowPass() {
     VkImageMemoryBarrier2 b2{};
     b2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
     b2.srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    b2.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    // Compute too: the volumetric fog samples it right after this pass.
+    b2.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
     b2.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     b2.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     b2.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -4216,6 +4315,176 @@ void Renderer::renderShadowPass() {
     cmdPipelineBarrier2(currentCmd, b2Dep);
     shadowDepthLayout_[frame] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     if (vkCtx) vkCtx->gpuMark(currentCmd, "shadows");
+}
+
+VkImageView Renderer::getNeutralFogVolumeView() const {
+    return volumetricFog_ ? volumetricFog_->getNeutralView() : VK_NULL_HANDLE;
+}
+
+void Renderer::setVolumetricFogQuality(int quality) {
+    if (!volumetricFog_) return;
+    volumetricFog_->setQuality(static_cast<VolumetricFog::Quality>(std::clamp(quality, 0, 3)));
+}
+
+void Renderer::writeFogVolumeBindings() {
+    if (!volumetricFog_ || !vkCtx) return;
+    // applyPendingQuality has already waited for the device, so neither
+    // slot's set is in use by a frame still in flight.
+    for (uint32_t i = 0; i < MAX_FRAMES; i++) {
+        VkDescriptorImageInfo fogImgInfo{};
+        fogImgInfo.imageView = volumetricFog_->getVolumeView(i);
+        fogImgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = perFrameDescSets[i];
+        write.dstBinding = 2;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.pImageInfo = &fogImgInfo;
+        vkUpdateDescriptorSets(vkCtx->getDevice(), 1, &write, 0, nullptr);
+    }
+}
+
+float Renderer::volumetricFogExtinction() const {
+    // Per yard, at and below the layer, near the camera. At this a sixth of
+    // the light is gone over the first hundred yards and two fifths across
+    // the whole volume, which thins its air out by 400 - a haze, not a wall,
+    // before the slider scales it - while a ten-yard shaft near the sun still
+    // lifts what is behind it by a tenth or more.
+    constexpr float kBaseExtinction = 0.002f;
+    float extinction = kBaseExtinction * volumetricFogDensity_;
+
+    if (lightingManager) {
+        const auto& lp = lightingManager->getLightingParams();
+        // The zone's own opinion, read off how close its authored fog comes
+        // in: Duskwood's ends at 525 yards and gets most of the mist, an
+        // open plain's ends far out and gets less. The player's fog slider
+        // divides those distances, so it is multiplied back out to reach the
+        // zone's number rather than the slider's.
+        const float strength = lightingManager->getFogStrength();
+        if (strength > 0.001f && lp.fogEnd > 1.0f) {
+            const float authoredEnd = lp.fogEnd * strength;
+            extinction *= glm::clamp(900.0f / authoredEnd, 0.6f, 2.0f);
+        }
+        // Morning mist: thickest around half past six, gone by nine.
+        const float hours = lightingManager->getVisualTimeOfDayHours();
+        const float dawn = 1.0f - glm::smoothstep(0.0f, 2.5f, std::abs(hours - 6.5f));
+        extinction *= 1.0f + 0.8f * dawn;
+    }
+
+    if (weather) {
+        const float w = glm::clamp(weather->getIntensity(), 0.0f, 1.0f);
+        switch (weather->getWeatherType()) {
+            case Weather::Type::RAIN:  extinction *= 1.0f + 1.2f * w; break;
+            case Weather::Type::SNOW:  extinction *= 1.0f + 0.8f * w; break;
+            case Weather::Type::STORM: extinction *= 1.0f + 2.0f * w; break;
+            default: break;
+        }
+    }
+
+    // Indoors the outdoor air mostly stays outside. Not all of it: a hall
+    // with torches in it should still show their glow.
+    if (cameraController && cameraController->isInsideInteriorWMO()) extinction *= 0.35f;
+    return extinction;
+}
+
+void Renderer::renderVolumetricFog() {
+    ZoneScopedN("Renderer::renderVolumetricFog");
+    if (!volumetricThisFrame_ || !volumetricFog_ || !camera || currentCmd == VK_NULL_HANDLE) return;
+    const uint32_t frame = vkCtx->getCurrentFrame();
+    // The inject pass samples this slot's shadow map, so not before the shadow
+    // pass has left it readable: at the login screen, before the player has a
+    // position, it has never been drawn and is still UNDEFINED, which the
+    // validation layer reports for any dispatch that binds it. Skipping leaves
+    // this slot's volume as it was - clear air, until the first real frame -
+    // and the shaders read that.
+    if (shadowDepthLayout_[frame] != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) return;
+    const float dt = std::max(lastDeltaTime_, 0.0f);
+
+    // The ground the mist lies on: the terrain under the player, or the
+    // player's own feet where those are lower - a cave, a city under a
+    // mountain - so the layer is never a ceiling over them. Chased over a
+    // second or two so a step off a ledge does not lift the whole bank of
+    // mist with it; a teleport snaps it, and drops last frame's air too.
+    float ground = characterPosition.z;
+    if (terrainManager) {
+        if (auto h = terrainManager->getHeightAt(characterPosition.x, characterPosition.y)) {
+            ground = std::min(ground, *h);
+        }
+    }
+    if (!fogLayerBaseValid_ || std::abs(ground - fogLayerBase_) > 150.0f) {
+        fogLayerBase_ = ground;
+        fogLayerBaseValid_ = true;
+        volumetricFog_->resetHistory();
+    } else {
+        fogLayerBase_ += (ground - fogLayerBase_) * (1.0f - std::exp(-dt / 1.5f));
+    }
+
+    const float target = volumetricFogExtinction();
+    if (fogExtinction_ < 0.0f) fogExtinction_ = target;
+    fogExtinction_ += (target - fogExtinction_) * (1.0f - std::exp(-dt / 1.0f));
+
+    VolumetricFog::FrameInputs in;
+    in.view = currentFrameData.view;
+    in.projection = currentFrameData.projection;
+    in.cameraPos = glm::vec3(currentFrameData.viewPos);
+    in.time = globalTime;
+    in.density = fogExtinction_;
+    in.layerBase = fogLayerBase_;
+    volumetricFog_->record(currentCmd, frame, perFrameDescSets[frame], in);
+    if (vkCtx) vkCtx->gpuMark(currentCmd, "volumetric fog");
+
+    // What it was built from, every few seconds, for the report that says the
+    // fog is too thick or missing: INFO, so it costs nothing unless asked for.
+    static double lastFogLog = 0.0;
+    if (globalTime - lastFogLog > 5.0) {
+        lastFogLog = globalTime;
+        LOG_INFO("volumetricFog: extinction=", fogExtinction_, "/yd (target ", target,
+                 ") layerBase=", fogLayerBase_, " lights=", currentFrameData.localLightMeta.x);
+    }
+}
+
+void Renderer::recordSunShafts() {
+    if (!sunShafts_ || currentCmd == VK_NULL_HANDLE) return;
+    SunShafts::FrameInputs in;
+    const auto& images = vkCtx->getSwapchainImages();
+    if (sunShaftsEnabled_ && worldDrawnThisFrame_ && camera && lightingManager &&
+        currentImageIndex < images.size() &&
+        !(passAblation_ && passAblation_->skip(AblationPass::SunShafts))) {
+        const auto& lp = lightingManager->getLightingParams();
+        // The sun the lens flare draws around, from the same rule.
+        const glm::vec3 sunDir = sunDirectionFromLightDir(lp.directionalDir);
+        const SunOnScreen sun = sunScreenPosition(camera->getViewMatrix(),
+                                                  camera->getProjectionMatrix(), sunDir);
+        if (sun.inFront) {
+            // Screen strength: 1 would be the sky's own colour over anything a
+            // fully lit walk crosses. Less, because the sky around the sun is
+            // already the brightest thing on screen.
+            float strength = 0.8f;
+            // Up out of the horizon and gone again as it sets. A sun under the
+            // ground lights nothing to stream from.
+            strength *= glm::smoothstep(-0.02f, 0.1f, sunDir.z);
+            // In view, or streaming in from just past an edge, fading out as
+            // it goes half a screen beyond one.
+            const glm::vec2 past = glm::max(glm::abs(sun.uv - 0.5f) - 0.5f, glm::vec2(0.0f));
+            strength *= 1.0f - glm::smoothstep(0.0f, 0.5f, std::max(past.x, past.y));
+            // Rain and snow put a lid over it.
+            if (weather) strength *= 1.0f - 0.8f * glm::clamp(weather->getIntensity(), 0.0f, 1.0f);
+
+            // The sun's own colour, kept in hue and not in brightness, and
+            // half white: the rays should warm at dusk, not turn orange.
+            const glm::vec3 c = lp.diffuseColor;
+            const float peak = std::max({c.r, c.g, c.b, 1e-3f});
+            in.tint = glm::mix(glm::vec3(1.0f), c / peak, 0.5f);
+            in.sunUV = sun.uv;
+            in.strength = strength;
+        }
+    }
+    // Called every frame, strength zero included, so the composite knows
+    // there is nothing of this frame's to add.
+    sunShafts_->record(currentCmd, vkCtx->getCurrentFrame(),
+                       currentImageIndex < images.size() ? images[currentImageIndex] : VK_NULL_HANDLE,
+                       vkCtx->getSwapchainExtent(), in);
 }
 
 // Build the per-frame render graph for off-screen pre-passes.
@@ -4277,6 +4546,15 @@ void Renderer::buildFrameGraph(game::GameHandler* gameHandler) {
     // already declines to draw anything; what has to keep happening is the
     // transition.
     renderGraph_->setPassEnabled("shadow_pass", shadowDepthImage[0] != VK_NULL_HANDLE);
+
+    // Volumetric fog → reads this frame's shadow map, outputs the fog volume
+    // every world shader samples.
+    auto fogVolume = renderGraph_->findResource("volumetric_fog");
+    renderGraph_->addPass("volumetric_fog", {shadowDepth}, {fogVolume},
+        [this](VkCommandBuffer) {
+            renderVolumetricFog();
+        });
+    renderGraph_->setPassEnabled("volumetric_fog", volumetricThisFrame_);
 
     // Reflection pre-pass → outputs reflection_texture (reads scene, so after shadow)
     renderGraph_->addPass("reflection_pass", {shadowDepth}, {reflTex},

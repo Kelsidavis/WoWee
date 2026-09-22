@@ -854,7 +854,7 @@ constexpr const char* kGraphicsApplyKeys[] = {
     "grassdistance", "waterrefraction", "upscaling", "fsrquality",
     "fsrsharpness", "framegen", "brightness", "uiopacity", "minimapsquare",
     "minimapnpcdots", "minimapclock", "minimapcoords", "minimaprotate", "latencymeter",
-    "fogskyblend", "fogstrength", "sharpstars",
+    "fogskyblend", "fogstrength", "sharpstars", "lightshafts", "mistdensity", "sunshafts",
     // Moved off the game's own Effects panel, so this list is now what
     // applies them at startup; the cvar store used to do it.
     "groundclutterdistance", "particledensity", "weatherdetail",
@@ -996,6 +996,8 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "viewdistance",   .asFloat = &SettingsPanel::pendingViewDistance},
     {.key = "fogskyblend",    .asFloat = &SettingsPanel::pendingFogSkyBlend},
     {.key = "fogstrength",    .asFloat = &SettingsPanel::pendingFogStrength},
+    {.key = "lightshafts",    .asInt   = &SettingsPanel::pendingVolumetricFog},
+    {.key = "mistdensity",    .asFloat = &SettingsPanel::pendingVolumetricDensity},
     {.key = "mousespeed",     .asFloat = &SettingsPanel::pendingMouseSensitivity},
     {.key = "minimapclock",   .asBool  = &SettingsPanel::pendingShowMinimapClock},
     {.key = "friendlyplates", .asBool  = &SettingsPanel::showFriendlyNameplates_},
@@ -1040,6 +1042,7 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "framecap",          .asInt   = &SettingsPanel::pendingFrameCap},
     {.key = "parallax",          .asBool  = &SettingsPanel::pendingPOM},
     {.key = "sharpstars",        .asBool  = &SettingsPanel::pendingSharpStars},
+    {.key = "sunshafts",         .asBool  = &SettingsPanel::pendingSunShafts},
     {.key = "parallaxquality",   .asInt   = &SettingsPanel::pendingPOMQuality},
 
     // --- Upscaling ---
@@ -1349,6 +1352,8 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
         if (chars) chars->setPOMEnabled(pendingPOM);
     } else if (key == "sharpstars") {
         if (renderer) renderer->setSharpStars(pendingSharpStars);
+    } else if (key == "sunshafts") {
+        if (renderer) renderer->setSunShaftsEnabled(pendingSunShafts);
     } else if (key == "parallaxquality") {
         if (wmo) wmo->setPOMQuality(pendingPOMQuality);
         if (chars) chars->setPOMQuality(pendingPOMQuality);
@@ -1379,6 +1384,10 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
                 lighting->setFogStrength(pendingFogStrength);
             }
         }
+    } else if (key == "lightshafts") {
+        if (renderer) renderer->setVolumetricFogQuality(pendingVolumetricFog);
+    } else if (key == "mistdensity") {
+        if (renderer) renderer->setVolumetricFogDensity(pendingVolumetricDensity);
     } else if (key == "fogskyblend") {
         if (renderer) {
             if (auto* lighting = renderer->getLightingManager()) {

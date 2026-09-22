@@ -358,13 +358,13 @@ void CharacterPreview::createFBO() {
         });
     }
 
-    // 3. Create descriptor pool for per-frame sets (2 UBO + 2 sampler)
+    // 3. Create descriptor pool for per-frame sets (2 UBO + 2 shadow + 2 fog volume)
     {
         VkDescriptorPoolSize sizes[2]{};
         sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         sizes[0].descriptorCount = MAX_FRAMES;
         sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        sizes[1].descriptorCount = MAX_FRAMES;
+        sizes[1].descriptorCount = MAX_FRAMES * 2;
 
         VkDescriptorPoolCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         ci.maxSets = MAX_FRAMES;
@@ -420,7 +420,14 @@ void CharacterPreview::createFBO() {
         shadowImg.imageView = dummyShadowView_;
         shadowImg.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        VkWriteDescriptorSet writes[2]{};
+        // Binding 2 is the fog volume, which a portrait has no air for: the
+        // renderer's neutral one, with the block's switch left at zero. Its
+        // sampler is immutable in the layout, like binding 1's.
+        VkDescriptorImageInfo fogImg{};
+        fogImg.imageView = appRenderer->getNeutralFogVolumeView();
+        fogImg.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+        VkWriteDescriptorSet writes[3]{};
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet = previewPerFrameSet_[i];
         writes[0].dstBinding = 0;
@@ -433,8 +440,14 @@ void CharacterPreview::createFBO() {
         writes[1].descriptorCount = 1;
         writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         writes[1].pImageInfo = &shadowImg;
+        writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[2].dstSet = previewPerFrameSet_[i];
+        writes[2].dstBinding = 2;
+        writes[2].descriptorCount = 1;
+        writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[2].pImageInfo = &fogImg;
 
-        vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
+        vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
     }
 
     // 5. Register the color attachment as an ImGui texture
