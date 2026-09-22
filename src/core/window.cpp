@@ -317,6 +317,10 @@ void Window::setFullscreen(bool enable) {
         width = windowedWidth;
         height = windowedHeight;
     }
+    // Said, as vsync changes are: several things can switch the window between
+    // full screen and not, and a report that it "did not stay" is otherwise a
+    // guess at which of them did.
+    LOG_WARNING("Window: full screen ", fullscreen ? "on" : "off", ", ", width, "x", height);
     if (vkContext) {
         vkContext->markSwapchainDirty();
     }
@@ -414,7 +418,10 @@ void Window::applyResolution(int w, int h) {
         if (vkContext) {
             vkContext->markSwapchainDirty();
         }
-        LOG_INFO("Fullscreen resolution applied: ", width, "x", height);
+        // At warning: this switches the display's mode, which on a desktop
+        // with more than one monitor is visible on all of them.
+        LOG_WARNING("Window: full screen display mode ", closest.w, "x", closest.h,
+                    " for a requested ", w, "x", h);
         return;
     }
     // Windowed. What is asked for and what is granted are not the same
