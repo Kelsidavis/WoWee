@@ -96,6 +96,9 @@ public:
         bool showWho       = false;
         bool toggleCombatLog = false;
         bool takeScreenshot = false;
+        /// /record: start, stop, or whichever it is not doing.
+        enum class Recording { None, Toggle, Start, Stop };
+        Recording recording = Recording::None;
     };
 
     /** Return accumulated slash-command flags and reset them. */

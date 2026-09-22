@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
@@ -9,6 +10,7 @@
 // Forward declare miniaudio types to avoid exposing implementation in header
 struct ma_engine;
 struct ma_sound;
+struct ma_device;
 
 namespace wowee {
 namespace pipeline { class AssetManager; }
@@ -88,6 +90,22 @@ public:
     // Update (call once per frame for cleanup/position sync)
     void update(float deltaTime);
 
+    /// Keep a copy of what the speakers play, for the screen recorder.
+    ///
+    /// Taken in the device's own callback after the mix and the master volume,
+    /// so a recording sounds as the session did - muted or suspended included.
+    /// Anything captured before this call is discarded. False when there is no
+    /// device to listen to, in which case a recording goes without sound.
+    bool beginOutputCapture();
+    void endOutputCapture();
+    /// Up to maxFrames interleaved float frames captured since the last read,
+    /// oldest first. One reader at a time; any thread.
+    uint32_t readCapturedOutput(float* dst, uint32_t maxFrames);
+    /// Frames captured and not yet read.
+    [[nodiscard]] uint32_t capturedOutputAvailable() const;
+    [[nodiscard]] uint32_t getOutputChannels() const;
+    [[nodiscard]] uint32_t getOutputSampleRate() const;
+
 private:
     AudioEngine();
     AudioEngine(const AudioEngine&) = delete;
@@ -120,6 +138,15 @@ private:
 
     // miniaudio engine (opaque pointer)
     ma_engine* engine_ = nullptr;
+
+    /// Replaces miniaudio's own device callback: it mixes exactly as that one
+    /// does, then hands the result to the capture ring when one is open.
+    static void deviceDataCallback(ma_device* device, void* out, const void* in, uint32_t frames);
+    // ma_pcm_rb, which miniaudio declares anonymously and so cannot be named
+    // here. Made on the first capture and kept until shutdown: freeing it while
+    // the audio thread might still be writing is the one race not worth having.
+    void* captureRing_ = nullptr;
+    std::atomic<bool> capturing_{false};
 };
 
 } // namespace audio

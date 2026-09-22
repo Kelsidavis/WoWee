@@ -4880,6 +4880,30 @@ void Application::render() {
         }
     }
 
+    // A recording of the client, from start-up, then done with - the recorder
+    // checked end to end without a world to stand in or a key to press:
+    // WOWEE_RECORD=<file.mp4>, for WOWEE_RECORD_SECONDS (five by default).
+    // Started once the interface has settled, as the screenshot is; stopped by
+    // quitting, which finishes the file on the way out.
+    if (const char* record = std::getenv("WOWEE_RECORD"); record != nullptr && *record != '\0') {
+        ++envRecordFrames_;
+        if (envRecordFrames_ == kScreenshotFrame) {
+            std::string error;
+            if (renderer->startRecording(record, error)) {
+                envRecordStart_ = std::chrono::steady_clock::now();
+            } else {
+                LOG_WARNING("WOWEE_RECORD: could not start: ", error);
+                running = false;
+            }
+        } else if (envRecordFrames_ > kScreenshotFrame) {
+            const char* limit = std::getenv("WOWEE_RECORD_SECONDS");
+            const double seconds = (limit && *limit) ? std::atof(limit) : 5.0;
+            if (std::chrono::duration<double>(std::chrono::steady_clock::now() - envRecordStart_).count() >= seconds) {
+                running = false;
+            }
+        }
+    }
+
     stageStatFrames_ += 1;
     reportStageTimes();
     renderingFrame_ = false;

@@ -134,6 +134,30 @@ public:
     [[nodiscard]] std::string helpText() const override { return "Take a screenshot"; }
 };
 
+// --- /record ---
+// Start or stop recording the screen. On its own it flips between the two, so
+// a macro holding just "/record" is a key that starts and stops it - which is
+// how a player without a Print Screen key, every Mac keyboard, binds one.
+class RecordCommand : public IChatCommand {
+public:
+    ChatCommandResult execute(ChatCommandContext& ctx) override {
+        std::string arg = ctx.args;
+        for (char& c : arg) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        while (!arg.empty() && arg.back() == ' ') arg.pop_back();
+        while (!arg.empty() && arg.front() == ' ') arg.erase(arg.begin());
+        using Recording = ChatPanel::SlashCommands::Recording;
+        auto& cmds = ctx.panel.getSlashCmds();
+        if (arg == "start" || arg == "on") cmds.recording = Recording::Start;
+        else if (arg == "stop" || arg == "off") cmds.recording = Recording::Stop;
+        else cmds.recording = Recording::Toggle;
+        return {};
+    }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"record"}; }
+    [[nodiscard]] std::string helpText() const override {
+        return "Record the screen to a video: /record [start|stop]";
+    }
+};
+
 // --- /ticket, /gmticket, /gm ---
 class TicketCommand : public IChatCommand {
 public:
@@ -397,6 +421,7 @@ void registerMiscCommands(ChatCommandRegistry& reg) {
     reg.registerCommand(std::make_unique<ZoneCommand>());
     reg.registerCommand(std::make_unique<PlayedCommand>());
     reg.registerCommand(std::make_unique<ScreenshotCommand>());
+    reg.registerCommand(std::make_unique<RecordCommand>());
     reg.registerCommand(std::make_unique<TicketCommand>());
     reg.registerCommand(std::make_unique<ScoreCommand>());
     reg.registerCommand(std::make_unique<ThreatCommand>());

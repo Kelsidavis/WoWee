@@ -574,6 +574,7 @@ endif()
 set(WOWEE_SOURCES
     # Core
     src/core/application.cpp
+    src/core/screen_recorder.cpp
     src/core/entity_spawner.cpp
     src/core/entity_spawner_player.cpp
     src/core/entity_spawner_processing.cpp
@@ -898,6 +899,7 @@ set(WOWEE_SOURCES
     src/rendering/hiz_system.cpp
     src/rendering/volumetric_fog.cpp
     src/rendering/sun_shafts.cpp
+    src/rendering/screen_capture.cpp
     src/rendering/grass_renderer.cpp
     src/pipeline/adt_alpha.cpp
     src/pipeline/grass_terrain.cpp

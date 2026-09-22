@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/window.hpp"
+#include <chrono>
 #include "core/gamepad.hpp"
 #include "ui/unit_portrait.hpp"
 #include "ui/widget_renderer.hpp"
@@ -228,6 +229,9 @@ private:
     /// interface has settled into what it will actually look like.
     static constexpr int kScreenshotFrame = 30;
     int screenshotFrames_ = 0;
+    /// WOWEE_RECORD: a recording from start-up, then quit. See runFrame.
+    int envRecordFrames_ = 0;
+    std::chrono::steady_clock::time_point envRecordStart_{};
 
     void setupUICallbacks();
     void spawnPlayerCharacter();

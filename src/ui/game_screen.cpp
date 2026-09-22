@@ -652,7 +652,14 @@ void GameScreen::render(game::GameHandler& gameHandler) {
         }
         if (cmds.toggleCombatLog) combatUI_.showCombatLog_ = !combatUI_.showCombatLog_;
         if (cmds.takeScreenshot) takeScreenshot();
+        switch (cmds.recording) {
+            case ChatPanel::SlashCommands::Recording::Toggle: toggleRecording(); break;
+            case ChatPanel::SlashCommands::Recording::Start:  startRecording();  break;
+            case ChatPanel::SlashCommands::Recording::Stop:   stopRecording();   break;
+            case ChatPanel::SlashCommands::Recording::None:   break;
+        }
     }
+    reportRecordingFailure();
 
     // ---- New UI elements ----
     auto spellIconFn = [this](uint32_t id, pipeline::AssetManager* am) { return getSpellIcon(id, am); };
@@ -1738,9 +1745,14 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 gameHandler.runInterfaceCommand("TogglePVPFrame()");
             }
 
-            // Screenshot (PrintScreen key)
+            // Screenshot (PrintScreen key), and with Shift held, start or
+            // stop a recording.
             if (input.isKeyJustPressed(SDL_SCANCODE_PRINTSCREEN)) {
-                takeScreenshot();
+                if (input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT)) {
+                    toggleRecording();
+                } else {
+                    takeScreenshot();
+                }
             }
 
             // Action bar keys (1-9, 0, -, =)

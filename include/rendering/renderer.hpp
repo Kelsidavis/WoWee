@@ -17,6 +17,7 @@
 #include "rendering/vk_frame_data.hpp"
 #include "rendering/vk_utils.hpp"
 #include "rendering/sky_system.hpp"
+#include "core/screen_recorder.hpp"
 #include "pipeline/custom_zone_discovery.hpp"
 
 #include "pipeline/grass_biomes.hpp"
@@ -73,6 +74,7 @@ class HiZSystem;
 class GrassRenderer;
 class VolumetricFog;
 class SunShafts;
+class ScreenCapture;
 
 class Renderer {
 public:
@@ -181,6 +183,17 @@ public:
 
     // Screenshot capture - copies swapchain image to PNG file
     bool captureScreenshot(const std::string& outputPath);
+
+    /// Start writing the screen, interface included, and what the client
+    /// plays to a video file. False, with the reason in error, when it cannot.
+    bool startRecording(const std::string& path, std::string& error);
+    /// Finish the file and close it.
+    core::ScreenRecorder::Stats stopRecording();
+    [[nodiscard]] bool isRecording() const;
+    /// Why a recording stopped by itself - the disk filled, the encoder gave
+    /// up - once, for the interface to say; empty otherwise. The file is
+    /// finished properly all the same.
+    std::string takeRecordingFailure();
 
     // Spell visual effects (SMSG_PLAY_SPELL_VISUAL / SMSG_PLAY_SPELL_IMPACT)
     // Delegates to SpellVisualSystem (owned by Renderer)
@@ -534,6 +547,13 @@ private:
     void renderVolumetricFog();
     void writeFogVolumeBindings();
     float volumetricFogExtinction() const;
+
+    // Screen recording: the GPU side reads frames back, the recorder encodes.
+    std::unique_ptr<ScreenCapture> screenCapture_;
+    std::unique_ptr<core::ScreenRecorder> recorder_;
+    std::string recordingFailure_;
+    void collectRecordedFrame();
+    void recordScreenCapture();
 
     // Screen-space sun shafts, built from the finished frame at the end of
     // endFrame and added in the overlay pass ahead of the interface.

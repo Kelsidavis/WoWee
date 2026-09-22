@@ -40,6 +40,7 @@
 #include "rendering/hiz_system.hpp"
 #include "rendering/volumetric_fog.hpp"
 #include "rendering/sun_shafts.hpp"
+#include "rendering/screen_capture.hpp"
 #include "rendering/minimap.hpp"
 #include "rendering/world_map.hpp"
 #include "rendering/quest_marker_renderer.hpp"
@@ -801,6 +802,10 @@ bool Renderer::initialize(core::Window* win) {
 }
 
 void Renderer::shutdown() {
+    // A recording in progress is finished, not abandoned: the file is only
+    // playable once its index is written.
+    if (recorder_) stopRecording();
+
     destroySecondaryCommandResources();
 
     LOG_DEBUG("Renderer::shutdown - terrainManager stopWorkers...");
@@ -1207,6 +1212,10 @@ void Renderer::beginFrame() {
         return;
     }
 
+    // This slot's fence has just been waited on, so a frame it copied for the
+    // recording two frames ago is complete.
+    collectRecordedFrame();
+
     // FSR2 jitter pattern (§4.3 - delegates to PostProcessPipeline)
     if (postProcessPipeline_ && camera) postProcessPipeline_->applyJitter(camera.get());
 
@@ -1383,6 +1392,10 @@ void Renderer::endFrame() {
 
     if (afterInterface_) afterInterface_(currentCmd);
 
+    // Last, so the recording holds everything the player sees - and then the
+    // recording dot, which it does not.
+    recordScreenCapture();
+
     // Submit and present
     vkCtx->endFrame(currentCmd, currentImageIndex);
     currentCmd = VK_NULL_HANDLE;
@@ -1394,6 +1407,110 @@ void Renderer::setCharacterFollow(uint32_t instanceId) {
         cameraController->setFollowTarget(&characterPosition);
     }
     if (animationController_) animationController_->onCharacterFollow(instanceId);
+}
+
+bool Renderer::startRecording(const std::string& path, std::string& error) {
+    if (recorder_ && recorder_->isRecording()) {
+        error = "already recording";
+        return false;
+    }
+    if (!vkCtx) {
+        error = "there is no renderer to record from";
+        return false;
+    }
+    if (!core::ScreenRecorder::compiledIn()) {
+        error = "this build was made without FFmpeg 5.1 or later, which recording needs";
+        return false;
+    }
+    const VkExtent2D extent = vkCtx->getSwapchainExtent();
+    const core::RecordingSize size = core::recordingFrameSize(extent.width, extent.height);
+    auto capture = std::make_unique<ScreenCapture>();
+    if (!capture->initialize(vkCtx, size.width, size.height)) {
+        capture->shutdown();
+        error = "could not set up reading frames back from the GPU";
+        return false;
+    }
+    auto recorder = std::make_unique<core::ScreenRecorder>();
+    if (!recorder->start(path, size, error)) {
+        capture->shutdown();
+        return false;
+    }
+    screenCapture_ = std::move(capture);
+    recorder_ = std::move(recorder);
+    recordingFailure_.clear();
+    return true;
+}
+
+core::ScreenRecorder::Stats Renderer::stopRecording() {
+    core::ScreenRecorder::Stats stats;
+    if (!recorder_) return stats;
+    // The frames still on the GPU are finished and handed over, oldest first,
+    // so the file ends where the recording did rather than two frames short.
+    if (vkCtx && screenCapture_) {
+        vkDeviceWaitIdle(vkCtx->getDevice());
+        ScreenCapture::Ready ready[2] = {screenCapture_->collect(0), screenCapture_->collect(1)};
+        if (ready[0].valid && ready[1].valid && ready[1].pts < ready[0].pts) std::swap(ready[0], ready[1]);
+        ScreenCapture* capture = screenCapture_.get();
+        for (const auto& r : ready) {
+            if (!r.valid) continue;
+            const uint32_t buffer = r.buffer;
+            recorder_->submit({.bgra = r.bgra, .stride = r.stride, .pts = r.pts,
+                               .release = [capture, buffer] { capture->release(buffer); }});
+        }
+    }
+    // The recorder first: its thread holds readback buffers until it is done.
+    stats = recorder_->stop();
+    recorder_.reset();
+    if (screenCapture_) {
+        screenCapture_->shutdown();
+        screenCapture_.reset();
+    }
+    return stats;
+}
+
+bool Renderer::isRecording() const {
+    return recorder_ && recorder_->isRecording();
+}
+
+std::string Renderer::takeRecordingFailure() {
+    std::string failure;
+    failure.swap(recordingFailure_);
+    return failure;
+}
+
+void Renderer::collectRecordedFrame() {
+    if (!recorder_ || !screenCapture_ || !vkCtx) return;
+    const ScreenCapture::Ready ready = screenCapture_->collect(vkCtx->getCurrentFrame());
+    if (ready.valid) {
+        ScreenCapture* capture = screenCapture_.get();
+        const uint32_t buffer = ready.buffer;
+        recorder_->submit({.bgra = ready.bgra, .stride = ready.stride, .pts = ready.pts,
+                           .release = [capture, buffer] { capture->release(buffer); }});
+    }
+    // Given up on its own: finish what it has and say why, once.
+    if (recorder_->failed()) {
+        recordingFailure_ = recorder_->failure();
+        stopRecording();
+    }
+}
+
+void Renderer::recordScreenCapture() {
+    if (!recorder_ || !screenCapture_ || !recorder_->isRecording() || currentCmd == VK_NULL_HANDLE) return;
+    const auto& images = vkCtx->getSwapchainImages();
+    const VkExtent2D extent = vkCtx->getSwapchainExtent();
+    int64_t pts = 0;
+    if (currentImageIndex < images.size() && recorder_->frameDue(&pts)) {
+        if (!screenCapture_->record(currentCmd, vkCtx->getCurrentFrame(), images[currentImageIndex],
+                                    extent, pts)) {
+            recorder_->frameDropped();
+        }
+        recorder_->frameTaken(pts);
+    }
+    const auto& overlayFbs = vkCtx->getOverlayFramebuffers();
+    if (vkCtx->getOverlayRenderPass() != VK_NULL_HANDLE && currentImageIndex < overlayFbs.size()) {
+        screenCapture_->drawIndicator(currentCmd, overlayFbs[currentImageIndex], extent,
+                                      static_cast<float>(recorder_->elapsedSeconds()));
+    }
 }
 
 bool Renderer::captureScreenshot(const std::string& outputPath) {

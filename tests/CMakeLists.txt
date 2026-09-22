@@ -1118,6 +1118,11 @@ wowee_add_test(test_frustum
     SOURCES test_frustum.cpp
             ${CMAKE_SOURCE_DIR}/src/rendering/frustum.cpp)
 
+# ── test_recording_size ──────────────────────────────────────
+# Header-only: the size a screen recording is encoded at.
+wowee_add_test(test_recording_size
+    SOURCES test_recording_size.cpp)
+
 # ── test_volumetric_fog_math ─────────────────────────────────
 # Header-only: where the fog volume's cells are, against where the shaders
 # look for them.

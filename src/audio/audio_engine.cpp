@@ -202,8 +202,11 @@ bool AudioEngine::initialize() {
     // Allocate miniaudio engine
     engine_ = new ma_engine();
 
-    // Initialize with default config
-    ma_result result = ma_engine_init(nullptr, engine_);
+    // The default config, but with the device's callback our own: it mixes the
+    // same way miniaudio's does and also feeds the screen recorder's tap.
+    ma_engine_config engineConfig = ma_engine_config_init();
+    engineConfig.dataCallback = &AudioEngine::deviceDataCallback;
+    ma_result result = ma_engine_init(&engineConfig, engine_);
     if (result != MA_SUCCESS) {
         LOG_ERROR("Failed to initialize miniaudio engine: ", result);
         delete engine_;
@@ -266,10 +269,18 @@ void AudioEngine::shutdown() {
     }
     activeSounds_.clear();
 
+    capturing_.store(false, std::memory_order_release);
     if (engine_) {
         ma_engine_uninit(engine_);
         delete engine_;
         engine_ = nullptr;
+    }
+    // The device is gone, so nothing writes to the ring any more.
+    if (captureRing_) {
+        auto* ring = static_cast<ma_pcm_rb*>(captureRing_);
+        ma_pcm_rb_uninit(ring);
+        delete ring;
+        captureRing_ = nullptr;
     }
 
     initialized_ = false;
@@ -686,6 +697,88 @@ void AudioEngine::update(float deltaTime) {
             ++i;
         }
     }
+}
+
+void AudioEngine::deviceDataCallback(ma_device* device, void* out, const void* in, uint32_t frames) {
+    (void)in;
+    // What miniaudio's own callback does, less an Emscripten-only job pump.
+    auto* engine = static_cast<ma_engine*>(device->pUserData);
+    ma_engine_read_pcm_frames(engine, out, frames, nullptr);
+
+    AudioEngine& self = instance();
+    if (!self.capturing_.load(std::memory_order_acquire)) return;
+    auto* ring = static_cast<ma_pcm_rb*>(self.captureRing_);
+    const ma_uint32 channels = ma_engine_get_channels(engine);
+    const auto* src = static_cast<const float*>(out);
+    // Whatever does not fit is dropped: the recorder has fallen a second
+    // behind, and the audio thread is the one thing that must never wait.
+    ma_uint32 remaining = frames;
+    while (remaining > 0) {
+        ma_uint32 chunk = remaining;
+        void* dst = nullptr;
+        if (ma_pcm_rb_acquire_write(ring, &chunk, &dst) != MA_SUCCESS || chunk == 0) break;
+        std::memcpy(dst, src, static_cast<size_t>(chunk) * channels * sizeof(float));
+        ma_pcm_rb_commit_write(ring, chunk);
+        src += static_cast<size_t>(chunk) * channels;
+        remaining -= chunk;
+    }
+}
+
+bool AudioEngine::beginOutputCapture() {
+    if (!initialized_ || !engine_) return false;
+    if (!captureRing_) {
+        // A second of the device's output: the recorder drains it every few
+        // tens of milliseconds, so this is room for a long stall.
+        auto* ring = new ma_pcm_rb();
+        if (ma_pcm_rb_init(ma_format_f32, ma_engine_get_channels(engine_),
+                           ma_engine_get_sample_rate(engine_), nullptr, nullptr, ring) != MA_SUCCESS) {
+            delete ring;
+            LOG_WARNING("AudioEngine: could not make the capture buffer - recording without sound");
+            return false;
+        }
+        captureRing_ = ring;
+    }
+    // Drop what an earlier capture left unread. The reader's side, so it is
+    // safe with the audio thread writing.
+    auto* ring = static_cast<ma_pcm_rb*>(captureRing_);
+    const ma_uint32 stale = ma_pcm_rb_available_read(ring);
+    if (stale > 0) ma_pcm_rb_seek_read(ring, stale);
+    capturing_.store(true, std::memory_order_release);
+    return true;
+}
+
+void AudioEngine::endOutputCapture() {
+    capturing_.store(false, std::memory_order_release);
+}
+
+uint32_t AudioEngine::readCapturedOutput(float* dst, uint32_t maxFrames) {
+    if (!captureRing_ || !dst || maxFrames == 0) return 0;
+    auto* ring = static_cast<ma_pcm_rb*>(captureRing_);
+    const ma_uint32 channels = ma_pcm_rb_get_channels(ring);
+    uint32_t read = 0;
+    while (read < maxFrames) {
+        ma_uint32 chunk = maxFrames - read;
+        void* src = nullptr;
+        if (ma_pcm_rb_acquire_read(ring, &chunk, &src) != MA_SUCCESS || chunk == 0) break;
+        std::memcpy(dst + static_cast<size_t>(read) * channels, src,
+                    static_cast<size_t>(chunk) * channels * sizeof(float));
+        ma_pcm_rb_commit_read(ring, chunk);
+        read += chunk;
+    }
+    return read;
+}
+
+uint32_t AudioEngine::capturedOutputAvailable() const {
+    if (!captureRing_) return 0;
+    return ma_pcm_rb_available_read(static_cast<ma_pcm_rb*>(captureRing_));
+}
+
+uint32_t AudioEngine::getOutputChannels() const {
+    return engine_ ? ma_engine_get_channels(engine_) : 0;
+}
+
+uint32_t AudioEngine::getOutputSampleRate() const {
+    return engine_ ? ma_engine_get_sample_rate(engine_) : 0;
 }
 
 } // namespace audio

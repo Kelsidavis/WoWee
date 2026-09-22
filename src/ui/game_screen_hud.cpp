@@ -1720,15 +1720,15 @@ void GameScreen::setGamma(float gamma) {
     if (changed) saveSettings();
 }
 
-void GameScreen::takeScreenshot() {
-    auto* renderer = services_.renderer;
-    if (!renderer) return;
+namespace {
 
-    // Build path: ~/.wowee/screenshots/WoWee_YYYYMMDD_HHMMSS.png
+/// ~/.wowee/<folder>/WoWee_YYYYMMDD_HHMMSS.<extension>, the name a screenshot
+/// or a recording is saved under.
+std::string capturePath(const char* folder, const char* extension) {
     const char* home = std::getenv("HOME");
     if (!home) home = std::getenv("USERPROFILE");
     if (!home) home = "/tmp";
-    std::string dir = std::string(home) + "/.wowee/screenshots";
+    std::string dir = std::string(home) + "/.wowee/" + folder;
 
     auto now = std::chrono::system_clock::now();
     auto tt  = std::chrono::system_clock::to_time_t(now);
@@ -1737,11 +1737,69 @@ void GameScreen::takeScreenshot() {
 
     char filename[128];
     std::snprintf(filename, sizeof(filename),
-                  "WoWee_%04d%02d%02d_%02d%02d%02d.png",
+                  "WoWee_%04d%02d%02d_%02d%02d%02d.%s",
                   tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-                  tm.tm_hour, tm.tm_min, tm.tm_sec);
+                  tm.tm_hour, tm.tm_min, tm.tm_sec, extension);
+    return dir + "/" + filename;
+}
 
-    std::string path = dir + "/" + filename;
+}  // namespace
+
+void GameScreen::startRecording() {
+    auto* renderer = services_.renderer;
+    if (!renderer || !services_.gameHandler || renderer->isRecording()) return;
+    const std::string path = capturePath("recordings", "mp4");
+    std::error_code ec;
+    std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
+    std::string error;
+    if (renderer->startRecording(path, error)) {
+        recordingPath_ = path;
+        services_.gameHandler->addSystemChatMessage(
+            "Recording to " + path + ". Type /record again to stop.");
+    } else {
+        services_.gameHandler->addSystemChatMessage("Could not start recording: " + error + ".");
+    }
+}
+
+void GameScreen::stopRecording() {
+    auto* renderer = services_.renderer;
+    if (!renderer || !services_.gameHandler || !renderer->isRecording()) return;
+    const auto stats = renderer->stopRecording();
+    const int seconds = static_cast<int>(stats.seconds + 0.5);
+    char length[32];
+    std::snprintf(length, sizeof(length), "%d:%02d", seconds / 60, seconds % 60);
+    std::string message = "Recording saved: " + recordingPath_ + " (" + length;
+    if (!stats.hasAudio) message += ", no sound";
+    if (stats.framesDropped > 0) {
+        message += ", " + std::to_string(stats.framesDropped) + " frames dropped";
+    }
+    services_.gameHandler->addSystemChatMessage(message + ").");
+}
+
+void GameScreen::toggleRecording() {
+    auto* renderer = services_.renderer;
+    if (!renderer) return;
+    if (renderer->isRecording()) {
+        stopRecording();
+    } else {
+        startRecording();
+    }
+}
+
+void GameScreen::reportRecordingFailure() {
+    auto* renderer = services_.renderer;
+    if (!renderer || !services_.gameHandler) return;
+    const std::string failure = renderer->takeRecordingFailure();
+    if (failure.empty()) return;
+    services_.gameHandler->addSystemChatMessage(
+        "Recording stopped: " + failure + ". What was recorded is saved in " + recordingPath_ + ".");
+}
+
+void GameScreen::takeScreenshot() {
+    auto* renderer = services_.renderer;
+    if (!renderer) return;
+
+    const std::string path = capturePath("screenshots", "png");
 
     if (renderer->captureScreenshot(path)) {
         game::MessageChatData sysMsg;

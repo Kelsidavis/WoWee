@@ -143,8 +143,18 @@ public:
     /// GameHandler it never read.
     void takeScreenshot();
 
+    /// Screen recording, to ~/.wowee/recordings. Each says in the chat what
+    /// it did, and where the file is.
+    void startRecording();
+    void stopRecording();
+    void toggleRecording();
+
 private:
     void applyCameraControlSettings();
+    /// Say in the chat why a recording stopped by itself, if one did.
+    void reportRecordingFailure();
+    /// Where the recording in progress, or the last one, is being written.
+    std::string recordingPath_;
 
     // Injected UI services (Section 3.5 Phase B - replaces getInstance() calls)
     UIServices services_;
