@@ -8,6 +8,7 @@
 #include "game/game_utils.hpp"
 #include "game/packed_time.hpp"
 #include "game/quest_progress.hpp"
+#include "game/quest_objectives.hpp"
 #include "ui/chat/chat_utils.hpp"
 #include "core/logger.hpp"
 
@@ -796,32 +797,6 @@ static int lua_GetQuestLink(lua_State* L) {
     return 1;
 }
 
-/// Whether a quest's objective record is a line in the log at all.
-///
-/// A count of none is not an objective. The server's quest template names the
-/// creature an item drops from in the kill record beside it - Dextren Ward
-/// carries the Hand of Dextren Ward - and writes a required count of zero on
-/// that record, because there is nothing to kill. Counting those as objectives
-/// gave every such quest one more leader board than it has, and the extra one
-/// answers "0/0", which reads as finished: the tracker drew nothing for it and
-/// the world map drew its dash with nothing beside it, on quest after quest.
-static bool isQuestObjective(int32_t id, uint32_t required) {
-    return id != 0 && required > 0;
-}
-
-/// How many objective lines a quest draws: the kill and item objectives it
-/// carries, which is what GetNumQuestLeaderBoards counts.
-static int questObjectiveCount(const game::GameHandler::QuestLogEntry& q) {
-    int count = 0;
-    for (const auto& ko : q.killObjectives) {
-        if (isQuestObjective(ko.npcOrGoId, ko.required)) ++count;
-    }
-    for (const auto& io : q.itemObjectives) {
-        if (isQuestObjective(static_cast<int32_t>(io.itemId), io.required)) ++count;
-    }
-    return count;
-}
-
 // GetNumQuestLeaderBoards(questLogIndex) → count of objectives
 static int lua_GetNumQuestLeaderBoards(lua_State* L) {
     auto* gh = getGameHandler(L);
@@ -829,7 +804,7 @@ static int lua_GetNumQuestLeaderBoards(lua_State* L) {
     if (!gh || index < 1) { return luaReturnZero(L); }
     const auto* qp = questAtRow(gh, index);
     if (!qp) { return luaReturnZero(L); }
-    lua_pushnumber(L, questObjectiveCount(*qp));
+    lua_pushnumber(L, game::questObjectiveCount(*qp));
     return 1;
 }
 
@@ -1022,29 +997,8 @@ static int lua_GetQuestPOILeaderBoard(lua_State* L) {
     return lua_GetQuestLogLeaderBoard(L);
 }
 
-/// What a kill objective is about, by name: a creature for a positive id, a
-/// game object for a negative one.
-///
-/// Empty while the query is out. The quest asks for both the moment its own
-/// query response is parsed, so the usual case is that the name is already
-/// here; this asks again for the one that is not, because a log built from a
-/// saved character can reach an objective whose query was never sent.
-static std::string objectiveTargetName(game::GameHandler* gh, int32_t npcOrGoId) {
-    if (!gh || npcOrGoId == 0) return {};
-    const uint32_t entry = static_cast<uint32_t>(std::abs(npcOrGoId));
-    if (npcOrGoId > 0) {
-        std::string name = gh->getCachedCreatureName(entry);
-        if (name.empty()) gh->queryCreatureInfo(entry, 0);
-        return name;
-    }
-    const auto* info = gh->getCachedGameObjectInfo(entry);
-    if (!info || info->name.empty()) {
-        gh->queryGameObjectInfo(entry, 0);
-        return {};
-    }
-    return info->name;
-}
-
+/// The objective's line, its kind and whether it is done - through the one
+/// builder the map window's quest list uses too (game/quest_objectives.hpp).
 static int lua_GetQuestLogLeaderBoard(lua_State* L) {
     auto* gh = getGameHandler(L);
     int objIdx = static_cast<int>(luaL_checknumber(L, 1));
@@ -1053,74 +1007,16 @@ static int lua_GetQuestLogLeaderBoard(lua_State* L) {
     if (!gh || questIdx < 1 || objIdx < 1) { return luaReturnNil(L); }
     const auto* qp = questAtRow(gh, questIdx);
     if (!qp) { return luaReturnNil(L); }
-    const auto& q = *qp;
-
-    // Build ordered list: kill objectives first, then item objectives
-    int cur = 0;
-    for (int i = 0; i < 4; ++i) {
-        if (!isQuestObjective(q.killObjectives[i].npcOrGoId,
-                              q.killObjectives[i].required)) continue;
-        ++cur;
-        if (cur == objIdx) {
-            // Get current count from killCounts map (keyed by abs(npcOrGoId))
-            uint32_t key = static_cast<uint32_t>(std::abs(q.killObjectives[i].npcOrGoId));
-            uint32_t current = 0;
-            auto it = q.killCounts.find(key);
-            if (it != q.killCounts.end()) current = it->second.first;
-            uint32_t required = q.killObjectives[i].required;
-            bool finished = (current >= required);
-            // Whatever it is that has to be killed or found, by name.
-            //
-            // This said "Creature slain: 12/15" for every kill objective in the
-            // log and the tracker at once, which names none of the fifteen
-            // things and is the one thing an objective line is for. The name
-            // comes from the creature or game object query the quest sent when
-            // it was read; until that answers there is no name to give, and the
-            // generic word stands in for the moment - the answer lands with a
-            // QUEST_LOG_UPDATE behind it, so the line is rewritten with the
-            // name on it.
-            const bool isObject = q.killObjectives[i].npcOrGoId < 0;
-            const std::string text = game::questObjectiveLine(
-                objectiveTargetName(gh, q.killObjectives[i].npcOrGoId),
-                isObject, current, required);
-            lua_pushstring(L, text.c_str());
-            lua_pushstring(L, isObject ? "object" : "monster");
-            lua_pushboolean(L, finished ? 1 : 0);
-            return 3;
-        }
+    const std::vector<game::QuestObjective> lines = game::questObjectives(*gh, *qp);
+    if (objIdx > static_cast<int>(lines.size())) {
+        lua_pushnil(L);
+        return 1;
     }
-    for (int i = 0; i < 6; ++i) {
-        if (!isQuestObjective(static_cast<int32_t>(q.itemObjectives[i].itemId),
-                              q.itemObjectives[i].required)) continue;
-        ++cur;
-        if (cur == objIdx) {
-            uint32_t current = 0;
-            auto it = q.itemCounts.find(q.itemObjectives[i].itemId);
-            if (it != q.itemCounts.end()) current = it->second;
-            uint32_t required = q.itemObjectives[i].required;
-            bool finished = (current >= required);
-            // What it asks for, by name. The quest sends the query when it is
-            // read; this asks again for an objective whose answer never came,
-            // and the number stands in for the moment - the answer lands with a
-            // QUEST_LOG_UPDATE behind it and the line is rewritten with the
-            // name on it.
-            std::string itemName;
-            const auto* info = gh->getItemInfo(q.itemObjectives[i].itemId);
-            if (info && !info->name.empty()) {
-                itemName = info->name;
-            } else {
-                gh->queryItemInfo(q.itemObjectives[i].itemId, 0);
-                itemName = "Item #" + std::to_string(q.itemObjectives[i].itemId);
-            }
-            std::string text = itemName + ": " + std::to_string(current) + "/" + std::to_string(required);
-            lua_pushstring(L, text.c_str());
-            lua_pushstring(L, "item");
-            lua_pushboolean(L, finished ? 1 : 0);
-            return 3;
-        }
-    }
-    lua_pushnil(L);
-    return 1;
+    const game::QuestObjective& line = lines[objIdx - 1];
+    lua_pushstring(L, line.text.c_str());
+    lua_pushstring(L, line.type);
+    lua_pushboolean(L, line.finished ? 1 : 0);
+    return 3;
 }
 
 // ExpandQuestHeader(index) / CollapseQuestHeader(index) - fold a zone away.
@@ -3120,7 +3016,7 @@ void registerQuestLuaAPI(lua_State* L) {
             // server has called complete, or one with nothing countable in it,
             // which the tracker treats as complete itself. Anything else keeps
             // the empty answer the API promises.
-            const int objectives = questObjectiveCount(*q);
+            const int objectives = game::questObjectiveCount(*q);
             const bool drawnAsComplete = q->complete || objectives == 0;
             if (!drawnAsComplete) { lua_pushstring(L, ""); return 1; }
 
