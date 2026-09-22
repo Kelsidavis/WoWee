@@ -2978,8 +2978,26 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                 }
             }
             const float boxW = x1 - x0, boxH = y1 - y0;
+            // Too long, on one line, for the box it was given: cut at the end
+            // with "...", as WoW does, and set from the box's left edge
+            // whatever the justification. Justified as it was, a right-aligned
+            // label started out past the left of its box and lost its first
+            // characters to the clip - the video options' resolution read
+            // "920x1080 (Wide)", 90 units of text in an 85-unit box.
+            //
+            // Plain text only. A label with markup keeps its runs and is only
+            // moved, so it still loses its end rather than its start.
+            const bool overflows = clipToBox && wrapW <= 0.0f && extent.x > boxW + 0.5f;
+            std::string fitted;
+            if (overflows && font && measured == w->text &&
+                w->text.find('\n') == std::string::npos) {
+                fitted = fitWithEllipsis(w->text, boxW, [&](const std::string& piece) {
+                    return font->CalcTextSizeA(size, FLT_MAX, 0.0f, piece.c_str()).x;
+                });
+            }
+            const std::string& shown = fitted.empty() ? w->text : fitted;
             float tx = x0;
-            if (wrapW <= 0.0f) {
+            if (wrapW <= 0.0f && !overflows) {
                 if (w->justifyH == "CENTER")     tx = x0 + (boxW - extent.x) * 0.5f;
                 else if (w->justifyH == "RIGHT") tx = x1 - extent.x;
             }
@@ -3006,7 +3024,7 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                     // copy of the words in a darker shade, out of line with
                     // the ones on top of it.
                     drawMarkupText(dl, font, size, ImVec2(tx + o.x, ty + o.y),
-                                   shadow, w->alpha, w->text, wrapW,
+                                   shadow, w->alpha, shown, wrapW,
                                    w->nonSpaceWrap, w->justifyH.c_str(), true);
                 }
             }
@@ -3020,7 +3038,7 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                 drawMarkupText(dl, font, size,
                                ImVec2(tx + w->shadowX * s, ty - w->shadowY * s),
                                packColor(sc, w->alpha * w->shadowColor[3]),
-                               w->alpha, w->text, wrapW, w->nonSpaceWrap,
+                               w->alpha, shown, wrapW, w->nonSpaceWrap,
                                w->justifyH.c_str(), true);
             }
             // A button's label takes its colour from the button's state. The
@@ -3037,7 +3055,7 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                 }
             }
             drawMarkupText(dl, font, size, ImVec2(tx, ty),
-                           packColor(textColor, w->alpha), w->alpha, w->text,
+                           packColor(textColor, w->alpha), w->alpha, shown,
                            wrapW, w->nonSpaceWrap, w->justifyH.c_str(), false,
                            &tree, w->id);
         }

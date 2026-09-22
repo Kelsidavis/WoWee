@@ -171,4 +171,28 @@ std::vector<std::vector<WrapRun>> wrapText(const std::vector<WrapRun>& runs,
     return lines;
 }
 
+/// One line of plain text cut to fit a width, ending in "..." where it had to
+/// be cut - what WoW does with a label too long for the width it was given.
+///
+/// Text that fits comes back as it is. Otherwise the longest start of it that
+/// fits with the dots after it, cut between characters rather than inside one
+/// (UTF-8), and without a space left hanging before the dots. When not even
+/// the dots fit, the dots alone, and the clip takes what it must.
+template <typename Measure>
+std::string fitWithEllipsis(const std::string& text, float width, Measure measure) {
+    if (measure(text) <= width) return text;
+    static const std::string kDots = "...";
+    std::size_t cut = text.size();
+    while (cut > 0) {
+        do {
+            --cut;
+        } while (cut > 0 && (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80);
+        std::string head = text.substr(0, cut);
+        while (!head.empty() && head.back() == ' ') head.pop_back();
+        if (head.empty()) break;
+        if (measure(head + kDots) <= width) return head + kDots;
+    }
+    return kDots;
+}
+
 }  // namespace wowee::ui

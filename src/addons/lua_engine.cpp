@@ -2000,7 +2000,13 @@ static bool fillSpellTooltip(wowee::ui::Widget* w, game::GameHandler* gh,
 
     const std::string body =
         gh->formatSpellDescription(spellId, gh->getSpellDescription(spellId));
-    if (!body.empty()) line(body, "", 1.0f, 1.0f, 1.0f);
+    if (!body.empty()) {
+        // Wrapped, as every line of prose in a tooltip is: a line that does
+        // not wrap sets the tooltip's width, and a description is a sentence
+        // or three - the tooltip grew as wide as the screen and ran off it.
+        line(body, "", 1.0f, 1.0f, 1.0f);
+        w->tooltipLines.back().wrap = true;
+    }
 
     w->shown = true;
     return true;
@@ -2331,6 +2337,7 @@ int lua_Tooltip_SetTalent(lua_State* L) {
         desc.left = body;
         desc.lc[0] = desc.lc[1] = desc.lc[2] = 1.0f; desc.lc[3] = 1.0f;
         desc.rc[0] = desc.rc[1] = desc.rc[2] = desc.rc[3] = 1.0f;
+        desc.wrap = true;  // prose; see fillSpellTooltip
         w->tooltipLines.push_back(std::move(desc));
     }
 
@@ -2377,6 +2384,7 @@ int lua_Tooltip_SetTradeSkillItem(lua_State* L) {
         desc.left = body;
         desc.lc[0] = desc.lc[1] = desc.lc[2] = 1.0f; desc.lc[3] = 1.0f;
         desc.rc[0] = desc.rc[1] = desc.rc[2] = desc.rc[3] = 1.0f;
+        desc.wrap = true;  // prose; see fillSpellTooltip
         w->tooltipLines.push_back(std::move(desc));
     }
     w->shown = true;
@@ -2652,7 +2660,10 @@ static void appendItemStats(wowee::ui::Widget* w, const game::ItemQueryResponseD
     }
 
     if (info.requiredLevel > 0) white("Requires Level " + std::to_string(info.requiredLevel));
-    if (!info.description.empty()) gold("\"" + info.description + "\"");
+    if (!info.description.empty()) {
+        gold("\"" + info.description + "\"");
+        w->tooltipLines.back().wrap = true;  // prose; see fillSpellTooltip
+    }
 }
 
 /// The same tooltip for an item known only by its id.
@@ -8088,7 +8099,7 @@ void LuaEngine::registerCoreAPI() {
         "                local label = triggerLabels[sp.trigger] or ''\n"
         "                local text = sp.description or sp.name or ''\n"
         "                if text ~= '' then\n"
-        "                    self:AddLine(label .. text, 0, 1, 0)\n"
+        "                    self:AddLine(label .. text, 0, 1, 0, 1)\n"
         "                end\n"
         "            end\n"
         "        end\n"
@@ -8105,7 +8116,7 @@ void LuaEngine::registerCoreAPI() {
         "            self:AddLine('Requires Level '..data.requiredLevel, 1, 1, 1)\n"
         "        end\n"
         "        -- Flavor text\n"
-        "        if data.description then self:AddLine('\"'..data.description..'\"', 1, 0.82, 0) end\n"
+        "        if data.description then self:AddLine('\"'..data.description..'\"', 1, 0.82, 0, 1) end\n"
         "        if data.startsQuest then self:AddLine('This Item Begins a Quest', 1, 0.82, 0) end\n"
         "    end\n"
         "    -- Sell price from GetItemInfo\n"
@@ -8241,7 +8252,10 @@ void LuaEngine::registerCoreAPI() {
         "        -- Description\n"
         "        local desc = GetSpellDescription(spellId)\n"
         "        if desc and desc ~= '' then\n"
-        "            self:AddLine(desc, 1, 0.82, 0)\n"
+        // Wrapped, as prose in a tooltip always is. Without the flag the
+        // description set the tooltip's width on its own and the tooltip ran
+        // off the edge of the screen.
+        "            self:AddLine(desc, 1, 0.82, 0, 1)\n"
         "        end\n"
         "        -- Cooldown\n"
         "        local start, dur = GetSpellCooldown(spellId)\n"

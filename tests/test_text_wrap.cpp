@@ -195,3 +195,42 @@ TEST_CASE("an empty string produces one empty line", "[text_wrap]") {
     REQUIRE(out.size() == 1);
     REQUIRE(joined(out[0]).empty());
 }
+
+// ---------------------------------------------------------------------------
+// A label too long for its box is cut at the end with "...", as WoW cuts it.
+// Before this it was justified as if it fitted: a right-aligned one started
+// out past the left of its box and lost its first characters to the clip, so
+// the video options' resolution read "920x1080 (Wide)".
+
+using wowee::ui::fitWithEllipsis;
+
+TEST_CASE("text that fits is left alone", "[wrap][ellipsis]") {
+    CHECK(fitWithEllipsis("1920x1080", 9.0f, charWidth) == "1920x1080");
+    CHECK(fitWithEllipsis("", 0.0f, charWidth).empty());
+}
+
+TEST_CASE("text that does not fit keeps its start and loses its end", "[wrap][ellipsis]") {
+    // Sixteen characters in fifteen: the dots take three, so twelve remain.
+    const std::string cut = fitWithEllipsis("1920x1080 (Wide)", 15.0f, charWidth);
+    CHECK(cut == "1920x1080 (W...");
+    CHECK(charWidth(cut) <= 15.0f);
+    CHECK(cut.rfind("1920", 0) == 0);
+}
+
+TEST_CASE("no space is left hanging before the dots", "[wrap][ellipsis]") {
+    // "Long " would be cut to fit six, and the space before the dots dropped.
+    CHECK(fitWithEllipsis("Long quest name", 8.0f, charWidth) == "Long...");
+}
+
+TEST_CASE("a character is never cut in half", "[wrap][ellipsis]") {
+    // "é" is two bytes. Measured in bytes here, so the cut has to back up over
+    // the continuation byte rather than land between the two.
+    const std::string cut = fitWithEllipsis("caf\xC3\xA9 au lait", 7.0f, charWidth);
+    CHECK(cut == "caf...");
+    const std::string whole = fitWithEllipsis("caf\xC3\xA9 au lait", 8.0f, charWidth);
+    CHECK(whole == "caf\xC3\xA9...");
+}
+
+TEST_CASE("a box too small for the dots gets the dots", "[wrap][ellipsis]") {
+    CHECK(fitWithEllipsis("Anything", 2.0f, charWidth) == "...");
+}
