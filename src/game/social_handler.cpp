@@ -2567,7 +2567,13 @@ void SocialHandler::handleGuildEvent(network::Packet& packet) {
     GuildEventData data;
     if (!GuildEventParser::parse(packet, data)) return;
 
+    // What the game prints for each, in its own words (ERR_GUILD_* and the
+    // friend list's online and offline lines) and as a system line. These went
+    // out as guild chat with no sender, and the interface puts the player's own
+    // name on a local line without one: "[Guild] [You]: [Guild] Coggs has come
+    // online."
     std::string msg;
+    bool guildLine = false;  // the MOTD, which is the one that is guild chat
     switch (data.eventType) {
         case GuildEvent::PROMOTION:
             if (data.numStrings >= 3)
@@ -2581,8 +2587,10 @@ void SocialHandler::handleGuildEvent(network::Packet& packet) {
             // The interface writes this one itself, from the GUILD_MOTD event
             // fired further down: chatframe.lua formats GUILD_MOTD_TEMPLATE
             // and adds it. Only the client's own window needs a line here.
-            if (data.numStrings >= 1 && !ui::frameXmlOwns(ui::UiElement::Chat))
-                msg = "Guild MOTD: " + data.strings[0];
+            if (data.numStrings >= 1 && !ui::frameXmlOwns(ui::UiElement::Chat)) {
+                msg = "Guild Message of the Day: " + data.strings[0];
+                guildLine = true;
+            }
             break;
         case GuildEvent::JOINED:
             if (data.numStrings >= 1) msg = data.strings[0] + " has joined the guild.";
@@ -2591,13 +2599,15 @@ void SocialHandler::handleGuildEvent(network::Packet& packet) {
             if (data.numStrings >= 1) msg = data.strings[0] + " has left the guild.";
             break;
         case GuildEvent::REMOVED:
-            if (data.numStrings >= 2) msg = data.strings[1] + " has been kicked from the guild by " + data.strings[0] + ".";
+            // The member removed, then who removed them - the order the server
+            // sends and ERR_GUILD_REMOVE_SS reads them in.
+            if (data.numStrings >= 2) msg = data.strings[0] + " has been kicked out of the guild by " + data.strings[1] + ".";
             break;
         case GuildEvent::LEADER_IS:
-            if (data.numStrings >= 1) msg = data.strings[0] + " is the guild leader.";
+            if (data.numStrings >= 1) msg = data.strings[0] + " is the leader of your guild.";
             break;
         case GuildEvent::LEADER_CHANGED:
-            if (data.numStrings >= 2) msg = data.strings[0] + " has made " + data.strings[1] + " the new guild leader.";
+            if (data.numStrings >= 2) msg = data.strings[0] + " has made " + data.strings[1] + " the new Guild Master.";
             break;
         case GuildEvent::DISBANDED:
             msg = "Guild has been disbanded.";
@@ -2620,12 +2630,12 @@ void SocialHandler::handleGuildEvent(network::Packet& packet) {
             // player's idea of what is worth reading.
             if (data.numStrings >= 1 && guildMemberOnlineTransition(data.strings[0], true) &&
                 addons::storedCVarValue("guildMemberNotify", "1") != "0")
-                msg = "[Guild] " + data.strings[0] + " has come online.";
+                msg = "|Hplayer:" + data.strings[0] + "|h[" + data.strings[0] + "]|h has come online.";
             break;
         case GuildEvent::SIGNED_OFF:
             if (data.numStrings >= 1 && guildMemberOnlineTransition(data.strings[0], false) &&
                 addons::storedCVarValue("guildMemberNotify", "1") != "0")
-                msg = "[Guild] " + data.strings[0] + " has gone offline.";
+                msg = data.strings[0] + " has gone offline.";
             break;
         // The bank's half of the event list. The server broadcasts these to
         // every member whenever anyone touches the bank, so they are frequent,
@@ -2664,7 +2674,7 @@ void SocialHandler::handleGuildEvent(network::Packet& packet) {
 
     if (!msg.empty()) {
         MessageChatData chatMsg;
-        chatMsg.type = ChatType::GUILD;
+        chatMsg.type = guildLine ? ChatType::GUILD : ChatType::SYSTEM;
         chatMsg.language = ChatLanguage::UNIVERSAL;
         chatMsg.message = msg;
         owner_.addLocalChatMessage(chatMsg);
