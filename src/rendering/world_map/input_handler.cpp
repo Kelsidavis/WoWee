@@ -11,7 +11,8 @@ namespace world_map {
 
 InputResult InputHandler::process(ViewLevel currentLevel,
                                    int hoveredZoneIdx,
-                                   [[maybe_unused]] bool cosmicEnabled) {
+                                   [[maybe_unused]] bool cosmicEnabled,
+                                   bool mouseOverMap) {
     InputResult result;
     auto& input = core::Input::getInstance();
 
@@ -21,9 +22,9 @@ InputResult InputHandler::process(ViewLevel currentLevel,
         return result;
     }
 
-    // Scroll wheel zoom
+    // Scroll wheel zoom, over the map only.
     auto& io = ImGui::GetIO();
-    float wheelDelta = io.MouseWheel;
+    float wheelDelta = mouseOverMap ? io.MouseWheel : 0.0f;
     if (wheelDelta > 0.0f) {
         result.action = InputAction::ZOOM_IN;
         return result;
@@ -41,7 +42,7 @@ InputResult InputHandler::process(ViewLevel currentLevel,
     }
 
     // Right-click to go back (zone → continent; continent → world)
-    if (io.MouseClicked[1]) {
+    if (mouseOverMap && io.MouseClicked[1]) {
         result.action = InputAction::RIGHT_CLICK_BACK;
         return result;
     }

@@ -105,6 +105,12 @@ struct WorldMapFacade::Impl {
     pipeline::AssetManager* assetManager = nullptr;
     bool initialized = false;
     bool open = false;
+    // Where the map image was drawn last frame, in the ImGui context's own
+    // coordinates. Input is read before the window is built, so this is the
+    // rect the cursor is tested against.
+    bool haveImageRect = false;
+    ImVec2 imageMin{0.0f, 0.0f};
+    ImVec2 imageMax{0.0f, 0.0f};
     // The zone the server says the player is in (SMSG_INIT_WORLD_STATES). 0 until
     // it has said. Preferred over guessing from WorldMapArea boxes, which overlap
     // their neighbours enough to open the map on a zone the player is merely near.
@@ -170,6 +176,7 @@ struct WorldMapFacade::Impl {
 
 void WorldMapFacade::Impl::closeMap() {
     open = false;
+    haveImageRect = false;
     userMapOverride = false;
     // Apply any map name that was deferred while in world/cosmic view.
     if (!pendingMapName.empty()) {
@@ -509,9 +516,14 @@ void WorldMapFacade::render(const glm::vec3& playerRenderPos,
 
     // Process input
     int hoveredZone = d.zoneHighlightLayer ? d.zoneHighlightLayer->hoveredZone() : -1;
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const bool mouseOverMap = d.haveImageRect && ImGui::IsMousePosValid(&mouse) &&
+                              mouse.x >= d.imageMin.x && mouse.x < d.imageMax.x &&
+                              mouse.y >= d.imageMin.y && mouse.y < d.imageMax.y;
     InputResult inputResult = d.input.process(d.viewState.currentLevel(),
                                                hoveredZone,
-                                               d.viewState.cosmicEnabled());
+                                               d.viewState.cosmicEnabled(),
+                                               mouseOverMap);
 
     // Flight map is locked to the continent view: node clicks are handled by
     // the taxi layer, so only closing the map is a valid input action here.
@@ -947,6 +959,9 @@ void WorldMapFacade::Impl::renderImGuiOverlay(const glm::vec3& playerRenderPos,
         ImVec2 contentSize = ImGui::GetContentRegionAvail();
         ImVec2 imgMin = contentPos;
         ImVec2 imgMax(contentPos.x + contentSize.x, contentPos.y + contentSize.y);
+        haveImageRect = true;
+        imageMin = imgMin;
+        imageMax = imgMax;
         displayW = contentSize.x;
         displayH = contentSize.y;
         // Show only the visible 1002×668 content region of the 1024×768 FBO.

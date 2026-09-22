@@ -27,9 +27,15 @@ struct InputResult {
 class InputHandler {
 public:
     /// Process input for current frame. Returns the highest-priority action.
+    ///
+    /// `mouseOverMap` is whether the cursor is over the map image. The wheel
+    /// and the right-click step are the map's only while it is: FrameXML's
+    /// quest list sits beside the map in the same frame, and scrolling it
+    /// zoomed the map out as well.
     InputResult process(ViewLevel currentLevel,
                         int hoveredZoneIdx,
-                        bool cosmicEnabled);
+                        bool cosmicEnabled,
+                        bool mouseOverMap);
 };
 
 } // namespace world_map
