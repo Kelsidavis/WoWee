@@ -1287,6 +1287,8 @@ void Renderer::endFrame() {
 
     // Water now renders in the main pass (renderWorld), no separate 1x pass needed.
 
+    if (afterInterface_) afterInterface_(currentCmd);
+
     // Submit and present
     vkCtx->endFrame(currentCmd, currentImageIndex);
     currentCmd = VK_NULL_HANDLE;

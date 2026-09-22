@@ -89,6 +89,30 @@ public:
     VkCommandBuffer beginFrame(uint32_t& imageIndex);
     void endFrame(VkCommandBuffer cmd, uint32_t imageIndex);
 
+    /// A second window presented by this frame, recorded into its command buffer.
+    ///
+    /// The frame is one submit and one fence, and everything that is ringed per
+    /// frame - deferred destruction, per-frame descriptor sets, query pools -
+    /// relies on that. A second window drawn into the same command buffer is
+    /// covered by the same fence, so none of it needs to know the window is
+    /// there: the submit waits on its image as well as the main one, signals
+    /// its semaphore as well, and endFrame presents it after the main image.
+    /// Valid for the frame it is added in; endFrame consumes it.
+    struct ExtraPresent {
+        VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+        uint32_t imageIndex = 0;
+        VkSemaphore acquired = VK_NULL_HANDLE;   ///< signalled by its acquire
+        VkSemaphore rendered = VK_NULL_HANDLE;   ///< signalled by the submit
+        /// What the present answered, or VK_NOT_READY when the frame's submit
+        /// failed and it was never presented.
+        std::function<void(VkResult)> onResult;
+    };
+    void addExtraPresent(ExtraPresent present);
+    /// Counts resetFrameSyncState calls. A window with semaphores of its own
+    /// remakes them when this moves: the reset exists because a failed submit
+    /// leaves semaphores signalled, and that is true of every window's.
+    [[nodiscard]] uint64_t syncResetGeneration() const { return syncResetGeneration_; }
+
     // Single-time command buffer helpers
     VkCommandBuffer beginSingleTimeCommands();
     void endSingleTimeCommands(VkCommandBuffer cmd);
@@ -136,6 +160,8 @@ public:
     [[nodiscard]] bool isNvidiaGpu() const { return gpuVendorId_ == 0x10DE; }
     [[nodiscard]] VkQueue getGraphicsQueue() const { return graphicsQueue; }
     [[nodiscard]] uint32_t getGraphicsQueueFamily() const { return graphicsQueueFamily; }
+    /// The family every present goes to, a second window's included.
+    [[nodiscard]] uint32_t getPresentQueueFamily() const { return presentQueueFamily; }
 
     // ---- GPU timing ------------------------------------------------------
     //
@@ -390,6 +416,8 @@ private:
     // Per-frame resources
     FrameData frames[MAX_FRAMES_IN_FLIGHT];
     uint32_t currentFrame = 0;
+    std::vector<ExtraPresent> extraPresents_;
+    uint64_t syncResetGeneration_ = 0;
 
     /// One timeline semaphore across the whole frame ring, replacing the
     /// per-slot fences. VK_NULL_HANDLE when the device did not offer

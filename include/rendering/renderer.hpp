@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 #include <cstdint>
@@ -81,6 +82,13 @@ public:
 
     void beginFrame();
     void endFrame();
+
+    /// Recorded after the interface is drawn and before the frame is submitted,
+    /// into the frame's own command buffer. A second window draws here - see
+    /// AuxSwapchain - so the frame's one fence covers it. Empty clears it.
+    void setAfterInterfaceRecorder(std::function<void(VkCommandBuffer)> recorder) {
+        afterInterface_ = std::move(recorder);
+    }
 
     void renderWorld(game::World* world, game::GameHandler* gameHandler = nullptr);
 
@@ -202,6 +210,8 @@ public:
     const std::vector<pipeline::CustomZoneInfo>& getCustomZones() const { return customZones_; }
 
 private:
+    std::function<void(VkCommandBuffer)> afterInterface_;
+
     // True when water is drawn in the scene continuation pass rather than in
     // the scene pass itself (see renderWorld).
     bool waterDrawsInContinuePass() const;

@@ -2658,8 +2658,13 @@ bool VkContext::recreateSwapchain(int width, int height) {
     return true;
 }
 
+void VkContext::addExtraPresent(ExtraPresent present) {
+    extraPresents_.push_back(std::move(present));
+}
+
 void VkContext::resetFrameSyncState() {
     if (device == VK_NULL_HANDLE) return;
+    ++syncResetGeneration_;
     // How many asynchronous upload batches are still outstanding when a
     // rebuild happens. These are submitted without being waited on, one fence
     // each, and FrameXML makes hundreds where this client alone makes almost
@@ -2877,18 +2882,29 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
 
     auto& frame = frames[currentFrame];
 
-    VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-
     // Use per-image semaphores: acquire semaphore was swapped into the per-image
     // slot in beginFrame; renderFinished is also indexed by the acquired image.
     VkSemaphore& acquireSem = imageAcquiredSemaphores_[imageIndex];
     VkSemaphore& renderSem = renderFinishedSemaphores_[imageIndex];
 
+    // The main image first in every list, then any second window this frame
+    // drew into (see addExtraPresent). One wait and one signal each.
+    std::vector<ExtraPresent> extras;
+    extras.swap(extraPresents_);
+    std::vector<VkSemaphore> waitSemaphores{acquireSem};
+    std::vector<VkPipelineStageFlags> waitStages{VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    std::vector<VkSemaphore> signalSemaphores{renderSem};
+    for (const ExtraPresent& extra : extras) {
+        waitSemaphores.push_back(extra.acquired);
+        waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+        signalSemaphores.push_back(extra.rendered);
+    }
+
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &acquireSem;
-    submitInfo.pWaitDstStageMask = &waitStage;
+    submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
+    submitInfo.pWaitSemaphores = waitSemaphores.data();
+    submitInfo.pWaitDstStageMask = waitStages.data();
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &cmd;
 
@@ -2897,25 +2913,22 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
     // vkQueuePresentKHR, and the timeline for the CPU wait in beginFrame that
     // used to be a fence. The value paired with a binary semaphore is ignored,
     // but the arrays still have to be the same length.
-    VkSemaphore signalSemaphores[2] = { renderSem, frameTimeline_ };
-    uint64_t signalValues[2] = { 0, 0 };
-    const uint64_t waitValue = 0;
+    std::vector<uint64_t> signalValues(signalSemaphores.size(), 0);
+    const std::vector<uint64_t> waitValues(waitSemaphores.size(), 0);
     VkTimelineSemaphoreSubmitInfo timelineSubmit{};
 
     if (frameTimeline_ != VK_NULL_HANDLE) {
-        signalValues[1] = ++frameTimelineValue_;
+        signalSemaphores.push_back(frameTimeline_);
+        signalValues.push_back(++frameTimelineValue_);
         timelineSubmit.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-        timelineSubmit.waitSemaphoreValueCount = 1;
-        timelineSubmit.pWaitSemaphoreValues = &waitValue;
-        timelineSubmit.signalSemaphoreValueCount = 2;
-        timelineSubmit.pSignalSemaphoreValues = signalValues;
+        timelineSubmit.waitSemaphoreValueCount = static_cast<uint32_t>(waitValues.size());
+        timelineSubmit.pWaitSemaphoreValues = waitValues.data();
+        timelineSubmit.signalSemaphoreValueCount = static_cast<uint32_t>(signalValues.size());
+        timelineSubmit.pSignalSemaphoreValues = signalValues.data();
         submitInfo.pNext = &timelineSubmit;
-        submitInfo.signalSemaphoreCount = 2;
-        submitInfo.pSignalSemaphores = signalSemaphores;
-    } else {
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &renderSem;
     }
+    submitInfo.signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size());
+    submitInfo.pSignalSemaphores = signalSemaphores.data();
 
     VkResult submitResult = vkQueueSubmit(graphicsQueue, 1, &submitInfo,
                                           frameTimeline_ != VK_NULL_HANDLE ? VK_NULL_HANDLE
@@ -2924,7 +2937,7 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
         // Only once the submit is in: on failure the timeline is never
         // signalled, and a slot left waiting on an unreachable value would
         // hang the next beginFrame for its whole timeout instead of failing.
-        frame.timelineValue = signalValues[1];
+        frame.timelineValue = signalValues.back();
     }
     if (submitResult != VK_SUCCESS) {
         LOG_ERROR("endFrame[", endFrameCounter, "] vkQueueSubmit FAILED: ", static_cast<int>(submitResult));
@@ -2960,6 +2973,11 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
         // advancing past this one was for.
         resetFrameSyncState();
         swapchainDirty = true;
+        // Never presented, and their semaphores were remade with everyone
+        // else's (see syncResetGeneration).
+        for (const ExtraPresent& extra : extras) {
+            if (extra.onResult) extra.onResult(VK_NOT_READY);
+        }
         return;
     }
 
@@ -2980,6 +2998,21 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
     if (result == VK_ERROR_OUT_OF_DATE_KHR ||
         (result == VK_SUBOPTIMAL_KHR && !suboptimalIsExpected)) {
         swapchainDirty = true;
+    }
+
+    // Each on its own, after the main image: one call for several swapchains
+    // answers for each in pResults, but a window that went out of date would
+    // then share a return code with the one that did not.
+    for (const ExtraPresent& extra : extras) {
+        VkPresentInfoKHR extraInfo{};
+        extraInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        extraInfo.waitSemaphoreCount = 1;
+        extraInfo.pWaitSemaphores = &extra.rendered;
+        extraInfo.swapchainCount = 1;
+        extraInfo.pSwapchains = &extra.swapchain;
+        extraInfo.pImageIndices = &extra.imageIndex;
+        const VkResult extraResult = vkQueuePresentKHR(presentQueue, &extraInfo);
+        if (extra.onResult) extra.onResult(extraResult);
     }
 
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
