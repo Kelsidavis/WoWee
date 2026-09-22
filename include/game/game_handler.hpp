@@ -1736,6 +1736,9 @@ public:
     const std::string& lookupName(uint64_t guid) const {
         return entityController_->lookupName(guid);
     }
+    uint8_t lookupPlayerGender(uint64_t guid) const {
+        return entityController_->lookupPlayerGender(guid);
+    }
 
     uint8_t getPlayerClass() const {
         const Character* ch = getActiveCharacter();

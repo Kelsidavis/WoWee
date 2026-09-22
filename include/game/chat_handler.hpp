@@ -21,6 +21,7 @@ namespace wowee {
 namespace game {
 
 class GameHandler;
+struct TextSubject;
 
 class ChatHandler {
 public:
@@ -109,7 +110,8 @@ public:
     ChatAutoJoin chatAutoJoin;
 
 private:
-    /// A chat line waiting for its sender's name. See deliverChatMessage.
+    /// A chat line waiting for a name: its sender's, or that of the player an
+    /// NPC's line is written for. See deliverChatMessage.
     struct ChatAwaitingName {
         MessageChatData data;
         uint64_t guid = 0;
@@ -125,6 +127,12 @@ private:
     /// tell the interface. Split from handleMessageChat so a line held back
     /// for its sender's name can be run through it again once the name lands.
     void deliverChatMessage(MessageChatData data, bool alreadyWaited);
+    /// A player's name from whatever already holds it - the name cache, the
+    /// player nearby, the party, the guild roster. Empty when none does.
+    [[nodiscard]] std::string knownPlayerName(uint64_t guid) const;
+    /// Who an NPC's line fills its $-tokens in for: the receiver the packet
+    /// names, or the logged-in character when it names nobody.
+    TextSubject monsterLineSubject(const MessageChatData& data);
 
     void handleTextEmote(network::Packet& packet);
     void handleChannelNotify(network::Packet& packet);

@@ -2881,12 +2881,15 @@ void EntityController::handleNameQueryResponse(network::Packet& packet) {
 
     if (data.isValid()) {
         playerNameCache[data.guid] = data.name;
-        // Chat lines held back for this name can go out now, with it on them.
-        if (owner_.getChatHandler()) owner_.getChatHandler()->flushChatAwaitingName(data.guid);
-        // Cache class/race from name query for UnitClass/UnitRace fallback
+        // Cache class/race from name query for UnitClass/UnitRace fallback,
+        // and the gender an NPC's $g switch chooses by.
         if (data.classId != 0 || data.race != 0) {
-            playerClassRaceCache_[data.guid] = {.classId = data.classId, .raceId = data.race};
+            playerClassRaceCache_[data.guid] = {.classId = data.classId, .raceId = data.race,
+                                                .gender = data.gender};
         }
+        // Chat lines held back for this name can go out now, with it on them.
+        // After the cache above, which a held NPC line reads for its $-tokens.
+        if (owner_.getChatHandler()) owner_.getChatHandler()->flushChatAwaitingName(data.guid);
         // Update entity name
         auto entity = entityManager.getEntity(data.guid);
         if (entity && entity->getType() == ObjectType::PLAYER) {

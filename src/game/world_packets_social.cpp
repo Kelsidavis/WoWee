@@ -129,9 +129,8 @@ bool MessageChatParser::parse(network::Packet& packet, MessageChatData& data) {
                 bool isPet = ((highGuid & kGuidTypeMask) == kGuidTypePet) ||
                              ((highGuid & kGuidTypeMask) == kGuidTypeVehicle);
                 if (!isPlayer && !isPet) {
-                    // Read receiver name (SizedCString), which we skip rather
-                    // than keep - but the skip has to be one the packet can
-                    // actually take. A length past the end walked the read
+                    // The receiver's name, which an NPC's $n is filled from.
+                    // Bounds-checked: a length past the end walked the read
                     // position off the buffer, and the message length below
                     // then read a clamped zero, passed its own bounds test on
                     // the strength of it, and delivered an empty monster line
@@ -139,7 +138,11 @@ bool MessageChatParser::parse(network::Packet& packet, MessageChatData& data) {
                     // about the packet, so refuse the packet.
                     const uint32_t recvNameLen = packet.readUInt32();
                     if (recvNameLen > packet.getRemainingSize()) return false;
-                    packet.setReadPos(packet.getReadPos() + recvNameLen);
+                    data.receiverName.clear();
+                    for (uint32_t i = 0; i < recvNameLen; ++i) {
+                        const char c = static_cast<char>(packet.readUInt8());
+                        if (c != '\0') data.receiverName.push_back(c);
+                    }
                 }
             }
             break;

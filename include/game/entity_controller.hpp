@@ -85,6 +85,11 @@ public:
         auto it = playerClassRaceCache_.find(guid);
         return it != playerClassRaceCache_.end() ? it->second.raceId : 0;
     }
+    /// 0 male, 1 female, as the name query answers; 0xFF when not known.
+    [[nodiscard]] uint8_t lookupPlayerGender(uint64_t guid) const {
+        auto it = playerClassRaceCache_.find(guid);
+        return it != playerClassRaceCache_.end() ? it->second.gender : 0xFF;
+    }
 
     // --- Transport GUID tracking ---
     [[nodiscard]] bool isTransportGuid(uint64_t guid) const { return transportGuids_.count(guid) > 0; }
@@ -108,7 +113,7 @@ private:
     // ---- Name caches ----
     std::unordered_map<uint64_t, std::string> playerNameCache;
     // Class/race cache from SMSG_NAME_QUERY_RESPONSE (guid → {classId, raceId})
-    struct PlayerClassRace { uint8_t classId = 0; uint8_t raceId = 0; };
+    struct PlayerClassRace { uint8_t classId = 0; uint8_t raceId = 0; uint8_t gender = 0xFF; };
     std::unordered_map<uint64_t, PlayerClassRace> playerClassRaceCache_;
     std::unordered_set<uint64_t> pendingNameQueries;
     std::unordered_map<uint32_t, CreatureQueryResponseData> creatureInfoCache;

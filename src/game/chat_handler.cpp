@@ -89,6 +89,27 @@ std::string chatParticipant(const std::string& name, uint64_t guid, const char* 
     return fallback ? fallback : "";
 }
 
+/// A line an NPC or a boss said - the kinds whose text carries $-tokens.
+bool isMonsterChatType(ChatType type) {
+    switch (type) {
+        case ChatType::MONSTER_SAY:
+        case ChatType::MONSTER_PARTY:
+        case ChatType::MONSTER_YELL:
+        case ChatType::MONSTER_WHISPER:
+        case ChatType::MONSTER_EMOTE:
+        case ChatType::RAID_BOSS_EMOTE:
+        case ChatType::RAID_BOSS_WHISPER:
+            return true;
+        default:
+            return false;
+    }
+}
+
+/// A player's guid: the type in its top sixteen bits is zero.
+bool isPlayerGuid(uint64_t guid) {
+    return guid != 0 && (guid >> 48) == 0;
+}
+
 bool chatPacketDiagEnabled() {
     static const bool enabled = [] {
         const char* raw = std::getenv("WOWEE_CHAT_PACKET_DIAG");
@@ -488,6 +509,26 @@ void ChatHandler::deliverChatMessage(MessageChatData data, bool alreadyWaited) {
         }
     }
 
+    // And the player an NPC's line is written for, when that is someone else.
+    //
+    // "$N has defeated the hero of the Warmaul" is a yell the whole area hears,
+    // and $N is whoever earned it: the packet names them as the receiver. This
+    // wrote the logged-in character's name into every such line, so each
+    // bystander read that they had done it themselves. A player receiver comes
+    // as a guid alone, so a name nothing holds yet is asked for and the line
+    // waits for it, as a player's own line does.
+    if (isMonsterChatType(data.type) && data.message.find('$') != std::string::npos &&
+        isPlayerGuid(data.receiverGuid) && data.receiverGuid != owner_.getPlayerGuid() &&
+        knownPlayerName(data.receiverGuid).empty()) {
+        owner_.queryPlayerName(data.receiverGuid);
+        if (!alreadyWaited) {
+            const uint64_t waitingOn = data.receiverGuid;
+            chatAwaitingName_.push_back({std::move(data), waitingOn,
+                                         core::appTimeSeconds() + kNameWaitSeconds});
+            return;
+        }
+    }
+
     if (data.message.empty()) {
         return;
     }
@@ -638,18 +679,11 @@ void ChatHandler::deliverChatMessage(MessageChatData data, bool alreadyWaited) {
     // those two characters and means them: the real client does not resolve
     // tokens in player chat, and resolving them here would let one player make
     // another's client print that player's own name.
-    switch (data.type) {
-        case ChatType::MONSTER_SAY:
-        case ChatType::MONSTER_PARTY:
-        case ChatType::MONSTER_YELL:
-        case ChatType::MONSTER_WHISPER:
-        case ChatType::MONSTER_EMOTE:
-        case ChatType::RAID_BOSS_EMOTE:
-        case ChatType::RAID_BOSS_WHISPER:
-            data.message = resolveTextTokens(data.message, owner_);
-            break;
-        default:
-            break;
+    //
+    // For whoever the line is written for, which is not always the reader:
+    // see monsterLineSubject.
+    if (isMonsterChatType(data.type)) {
+        data.message = resolveTextTokens(data.message, monsterLineSubject(data));
     }
 
     // Add to chat history
@@ -865,6 +899,48 @@ void ChatHandler::sendTextEmote(uint32_t textEmoteId, uint64_t targetGuid) {
     if (owner_.getState() != WorldState::IN_WORLD || !owner_.getSocket()) return;
     auto packet = TextEmotePacket::build(textEmoteId, targetGuid);
     owner_.getSocket()->send(packet);
+}
+
+std::string ChatHandler::knownPlayerName(uint64_t guid) const {
+    if (guid == 0) return {};
+    if (const std::string& name = owner_.lookupName(guid); !name.empty()) return name;
+    for (const auto& member : owner_.getPartyData().members) {
+        if (member.guid == guid && !member.name.empty()) return member.name;
+    }
+    for (const auto& member : owner_.getGuildRoster().members) {
+        if (member.guid == guid && !member.name.empty()) return member.name;
+    }
+    return {};
+}
+
+TextSubject ChatHandler::monsterLineSubject(const MessageChatData& data) {
+    // Addressed to nobody, or to us: the reader, which is who a line with no
+    // one else in it is for.
+    if (data.receiverGuid == 0 || data.receiverGuid == owner_.getPlayerGuid()) {
+        return textSubjectFor(owner_);
+    }
+    TextSubject subject;
+    if (isPlayerGuid(data.receiverGuid)) {
+        if (std::string name = knownPlayerName(data.receiverGuid); !name.empty()) {
+            subject.name = std::move(name);
+        }
+        // Class, race and gender come with the name query's answer. Unknown,
+        // they stay neutral rather than borrowing the reader's.
+        if (const uint8_t cls = owner_.lookupPlayerClass(data.receiverGuid)) {
+            subject.className = getClassName(static_cast<Class>(cls));
+        }
+        if (const uint8_t race = owner_.lookupPlayerRace(data.receiverGuid)) {
+            subject.raceName = getRaceName(static_cast<Race>(race));
+        }
+        const uint8_t gender = owner_.lookupPlayerGender(data.receiverGuid);
+        if (gender == 0) subject.gender = Gender::MALE;
+        else if (gender == 1) subject.gender = Gender::FEMALE;
+    } else if (!data.receiverName.empty()) {
+        subject.name = data.receiverName;
+    } else if (const std::string& name = owner_.lookupName(data.receiverGuid); !name.empty()) {
+        subject.name = name;
+    }
+    return subject;
 }
 
 void ChatHandler::flushChatAwaitingName(uint64_t guid) {
