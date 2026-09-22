@@ -7,6 +7,8 @@
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <chrono>
 #include "core/window.hpp"
 #include "core/application.hpp"
@@ -283,6 +285,15 @@ void UIManager::loadInterfaceFont(const std::string& dataRoot,
     };
 
     const fs::path frizqt = resolve("frizqt__.ttf");
+    // Kept for any other ImGui context that wants the same face - a second
+    // window has an atlas of its own and would otherwise search for it again.
+    clientFontSize_ = kClientSize / (atlasScale > 0.0f ? atlasScale : 1.0f);
+    if (!frizqt.empty()) {
+        std::ifstream in(frizqt, std::ios::binary);
+        clientFontData_.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    } else if (assets) {
+        clientFontData_ = assets->readFileOptional("Fonts\\FRIZQT__.TTF");
+    }
     if (frizqt.empty() && addFromArchive("FRIZQT__.TTF", kClientSize)) {
         LOG_INFO("Interface font read from the archives rather than from disk");
     } else if (!frizqt.empty()) {

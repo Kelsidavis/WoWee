@@ -1052,6 +1052,7 @@ constexpr FieldBinding kFieldBindings[] = {
     // --- Display ---
     {.key = "fullscreen", .asBool = &SettingsPanel::pendingFullscreen},
     {.key = "vsync",      .asBool = &SettingsPanel::pendingVsync},
+    {.key = "mapwindow",  .asBool = &SettingsPanel::showMapWindow_},
     {.key = "brightness", .asInt  = &SettingsPanel::pendingBrightness},
 
     // --- Camera ---

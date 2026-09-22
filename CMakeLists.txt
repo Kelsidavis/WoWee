@@ -950,6 +950,7 @@ set(WOWEE_SOURCES
 
     # UI
     src/ui/ui_manager.cpp
+    src/ui/map_window.cpp
     src/ui/ui_upload_budget.cpp
     src/ui/widget_tree.cpp
     src/ui/xml_parser.cpp

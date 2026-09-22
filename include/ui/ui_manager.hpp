@@ -7,8 +7,10 @@
 #include "ui/character_screen.hpp"
 #include "ui/game_screen.hpp"
 #include "ui/ui_services.hpp"
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 // Forward declare SDL_Event
 union SDL_Event;
@@ -57,6 +59,11 @@ public:
                            pipeline::AssetManager* assets = nullptr);
     /// Whether a face has already been taken; a second call is a no-op.
     bool interfaceFontsLoaded_ = false;
+
+    /// The client's own face - FRIZQT - as bytes, and the size its panels use
+    /// at a scale of 1. Empty until loadInterfaceFont has found it.
+    [[nodiscard]] const std::vector<uint8_t>& clientFontData() const { return clientFontData_; }
+    [[nodiscard]] float clientFontSize() const { return clientFontSize_; }
 
     /**
      * Shutdown ImGui and cleanup
@@ -120,6 +127,8 @@ private:
     /// drawn. Decided once at start-up; the style and the font atlas both use
     /// it, and they have to agree. 1.0 off Android.
     float interfaceScale_ = 1.0f;
+    std::vector<uint8_t> clientFontData_;
+    float clientFontSize_ = 15.0f;
     core::Window* window = nullptr;
     UIServices services_;  // Injected services
 

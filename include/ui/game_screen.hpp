@@ -23,11 +23,12 @@
 #include <unordered_set>
 
 #include "ui/scene_pick.hpp"
+#include <functional>
 
 namespace wowee {
 namespace core { class AppearanceComposer; class Window; }
 namespace pipeline { class AssetManager; }
-namespace rendering { class Renderer; }
+namespace rendering { class Renderer; namespace world_map { class WorldMapFacade; } }
 namespace ui {
 
 /**
@@ -332,6 +333,14 @@ private:
      * Inventory screen
      */
     void renderWorldMap(game::GameHandler& gameHandler);
+    /// Everything a map shows besides the land, for either map: the in-game
+    /// one and the one on the second window. See game_screen_hud.cpp.
+    /// `questAreaShown` says which quests have their objective areas shaded:
+    /// the one chosen in the game's quest log for its map, the one chosen in
+    /// the map window's own list for that one.
+    void feedWorldMap(game::GameHandler& gameHandler,
+                      rendering::world_map::WorldMapFacade& targetMap,
+                      const std::function<bool(uint32_t)>& questAreaShown);
 
     InventoryScreen inventoryScreen;
     uint64_t inventoryScreenCharGuid_ = 0;  // GUID of character inventory screen was initialized for

@@ -11,6 +11,7 @@
 #include "rendering/vk_context.hpp"
 #include "core/application.hpp"
 #include "core/appearance_composer.hpp"
+#include "ui/map_window.hpp"
 #include "addons/addon_manager.hpp"
 #include "core/coordinates.hpp"
 #include "core/input.hpp"
@@ -463,43 +464,17 @@ void GameScreen::updateCharacterTextures(game::Inventory& inventory) {
 // World Map
 // ============================================================
 
-void GameScreen::renderWorldMap(game::GameHandler& gameHandler) {
-    auto& app = core::Application::getInstance();
-    auto* renderer = app.getRenderer();
+// Everything the map shows besides the land: the zone the player is in, what
+// they have explored, their party, flight points, quests, their corpse and the
+// rares nearby. For the in-game map and the second-window one alike, which is
+// why it is on its own - the second window's map is fed every frame it is open,
+// whatever the in-game one is doing.
+void GameScreen::feedWorldMap(game::GameHandler& gameHandler,
+                              rendering::world_map::WorldMapFacade& targetMap,
+                              const std::function<bool(uint32_t)>& questAreaShown) {
+    auto* renderer = core::Application::getInstance().getRenderer();
     if (!renderer) return;
-
-    auto* wm = renderer->getWorldMap();
-    if (!wm) return;
-
-    // Flight master window drives the world map's flight-map (taxi selection)
-    // mode: opening SMSG_SHOWTAXINODES opens the map, activating a flight or
-    // closing the gossip closes it. A user-dismissed map (Escape / X) closes
-    // the flight master window through the onClose handler.
-    // Not while FrameXML is drawing the flight map itself. The legacy taxi
-    // list a few lines up already stands aside for that element; this mode did
-    // not, so talking to a flight master put both on screen at once - TaxiFrame
-    // over this client's own map, each with its own set of pins.
-    const bool taxiWanted = gameHandler.isTaxiWindowOpen() &&
-                            !frameXmlOwns(UiElement::Taxi);
-    if (taxiWanted && !wm->isTaxiMapOpen()) {
-        auto* gh = &gameHandler;
-        wm->openTaxiMap(
-            [gh](uint32_t dest) { return gh->getTaxiRouteTo(dest); },
-            [gh](uint32_t dest) { gh->activateTaxi(dest); },
-            [gh]() { gh->closeTaxi(); });
-    } else if (!taxiWanted && wm->isTaxiMapOpen()) {
-        wm->closeTaxiMap();
-    }
-
-    // Who says the map is wanted depends on who owns it. FrameXML's world map
-    // is a frame it shows and hides, and application.cpp gives this one that
-    // frame's rect while it is visible - so a rect being set is the same
-    // statement as showWorldMap_ is for this client's own window.
-    const bool frameXmlDrivesMap = frameXmlOwns(UiElement::WorldMap);
-    const bool wanted = frameXmlDrivesMap
-        ? (wm->hasFrameRect() || wm->isTaxiMapOpen())
-        : (showWorldMap_ || wm->isTaxiMapOpen());
-    if (!wanted) return;
+    auto* wm = &targetMap;
 
     // Keep map name in sync with minimap's map name
     auto* minimap = renderer->getMinimap();
@@ -676,7 +651,7 @@ void GameScreen::renderWorldMap(game::GameHandler& gameHandler) {
             // objective of that quest gets its own, which is what the real
             // client shades: DrawQuestBlob names a quest, not an objective.
             if (poi.questObjectiveIndex >= 0 && !poi.area.empty() &&
-                gameHandler.isQuestBlobShown(poi.data)) {
+                questAreaShown(poi.data)) {
                 qp.area.reserve(poi.area.size());
                 for (const auto& pt : poi.area) qp.area.emplace_back(pt.first, pt.second);
             }
@@ -753,6 +728,60 @@ void GameScreen::renderWorldMap(game::GameHandler& gameHandler) {
         }
         wm->setRares(std::move(rares));
     }
+
+}
+
+void GameScreen::renderWorldMap(game::GameHandler& gameHandler) {
+    auto& app = core::Application::getInstance();
+    auto* renderer = app.getRenderer();
+    if (!renderer) return;
+
+    // The map on the second window, under its own ImGui context: a setter can
+    // free a texture, and that goes back through the context that made it.
+    if (auto* mapWindow = app.getMapWindow(); mapWindow && mapWindow->map()) {
+        mapWindow->withContext([&] {
+            feedWorldMap(gameHandler, *mapWindow->map(), [mapWindow](uint32_t questId) {
+                return questId != 0 && questId == mapWindow->selectedQuest();
+            });
+        });
+    }
+
+    auto* wm = renderer->getWorldMap();
+    if (!wm) return;
+
+    // Flight master window drives the world map's flight-map (taxi selection)
+    // mode: opening SMSG_SHOWTAXINODES opens the map, activating a flight or
+    // closing the gossip closes it. A user-dismissed map (Escape / X) closes
+    // the flight master window through the onClose handler.
+    // Not while FrameXML is drawing the flight map itself. The legacy taxi
+    // list a few lines up already stands aside for that element; this mode did
+    // not, so talking to a flight master put both on screen at once - TaxiFrame
+    // over this client's own map, each with its own set of pins.
+    const bool taxiWanted = gameHandler.isTaxiWindowOpen() &&
+                            !frameXmlOwns(UiElement::Taxi);
+    if (taxiWanted && !wm->isTaxiMapOpen()) {
+        auto* gh = &gameHandler;
+        wm->openTaxiMap(
+            [gh](uint32_t dest) { return gh->getTaxiRouteTo(dest); },
+            [gh](uint32_t dest) { gh->activateTaxi(dest); },
+            [gh]() { gh->closeTaxi(); });
+    } else if (!taxiWanted && wm->isTaxiMapOpen()) {
+        wm->closeTaxiMap();
+    }
+
+    // Who says the map is wanted depends on who owns it. FrameXML's world map
+    // is a frame it shows and hides, and application.cpp gives this one that
+    // frame's rect while it is visible - so a rect being set is the same
+    // statement as showWorldMap_ is for this client's own window.
+    const bool frameXmlDrivesMap = frameXmlOwns(UiElement::WorldMap);
+    const bool wanted = frameXmlDrivesMap
+        ? (wm->hasFrameRect() || wm->isTaxiMapOpen())
+        : (showWorldMap_ || wm->isTaxiMapOpen());
+    if (!wanted) return;
+
+    feedWorldMap(gameHandler, *wm, [&gameHandler](uint32_t questId) {
+        return gameHandler.isQuestBlobShown(questId);
+    });
 
     glm::vec3 playerPos = renderer->getCharacterPosition();
     float playerYaw = renderer->getCharacterYaw();

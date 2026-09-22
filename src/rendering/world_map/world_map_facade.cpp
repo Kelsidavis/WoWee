@@ -111,6 +111,7 @@ struct WorldMapFacade::Impl {
     bool haveImageRect = false;
     ImVec2 imageMin{0.0f, 0.0f};
     ImVec2 imageMax{0.0f, 0.0f};
+    bool persistent = false;   // see setPersistent
     // The zone the server says the player is in (SMSG_INIT_WORLD_STATES). 0 until
     // it has said. Preferred over guessing from WorldMapArea boxes, which overlap
     // their neighbours enough to open the map on a zone the player is merely near.
@@ -533,6 +534,7 @@ void WorldMapFacade::render(const glm::vec3& playerRenderPos,
 
     switch (inputResult.action) {
         case InputAction::CLOSE:
+            if (d.persistent) break;
             d.closeMap();
             return;
 
@@ -635,6 +637,10 @@ void WorldMapFacade::render(const glm::vec3& playerRenderPos,
     bool rightClickConsumed = (inputResult.action == InputAction::RIGHT_CLICK_BACK);
     d.renderImGuiOverlay(displayPlayerRenderPos, screenWidth, screenHeight,
                          playerYawDeg, rightClickConsumed);
+}
+
+void WorldMapFacade::setPersistent(bool persistent) {
+    impl_->persistent = persistent;
 }
 
 void WorldMapFacade::setMapName(const std::string& name) {
@@ -1643,6 +1649,24 @@ bool WorldMapFacade::showWorldMapArea(uint32_t worldMapAreaId) {
             impl_->viewState.enterZone(static_cast<int>(i));
         }
         impl_->userMapOverride = true;
+        return true;
+    }
+    return false;
+}
+
+bool WorldMapFacade::showAreaZone(uint32_t areaTableId) {
+    if (areaTableId == 0) return false;
+    auto& d = *impl_;
+    for (size_t i = 0; i < d.data.zones().size(); ++i) {
+        if (d.data.zones()[i].areaID != areaTableId) continue;
+        // What clicking the zone does, art and all: moving the view alone
+        // leaves the last zone's picture on screen under the new zone's pins.
+        const int idx = static_cast<int>(i);
+        d.compositor.loadZoneTextures(idx, d.data.zones(), d.mapName);
+        d.compositor.loadOverlayTextures(idx, d.data.zones());
+        d.compositor.requestComposite(idx);
+        d.viewState.enterZone(idx);
+        d.userMapOverride = true;
         return true;
     }
     return false;

@@ -31,7 +31,7 @@ namespace wowee {
 
 // Forward declarations
 namespace rendering { class Renderer; }
-namespace ui { class UIManager; }
+namespace ui { class UIManager; class MapWindow; }
 namespace auth { class AuthHandler; }
 namespace game { class GameHandler; class World; class ExpansionRegistry; struct ExpansionProfile; }
 namespace pipeline { class AssetManager; class DBCLayout; struct M2Model; struct WMOModel; }
@@ -93,6 +93,9 @@ public:
 
     // Accessors
     Window* getWindow() { return window.get(); }
+    /// The world map on a window of its own, for a second monitor. Null until
+    /// the setting first opens it; see updateMapWindow.
+    ui::MapWindow* getMapWindow() { return mapWindow_.get(); }
     rendering::Renderer* getRenderer() { return renderer.get(); }
     ui::UIManager* getUIManager() { return uiManager.get(); }
     auth::AuthHandler* getAuthHandler() { return authHandler.get(); }
@@ -158,6 +161,11 @@ public:
 
 private:
     void update(float deltaTime);
+
+    /// Opens or closes the map window to match its setting, and builds its
+    /// frame. After the game's own interface frame, before the frame is
+    /// submitted: the window draws into the same frame.
+    void updateMapWindow();
 
     /// One frame of being in the world - the largest arm of update()'s state
     /// switch. updateCheckpoint travels by reference because the caller's catch
@@ -238,6 +246,10 @@ private:
     std::unique_ptr<Window> window;
     std::unique_ptr<rendering::Renderer> renderer;
     std::unique_ptr<ui::UIManager> uiManager;
+    std::unique_ptr<ui::MapWindow> mapWindow_;
+    /// A failed open is not retried every frame; switching the setting off
+    /// and on again tries again.
+    bool mapWindowFailed_ = false;
     std::unique_ptr<auth::AuthHandler> authHandler;
     std::unique_ptr<game::GameHandler> gameHandler;
     std::unique_ptr<game::World> world;

@@ -70,6 +70,12 @@ public:
     [[nodiscard]] bool isOpen() const;
     void close();
 
+    /// A map that is always open, in a window of its own: Escape does not
+    /// close it. Escape is read from the global keyboard state, not from the
+    /// window the map is in, so closing the game's panels with it would
+    /// otherwise close this map too.
+    void setPersistent(bool persistent);
+
     /// Flight-map (taxi selection) mode - opens the map locked to the player's
     /// continent with interactive flight nodes (see TaxiNodeLayer flight-map
     /// rendering). routeProvider maps a destination node id to the hop chain
@@ -188,6 +194,10 @@ public:
     /// Show the zone or continent with that WorldMapArea id. False if the map
     /// data has no such area.
     bool showWorldMapArea(uint32_t worldMapAreaId);
+
+    /// Show the zone with that AreaTable id - what a quest names as its zone.
+    /// False when it is not a zone of the map now loaded.
+    bool showAreaZone(uint32_t areaTableId);
 
 private:
     struct Impl;

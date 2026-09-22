@@ -1744,6 +1744,7 @@ void GameScreen::saveSettings() {
     }
     out << "show_cooldown_tracker=" << (settingsPanel_.showCooldownTracker_ ? 1 : 0) << "\n";
     out << "show_rare_tracker=" << (settingsPanel_.showRareTracker_ ? 1 : 0) << "\n";
+    out << "map_window=" << (settingsPanel_.showMapWindow_ ? 1 : 0) << "\n";
     out << "show_chest_tracker=" << (settingsPanel_.showChestTracker_ ? 1 : 0) << "\n";
     out << "separate_bags=" << (settingsPanel_.pendingSeparateBags ? 1 : 0) << "\n";
     out << "show_keyring=" << (settingsPanel_.pendingShowKeyring ? 1 : 0) << "\n";
@@ -1969,6 +1970,8 @@ void GameScreen::loadSettings() {
                 settingsPanel_.showCooldownTracker_ = (std::stoi(val) != 0);
             } else if (key == "show_rare_tracker") {
                 settingsPanel_.showRareTracker_ = (std::stoi(val) != 0);
+            } else if (key == "map_window") {
+                settingsPanel_.showMapWindow_ = (std::stoi(val) != 0);
             } else if (key == "show_chest_tracker") {
                 settingsPanel_.showChestTracker_ = (std::stoi(val) != 0);
             } else if (key == "separate_bags") {

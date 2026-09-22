@@ -66,6 +66,7 @@
 #include "pipeline/wdt_loader.hpp"
 #include "pipeline/dbc_loader.hpp"
 #include "ui/ui_manager.hpp"
+#include "ui/map_window.hpp"
 #include "ui/touch_controls.hpp"
 #include "ui/gamepad_controls.hpp"
 #include "core/gamepad.hpp"
@@ -1413,6 +1414,30 @@ void Application::run() {
 
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            // Sound in Background. Off in the real client and off here: losing
+            // focus silences the client rather than playing on behind whatever
+            // the player switched to. Read at the moment focus changes, so
+            // clearing the box takes effect on the next alt-tab and not the
+            // next restart.
+            //
+            // Whether any of this client's windows has the keyboard, not
+            // whether this one does: clicking the map window takes focus from
+            // the game's, and that is not switching away from the game. Ahead
+            // of the map window's dispatch below, which keeps its events.
+            if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST ||
+                event.type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
+                const bool focused = SDL_GetKeyboardFocus() != nullptr ||
+                                     event.type == SDL_EVENT_WINDOW_FOCUS_GAINED;
+                const bool playInBackground =
+                    addons::storedCVarValue("Sound_EnableSoundWhenGameIsInBG", "0") != "0";
+                audio::AudioEngine::instance().setSuspended(!focused && !playInBackground);
+            }
+
+            // The map window's own events stop here. A click on the map is not
+            // a click on the world behind the game's window, and neither the
+            // interface nor the camera may act on it.
+            if (mapWindow_ && mapWindow_->handleEvent(event)) continue;
+
             // Connected and disconnected, which is all the pad needs from the
             // queue - its sticks and buttons are sampled once a frame rather
             // than accumulated out of events.
@@ -1494,6 +1519,12 @@ void Application::run() {
                 window->setShouldClose(true);
             }
             else if ((event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST)) {
+                // Closing the game's window quits. SDL sends QUIT only when the
+                // last window closes, so with the map window open, closing this
+                // one said nothing but this.
+                if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+                    window->setShouldClose(true);
+                }
                 if (event.type == SDL_EVENT_WINDOW_RESIZED) {
                     int newWidth = event.window.data1;
                     int newHeight = event.window.data2;
@@ -1509,19 +1540,6 @@ void Application::run() {
                     // Notify addons so UI layouts can adapt to the new size
                     if (addonManager_)
                         addonManager_->fireEvent("DISPLAY_SIZE_CHANGED");
-                }
-                // Sound in Background. Off in the real client and off here:
-                // losing the window silences the client rather than playing
-                // on behind whatever the player switched to. Read at the
-                // moment focus changes, so clearing the box takes effect on
-                // the next alt-tab and not the next restart.
-                else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST ||
-                         event.type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
-                    const bool focused =
-                        (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED);
-                    const bool playInBackground =
-                        addons::storedCVarValue("Sound_EnableSoundWhenGameIsInBG", "0") != "0";
-                    audio::AudioEngine::instance().setSuspended(!focused && !playInBackground);
                 }
             }
             // Typed text, when an edit box is listening for it - or, when none
@@ -1881,12 +1899,50 @@ void Application::namePadKeysForInterface() {
     if (!code.empty()) engine->executeString(code);
 }
 
+void Application::updateMapWindow() {
+    if (!uiManager || !renderer || !window) return;
+    auto& gameScreen = uiManager->getGameScreen();
+    auto& settings = gameScreen.getSettingsPanel();
+
+    // Closed with its own button: that is the player turning it off.
+    if (mapWindow_ && mapWindow_->takeClosedByPlayer()) {
+        mapWindow_->close();
+        settings.showMapWindow_ = false;
+        gameScreen.saveSettings();
+    }
+
+    // Only in the world. Logging out closes it, and it opens again where it
+    // was left when the next character comes in.
+    const bool inWorld = (state == AppState::IN_GAME);
+    const bool wanted = settings.showMapWindow_ && inWorld;
+    const bool open = mapWindow_ && mapWindow_->isOpen();
+    if (wanted && !open && !mapWindowFailed_) {
+        if (!mapWindow_) mapWindow_ = std::make_unique<ui::MapWindow>();
+        if (!mapWindow_->open(window->getSDLWindow(), renderer.get(), window->getVkContext(),
+                              assetManager.get(), uiManager.get())) {
+            mapWindowFailed_ = true;
+        }
+    } else if (!wanted && open) {
+        mapWindow_->close();
+    }
+    if (!settings.showMapWindow_) mapWindowFailed_ = false;
+
+    if (mapWindow_ && mapWindow_->isOpen()) {
+        mapWindow_->buildFrame(inWorld, renderer->getCharacterPosition(),
+                               renderer->getCharacterYaw(),
+                               gameHandler ? gameHandler->getWorldStateZoneId() : 0);
+    }
+}
+
 void Application::shutdown() {
     LOG_DEBUG("Shutting down application...");
 
     // Before the window, whose destructor takes SDL down with it.
     ui::gamepadControls().setKeyRouter(nullptr);
     core::gamepad().shutdown();
+
+    // Before the renderer it records through and the device it draws with.
+    if (mapWindow_) mapWindow_->close();
 
     // Hide the window immediately so the OS doesn't think the app is frozen
     // during the (potentially slow) resource cleanup below.
@@ -4799,6 +4855,8 @@ void Application::render() {
 
         // Only now is the draw data closed.
         uiManager->finishImGuiFrame();
+
+        runRenderStage("mapWindow", [&] { updateMapWindow(); });
     }
 
     runRenderStage("endFrame", [&] { renderer->endFrame(); });

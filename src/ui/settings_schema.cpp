@@ -235,6 +235,11 @@ constexpr SettingDesc kSchema[] = {
      "for frames nobody sees. Vertical sync already caps at the display's\n"
      "rate; use this to cap below it.",
      "Unlimited|30|60|90|120|144|240", 0},
+    {"mapwindow", "Map in its own window", SettingKind::Bool, 0, 0, 0, "Display", "",
+     "The world map in a window of its own, to put on a second monitor.\n"
+     "It follows your zone and can be browsed; left alone, it comes back\n"
+     "to where you are. Drag it where you want it - it opens there again.",
+     "", 0},
     {"brightness", "Brightness", SettingKind::Int, 0, 100, 5, "Display", "",
      "How bright the picture is. 50 leaves it as the zone was lit; below\n"
      "darkens and above lifts the shadows. The game's own panel called\n"
