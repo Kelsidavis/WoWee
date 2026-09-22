@@ -4,6 +4,8 @@
 #include "addons/lua_api_helpers.hpp"
 #include "game/item_text.hpp"
 #include "addons/lua_engine.hpp"
+#include "core/logger.hpp"
+#include <set>
 
 namespace wowee::addons {
 
@@ -242,6 +244,20 @@ static int lua_UnitAura(lua_State* L, bool wantBuff) {
         if (found == index) {
             // Return: name, rank, icon, count, debuffType, duration, expirationTime, ...spellId
             std::string name = gh->getSpellName(aura.spellId);
+            if (name.empty()) {
+                // An aura this client's Spell.dbc has no row for draws as
+                // "Unknown" with no icon, and nothing said which one it was.
+                // A realm's own spells are the usual cause - a server can put
+                // any id on a unit, and only a patched client knows its name.
+                static std::set<uint32_t> saidNoName;
+                if (saidNoName.insert(aura.spellId).second) {
+                    LOG_WARNING("Aura spell ", aura.spellId, " on ", uidStr,
+                                " has no Spell.dbc row, so it shows as 'Unknown' with no "
+                                "icon (", (aura.flags & 0x80) ? "debuff" : "buff",
+                                ", flags 0x", std::hex, static_cast<int>(aura.flags), std::dec,
+                                ", caster 0x", std::hex, aura.casterGuid, std::dec, ")");
+                }
+            }
             lua_pushstring(L, name.empty() ? "Unknown" : name.c_str()); // name
             lua_pushstring(L, "");           // rank
             std::string iconPath = gh->getSpellIconPath(aura.spellId);
