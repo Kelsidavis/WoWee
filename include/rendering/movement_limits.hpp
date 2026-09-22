@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <glm/glm.hpp>
 
 namespace wowee::rendering::movement {
 
@@ -30,16 +31,71 @@ inline bool isWalkableNormal(float normalZ) {
 /// unknowable rather than steep, so the answer is 1 and the caller lets it
 /// pass: refusing on absent data would stop the player at every tile edge.
 template <typename SampleFn>
-float heightfieldNormalZ(SampleFn&& sample, float x, float y, float spacing) {
+glm::vec3 heightfieldNormal(SampleFn&& sample, float x, float y, float spacing) {
     const auto west  = sample(x - spacing, y);
     const auto east  = sample(x + spacing, y);
     const auto south = sample(x, y - spacing);
     const auto north = sample(x, y + spacing);
-    if (!west || !east || !south || !north) return 1.0f;
+    if (!west || !east || !south || !north) return {0.0f, 0.0f, 1.0f};
 
     const float dzdx = (*east - *west) / (2.0f * spacing);
     const float dzdy = (*north - *south) / (2.0f * spacing);
-    return 1.0f / std::sqrt(dzdx * dzdx + dzdy * dzdy + 1.0f);
+    return glm::vec3(-dzdx, -dzdy, 1.0f) / std::sqrt(dzdx * dzdx + dzdy * dzdy + 1.0f);
+}
+
+template <typename SampleFn>
+float heightfieldNormalZ(SampleFn&& sample, float x, float y, float spacing) {
+    return heightfieldNormal(sample, x, y, spacing).z;
+}
+
+/// Where a step taken in flight ends, when it would end inside the ground.
+///
+/// Flight has no use for the step-up budget that keeps a walker on the ground:
+/// a flying mount at speed rises more than 0.6 yards a frame up any steep
+/// slope, so the floor pick refused the hillside ahead as out of reach, and
+/// nothing else holds the heightfield up in flight. The mount flew into the
+/// hill and on through it.
+///
+/// So the step goes as far as the surface, and what is left of it slides along
+/// the surface with the part driving into the slope taken out: a gentle rise
+/// is skimmed up, a steep one climbed slowly, and a sheer face stops the step.
+/// Flying straight down ends on the ground, which is how a landing starts.
+///
+/// Only a step that crosses the surface is touched. One that starts under it is
+/// in a cave or a tunnel, or somewhere else this cannot vouch for, and ground
+/// that answers nothing - a hole, a tile not loaded - is no ground.
+template <typename SampleFn>
+glm::vec3 flightStepAgainstGround(SampleFn&& sample, const glm::vec3& from,
+                                  const glm::vec3& to, float normalSpacing) {
+    const auto endGround = sample(to.x, to.y);
+    if (!endGround || to.z >= *endGround) return to;
+    // Feet on the ground read a hair either side of it.
+    constexpr float kContactSlack = 0.25f;
+    const auto startGround = sample(from.x, from.y);
+    if (!startGround || from.z < *startGround - kContactSlack) return to;
+
+    // Where along the step the feet meet the surface: from is above it (or
+    // touching), to is below.
+    const glm::vec3 step = to - from;
+    float above = 0.0f;
+    float below = 1.0f;
+    for (int i = 0; i < 10; ++i) {
+        const float mid = 0.5f * (above + below);
+        const glm::vec3 p = from + step * mid;
+        const auto ground = sample(p.x, p.y);
+        if (!ground || p.z >= *ground) above = mid;
+        else below = mid;
+    }
+    const glm::vec3 contact = from + step * above;
+
+    glm::vec3 rest = step * (1.0f - above);
+    const glm::vec3 n = heightfieldNormal(sample, contact.x, contact.y, normalSpacing);
+    const float into = glm::dot(rest, n);
+    if (into < 0.0f) rest -= into * n;
+
+    glm::vec3 end = contact + rest;
+    if (const auto ground = sample(end.x, end.y); ground && end.z < *ground) end.z = *ground;
+    return end;
 }
 
 inline bool isReachableStep(float deltaZ) {

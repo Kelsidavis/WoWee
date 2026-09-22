@@ -200,3 +200,61 @@ TEST_CASE("the floor pick anchors where the player actually stands", "[movement]
         CHECK(floorArbitrationAnchor(false, 12.0f, 10.0f) == Catch::Approx(10.0f));
     }
 }
+
+// Flying into the ground: the step stops at the surface and slides along it.
+TEST_CASE("a flight step that ends in the ground slides along it", "[movement][flight]") {
+    using namespace wowee::rendering::movement;
+    using Height = std::optional<float>;
+
+    // Ground rising in +x at the given slope from x = 0; flat before it.
+    auto hill = [](float degrees) {
+        const float rise = std::tan(glm::radians(degrees));
+        return [rise](float x, float) -> Height { return x > 0.0f ? x * rise : 0.0f; };
+    };
+    const auto flat = [](float, float) -> Height { return 0.0f; };
+
+    SECTION("a step clear of the ground is untouched") {
+        const glm::vec3 from(-5.0f, 0.0f, 10.0f), to(-4.0f, 0.0f, 10.0f);
+        CHECK(flightStepAgainstGround(hill(45.0f), from, to, 2.0f) == to);
+    }
+
+    SECTION("flying straight down ends on the ground") {
+        const glm::vec3 end = flightStepAgainstGround(
+            flat, glm::vec3(0.0f, 0.0f, 0.3f), glm::vec3(0.0f, 0.0f, -0.4f), 2.0f);
+        CHECK(end.x == Catch::Approx(0.0f).margin(1e-4));
+        CHECK(end.z == Catch::Approx(0.0f).margin(1e-3));
+    }
+
+    SECTION("level flight into a slope climbs it, slower the steeper it is") {
+        // Level at the foot of the hill, with a frame's worth of travel into it
+        // that out-climbs the step-up budget - the frame that used to go in.
+        const glm::vec3 from(5.0f, 0.0f, 5.0f), to(6.0f, 0.0f, 5.0f);
+        const glm::vec3 gentle = flightStepAgainstGround(hill(30.0f), glm::vec3(8.0f, 0.0f, 4.62f),
+                                                         glm::vec3(9.0f, 0.0f, 4.62f), 2.0f);
+        const glm::vec3 steep = flightStepAgainstGround(hill(45.0f), from, to, 2.0f);
+        const glm::vec3 cliff = flightStepAgainstGround(hill(85.0f), glm::vec3(0.0f, 0.0f, 0.0f),
+                                                        glm::vec3(1.0f, 0.0f, 0.0f), 2.0f);
+        // Never inside the ground...
+        CHECK(gentle.z >= gentle.x * std::tan(glm::radians(30.0f)) - 1e-3f);
+        CHECK(steep.z >= steep.x - 1e-3f);
+        CHECK(cliff.z >= cliff.x * std::tan(glm::radians(85.0f)) - 1e-3f);
+        // ...and less of the step gets through the steeper the face.
+        CHECK(gentle.x - 8.0f > steep.x - 5.0f);
+        CHECK(steep.x - 5.0f > cliff.x);
+        CHECK(cliff.x < 0.05f);
+    }
+
+    SECTION("a step starting under the ground is left alone") {
+        const glm::vec3 from(5.0f, 0.0f, 2.0f), to(6.0f, 0.0f, 2.0f);
+        CHECK(flightStepAgainstGround(hill(45.0f), from, to, 2.0f) == to);
+    }
+
+    SECTION("no ground at the end - a hole, an unloaded tile - is no ground") {
+        const auto holed = [](float x, float) -> Height {
+            if (x > 0.5f) return std::nullopt;
+            return 10.0f;
+        };
+        const glm::vec3 from(0.0f, 0.0f, 11.0f), to(1.0f, 0.0f, 5.0f);
+        CHECK(flightStepAgainstGround(holed, from, to, 2.0f) == to);
+    }
+}

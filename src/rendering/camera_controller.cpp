@@ -698,6 +698,7 @@ glm::vec3 CameraController::moveFollowedCharacter(float /*deltaTime*/, FrameInpu
             // flightForward. The camera's own look direction is not it.
             glm::vec3 flyFwd = f.flightForward;
             if (glm::dot(flyFwd, flyFwd) < 1e-8f) flyFwd = f.forward;
+            const glm::vec3 flightFrom = targetPos;
             glm::vec3 flyMove(0.0f);
             if (f.nowForward)     flyMove += flyFwd;
             if (f.nowBackward)    flyMove -= flyFwd;
@@ -721,6 +722,26 @@ glm::vec3 CameraController::moveFollowedCharacter(float /*deltaTime*/, FrameInpu
                 targetPos += flyMove * flySpeed * f.physicsDeltaTime;
             }
             targetPos.z += verticalVelocity * f.physicsDeltaTime;
+
+            // The ground holds a flying mount up - see flightStepAgainstGround.
+            // Not where a WMO floor lies at the feet under the heightfield: that
+            // is a tunnel burrowing under unholed ground, flown into, not over.
+            if (terrainManager) {
+                // Half a heightfield cell, as the slope reading in
+                // sampleFloorUnderFeet uses, for the same reason.
+                constexpr float kGroundNormalSpacing = 2.0f;
+                const glm::vec3 slid = movement::flightStepAgainstGround(
+                    [this](float x, float y) -> std::optional<float> {
+                        if (terrainManager->isHoleAt(x, y)) return std::nullopt;
+                        return terrainManager->getHeightAt(x, y);
+                    },
+                    flightFrom, targetPos, kGroundNormalSpacing);
+                if (slid != targetPos &&
+                    !(wmoRenderer && wmoRenderer->getFloorHeight(
+                          targetPos.x, targetPos.y, targetPos.z + 1.5f))) {
+                    targetPos = slid;
+                }
+            }
             // Skip all ground physics - go straight to collision/WMO sections
         } else {
 
@@ -1667,7 +1688,10 @@ void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
             *groundH >= targetPos.z - 2.0f &&
             *groundH <= targetPos.z + 0.6f;
 
-        if (!swimming && !isFlightAirborne() && !hoverActive_ && !externalFollow_ &&
+        // In flight as well: flightStepAgainstGround keeps a mount from flying
+        // into a hill, and this is what brings one back out that is already in
+        // it.
+        if (!swimming && !hoverActive_ && !externalFollow_ &&
             !cachedInsideWMO && !nearStructureSpace && !standingOnStructure &&
             centerTerrainH && verticalVelocity <= 0.0f) {
             const float penetration = *centerTerrainH - targetPos.z;
