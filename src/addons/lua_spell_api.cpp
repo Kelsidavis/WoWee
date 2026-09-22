@@ -140,25 +140,9 @@ static int lua_IsSpellInRange(lua_State* L) {
     }
     if (spellId == 0) { return luaReturnNil(L); }
 
-    // Get spell max range from DBC
-    auto data = gh->getSpellData(spellId);
-    if (data.maxRange <= 0.0f) { return luaReturnNil(L); }
-
-    // Resolve target position
     std::string uidStr(uid);
     toLowerInPlace(uidStr);
-    uint64_t guid = resolveUnitGuid(gh, uidStr);
-    if (guid == 0) { return luaReturnNil(L); }
-    auto targetEnt = gh->getEntityManager().getEntity(guid);
-    auto playerEnt = gh->getEntityManager().getEntity(gh->getPlayerGuid());
-    if (!targetEnt || !playerEnt) { return luaReturnNil(L); }
-
-    float dx = playerEnt->getX() - targetEnt->getX();
-    float dy = playerEnt->getY() - targetEnt->getY();
-    float dz = playerEnt->getZ() - targetEnt->getZ();
-    float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
-    lua_pushnumber(L, dist <= data.maxRange ? 1 : 0);
-    return 1;
+    return pushSpellRangeAnswer(L, gh, spellId, resolveUnitGuid(gh, uidStr));
 }
 
 // UnitIsVisible(unit) → boolean (entity exists in the client's entity manager)

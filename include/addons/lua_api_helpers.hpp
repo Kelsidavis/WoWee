@@ -6,12 +6,14 @@
 #include <string>
 #include <chrono>
 #include <cstring>
+#include <cmath>
 #include <algorithm>
 
 #include "game/item_text.hpp"
 #include "addons/lua_services.hpp"
 #include "game/game_handler.hpp"
 #include "game/entity.hpp"
+#include "game/spell_classification.hpp"
 #include "game/update_field_table.hpp"
 #include "game/inventory_slots.hpp"
 #include "game/reputation_standing.hpp"
@@ -77,6 +79,33 @@ inline int interfaceVersion(lua_State* L) {
 inline int luaReturnNil(lua_State* L)  { lua_pushnil(L); return 1; }
 inline int luaReturnZero(lua_State* L) { lua_pushnumber(L, 0); return 1; }
 inline int luaReturnFalse(lua_State* L){ lua_pushboolean(L, 0); return 1; }
+
+/// IsActionInRange and IsSpellInRange's answer for one spell against one unit:
+/// 1 in range, 0 out, and nil where there is no range to speak of - a spell
+/// with none, nothing targeted, either side not known to the client. Edge to
+/// edge, as the server measures it; see spellclass::withinSpellRange.
+inline int pushSpellRangeAnswer(lua_State* L, game::GameHandler* gh,
+                                uint32_t spellId, uint64_t targetGuid) {
+    if (!gh || spellId == 0 || targetGuid == 0) return luaReturnNil(L);
+    const auto data = gh->getSpellData(spellId);
+    // Self-cast spells have no range and show no indicator.
+    if (data.maxRange <= 0.0f) return luaReturnNil(L);
+    const auto target = gh->getEntityManager().getEntity(targetGuid);
+    const auto player = gh->getEntityManager().getEntity(gh->getPlayerGuid());
+    if (!target || !player) return luaReturnNil(L);
+    const float dx = player->getX() - target->getX();
+    const float dy = player->getY() - target->getY();
+    const float dz = player->getZ() - target->getZ();
+    const auto reach = [](const game::Entity& e) {
+        const auto* unit = dynamic_cast<const game::Unit*>(&e);
+        return unit ? unit->getCombatReach() : 0.0f;
+    };
+    const bool inRange = game::spellclass::withinSpellRange(
+        std::sqrt(dx * dx + dy * dy + dz * dz), data.minRange, data.maxRange,
+        reach(*player), reach(*target));
+    lua_pushnumber(L, inRange ? 1 : 0);
+    return 1;
+}
 
 // ---- Lenient numeric argument, for values that came out of a widget ----
 //

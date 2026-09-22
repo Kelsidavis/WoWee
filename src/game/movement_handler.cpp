@@ -953,6 +953,18 @@ void MovementHandler::setPosition(float x, float y, float z) {
     movementInfo.x = x;
     movementInfo.y = y;
     movementInfo.z = z;
+    // The player's own entity goes with it. The server never echoes the
+    // player's movement back, so nothing else moved it: it stayed where the
+    // player logged in, landed or was teleported, and every distance measured
+    // from it - range on the action bar, IsSpellInRange, interact distance,
+    // tab targeting - was measured from there.
+    //
+    // Not during a client taxi flight, where the flight simulation moves the
+    // entity and the character is placed from it.
+    if (taxiClientActive_ || onTaxiFlight_) return;
+    if (auto player = owner_.getEntityManager().getEntity(owner_.getPlayerGuid())) {
+        player->setPosition(x, y, z, movementInfo.orientation);
+    }
 }
 
 void MovementHandler::setOrientation(float orientation) {

@@ -353,3 +353,31 @@ TEST_CASE("hostile-target spells are the ones that must not be sent unaimed",
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Range between two units is edge to edge. The action bar measured centre to
+// centre, so a melee button read out of range on anything larger than a boar
+// and a ranged one went red a couple of yards before the server would refuse.
+
+TEST_CASE("a ranged spell reaches its range plus both combat reaches", "[spellclass][range]") {
+    // Fireball, 35 yards, between two ordinary 1.5-yard reaches: 38 from centre.
+    CHECK(withinSpellRange(38.0f, 0.0f, 35.0f, 1.5f, 1.5f));
+    CHECK_FALSE(withinSpellRange(38.1f, 0.0f, 35.0f, 1.5f, 1.5f));
+    // With no reach known, the range alone.
+    CHECK(withinSpellRange(35.0f, 0.0f, 35.0f, 0.0f, 0.0f));
+}
+
+TEST_CASE("a melee ability reaches both reaches and a third over a yard", "[spellclass][range]") {
+    // Never less than Combat Range, however small the two are.
+    CHECK(withinSpellRange(5.0f, 0.0f, 5.0f, 0.0f, 0.0f));
+    CHECK_FALSE(withinSpellRange(5.1f, 0.0f, 5.0f, 0.0f, 0.0f));
+    // A large target: 1.5 + 6 + 4/3 is 8.83 yards from its centre.
+    CHECK(withinSpellRange(8.8f, 0.0f, 5.0f, 1.5f, 6.0f));
+    CHECK_FALSE(withinSpellRange(8.9f, 0.0f, 5.0f, 1.5f, 6.0f));
+}
+
+TEST_CASE("inside a minimum range is out of range", "[spellclass][range]") {
+    // A hunter's dead zone: 5 to 35, measured edge to edge like the maximum.
+    CHECK_FALSE(withinSpellRange(7.0f, 5.0f, 35.0f, 1.5f, 1.5f));
+    CHECK(withinSpellRange(8.0f, 5.0f, 35.0f, 1.5f, 1.5f));
+}

@@ -279,28 +279,7 @@ static int lua_IsActionInRange(lua_State* L) {
         lua_pushnil(L);
         return 1;
     }
-    if (spellId == 0) { return luaReturnNil(L); }
-
-    auto data = gh->getSpellData(spellId);
-    if (data.maxRange <= 0.0f) {
-        // Melee or self-cast spells: no range indicator
-        lua_pushnil(L);
-        return 1;
-    }
-
-    // Need a target to check range against
-    uint64_t targetGuid = gh->getTargetGuid();
-    if (targetGuid == 0) { return luaReturnNil(L); }
-    auto targetEnt = gh->getEntityManager().getEntity(targetGuid);
-    auto playerEnt = gh->getEntityManager().getEntity(gh->getPlayerGuid());
-    if (!targetEnt || !playerEnt) { return luaReturnNil(L); }
-
-    float dx = playerEnt->getX() - targetEnt->getX();
-    float dy = playerEnt->getY() - targetEnt->getY();
-    float dz = playerEnt->getZ() - targetEnt->getZ();
-    float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
-    lua_pushnumber(L, dist <= data.maxRange ? 1 : 0);
-    return 1;
+    return pushSpellRangeAnswer(L, gh, spellId, gh->getTargetGuid());
 }
 
 // GetActionInfo(slot) → actionType, id, subType
