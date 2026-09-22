@@ -72,6 +72,15 @@ local function num(v)
     return (string.format("%.2f", v):gsub("0+$", ""):gsub("%.$", ""))
 end
 
+-- Whether two setting values are the same one. Numbers by value, loosely: the
+-- schema's defaults arrive as single-precision floats, 0.4 as
+-- 0.40000000596046, while a setting reads back as the text "0.4".
+local function sameValue(a, b)
+    local x, y = tonumber(a), tonumber(b)
+    if x and y then return math.abs(x - y) <= 1e-5 * math.max(1, math.abs(y)) end
+    return tostring(a) == tostring(b)
+end
+
 -- Whether a control is worth offering yet, from the schema's own test against
 -- another setting: "" always, "key" whenever that one is on, "key=2" and
 -- "key!=2" comparing its value.
@@ -324,16 +333,23 @@ local function addSlider(layout, panel, setting)
     local function showValue(value)
         valueText:SetText(setting.label .. ":  " .. num(value))
     end
+    -- Only a drag writes. read() moves the thumb to the setting, and SetValue
+    -- fires this; writing from it put every slider on the page back each time
+    -- the window opened - applied again, saved again, and as the float the
+    -- thumb holds, so a fog strength of 0.4 went back as 0.40000000596046.
+    local reading = false
     slider:SetScript("OnValueChanged", function(self, value)
         showValue(value)
-        WoweeSetSetting(setting.key, tostring(value))
+        if not reading then WoweeSetSetting(setting.key, tostring(value)) end
     end)
     withTooltip(slider, setting.label,
                 joinReason(setting.tooltip, waitingOn(setting)))
     return {
         read = function()
             local value = tonumber(WoweeGetSetting(setting.key)) or setting.min
+            reading = true
             slider:SetValue(value)
+            reading = false
             showValue(value)
             setEnabled(slider, valueText, isEnabled(setting))
         end,
@@ -509,9 +525,16 @@ local function buildPanel(category, settings)
             opened[control.key] = WoweeGetSetting(control.key)
         end
     end
+    -- Both put back only what differs. Writing a setting applies it, and
+    -- Cancel with nothing changed wrote every row on every page: full screen
+    -- chose the display mode again, vertical sync rebuilt the swapchain,
+    -- anti-aliasing its pipelines.
     panel.cancel = function()
         for _, control in ipairs(controls) do
-            if opened[control.key] then control.write(opened[control.key]) end
+            local was = opened[control.key]
+            if was and not sameValue(WoweeGetSetting(control.key), was) then
+                control.write(was)
+            end
         end
         panel.refresh()
     end
@@ -521,7 +544,9 @@ local function buildPanel(category, settings)
     -- leaves every other panel's alone.
     panel.default = function()
         for _, setting in ipairs(settings) do
-            WoweeSetSetting(setting.key, tostring(setting.default))
+            if not sameValue(WoweeGetSetting(setting.key), setting.default) then
+                WoweeSetSetting(setting.key, tostring(setting.default))
+            end
         end
         panel.refresh()
     end
