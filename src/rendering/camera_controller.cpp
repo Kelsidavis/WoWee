@@ -1761,6 +1761,48 @@ void CameraController::groundFollowedCharacter(float deltaTime, FrameInput& f,
             terrainRescueActive_ = false;
         }
 
+        // On the ground under a building's floor.
+        //
+        // A raised floor sits a yard or so over the heightfield it is built on,
+        // which is more than a step. Once the feet are down on that ground -
+        // one frame at the doorway where the floor query misses the threshold
+        // is enough - the floor is out of reach of the step-up, so it is never
+        // chosen again, and the player walks about inside the building sunk to
+        // the chest in its floor. Reported entering a house at an angle.
+        //
+        // Nowhere legitimate to stand has a walkable floor across the whole
+        // footprint at waist height: the body would be inside it. Put the feet
+        // back on it. The centre is asked first, so the four around it cost
+        // nothing on the frames that matter least - every one where the answer
+        // is no.
+        if (!isFlightAirborne() && !hoverActive_ && !externalFollow_ && wmoRenderer &&
+            nearWmoSpace && groundH && centerTerrainH && *groundH == *centerTerrainH) {
+            constexpr float kWaistHeight = 1.8f;
+            const float feetZ = targetPos.z;
+            const auto slabAt = [&](const glm::vec2& o) -> std::optional<float> {
+                float nz = 1.0f;
+                const auto h = wmoRenderer->getFloorHeight(
+                    targetPos.x + o.x, targetPos.y + o.y, feetZ + kWaistHeight, &nz);
+                if (!h || nz < MIN_WALKABLE_NORMAL_WMO) return std::nullopt;
+                if (*h <= feetZ + stepUpBudget || *h >= feetZ + kWaistHeight) return std::nullopt;
+                return h;
+            };
+            const auto cross = feetCross(0.35f);
+            std::optional<float> slab = slabAt(cross[0]);
+            for (std::size_t i = 1; slab && i < cross.size(); ++i) {
+                if (!slabAt(cross[i])) slab = std::nullopt;
+            }
+            if (slab) {
+                LOG_WARNING("Under a floor: feet ", feetZ, " on the ground at (", targetPos.x,
+                            ", ", targetPos.y, ") with a WMO floor at ", *slab,
+                            " across the footprint - back onto it");
+                targetPos.z = *slab;
+                groundH = slab;
+                lastGroundZ = *slab;
+                verticalVelocity = 0.0f;
+            }
+        }
+
         // WOWEE_FLOOR_DEBUG=1 - what every floor query answered and which
         // one won, four times a second.
         //
