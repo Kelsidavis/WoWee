@@ -1470,11 +1470,21 @@ end
 -- A page with nothing left on it is the same puzzle as a disabled row, so it
 -- leaves the list. The entry is the panel itself, and the list skips anything
 -- marked hidden - which is what collapsed child categories already use.
+--
+-- Out of the list is not out of the frame: Okay, Cancel and Defaults still run
+-- every registered page, and each of these puts back the values its refresh
+-- read when the window opened. Mute on the Sound page, press Okay, and the
+-- game's own Sound page wrote Enable Sound back on. Whatever of theirs this
+-- client uses is a row on a page of ours, which does its own committing, so
+-- they are given nothing to do.
+local function nothing() end
 for _, name in ipairs(kRemovedCategories) do
     local panel = _G[name]
     if panel then
         panel.hidden = true
         if panel.Hide then panel:Hide() end
+        panel.okay, panel.cancel, panel.default, panel.refresh =
+            nothing, nothing, nothing, nothing
     end
 end
 for _, frameName in ipairs({ "AudioOptionsFrameCategoryFrame", "VideoOptionsFrameCategoryFrame" }) do
