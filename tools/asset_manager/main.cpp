@@ -49,11 +49,65 @@
 #include "profiles.hpp"
 
 #include "panel.hpp"
+#include "model_import.hpp"
 
 namespace {
 
 namespace fs = std::filesystem;
 using namespace wowee::assets;
+
+/// `wowee_assets --import-later <later install> [data folder] [expansion]`
+///
+/// The window's Legion step, from a terminal: the repair of earlier imports,
+/// then the import over creature, world and item. Rerunning it is how models a
+/// previous import brought are given the skins their display rows name - a
+/// Legion mount mesh left wearing the 3.3.5 skin painted for the old one, for
+/// instance - and there was no way to ask for that without clicking through
+/// the window.
+int runImportLater(const std::string& laterInstall, const std::string& dataDir,
+                   const std::string& expansion) {
+    const std::string expansionDir = (fs::path(dataDir) / "expansions" / expansion).string();
+    if (!fs::is_directory(expansionDir)) {
+        std::fprintf(stderr, "No extraction at %s\n", expansionDir.c_str());
+        return 1;
+    }
+    auto say = [](const std::string& line) { std::printf("%s\n", line.c_str()); std::fflush(stdout); };
+
+    const RepairResult repaired = repairEarlierImports(expansionDir);
+    say(std::to_string(repaired.namesCleared) + " missing texture names cleared from " +
+        std::to_string(repaired.modelsRepaired) + " earlier imports; " +
+        std::to_string(repaired.leftDrawn) + " drawn ones left as they are");
+
+    CascStorage storage;
+    std::string error;
+    if (!storage.open(laterInstall, &error)) {
+        std::fprintf(stderr, "Could not read %s: %s\n", laterInstall.c_str(), error.c_str());
+        return 1;
+    }
+    say(std::to_string(storage.rootCount()) + " files in " + laterInstall);
+    std::unique_ptr<ModelSource> source = cascSource(storage);
+
+    const std::atomic<bool> cancel{false};
+    ImportResult total;
+    for (const std::string prefix : {"creature", "world", "item"}) {
+        say("looking through " + prefix);
+        const ImportResult part =
+            importModels(*source, expansionDir, expansionDir, prefix, 1.3f, say, cancel);
+        total.written += part.written;
+        total.tableSkinsBrought += part.tableSkinsBrought;
+        total.earlierImportsDressed += part.earlierImportsDressed;
+        total.earlierImportsRemoved += part.earlierImportsRemoved;
+        total.notBetter += part.notBetter;
+        total.dressedByTable += part.dressedByTable;
+        total.missingTextures += part.missingTextures;
+    }
+    say("took " + std::to_string(total.written) + " models, left " +
+        std::to_string(total.notBetter) + " alone as no better");
+    say(std::to_string(total.tableSkinsBrought) + " creature skins brought; earlier imports: " +
+        std::to_string(total.earlierImportsDressed) + " dressed, " +
+        std::to_string(total.earlierImportsRemoved) + " removed as nothing can dress them");
+    return 0;
+}
 
 /// ImGui's built-in face is drawn at thirteen pixels. Everything the panel
 /// lays out was sized against that, so it is the height the atlas is scaled
@@ -166,6 +220,12 @@ void startupFailure(const char* what) {
 }  // namespace
 
 int main(int argc, char** argv) {
+    if (argc > 2 && std::strcmp(argv[1], "--import-later") == 0) {
+        App defaults;
+        initPanelDefaults(defaults);
+        return runImportLater(argv[2], argc > 3 ? argv[3] : defaults.outputDir,
+                              argc > 4 ? argv[4] : "wotlk");
+    }
     // SDL3 answers true on success where SDL2 answered 0: this test is
     // inverted from what it was, not renamed.
     if (!SDL_Init(SDL_INIT_VIDEO)) {

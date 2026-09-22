@@ -561,10 +561,10 @@ ImportResult importModels(ModelSource& source, const std::string& expansionDir,
             (candidate.localVertices < 20 ||
              float(theirVertices) <= float(candidate.localVertices) * betterRatio)) {
             ++result.notBetter;
-            // The same mesh already here may be an earlier run's import, and the
-            // pipeline before this one brought creatures without the skins their
-            // display rows name. See dressEarlierImport below.
-            if (theirVertices == candidate.localVertices && !candidate.localPath.empty()) {
+            // An earlier run's import may be sitting here, and the pipelines
+            // before this one left two kinds of creature wearing skins that do
+            // not fit it. See the two cases below.
+            if (!candidate.localPath.empty()) {
                 const fs::path localModel(candidate.localPath);
                 const std::vector<uint8_t> localBody = readBytes(localModel);
                 const std::vector<uint8_t> localSkin = readBytes(
@@ -584,44 +584,72 @@ ImportResult importModels(ModelSource& source, const std::string& expansionDir,
                     fs::relative(localModel, overrideRoot, relEc).generic_string();
                 const bool isEarlierImport = !relEc && !underOverride.empty() &&
                                              underOverride.rfind("..", 0) != 0;
-                if (!columns.empty() && isEarlierImport) {
-                    const SkinFetch fetch = fetchTableSkins(where, columns);
-                    if (fetch.ok) {
-                        if (!fetch.files.empty()) {
-                            writeSkins(fetch);
-                            ++result.earlierImportsDressed;
-                        }
-                    } else {
-                        // Nothing can dress it, so it comes out, with what was
-                        // written beside it, and the extracted model under it
-                        // is drawn again. Textures stay: they may be shared.
-                        const std::string stemLower = lower(localModel.stem().string());
-                        std::error_code dirEc;
-                        std::vector<fs::path> beside;
-                        for (const auto& entry :
-                             fs::directory_iterator(localModel.parent_path(), dirEc)) {
-                            const std::string name = lower(entry.path().filename().string());
-                            const std::string ext = lower(entry.path().extension().string());
-                            if (name.rfind(stemLower, 0) != 0) continue;
-                            if (ext != ".skin" && ext != ".anim") continue;
-                            // "00.skin", "0060-00.anim": digits and a dash
-                            // between the stem and the extension. ogre and
-                            // ogrewarlord share a prefix and differ here.
-                            const std::string middle = name.substr(
-                                stemLower.size(), name.size() - stemLower.size() - ext.size());
-                            if (!middle.empty() &&
-                                middle.find_first_not_of("0123456789-") == std::string::npos) {
-                                beside.push_back(entry.path());
-                            }
-                        }
-                        std::error_code rmEc;
-                        if (fs::remove(localModel, rmEc)) {
-                            for (const fs::path& p : beside) fs::remove(p, rmEc);
-                            ++result.earlierImportsRemoved;
-                            if (say) say("    removed an earlier import of " + where + ": " +
-                                         fetch.why);
+
+                // Nothing can dress it, so it comes out, with what was written
+                // beside it, and the extracted model under it is drawn again.
+                // Textures stay: they may be shared.
+                auto removeEarlierImport = [&](const std::string& why) {
+                    const std::string stemLower = lower(localModel.stem().string());
+                    std::error_code dirEc;
+                    std::vector<fs::path> beside;
+                    for (const auto& entry :
+                         fs::directory_iterator(localModel.parent_path(), dirEc)) {
+                        const std::string name = lower(entry.path().filename().string());
+                        const std::string ext = lower(entry.path().extension().string());
+                        if (name.rfind(stemLower, 0) != 0) continue;
+                        if (ext != ".skin" && ext != ".anim") continue;
+                        // "00.skin", "0060-00.anim": digits and a dash between
+                        // the stem and the extension. ogre and ogrewarlord
+                        // share a prefix and differ here.
+                        const std::string middle = name.substr(
+                            stemLower.size(), name.size() - stemLower.size() - ext.size());
+                        if (!middle.empty() &&
+                            middle.find_first_not_of("0123456789-") == std::string::npos) {
+                            beside.push_back(entry.path());
                         }
                     }
+                    std::error_code rmEc;
+                    if (fs::remove(localModel, rmEc)) {
+                        for (const fs::path& p : beside) fs::remove(p, rmEc);
+                        ++result.earlierImportsRemoved;
+                        if (say) say("    removed an earlier import of " + where + ": " + why);
+                    }
+                };
+
+                if (!columns.empty() && isEarlierImport) {
+                    if (theirVertices == candidate.localVertices) {
+                        // The later client's own model, brought without the
+                        // skins its display rows name.
+                        const SkinFetch fetch = fetchTableSkins(where, columns);
+                        if (fetch.ok) {
+                            if (!fetch.files.empty()) {
+                                writeSkins(fetch);
+                                ++result.earlierImportsDressed;
+                            }
+                        } else {
+                            removeEarlierImport(fetch.why);
+                        }
+                    } else if (float(candidate.localVertices) > float(theirVertices) * 1.1f ||
+                               float(candidate.localVertices) * 1.1f < float(theirVertices)) {
+                        // Not the later client's model at this path at all.
+                        // An earlier pack filed models under the community
+                        // listfile's names, which guess: what it installed as
+                        // creature/ridinghorse/ridinghorse.m2 is Legion's
+                        // HorseMultiSaddle, 3155 vertices, while Legion's own
+                        // file at that path is the 673-vertex horse 3.3.5
+                        // ships. The displays that name this path are dressed
+                        // for that horse, in 3.3.5 and in Legion alike, so no
+                        // skin they name can fit what is here.
+                        removeEarlierImport(
+                            "not the later client's model at this path (" +
+                            std::to_string(candidate.localVertices) + " vertices here, " +
+                            std::to_string(theirVertices) + " in the later install), so the "
+                            "skins named for this path do not fit it");
+                    }
+                    // Within a tenth either way it is the same model exported
+                    // again with small edits - Legion's banshee is 1141
+                    // vertices, an earlier pack's 1132 - and the skins named
+                    // for it still fit.
                 }
             }
             continue;

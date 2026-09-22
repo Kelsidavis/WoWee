@@ -517,6 +517,32 @@ TEST_CASE("an earlier import nothing can dress is removed") {
     CHECK(fs::exists(box.root / "creature/thing/thing.m2"));   // the extracted one stays
 }
 
+TEST_CASE("an earlier import that is not the later model at its path is removed") {
+    // An earlier pack filed a different model under this name - Legion's
+    // HorseMultiSaddle as creature/ridinghorse/ridinghorse.m2, while Legion's
+    // own file there is the horse 3.3.5 ships. The skins its displays name are
+    // for that horse, and cannot fit what was installed.
+    Sandbox box;
+    box.installed("creature/horse/horse.m2", 673, {{11, ""}});
+    box.installed("override/creature/horse/horse.m2", 3155, {{11, ""}});
+    const std::vector<uint8_t> skin = makeSkin({{0, 1}});
+    std::ofstream(box.root / "override/creature/horse/horse00.skin", std::ios::binary)
+        .write(reinterpret_cast<const char*>(skin.data()), std::streamsize(skin.size()));
+    writeDisplayTables(box, "Creature\\Horse\\Horse.mdx", {{"HorseSkin", "", ""}});
+
+    FakeSource source;
+    source.files["creature/horse/horse.m2"] = wrap(makeBody(274, 673, {{11, ""}}), {1}, {});
+    source.ids[1] = makeSkin({{0, 1}});
+
+    const ImportResult result = importModels(source, box.root.string(), box.root.string(),
+                                             "creature", 1.3f, nullptr, kNeverCancelled);
+    CHECK(result.earlierImportsRemoved == 1);
+    CHECK(result.written == 0);
+    CHECK_FALSE(fs::exists(box.root / "override/creature/horse/horse.m2"));
+    CHECK_FALSE(fs::exists(box.root / "override/creature/horse/horse00.skin"));
+    CHECK(fs::exists(box.root / "creature/horse/horse.m2"));
+}
+
 TEST_CASE("a model whose texture is not in this installation is refused") {
     Sandbox box;
     box.installed("creature/thing/thing.m2", 100);
