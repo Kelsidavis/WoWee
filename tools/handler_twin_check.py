@@ -50,8 +50,12 @@ CALL = re.compile(r"(?<![\w:.>])(handle\w+)\s*\(")
 # only thing that calls it is the class that owns it.
 THROUGH = re.compile(r"(\w+)\s*(?:->|\.)\s*(handle\w+)\s*\(")
 # `std::unique_ptr<SpellHandler> spellHandler_;` and plain members, so a call
-# through a member can be attributed to the class it points at.
-MEMBER = re.compile(r"\b(?:std::(?:unique_ptr|shared_ptr)<\s*)?(\w+Handler)\s*>?\s*[\*&]?\s*(\w+_)\s*[;=]")
+# through a member can be attributed to the class it points at. Any class held
+# by a smart pointer, namespace and all - `std::unique_ptr<ui::MapWindow>
+# mapWindow_` owns the only MapWindow, and matching Handler names alone read
+# the call through it as nothing, and the handler it reaches as dead.
+MEMBER = re.compile(r"\b(?:std::(?:unique_ptr|shared_ptr)<\s*(?:\w+::)*(\w+)\s*>|(\w+Handler))"
+                    r"\s*[\*&]?\s*(\w+_)\s*[;=]")
 # `TouchControls& touchControls();` - a free function handing out the single
 # instance of a class that has no owner to be a member of. Without this the
 # only thing calling that class's handler is a line the scan cannot attribute
@@ -91,7 +95,7 @@ def main() -> int:
     member_class = {}
     for path in sorted((ROOT / "include").rglob("*.hpp")):
         for m in MEMBER.finditer(path.read_text(errors="ignore")):
-            member_class[m.group(2)] = m.group(1)
+            member_class[m.group(3)] = m.group(1) or m.group(2)
     for m in THROUGH.finditer(joined):
         cls = member_class.get(m.group(1))
         if cls:
