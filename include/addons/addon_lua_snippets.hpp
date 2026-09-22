@@ -210,8 +210,11 @@ local function newLayout(panel)
             bottom = -(height - 10)}
 end
 
-local function reserve(layout, height)
-    if layout.y - height < layout.bottom and layout.column < #layout.columns then
+-- `keepWith` is room that must fit after this in the same column - a heading's
+-- first control - or both go to the next one.
+local function reserve(layout, height, keepWith)
+    local needed = height + (keepWith or 0)
+    if layout.y - needed < layout.bottom and layout.column < #layout.columns then
         layout.column = layout.column + 1
         layout.y = COLUMN_TOP
     end
@@ -220,8 +223,12 @@ local function reserve(layout, height)
     return x, y
 end
 
-local function addHeading(layout, text)
-    local x, y = reserve(layout, 32)
+-- Kept with its first control. A heading that only just fitted at the foot of
+-- a column stayed there while the control under it went to the top of the
+-- next, so "Effects" sat alone at the bottom of the Detail page's first column
+-- with nothing beneath it and its three settings across the page.
+local function addHeading(layout, text, firstControlHeight)
+    local x, y = reserve(layout, 32, firstControlHeight)
     local label = layout.panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     label:SetPoint("TOPLEFT", x, y - 4)
     label:SetText(text)
@@ -472,7 +479,7 @@ local function buildPanel(category, settings)
     for _, setting in ipairs(settings) do
         if setting.section ~= "" and setting.section ~= heading then
             heading = setting.section
-            addHeading(layout, heading)
+            addHeading(layout, heading, setting.kind == "bool" and 27 or 50)
         end
         local control
         if setting.kind == "bool" then

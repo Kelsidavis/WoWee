@@ -123,26 +123,35 @@ TEST_CASE("every settings panel fits in its two columns", "[settings]") {
             if (last) break;
         }
 
-        std::vector<int> reservations;
+        const int controlHeight = schema[i].kind == ui::SettingKind::Bool ? kCheckButtonHeight
+                                                                          : kSliderHeight;
         const std::string thisSection = schema[i].section;
+        int headingColumn = 0;
         if (!thisSection.empty() && thisSection != section) {
             section = thisSection;
-            reservations.push_back(kHeadingHeight);
-        }
-        reservations.push_back(schema[i].kind == ui::SettingKind::Bool ? kCheckButtonHeight
-                                                                      : kSliderHeight);
-
-        for (int height : reservations) {
-            if (y - height < columnBottom && column < columnCount) {
+            // A heading is kept with its first control, as addHeading asks
+            // reserve to: both fit in this column, or both move.
+            if (y - kHeadingHeight - controlHeight < columnBottom && column < columnCount) {
                 ++column;
                 y = columnTop;
             }
-            INFO("setting " << schema[i].key << " on panel " << schema[i].category
-                            << " lands at " << (y - height) << " in column " << column
-                            << ", past the bottom at " << columnBottom);
-            CHECK(y - height >= columnBottom);
-            y -= height;
+            y -= kHeadingHeight;
+            headingColumn = column;
         }
+
+        if (y - controlHeight < columnBottom && column < columnCount) {
+            ++column;
+            y = columnTop;
+        }
+        INFO("setting " << schema[i].key << " on panel " << schema[i].category
+                        << " lands at " << (y - controlHeight) << " in column " << column
+                        << ", past the bottom at " << columnBottom);
+        CHECK(y - controlHeight >= columnBottom);
+        // The heading over it is in the same column, not left at the foot of
+        // the one before - which is how "Effects" came to sit alone at the
+        // bottom of the Detail page.
+        if (headingColumn != 0) CHECK(headingColumn == column);
+        y -= controlHeight;
     }
 }
 
