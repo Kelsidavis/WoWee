@@ -1,6 +1,7 @@
 #include "game/zone_manager.hpp"
 #include "pipeline/asset_manager.hpp"
 #include "core/logger.hpp"
+#include <algorithm>
 #include <cstdlib>
 #include <ctime>
 #include <filesystem>
@@ -78,8 +79,6 @@ void ZoneManager::initialize() {
         "Sound\\Music\\CityMusic\\Stormwind\\stormwind06-zone.mp3",
         "Sound\\Music\\CityMusic\\Stormwind\\stormwind07-zone.mp3",
         "Sound\\Music\\CityMusic\\Stormwind\\stormwind08-zone.mp3",
-        "Sound\\Music\\CityMusic\\Stormwind\\stormwind09-zone.mp3",
-        "Sound\\Music\\CityMusic\\Stormwind\\stormwind10-zone.mp3",
     };
     if (!omStormwindInst.empty()) stormwind.musicPaths.push_back(omStormwindInst);
     if (!omStormwindGtr.empty()) stormwind.musicPaths.push_back(omStormwindGtr);
@@ -104,7 +103,6 @@ void ZoneManager::initialize() {
     westfall.musicPaths = {
         "Sound\\Music\\ZoneMusic\\Plains\\DayPlains01.mp3",
         "Sound\\Music\\ZoneMusic\\Plains\\DayPlains02.mp3",
-        "Sound\\Music\\ZoneMusic\\Plains\\DayPlains03.mp3",
     };
     if (!omYouNoTake.empty()) westfall.musicPaths.push_back(omYouNoTake);
     zones[40] = westfall;
@@ -114,9 +112,15 @@ void ZoneManager::initialize() {
     tirisfal.id = 85;
     tirisfal.name = "Tirisfal Glades";
     tirisfal.musicPaths = {
-        "Sound\\Music\\ZoneMusic\\UndeadForest\\UndeadForest01.mp3",
-        "Sound\\Music\\ZoneMusic\\UndeadForest\\UndeadForest02.mp3",
-        "Sound\\Music\\ZoneMusic\\UndeadForest\\UndeadForest03.mp3",
+        // EvilForest, as AreaTable -> ZoneMusic -> SoundEntries names it. There
+        // was never an UndeadForest folder, so all three of these failed to
+        // read and Tirisfal was silent but for the client's own tracks.
+        "Sound\\Music\\ZoneMusic\\EvilForest\\DayEvilForest01.mp3",
+        "Sound\\Music\\ZoneMusic\\EvilForest\\DayEvilForest02.mp3",
+        "Sound\\Music\\ZoneMusic\\EvilForest\\DayEvilForest03.mp3",
+        "Sound\\Music\\ZoneMusic\\EvilForest\\NightEvilForest01.mp3",
+        "Sound\\Music\\ZoneMusic\\EvilForest\\NightEvilForest02.mp3",
+        "Sound\\Music\\ZoneMusic\\EvilForest\\NightEvilForest03.mp3",
     };
     if (!omLanterns.empty()) tirisfal.musicPaths.push_back(omLanterns);
     zones[85] = tirisfal;
@@ -162,9 +166,12 @@ void ZoneManager::initialize() {
     duskwood.id = 10;
     duskwood.name = "Duskwood";
     duskwood.musicPaths = {
-        "Sound\\Music\\ZoneMusic\\HauntedForest\\HauntedForest01.mp3",
-        "Sound\\Music\\ZoneMusic\\HauntedForest\\HauntedForest02.mp3",
-        "Sound\\Music\\ZoneMusic\\HauntedForest\\HauntedForest03.mp3",
+        "Sound\\Music\\ZoneMusic\\EvilForest\\DayEvilForest01.mp3",
+        "Sound\\Music\\ZoneMusic\\EvilForest\\DayEvilForest02.mp3",
+        "Sound\\Music\\ZoneMusic\\EvilForest\\DayEvilForest03.mp3",
+        "Sound\\Music\\ZoneMusic\\EvilForest\\NightEvilForest01.mp3",
+        "Sound\\Music\\ZoneMusic\\EvilForest\\NightEvilForest02.mp3",
+        "Sound\\Music\\ZoneMusic\\EvilForest\\NightEvilForest03.mp3",
     };
     // Keep Duskwood on its original haunted-forest score; custom tracks are
     // too upbeat for the zone's persistent dark ambience.
@@ -201,9 +208,9 @@ void ZoneManager::initialize() {
     ironforge.id = 1537;
     ironforge.name = "Ironforge";
     ironforge.musicPaths = {
-        "Sound\\Music\\CityMusic\\Ironforge\\Ironforge01-zone.mp3",
-        "Sound\\Music\\CityMusic\\Ironforge\\Ironforge02-zone.mp3",
-        "Sound\\Music\\CityMusic\\Ironforge\\Ironforge03-zone.mp3",
+        "Sound\\Music\\CityMusic\\Ironforge\\IronForge Walking 01.mp3",
+        "Sound\\Music\\CityMusic\\Ironforge\\Ironforge Walking 03 (Glenn).mp3",
+        "Sound\\Music\\CityMusic\\Ironforge\\Ironforge Walking 04.mp3",
     };
     if (!omRunBackPolka.empty()) ironforge.musicPaths.push_back(omRunBackPolka);
     if (!omRollNeedGreed.empty()) ironforge.musicPaths.push_back(omRollNeedGreed);
@@ -231,7 +238,6 @@ void ZoneManager::initialize() {
     orgrimmar.musicPaths = {
         "Sound\\Music\\CityMusic\\Orgrimmar\\orgrimmar01-zone.mp3",
         "Sound\\Music\\CityMusic\\Orgrimmar\\orgrimmar02-zone.mp3",
-        "Sound\\Music\\CityMusic\\Orgrimmar\\orgrimmar03-zone.mp3",
     };
     if (!omWhoPulled.empty()) orgrimmar.musicPaths.push_back(omWhoPulled);
     if (!omOneMorePull.empty()) orgrimmar.musicPaths.push_back(omOneMorePull);
@@ -256,7 +262,6 @@ void ZoneManager::initialize() {
     mulgore.musicPaths = {
         "Sound\\Music\\ZoneMusic\\Plains\\DayPlains01.mp3",
         "Sound\\Music\\ZoneMusic\\Plains\\DayPlains02.mp3",
-        "Sound\\Music\\ZoneMusic\\Plains\\DayPlains03.mp3",
     };
     if (!omWanderwewill.empty()) mulgore.musicPaths.push_back(omWanderwewill);
     if (!omBarrens.empty()) mulgore.musicPaths.push_back(omBarrens);
@@ -267,9 +272,9 @@ void ZoneManager::initialize() {
     thunderBluff.id = 1638;
     thunderBluff.name = "Thunder Bluff";
     thunderBluff.musicPaths = {
-        "Sound\\Music\\CityMusic\\ThunderBluff\\ThunderBluff01-zone.mp3",
-        "Sound\\Music\\CityMusic\\ThunderBluff\\ThunderBluff02-zone.mp3",
-        "Sound\\Music\\CityMusic\\ThunderBluff\\ThunderBluff03-zone.mp3",
+        "Sound\\Music\\CityMusic\\Thunderbluff\\Thunderbluff Walking 01.mp3",
+        "Sound\\Music\\CityMusic\\Thunderbluff\\Thunderbluff Walking 02.mp3",
+        "Sound\\Music\\CityMusic\\Thunderbluff\\Thunderbluff Walking 03.mp3",
     };
     if (!omWanderwewill.empty()) thunderBluff.musicPaths.push_back(omWanderwewill);
     zones[1638] = thunderBluff;
@@ -279,9 +284,10 @@ void ZoneManager::initialize() {
     darkshore.id = 148;
     darkshore.name = "Darkshore";
     darkshore.musicPaths = {
-        "Sound\\Music\\ZoneMusic\\NightElf\\NightElf01.mp3",
-        "Sound\\Music\\ZoneMusic\\NightElf\\NightElf02.mp3",
-        "Sound\\Music\\ZoneMusic\\NightElf\\NightElf03.mp3",
+        "Sound\\Music\\ZoneMusic\\Forest\\NightForest01.mp3",
+        "Sound\\Music\\ZoneMusic\\Forest\\NightForest02.mp3",
+        "Sound\\Music\\ZoneMusic\\Forest\\NightForest03.mp3",
+        "Sound\\Music\\ZoneMusic\\Forest\\NightForest04.mp3",
     };
     if (!omBoneCollector.empty()) darkshore.musicPaths.push_back(omBoneCollector);
     if (!omLanterns.empty()) darkshore.musicPaths.push_back(omLanterns);
@@ -292,9 +298,11 @@ void ZoneManager::initialize() {
     teldrassil.id = 141;
     teldrassil.name = "Teldrassil";
     teldrassil.musicPaths = {
-        "Sound\\Music\\ZoneMusic\\NightElf\\NightElf01.mp3",
-        "Sound\\Music\\ZoneMusic\\NightElf\\NightElf02.mp3",
-        "Sound\\Music\\ZoneMusic\\NightElf\\NightElf03.mp3",
+        "Sound\\Music\\ZoneMusic\\EnchantedForest\\EnchantedForest01.mp3",
+        "Sound\\Music\\ZoneMusic\\EnchantedForest\\EnchantedForest02.mp3",
+        "Sound\\Music\\ZoneMusic\\EnchantedForest\\EnchantedForest03.mp3",
+        "Sound\\Music\\ZoneMusic\\EnchantedForest\\EnchantedForest04.mp3",
+        "Sound\\Music\\ZoneMusic\\EnchantedForest\\EnchantedForest05.mp3",
     };
     if (!omWanderwewill.empty()) teldrassil.musicPaths.push_back(omWanderwewill);
     zones[141] = teldrassil;
@@ -304,9 +312,9 @@ void ZoneManager::initialize() {
     darnassus.id = 1657;
     darnassus.name = "Darnassus";
     darnassus.musicPaths = {
-        "Sound\\Music\\CityMusic\\Darnassus\\Darnassus01-zone.mp3",
-        "Sound\\Music\\CityMusic\\Darnassus\\Darnassus02-zone.mp3",
-        "Sound\\Music\\CityMusic\\Darnassus\\Darnassus03-zone.mp3",
+        "Sound\\Music\\CityMusic\\Darnassus\\Darnassus Walking 1.mp3",
+        "Sound\\Music\\CityMusic\\Darnassus\\Darnassus Walking 2.mp3",
+        "Sound\\Music\\CityMusic\\Darnassus\\Darnassus Walking 3.mp3",
     };
     zones[1657] = darnassus;
 
@@ -640,6 +648,29 @@ void ZoneManager::enrichFromDBC(pipeline::AssetManager* assets) {
     }
 
     LOG_INFO("Zone music enriched from DBC: ", zones.size(), " zones, ", zonesEnriched, " paths added");
+
+    // A track the data does not have is taken out of the pool rather than
+    // picked and failed on: each one was a "Could not read" and a zone gone
+    // quiet until the next pick. The table above is written by hand and the
+    // data differs by expansion, so this is checked against what is actually
+    // there. The client's own tracks (file:) are not game data and are left.
+    std::size_t dropped = 0;
+    std::string firstDropped;
+    for (auto& [zoneId, zone] : zones) {
+        (void)zoneId;
+        auto& paths = zone.musicPaths;
+        const auto missing = [&](const std::string& path) {
+            if (path.rfind("file:", 0) == 0 || assets->fileExists(path)) return false;
+            if (firstDropped.empty()) firstDropped = path;
+            ++dropped;
+            return true;
+        };
+        paths.erase(std::remove_if(paths.begin(), paths.end(), missing), paths.end());
+    }
+    if (dropped > 0) {
+        LOG_WARNING("Zone music: ", dropped, " track(s) named for zones are not in the data and "
+                    "were left out, first ", firstDropped);
+    }
 }
 
 } // namespace game
