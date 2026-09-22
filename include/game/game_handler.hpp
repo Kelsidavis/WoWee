@@ -5149,6 +5149,25 @@ private:
     bool        resurrectHasSickness_ = false;
     bool        resurrectHasTimer_ = true;
     uint64_t    areaSpiritHealerGuid_ = 0;
+    /// The conversation last asked for, until the server answers it.
+    ///
+    /// A server that refuses one says nothing - out of reach, a creature that
+    /// regards the player as Unfriendly, one that is busy - and a refusal
+    /// looked exactly like a click that never happened. Held so a hello with
+    /// no answer can say what it was sent from. See interactWithNpc.
+    struct PendingNpcHello {
+        uint64_t guid = 0;
+        std::string name;
+        std::chrono::steady_clock::time_point sentAt{};
+        float distance = -1.0f;
+        int reaction = 0;
+        uint32_t npcFlags = 0;
+    };
+    PendingNpcHello pendingNpcHello_;
+    /// The server answered a conversation: whatever it said, the hello got
+    /// through. Called from the dispatch for every packet that opens an NPC's
+    /// window.
+    void noteNpcAnswered() { pendingNpcHello_.guid = 0; }
     float       areaSpiritHealerSeconds_ = 0.0f;
 
     // ---- WotLK Calendar: pending invite counter ----

@@ -2179,6 +2179,17 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                         if (!unit->isHostile() && canInteractNpc) {
                             gameHandler.interactWithNpc(target->getGuid());
                         } else if (unit->isHostile() || shouldAttackByFallback) {
+                            // Said once per unit: a creature nobody thinks is
+                            // hostile, attacked because it carries no NPC flags,
+                            // is a talk that never left this client.
+                            if (!unit->isHostile()) {
+                                static std::unordered_set<uint64_t> said;
+                                if (said.insert(target->getGuid()).second) {
+                                    LOG_WARNING("Right-click: ", unit->getName(),
+                                                " is not hostile and has no NPC flags,"
+                                                " so it was attacked rather than spoken to");
+                                }
+                            }
                             gameHandler.startAutoAttack(target->getGuid());
                         }
                     }

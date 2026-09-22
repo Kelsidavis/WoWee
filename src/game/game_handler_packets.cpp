@@ -3547,6 +3547,33 @@ void GameHandler::handlePacket(network::Packet& packet) {
         }
     }
 
+    // An NPC's window opening is the answer to a hello. See pendingNpcHello_.
+    switch (*logicalOp) {
+        case Opcode::SMSG_GOSSIP_MESSAGE:
+        case Opcode::SMSG_GOSSIP_COMPLETE:
+        case Opcode::SMSG_NPC_WONT_TALK:
+        case Opcode::SMSG_QUESTGIVER_QUEST_LIST:
+        case Opcode::SMSG_QUESTGIVER_QUEST_DETAILS:
+        case Opcode::SMSG_QUESTGIVER_REQUEST_ITEMS:
+        case Opcode::SMSG_QUESTGIVER_OFFER_REWARD:
+        case Opcode::SMSG_QUESTGIVER_QUEST_INVALID:
+        case Opcode::SMSG_LIST_INVENTORY:
+        case Opcode::SMSG_TRAINER_LIST:
+        case Opcode::SMSG_SHOWTAXINODES:
+        case Opcode::SMSG_BINDER_CONFIRM:
+        case Opcode::SMSG_SHOW_BANK:
+        case Opcode::SMSG_PETITION_SHOWLIST:
+        case Opcode::SMSG_SPIRIT_HEALER_CONFIRM:
+        case Opcode::SMSG_AREA_SPIRIT_HEALER_TIME:
+        case Opcode::MSG_AUCTION_HELLO:
+        case Opcode::MSG_TABARDVENDOR_ACTIVATE:
+        case Opcode::MSG_LIST_STABLED_PETS:
+            noteNpcAnswered();
+            break;
+        default:
+            break;
+    }
+
     // Dispatch via the opcode handler table
     auto it = dispatchTable_.find(*logicalOp);
     if (it != dispatchTable_.end()) {

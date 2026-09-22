@@ -182,6 +182,14 @@ public:
     float& timeSinceLastMoveHeartbeatRef() { return timeSinceLastMoveHeartbeat_; }
     [[nodiscard]] float getMoveHeartbeatInterval() const { return moveHeartbeatInterval_; }
     [[nodiscard]] bool isServerMovementAllowed() const { return serverMovementAllowed_; }
+    /// Where the last movement packet that went out put the player, in
+    /// canonical coordinates - which is where the server has them - and false
+    /// before any has.
+    [[nodiscard]] bool lastSentPosition(glm::vec3& out) const {
+        if (!hasSentMovement_) return false;
+        out = lastSentPos_;
+        return true;
+    }
     void setServerMovementAllowed(bool v) { serverMovementAllowed_ = v; }
     uint32_t& monsterMovePacketsThisTickRef() { return monsterMovePacketsThisTick_; }
     uint32_t& monsterMovePacketsDroppedThisTickRef() { return monsterMovePacketsDroppedThisTick_; }
@@ -298,6 +306,11 @@ private:
     uint32_t lastHeartbeatFlags_ = 0;
     uint64_t lastHeartbeatTransportGuid_ = 0;
     uint32_t lastNonHeartbeatMoveSendTimeMs_ = 0;
+    glm::vec3 lastSentPos_{0.0f};
+    bool hasSentMovement_ = false;
+    /// Why movement is being held back from the server, said once per stretch
+    /// of it. See sendMovement.
+    const char* movementHeldReason_ = nullptr;
     uint32_t lastFacingSendTimeMs_ = 0;
     float lastFacingSentOrientation_ = 0.0f;
 

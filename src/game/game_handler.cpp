@@ -893,11 +893,44 @@ void GameHandler::update(float deltaTime) {
             if (!npc) return;
             float dx = movementInfo.x - npc->getX();
             float dy = movementInfo.y - npc->getY();
-            if (std::sqrt(dx * dx + dy * dy) > game::NPC_INTERACT_MAX_DISTANCE) {
+            const float distance = std::sqrt(dx * dx + dy * dy);
+            if (distance > game::NPC_INTERACT_MAX_DISTANCE) {
                 closeFn();
-                LOG_INFO(label, " closed: walked too far from NPC");
+                // Warning: a window closing by itself is a report waiting to
+                // happen, and the client is the one deciding.
+                LOG_WARNING(label, " closed: ", distance, " yards from the NPC, past ",
+                            game::NPC_INTERACT_MAX_DISTANCE);
             }
         };
+        // A hello the server never answered. It says nothing when it refuses,
+        // so this is the only place the refusal can be seen.
+        if (pendingNpcHello_.guid != 0 &&
+            std::chrono::steady_clock::now() - pendingNpcHello_.sentAt > std::chrono::milliseconds(1500)) {
+            const int reaction = pendingNpcHello_.reaction;
+            // Where the server has the player: the last movement packet sent.
+            // Far from the NPC while the client stands beside it means the
+            // server never heard the walk over.
+            float sentDistance = -1.0f;
+            glm::vec3 sent;
+            auto npc = entityController_->getEntityManager().getEntity(pendingNpcHello_.guid);
+            if (npc && movementHandler_ && movementHandler_->lastSentPosition(sent)) {
+                sentDistance = glm::length(sent - glm::vec3(npc->getX(), npc->getY(), npc->getZ()));
+            }
+            LOG_WARNING("Talk: ", pendingNpcHello_.name.empty() ? "an NPC" : pendingNpcHello_.name,
+                        " (guid 0x", std::hex, pendingNpcHello_.guid, std::dec, ")",
+                        " did not answer. Asked from ", pendingNpcHello_.distance,
+                        " yards here and ", sentDistance,
+                        " from the last position sent to the server (3D); npc flags 0x",
+                        std::hex, pendingNpcHello_.npcFlags, std::dec,
+                        "; movement allowed=", movementHandler_ && movementHandler_->isServerMovementAllowed(),
+                        " taxi=", movementHandler_ && movementHandler_->isOnTaxiFlight(),
+                        " taxi mount=", movementHandler_ && movementHandler_->isTaxiMountActive(),
+                        "; it regards you as ",
+                        reaction >= 1 && reaction <= 8 ? kReputationStandings[reaction - 1].name : "?",
+                        ". The server refuses in silence when the NPC is out of reach, busy, "
+                        "or regards you as Unfriendly or worse");
+            pendingNpcHello_.guid = 0;
+        }
         closeIfTooFar(isVendorWindowOpen(), getVendorItems().vendorGuid, [this]{ closeVendor(); }, "Vendor");
         closeIfTooFar(isGossipWindowOpen(), getCurrentGossip().npcGuid, [this]{ closeGossip(); }, "Gossip");
         // The movement handler's guid, not a copy of it: the one this class

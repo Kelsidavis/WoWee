@@ -2841,6 +2841,23 @@ void GameHandler::interactWithNpc(uint64_t guid) {
 
     auto packet = GossipHelloPacket::build(guid);
     socket->send(packet);
+
+    pendingNpcHello_ = PendingNpcHello{};
+    pendingNpcHello_.guid = guid;
+    pendingNpcHello_.sentAt = std::chrono::steady_clock::now();
+    if (auto entity = getEntityManager().getEntity(guid)) {
+        const float dx = movementInfo.x - entity->getX();
+        const float dy = movementInfo.y - entity->getY();
+        const float dz = movementInfo.z - entity->getZ();
+        pendingNpcHello_.distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (auto* unit = dynamic_cast<Unit*>(entity.get())) {
+            pendingNpcHello_.name = unit->getName();
+            pendingNpcHello_.reaction = unitReactionToPlayer(*unit);
+            pendingNpcHello_.npcFlags = unit->getNpcFlags();
+        }
+    }
+    LOG_DEBUG("interactWithNpc: hello to ", pendingNpcHello_.name, " at ",
+              pendingNpcHello_.distance, " yards");
 }
 
 void GameHandler::queryAreaSpiritHealer(uint64_t guid) {

@@ -479,9 +479,25 @@ void MovementHandler::sendMovement(Opcode opcode) {
         (opcode == Opcode::MSG_MOVE_STOP_STRAFE) ||
         (opcode == Opcode::MSG_MOVE_STOP_TURN) ||
         (opcode == Opcode::MSG_MOVE_STOP_SWIM);
-    if (!serverMovementAllowed_ && !taxiAllowed) return;
-    if ((onTaxiFlight_ || taxiMountActive_) && !taxiAllowed) return;
-    if (owner_.resurrectPendingRef() && !taxiAllowed) return;
+    // Held back, and said: a packet not sent leaves the server with the last
+    // position it was told, while the player walks on here - so every NPC the
+    // player then walks up to is out of the server's reach, and refuses in
+    // silence. Once per stretch of it, not per packet.
+    const char* heldReason = nullptr;
+    if (!taxiAllowed) {
+        if (!serverMovementAllowed_) heldReason = "the server has not given control of the character";
+        else if (onTaxiFlight_) heldReason = "a taxi flight is in progress";
+        else if (taxiMountActive_) heldReason = "a taxi mount is on";
+        else if (owner_.resurrectPendingRef()) heldReason = "a resurrection is pending";
+    }
+    if (heldReason) {
+        if (heldReason != movementHeldReason_) {
+            movementHeldReason_ = heldReason;
+            LOG_WARNING("Movement: not sent while ", heldReason,
+                        " - the server keeps the last position it was told");
+        }
+        return;
+    }
 
     // Always send a strictly increasing non-zero client movement clock value.
     const uint32_t movementTime = nextMovementTimestampMs();
@@ -810,6 +826,12 @@ void MovementHandler::sendMovement(Opcode opcode) {
         ? owner_.getPacketParsers()->buildMovementPacket(opcode, wireInfo, owner_.getPlayerGuid())
         : MovementPacket::build(opcode, wireInfo, owner_.getPlayerGuid());
     owner_.getSocket()->send(packet);
+    lastSentPos_ = glm::vec3(movementInfo.x, movementInfo.y, movementInfo.z);
+    hasSentMovement_ = true;
+    if (movementHeldReason_) {
+        LOG_WARNING("Movement: sending again (was held while ", movementHeldReason_, ")");
+        movementHeldReason_ = nullptr;
+    }
 
     if (opcode == Opcode::MSG_MOVE_HEARTBEAT) {
         lastHeartbeatSendTimeMs_ = movementInfo.time;
