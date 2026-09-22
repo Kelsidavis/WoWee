@@ -1178,9 +1178,11 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
             }
 
             VisibleEntry visible{.index = i, .modelId = instance.modelId, .distSq = distSq, .effectiveMaxDistSq = effectiveMaxDistSq};
-            out.opaque.push_back(visible);
-            if (instance.cachedModel &&
-                (instance.cachedModel->hasTransparentBatches || instance.cachedModel->isSpellEffect)) {
+            // A faded instance is drawn blended, all of it - see M2Instance::fade.
+            const bool faded = instance.fade < 0.999f;
+            if (!faded) out.opaque.push_back(visible);
+            if (faded || (instance.cachedModel &&
+                (instance.cachedModel->hasTransparentBatches || instance.cachedModel->isSpellEffect))) {
                 out.transparent.push_back(visible);
             }
         }
@@ -1947,7 +1949,8 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
             fadeAlpha = std::clamp((entry.effectiveMaxDistSq - entry.distSq) /
                                   (entry.effectiveMaxDistSq - fadeStartDistSq), 0.0f, 1.0f);
         }
-        float instanceFadeAlpha = fadeAlpha;
+        float instanceFadeAlpha = fadeAlpha * instance.fade;
+        const bool instanceFaded = instance.fade < 0.999f;
         if (model.isGroundDetail) instanceFadeAlpha *= 0.82f;
         if (model.isInstancePortal) instanceFadeAlpha *= 0.72f;
 
@@ -1973,9 +1976,11 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
             if (batch.batchOpacity < 0.01f) continue;
             if (!skyBatchAllowed(skyMode_, static_cast<std::size_t>(&batch - model.batches.data()))) continue;
 
-            // Pass 2 gate: only transparent/additive batches
+            // Pass 2 gate: only transparent/additive batches - or, for a faded
+            // instance, every batch, since the opaque pass left it out.
             {
-                const bool rawTransparent = (batch.blendMode >= 2) || model.isSpellEffect;
+                const bool rawTransparent = (batch.blendMode >= 2) || model.isSpellEffect ||
+                                            instanceFaded;
                 if (!rawTransparent) continue;
             }
 
@@ -2075,6 +2080,8 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
                 case 2: desiredPipeline = alphaPipeline_; break;
                 default: desiredPipeline = additivePipeline_; break;
             }
+            // An opaque layer of a faded instance: blended by its fade.
+            if (instanceFaded && effectiveBlendMode <= 1) desiredPipeline = alphaPipeline_;
             if (desiredPipeline != currentPipeline) {
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, desiredPipeline);
                 currentPipeline = desiredPipeline;

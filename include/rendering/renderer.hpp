@@ -288,12 +288,18 @@ private:
     /// continent change rather than held across one.
     mutable uint32_t lastResolvedZoneMapId_ = 0xFFFFFFFFu;
 
-    std::string skyboxModelPath_;
-    uint32_t skyboxModelInstanceId_ = 0;
-    /// Sky paths that did not resolve to a usable model. The swap is atomic -
-    /// the old sky is kept when a new one cannot be loaded - so without this
-    /// the failing path would be read off disk again on every frame it was
-    /// active.
+    /// The original client's sky models that are up, one instance each, faded
+    /// by the weight LightingManager gives them. See updateSkyboxLayers.
+    struct SkyLayerInstance {
+        std::string path;
+        uint32_t instanceId = 0;
+    };
+    std::vector<SkyLayerInstance> skyLayers_;
+    /// Sky models already uploaded, by path, so one that fades out and back in
+    /// is not read off disk again.
+    std::unordered_map<std::string, uint32_t> loadedSkyModels_;
+    /// Sky paths that did not resolve to a usable model, so a failing path is
+    /// not read off disk again on every frame it is wanted.
     std::unordered_set<std::string> failedSkyboxPaths_;
     std::unique_ptr<Minimap> minimap;
     std::unique_ptr<WorldMap> worldMap;
@@ -375,7 +381,8 @@ public:
 
 private:
     void applyMsaaChange();
-    bool ensureSkyboxModel();
+    bool updateSkyboxLayers();
+    uint32_t loadSkyboxModel(const std::string& path);
     VkSampleCountFlagBits pendingMsaaSamples_ = VK_SAMPLE_COUNT_1_BIT;
     bool msaaChangePending_ = false;
     void renderShadowPass();

@@ -836,8 +836,8 @@ void Renderer::shutdown() {
     if (skyboxModelRenderer_) {
         skyboxModelRenderer_->shutdown();
         skyboxModelRenderer_.reset();
-        skyboxModelInstanceId_ = 0;
-        skyboxModelPath_.clear();
+        skyLayers_.clear();
+        loadedSkyModels_.clear();
     }
 
     // Audio shutdown is handled by AudioCoordinator (owned by Application).
@@ -1414,47 +1414,58 @@ const std::string& Renderer::getCurrentZoneName() const {
     return audioCoordinator_ ? audioCoordinator_->getCurrentZoneName() : empty;
 }
 
-bool Renderer::ensureSkyboxModel() {
-    // Which skybox model a place uses is Light.dbc's answer, not a map id:
-    // LightParams names a LightSkybox row and LightSkybox names the model, and
-    // getActiveSkyboxPath already walks that for whatever map the player is
-    // on. This was restricted to Outland, so every other zone that defines one
-    // - Tirisfal's night sky among them - fell back to the procedural sky.
-    //
-    // A zone that names no skybox leaves the path empty and is unaffected.
-    // WOWEE_NO_SKY_M2=1 draws the procedural sky alone.
-    //
-    // There are two skies over the player - this client's own gradient dome and
-    // the original client's sky model on top of it - and a report about the sky
-    // cannot say which. Everything measurable about the model is right: the
-    // lighting inputs behind it hold still, its clock advances at wall speed
-    // with no restart, and the frame time beside it is steady. So the next
-    // thing worth knowing is whether taking it away takes the fault with it,
-    // and that is one bit that no amount of reading the code will supply.
+bool Renderer::updateSkyboxLayers() {
+    // Which skybox models a place uses is Light.dbc's answer, not a map id:
+    // LightParams names a LightSkybox row and LightSkybox names the model.
+    // LightingManager walks that for the lights around the player and says
+    // how much of each is up; this keeps one instance per model and fades it
+    // by that weight, so crossing from one zone's sky to another's is a blend
+    // and not a swap. WOWEE_NO_SKY_M2=1 draws the procedural sky alone.
     static const bool noSkyM2 = std::getenv("WOWEE_NO_SKY_M2") != nullptr;
     if (noSkyM2) return false;
-
-    if (!skyboxModelRenderer_ || !lightingManager || !cachedAssetManager ||
-        !camera) {
+    if (!skyboxModelRenderer_ || !lightingManager || !cachedAssetManager || !camera) {
         return false;
     }
 
-    std::string path = lightingManager->getActiveSkyboxPath();
-    if (path.empty()) return false;
-    std::replace(path.begin(), path.end(), '/', '\\');
-    if (path == skyboxModelPath_) return skyboxModelInstanceId_ != 0;
-    if (failedSkyboxPaths_.count(path)) return skyboxModelInstanceId_ != 0;
+    auto normalized = [](std::string p) {
+        std::replace(p.begin(), p.end(), '/', '\\');
+        return p;
+    };
+    const auto& layers = lightingManager->getSkyboxLayers();
 
-    // The sky that is up stays up until the next one is known to be loadable.
-    //
-    // This used to clear the renderer and blank the path before reading a
-    // byte, so any path that did not resolve left no sky at all - and the
-    // instance is dropped and rebuilt on every change, which restarts the
-    // model's animation. While the active path was changing as the player
-    // walked, that was a sky whose clouds kept jumping back to the start and
-    // vanishing in between. The path churn is fixed in LightingManager; this
-    // makes the swap itself atomic, so a failure costs nothing and the old sky
-    // simply stays.
+    // Faded out and no longer wanted.
+    std::erase_if(skyLayers_, [&](const SkyLayerInstance& sky) {
+        const bool wanted = std::any_of(layers.begin(), layers.end(), [&](const auto& l) {
+            return normalized(l.path) == sky.path;
+        });
+        if (!wanted) skyboxModelRenderer_->removeInstance(sky.instanceId);
+        return !wanted;
+    });
+
+    for (const auto& layer : layers) {
+        const std::string path = normalized(layer.path);
+        auto it = std::find_if(skyLayers_.begin(), skyLayers_.end(),
+                               [&](const SkyLayerInstance& s) { return s.path == path; });
+        if (it == skyLayers_.end()) {
+            const uint32_t modelId = loadSkyboxModel(path);
+            if (modelId == 0) continue;
+            const uint32_t instanceId = skyboxModelRenderer_->createInstance(
+                modelId, camera->getPosition(), glm::vec3(0.0f), 1.0f);
+            if (instanceId == 0) continue;
+            skyboxModelRenderer_->setSkipCollision(instanceId, true);
+            skyLayers_.push_back({.path = path, .instanceId = instanceId});
+            it = std::prev(skyLayers_.end());
+        }
+        skyboxModelRenderer_->setInstanceFade(it->instanceId, layer.weight);
+        skyboxModelRenderer_->setInstancePosition(it->instanceId, camera->getPosition());
+    }
+    return !skyLayers_.empty();
+}
+
+uint32_t Renderer::loadSkyboxModel(const std::string& path) {
+    if (auto it = loadedSkyModels_.find(path); it != loadedSkyModels_.end()) return it->second;
+    if (failedSkyboxPaths_.count(path)) return 0;
+
     std::vector<std::string> candidates{path};
     const size_t dot = path.find_last_of('.');
     if (dot == std::string::npos) {
@@ -1476,9 +1487,9 @@ bool Renderer::ensureSkyboxModel() {
         }
     }
     if (modelData.empty()) {
-        LOG_WARNING("Outland original skybox unavailable: ", path);
+        LOG_WARNING("Skybox model unavailable: ", path);
         failedSkyboxPaths_.insert(path);
-        return skyboxModelInstanceId_ != 0;
+        return 0;
     }
 
     pipeline::M2Model model = pipeline::M2Loader::load(modelData);
@@ -1489,31 +1500,20 @@ bool Renderer::ensureSkyboxModel() {
         pipeline::M2Loader::loadSkin(skinData, model);
     }
     if (!model.isValid()) {
-        LOG_WARNING("Outland original skybox model is invalid: ", resolvedPath);
+        LOG_WARNING("Skybox model is invalid: ", resolvedPath);
         failedSkyboxPaths_.insert(path);
-        return skyboxModelInstanceId_ != 0;
+        return 0;
     }
-
-    // The model is good, so the old one can go now.
-    skyboxModelRenderer_->clear();
-    skyboxModelPath_ = path;
-    skyboxModelInstanceId_ = 0;
 
     const uint32_t modelId = static_cast<uint32_t>(std::hash<std::string>{}(model.name));
     if (!skyboxModelRenderer_->loadModel(model, modelId)) {
-        LOG_WARNING("Failed to upload Outland original skybox: ", resolvedPath);
+        LOG_WARNING("Failed to upload skybox model: ", resolvedPath);
         failedSkyboxPaths_.insert(path);
-        return false;
+        return 0;
     }
-    skyboxModelInstanceId_ = skyboxModelRenderer_->createInstance(
-        modelId, camera->getPosition(), glm::vec3(0.0f), 1.0f);
-    if (!skyboxModelInstanceId_) {
-        failedSkyboxPaths_.insert(path);
-        return false;
-    }
-    skyboxModelRenderer_->setSkipCollision(skyboxModelInstanceId_, true);
-    LOG_INFO("Outland original skybox active: ", resolvedPath);
-    return true;
+    loadedSkyModels_[path] = modelId;
+    LOG_INFO("Skybox model loaded: ", resolvedPath);
+    return modelId;
 }
 
 bool Renderer::isOnOutdoorPvpObjective() const {
@@ -1810,8 +1810,7 @@ void Renderer::update(float deltaTime) {
     if (skySystem) {
         skySystem->update(deltaTime);
     }
-    if (ensureSkyboxModel() && skyboxModelRenderer_ && camera) {
-        skyboxModelRenderer_->setInstancePosition(skyboxModelInstanceId_, camera->getPosition());
+    if (updateSkyboxLayers() && skyboxModelRenderer_ && camera) {
         skyboxModelRenderer_->update(deltaTime, camera->getPosition(),
             camera->getProjectionMatrix() * camera->getViewMatrix());
     }
@@ -2605,8 +2604,16 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
     float timeOfDay = lightingManager
         ? lightingManager->getVisualTimeOfDayHours()
         : (skybox ? skybox->getTimeOfDay() : 12.0f);
-    const bool useOriginalSkybox =
-        skyboxModelRenderer_ && skyboxModelInstanceId_ != 0;
+    // Two questions, apart while the sky crossfades. The sky models are drawn
+    // whenever any is up at all; the procedural sun, moons and clouds they
+    // stand in for hand over halfway, where both are at half and a switch is
+    // least visible - rather than staying away until the last model has faded.
+    const bool drawSkyModels = skyboxModelRenderer_ && !skyLayers_.empty();
+    float skyModelCoverage = 0.0f;
+    if (lightingManager) {
+        for (const auto& layer : lightingManager->getSkyboxLayers()) skyModelCoverage += layer.weight;
+    }
+    const bool useOriginalSkybox = drawSkyModels && skyModelCoverage >= 0.5f;
 
     // ── Multithreaded secondary command buffer recording ──
     // Terrain, WMO, and M2 record on worker threads while main thread handles
@@ -2623,7 +2630,7 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
         if (wmoRenderer) wmoRenderer->prepareRender();
         auto prepWmoEnd = std::chrono::steady_clock::now();
         if (m2Renderer && camera) m2Renderer->prepareRender(frameIdx, *camera);
-        if (useOriginalSkybox && camera)
+        if (drawSkyModels && camera)
             skyboxModelRenderer_->prepareRender(frameIdx, *camera);
         auto prepM2End = std::chrono::steady_clock::now();
         if (characterRenderer) characterRenderer->prepareRender(frameIdx);
@@ -2730,7 +2737,7 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
                     useOriginalSkybox);
                 skyParams.sunOcclusion = sunOcclusion_;
                 skySystem->render(cmd, perFrameSet, *camera, skyParams);
-                if (useOriginalSkybox) {
+                if (drawSkyModels) {
                     skyboxModelRenderer_->render(cmd, perFrameSet, *camera);
                 }
             }
@@ -2934,7 +2941,7 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
                 useOriginalSkybox);
             skyParams.sunOcclusion = sunOcclusion_;
             skySystem->render(currentCmd, perFrameSet, *camera, skyParams);
-            if (useOriginalSkybox) {
+            if (drawSkyModels) {
                 skyboxModelRenderer_->prepareRender(frameIdx, *camera);
                 skyboxModelRenderer_->render(currentCmd, perFrameSet, *camera);
             }

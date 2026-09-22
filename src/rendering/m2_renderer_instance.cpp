@@ -61,6 +61,12 @@ void M2Renderer::setInstancePosition(uint32_t instanceId, const glm::vec3& posit
                  inst.worldBoundsMin, inst.worldBoundsMax, instanceId);
 }
 
+void M2Renderer::setInstanceFade(uint32_t instanceId, float alpha) {
+    auto idxIt = instanceIndexById.find(instanceId);
+    if (idxIt == instanceIndexById.end()) return;
+    instances[idxIt->second].fade = std::clamp(alpha, 0.0f, 1.0f);
+}
+
 void M2Renderer::setInstanceHighlight(uint32_t instanceId, float amount) {
     auto idxIt = instanceIndexById.find(instanceId);
     if (idxIt == instanceIndexById.end()) return;

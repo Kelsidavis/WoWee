@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <vector>
 #include <map>
 #include <memory>
@@ -221,8 +222,16 @@ public:
     /** Time used by the visible sky, including persistent zone ambience. */
     [[nodiscard]] float getVisualTimeOfDayHours() const { return visualTimeOfDayHours_; }
 
-    /** Original client M2 sky selected by the dominant LightParams volume. */
-    [[nodiscard]] const std::string& getActiveSkyboxPath() const { return activeSkyboxPath_; }
+    /// One of the original client's sky models, and how much of it is up.
+    struct SkyboxLayer {
+        std::string path;
+        float weight = 0.0f;   ///< 0..1: the share of the lights here that name it
+    };
+    /// Every sky model the lights around the player name, heaviest first, at
+    /// the weights those lights have - the same falloff the sky colours blend
+    /// by, smoothed the same way. A zone's sky fades out across its edge as
+    /// the next one's fades in, rather than one swapping for the other.
+    [[nodiscard]] const std::vector<SkyboxLayer>& getSkyboxLayers() const { return skyboxLayers_; }
 
     /**
      * Manually set time of day for testing
@@ -304,7 +313,9 @@ private:
     glm::vec3 currentPlayerPos_{0.0f};
     float timeOfDay_ = 0.5f;  // Start at noon
     float visualTimeOfDayHours_ = 12.0f;
-    std::string activeSkyboxPath_;
+    std::vector<SkyboxLayer> skyboxLayers_;
+    /// When update last ran, for smoothing by real time rather than by frame.
+    std::chrono::steady_clock::time_point lastUpdate_{};
     bool isIndoors_ = false;
     float fogSkyBlend_ = 0.7f;
     float fogStrength_ = 0.4f;

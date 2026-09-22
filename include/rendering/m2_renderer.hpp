@@ -277,6 +277,10 @@ struct M2Instance {
     /// - so the press is the only thing that can say the click landed on this
     /// one and not the scenery beside it.
     float highlight = 0.0f;
+    /// An alpha its owner sets on the whole model - the sky's crossfade
+    /// between zones. Below one the instance is drawn in the blended pass
+    /// alone, every layer of it, since an opaque layer cannot fade otherwise.
+    float fade = 1.0f;
 
     // Particle emitter state
     std::vector<float> emitterAccumulators;  // fractional particle counter per emitter
@@ -516,6 +520,8 @@ public:
 
     /// Light an instance while it is being pressed on. 0 clears it.
     void setInstanceHighlight(uint32_t instanceId, float amount);
+    /// See M2Instance::fade.
+    void setInstanceFade(uint32_t instanceId, float alpha);
     /// Take the light off whatever has it, whichever instance that was.
     void clearInstanceHighlights();
     /// Set the animation sequence by animation ID (e.g. anim::OPEN, anim::CLOSE).

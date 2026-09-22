@@ -148,7 +148,11 @@ void main() {
     // and stood still when it did not, on its blended layers alone. The rescale
     // is for foliage cutouts, where a hard edge is the point.
     if (vSkyMode != 0) {
-        outColor = vec4(texColor.rgb, texColor.a * vFadeAlpha);
+        // An opaque layer's alpha channel says nothing - it was never
+        // blended - so only the fade is its alpha. That matters while the
+        // sky crossfades between zones, when every layer is drawn blended.
+        float skyAlpha = (blendMode == 0) ? 1.0 : texColor.a;
+        outColor = vec4(texColor.rgb, skyAlpha * vFadeAlpha);
         return;
     }
 

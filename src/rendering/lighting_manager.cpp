@@ -316,38 +316,69 @@ void LightingManager::update(const glm::vec3& playerPos, uint32_t mapId, uint32_
     // Find light volumes for blending
     activeVolumes_ = findLightVolumes(playerPos, mapId);
 
-    // Which sky model is overhead, decided over every volume in range rather
-    // than over the two that are blended, and held until it leaves range.
+    // Smoothing by real time. This assumed sixty frames a second, so on a
+    // display running at a hundred and twenty every blend below ran twice as
+    // fast, and at thirty half as fast.
+    const auto now = std::chrono::steady_clock::now();
+    float deltaTime = 0.016f;
+    if (lastUpdate_.time_since_epoch().count() != 0) {
+        deltaTime = std::clamp(std::chrono::duration<float>(now - lastUpdate_).count(),
+                               0.0f, 0.25f);
+    }
+    lastUpdate_ = now;
+    const float blendFactor = 1.0f - std::exp(-deltaTime * 5.0f);
+
+    // Which sky models are overhead, and how much of each.
     //
-    // Changing this string makes the renderer throw the sky M2 away and load
-    // another, which restarts its animation - so a path that changes often is
-    // a sky whose clouds keep jumping back to the beginning. Two things made
-    // it change often. It was read from the blended pair, so a volume swapping
-    // into second place on weight could replace the sky even though it is not
-    // the dominant one; and it was recomputed from scratch each frame, so two
-    // volumes of near-equal weight at a boundary handed it back and forth.
+    // One model was chosen and held until the player left its zone's
+    // falloff, then swapped for the next in a single frame - while the sky
+    // colours had been blending across that same falloff all along. So at a
+    // border the old zone's sky sat over colours already most of the way to
+    // the new one: Hellfire's nebula stops at a line of longitude, and past it
+    // the sky behind was already Terokkar's pale blue, a hard edge down the
+    // middle of the screen. Then it popped.
     //
-    // Now the whole in-range list decides it, in the order the volumes are
-    // already sorted into, and the current sky is kept while any volume that
-    // names it still has weight. Leaving a zone therefore switches once, at
-    // the edge of the old zone's falloff.
-    if (isIndoors_) {
-        activeSkyboxPath_.clear();
-    } else {
-        std::string dominantPath;
-        bool currentStillInRange = false;
-        for (const auto& wv : activeVolumes_) {
-            const uint32_t paramsId = selectLightParamsId(wv.volume, isRaining, isUnderwater);
-            auto profileIt = lightParamsProfiles_.find(paramsId);
-            if (profileIt == lightParamsProfiles_.end() || profileIt->second.lightSkyboxId == 0) continue;
-            auto skyIt = lightSkyboxPaths_.find(profileIt->second.lightSkyboxId);
-            if (skyIt == lightSkyboxPaths_.end()) continue;
-            if (dominantPath.empty()) dominantPath = skyIt->second;
-            if (!activeSkyboxPath_.empty() && skyIt->second == activeSkyboxPath_) {
-                currentStillInRange = true;
+    // Now each model is up by the weight of the lights that name it, over the
+    // same volumes and with the same smoothing the colours use, so the two
+    // cross the border together. A light with no sky model contributes to no
+    // layer, and the models fade toward the plain sky there.
+    {
+        std::vector<std::pair<std::string, float>> target;
+        if (!isIndoors_) {
+            const size_t blendCount = std::min(activeVolumes_.size(), MAX_BLEND_VOLUMES);
+            for (size_t i = 0; i < blendCount; ++i) {
+                const auto& wv = activeVolumes_[i];
+                const uint32_t paramsId = selectLightParamsId(wv.volume, isRaining, isUnderwater);
+                auto profileIt = lightParamsProfiles_.find(paramsId);
+                if (profileIt == lightParamsProfiles_.end() ||
+                    profileIt->second.lightSkyboxId == 0) continue;
+                auto skyIt = lightSkyboxPaths_.find(profileIt->second.lightSkyboxId);
+                if (skyIt == lightSkyboxPaths_.end() || skyIt->second.empty()) continue;
+                auto t = std::find_if(target.begin(), target.end(),
+                                      [&](const auto& e) { return e.first == skyIt->second; });
+                if (t == target.end()) target.emplace_back(skyIt->second, wv.weight);
+                else t->second += wv.weight;
             }
         }
-        if (!currentStillInRange) activeSkyboxPath_ = dominantPath;
+        auto targetFor = [&](const std::string& path) {
+            for (const auto& [p, w] : target) if (p == path) return w;
+            return 0.0f;
+        };
+        for (auto& layer : skyboxLayers_) {
+            layer.weight += (targetFor(layer.path) - layer.weight) * blendFactor;
+        }
+        for (const auto& [path, w] : target) {
+            const bool present = std::any_of(skyboxLayers_.begin(), skyboxLayers_.end(),
+                                             [&](const SkyboxLayer& l) { return l.path == path; });
+            if (!present) skyboxLayers_.push_back({.path = path, .weight = w * blendFactor});
+        }
+        // Gone once faded out and not wanted - never while it is still wanted,
+        // so a model is not dropped and reloaded on its way in.
+        std::erase_if(skyboxLayers_, [&](const SkyboxLayer& l) {
+            return l.weight < 0.005f && targetFor(l.path) <= 0.0f;
+        });
+        std::sort(skyboxLayers_.begin(), skyboxLayers_.end(),
+                  [](const SkyboxLayer& a, const SkyboxLayer& b) { return a.weight > b.weight; });
     }
 
     // Sample and blend lighting
@@ -497,11 +528,12 @@ void LightingManager::update(const glm::vec3& playerPos, uint32_t mapId, uint32_
         const float skyLuma = 0.2126f * newParams.skyTopColor.r +
                               0.7152f * newParams.skyTopColor.g +
                               0.0722f * newParams.skyTopColor.b;
+        const std::string topSkybox = skyboxLayers_.empty() ? std::string() : skyboxLayers_.front().path;
         uint32_t firstVolume = 0, secondVolume = 0;
         if (!activeVolumes_.empty()) firstVolume = activeVolumes_[0].volume->lightId;
         if (activeVolumes_.size() > 1) secondVolume = activeVolumes_[1].volume->lightId;
         const bool changed =
-            zoneId != diagZoneId_ || activeSkyboxPath_ != diagSkyboxPath_ ||
+            zoneId != diagZoneId_ || topSkybox != diagSkyboxPath_ ||
             firstVolume != diagFirstVolume_ || secondVolume != diagSecondVolume_ ||
             std::abs(visualTimeOfDayHours_ - diagVisualHours_) > 0.02f ||
             std::abs(skyLuma - diagSkyLuma_) > 0.01f;
@@ -516,9 +548,9 @@ void LightingManager::update(const glm::vec3& playerPos, uint32_t mapId, uint32_
             LOG_INFO("sky: zone=", zoneId, " hour=", visualTimeOfDayHours_,
                      " skyLuma=", skyLuma, " volumes=", firstVolume, "/", secondVolume,
                      " inRange=", activeVolumes_.size(),
-                     " skybox=", activeSkyboxPath_.empty() ? "-" : activeSkyboxPath_);
+                     " skybox=", topSkybox.empty() ? "-" : topSkybox);
             diagZoneId_ = zoneId;
-            diagSkyboxPath_ = activeSkyboxPath_;
+            diagSkyboxPath_ = topSkybox;
             diagFirstVolume_ = firstVolume;
             diagSecondVolume_ = secondVolume;
             diagVisualHours_ = visualTimeOfDayHours_;
@@ -526,9 +558,8 @@ void LightingManager::update(const glm::vec3& playerPos, uint32_t mapId, uint32_
         }
     }
 
-    // Smooth temporal blending to avoid snapping (5.0 = blend rate)
-    float deltaTime = 0.016f;  // Assume ~60 FPS for now
-    float blendFactor = 1.0f - std::exp(-deltaTime * 5.0f);
+    // Smooth temporal blending to avoid snapping (5.0 = blend rate); see
+    // blendFactor above.
 
     currentParams_.ambientColor = glm::mix(currentParams_.ambientColor, newParams.ambientColor, blendFactor);
     currentParams_.diffuseColor = glm::mix(currentParams_.diffuseColor, newParams.diffuseColor, blendFactor);
