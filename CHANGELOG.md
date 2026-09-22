@@ -1,5 +1,26 @@
 # Changelog
 
+## [v3.1.37] - 2026-09-22
+
+### Added
+- **Volumetric fog and light shafts.** "Light shafts and mist" on the Detail page (Off, Low, Medium, High) fills the air with a mist that light passes through: the sun casts shafts past trees and buildings where the shadow map says it reaches, and torches, lava and other local lights glow in it. "Mist density" on the Graphics page sets how thick it is; rain, snow, dawn and foggy zones thicken it further. It fades out at night with the sun
+- **Sun shafts.** "Sun shafts" on the Graphics page draws rays from the sun through gaps in trees and between buildings when you look toward it, over the finished picture
+- **Screen recording.** `/record` starts recording the game window to an MP4 with the game's sound, and `/record` again stops it. Files go to `.wowee/recordings` in your home folder. On a Mac it encodes on the GPU with VideoToolbox; elsewhere it uses the hardware encoder if there is one, then software
+- **Scroll speed.** "Scroll speed" on the Interface page sets how far the wheel or a trackpad scrolls the interface's windows
+
+### Fixed
+- **Scrolling a window jumped half a page at a time, and a trackpad raced through it.** A scroll frame moves half a page per notch of the wheel, and a Mac trackpad reports a swipe as pixels, which came through as dozens of notches, so even a slow swipe went through the quest log pages at a time. A scroll bar glides to where the wheel sends it now, a trackpad moves it by fractions of a notch, and a trackpad's travel is scaled to a wheel's
+- **A flying mount flew into steep hillsides and through them.** Flight used the same step-up limit as walking, so any slope that rose faster than that in a frame was treated as out of reach and the mount went into it. A flight step that meets the ground now stops at the surface and slides along it: a gentle rise is skimmed, a steep one climbed slowly, and a sheer face stops the mount. A mount already inside a hill is put back on top of it
+- **Entering a building at an angle could leave the player walking inside its floor.** A raised floor sits a yard or so over the ground it is built on, and once the feet dropped to that ground at the doorway the floor was out of reach. Standing on the ground with a building's floor across the footprint at waist height puts the player back on the floor, and the log says so
+- **The action bar's range colour did not keep up with the player.** Range was measured from wherever the player had last logged in, teleported or landed from a flight, so a spell in reach showed red. It is measured from where the player is, edge to edge with both combat reaches as the server measures it, and a spell's minimum range counts
+- **Spell tooltips ran off the side of the screen.** A spell, talent, recipe or item description was one unbroken line that set the tooltip's width. Descriptions wrap now. Text too long for a single-line box, such as the resolution in the video options, is cut with "..." rather than losing its first characters
+- **Corpses with loot did not sparkle.** A lootable corpse shows the game's loot sparkles now, and they go when it has been looted
+- **Some zones played no music.** Twenty-two of the client's own zone music paths did not exist in the game's files - Tirisfal, Duskwood, Darkshore, Teldrassil, Ironforge, Thunder Bluff and Darnassus among them - and each one failed with "Could not read". They are corrected, and any path the loaded data does not have is dropped with one warning
+- **The installed Mac app wrote its log inside itself.** It went to `Contents/Resources/logs` in the app bundle, where only Show Package Contents finds it, and changed a signed app on every run. The app writes to `~/Library/Logs/Wowee/wowee.log` now, which Console also shows
+
+### Changed
+- **Attacking or casting at a target no longer turns the player to face it.** The original client does not; a target behind the player has to be faced first. "Turn to face the target (debug)" in the Combat settings turns it back on
+
 ## [v3.1.36] - 2026-09-22
 
 ### Added
