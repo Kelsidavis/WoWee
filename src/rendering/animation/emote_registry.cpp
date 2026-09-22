@@ -37,24 +37,6 @@ static bool isLoopingEmote(const std::string& command) {
     return kLooping.find(command) != kLooping.end();
 }
 
-// Map one-shot emote animation IDs to their persistent EMOTE_STATE_* looping variants.
-// When a looping emote is played, we prefer the STATE variant if the model has it.
-static uint32_t getEmoteStateVariantStatic(uint32_t oneShotAnimId) {
-    static const std::unordered_map<uint32_t, uint32_t> kStateMap = {
-        {anim::EMOTE_DANCE,         anim::EMOTE_STATE_DANCE},
-        {anim::EMOTE_LAUGH,         anim::EMOTE_STATE_LAUGH},
-        {anim::EMOTE_POINT,         anim::EMOTE_STATE_POINT},
-        {anim::EMOTE_EAT,           anim::EMOTE_STATE_EAT},
-        {anim::EMOTE_ROAR,          anim::EMOTE_STATE_ROAR},
-        {anim::EMOTE_APPLAUD,       anim::EMOTE_STATE_APPLAUD},
-        {anim::EMOTE_WORK,          anim::EMOTE_STATE_WORK},
-        {anim::EMOTE_USE_STANDING,  anim::EMOTE_STATE_USE_STANDING},
-        {anim::EATING_LOOP,         anim::EMOTE_STATE_EAT},
-    };
-    auto it = kStateMap.find(oneShotAnimId);
-    return it != kStateMap.end() ? it->second : 0;
-}
-
 static std::unordered_map<uint32_t, uint32_t> makeFallbackEmotesIdMap() {
     // Emotes.dbc IDs used on classic-family MaNGOS/CMaNGOS servers.
     return {
@@ -96,20 +78,20 @@ static std::unordered_map<uint32_t, uint32_t> makeFallbackEmotesIdMap() {
         {69, anim::EMOTE_USE_STANDING},
         {70, anim::EMOTE_WAVE},
         {71, anim::EMOTE_CHEER},
-        {92, anim::EMOTE_EAT},
+        {92, anim::EMOTE_EAT_NO_SHEATHE},
         {94, anim::EMOTE_DANCE},
         {113, anim::EMOTE_SALUTE},
         {133, anim::EMOTE_USE_STANDING_NO_SHEATHE},
         {153, anim::EMOTE_LAUGH},
-        {173, anim::EMOTE_WORK},
+        {173, anim::EMOTE_WORK_NO_SHEATHE},
         {193, anim::SPELL_PRECAST},
         {213, anim::READY_RIFLE},
         {214, anim::HOLD_RIFLE},
-        {233, anim::EMOTE_WORK},
-        {234, anim::EMOTE_CHOP},
+        {233, anim::EMOTE_WORK_NO_SHEATHE},
+        {234, anim::EMOTE_WORK_NO_SHEATHE},
         {253, anim::EMOTE_APPLAUD},
-        {273, anim::EMOTE_TALK_EXCLAMATION},
-        {274, anim::EMOTE_TALK_QUESTION},
+        {273, anim::EMOTE_YES},
+        {274, anim::EMOTE_NO},
         {275, anim::EMOTE_TRAIN},
     };
 }
@@ -339,9 +321,6 @@ bool EmoteRegistry::isStateEmote(uint32_t emoteId) const {
     return stateEmoteIds_.count(emoteId) != 0;
 }
 
-uint32_t EmoteRegistry::getStateVariant(uint32_t oneShotAnimId) const {
-    return getEmoteStateVariantStatic(oneShotAnimId);
-}
 std::string EmoteRegistry::textFor(const std::string& emoteName,
                                    const std::string* targetName) const {
     auto it = emoteTable_.find(emoteName);

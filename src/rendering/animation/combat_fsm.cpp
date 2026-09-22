@@ -300,7 +300,7 @@ void CombatFSM::updateTransitions(const Input& in) {
         case State::UNSHEATHE:
             if (in.swimming || in.moving) {
                 state_ = State::INACTIVE;
-            } else if (in.haveAnimState && oneShotComplete(in, anim::UNSHEATHE)) {
+            } else if (in.haveAnimState && oneShotComplete(in, anim::SHEATHE)) {
                 state_ = State::COMBAT_IDLE;
             }
             break;
@@ -443,7 +443,7 @@ AnimOutput CombatFSM::resolve(const Input& in, const AnimCapabilitySet& caps,
             break;
 
         case State::UNSHEATHE:
-            animId = caps.resolvedUnsheathe ? caps.resolvedUnsheathe : anim::UNSHEATHE;
+            animId = caps.resolvedUnsheathe ? caps.resolvedUnsheathe : anim::SHEATHE;
             loop = false;
             break;
 

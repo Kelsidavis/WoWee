@@ -76,7 +76,7 @@ TEST_CASE("nameFromId returns UNKNOWN for out-of-range IDs", "[animation]") {
 
 TEST_CASE("nameFromId covers first and last IDs", "[animation]") {
     REQUIRE(std::string(anim::nameFromId(0)) == "STAND");
-    REQUIRE(std::string(anim::nameFromId(anim::ANIM_COUNT - 1)) == "FLY_GUILD_CHAMPION_2");
+    REQUIRE(std::string(anim::nameFromId(anim::ANIM_COUNT - 1)) == "FLY_CARRIED_2H");
 }
 
 // ── validateAgainstDBC tests ────────────────────────────────────────────────
@@ -159,7 +159,7 @@ TEST_CASE("validateAgainstDBC with single ID", "[animation][dbc]") {
 }
 
 TEST_CASE("ANIM_COUNT matches expected value", "[animation]") {
-    REQUIRE(anim::ANIM_COUNT == 452);
+    REQUIRE(anim::ANIM_COUNT == 506);   // 0-505, 3.3.5's AnimationData.dbc
 }
 
 TEST_CASE("Animation constant IDs are unique and sequential from documentation", "[animation]") {
@@ -181,4 +181,23 @@ TEST_CASE("Animation constant IDs are unique and sequential from documentation",
     REQUIRE(anim::CHANNEL_CAST_DIRECTED == 124);
     REQUIRE(anim::CHANNEL_CAST_OMNI == 125);
     REQUIRE(anim::EMOTE_DANCE == 69);
+}
+
+TEST_CASE("IDs above 145 follow 3.3.5's AnimationData.dbc", "[animation]") {
+    // The block these sit in was once transcribed from a list that dropped
+    // Opened at 149, so everything after named something else in the game.
+    REQUIRE(anim::OPENED == 149);
+    REQUIRE(anim::DESTROY == 150);
+    REQUIRE(anim::HOLD == 158);
+    REQUIRE(anim::JUMP_LAND_RUN == 187);
+    REQUIRE(anim::HOVER == 193);
+    REQUIRE(anim::STEALTH_RUN == 223);
+    REQUIRE(anim::FLY_STAND == 229);
+    REQUIRE(anim::FLY_RUN == 234);
+    REQUIRE(anim::EMOTE_YES == 185);
+    REQUIRE(anim::EMOTE_TRAIN == 195);
+    // A flying mount moves with Fly and holds still with Hover.
+    REQUIRE(anim::FLY_FORWARD == anim::FLY);
+    REQUIRE(anim::FLY_IDLE == anim::HOVER);
+    REQUIRE(std::string(anim::nameFromId(193)) == "HOVER");
 }

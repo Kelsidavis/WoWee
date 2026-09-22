@@ -62,9 +62,9 @@ inline std::span<const uint32_t> meleeAnimChain(MeleeChain kind) {
         ATTACK_2H, ATTACK_1H, ATTACK_UNARMED};
     static constexpr uint32_t kDagger[] = {
         ATTACK_1H_PIERCE, ATTACK_1H, ATTACK_UNARMED};
+    // Punches: 3.3.5 has no fist-weapon animations of its own.
     static constexpr uint32_t kFist[] = {
-        ATTACK_FIST_1H, ATTACK_FIST_1H_OFF,
-        ATTACK_1H, ATTACK_UNARMED, PARRY_FIST_1H, PARRY_1H};
+        ATTACK_UNARMED, ATTACK_1H, PARRY_UNARMED, PARRY_1H};
     static constexpr uint32_t kUnarmed[] = {
         ATTACK_UNARMED, ATTACK_1H, ATTACK_2H,
         ATTACK_2H_LOOSE, PARRY_UNARMED, PARRY_1H};
@@ -73,7 +73,7 @@ inline std::span<const uint32_t> meleeAnimChain(MeleeChain kind) {
     static constexpr uint32_t kOffHandPierce[] = {
         ATTACK_OFF_PIERCE, ATTACK_OFF, ATTACK_1H_PIERCE, ATTACK_1H};
     static constexpr uint32_t kOffHandFist[] = {
-        ATTACK_FIST_1H_OFF, ATTACK_OFF, ATTACK_FIST_1H, ATTACK_1H};
+        ATTACK_UNARMED_OFF, ATTACK_OFF, ATTACK_UNARMED, ATTACK_1H};
     static constexpr uint32_t kOffHandUnarmed[] = {
         ATTACK_UNARMED_OFF, ATTACK_UNARMED, ATTACK_OFF, ATTACK_1H};
     static constexpr uint32_t kGeneric[] = {

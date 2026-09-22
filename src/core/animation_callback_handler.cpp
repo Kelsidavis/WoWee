@@ -364,13 +364,11 @@ void AnimationCallbackHandler::setupCallbacks() {
                 }
                 cr->playAnimation(emoteInstanceId, resumeAnim, true);
             } else if (isState) {
-                const uint32_t stateAnim =
-                    rendering::EmoteRegistry::instance().getStateVariant(emoteAnim);
-                const uint32_t persistentAnim =
-                    stateAnim != 0 && cr->hasAnimation(emoteInstanceId, stateAnim)
-                        ? stateAnim : emoteAnim;
-                activeEmotes[guid] = persistentAnim;
-                cr->playAnimation(emoteInstanceId, persistentAnim, true);
+                // A state emote loops the animation its Emotes.dbc row names -
+                // STATE_DANCE is 69, the dance itself. 3.3.5 has no separate
+                // looping variants to look for.
+                activeEmotes[guid] = emoteAnim;
+                cr->playAnimation(emoteInstanceId, emoteAnim, true);
             } else {
                 // One-shot: play once, then resume the retained state loop (or Stand).
                 auto retained = activeEmotes.find(guid);
@@ -388,16 +386,8 @@ void AnimationCallbackHandler::setupCallbacks() {
             if (emoteAnim == 0) {
                 cr->playAnimation(emoteInstanceId, rendering::anim::STAND, true);
             } else if (isState) {
-                // Emotes.dbc state entries commonly point at the introductory
-                // one-shot (dance, laugh, eat, etc.). Other players need the
-                // same looping STATE_* resolution as NPCs or they visibly
-                // repeat the intro instead of holding the real emote pose.
-                const uint32_t stateAnim =
-                    rendering::EmoteRegistry::instance().getStateVariant(emoteAnim);
-                const uint32_t persistentAnim =
-                    stateAnim != 0 && cr->hasAnimation(emoteInstanceId, stateAnim)
-                        ? stateAnim : emoteAnim;
-                cr->playAnimation(emoteInstanceId, persistentAnim, true);
+                // Looped, as the NPC branch above does.
+                cr->playAnimation(emoteInstanceId, emoteAnim, true);
             } else {
                 cr->playAnimation(emoteInstanceId, emoteAnim, false);
             }
@@ -409,7 +399,7 @@ void AnimationCallbackHandler::setupCallbacks() {
     //   SPELL_PRECAST (31)              - one-shot wind-up
     //   READY_SPELL_DIRECTED/OMNI (51/52) - looping hold while cast bar fills
     //   SPELL_CAST_DIRECTED/OMNI/AREA (53/54/33) - one-shot release at completion
-    // Channels use CHANNEL_CAST_DIRECTED/OMNI (124/125) or SPELL_CHANNEL_DIRECTED_OMNI (201).
+    // Channels use CHANNEL_CAST_DIRECTED/OMNI (124/125).
     // castType comes from the spell packet's targetGuid:
     //   DIRECTED - spell targets a specific unit  (Frostbolt, Heal)
     //   OMNI     - self-cast / no explicit target (Arcane Explosion, buffs)
@@ -587,7 +577,6 @@ void AnimationCallbackHandler::setupCallbacks() {
                     castAnim = pickFirst({
                         rendering::anim::CHANNEL_CAST_DIRECTED,
                         rendering::anim::CHANNEL_CAST_OMNI,
-                        rendering::anim::SPELL_CHANNEL_DIRECTED_OMNI,
                         rendering::anim::READY_SPELL_DIRECTED,
                         rendering::anim::SPELL
                     });
@@ -596,7 +585,6 @@ void AnimationCallbackHandler::setupCallbacks() {
                     castAnim = pickFirst({
                         rendering::anim::CHANNEL_CAST_OMNI,
                         rendering::anim::CHANNEL_CAST_DIRECTED,
-                        rendering::anim::SPELL_CHANNEL_DIRECTED_OMNI,
                         rendering::anim::READY_SPELL_OMNI,
                         rendering::anim::SPELL
                     });

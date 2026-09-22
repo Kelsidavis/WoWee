@@ -1287,16 +1287,7 @@ void EntitySpawner::spawnOnlineGameObject(uint64_t guid, uint32_t entry, uint32_
         // Transports are driven by the transport system rather than a looping idle.
         bool isTransportGO = gameHandler_ && gameHandler_->isTransportGuid(guid);
         if (!isTransportGO) {
-            // Totems play an explicit idle rather than the model's default sequence.
-            bool isTotem = false;
-            for (uint32_t totemAnim : {245u, 246u, 247u}) {  // TOTEM_SMALL/MEDIUM/LARGE
-                if (m2Renderer->hasAnimation(instanceId, totemAnim)) {
-                    m2Renderer->setInstanceAnimation(instanceId, totemAnim, true);
-                    isTotem = true;
-                    break;
-                }
-            }
-            if (!isTotem) applyGameObjectAnimationPolicy(guid, entry, instanceId);
+            applyGameObjectAnimationPolicy(guid, entry, instanceId);
         }
 
         gameObjectInstances_[guid] = {.modelId = modelId, .instanceId = instanceId, .isWmo = false};

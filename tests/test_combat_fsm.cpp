@@ -16,7 +16,7 @@ static AnimCapabilitySet makeCombatCaps() {
     caps.resolvedMeleeUnarmed = anim::ATTACK_UNARMED;
     caps.resolvedReadyUnarmed = anim::READY_UNARMED;
     caps.resolvedStun = anim::STUN;
-    caps.resolvedUnsheathe = anim::UNSHEATHE;
+    caps.resolvedUnsheathe = anim::SHEATHE;
     caps.resolvedSheathe = anim::SHEATHE;
     caps.hasMelee = true;
     return caps;
@@ -61,18 +61,18 @@ TEST_CASE("CombatFSM: unarmed combat uses fist-ready and fist-swing animations",
 TEST_CASE("CombatFSM: equipped fist weapons retain fist-weapon animations", "[combat][fist-weapon]") {
     CombatFSM fsm;
     auto caps = makeCombatCaps();
-    caps.resolvedReadyFist = anim::READY_FIST;
-    caps.resolvedMeleeFist = anim::ATTACK_FIST_1H;
+    caps.resolvedReadyFist = anim::READY_1H;
+    caps.resolvedMeleeFist = anim::ATTACK_1H_PIERCE;
     WeaponLoadout loadout;
     loadout.inventoryType = wowee::game::InvType::ONE_HAND;
     loadout.isFist = true;
     auto in = combatInput();
 
     fsm.setState(CombatFSM::State::COMBAT_IDLE);
-    CHECK(fsm.resolve(in, caps, loadout).animId == anim::READY_FIST);
+    CHECK(fsm.resolve(in, caps, loadout).animId == anim::READY_1H);
 
     in.meleeSwingTimer = 0.5f;
-    CHECK(fsm.resolve(in, caps, loadout).animId == anim::ATTACK_FIST_1H);
+    CHECK(fsm.resolve(in, caps, loadout).animId == anim::ATTACK_1H_PIERCE);
 }
 
 TEST_CASE("CombatFSM: INACTIVE → UNSHEATHE on COMBAT_ENTER event", "[combat]") {

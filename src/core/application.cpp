@@ -3490,15 +3490,8 @@ void Application::syncRenderInstancesToEntities(float deltaTime) {
                 const bool isSwimmingNow = _pCreatureSwimmingState.count(guid) > 0;
                 const bool isWalkingNow  = _pCreatureWalkingState.count(guid) > 0;
                 const bool isFlyingNow   = _pCreatureFlyingState.count(guid) > 0;
-                uint32_t mountedRiderAnim = rendering::anim::MOUNT;
-                if (remoteMount && isFlyingNow) {
-                    const uint32_t flightPose = isMovingNow
-                        ? rendering::anim::MOUNT_FLIGHT_FORWARD
-                        : rendering::anim::MOUNT_FLIGHT_IDLE;
-                    if (charRenderer->hasAnimation(instanceId, flightPose)) {
-                        mountedRiderAnim = flightPose;
-                    }
-                }
+                // In Mount in the air too: 3.3.5 has no rider flight poses.
+                const uint32_t mountedRiderAnim = rendering::anim::MOUNT;
                 bool prevMoving   = _pCreatureWasMoving[guid];
                 bool prevSwimming = _pCreatureWasSwimming[guid];
                 bool prevFlying   = _pCreatureWasFlying[guid];

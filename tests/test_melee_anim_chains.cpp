@@ -44,11 +44,11 @@ TEST_CASE("each chain asks first for what the weapon actually is", "[anim]") {
     CHECK(chain(MeleeChain::TwoHand).front() == ATTACK_2H);
     CHECK(chain(MeleeChain::TwoHandLoose).front() == ATTACK_2H_LOOSE_PIERCE);
     CHECK(chain(MeleeChain::Dagger).front() == ATTACK_1H_PIERCE);
-    CHECK(chain(MeleeChain::Fist).front() == ATTACK_FIST_1H);
+    CHECK(chain(MeleeChain::Fist).front() == ATTACK_UNARMED);   // 3.3.5 has no fist animations
     CHECK(chain(MeleeChain::Unarmed).front() == ATTACK_UNARMED);
     CHECK(chain(MeleeChain::OffHand).front() == ATTACK_OFF);
     CHECK(chain(MeleeChain::OffHandPierce).front() == ATTACK_OFF_PIERCE);
-    CHECK(chain(MeleeChain::OffHandFist).front() == ATTACK_FIST_1H_OFF);
+    CHECK(chain(MeleeChain::OffHandFist).front() == ATTACK_UNARMED_OFF);
     CHECK(chain(MeleeChain::OffHandUnarmed).front() == ATTACK_UNARMED_OFF);
 }
 
@@ -81,7 +81,6 @@ TEST_CASE("every off-hand chain prefers an off-hand animation", "[anim]") {
         REQUIRE_FALSE(ids.empty());
         const bool offHandFirst = ids.front() == ATTACK_OFF ||
                                   ids.front() == ATTACK_OFF_PIERCE ||
-                                  ids.front() == ATTACK_FIST_1H_OFF ||
                                   ids.front() == ATTACK_UNARMED_OFF;
         CHECK(offHandFirst);
     }

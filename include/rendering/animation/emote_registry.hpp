@@ -49,8 +49,6 @@ public:
     /// != 0, e.g. STATE_WORK_NOSHEATHE) rather than a one-shot (ONESHOT_WAVE).
     [[nodiscard]] bool isStateEmote(uint32_t emoteId) const;
 
-    /// Get the emote state variant (looping) for a one-shot emote animation.
-    [[nodiscard]] uint32_t getStateVariant(uint32_t oneShotAnimId) const;
 
     /// Get first-person emote text for a command.
     std::string textFor(const std::string& emoteName,

@@ -1253,13 +1253,6 @@ if (deadCreatureGuids_.count(guid)) {
             npcEmoteAnim = activeIt->second;
         }
     }
-    if (npcEmoteAnim != 0) {
-        const uint32_t stateAnim =
-            rendering::EmoteRegistry::instance().getStateVariant(npcEmoteAnim);
-        if (stateAnim != 0 && charRenderer->hasAnimation(instanceId, stateAnim)) {
-            npcEmoteAnim = stateAnim;
-        }
-    }
     if (npcEmoteAnim != 0 && charRenderer->hasAnimation(instanceId, npcEmoteAnim)) {
         creatureActiveEmotes_[guid] = npcEmoteAnim;
         charRenderer->playAnimation(instanceId, npcEmoteAnim, true);

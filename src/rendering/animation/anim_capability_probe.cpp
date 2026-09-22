@@ -139,13 +139,14 @@ AnimCapabilitySet AnimCapabilityProbe::probe(Renderer* renderer, uint32_t instan
     }
     {
         static const uint32_t readyUnarmedCands[] = {
-            anim::READY_UNARMED, anim::READY_1H, anim::READY_FIST};
-        caps.resolvedReadyUnarmed = pick(readyUnarmedCands, 3);
+            anim::READY_UNARMED, anim::READY_1H};
+        caps.resolvedReadyUnarmed = pick(readyUnarmedCands, 2);
     }
     {
+        // A fist weapon fights unarmed in 3.3.5, which has no fist animations.
         static const uint32_t readyFistCands[] = {
-            anim::READY_FIST_1H, anim::READY_FIST, anim::READY_1H, anim::READY_UNARMED};
-        caps.resolvedReadyFist = pick(readyFistCands, 4);
+            anim::READY_UNARMED, anim::READY_1H};
+        caps.resolvedReadyFist = pick(readyFistCands, 2);
     }
     {
         static const uint32_t readyBowCands[] = {
@@ -158,9 +159,10 @@ AnimCapabilitySet AnimCapabilityProbe::probe(Renderer* renderer, uint32_t instan
         caps.resolvedReadyRifle = pick(readyRifleCands, 4);
     }
     {
+        // No crossbow stance of its own in 3.3.5: the bow's.
         static const uint32_t readyCrossbowCands[] = {
-            anim::READY_CROSSBOW, anim::READY_BOW, anim::READY_1H, anim::READY_UNARMED};
-        caps.resolvedReadyCrossbow = pick(readyCrossbowCands, 4);
+            anim::READY_BOW, anim::READY_1H, anim::READY_UNARMED};
+        caps.resolvedReadyCrossbow = pick(readyCrossbowCands, 3);
     }
     {
         static const uint32_t readyThrownCands[] = {
@@ -181,8 +183,8 @@ AnimCapabilitySet AnimCapabilityProbe::probe(Renderer* renderer, uint32_t instan
     }
     caps.resolvedAttackRifle = has(anim::ATTACK_RIFLE) ? anim::ATTACK_RIFLE : 0;
     {
-        static const uint32_t attackCrossbowCands[] = {anim::ATTACK_CROSSBOW, anim::ATTACK_BOW};
-        caps.resolvedAttackCrossbow = pick(attackCrossbowCands, 2);
+        static const uint32_t attackCrossbowCands[] = {anim::ATTACK_BOW};
+        caps.resolvedAttackCrossbow = pick(attackCrossbowCands, 1);
     }
     caps.resolvedAttackThrown = has(anim::ATTACK_THROWN) ? anim::ATTACK_THROWN : 0;
     {
@@ -225,7 +227,10 @@ AnimCapabilitySet AnimCapabilityProbe::probe(Renderer* renderer, uint32_t instan
     // ── Misc ────────────────────────────────────────────────────────────
     caps.resolvedMount = has(anim::MOUNT) ? anim::MOUNT : 0;
     caps.hasMount = (caps.resolvedMount != 0);
-    caps.resolvedUnsheathe = has(anim::UNSHEATHE) ? anim::UNSHEATHE : 0;
+    // The same reach as sheathing: 3.3.5 has no animation of its own for
+    // drawing a weapon.
+    caps.resolvedUnsheathe = has(anim::SHEATHE) ? anim::SHEATHE
+                           : has(anim::HIP_SHEATHE) ? anim::HIP_SHEATHE : 0;
     {
         static const uint32_t sheatheCands[] = {anim::SHEATHE, anim::HIP_SHEATHE};
         caps.resolvedSheathe = pick(sheatheCands, 2);
