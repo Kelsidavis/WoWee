@@ -413,6 +413,10 @@ void AddonManager::loadAllAddons() {
             LOG_WARNING("UI scale confirmation did not apply: ",
                         luaEngine_.lastError());
         }
+        // Picked talents lit, and let go when the talent frame closes.
+        if (!luaEngine_.executeString(kTalentPreviewLua)) {
+            LOG_WARNING("Talent preview hooks did not install: ", luaEngine_.lastError());
+        }
         // Said once, after the interface is up: anything neither handed over
         // nor hidden is about to be on screen twice.
         ui::frameXmlReportUnaccountedElements();

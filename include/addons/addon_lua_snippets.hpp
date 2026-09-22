@@ -1809,6 +1809,56 @@ watcher:SetScript("OnEvent", function()
 end)
 )LUA";
 
+// The talent frame's preview: points picked with a click and held until Learn.
+//
+// Two things the game's own frame leaves to memory. A pick is drawn only as a
+// rank number, so which talents have points waiting is something to read off
+// every button - they are lit instead, the button's own highlight held on.
+// And the picks outlived the frame: closed and opened again, it still held a
+// half-made plan the player had walked away from. Closing it lets them go.
+//
+// Taking one point back is the frame's own right-click, which it already does.
+//
+// Installed when Blizzard_TalentUI loads, since the frame and the function
+// hooked here are that addon's, and it is loaded on demand.
+inline constexpr const char* kTalentPreviewLua = R"LUA(
+local function install()
+    if not PlayerTalentFrame or PlayerTalentFrame.__woweePreview then return end
+    PlayerTalentFrame.__woweePreview = true
+
+    PlayerTalentFrame:HookScript("OnHide", function(self)
+        if (GetGroupPreviewTalentPointsSpent(self.pet, self.talentGroup) or 0) > 0 then
+            ResetGroupPreviewTalentPoints(self.pet, self.talentGroup)
+        end
+    end)
+
+    hooksecurefunc("TalentFrame_Update", function(frame)
+        if frame ~= PlayerTalentFrame then return end
+        local preview = GetCVarBool("previewTalents")
+        local tab = PanelTemplates_GetSelectedTab(frame)
+        local prefix = frame:GetName() .. "Talent"
+        for i = 1, (MAX_NUM_TALENTS or 40) do
+            local button = _G[prefix .. i]
+            if not button then break end
+            local picked = false
+            if preview and tab and button:IsShown() then
+                local _, _, _, _, rank, _, _, _, previewRank =
+                    GetTalentInfo(tab, i, frame.inspect, frame.pet, frame.talentGroup)
+                picked = (previewRank or 0) > (rank or 0)
+            end
+            if picked then button:LockHighlight() else button:UnlockHighlight() end
+        end
+    end)
+end
+
+local watcher = CreateFrame("Frame")
+watcher:RegisterEvent("ADDON_LOADED")
+watcher:SetScript("OnEvent", function(_, _, addon)
+    if addon == "Blizzard_TalentUI" then install() end
+end)
+install()
+)LUA";
+
 inline constexpr const char* kChatInputBackgroundLua = R"LUA(
 local kParts = {"Left", "Mid", "Right", "FocusLeft", "FocusMid", "FocusRight"}
 
