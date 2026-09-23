@@ -26,6 +26,10 @@ AzerothCore/ChromieCraft, TrinityCore, MaNGOS, and Turtle WoW 1.18.
   <img src="assets/orgrimmar-entrance.png" alt="WoWee rendering Orgrimmar" width="100%" />
 </p>
 
+<p align="center">
+  <img src="assets/hellfire-peninsula.png" alt="WoWee rendering Honor Hold in Hellfire Peninsula" width="100%" />
+</p>
+
 > [!NOTE]
 > macOS release DMGs are Developer ID signed, notarized by Apple, and stapled
 > before publication. Gatekeeper should identify them as notarized Developer ID
