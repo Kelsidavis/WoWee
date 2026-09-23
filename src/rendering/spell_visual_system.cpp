@@ -323,6 +323,7 @@ void SpellVisualSystem::playSpellVisualPrecast(uint32_t visualId, const glm::vec
         LOG_WARNING("SpellVisual: createInstance returned 0 for precast model=", modelPath);
         return;
     }
+    m2Renderer_->restartInstanceAnimation(instanceId);
 
     // Duration: prefer server cast time if available (long casts like Hearthstone=10s),
     // otherwise fall back to M2 animation duration, then default.
@@ -355,6 +356,7 @@ void SpellVisualSystem::playSpellVisualPrecast(uint32_t visualId, const glm::vec
         }
         uint32_t leftId = m2Renderer_->createInstance(modelId, leftPos, glm::vec3(0.0f), 1.0f);
         if (leftId != 0) {
+            m2Renderer_->restartInstanceAnimation(leftId);
             activeSpellVisuals_.push_back({.instanceId = leftId, .elapsed = 0.0f, .duration = duration, .isPrecast = true, .attachmentId = 2 /* LeftHand */, .attachInstanceId = attachInstanceId});
         }
     }
@@ -475,6 +477,7 @@ void SpellVisualSystem::playSpellVisual(uint32_t visualId, const glm::vec3& worl
         LOG_WARNING("SpellVisual: failed to create instance for visualId=", visualId);
         return;
     }
+    m2Renderer_->restartInstanceAnimation(instanceId);
     // Determine lifetime from M2 animation duration (clamp to reasonable range)
     float animDurMs = m2Renderer_->getInstanceAnimDuration(instanceId);
     float duration = (animDurMs > 100.0f)
@@ -498,6 +501,7 @@ void SpellVisualSystem::playSpellVisual(uint32_t visualId, const glm::vec3& worl
         }
         uint32_t leftId = m2Renderer_->createInstance(modelId, leftPos, glm::vec3(0.0f), 1.0f);
         if (leftId != 0) {
+            m2Renderer_->restartInstanceAnimation(leftId);
             activeSpellVisuals_.push_back({.instanceId = leftId, .elapsed = 0.0f, .duration = duration, .isPrecast = false, .attachmentId = 2 /* LeftHand */, .attachInstanceId = attachInstanceId});
         }
     }

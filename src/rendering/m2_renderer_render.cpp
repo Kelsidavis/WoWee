@@ -59,10 +59,7 @@ void M2Renderer::seedInstanceAnimation(const M2ModelGPU& model, uint32_t modelId
             instance.currentSequenceIndex = 0;
             instance.idleSequenceIndex = 0;
             instance.animDuration = static_cast<float>(model.sequences[0].duration);
-            // Spells start at correct anim frame, world animations don't sync up.
-            instance.animTime = model.isSpellEffect 
-                ? 0.0f 
-                : static_cast<float>(randRange(std::max(1u, model.sequences[0].duration)));
+            instance.animTime = static_cast<float>(randRange(std::max(1u, model.sequences[0].duration)));
             instance.variationTimer = randFloat(rendering::M2_VARIATION_TIMER_MIN_MS, rendering::M2_VARIATION_TIMER_MAX_MS);
         }
 

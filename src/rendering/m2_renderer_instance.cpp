@@ -91,6 +91,16 @@ void M2Renderer::setInstanceAnimationFrozen(uint32_t instanceId, bool frozen) {
     }
 }
 
+void M2Renderer::restartInstanceAnimation(uint32_t instanceId) {
+    auto idxIt = instanceIndexById.find(instanceId);
+    if (idxIt == instanceIndexById.end()) return;
+    auto& inst = instances[idxIt->second];
+    inst.animTime = 0.0f;
+    inst.animTimeAlt = 0.0f;
+    inst.animDir = 1.0f;
+    if (inst.cachedModel) computeBoneMatrices(*inst.cachedModel, inst, &cachedCamPos_);
+}
+
 std::optional<uint32_t> M2Renderer::soleSequenceId(uint32_t instanceId) const {
     auto idxIt = instanceIndexById.find(instanceId);
     if (idxIt == instanceIndexById.end()) return std::nullopt;
