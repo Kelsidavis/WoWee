@@ -17,7 +17,12 @@ layout(set = 0, binding = 0) uniform PerFrame {
     vec4 localLightColorIntensity[64];
     ivec4 localLightMeta;
     vec4 volumetricParams;  // x = on, y = near, z = 1 / ln(far / near), w = slices
+    mat4 rtViewProj;
+    vec4 rtCameraPos;
+    vec4 rtParams;
 };
+
+#include "rt_lighting.glsli"
 
 layout(set = 1, binding = 0) uniform sampler2D uBaseTexture;
 layout(set = 1, binding = 1) uniform sampler2D uLayer1Texture;
@@ -249,6 +254,10 @@ void main() {
             shadow = mix(1.0, shadow, shadowParams.y);
         }
     }
+
+    RtLight rt = rtLightAt(FragPos);
+    shadow = rtShadow(rt, shadow);
+    ambient = rtAmbient(rt, ambientColor.rgb) * finalColor.rgb;
 
     vec3 result = ambient + shadow * diffuse;
     result += localLightContribution(FragPos, norm, finalColor.rgb);

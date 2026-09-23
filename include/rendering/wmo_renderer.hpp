@@ -33,6 +33,7 @@ namespace rendering {
 class Camera;
 class Frustum;
 class M2Renderer;
+class RtScene;
 class VkContext;
 class VkTexture;
 
@@ -69,6 +70,14 @@ public:
      * Set M2 renderer for hierarchical transform updates (doodads follow parent WMO)
      */
     void setM2Renderer(M2Renderer* renderer) { m2Renderer_ = renderer; }
+
+    /// Where loaded models register their geometry for the ray traced lighting.
+    void setRtScene(RtScene* scene) { rtScene_ = scene; }
+    /// Bring the scene's instances in line with this renderer's: added,
+    /// moved, hidden and removed. Once a frame, and only while the lighting
+    /// is on; one pass over the instances is cheaper than hooking every one
+    /// of the half-dozen ways they change.
+    void syncRtScene();
 
     /**
      * Load WMO model and create GPU resources
@@ -800,6 +809,19 @@ private:
 
     // M2 renderer for hierarchical transforms (doodads following WMO parent)
     M2Renderer* m2Renderer_ = nullptr;
+
+    RtScene* rtScene_ = nullptr;
+    std::unordered_map<uint32_t, uint32_t> rtModelMeshes_;  // modelId -> RtScene mesh
+    struct RtInstanceRecord {
+        uint32_t rtId;
+        uint32_t modelId;
+        glm::mat4 matrix;
+        uint64_t seen;
+    };
+    std::unordered_map<uint32_t, RtInstanceRecord> rtInstances_;  // WMO instance id ->
+    uint64_t rtSyncGeneration_ = 0;
+    void registerRtModel(uint32_t modelId, const ModelData& model);
+    void releaseRtModel(uint32_t modelId);
 
     // Current map name for zone-specific floor cache
     std::string mapName_;

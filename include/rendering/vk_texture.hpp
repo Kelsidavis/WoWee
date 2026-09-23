@@ -8,6 +8,7 @@
 #include <vk_mem_alloc.h>
 #include <string>
 #include <cstdint>
+#include <glm/glm.hpp>
 
 namespace wowee {
 namespace rendering {
@@ -46,6 +47,12 @@ public:
     /// Returns false if the image is invalid or the device cannot sample the
     /// block format, so a caller can fall back to loading it decoded.
     bool uploadBLP(VkContext& ctx, const pipeline::BLPImage& image);
+
+    /// Mean colour of the visible texels and the fraction that are visible,
+    /// taken by uploadBLP (BLPImage::averageColor). White and fully covered
+    /// for a texture that came in any other way.
+    [[nodiscard]] const glm::vec3& averageColor() const { return averageColor_; }
+    [[nodiscard]] float alphaCoverage() const { return alphaCoverage_; }
 
     /// What every uploadBLP so far actually cost, and what the same textures
     /// would have cost decoded.
@@ -138,6 +145,8 @@ private:
     /// came from that, one of them 540 MB.
     VkDevice device_ = VK_NULL_HANDLE;
     VmaAllocator allocator_ = VK_NULL_HANDLE;
+    glm::vec3 averageColor_{1.0f};
+    float alphaCoverage_ = 1.0f;
 };
 
 } // namespace rendering

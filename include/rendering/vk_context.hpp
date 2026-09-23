@@ -196,6 +196,10 @@ public:
     /// during the load surfaced a frame later as the frame's own submit.
     VkResult waitIdle(const char* where);
     [[nodiscard]] bool robustBufferAccessEnabled() const { return robustBufferAccessSupported_; }
+    /// Acceleration structures, ray queries and buffer device addresses are all
+    /// enabled. False on MoltenVK, which exposes none of them; the ray traced
+    /// lighting then uses its compute-shader tracer instead.
+    [[nodiscard]] bool hardwareRayQueryEnabled() const { return hardwareRayQuery_; }
     /// The last completed frame's marks, as (label, milliseconds since the
     /// previous mark). Empty until a frame has come round and been read back.
     [[nodiscard]] const std::vector<std::pair<const char*, double>>&
@@ -464,6 +468,7 @@ private:
     /// and what address it touched when it died.
     bool deviceFaultSupported_ = false;
     bool checkpointsSupported_ = false;
+    bool hardwareRayQuery_ = false;
 #if defined(VK_EXT_device_fault)
     PFN_vkGetDeviceFaultInfoEXT getDeviceFaultInfo_ = nullptr;
 #endif

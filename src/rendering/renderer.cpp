@@ -40,6 +40,8 @@
 #include "rendering/hiz_system.hpp"
 #include "rendering/volumetric_fog.hpp"
 #include "rendering/sun_shafts.hpp"
+#include "rendering/rt_lighting.hpp"
+#include "rendering/rt_scene.hpp"
 #include "rendering/screen_capture.hpp"
 #include "rendering/loot_sparkles.hpp"
 #include "rendering/minimap.hpp"
@@ -241,8 +243,25 @@ bool Renderer::createPerFrameResources() {
         return false;
     }
 
-    // --- Create descriptor set layout for set 0 (per-frame UBO + shadow sampler + fog volume) ---
-    VkDescriptorSetLayoutBinding bindings[3]{};
+    // The ray traced lighting's scene and pass. They outlive the per-frame
+    // sets: the renderers register geometry with the scene as they load, and
+    // bindings 3 and 4 below take the pass's sampler as immutable.
+    if (!rtScene_) {
+        rtScene_ = std::make_unique<RtScene>();
+        if (!rtScene_->initialize(vkCtx)) {
+            LOG_ERROR("Failed to create the ray tracing scene");
+            return false;
+        }
+        rtLighting_ = std::make_unique<RtLighting>();
+        if (!rtLighting_->initialize(vkCtx, rtScene_.get())) {
+            LOG_ERROR("Failed to create the ray traced lighting");
+            return false;
+        }
+    }
+
+    // --- Create descriptor set layout for set 0 (per-frame UBO + shadow sampler + fog volume
+    //     + ray traced lighting) ---
+    VkDescriptorSetLayoutBinding bindings[5]{};
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     bindings[0].descriptorCount = 1;
@@ -268,10 +287,21 @@ bool Renderer::createPerFrameResources() {
     bindings[2].descriptorCount = 1;
     bindings[2].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     bindings[2].pImmutableSamplers = &fogSampler;
+    // Last frame's ray traced lighting (RtLighting), read by the terrain,
+    // building, doodad and character surfaces. Immutable samplers again, so
+    // the preview's sets only name the neutral view.
+    const VkSampler rtSampler = rtLighting_->sampler();
+    for (uint32_t b = 3; b <= 4; ++b) {
+        bindings[b].binding = b;
+        bindings[b].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[b].descriptorCount = 1;
+        bindings[b].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        bindings[b].pImmutableSamplers = &rtSampler;
+    }
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 3;
+    layoutInfo.bindingCount = 5;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &perFrameSetLayout) != VK_SUCCESS) {
@@ -284,7 +314,7 @@ bool Renderer::createPerFrameResources() {
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = MAX_FRAMES * 2; // normal frames + reflection frames
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = MAX_FRAMES * 2 * 2;  // shadow map + fog volume, per set
+    poolSizes[1].descriptorCount = MAX_FRAMES * 2 * 4;  // shadow, fog, two RT results, per set
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -346,7 +376,14 @@ bool Renderer::createPerFrameResources() {
         fogImgInfo.imageView = volumetricFog_->getVolumeView(i);
         fogImgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-        VkWriteDescriptorSet writes[3]{};
+        // Neutral until the ray traced lighting is on; writeRtLightingBindings
+        // swaps in the other slot's results then.
+        VkDescriptorImageInfo rtImgInfo[2]{};
+        rtImgInfo[0].imageView = rtLighting_->lightViewForSlot(i);
+        rtImgInfo[1].imageView = rtLighting_->giViewForSlot(i);
+        rtImgInfo[0].imageLayout = rtImgInfo[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+        VkWriteDescriptorSet writes[5]{};
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet = perFrameDescSets[i];
         writes[0].dstBinding = 0;
@@ -365,8 +402,16 @@ bool Renderer::createPerFrameResources() {
         writes[2].descriptorCount = 1;
         writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         writes[2].pImageInfo = &fogImgInfo;
+        for (uint32_t b = 0; b < 2; ++b) {
+            writes[3 + b].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[3 + b].dstSet = perFrameDescSets[i];
+            writes[3 + b].dstBinding = 3 + b;
+            writes[3 + b].descriptorCount = 1;
+            writes[3 + b].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            writes[3 + b].pImageInfo = &rtImgInfo[b];
+        }
 
-        vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
+        vkUpdateDescriptorSets(device, 5, writes, 0, nullptr);
     }
 
     // --- Create reflection per-frame UBO and descriptor set ---
@@ -421,7 +466,13 @@ bool Renderer::createPerFrameResources() {
             fogImgInfo.imageView = volumetricFog_->getNeutralView();
             fogImgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-            VkWriteDescriptorSet writes[3]{};
+            // Neutral as well: the result is the camera's, and the block's
+            // switch is off in the reflection's copy.
+            VkDescriptorImageInfo rtImgInfo{};
+            rtImgInfo.imageView = rtLighting_->neutralView();
+            rtImgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+            VkWriteDescriptorSet writes[5]{};
             writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writes[0].dstSet = reflPerFrameDescSet[i];
             writes[0].dstBinding = 0;
@@ -440,8 +491,16 @@ bool Renderer::createPerFrameResources() {
             writes[2].descriptorCount = 1;
             writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             writes[2].pImageInfo = &fogImgInfo;
+            for (uint32_t b = 3; b <= 4; ++b) {
+                writes[b].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writes[b].dstSet = reflPerFrameDescSet[i];
+                writes[b].dstBinding = b;
+                writes[b].descriptorCount = 1;
+                writes[b].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                writes[b].pImageInfo = &rtImgInfo;
+            }
 
-            vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
+            vkUpdateDescriptorSets(device, 5, writes, 0, nullptr);
         }
     }
 
@@ -475,6 +534,16 @@ void Renderer::destroyPerFrameResources() {
     }
     destroy(device, sceneDescriptorPool);
     destroy(device, perFrameSetLayout);
+    // After every renderer has let go of its geometry, which is why this is
+    // here rather than beside the fog: shutdown() calls this last.
+    if (rtLighting_) {
+        rtLighting_->shutdown();
+        rtLighting_.reset();
+    }
+    if (rtScene_) {
+        rtScene_->shutdown();
+        rtScene_.reset();
+    }
 
     // Destroy per-frame shadow resources
     for (uint32_t i = 0; i < MAX_FRAMES; i++) {
@@ -557,6 +626,13 @@ void Renderer::updatePerFrameUBO() {
             MAX_LOCAL_LIGHTS - localLightCount);
     }
     currentFrameData.localLightMeta = glm::ivec4(static_cast<int32_t>(localLightCount), 0, 0, 0);
+
+    if (rtLighting_) {
+        const RtLighting::ConsumerData rt = rtLighting_->consumerData();
+        currentFrameData.rtViewProj = rt.viewProj;
+        currentFrameData.rtCameraPos = rt.cameraPos;
+        currentFrameData.rtParams = rt.params;
+    }
 
     // What the local lights are actually doing, throttled to a line every few
     // seconds. These are gathered around the camera rather than the player, so
@@ -778,6 +854,15 @@ bool Renderer::initialize(core::Window* win) {
     // Create PostProcessPipeline (§4.3 - owns FSR/FXAA/FSR2/FSR3/brightness)
     postProcessPipeline_ = std::make_unique<PostProcessPipeline>();
     postProcessPipeline_->initialize(vkCtx);
+    // The ray traced lighting normally records where the water leaves the
+    // scene pass. A multisampled scene in an off-screen target never leaves
+    // it early, so the pass records here instead, as the upscaler takes over.
+    postProcessPipeline_->setSceneClosedHook([this](VkCommandBuffer) {
+        if (rtRecordedThisFrame_ || !postProcessPipeline_) return;
+        recordRtLighting(postProcessPipeline_->getSceneDepthImage(),
+                         postProcessPipeline_->getSceneRenderExtent(),
+                         postProcessPipeline_->sceneDepthIsMsaa());
+    });
 
     // Not fatal: without them the picture is only missing its rays.
     sunShafts_ = std::make_unique<SunShafts>();
@@ -1206,6 +1291,12 @@ void Renderer::beginFrame() {
             }
         }
     }
+
+    // Between frames, so a resize of the ray traced lighting's images can wait
+    // for the device and rewrite both slots' sets.
+    if (rtLighting_ && rtLighting_->prepare(sceneRenderExtent())) writeRtLightingBindings();
+
+    rtRecordedThisFrame_ = false;
 
     // Acquire swapchain image and begin command buffer
     currentCmd = vkCtx->beginFrame(currentImageIndex);
@@ -3248,6 +3339,10 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
             sceneDepth = vkCtx->getDepthCopySourceImage();
         }
 
+        // The opaque scene is finished and out of its pass: the ray traced
+        // lighting reads its depth here, for the surfaces of the next frame.
+        recordRtLighting(sceneDepth, sceneExtent, depthIsMsaa);
+
         if (sceneColor != VK_NULL_HANDLE && waterRenderer->isRefractionEnabled()) {
             waterRenderer->captureSceneHistory(currentCmd, sceneColor, sceneDepth,
                                                sceneExtent, depthIsMsaa,
@@ -3556,6 +3651,7 @@ bool Renderer::initializeRenderers(pipeline::AssetManager* assetManager, const s
             terrainRenderer.reset();
             return false;
         }
+        terrainRenderer->setRtScene(rtScene_.get());
         if (shadowRenderPass != VK_NULL_HANDLE) {
             terrainRenderer->initializeShadow(shadowRenderPass);
         }
@@ -3595,6 +3691,7 @@ bool Renderer::initializeRenderers(pipeline::AssetManager* assetManager, const s
         m2Renderer = std::make_unique<M2Renderer>();
         if (!m2Renderer->initialize(vkCtx, perFrameSetLayout, assetManager))
             LOG_ERROR("M2Renderer initialization failed");
+        m2Renderer->setRtScene(rtScene_.get());
         if (swimEffects) {
             swimEffects->setM2Renderer(m2Renderer.get());
         }
@@ -3631,6 +3728,7 @@ bool Renderer::initializeRenderers(pipeline::AssetManager* assetManager, const s
         wmoRenderer = std::make_unique<WMORenderer>();
         if (!wmoRenderer->initialize(vkCtx, perFrameSetLayout, assetManager))
             LOG_ERROR("WMORenderer initialization failed");
+        wmoRenderer->setRtScene(rtScene_.get());
         if (shadowRenderPass != VK_NULL_HANDLE) {
             if (!wmoRenderer->initializeShadow(shadowRenderPass))
                 LOG_WARNING("WMO shadow pipeline initialization failed");
@@ -4246,6 +4344,7 @@ void Renderer::renderReflectionPass() {
     reflData.viewPos = glm::vec4(reflPos, 1.0f);
     // The fog volume is the camera's; its sets here bind the neutral one.
     reflData.volumetricParams = glm::vec4(0.0f);
+    reflData.rtParams = glm::vec4(0.0f);
     std::memcpy(reflPerFrameUBOMapped, &reflData, sizeof(GPUPerFrameData));
 
     // Begin reflection render pass (clears to black; scene rendered if pipeline-compatible)
@@ -4434,6 +4533,60 @@ void Renderer::renderShadowPass() {
     cmdPipelineBarrier2(currentCmd, b2Dep);
     shadowDepthLayout_[frame] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     if (vkCtx) vkCtx->gpuMark(currentCmd, "shadows");
+}
+
+VkImageView Renderer::getNeutralRtLightingView() const {
+    return rtLighting_ ? rtLighting_->neutralView() : VK_NULL_HANDLE;
+}
+
+void Renderer::setRtLightingMode(int mode) {
+    if (!rtLighting_) return;
+    rtLighting_->setMode(static_cast<RtLighting::Mode>(std::clamp(mode, 0, 3)));
+}
+
+void Renderer::writeRtLightingBindings() {
+    if (!rtLighting_ || !vkCtx) return;
+    // RtLighting::prepare has waited for the device whenever it reports a
+    // change, so neither slot's set is in use.
+    for (uint32_t i = 0; i < MAX_FRAMES; i++) {
+        VkDescriptorImageInfo info[2]{};
+        info[0].imageView = rtLighting_->lightViewForSlot(i);
+        info[1].imageView = rtLighting_->giViewForSlot(i);
+        info[0].imageLayout = info[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        VkWriteDescriptorSet writes[2]{};
+        for (uint32_t b = 0; b < 2; ++b) {
+            writes[b].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[b].dstSet = perFrameDescSets[i];
+            writes[b].dstBinding = 3 + b;
+            writes[b].descriptorCount = 1;
+            writes[b].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            writes[b].pImageInfo = &info[b];
+        }
+        vkUpdateDescriptorSets(vkCtx->getDevice(), 2, writes, 0, nullptr);
+    }
+}
+
+VkExtent2D Renderer::sceneRenderExtent() const {
+    if (postProcessPipeline_ && postProcessPipeline_->getSceneFramebuffer() != VK_NULL_HANDLE) {
+        return postProcessPipeline_->getSceneRenderExtent();
+    }
+    return vkCtx->getSwapchainExtent();
+}
+
+void Renderer::recordRtLighting(VkImage sceneDepth, VkExtent2D sceneExtent, bool depthIsMsaa) {
+    if (!rtLighting_ || !rtLighting_->active() || !camera) return;
+    rtRecordedThisFrame_ = true;
+    RtLighting::FrameInputs in{};
+    in.viewProj = camera->getProjectionMatrix() * camera->getViewMatrix();
+    in.cameraPos = camera->getPosition();
+    in.sunDir = -glm::vec3(currentFrameData.lightDir);
+    in.sunColor = glm::vec3(currentFrameData.lightColor);
+    in.skyColor = glm::vec3(currentFrameData.ambientColor);
+    in.sunUp = in.sunDir.z > -0.05f;
+    if (wmoRenderer) wmoRenderer->syncRtScene();
+    if (m2Renderer) m2Renderer->syncRtScene();
+    rtLighting_->record(currentCmd, sceneDepth, sceneExtent, depthIsMsaa, in);
+    vkCtx->gpuMark(currentCmd, "rt_lighting");
 }
 
 VkImageView Renderer::getNeutralFogVolumeView() const {

@@ -660,3 +660,84 @@ const char* BLPLoader::getCompressionName(BLPCompression compression) {
 
 } // namespace pipeline
 } // namespace wowee
+
+namespace wowee::pipeline {
+
+void BLPImage::averageColor(float rgb[3], float& coverage) const {
+    rgb[0] = rgb[1] = rgb[2] = 1.0f;
+    coverage = 0.0f;
+    double sum[3] = {0.0, 0.0, 0.0};
+    uint64_t visible = 0, total = 0;
+    auto add = [&](uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+        ++total;
+        if (a <= 127) return;
+        ++visible;
+        sum[0] += r;
+        sum[1] += g;
+        sum[2] += b;
+    };
+
+    if (!isBlockCompressed()) {
+        // Every texel of up to 64K, then a stride that keeps it about that.
+        const size_t texels = data.size() / 4;
+        const size_t step = std::max<size_t>(1, texels / 65536);
+        for (size_t i = 0; i < texels; i += step) {
+            add(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
+        }
+    } else {
+        // The first level no larger than 64 on a side. Not the tail: mips
+        // average alpha, and a 4x4 of a leaf card is a uniform half-opaque
+        // smear that says nothing about how much of the card is leaf.
+        size_t level = 0;
+        while (level + 1 < mipmaps.size() &&
+               (std::max(1, width >> level) > 64 || std::max(1, height >> level) > 64)) {
+            ++level;
+        }
+        const std::vector<uint8_t>& blocks = mipmaps[level];
+        const bool dxt1 = compression == BLPCompression::DXT1;
+        const size_t blockBytes = dxt1 ? 8 : 16;
+        for (size_t at = 0; at + blockBytes <= blocks.size(); at += blockBytes) {
+            const uint8_t* colorBytes = &blocks[at + (dxt1 ? 0 : 8)];
+            const DxtColorBlock c = decodeDxtColorBlock(colorBytes, dxt1);
+            uint8_t alphaPalette[8] = {};
+            if (compression == BLPCompression::DXT5) {
+                const uint8_t a0 = blocks[at], a1 = blocks[at + 1];
+                alphaPalette[0] = a0;
+                alphaPalette[1] = a1;
+                if (a0 > a1) {
+                    for (int i = 0; i < 6; ++i)
+                        alphaPalette[2 + i] = static_cast<uint8_t>(((6 - i) * a0 + (1 + i) * a1) / 7);
+                } else {
+                    for (int i = 0; i < 4; ++i)
+                        alphaPalette[2 + i] = static_cast<uint8_t>(((4 - i) * a0 + (1 + i) * a1) / 5);
+                    alphaPalette[6] = 0;
+                    alphaPalette[7] = 255;
+                }
+            }
+            uint64_t alphaBits = 0;
+            if (compression == BLPCompression::DXT5) {
+                for (int b = 0; b < 6; ++b) alphaBits |= uint64_t(blocks[at + 2 + b]) << (8 * b);
+            }
+            for (int p = 0; p < 16; ++p) {
+                const int px = p & 3, py = p >> 2;
+                const int idx = c.indexAt(px, py);
+                uint8_t a = 255;
+                if (dxt1) {
+                    if (c.index3IsTransparent && idx == 3) a = 0;
+                } else if (compression == BLPCompression::DXT3) {
+                    const uint8_t nib = (blocks[at + p / 2] >> ((p & 1) * 4)) & 0x0Fu;
+                    a = static_cast<uint8_t>(nib * 17);
+                } else {
+                    a = alphaPalette[(alphaBits >> (3 * p)) & 0x7u];
+                }
+                add(c.rgb[idx][0], c.rgb[idx][1], c.rgb[idx][2], a);
+            }
+        }
+    }
+
+    if (total == 0 || visible == 0) return;
+    for (int i = 0; i < 3; ++i) rgb[i] = static_cast<float>(sum[i] / (255.0 * double(visible)));
+    coverage = static_cast<float>(double(visible) / double(total));
+}
+
+}  // namespace wowee::pipeline

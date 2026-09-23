@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <memory>
 #include <string>
 #include <cstdint>
@@ -66,6 +68,14 @@ public:
     [[nodiscard]] bool useFXAAPostPass() const { return fxaa_.enabled; }
 
     // --- Frame-loop integration (called from Renderer::endFrame) ---
+
+    /// Called with the off-screen scene pass just closed and its depth still
+    /// in DEPTH_STENCIL_ATTACHMENT_OPTIMAL, before any upscaler touches it.
+    /// The one point a frame whose scene could not leave its pass earlier
+    /// (MSAA into an off-screen target) has for work that reads that depth.
+    void setSceneClosedHook(std::function<void(VkCommandBuffer)> hook) {
+        sceneClosedHook_ = std::move(hook);
+    }
 
     /// Execute all post-processing passes.  Returns true if an INLINE
     /// render pass was started (affects ImGui recording mode).
@@ -136,6 +146,7 @@ public:
 private:
     VkContext* vkCtx_ = nullptr;
 
+    std::function<void(VkCommandBuffer)> sceneClosedHook_;
     // Per-frame state set during executePostProcessing
     VkCommandBuffer currentCmd_ = VK_NULL_HANDLE;
     Camera* camera_ = nullptr;

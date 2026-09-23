@@ -1,0 +1,84 @@
+// Ray traced lighting as the surface shaders read it (RtLighting).
+//
+// The result was traced last frame, so a surface finds its texels by
+// projecting its world position with that frame's matrix, and trusts them only
+// where the distance stored there matches its own - anything else is a surface
+// that was hidden, off screen or somewhere else last frame. Where nothing
+// matches, every term falls back to what the shader computed without ray
+// tracing.
+//
+// The including shader must declare, at the end of its PerFrame block:
+//     mat4 rtViewProj;   // the frame the result was traced in
+//     vec4 rtCameraPos;  // its camera position
+//     vec4 rtParams;     // x = mode (0 off, 1 sun, 2 +AO, 3 +bounce)
+
+layout(set = 0, binding = 3) uniform sampler2D uRtLight;  // r sun, g AO, a distance
+layout(set = 0, binding = 4) uniform sampler2D uRtGi;     // rgb incoming light
+
+struct RtLight {
+    float weight;
+    float sun;
+    float ao;
+    vec3 gi;
+};
+
+// The result is traced at half resolution, so a surface's texel neighbours
+// can be other surfaces - most of all along an object's silhouette, where a
+// single filtered read would average the object with what is behind it, fail
+// the distance test and drop the pixel to the fallback: a bright rim. So the
+// 3x3 texels around the nearest one are weighed individually, by how close
+// they are and whether their stored distance is this surface's, and only the
+// matching ones are blended.
+RtLight rtLightAt(vec3 worldPos) {
+    RtLight r = RtLight(0.0, 1.0, 1.0, vec3(0.0));
+    if (rtParams.x < 0.5) return r;
+    vec4 clip = rtViewProj * vec4(worldPos, 1.0);
+    if (clip.w <= 0.0) return r;
+    vec2 uv = clip.xy / clip.w * 0.5 + 0.5;
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return r;
+
+    ivec2 size = textureSize(uRtLight, 0);
+    vec2 f = uv * vec2(size) - 0.5;
+    ivec2 center = ivec2(floor(f + 0.5));
+    float expected = length(worldPos - rtCameraPos.xyz);
+    float tolerance = 0.03 * expected + 0.05;
+    bool wantGi = rtParams.x > 2.5;
+
+    float wsum = 0.0;
+    float best = 0.0;
+    vec2 sunAo = vec2(0.0);
+    vec3 gi = vec3(0.0);
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            ivec2 q = clamp(center + ivec2(x, y), ivec2(0), size - 1);
+            vec4 l = texelFetch(uRtLight, q, 0);
+            float e = (l.a - expected) / tolerance;
+            float match = l.a > 0.0 ? exp(-e * e) : 0.0;
+            vec2 o = vec2(q) - f;
+            float w = match * exp(-dot(o, o));
+            if (w <= 1e-4) continue;
+            best = max(best, match);
+            wsum += w;
+            sunAo += l.rg * w;
+            if (wantGi) gi += texelFetch(uRtGi, q, 0).rgb * w;
+        }
+    }
+    if (wsum <= 1e-4) return r;
+    r.weight = smoothstep(0.1, 0.6, best);
+    r.sun = sunAo.x / wsum;
+    r.ao = sunAo.y / wsum;
+    r.gi = gi / wsum;
+    return r;
+}
+
+// Characters are not in the acceleration structure and cast only into the
+// shadow map, so the two are combined rather than one replacing the other.
+float rtShadow(RtLight r, float shadowMap) {
+    return min(shadowMap, mix(1.0, r.sun, r.weight));
+}
+
+vec3 rtAmbient(RtLight r, vec3 flatAmbient) {
+    if (rtParams.x < 1.5) return flatAmbient;
+    vec3 traced = rtParams.x > 2.5 ? r.gi : flatAmbient * r.ao;
+    return mix(flatAmbient, traced, r.weight);
+}

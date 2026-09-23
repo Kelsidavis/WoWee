@@ -27,6 +27,7 @@ namespace rendering {
 class VkContext;
 class VkTexture;
 class Frustum;
+class RtScene;
 
 /**
  * GPU-side terrain chunk data (Vulkan)
@@ -67,6 +68,10 @@ struct TerrainChunkGPU {
     int32_t megaBaseVertex = -1;
     uint32_t megaFirstIndex = 0;
     uint32_t vertexCount = 0;
+
+    // The chunk as the ray traced lighting sees it (RtScene ids, or ~0u).
+    uint32_t rtMesh = ~0u;
+    uint32_t rtInstance = ~0u;
 
     [[nodiscard]] bool isValid() const { return vertexBuffer != VK_NULL_HANDLE && indexBuffer != VK_NULL_HANDLE; }
 };
@@ -159,6 +164,9 @@ public:
     [[nodiscard]] int getTriangleCount() const;
     [[nodiscard]] VkContext* getVkContext() const { return vkCtx; }
 
+    /// Where chunks register their geometry for the ray traced lighting.
+    void setRtScene(RtScene* scene) { rtScene_ = scene; }
+
 private:
     TerrainChunkGPU uploadChunk(const pipeline::ChunkMesh& chunk);
     VkTexture* loadTexture(const std::string& path);
@@ -188,6 +196,8 @@ private:
     bool createChunkParamsUBO(TerrainChunkGPU& gpuChunk);
 
     VkContext* vkCtx = nullptr;
+    RtScene* rtScene_ = nullptr;
+    void registerRtChunk(TerrainChunkGPU& gpuChunk, const pipeline::ChunkMesh& chunk);
     pipeline::AssetManager* assetManager = nullptr;
 
     // Main pipelines

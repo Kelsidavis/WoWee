@@ -17,6 +17,7 @@
 
 #include "pipeline/blp_loader.hpp"
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -88,4 +89,48 @@ TEST_CASE("the block alpha scan agrees with the decoded one", "[blp]") {
     INFO("compared " << compared << " textures, " << disagreed << " disagreed");
     for (const auto& e : examples) INFO("  " << e);
     CHECK(disagreed == 0);
+}
+
+// The ray traced lighting's per-texture colour and coverage come from a small
+// mip's blocks; the decoded full-size image is the reference. Mips filter
+// alpha, so coverage is only expected to agree loosely.
+TEST_CASE("the block colour average agrees with the decoded one", "[blp]") {
+    std::error_code ec;
+    if (!std::filesystem::is_directory(kDataDir, ec)) {
+        WARN("no Data directory - nothing to compare against");
+        return;
+    }
+    int compared = 0;
+    int colourOff = 0;
+    int coverageOff = 0;
+    constexpr int kMaxFiles = 200;
+    for (std::filesystem::recursive_directory_iterator it(kDataDir, ec), end;
+         it != end && compared < kMaxFiles; it.increment(ec)) {
+        if (ec) break;
+        if (!it->is_regular_file(ec) || it->path().extension() != ".blp") continue;
+        const std::vector<uint8_t> bytes = slurpBytes(it->path());
+        if (bytes.empty()) continue;
+        const auto decoded = wowee::pipeline::BLPLoader::load(bytes, false);
+        const auto blocks = wowee::pipeline::BLPLoader::load(bytes, true);
+        if (!decoded.isValid() || !blocks.isValid() || !blocks.isBlockCompressed()) continue;
+
+        float rgbD[3], rgbB[3], covD, covB;
+        decoded.averageColor(rgbD, covD);
+        blocks.averageColor(rgbB, covB);
+        ++compared;
+        if (std::abs(covD - covB) > 0.15f) ++coverageOff;
+        if (covD > 0.2f && covB > 0.2f) {
+            for (int i = 0; i < 3; ++i) {
+                if (std::abs(rgbD[i] - rgbB[i]) > 0.08f) {
+                    ++colourOff;
+                    break;
+                }
+            }
+        }
+    }
+    INFO("compared " << compared << ", colour off " << colourOff << ", coverage off " << coverageOff);
+    // A few percent of outliers: small cut-out detail that a 64-texel mip
+    // cannot resolve. A systematic error would miss on most of them.
+    CHECK(colourOff * 20 <= compared);
+    CHECK(coverageOff * 10 <= compared);
 }

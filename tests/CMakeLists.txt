@@ -1118,6 +1118,12 @@ wowee_add_test(test_frustum
     SOURCES test_frustum.cpp
             ${CMAKE_SOURCE_DIR}/src/rendering/frustum.cpp)
 
+# ── test_rt_bvh ──────────────────────────────────────────────
+# The hierarchy the software ray tracer walks, against a brute-force scan.
+wowee_add_test(test_rt_bvh
+    SOURCES test_rt_bvh.cpp
+            ${CMAKE_SOURCE_DIR}/src/rendering/rt_bvh.cpp)
+
 # ── test_recording_size ──────────────────────────────────────
 # Header-only: the size a screen recording is encoded at.
 wowee_add_test(test_recording_size

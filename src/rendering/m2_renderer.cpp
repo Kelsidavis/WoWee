@@ -1,6 +1,8 @@
 #include <atomic>
 #include "rendering/placement_transform.hpp"
 #include "rendering/m2_renderer.hpp"
+#include "rendering/rt_bvh.hpp"
+#include "rendering/rt_scene.hpp"
 #include "core/env_flag.hpp"
 #include "rendering/m2_renderer_internal.h"
 #include "rendering/m2_blend_mode.hpp"
@@ -1202,6 +1204,7 @@ void M2Renderer::shutdown() {
 
 void M2Renderer::destroyModelGPU(M2ModelGPU& model) {
     if (!vkCtx_) return;
+    releaseRtModel(model);
     VmaAllocator alloc = vkCtx_->getAllocator();
     destroy(alloc, model.vertexBuffer, model.vertexAlloc);
     destroy(alloc, model.indexBuffer, model.indexAlloc);
@@ -2564,6 +2567,7 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
         if (b.submeshLevel < 8) gpuModel.availableLODs |= (1u << b.submeshLevel);
     }
 
+    registerRtModel(gpuModel, model);
     models[modelId] = std::move(gpuModel);
     spatialIndexDirty_ = true;  // Map may have rehashed - refresh cachedModel pointers
 
@@ -2572,6 +2576,123 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
 
 
     return true;
+}
+
+} // namespace rendering
+} // namespace wowee
+
+namespace wowee {
+namespace rendering {
+
+void M2Renderer::registerRtModel(M2ModelGPU& gpuModel, const pipeline::M2Model& model) {
+    if (!rtScene_ || model.vertices.empty() || model.indices.empty()) return;
+    // What the renderer never draws, what is too small and numerous to be
+    // worth its triangles (ground clutter), and what moves: an animated model
+    // would cast its bind pose, not the pose on screen.
+    if (gpuModel.isInvisibleTrap || gpuModel.isSmoke || gpuModel.isSpellEffect ||
+        gpuModel.isGroundDetail || gpuModel.isSkyBird || gpuModel.isLightBeam) {
+        return;
+    }
+    if (gpuModel.hasAnimation && !gpuModel.disableAnimation && !gpuModel.isTransportDoodad) return;
+
+    RtScene::MeshSource src;
+    src.positions.reserve(model.vertices.size());
+    for (const auto& v : model.vertices) src.positions.push_back(v.position);
+    for (const auto& batch : gpuModel.batches) {
+        if (batch.submeshLevel != 0 || batch.blendMode >= 2 || batch.batchOpacity < 0.01f ||
+            batch.starLayer || batch.glowCardLike) {
+            continue;
+        }
+        glm::vec3 albedo = batch.tint;
+        float opacity = 1.0f;
+        if (batch.texture) {
+            albedo *= batch.texture->averageColor();
+            if (m2BatchNeedsAlphaTest(static_cast<uint8_t>(batch.blendMode), batch.hasAlpha)) {
+                opacity = batch.texture->alphaCoverage();
+            }
+        }
+        const float surface = packRtSurface(albedo, opacity);
+        const size_t end = std::min<size_t>(size_t(batch.indexStart) + batch.indexCount,
+                                            model.indices.size());
+        for (size_t i = batch.indexStart; i + 2 < end; i += 3) {
+            src.indices.push_back(model.indices[i]);
+            src.indices.push_back(model.indices[i + 1]);
+            src.indices.push_back(model.indices[i + 2]);
+            src.surfaces.push_back(surface);
+        }
+    }
+    gpuModel.rtMesh = rtScene_->addMesh(std::move(src));
+}
+
+void M2Renderer::releaseRtModel(M2ModelGPU& gpuModel) {
+    if (!rtScene_ || gpuModel.rtMesh == RtScene::kInvalid) return;
+    // Instances of it are normally gone already; any left are dropped here,
+    // and the M2Instance that still names one re-registers on the next sync
+    // if its model comes back.
+    for (size_t i = 0; i < rtOwned_.size();) {
+        const uint32_t id = rtOwned_[i];
+        if (rtMeshOf_[id] == gpuModel.rtMesh) {
+            rtScene_->removeInstance(id);
+            rtSeen_[id] = 0;
+            rtOwned_[i] = rtOwned_.back();
+            rtOwned_.pop_back();
+        } else {
+            ++i;
+        }
+    }
+    rtScene_->removeMesh(gpuModel.rtMesh);
+    gpuModel.rtMesh = RtScene::kInvalid;
+}
+
+void M2Renderer::syncRtScene() {
+    if (!rtScene_ || !rtScene_->isActive()) return;
+    const uint64_t gen = ++rtSyncGeneration_;
+    auto track = [&](uint32_t id, uint32_t mesh) {
+        if (id >= rtSeen_.size()) {
+            rtSeen_.resize(id + 1, 0);
+            rtMeshOf_.resize(id + 1, RtScene::kInvalid);
+        }
+        rtSeen_[id] = gen;
+        rtMeshOf_[id] = mesh;
+    };
+    for (auto& inst : instances) {
+        auto it = models.find(inst.modelId);
+        const uint32_t mesh = it != models.end() ? it->second.rtMesh : RtScene::kInvalid;
+        const bool wanted = mesh != RtScene::kInvalid && inst.fade >= 1.0f;
+        // Still ours, not claimed by another instance this pass (a copied
+        // M2Instance carries its original's id), and placing the same mesh.
+        const bool valid = inst.rtInstance != RtScene::kInvalid &&
+                           inst.rtInstance < rtSeen_.size() && rtSeen_[inst.rtInstance] != 0 &&
+                           rtSeen_[inst.rtInstance] != gen && rtMeshOf_[inst.rtInstance] == mesh;
+        if (!wanted) {
+            inst.rtInstance = RtScene::kInvalid;  // an unseen id is removed below
+            continue;
+        }
+        if (!valid) {
+            inst.rtInstance = rtScene_->addInstance(mesh, inst.modelMatrix);
+            if (inst.rtInstance == RtScene::kInvalid) continue;
+            inst.rtMatrix = inst.modelMatrix;
+            rtOwned_.push_back(inst.rtInstance);
+            track(inst.rtInstance, mesh);
+            continue;
+        }
+        if (inst.rtMatrix != inst.modelMatrix) {
+            rtScene_->setInstanceTransform(inst.rtInstance, inst.modelMatrix);
+            inst.rtMatrix = inst.modelMatrix;
+        }
+        track(inst.rtInstance, mesh);
+    }
+    for (size_t i = 0; i < rtOwned_.size();) {
+        const uint32_t id = rtOwned_[i];
+        if (rtSeen_[id] != gen) {
+            rtScene_->removeInstance(id);
+            rtSeen_[id] = 0;
+            rtOwned_[i] = rtOwned_.back();
+            rtOwned_.pop_back();
+        } else {
+            ++i;
+        }
+    }
 }
 
 } // namespace rendering

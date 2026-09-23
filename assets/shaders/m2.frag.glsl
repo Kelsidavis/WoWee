@@ -17,7 +17,12 @@ layout(set = 0, binding = 0) uniform PerFrame {
     vec4 localLightColorIntensity[64];
     ivec4 localLightMeta;
     vec4 volumetricParams;  // x = on, y = near, z = 1 / ln(far / near), w = slices
+    mat4 rtViewProj;
+    vec4 rtCameraPos;
+    vec4 rtParams;
 };
+
+#include "rt_lighting.glsli"
 
 layout(set = 1, binding = 0) uniform sampler2D uTexture;
 
@@ -332,7 +337,9 @@ void main() {
         // Sky-bounce ambient for foliage: upward-facing leaves catch more
         // ambient than the canopy underside, giving the crown depth instead
         // of a uniformly-lit blob.
-        vec3 ambientTerm = ambientColor.rgb;
+        RtLight rt = rtLightAt(FragPos);
+        shadow = rtShadow(rt, shadow);
+        vec3 ambientTerm = rtAmbient(rt, ambientColor.rgb);
         if (isFoliage) {
             ambientTerm *= 0.82 + 0.30 * clamp(norm.z, 0.0, 1.0);
         }

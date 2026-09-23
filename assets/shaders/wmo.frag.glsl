@@ -17,7 +17,12 @@ layout(set = 0, binding = 0) uniform PerFrame {
     vec4 localLightColorIntensity[64];
     ivec4 localLightMeta;
     vec4 volumetricParams;  // x = on, y = near, z = 1 / ln(far / near), w = slices
+    mat4 rtViewProj;
+    vec4 rtCameraPos;
+    vec4 rtParams;
 };
+
+#include "rt_lighting.glsli"
 
 layout(set = 1, binding = 0) uniform sampler2D uTexture;
 
@@ -260,6 +265,8 @@ void main() {
         }
         shadow = mix(1.0, shadow, shadowParams.y);
     }
+    RtLight rt = rtLightAt(FragPos);
+    shadow = rtShadow(rt, shadow);
 
     if (emissive == 1) {
         // Authored luminous glass must remain bright in direct sun and shadow.
@@ -348,7 +355,7 @@ void main() {
         vec3 halfDir = normalize(ldir + viewDir);
         float spec = pow(max(dot(norm, halfDir), 0.0), 32.0) * specularIntensity;
 
-        result = ambientColor.rgb * texColor.rgb
+        result = rtAmbient(rt, ambientColor.rgb) * texColor.rgb
                + shadow * (diff * lightColor.rgb * texColor.rgb + spec * lightColor.rgb);
 
         // Exterior vertex colour is the baked shadow and occlusion the

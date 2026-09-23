@@ -1,6 +1,7 @@
 #include "rendering/terrain_vertex.hpp"
 #include "rendering/shadow_params.hpp"
 #include "rendering/terrain_renderer.hpp"
+#include "rendering/rt_scene.hpp"
 #include "rendering/vk_context.hpp"
 #include "rendering/vk_texture.hpp"
 #include "rendering/vk_buffer.hpp"
@@ -399,6 +400,7 @@ bool TerrainRenderer::loadTerrain(const pipeline::TerrainMesh& mesh,
                 continue;
             }
 
+            registerRtChunk(gpuChunk, chunk);
             chunks.push_back(std::move(gpuChunk));
         }
     }
@@ -471,6 +473,7 @@ bool TerrainRenderer::loadTerrainIncremental(const pipeline::TerrainMesh& mesh,
             continue;
         }
 
+        registerRtChunk(gpuChunk, chunk);
         chunks.push_back(std::move(gpuChunk));
         uploaded++;
     }
@@ -1151,8 +1154,42 @@ void TerrainRenderer::clear() {
     evictProtectFrom_ = 0;
 }
 
+void TerrainRenderer::registerRtChunk(TerrainChunkGPU& gpuChunk, const pipeline::ChunkMesh& chunk) {
+    if (!rtScene_) return;
+    RtScene::MeshSource src;
+    src.positions.reserve(chunk.vertices.size());
+    for (const auto& v : chunk.vertices) {
+        src.positions.emplace_back(v.position[0], v.position[1], v.position[2]);
+    }
+    src.indices.assign(chunk.indices.begin(), chunk.indices.end());
+
+    // One colour for the chunk: the base layer's, with each layer over it in
+    // proportion to how much of the chunk its alpha map covers.
+    glm::vec3 albedo = gpuChunk.baseTexture ? gpuChunk.baseTexture->averageColor() : glm::vec3(0.5f);
+    for (int i = 0; i < 3 && i + 1 < static_cast<int>(chunk.layers.size()); ++i) {
+        const VkTexture* tex = gpuChunk.layerTextures[i];
+        const auto& alpha = chunk.layers[i + 1].alphaData;
+        if (!tex || alpha.empty()) continue;
+        uint64_t sum = 0;
+        for (uint8_t a : alpha) sum += a;
+        const float cover = static_cast<float>(sum) / (255.0f * static_cast<float>(alpha.size()));
+        albedo = glm::mix(albedo, tex->averageColor(), cover);
+    }
+    src.surfaces.push_back(packRtSurface(albedo, 1.0f));
+
+    gpuChunk.rtMesh = rtScene_->addMesh(std::move(src));
+    // Terrain vertices are already in world space.
+    gpuChunk.rtInstance = rtScene_->addInstance(gpuChunk.rtMesh, glm::mat4(1.0f));
+}
+
 void TerrainRenderer::destroyChunkGPU(TerrainChunkGPU& chunk) {
     if (!vkCtx) return;
+
+    if (rtScene_ && chunk.rtMesh != RtScene::kInvalid) {
+        rtScene_->removeInstance(chunk.rtInstance);
+        rtScene_->removeMesh(chunk.rtMesh);
+        chunk.rtInstance = chunk.rtMesh = RtScene::kInvalid;
+    }
 
     VkDevice device = vkCtx->getDevice();
     VmaAllocator allocator = vkCtx->getAllocator();

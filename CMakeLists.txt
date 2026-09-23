@@ -495,6 +495,10 @@ function(compile_shaders TARGET_NAME)
     file(MAKE_DIRECTORY ${SPV_DIR})
 
     file(GLOB GLSL_SOURCES "${SHADER_DIR}/*.glsl")
+    # Shared code lives in .glsli, which the glob above does not pick up. A
+    # shader that includes any of it is rebuilt when one changes; the rest are
+    # left alone, since their .spv are tracked and a rebuild rewrites them.
+    file(GLOB GLSL_INCLUDES "${SHADER_DIR}/*.glsli")
     set(SPV_OUTPUTS)
 
     foreach(GLSL_FILE ${GLSL_SOURCES})
@@ -517,14 +521,43 @@ function(compile_shaders TARGET_NAME)
             continue()
         endif()
 
+        file(STRINGS ${GLSL_FILE} SHADER_INCLUDES REGEX "^#include \"")
+        set(SHADER_DEPS ${GLSL_FILE})
+        if(SHADER_INCLUDES)
+            list(APPEND SHADER_DEPS ${GLSL_INCLUDES})
+        endif()
         add_custom_command(
             OUTPUT ${SPV_FILE}
             COMMAND ${GLSLC} -fshader-stage=${SHADER_STAGE} -O ${GLSL_FILE} -o ${SPV_FILE}
-            DEPENDS ${GLSL_FILE}
+            DEPENDS ${SHADER_DEPS}
             COMMENT "Compiling SPIR-V: ${FILE_NAME} -> ${SPV_NAME}"
             VERBATIM
         )
         list(APPEND SPV_OUTPUTS ${SPV_FILE})
+    endforeach()
+
+    # Extra builds of one source with different definitions: source, output,
+    # then the extra glslc arguments. Ray queries need SPIR-V 1.4 or later,
+    # hence the target environment on the hardware tracer.
+    set(SHADER_VARIANTS
+        "rt_prepare.comp.glsl|rt_prepare_ms.comp.spv|-DRT_MSAA"
+        "rt_trace.comp.glsl|rt_trace_hw.comp.spv|-DRT_HARDWARE --target-env=vulkan1.2"
+    )
+    foreach(VARIANT ${SHADER_VARIANTS})
+        string(REPLACE "|" ";" VARIANT_PARTS "${VARIANT}")
+        list(GET VARIANT_PARTS 0 VARIANT_SRC)
+        list(GET VARIANT_PARTS 1 VARIANT_OUT)
+        list(GET VARIANT_PARTS 2 VARIANT_ARGS)
+        separate_arguments(VARIANT_ARGS UNIX_COMMAND "${VARIANT_ARGS}")
+        add_custom_command(
+            OUTPUT ${SPV_DIR}/${VARIANT_OUT}
+            COMMAND ${GLSLC} -fshader-stage=compute ${VARIANT_ARGS} -O
+                    ${SHADER_DIR}/${VARIANT_SRC} -o ${SPV_DIR}/${VARIANT_OUT}
+            DEPENDS ${SHADER_DIR}/${VARIANT_SRC} ${GLSL_INCLUDES}
+            COMMENT "Compiling SPIR-V: ${VARIANT_SRC} -> ${VARIANT_OUT}"
+            VERBATIM
+        )
+        list(APPEND SPV_OUTPUTS ${SPV_DIR}/${VARIANT_OUT})
     endforeach()
 
     add_custom_target(${TARGET_NAME}_shaders ALL DEPENDS ${SPV_OUTPUTS})
@@ -872,6 +905,9 @@ set(WOWEE_SOURCES
     src/rendering/shadow_params.cpp
     src/rendering/terrain_manager.cpp
     src/rendering/frustum.cpp
+    src/rendering/rt_bvh.cpp
+    src/rendering/rt_scene.cpp
+    src/rendering/rt_lighting.cpp
     src/rendering/performance_hud.cpp
     src/rendering/water_renderer.cpp
     src/rendering/skybox.cpp
@@ -1712,6 +1748,45 @@ if(WOWEE_BUILD_FRAMEXML_RUN)
 endif()
 
 
+# ---- Tool: rt_probe ----
+# The ray traced lighting pass run once against a scene with a known answer
+# on this machine's Vulkan device, without a realm to stand in. Built from the
+# client's own sources like framexml_run, for the same reason.
+option(WOWEE_BUILD_RT_PROBE "Build the ray traced lighting probe (tools/rt_probe.cpp)" OFF)
+if(WOWEE_BUILD_RT_PROBE)
+    set(WOWEE_RT_PROBE_SOURCES ${WOWEE_SOURCES})
+    list(REMOVE_ITEM WOWEE_RT_PROBE_SOURCES src/main.cpp)
+    add_executable(rt_probe
+        ${CMAKE_CURRENT_SOURCE_DIR}/tools/rt_probe.cpp
+        ${WOWEE_RT_PROBE_SOURCES}
+        ${WOWEE_PLATFORM_SOURCES}
+        ${WOWEE_MACOS_SOURCES}
+    )
+    get_target_property(_rtp_libs wowee LINK_LIBRARIES)
+    get_target_property(_rtp_incs wowee INCLUDE_DIRECTORIES)
+    get_target_property(_rtp_defs wowee COMPILE_DEFINITIONS)
+    get_target_property(_rtp_libdirs wowee LINK_DIRECTORIES)
+    if(_rtp_libs)
+        target_link_libraries(rt_probe PRIVATE ${_rtp_libs})
+    endif()
+    if(_rtp_libdirs)
+        target_link_directories(rt_probe PRIVATE ${_rtp_libdirs})
+    endif()
+    if(_rtp_incs)
+        target_include_directories(rt_probe PRIVATE ${_rtp_incs})
+    endif()
+    if(_rtp_defs)
+        target_compile_definitions(rt_probe PRIVATE ${_rtp_defs})
+    endif()
+    target_include_directories(rt_probe SYSTEM PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/extern
+        ${CMAKE_CURRENT_SOURCE_DIR}/extern/vk-bootstrap/src)
+    add_dependencies(rt_probe wowee_version wowee_shaders)
+    if(TARGET opcodes-generate)
+        add_dependencies(rt_probe opcodes-generate)
+    endif()
+endif()
+
 # ---- Tool: mpq_build (loose files → MPQ) ----
 # The reverse of asset_extract, and not for WoWee, which reads loose files: for
 # handing an override directory to a client that only reads archives, and for
@@ -2475,6 +2550,9 @@ add_executable(wowee_editor
     src/rendering/bone_slots.cpp
     src/rendering/normal_map.cpp
     src/rendering/frustum.cpp
+    src/rendering/rt_bvh.cpp
+    src/rendering/rt_scene.cpp
+    src/rendering/rt_lighting.cpp
     src/rendering/volumetric_fog.cpp
 
     # Core

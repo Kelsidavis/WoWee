@@ -64,6 +64,8 @@ public:
     float pendingFogStrength = 0.4f;
     /// Volumetric fog: 0 off, 1-3 the volume's size. See VolumetricFog.
     int pendingVolumetricFog = 2;
+    /// Ray traced lighting: 0 off, 1 sun, 2 + occlusion, 3 + bounce. See RtLighting.
+    int pendingRtLighting = 0;
     /// A multiplier on how thick that mist is. See Renderer::setVolumetricFogDensity.
     float pendingVolumetricDensity = 1.0f;
     bool pendingWaterRefraction = true;

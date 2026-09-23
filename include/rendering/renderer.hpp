@@ -73,6 +73,8 @@ class OverlaySystem;
 class HiZSystem;
 class GrassRenderer;
 class VolumetricFog;
+class RtScene;
+class RtLighting;
 class LootSparkles;
 class SunShafts;
 class ScreenCapture;
@@ -173,6 +175,10 @@ public:
     /// What a per-frame set allocated elsewhere binds at binding 2: a fog
     /// volume of clear air, for a set whose block leaves the fog off.
     VkImageView getNeutralFogVolumeView() const;
+    /// What a per-frame set allocated elsewhere binds at 3 and 4.
+    VkImageView getNeutralRtLightingView() const;
+    /// The geometry the ray traced lighting sees; renderers register with it.
+    RtScene* getRtScene() const { return rtScene_.get(); }
     VkRenderPass getShadowRenderPass() const { return shadowRenderPass; }
 
     // Third-person character follow
@@ -393,6 +399,9 @@ public:
     /// off, 1-3 the volume's resolution. Applied at the start of the next
     /// frame. See VolumetricFog.
     void setVolumetricFogQuality(int quality);
+    /// Ray traced lighting: 0 off, 1 sun shadows, 2 + ambient occlusion,
+    /// 3 + one-bounce diffuse. See RtLighting.
+    void setRtLightingMode(int mode);
     /// A multiplier on how thick that air is; 1 is the default mist.
     void setVolumetricFogDensity(float density) { volumetricFogDensity_ = glm::clamp(density, 0.0f, 3.0f); }
     /// Rays streaming from the sun across the finished picture. See SunShafts.
@@ -537,6 +546,14 @@ private:
     // Volumetric fog: a froxel volume built after the shadow pass and read by
     // every world shader through set 0 binding 2.
     std::unique_ptr<VolumetricFog> volumetricFog_;
+    // Ray traced lighting. Created with the per-frame resources and destroyed
+    // after every renderer that registers geometry with the scene.
+    std::unique_ptr<RtScene> rtScene_;
+    std::unique_ptr<RtLighting> rtLighting_;
+    void writeRtLightingBindings();
+    VkExtent2D sceneRenderExtent() const;
+    void recordRtLighting(VkImage sceneDepth, VkExtent2D sceneExtent, bool depthIsMsaa);
+    bool rtRecordedThisFrame_ = false;
     float volumetricFogDensity_ = 1.0f;
     /// Whether this frame builds the volume, decided where the per-frame block
     /// is written so the block's switch and the dispatch cannot disagree.

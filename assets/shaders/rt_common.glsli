@@ -1,0 +1,122 @@
+// Shared by the ray traced lighting passes (rt_*.comp.glsl).
+//
+// Set 0 is the lighting pass's own: this block, the scene depth and the
+// working images. Set 1 is the scene (rt_trace_sw.glsli / rt_trace_hw.glsli).
+// Must match RtPassData in rt_lighting.cpp.
+
+layout(set = 0, binding = 0) uniform RtPassData {
+    mat4 invViewProj;    // this frame: NDC -> world
+    mat4 prevViewProj;   // last frame: world -> clip, for reprojection
+    vec4 cameraPos;      // xyz; w = frame counter
+    vec4 prevCameraPos;  // xyz
+    vec4 sunDir;         // xyz toward the sun; w = tan of its angular radius
+    vec4 sunColor;       // rgb; w = 1 when the sun is above the horizon
+    vec4 skyColor;       // rgb radiance of a ray that escapes
+    vec4 params;         // x = mode (1 shadows, 2 +AO, 3 +GI), y = AO radius,
+                         // z = GI ray length, w = shadow ray length
+    vec4 extent;         // xy = trace size, zw = 1 / trace size
+    vec4 sceneExtent;    // xy = scene depth size, zw = 1 / size
+    vec4 misc;           // x = 1 when the acceleration structure holds anything,
+                         // y = 1 when last frame's slot holds history
+} pass;
+
+const uint RT_MODE_SHADOWS = 1u;
+const uint RT_MODE_AO = 2u;
+const uint RT_MODE_GI = 3u;
+
+// PCG hash. Good enough decorrelation per pixel and frame that the temporal
+// filter sees independent samples.
+uint rtHash(uint v) {
+    uint state = v * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+uint rtSeed(uvec2 pixel, uint frame) {
+    return rtHash(pixel.x ^ rtHash(pixel.y ^ rtHash(frame)));
+}
+
+float rtRandom(inout uint state) {
+    state = rtHash(state);
+    return float(state) * (1.0 / 4294967296.0);
+}
+
+// An orthonormal basis around n (Duff et al. 2017).
+void rtBasis(vec3 n, out vec3 t, out vec3 b) {
+    float s = n.z >= 0.0 ? 1.0 : -1.0;
+    float a = -1.0 / (s + n.z);
+    float c = n.x * n.y * a;
+    t = vec3(1.0 + s * n.x * n.x * a, s * c, -s * n.x);
+    b = vec3(c, s + n.y * n.y * a, -n.y);
+}
+
+vec3 rtCosineHemisphere(vec3 n, inout uint rng) {
+    float u = rtRandom(rng), v = rtRandom(rng);
+    float r = sqrt(u);
+    float phi = 6.28318530718 * v;
+    vec3 t, b;
+    rtBasis(n, t, b);
+    return normalize(t * (r * cos(phi)) + b * (r * sin(phi)) + n * sqrt(max(0.0, 1.0 - u)));
+}
+
+// A direction inside the cone of half-angle atan(tanRadius) around d.
+vec3 rtConeSample(vec3 d, float tanRadius, inout uint rng) {
+    float u = rtRandom(rng), v = rtRandom(rng);
+    float r = sqrt(u) * tanRadius;
+    float phi = 6.28318530718 * v;
+    vec3 t, b;
+    rtBasis(d, t, b);
+    return normalize(d + t * (r * cos(phi)) + b * (r * sin(phi)));
+}
+
+vec4 rtUnpackSurface(float packed) {
+    return unpackUnorm4x8(floatBitsToUint(packed));
+}
+
+// World position of a pixel in the scene depth.
+vec3 rtWorldFromDepth(vec2 uv, float depth) {
+    vec4 ndc = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    vec4 w = pass.invViewProj * ndc;
+    return w.xyz / w.w;
+}
+
+// The tracer's G-buffer texel: octahedral normal in xy, distance to the
+// camera in z (0 for sky), and in w which pixel of the 2x2 scene block it was
+// taken from (0-3, x fastest). The nearest surface in the block is kept, so
+// the edge of an object in front of the sky or a far wall is never lost to
+// the half resolution.
+vec2 rtOctEncode(vec3 n) {
+    n /= abs(n.x) + abs(n.y) + abs(n.z);
+    vec2 e = n.xy;
+    if (n.z < 0.0) e = (1.0 - abs(n.yx)) * vec2(e.x >= 0.0 ? 1.0 : -1.0, e.y >= 0.0 ? 1.0 : -1.0);
+    return e;
+}
+
+vec3 rtOctDecode(vec2 e) {
+    vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
+    if (n.z < 0.0) n.xy = (1.0 - abs(n.yx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0);
+    return normalize(n);
+}
+
+vec3 rtGbufNormal(vec4 g) { return rtOctDecode(g.xy); }
+float rtGbufDist(vec4 g) { return g.z; }
+
+// The first scene pixel of trace texel px's block, and the block's size.
+ivec2 rtBlockBase(ivec2 px) {
+    return ivec2(floor(vec2(px) * pass.sceneExtent.xy * pass.extent.zw));
+}
+
+// World position a G-buffer texel stands for.
+vec3 rtGbufWorld(vec4 g, ivec2 px) {
+    int sub = int(g.w + 0.5);
+    ivec2 sp = rtBlockBase(px) + ivec2(sub & 1, sub >> 1);
+    vec2 uv = (vec2(sp) + 0.5) * pass.sceneExtent.zw;
+    vec3 dir = normalize(rtWorldFromDepth(uv, 0.5) - pass.cameraPos.xyz);
+    return pass.cameraPos.xyz + dir * g.z;
+}
+
+// Distance the ray has to leave a surface by before it may hit it again.
+// Grows with distance from the camera, as the depth buffer's precision falls.
+float rtSurfaceOffset(float viewDist) {
+    return 0.02 + viewDist * 0.002;
+}

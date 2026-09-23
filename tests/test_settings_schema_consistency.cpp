@@ -338,7 +338,7 @@ TEST_CASE("every panel the client offers still has settings on it", "[settings][
     std::set<std::string> present;
     for (const auto& d : schema()) present.insert(d.category);
 
-    for (const char* category : {"Graphics", "Detail", "Grass", "Upscaling", "Display",
+    for (const char* category : {"Graphics", "Detail", "Grass", "Ray Tracing", "Upscaling", "Display",
                                  "Camera", "Interface", "Minimap", "Action Bars", "HUD",
                                  "Combat", "Names", "Nameplates", "Combat Text", "Unit Frames",
                                  "Sound", "Sound Effects", "Chat", "Gameplay"}) {
@@ -359,6 +359,8 @@ TEST_CASE("every panel the client offers still has settings on it", "[settings][
     // Nineteen since the nameplates left the Names page: twenty-five controls
     // is more than the 413 by 428 container holds in two columns, and the
     // last four were being laid out past the bottom of the second one.
-    INFO("the schema names " << present.size() << " categories where nineteen are expected");
-    CHECK(present.size() == 19);
+    // Twenty with Ray Tracing, for the same reason as Grass: Graphics and
+    // Detail both fill their columns.
+    INFO("the schema names " << present.size() << " categories where twenty are expected");
+    CHECK(present.size() == 20);
 }

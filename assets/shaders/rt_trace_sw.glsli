@@ -1,0 +1,180 @@
+// The compute tracer: a two-level BVH (rt_bvh.hpp) walked with a stack.
+// Implements the interface rt_trace.comp.glsl expects:
+//   bool rtOccluded(vec3 origin, vec3 dir, float tMax, inout uint rng)
+//   bool rtClosest(vec3 origin, vec3 dir, float tMax, inout uint rng,
+//                  out float t, out vec3 normal, out vec4 surface)
+// Translucent triangles (opacity < 1) are hit with probability equal to their
+// opacity - averaged over frames, that is the fraction of light a leaf card
+// lets through.
+
+struct RtNode { vec3 bmin; uint leftOrFirst; vec3 bmax; uint count; };
+struct RtTri { vec4 v0; vec4 v1; vec4 v2; };
+struct RtMesh { uint nodeOffset; uint triOffset; uint pad0; uint pad1; };
+struct RtInstance { vec4 worldToObject[3]; uint mesh; uint pad0; uint pad1; uint pad2; };
+
+layout(std430, set = 1, binding = 0) readonly buffer RtTris { RtTri rtTris[]; };
+layout(std430, set = 1, binding = 1) readonly buffer RtNodes { RtNode rtNodes[]; };
+layout(std430, set = 1, binding = 2) readonly buffer RtMeshes { RtMesh rtMeshes[]; };
+layout(std430, set = 1, binding = 3) readonly buffer RtInstances { RtInstance rtInstances[]; };
+layout(std430, set = 1, binding = 4) readonly buffer RtTopNodes { RtNode rtTopNodes[]; };
+
+const int RT_STACK = 32;
+
+float rtBoxEntry(vec3 bmin, vec3 bmax, vec3 o, vec3 invD, float tMax) {
+    vec3 t0 = (bmin - o) * invD;
+    vec3 t1 = (bmax - o) * invD;
+    vec3 tn = min(t0, t1), tf = max(t0, t1);
+    float enter = max(max(tn.x, tn.y), max(tn.z, 0.0));
+    float exit = min(min(tf.x, tf.y), min(tf.z, tMax));
+    return enter <= exit ? enter : 1e30;
+}
+
+// Moller-Trumbore, two-sided. Returns t, or -1 for a miss.
+float rtTriHit(RtTri tri, vec3 o, vec3 d) {
+    vec3 e1 = tri.v1.xyz - tri.v0.xyz;
+    vec3 e2 = tri.v2.xyz - tri.v0.xyz;
+    vec3 h = cross(d, e2);
+    float a = dot(e1, h);
+    if (abs(a) < 1e-12) return -1.0;
+    float f = 1.0 / a;
+    vec3 s = o - tri.v0.xyz;
+    float u = f * dot(s, h);
+    if (u < 0.0 || u > 1.0) return -1.0;
+    vec3 q = cross(s, e1);
+    float v = f * dot(d, q);
+    if (v < 0.0 || u + v > 1.0) return -1.0;
+    return f * dot(e2, q);
+}
+
+bool rtAcceptHit(float packedSurface, inout uint rng) {
+    float opacity = rtUnpackSurface(packedSurface).a;
+    return opacity >= 1.0 || rtRandom(rng) < opacity;
+}
+
+// Walk one bottom-level hierarchy in object space. Updates tMax and the hit
+// triangle when a closer hit is found; with anyHit, returns at the first.
+bool rtTraceMesh(RtMesh mesh, vec3 o, vec3 d, inout float tMax, inout uint hitTri,
+                 bool anyHit, inout uint rng) {
+    vec3 invD = 1.0 / d;
+    uint stack[RT_STACK];
+    int sp = 0;
+    uint cur = 0u;
+    bool found = false;
+    if (rtBoxEntry(rtNodes[mesh.nodeOffset].bmin, rtNodes[mesh.nodeOffset].bmax, o, invD, tMax) > tMax)
+        return false;
+    for (;;) {
+        RtNode node = rtNodes[mesh.nodeOffset + cur];
+        if (node.count > 0u) {
+            for (uint i = node.leftOrFirst; i < node.leftOrFirst + node.count; ++i) {
+                RtTri tri = rtTris[mesh.triOffset + i];
+                float t = rtTriHit(tri, o, d);
+                if (t > 0.0 && t < tMax && rtAcceptHit(tri.v0.w, rng)) {
+                    tMax = t;
+                    hitTri = mesh.triOffset + i;
+                    found = true;
+                    if (anyHit) return true;
+                }
+            }
+        } else {
+            uint a = node.leftOrFirst, b = a + 1u;
+            RtNode na = rtNodes[mesh.nodeOffset + a];
+            RtNode nb = rtNodes[mesh.nodeOffset + b];
+            float ta = rtBoxEntry(na.bmin, na.bmax, o, invD, tMax);
+            float tb = rtBoxEntry(nb.bmin, nb.bmax, o, invD, tMax);
+            if (ta > tb) { float tt = ta; ta = tb; tb = tt; uint u = a; a = b; b = u; }
+            if (ta <= tMax) {
+                if (tb <= tMax && sp < RT_STACK) stack[sp++] = b;
+                cur = a;
+                continue;
+            }
+        }
+        bool next = false;
+        while (sp > 0) {
+            cur = stack[--sp];
+            RtNode n = rtNodes[mesh.nodeOffset + cur];
+            if (rtBoxEntry(n.bmin, n.bmax, o, invD, tMax) <= tMax) { next = true; break; }
+        }
+        if (!next) break;
+    }
+    return found;
+}
+
+vec3 rtToObject(RtInstance inst, vec4 p) {
+    return vec3(dot(inst.worldToObject[0], p), dot(inst.worldToObject[1], p),
+                dot(inst.worldToObject[2], p));
+}
+
+// Top level: instance leaves, one instance per leaf.
+bool rtTraceScene(vec3 o, vec3 d, inout float tMax, out uint hitTri, out uint hitInstance,
+                  bool anyHit, inout uint rng) {
+    hitTri = 0u;
+    hitInstance = 0u;
+    if (pass.misc.x < 0.5) return false;  // the bound buffers hold no scene
+    vec3 invD = 1.0 / d;
+    uint stack[RT_STACK];
+    int sp = 0;
+    uint cur = 0u;
+    bool found = false;
+    if (rtBoxEntry(rtTopNodes[0].bmin, rtTopNodes[0].bmax, o, invD, tMax) > tMax) return false;
+    for (;;) {
+        RtNode node = rtTopNodes[cur];
+        if (node.count > 0u) {
+            for (uint i = node.leftOrFirst; i < node.leftOrFirst + node.count; ++i) {
+                RtInstance inst = rtInstances[i];
+                // The object-space direction is left unnormalised so t stays
+                // a world-space distance.
+                vec3 oo = rtToObject(inst, vec4(o, 1.0));
+                vec3 od = rtToObject(inst, vec4(d, 0.0));
+                if (rtTraceMesh(rtMeshes[inst.mesh], oo, od, tMax, hitTri, anyHit, rng)) {
+                    found = true;
+                    hitInstance = i;
+                    if (anyHit) return true;
+                }
+            }
+        } else {
+            uint a = node.leftOrFirst, b = a + 1u;
+            float ta = rtBoxEntry(rtTopNodes[a].bmin, rtTopNodes[a].bmax, o, invD, tMax);
+            float tb = rtBoxEntry(rtTopNodes[b].bmin, rtTopNodes[b].bmax, o, invD, tMax);
+            if (ta > tb) { float tt = ta; ta = tb; tb = tt; uint u = a; a = b; b = u; }
+            if (ta <= tMax) {
+                if (tb <= tMax && sp < RT_STACK) stack[sp++] = b;
+                cur = a;
+                continue;
+            }
+        }
+        bool next = false;
+        while (sp > 0) {
+            cur = stack[--sp];
+            if (rtBoxEntry(rtTopNodes[cur].bmin, rtTopNodes[cur].bmax, o, invD, tMax) <= tMax) {
+                next = true;
+                break;
+            }
+        }
+        if (!next) break;
+    }
+    return found;
+}
+
+bool rtOccluded(vec3 origin, vec3 dir, float tMax, inout uint rng) {
+    uint tri, inst;
+    return rtTraceScene(origin, dir, tMax, tri, inst, true, rng);
+}
+
+bool rtClosest(vec3 origin, vec3 dir, float tMax, inout uint rng,
+               out float t, out vec3 normal, out vec4 surface) {
+    uint tri, instIdx;
+    t = tMax;
+    normal = vec3(0.0, 0.0, 1.0);
+    surface = vec4(0.0);
+    if (!rtTraceScene(origin, dir, t, tri, instIdx, false, rng)) return false;
+    RtTri hit = rtTris[tri];
+    RtInstance inst = rtInstances[instIdx];
+    vec3 n = cross(hit.v1.xyz - hit.v0.xyz, hit.v2.xyz - hit.v0.xyz);
+    // Object to world for a normal is the transpose of world-to-object.
+    n = inst.worldToObject[0].xyz * n.x + inst.worldToObject[1].xyz * n.y +
+        inst.worldToObject[2].xyz * n.z;
+    normal = normalize(n);
+    if (dot(normal, dir) > 0.0) normal = -normal;
+    surface = rtUnpackSurface(hit.v0.w);
+    return true;
+}

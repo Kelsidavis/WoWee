@@ -60,6 +60,13 @@ struct BLPImage {
     /// that is currently running.
     [[nodiscard]] bool hasTransparency() const;
 
+    /// Mean colour of the visible texels (alpha above half) and the fraction
+    /// of texels that are visible, read from a small mip. What the ray traced
+    /// lighting stores per triangle in place of the texture: the colour a
+    /// bounce off the surface picks up, and how much light a leaf card lets
+    /// through. A texture with no visible texels reports white and zero.
+    void averageColor(float rgb[3], float& coverage) const;
+
     /// Whether this texture's alpha is a silhouette that has to be honoured.
     ///
     /// Asked by a batch whose material says opaque. Blend mode 0 means the

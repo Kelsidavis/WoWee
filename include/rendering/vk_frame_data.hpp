@@ -36,6 +36,13 @@ struct GPUPerFrameData {
     // z = 1 / ln(far / near), w = slice count. Off in the reflection pass and
     // the character preview, which bind a neutral volume there.
     glm::vec4 volumetricParams;
+    // Last frame's ray traced lighting at set 0 bindings 3 and 4, and how to
+    // find a surface in it (rt_lighting.glsli): the view-projection and camera
+    // position it was traced with, and params.x = mode, 0 when there is no
+    // result to read. Zero in the reflection pass and the character preview.
+    glm::mat4 rtViewProj;
+    glm::vec4 rtCameraPos;
+    glm::vec4 rtParams;
 };
 
 // Push constants for the model matrix (most common case)

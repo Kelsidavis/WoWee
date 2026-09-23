@@ -586,6 +586,10 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                 drawSchemaCategory("Grass", saveCallback);
 
                 ImGui::Spacing();
+                ImGui::SeparatorText("Ray Tracing (highly experimental)");
+                drawSchemaCategory("Ray Tracing", saveCallback);
+
+                ImGui::Spacing();
                 ImGui::SeparatorText("Upscaling");
                 drawSchemaCategory("Upscaling", saveCallback);
                 // Not settings: what the machine can actually do, which is the
@@ -619,7 +623,7 @@ void SettingsPanel::renderSettingsWindow(ChatPanel& chatPanel,
                 if (ImGui::Button("Restore Video Defaults", ImVec2(-1, 0))) {
                     // Three categories, because the settings window puts on one
                     // tab what the options panels put on three.
-                    for (const char* category : {"Graphics", "Detail", "Upscaling", "Display"}) {
+                    for (const char* category : {"Graphics", "Detail", "Ray Tracing", "Upscaling", "Display"}) {
                         restoreSchemaDefaults(category);
                     }
                     // Only the resolution is outside the schema now: it is the
@@ -855,6 +859,7 @@ constexpr const char* kGraphicsApplyKeys[] = {
     "fsrsharpness", "framegen", "brightness", "uiopacity", "minimapsquare",
     "minimapnpcdots", "minimapclock", "minimapcoords", "minimaprotate", "latencymeter",
     "fogskyblend", "fogstrength", "sharpstars", "lightshafts", "mistdensity", "sunshafts",
+    "raytracedlighting",
     // Moved off the game's own Effects panel, so this list is now what
     // applies them at startup; the cvar store used to do it.
     "groundclutterdistance", "particledensity", "weatherdetail",
@@ -997,6 +1002,7 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "fogskyblend",    .asFloat = &SettingsPanel::pendingFogSkyBlend},
     {.key = "fogstrength",    .asFloat = &SettingsPanel::pendingFogStrength},
     {.key = "lightshafts",    .asInt   = &SettingsPanel::pendingVolumetricFog},
+    {.key = "raytracedlighting", .asInt = &SettingsPanel::pendingRtLighting},
     {.key = "mistdensity",    .asFloat = &SettingsPanel::pendingVolumetricDensity},
     {.key = "mousespeed",     .asFloat = &SettingsPanel::pendingMouseSensitivity},
     {.key = "minimapclock",   .asBool  = &SettingsPanel::pendingShowMinimapClock},
@@ -1388,6 +1394,8 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
         }
     } else if (key == "lightshafts") {
         if (renderer) renderer->setVolumetricFogQuality(pendingVolumetricFog);
+    } else if (key == "raytracedlighting") {
+        if (renderer) renderer->setRtLightingMode(pendingRtLighting);
     } else if (key == "mistdensity") {
         if (renderer) renderer->setVolumetricFogDensity(pendingVolumetricDensity);
     } else if (key == "fogskyblend") {

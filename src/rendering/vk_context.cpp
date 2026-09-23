@@ -715,6 +715,46 @@ bool VkContext::createLogicalDevice() {
     checkpointsSupported_ = vkbPhysicalDevice_.enable_extension_if_present(
         VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
 
+    // Hardware ray queries for the ray traced lighting. All three extensions
+    // and both features, or none: the lighting falls back to its compute
+    // tracer, which needs nothing beyond storage buffers. The features are
+    // asked before any extension is enabled so a device that lists the
+    // extensions but not the features does not end up with them half on.
+    // WOWEE_RT_FORCE_SOFTWARE keeps them off on hardware that has them, which
+    // is how the fallback is exercised on such a machine.
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR asFeatures{};
+    asFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+    VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{};
+    rayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+    {
+        const bool forceSoftware = std::getenv("WOWEE_RT_FORCE_SOFTWARE") != nullptr;
+        const bool listed =
+            vkbPhysicalDevice_.is_extension_present(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) &&
+            vkbPhysicalDevice_.is_extension_present(VK_KHR_RAY_QUERY_EXTENSION_NAME) &&
+            vkbPhysicalDevice_.is_extension_present(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+        if (listed && !forceSoftware && instanceApiVersion_ >= VK_API_VERSION_1_2) {
+            VkPhysicalDeviceVulkan12Features f12{};
+            f12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+            asFeatures.pNext = &rayQueryFeatures;
+            f12.pNext = &asFeatures;
+            VkPhysicalDeviceFeatures2 f2{};
+            f2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+            f2.pNext = &f12;
+            vkGetPhysicalDeviceFeatures2(physicalDevice, &f2);
+            hardwareRayQuery_ = f12.bufferDeviceAddress && asFeatures.accelerationStructure &&
+                                rayQueryFeatures.rayQuery;
+        }
+        if (hardwareRayQuery_) {
+            vkbPhysicalDevice_.enable_extension_if_present(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+            vkbPhysicalDevice_.enable_extension_if_present(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+            vkbPhysicalDevice_.enable_extension_if_present(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+        }
+        LOG_INFO("Ray traced lighting: ",
+                 hardwareRayQuery_ ? "hardware ray queries"
+                 : forceSoftware   ? "compute tracer (WOWEE_RT_FORCE_SOFTWARE)"
+                                   : "compute tracer (no hardware ray queries)");
+    }
+
     vkb::DeviceBuilder deviceBuilder{vkbPhysicalDevice_};
 
     // Enable optional Vulkan 1.1/1.2 features for FSR2/FSR3 compute shaders.
@@ -769,8 +809,19 @@ bool VkContext::createLogicalDevice() {
         }
         // Add each struct separately - vk-bootstrap owns the pNext chaining;
         // manually linking them would be overwritten when it appends the next.
+        if (hardwareRayQuery_) enabled12.bufferDeviceAddress = VK_TRUE;
         deviceBuilder.add_pNext(&enabled11);
         deviceBuilder.add_pNext(&enabled12);
+    }
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR enabledAs{};
+    enabledAs.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+    VkPhysicalDeviceRayQueryFeaturesKHR enabledRayQuery{};
+    enabledRayQuery.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+    if (hardwareRayQuery_) {
+        enabledAs.accelerationStructure = VK_TRUE;
+        enabledRayQuery.rayQuery = VK_TRUE;
+        deviceBuilder.add_pNext(&enabledAs);
+        deviceBuilder.add_pNext(&enabledRayQuery);
     }
 
     // synchronization2, which is core at the 1.3 this build now requires -
@@ -1021,6 +1072,8 @@ bool VkContext::createAllocator() {
     const uint32_t vmaCeiling = VK_MAKE_API_VERSION(
         0, VMA_VULKAN_VERSION / 1000000, (VMA_VULKAN_VERSION / 1000) % 1000, 0);
     allocInfo.vulkanApiVersion = std::min(instanceApiVersion_, vmaCeiling);
+    // Acceleration structure builds take their inputs by device address.
+    if (hardwareRayQuery_) allocInfo.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     if (instanceApiVersion_ > vmaCeiling) {
         LOG_INFO("Instance is Vulkan ", VK_VERSION_MAJOR(instanceApiVersion_), ".",
                  VK_VERSION_MINOR(instanceApiVersion_), " but VMA was built for ",

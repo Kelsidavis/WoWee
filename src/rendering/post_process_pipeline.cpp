@@ -185,6 +185,7 @@ bool PostProcessPipeline::executePostProcessing(VkCommandBuffer cmd, uint32_t im
     if (fsr2_.enabled && fsr2_.sceneFramebuffer) {
         // End the off-screen scene render pass
         vkCmdEndRenderPass(currentCmd_);
+        if (sceneClosedHook_) sceneClosedHook_(currentCmd_);
 
         if (fsr2_.useAmdBackend) {
             // Compute passes: motion vectors -> temporal accumulation
@@ -307,6 +308,7 @@ bool PostProcessPipeline::executePostProcessing(VkCommandBuffer cmd, uint32_t im
         inlineMode = true;
         // End the off-screen scene render pass
         vkCmdEndRenderPass(currentCmd_);
+        if (sceneClosedHook_) sceneClosedHook_(currentCmd_);
 
         // Transition resolved scene color: PRESENT_SRC_KHR → SHADER_READ_ONLY
         transitionImageLayout(currentCmd_, fxaa_.sceneColor.image,
@@ -348,6 +350,7 @@ bool PostProcessPipeline::executePostProcessing(VkCommandBuffer cmd, uint32_t im
         // FSR1 upscale path - only runs when FXAA is not active.
         // When both FSR1 and FXAA are enabled, FXAA took priority above.
         vkCmdEndRenderPass(currentCmd_);
+        if (sceneClosedHook_) sceneClosedHook_(currentCmd_);
 
         // Transition scene color (1x resolve/color target): PRESENT_SRC_KHR → SHADER_READ_ONLY
         transitionImageLayout(currentCmd_, fsr_.sceneColor.image,
@@ -572,7 +575,7 @@ bool PostProcessPipeline::initFSRResources() {
     // sceneDepth: matches current MSAA sample count
     fsr_.sceneDepth = createImage(device, alloc, fsr_.internalWidth, fsr_.internalHeight,
         depthFmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
-                | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, msaa);
+                | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, msaa);
     if (!fsr_.sceneDepth.image) {
         LOG_ERROR("FSR: failed to create scene depth image");
         destroyFSRResources();
@@ -592,7 +595,7 @@ bool PostProcessPipeline::initFSRResources() {
         if (useDepthResolve) {
             fsr_.sceneDepthResolve = createImage(device, alloc, fsr_.internalWidth, fsr_.internalHeight,
                 depthFmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
-                        | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+                        | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
             if (!fsr_.sceneDepthResolve.image) {
                 LOG_ERROR("FSR: failed to create depth resolve image");
                 destroyFSRResources();
@@ -1652,7 +1655,7 @@ bool PostProcessPipeline::initFXAAResources() {
     // sceneDepth: depth buffer at current MSAA sample count
     fxaa_.sceneDepth = createImage(device, alloc, ext.width, ext.height,
         depthFmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
-                | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, msaa);
+                | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, msaa);
     if (!fxaa_.sceneDepth.image) {
         LOG_ERROR("FXAA: failed to create scene depth image");
         destroyFXAAResources();
@@ -1670,7 +1673,7 @@ bool PostProcessPipeline::initFXAAResources() {
         if (useDepthResolve) {
             fxaa_.sceneDepthResolve = createImage(device, alloc, ext.width, ext.height,
                 depthFmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
-                        | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+                        | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
             if (!fxaa_.sceneDepthResolve.image) {
                 LOG_ERROR("FXAA: failed to create depth resolve image");
                 destroyFXAAResources();

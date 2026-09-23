@@ -364,7 +364,7 @@ void CharacterPreview::createFBO() {
         sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         sizes[0].descriptorCount = MAX_FRAMES;
         sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        sizes[1].descriptorCount = MAX_FRAMES * 2;
+        sizes[1].descriptorCount = MAX_FRAMES * 4;
 
         VkDescriptorPoolCreateInfo ci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
         ci.maxSets = MAX_FRAMES;
@@ -427,7 +427,13 @@ void CharacterPreview::createFBO() {
         fogImg.imageView = appRenderer->getNeutralFogVolumeView();
         fogImg.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-        VkWriteDescriptorSet writes[3]{};
+        // Bindings 3 and 4 are the world's ray traced lighting; the neutral
+        // image, with the block's switch left at zero.
+        VkDescriptorImageInfo rtImg{};
+        rtImg.imageView = appRenderer->getNeutralRtLightingView();
+        rtImg.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+        VkWriteDescriptorSet writes[5]{};
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet = previewPerFrameSet_[i];
         writes[0].dstBinding = 0;
@@ -446,8 +452,16 @@ void CharacterPreview::createFBO() {
         writes[2].descriptorCount = 1;
         writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         writes[2].pImageInfo = &fogImg;
+        for (uint32_t b = 3; b <= 4; ++b) {
+            writes[b].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[b].dstSet = previewPerFrameSet_[i];
+            writes[b].dstBinding = b;
+            writes[b].descriptorCount = 1;
+            writes[b].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            writes[b].pImageInfo = &rtImg;
+        }
 
-        vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
+        vkUpdateDescriptorSets(device, 5, writes, 0, nullptr);
     }
 
     // 5. Register the color attachment as an ImGui texture

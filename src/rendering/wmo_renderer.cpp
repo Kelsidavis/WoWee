@@ -5,6 +5,8 @@
 #include "rendering/wmo_vertex.hpp"
 #include "rendering/shadow_params.hpp"
 #include "rendering/wmo_renderer.hpp"
+#include "rendering/rt_bvh.hpp"
+#include "rendering/rt_scene.hpp"
 #include "rendering/wmo_material_class.hpp"
 #include "rendering/normal_map.hpp"
 #include "rendering/m2_renderer.hpp"
@@ -328,6 +330,7 @@ void WMORenderer::shutdown() {
 
     // Free all GPU resources for loaded models
     for (auto& [id, model] : loadedModels) {
+        releaseRtModel(id);
         for (auto& group : model.groups) {
             destroyGroupGPU(group);
         }
@@ -1054,6 +1057,7 @@ WMORenderer::ModelLoadResult WMORenderer::loadModelIncremental(
     // Read before the move: the log line below reports what was stored, and
     // modelData no longer owns it afterwards.
     const uint32_t loadedGroupCount = modelData.loadedGroups;
+    registerRtModel(id, modelData);
     loadedModels[id] = std::move(modelData);
     loadingModels_.erase(id);
     core::Logger::getInstance().debug("WMO model ", id, " loaded successfully (", loadedGroupCount, " groups)");
@@ -1078,6 +1082,7 @@ void WMORenderer::unloadModel(uint32_t id) {
     if (it == loadedModels.end()) {
         return;
     }
+    releaseRtModel(id);
 
     // Free GPU resources - defer because in-flight command buffers may
     // still reference this model's vertex/index buffers and descriptors.
@@ -1366,6 +1371,7 @@ void WMORenderer::clearAll() {
 
         // Free GPU resources for loaded models
         for (auto& [id, model] : loadedModels) {
+            releaseRtModel(id);
             for (auto& group : model.groups) {
                 destroyGroupGPU(group);
             }
@@ -4286,6 +4292,102 @@ void WMORenderer::collectGrassClearings(float minX, float minY, float maxX, floa
         } else {
             out.push_back({inst.worldBoundsMin.x, inst.worldBoundsMin.y,
                            inst.worldBoundsMax.x, inst.worldBoundsMax.y, kClearing, kEase});
+        }
+    }
+}
+
+} // namespace rendering
+} // namespace wowee
+
+namespace wowee {
+namespace rendering {
+
+void WMORenderer::registerRtModel(uint32_t modelId, const ModelData& model) {
+    if (!rtScene_ || rtModelMeshes_.count(modelId)) return;
+    RtScene::MeshSource src;
+    for (const auto& group : model.groups) {
+        // Distance shells and groups the renderer never draws would cast
+        // shadows the player cannot see the source of.
+        if (group.isLOD || group.allUntextured || (group.groupFlags & 0x4000000u)) continue;
+        if (group.collisionVertices.empty()) continue;
+        const uint32_t base = static_cast<uint32_t>(src.positions.size());
+        src.positions.insert(src.positions.end(), group.collisionVertices.begin(),
+                             group.collisionVertices.end());
+        for (const auto& batch : group.batches) {
+            const uint32_t mat = batch.materialId;
+            const uint32_t blend = mat < model.materialBlendModes.size() ? model.materialBlendModes[mat] : 0;
+            if (blend >= 2) continue;  // blended: glass, light cards, water sheets
+            const uint32_t flags = mat < model.materialFlags.size() ? model.materialFlags[mat] : 0;
+            glm::vec3 albedo(0.5f);
+            float opacity = 1.0f;
+            if (mat < model.materialTextureIndices.size()) {
+                const uint32_t ti = model.materialTextureIndices[mat];
+                if (ti < model.textureNames.size() && wmoMaterialIsGlass(flags, model.textureNames[ti])) {
+                    continue;
+                }
+                if (ti < model.textures.size() && model.textures[ti]) {
+                    albedo = model.textures[ti]->averageColor();
+                    if (blend == 1) opacity = model.textures[ti]->alphaCoverage();
+                }
+            }
+            const float surface = packRtSurface(albedo, opacity);
+            const uint32_t end = std::min<uint32_t>(batch.startIndex + batch.indexCount,
+                                                    static_cast<uint32_t>(group.collisionIndices.size()));
+            for (uint32_t i = batch.startIndex; i + 2 < end; i += 3) {
+                src.indices.push_back(base + group.collisionIndices[i]);
+                src.indices.push_back(base + group.collisionIndices[i + 1]);
+                src.indices.push_back(base + group.collisionIndices[i + 2]);
+                src.surfaces.push_back(surface);
+            }
+        }
+    }
+    const RtScene::MeshId mesh = rtScene_->addMesh(std::move(src));
+    if (mesh != RtScene::kInvalid) rtModelMeshes_[modelId] = mesh;
+}
+
+void WMORenderer::releaseRtModel(uint32_t modelId) {
+    if (!rtScene_) return;
+    for (auto it = rtInstances_.begin(); it != rtInstances_.end();) {
+        if (it->second.modelId == modelId) {
+            rtScene_->removeInstance(it->second.rtId);
+            it = rtInstances_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    auto mesh = rtModelMeshes_.find(modelId);
+    if (mesh == rtModelMeshes_.end()) return;
+    rtScene_->removeMesh(mesh->second);
+    rtModelMeshes_.erase(mesh);
+}
+
+void WMORenderer::syncRtScene() {
+    if (!rtScene_ || !rtScene_->isActive()) return;
+    const uint64_t gen = ++rtSyncGeneration_;
+    for (const auto& inst : instances) {
+        if (inst.hidden) continue;
+        auto mesh = rtModelMeshes_.find(inst.modelId);
+        if (mesh == rtModelMeshes_.end()) continue;
+        auto rec = rtInstances_.find(inst.id);
+        if (rec == rtInstances_.end()) {
+            const uint32_t rtId = rtScene_->addInstance(mesh->second, inst.modelMatrix);
+            if (rtId != RtScene::kInvalid) {
+                rtInstances_.emplace(inst.id, RtInstanceRecord{rtId, inst.modelId, inst.modelMatrix, gen});
+            }
+            continue;
+        }
+        if (rec->second.matrix != inst.modelMatrix) {
+            rtScene_->setInstanceTransform(rec->second.rtId, inst.modelMatrix);
+            rec->second.matrix = inst.modelMatrix;
+        }
+        rec->second.seen = gen;
+    }
+    for (auto it = rtInstances_.begin(); it != rtInstances_.end();) {
+        if (it->second.seen != gen) {
+            rtScene_->removeInstance(it->second.rtId);
+            it = rtInstances_.erase(it);
+        } else {
+            ++it;
         }
     }
 }

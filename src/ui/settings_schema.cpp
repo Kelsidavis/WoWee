@@ -191,6 +191,21 @@ constexpr SettingDesc kSchema[] = {
      "are sharper and cost more; Low suits weaker hardware.",
      "Off|Low|Medium|High", 2},
 
+    // Off by default: the compute tracer is what most machines get, and it
+    // costs real frames. One row rather than three switches, because each
+    // term builds on the previous one's rays. A page of its own because
+    // Graphics and Detail are both full to the bottom of their columns.
+    {"raytracedlighting", "Ray traced lighting (highly experimental)", SettingKind::Enum, 0, 3, 1,
+     "Ray Tracing", "Highly experimental",
+     "HIGHLY EXPERIMENTAL: expect visual artefacts and a large\n"
+     "frame rate cost, especially without ray tracing hardware.\n"
+     "Traces rays against the world for the sun's shadows, the\n"
+     "darkening in corners and crevices, and light bounced off the\n"
+     "ground and walls. Uses the graphics card's ray tracing where it\n"
+     "has it and a slower compute path where it does not.\n"
+     "Characters still cast shadows from the shadow map.",
+     "Off|Sun shadows|Shadows and occlusion|Shadows, occlusion and bounce light", 0},
+
     // --------------------------------------------------------------- Upscaling
     {"upscaling", "Upscaling", SettingKind::Enum, 0, 2, 1, "Upscaling", "Mode",
      "Draw the world smaller, then scale it up to fill your screen,\n"
