@@ -523,6 +523,12 @@ public:
 
     void setInstanceTransform(uint32_t instanceId, const glm::mat4& transform);
     void setInstanceAnimationFrozen(uint32_t instanceId, bool frozen);
+    /// Play from the first frame, with bones to match.
+    ///
+    /// New instances start at a random point so placed doodads don't animate
+    /// in lockstep, and take their first bones from a sibling that is already
+    /// mid-animation. A spell cast has to start at its beginning instead.
+    void restartInstanceAnimation(uint32_t instanceId);
     /// Play an animation once and stay on its last frame.
     ///
     /// skipToEnd puts the model there immediately, which is what a door that
