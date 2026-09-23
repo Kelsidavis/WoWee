@@ -111,8 +111,12 @@ TEST_CASE("RT BVH honours tMax", "[rt_bvh]") {
     auto tris = randomSoup(500, 9, 20.0f, 2.0f);
     const auto original = tris;
     const RtBvh bvh = buildRtTriangleBvh(tris);
+    // Aim at a triangle rather than a fixed direction: the soup differs between
+    // standard libraries, so a hand-picked ray can miss everything on one of them.
     const glm::vec3 o(-40.0f, 0.3f, 0.1f);
-    const glm::vec3 d(1.0f, 0.0f, 0.0f);
+    const glm::vec3 target =
+        (glm::vec3(original[0].v0) + glm::vec3(original[0].v1) + glm::vec3(original[0].v2)) / 3.0f;
+    const glm::vec3 d = glm::normalize(target - o);
     const float full = bruteForce(original, o, d);
     REQUIRE(full > 0.0f);
     CHECK(traceRtClosest(bvh.nodes, tris, o, d, full * 0.5f).t < 0.0f);
