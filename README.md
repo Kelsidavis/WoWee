@@ -270,17 +270,24 @@ unknown source.
 
 Extract on a desktop exactly as above. There is no need to extract on the
 device. A full extraction is around 18 GB, so cut it down to a profile that
-fits, then copy the result across:
+fits, then copy the result across. Open the app once before pushing, so Android
+creates its folder:
 
 ```bash
 tools/android/make_minimal_data.py --source ~/Data --out ~/Data-phone \
     --profile world --maps all
 adb push ~/Data-phone/. /sdcard/Android/data/com.wowee.client/files/Data/
+adb shell chmod -R a+rwX /sdcard/Android/data/com.wowee.client/files/Data
 ```
 
 The trailing `/.` matters: push the **contents**, not the directory. Nesting it
 one level deeper leaves the client unable to find its `manifest.json`, and it
 starts with no game data at all.
+
+The `chmod` matters too. Files `adb push` writes into the app's folder belong to
+the shell user, not the app, and their directories are closed to it; without
+the `chmod` the client stops at startup with `Permission denied` on
+`manifest.json`. Run it again after any later push.
 
 | Profile | Size | Reaches |
 |---|---|---|

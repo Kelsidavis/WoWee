@@ -260,7 +260,9 @@ def main():
     extra = copy_repo_json(source, out, dry_run=False)
     print("wrote manifest.json with %d entries, plus %d expansion and opcode files."
           % (len(kept_lines), extra))
-    print("\nOn a device:\n  adb push %s/. /sdcard/Android/data/com.wowee.client/files/Data/" % out)
+    print("\nOn a device, after opening the app once:\n"
+          "  adb push %s/. /sdcard/Android/data/com.wowee.client/files/Data/\n"
+          "  adb shell chmod -R a+rwX /sdcard/Android/data/com.wowee.client/files/Data" % out)
     return 0
 
 

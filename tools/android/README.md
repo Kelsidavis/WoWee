@@ -11,7 +11,11 @@ screen and creating a character touches 4% of it.
 tools/android/make_minimal_data.py --source ~/Data --profile login --dry-run
 tools/android/make_minimal_data.py --source ~/Data --out ~/Data-login --profile login
 adb push ~/Data-login/. /sdcard/Android/data/com.wowee.client/files/Data/
+adb shell chmod -R a+rwX /sdcard/Android/data/com.wowee.client/files/Data
 ```
+
+The `chmod` is needed after every push: what `adb push` writes there belongs to
+the shell user, and the app cannot open its directories until they are opened up.
 
 Files are hard linked where the filesystem allows it, so a subset beside its
 source costs almost nothing. `--copy` for a different filesystem.
