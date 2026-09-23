@@ -116,33 +116,55 @@ std::int64_t plainSleepOvershootNs(std::int64_t budgetNs) {
 
 TEST_CASE("the cap holds a 144Hz frame to its budget", "[pacing]") {
     constexpr std::int64_t kFrameNs = 1'000'000'000LL / 144;   // 6'944'444
+    // How late a plain sleep has to land before the tight bound stops meaning
+    // anything: past this the scheduler's quantum is wider than the margin
+    // being measured.
+    constexpr std::int64_t kUntestable = 1'500'000;
 
-    // Several frames: the spin margin is learned, so the first one or two
-    // may still be adjusting to what this machine's sleep actually does.
-    FramePacer pacer;
-    (void)pacer.tickNs();
-    for (int i = 0; i < 3; ++i) { pacer.waitForCap(144); (void)pacer.tickNs(); }
-
+    // Up to three attempts, because both halves of the comparison are
+    // measured on a machine shared with whatever else is running. A CI run
+    // read a plain sleep at 1.37ms - just inside the bound that decides the
+    // tight check is worth making - and then overshot 4.4ms under pacing,
+    // which is the load moving between the two measurements rather than the
+    // cap failing. A cap that returns early, or that sleeps the whole budget
+    // and takes the overshoot on top, misses on every attempt.
+    constexpr int kAttempts = 3;
     std::int64_t bestOvershoot = kFrameNs;
-    for (int i = 0; i < 5; ++i) {
-        const std::int64_t start = pacer.lastTickNs();
-        pacer.waitForCap(144);
+    std::int64_t plain = 0;
+    bool held = false;
+    for (int attempt = 0; attempt < kAttempts && !held; ++attempt) {
+        // Several frames first: the spin margin is learned, so the first one
+        // or two may still be adjusting to what this machine's sleep does.
+        FramePacer pacer;
         (void)pacer.tickNs();
-        const std::int64_t took = pacer.lastTickNs() - start;
+        for (int i = 0; i < 3; ++i) { pacer.waitForCap(144); (void)pacer.tickNs(); }
 
-        // Never short, every time: returning early is the cap failing to cap,
-        // and it is also what dropping the spin at the end of the wait would
-        // do - so this is the check that holds the spin in place.
-        CHECK(took >= kFrameNs);
-        bestOvershoot = std::min(bestOvershoot, took - kFrameNs);
+        bestOvershoot = kFrameNs;
+        for (int i = 0; i < 5; ++i) {
+            const std::int64_t start = pacer.lastTickNs();
+            pacer.waitForCap(144);
+            (void)pacer.tickNs();
+            const std::int64_t took = pacer.lastTickNs() - start;
+
+            // Never short, every time: returning early is the cap failing to
+            // cap, and it is also what dropping the spin at the end of the
+            // wait would do - so this is the check that holds the spin in
+            // place.
+            CHECK(took >= kFrameNs);
+            bestOvershoot = std::min(bestOvershoot, took - kFrameNs);
+        }
+
+        // And not long. Sleeping the whole budget and taking the overshoot on
+        // top is the mistake the learned margin and the spin exist to avoid,
+        // so the bar is a fraction of what that mistake costs on this machine.
+        plain = plainSleepOvershootNs(kFrameNs);
+        held = plain < kUntestable
+                   ? bestOvershoot < std::max<std::int64_t>(plain / 4, 200'000)
+                   : bestOvershoot < 2 * plain;
     }
 
-    // And not long. Sleeping the whole budget and taking the overshoot on top
-    // is the mistake the learned margin and the spin exist to avoid, so the
-    // bar is a fraction of what that mistake costs on this machine.
-    const std::int64_t plain = plainSleepOvershootNs(kFrameNs);
     INFO("best overshoot " << bestOvershoot << "ns, plain sleep " << plain << "ns");
-    if (plain < 1'500'000) {
+    if (plain < kUntestable) {
         CHECK(bestOvershoot < std::max<std::int64_t>(plain / 4, 200'000));
     } else {
         // A shared runner whose scheduler quantum is wider than the margin
