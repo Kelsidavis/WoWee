@@ -37,7 +37,7 @@ public class WoweeActivity extends SDLActivity {
     /** SDLActivity loads these in order; libwowee.so provides SDL_main. */
     @Override
     protected String[] getLibraries() {
-        return new String[] { "SDL2", "wowee" };
+        return new String[] { "SDL3", "wowee" };
     }
 
     @Override

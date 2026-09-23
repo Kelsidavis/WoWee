@@ -12,6 +12,12 @@
 #include "core/data_paths.hpp"
 #include <string>
 #include <SDL3/SDL.h>
+// SDLActivity loads libwowee.so and calls SDL_main, the name this header gives
+// main(). SDL2's SDL.h pulled it in; SDL3's does not, and without it the
+// library exports only main and the activity has nothing to call.
+#ifdef __ANDROID__
+#include <SDL3/SDL_main.h>
+#endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
