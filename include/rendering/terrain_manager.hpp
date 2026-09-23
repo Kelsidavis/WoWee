@@ -484,6 +484,11 @@ private:
 
     // Track tiles currently queued or being processed to avoid duplicates
     std::unordered_map<TileCoord, bool, TileCoord::Hash> pendingTiles; // THREAD-SAFE: protected by queueMutex
+    // Tiles a worker has taken and not yet handed to readyQueue. Protected by queueMutex.
+    int preparingTiles_ = 0;
+    // Whether the workers are waiting on memory, so the wait is reported once
+    // per episode rather than once per retry. Protected by queueMutex.
+    bool memoryWaitReported_ = false;
     std::unordered_set<std::string> missingAdtWarnings_; // THREAD-SAFE: protected by missingAdtWarningsMutex_
     std::mutex missingAdtWarningsMutex_;
 
