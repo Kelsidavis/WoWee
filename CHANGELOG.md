@@ -1,5 +1,18 @@
 # Changelog
 
+## [v3.1.38] - 2026-09-23
+
+### Added
+- **Ray traced lighting (highly experimental).** "Ray traced lighting" on the new Ray Tracing page traces rays against the world for the sun's shadows, the darkening in corners and crevices, and light bounced off the ground and walls. It uses the graphics card's ray tracing where there is some and a slower compute path where there is not. Off by default; expect visual artefacts and a large frame rate cost
+
+### Fixed
+- **The Android app would not start.** The APK ships SDL3, but the app still asked for `libSDL2.so` and carried SDL2's Java side, and the client no longer exported the `SDL_main` the app calls. It loads SDL3 with SDL3's own Java side and starts the client now (#145)
+- **No terrain on a phone.** Terrain loading stopped entirely whenever less than 15% of memory was free, which is where Android keeps a phone by design, so the ground never loaded. Low memory now slows terrain loading to one tile at a time instead of stopping it, and the log says when it does
+- **Spell effects started part-way through their animation.** A cast began at a random frame, the way world doodads do so a field of them does not move in step. Spell effects start at their first frame now, and lava, portals and other placed effects keep their random start (#143, thanks @banishlight)
+
+### Changed
+- **Game data pushed to a phone needs one more step.** Files `adb push` writes into the app's folder belong to the shell user, and the app cannot open them until they are opened up. The README's Android steps add `adb shell chmod -R a+rwX` after the push, and say to open the app once before pushing
+
 ## [v3.1.37] - 2026-09-22
 
 ### Added
