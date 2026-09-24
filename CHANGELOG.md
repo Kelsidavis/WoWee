@@ -1,5 +1,15 @@
 # Changelog
 
+## [v3.1.39] - 2026-09-24
+
+### Fixed
+- **Kicked from the server a few seconds after entering the world.** Some Warden answers are built off the main thread, and nothing sent them once they were ready, so the server's check went unanswered and it dropped the connection. They are sent now, and one still being built when the connection ends is dropped rather than sent on the next (#146)
+- **Loot buttons took the wrong item, or nothing.** Taking an item removed it from the list, so every item after it moved up a slot under buttons that kept their old numbers. Taking the money did the same to every item. Taken items and money now keep their slots (#148, thanks @banishlight)
+- **"StormLib not found" with StormLib installed.** `extract_assets.sh` looked for a library named stormlib, but StormLib's file is `libstorm`, and a source build lands where Fedora's loader does not look. The script finds both now
+
+### Changed
+- **Fedora and Nobara StormLib steps.** StormLib is not packaged for either, and the README now gives the source build, installed under `/usr`
+
 ## [v3.1.38] - 2026-09-23
 
 ### Added
