@@ -97,9 +97,13 @@ fi
 if [ ! -f "$BINARY" ]; then
     # --- Check for StormLib (only required to build) ---
     STORMLIB_FOUND=false
-    if ldconfig -p 2>/dev/null | grep -qi stormlib; then
+    # The library is libstorm; a source build lands in /usr/local, which
+    # Fedora's loader cache does not list.
+    if { ldconfig -p 2>/dev/null || /sbin/ldconfig -p 2>/dev/null; } | grep -qiE 'lib(storm|stormlib)\.'; then
         STORMLIB_FOUND=true
-    elif pkg-config --exists stormlib 2>/dev/null; then
+    elif compgen -G "/usr/local/lib*/libstorm*" > /dev/null 2>&1; then
+        STORMLIB_FOUND=true
+    elif pkg-config --exists stormlib 2>/dev/null || pkg-config --exists storm 2>/dev/null; then
         STORMLIB_FOUND=true
     elif [ -f "$(brew --prefix 2>/dev/null)/lib/libstorm.dylib" ] 2>/dev/null; then
         STORMLIB_FOUND=true
@@ -107,6 +111,7 @@ if [ ! -f "$BINARY" ]; then
     if [ "$STORMLIB_FOUND" = false ]; then
         echo "Error: StormLib not found."
         echo "  Ubuntu/Debian: sudo apt install libstorm-dev"
+        echo "  Fedora/Nobara: build from source - see README, Fedora / Nobara"
         echo "  macOS:         brew install stormlib"
         echo "  From source:   https://github.com/ladislav-zezula/StormLib"
         exit 1

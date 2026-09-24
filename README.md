@@ -104,7 +104,7 @@ SDL3 from source and install it, as CI does with `release-3.2.24`.
 </details>
 
 <details>
-<summary>Fedora</summary>
+<summary>Fedora / Nobara</summary>
 
 ```bash
 sudo dnf install gcc-c++ cmake pkgconf-pkg-config git \
@@ -115,8 +115,23 @@ sudo dnf install gcc-c++ cmake pkgconf-pkg-config git \
 sudo dnf install unicorn-devel
 ```
 
-For the asset tools, build [StormLib](https://github.com/ladislav-zezula/StormLib)
-from source if it is unavailable in your enabled Fedora repositories.
+StormLib is not in the Fedora or Nobara repositories, so the asset tools need
+it built from source. Install it under `/usr` so both CMake and the loader find
+it without extra paths:
+
+```bash
+sudo dnf install cmake gcc-c++ zlib-devel git
+git clone https://github.com/ladislav-zezula/StormLib.git
+cd StormLib && mkdir build && cd build
+cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr
+make -j"$(nproc)"
+sudo make install
+sudo ldconfig
+```
+
+If you configured WoWee before installing StormLib, re-run CMake (or
+`./build.sh`) so it picks StormLib up; until then `asset_extract` and the
+client's asset builder are left out.
 
 </details>
 
