@@ -1085,7 +1085,7 @@ void InventoryHandler::lootItem(uint8_t slotIndex, bool confirmed) {
         // answers it with GetLootSlotInfo, which counts the coin as a slot of
         // its own and the items after it.
         const auto& loot = owner_.getCurrentLoot();
-        int display = (loot.gold > 0) ? 1 : 0;
+        int display = loot.hasCoinSlot() ? 1 : 0;
         for (const auto& item : loot.items) {
             ++display;
             if (item.slotIndex != slotIndex) continue;
@@ -1131,10 +1131,12 @@ void InventoryHandler::cancelTempEnchantment(uint8_t handIndex) {
 }
 
 void InventoryHandler::clearLootMoney() {
-    if (currentLoot_.gold == 0) return;
-    currentLoot_.gold = 0;
+    if (!currentLoot_.goldLeft()) return;
+    // Marked rather than zeroed: the coin is display slot one, and dropping it
+    // would move every item button onto the item after its own.
+    currentLoot_.goldLooted = true;
     auto it = localLootState_.find(currentLoot_.lootGuid);
-    if (it != localLootState_.end()) it->second.data.gold = 0;
+    if (it != localLootState_.end()) it->second.data.goldLooted = true;
     // Display slot one, which is where the coin sits whenever there is one.
     if (lootWindowOpen_ && owner_.addonEventCallbackRef()) {
         owner_.addonEventCallbackRef()("LOOT_SLOT_CLEARED", {"1"});
@@ -4472,7 +4474,7 @@ void InventoryHandler::handleItemQueryResponse(network::Packet& packet) {
         // as long as the corpse is open. LOOT_SLOT_CHANGED is the event the
         // loot frame redraws one button on.
         if (lootWindowOpen_ && owner_.addonEventCallbackRef()) {
-            const int coinSlots = currentLoot_.gold > 0 ? 1 : 0;
+            const int coinSlots = currentLoot_.hasCoinSlot() ? 1 : 0;
             for (size_t i = 0; i < currentLoot_.items.size(); ++i) {
                 if (currentLoot_.items[i].itemId != data.entry) continue;
                 owner_.addonEventCallbackRef()(

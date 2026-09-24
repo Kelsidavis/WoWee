@@ -2995,7 +2995,7 @@ static std::string lootCoinText(uint32_t copper) {
 /// translated before it is sent - which LootSlot already did by carrying
 /// LootItem::slotIndex rather than the display position.
 static bool lootHasCoin(game::GameHandler* gh) {
-    return gh && gh->isLootWindowOpen() && gh->getCurrentLoot().gold > 0;
+    return gh && gh->isLootWindowOpen() && gh->getCurrentLoot().hasCoinSlot();
 }
 
 /// The item behind a display slot, or null when the slot is the coin or past
@@ -3051,6 +3051,8 @@ static int lua_GetLootSlotInfo(lua_State* L) {
     }
     const auto& loot = gh->getCurrentLoot();
     if (lootHasCoin(gh) && slot == 1) {
+        // Taken: the slot stays, empty, as an item's does.
+        if (loot.goldLooted) return luaReturnNil(L);
         // The coin slot describes itself: the interface shows the amount as the
         // name and has a texture of its own for it.
         //
@@ -3130,7 +3132,10 @@ static int lua_LootSlot(lua_State* L) {
     auto* gh = getGameHandler(L);
     int slot = static_cast<int>(luaL_checknumber(L, 1));
     if (!gh || !gh->isLootWindowOpen()) return 0;
-    if (lootHasCoin(gh) && slot == 1) { gh->lootMoney(); return 0; }
+    if (lootHasCoin(gh) && slot == 1) {
+        if (gh->getCurrentLoot().goldLeft()) gh->lootMoney();
+        return 0;
+    }
     if (const auto* item = lootItemAtSlot(gh, slot)) {
         // The server's own slot number, not the position on screen.
         gh->lootItem(item->slotIndex);

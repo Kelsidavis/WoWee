@@ -632,6 +632,7 @@ bool LootResponseParser::parse(network::Packet& packet, LootResponseData& data, 
     }
 
     data.gold = packet.readUInt32();
+    data.goldLooted = false;
     uint8_t itemCount = packet.readUInt8();
 
     // Per-item wire size is 22 bytes across all expansions:

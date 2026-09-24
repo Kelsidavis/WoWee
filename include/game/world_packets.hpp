@@ -2422,10 +2422,15 @@ struct LootResponseData {
     uint64_t lootGuid = 0;
     uint8_t lootType = 0;
     uint32_t gold = 0;           // In copper
+    bool goldLooted = false;     // Taken; the coin keeps its slot
     std::vector<LootItem> items;
 
+    /// Whether display slot one is the coin, taken or not.
+    [[nodiscard]] bool hasCoinSlot() const { return gold > 0; }
+    [[nodiscard]] bool goldLeft() const { return gold > 0 && !goldLooted; }
+
     [[nodiscard]] bool nothingLeft() const {
-        if (gold != 0) return false;
+        if (goldLeft()) return false;
         for (const auto& item : items)
             if (!item.looted) return false;
         return true;
