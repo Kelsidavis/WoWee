@@ -173,6 +173,13 @@ void WardenHandler::reset() {
     wardenModuleSize_ = 0;
     wardenModuleData_.clear();
     wardenLoadedModule_.reset();
+    // A response still being built answers the session that just ended; sent
+    // on the next one it would go out under that session's keys.
+    if (wardenResponsePending_) {
+        wardenPendingEncrypted_.wait();
+        wardenPendingEncrypted_ = {};
+        wardenResponsePending_ = false;
+    }
 }
 
 // ---------------------------------------------------------------------------

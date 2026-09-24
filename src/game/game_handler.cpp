@@ -713,6 +713,11 @@ void GameHandler::update(float deltaTime) {
     updateNetworking();
     if (!socket) return;  // disconnect() may have been called
 
+    // Sends a Warden response built off the main thread. Nothing else does:
+    // without this the server's check goes unanswered and it drops the
+    // connection a few seconds later.
+    if (wardenHandler_) wardenHandler_->update(deltaTime);
+
     // Fallback for CMSG_CHAR_DELETE with no server response: if the server
     // doesn't send SMSG_CHAR_DELETE within 3 seconds, re-request the character
     // list.  Some server cores silently process the delete without responding.
