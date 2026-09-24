@@ -2414,6 +2414,7 @@ struct LootItem {
     uint32_t randomPropertyId = 0;
     uint8_t lootSlotType = 0;
     bool isQuestItem = false;
+    bool looted = false;
 };
 
 /** SMSG_LOOT_RESPONSE data */
@@ -2422,6 +2423,13 @@ struct LootResponseData {
     uint8_t lootType = 0;
     uint32_t gold = 0;           // In copper
     std::vector<LootItem> items;
+
+    [[nodiscard]] bool nothingLeft() const {
+        if (gold != 0) return false;
+        for (const auto& item : items)
+            if (!item.looted) return false;
+        return true;
+    }
 
     [[nodiscard]] bool isValid() const { return true; }
     [[nodiscard]] uint32_t getGold() const { return gold / 10000; }

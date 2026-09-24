@@ -3005,7 +3005,8 @@ static const game::LootItem* lootItemAtSlot(game::GameHandler* gh, int slot) {
     const auto& loot = gh->getCurrentLoot();
     const int itemIndex = lootHasCoin(gh) ? slot - 1 : slot;   // 1-based already
     if (itemIndex < 1 || itemIndex > static_cast<int>(loot.items.size())) return nullptr;
-    return &loot.items[itemIndex - 1];
+    const auto& item = loot.items[itemIndex - 1];
+    return item.looted ? nullptr : &item;
 }
 
 // LootSlotIsCoin(slot) → whether this slot is the money
