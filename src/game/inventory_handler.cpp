@@ -1140,7 +1140,7 @@ void InventoryHandler::clearLootMoney() {
         owner_.addonEventCallbackRef()("LOOT_SLOT_CLEARED", {"1"});
     }
     // A corpse that held only money is empty now.
-    if (lootWindowOpen_ && currentLoot_.items.empty()) closeLoot();
+    if (lootWindowOpen_ && currentLoot_.nothingLeft()) closeLoot();
 }
 
 void InventoryHandler::closeLoot() {
@@ -1280,7 +1280,7 @@ void InventoryHandler::handleLootRemoved(network::Packet& packet) {
             // emits the single "Received item" notification. Slot removal only
             // updates the open loot window; announcing here duplicated chat and
             // the loot sound for the same item.
-            currentLoot_.items.erase(it);
+            it->looted = true;
             if (owner_.addonEventCallbackRef())
                 owner_.addonEventCallbackRef()("LOOT_SLOT_CLEARED", {std::to_string(slotIndex + 1)});
             break;
@@ -1297,7 +1297,7 @@ void InventoryHandler::handleLootRemoved(network::Packet& packet) {
     // in the same breath at open, so items empty with no gold left is a corpse
     // with nothing on it. Retail closes it here too, for a manual last-item
     // loot as much as an automatic one.
-    if (lootWindowOpen_ && currentLoot_.items.empty() && currentLoot_.gold == 0) {
+    if (lootWindowOpen_ && currentLoot_.nothingLeft()) {
         closeLoot();
     }
 }
