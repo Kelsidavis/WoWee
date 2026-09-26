@@ -62,8 +62,9 @@ public:
 
     // ── Emote support ──────────────────────────────────────────────────────
     void playEmote(const std::string& emoteName);
-    /// Play the one-shot reach animation used by the manual Z sheath toggle.
-    void playWeaponSheathAnimation(bool sheathing);
+    /// Play the one-shot reach animation used by the manual Z sheath toggle:
+    /// down to the hip, or over the shoulder to the back.
+    void playWeaponSheathAnimation(bool atHip);
     void cancelEmote();
     [[nodiscard]] bool isEmoteActive() const { return characterAnimator_.getActivity().isEmoteActive(); }
     static std::string getEmoteText(const std::string& emoteName,

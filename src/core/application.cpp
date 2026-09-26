@@ -3685,7 +3685,8 @@ void Application::updateInGame(float deltaTime, const char*& updateCheckpoint) {
         if (attackWeaponNeeded && hasDrawableWeapon && appearanceComposer_ &&
             appearanceComposer_->isWeaponsSheathed()) {
             if (renderer && renderer->getAnimationController()) {
-                renderer->getAnimationController()->playWeaponSheathAnimation(false);
+                renderer->getAnimationController()->playWeaponSheathAnimation(
+                    appearanceComposer_->mainHandSheathesAtHip());
             }
             appearanceComposer_->setWeaponsSheathed(false);
             appearanceComposer_->loadEquippedWeapons();
@@ -3720,9 +3721,9 @@ void Application::updateInGame(float deltaTime, const char*& updateCheckpoint) {
                                      ui::interfaceTakingTypedInput();
         auto& input = Input::getInstance();
         if (!uiWantsKeyboard && input.isKeyJustPressed(SDL_SCANCODE_Z) && appearanceComposer_) {
-            const bool sheathing = !appearanceComposer_->isWeaponsSheathed();
             if (renderer && renderer->getAnimationController()) {
-                renderer->getAnimationController()->playWeaponSheathAnimation(sheathing);
+                renderer->getAnimationController()->playWeaponSheathAnimation(
+                    appearanceComposer_->mainHandSheathesAtHip());
             }
             appearanceComposer_->toggleWeaponsSheathed();
             appearanceComposer_->loadEquippedWeapons();

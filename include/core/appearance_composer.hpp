@@ -66,6 +66,8 @@ public:
     void setWeaponsSheathed(bool sheathed) { weaponsSheathed_ = sheathed; }
     [[nodiscard]] bool isWeaponsSheathed() const { return weaponsSheathed_; }
     void toggleWeaponsSheathed() { weaponsSheathed_ = !weaponsSheathed_; }
+    /// Whether the main hand is put away at the hip rather than on the back.
+    [[nodiscard]] bool mainHandSheathesAtHip() const;
 
     // Ranged weapon swap: temporarily show ranged weapon in right hand
     void showRangedWeapon(bool show);

@@ -101,7 +101,7 @@ void AnimationController::playEmote(const std::string& emoteName) {
     }
 }
 
-void AnimationController::playWeaponSheathAnimation(bool sheathing) {
+void AnimationController::playWeaponSheathAnimation(bool atHip) {
     if (!renderer_) return;
     auto* characterRenderer = renderer_->getCharacterRenderer();
     const uint32_t characterInstanceId = renderer_->getCharacterInstanceId();
@@ -109,14 +109,10 @@ void AnimationController::playWeaponSheathAnimation(bool sheathing) {
 
     // One animation both ways: 3.3.5 has Sheath and HipSheath and no unsheathe,
     // and plays the reach for drawing as well as for putting away.
-    (void)sheathing;
-    uint32_t animId = anim::SHEATHE;
+    uint32_t animId = atHip ? anim::HIP_SHEATHE : anim::SHEATHE;
     if (!characterRenderer->hasAnimation(characterInstanceId, animId)) {
-        if (characterRenderer->hasAnimation(characterInstanceId, anim::HIP_SHEATHE)) {
-            animId = anim::HIP_SHEATHE;
-        } else {
-            return;
-        }
+        animId = atHip ? anim::SHEATHE : anim::HIP_SHEATHE;
+        if (!characterRenderer->hasAnimation(characterInstanceId, animId)) return;
     }
 
     // ActivityFSM owns the one-shot until completion so locomotion/combat does
