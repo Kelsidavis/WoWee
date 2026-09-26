@@ -2,6 +2,8 @@
 
 #include "core/geoset_rules.hpp"
 #include "game/character.hpp"
+#include "game/inventory.hpp"
+#include "rendering/animation/weapon_type.hpp"
 #include <string>
 #include <vector>
 #include <unordered_set>
@@ -66,6 +68,8 @@ public:
     void setWeaponsSheathed(bool sheathed) { weaponsSheathed_ = sheathed; }
     [[nodiscard]] bool isWeaponsSheathed() const { return weaponsSheathed_; }
     void toggleWeaponsSheathed() { weaponsSheathed_ = !weaponsSheathed_; }
+    /// Where the item in a hand is put away; NONE when the hand is empty.
+    [[nodiscard]] rendering::SheathSpot sheathSpot(game::EquipSlot slot) const;
 
     // Ranged weapon swap: temporarily show ranged weapon in right hand
     void showRangedWeapon(bool show);

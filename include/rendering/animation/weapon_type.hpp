@@ -11,6 +11,9 @@ namespace rendering {
 /// and wands alike, so the inventory type alone gives a wand the rifle pose.
 enum class RangedWeaponType : uint8_t { NONE = 0, BOW, GUN, CROSSBOW, THROWN, WAND };
 
+/// Where a hand's item is put away, which decides that arm's sheathe reach.
+enum class SheathSpot : uint8_t { NONE = 0, HIP, BACK };
+
 // ============================================================================
 // WeaponLoadout - extracted from AnimationController
 //

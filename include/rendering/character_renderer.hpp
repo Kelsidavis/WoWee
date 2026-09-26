@@ -82,6 +82,8 @@ public:
     // persistent work/state loop instead of idling.
     void playAnimation(uint32_t instanceId, uint32_t animationId, bool loop = true,
                        uint32_t oneShotReturnAnim = 0);
+    /// Play other animations on each arm alone, until the next playAnimation.
+    void setArmAnimations(uint32_t instanceId, uint32_t leftArmAnim, uint32_t rightArmAnim);
 
     void update(float deltaTime, const glm::vec3& cameraPos = glm::vec3(0.0f));
 
@@ -253,6 +255,7 @@ private:
         // Animation state
         uint32_t currentAnimationId = 0;
         int currentSequenceIndex = -1;  // Index into M2Model::sequences
+        int armSequenceIndex[2] = {-1, -1};  // Left, right arm on their own sequences; -1 follows the body
         float animationTime = 0.0f;
         float globalSequenceTime = 0.0f; // Separate timer for global sequences (accumulates without wrapping at sequence duration)
         bool animationLoop = true;

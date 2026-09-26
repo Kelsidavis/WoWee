@@ -27,20 +27,26 @@ constexpr uint32_t kAttachShield = 0;
 // gear was going - attached successfully, on the forearm, invisible on the head.
 constexpr uint32_t kAttachRightHand = 1;
 constexpr uint32_t kAttachLeftHand = 2;
-constexpr uint32_t kAttachRightHip = 9;
-constexpr uint32_t kAttachLeftHip = 10;
 constexpr uint32_t kAttachBack = 12;
+// The model's own sheath points, which carry the sheathed orientation. Its
+// plain hip points do not, and some models name a second hip point at the
+// feet.
+constexpr uint32_t kAttachSheathShield = 28;
+constexpr uint32_t kAttachHipWeaponLeft = 32;
+constexpr uint32_t kAttachHipWeaponRight = 33;
 
 uint32_t weaponAttachment(bool sheathed, game::EquipSlot slot, uint8_t inventoryType) {
     if (!sheathed) {
+        if (inventoryType == game::InvType::SHIELD) return kAttachShield;
         return slot == game::EquipSlot::OFF_HAND ? kAttachLeftHand : kAttachRightHand;
     }
 
     if (inventoryType == game::InvType::TWO_HAND) return kAttachBack;
-    if (inventoryType == game::InvType::SHIELD) return kAttachShield;
+    if (inventoryType == game::InvType::SHIELD) return kAttachSheathShield;
     if (inventoryType == game::InvType::ONE_HAND ||
         inventoryType == game::InvType::MAIN_HAND) {
-        return slot == game::EquipSlot::OFF_HAND ? kAttachLeftHip : kAttachRightHip;
+        // Main hand on the left hip, drawn across the body.
+        return slot == game::EquipSlot::OFF_HAND ? kAttachHipWeaponRight : kAttachHipWeaponLeft;
     }
 
     // Holdables and other items with no sheath position are hidden, matching
@@ -69,10 +75,6 @@ glm::mat4 weaponLocalTransform(bool sheathed, game::EquipSlot /*slot*/,
         transform = glm::rotate(transform, glm::radians(33.0f), glm::vec3(1, 0, 0));
         transform = glm::rotate(transform, glm::radians(90.0f), glm::vec3(0, 1, 0));
         transform = glm::rotate(transform, glm::radians(90.0f), glm::vec3(1, 0, 0));
-    } else {
-        // Hip-sheathed one-handers have the same X-aligned long axis. Rotate it
-        // onto -Z so the blade points down alongside the leg.
-        transform = glm::rotate(transform, glm::radians(90.0f), glm::vec3(0, 1, 0));
     }
     return transform;
 }
@@ -420,6 +422,19 @@ void AppearanceComposer::loadEquippedHelm(game::Inventory& inventory) {
     }
 }
 
+rendering::SheathSpot AppearanceComposer::sheathSpot(game::EquipSlot slot) const {
+    if (!gameHandler_) return rendering::SheathSpot::NONE;
+    const auto& equipped = gameHandler_->getInventory().getEquipSlot(slot);
+    if (equipped.empty()) return rendering::SheathSpot::NONE;
+    switch (weaponAttachment(true, slot, equipped.item.inventoryType)) {
+        case kAttachHipWeaponLeft:
+        case kAttachHipWeaponRight: return rendering::SheathSpot::HIP;
+        case kAttachBack:
+        case kAttachSheathShield:   return rendering::SheathSpot::BACK;
+        default:                    return rendering::SheathSpot::NONE;
+    }
+}
+
 void AppearanceComposer::loadEquippedWeapons() {
     // Equipment refreshes can arrive during a gather cast. Keep the temporary
     // tool authoritative until the cast-end callback restores real equipment.
@@ -467,8 +482,8 @@ void AppearanceComposer::loadEquippedWeapons() {
     // Equipment reloads and Z toggles can move models between these points.
     // Clear both held and sheathed locations so old copies never remain behind.
     const uint32_t weaponAttachmentPoints[] = {
-        kAttachShield, kAttachRightHand, kAttachLeftHand,
-        kAttachRightHip, kAttachLeftHip, kAttachBack
+        kAttachShield, kAttachRightHand, kAttachLeftHand, kAttachBack,
+        kAttachSheathShield, kAttachHipWeaponLeft, kAttachHipWeaponRight
     };
     for (uint32_t attachmentId : weaponAttachmentPoints) {
         charRenderer->detachWeapon(charInstanceId, attachmentId);
