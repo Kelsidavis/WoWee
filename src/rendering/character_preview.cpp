@@ -918,8 +918,9 @@ bool CharacterPreview::applyEquipment(const std::vector<game::EquipmentItem>& eq
     if (geosetSleeves != 0) geosets.insert(geosetSleeves);
     if (geosetPants != 0) geosets.insert(geosetPants);
     if (geosetBelt != 0) geosets.insert(geosetBelt);
+    uint32_t capeGG = getGeosetGroup(findDisplayId({16}), geosetGroup1Field);
     uint16_t geosetCape = pickGeoset(
-        hasInvType({16}) ? core::kGeosetWithCape : core::kGeosetNoCape,
+        hasInvType({16}) ? core::cloakGeoset(capeGG) : core::kGeosetNoCape,
         core::kGeosetNoCape);
     if (geosetCape != 0) geosets.insert(geosetCape); // Cloak mesh toggle (visual may still be limited)
     if (hasInvType({19})) {

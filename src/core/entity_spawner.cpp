@@ -1349,7 +1349,7 @@ if (const auto* md = charRenderer->getModelData(modelId)) {
         uint16_t selectedFacial100 = 100;
         uint16_t selectedFacial200 = 200;
         uint16_t selectedFacial300 = 300;
-        uint32_t equipChestGG = 0, equipLegsGG = 0, equipFeetGG = 0, equipGlovesGG = 0;
+        uint32_t equipChestGG = 0, equipLegsGG = 0, equipFeetGG = 0, equipGlovesGG = 0, equipCapeGG = 0;
         if (itDisplayData != displayDataMap_.end() &&
             itDisplayData->second.extraDisplayId != 0) {
             auto itExtra = humanoidExtraMap_.find(itDisplayData->second.extraDisplayId);
@@ -1431,6 +1431,7 @@ if (const auto* md = charRenderer->getModelData(modelId)) {
                     equipLegsGG = readGG(itExtra->second.equipDisplayId[5]);
                     equipFeetGG = readGG(itExtra->second.equipDisplayId[6]);
                     equipGlovesGG = readGG(itExtra->second.equipDisplayId[8]);
+                    equipCapeGG = readGG(itExtra->second.equipDisplayId[10]);
                 }
             }
         }
@@ -1574,7 +1575,7 @@ if (const auto* md = charRenderer->getModelData(modelId)) {
         // use "no cape" back panel to cover the single-sided torso.
         if (hasGroup15) {
             if (hasRenderableCape) {
-                uint16_t capeSid = resolveGeoset(kGeosetWithCape, allGeosets);
+                uint16_t capeSid = resolveGeoset(cloakGeoset(equipCapeGG), allGeosets);
                 if (capeSid != 0) normalizedGeosets.insert(capeSid);
             } else if (allGeosets.count(kGeosetNoCape) > 0) {
                 // Only the real "no cape" panel, never a substitute. The
