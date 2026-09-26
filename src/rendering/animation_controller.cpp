@@ -101,17 +101,26 @@ void AnimationController::playEmote(const std::string& emoteName) {
     }
 }
 
-void AnimationController::playWeaponSheathAnimation(bool atHip) {
+void AnimationController::playWeaponSheathAnimation(SheathSpot mainHand, SheathSpot offHand) {
     if (!renderer_) return;
     auto* characterRenderer = renderer_->getCharacterRenderer();
     const uint32_t characterInstanceId = renderer_->getCharacterInstanceId();
     if (!characterRenderer || characterInstanceId == 0) return;
 
     // One animation both ways: 3.3.5 has Sheath and HipSheath and no unsheathe,
-    // and plays the reach for drawing as well as for putting away.
-    uint32_t animId = atHip ? anim::HIP_SHEATHE : anim::SHEATHE;
+    // and plays the reach for drawing as well as for putting away. Each arm
+    // reaches for its own hand's item and an empty hand stays still; the rest
+    // of the body follows whichever hand holds something.
+    auto reach = [](SheathSpot spot) {
+        return spot == SheathSpot::HIP  ? anim::HIP_SHEATHE
+             : spot == SheathSpot::BACK ? anim::SHEATHE
+                                        : anim::STAND;
+    };
+    const SheathSpot body = mainHand != SheathSpot::NONE ? mainHand : offHand;
+    if (body == SheathSpot::NONE) return;
+    uint32_t animId = reach(body);
     if (!characterRenderer->hasAnimation(characterInstanceId, animId)) {
-        animId = atHip ? anim::SHEATHE : anim::HIP_SHEATHE;
+        animId = body == SheathSpot::HIP ? anim::SHEATHE : anim::HIP_SHEATHE;
         if (!characterRenderer->hasAnimation(characterInstanceId, animId)) return;
     }
 
@@ -119,6 +128,7 @@ void AnimationController::playWeaponSheathAnimation(bool atHip) {
     // not replace the reach animation on the next frame.
     characterAnimator_.playEmote(animId, false);
     characterRenderer->playAnimation(characterInstanceId, animId, false);
+    characterRenderer->setArmAnimations(characterInstanceId, reach(offHand), reach(mainHand));
     lastPlayerAnimRequest_ = animId;
     lastPlayerAnimLoopRequest_ = false;
 }

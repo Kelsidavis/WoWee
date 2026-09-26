@@ -3686,7 +3686,8 @@ void Application::updateInGame(float deltaTime, const char*& updateCheckpoint) {
             appearanceComposer_->isWeaponsSheathed()) {
             if (renderer && renderer->getAnimationController()) {
                 renderer->getAnimationController()->playWeaponSheathAnimation(
-                    appearanceComposer_->mainHandSheathesAtHip());
+                    appearanceComposer_->sheathSpot(game::EquipSlot::MAIN_HAND),
+                    appearanceComposer_->sheathSpot(game::EquipSlot::OFF_HAND));
             }
             appearanceComposer_->setWeaponsSheathed(false);
             appearanceComposer_->loadEquippedWeapons();
@@ -3723,7 +3724,8 @@ void Application::updateInGame(float deltaTime, const char*& updateCheckpoint) {
         if (!uiWantsKeyboard && input.isKeyJustPressed(SDL_SCANCODE_Z) && appearanceComposer_) {
             if (renderer && renderer->getAnimationController()) {
                 renderer->getAnimationController()->playWeaponSheathAnimation(
-                    appearanceComposer_->mainHandSheathesAtHip());
+                    appearanceComposer_->sheathSpot(game::EquipSlot::MAIN_HAND),
+                    appearanceComposer_->sheathSpot(game::EquipSlot::OFF_HAND));
             }
             appearanceComposer_->toggleWeaponsSheathed();
             appearanceComposer_->loadEquippedWeapons();

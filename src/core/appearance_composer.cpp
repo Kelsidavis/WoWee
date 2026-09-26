@@ -422,11 +422,17 @@ void AppearanceComposer::loadEquippedHelm(game::Inventory& inventory) {
     }
 }
 
-bool AppearanceComposer::mainHandSheathesAtHip() const {
-    if (!gameHandler_) return false;
-    const auto& mainHand = gameHandler_->getInventory().getEquipSlot(game::EquipSlot::MAIN_HAND);
-    return !mainHand.empty() &&
-           weaponAttachment(true, game::EquipSlot::MAIN_HAND, mainHand.item.inventoryType) == kAttachHipWeaponLeft;
+rendering::SheathSpot AppearanceComposer::sheathSpot(game::EquipSlot slot) const {
+    if (!gameHandler_) return rendering::SheathSpot::NONE;
+    const auto& equipped = gameHandler_->getInventory().getEquipSlot(slot);
+    if (equipped.empty()) return rendering::SheathSpot::NONE;
+    switch (weaponAttachment(true, slot, equipped.item.inventoryType)) {
+        case kAttachHipWeaponLeft:
+        case kAttachHipWeaponRight: return rendering::SheathSpot::HIP;
+        case kAttachBack:
+        case kAttachSheathShield:   return rendering::SheathSpot::BACK;
+        default:                    return rendering::SheathSpot::NONE;
+    }
 }
 
 void AppearanceComposer::loadEquippedWeapons() {

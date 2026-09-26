@@ -2046,6 +2046,7 @@ void CharacterRenderer::playAnimation(uint32_t instanceId, uint32_t animationId,
     // Find animation sequence index by ID
     instance.currentAnimationId = animationId;
     instance.currentSequenceIndex = -1;
+    instance.armSequenceIndex[0] = instance.armSequenceIndex[1] = -1;
     instance.animationTime = 0.0f;
     instance.animationLoop = loop;
 
@@ -2333,7 +2334,25 @@ void CharacterRenderer::update(float deltaTime, const glm::vec3& cameraPos) {
 }
 // --- Bone transform calculation ---
 
+constexpr int32_t kKeyBoneShoulderL = 2;
+constexpr int32_t kKeyBoneShoulderR = 3;
 constexpr int32_t kKeyBoneSpineLow = 4;
+
+void CharacterRenderer::setArmAnimations(uint32_t instanceId, uint32_t leftArmAnim, uint32_t rightArmAnim) {
+    auto it = instances.find(instanceId);
+    if (it == instances.end()) return;
+    const auto& sequences = models[it->second.modelId].data.sequences;
+    const uint32_t anims[2] = {leftArmAnim, rightArmAnim};
+    for (int arm = 0; arm < 2; arm++) {
+        it->second.armSequenceIndex[arm] = -1;
+        for (size_t i = 0; i < sequences.size(); i++) {
+            if (sequences[i].id == anims[arm] && sequences[i].variationIndex == 0) {
+                it->second.armSequenceIndex[arm] = static_cast<int>(i);
+                break;
+            }
+        }
+    }
+}
 
 void CharacterRenderer::calculateBoneMatrices(CharacterInstance& instance) {
     if (!instance.cachedModel) return;
@@ -2366,13 +2385,30 @@ void CharacterRenderer::calculateBoneMatrices(CharacterInstance& instance) {
     // call, after it, instead of on a bone the loop happens to reach.
     static int diagFrames = 0;
 
+    // Which arm each bone is in - a shoulder and everything below it - when the
+    // arms have their own sequences. Parents come first, so one pass finds both.
+    const bool armsOwnSequences = instance.armSequenceIndex[0] >= 0 || instance.armSequenceIndex[1] >= 0;
+    std::vector<int8_t> arm(armsOwnSequences ? numBones : 0, -1);
+
     for (size_t i = 0; i < numBones; i++) {
         const auto& bone = model.bones[i];
 
+        int sequence = instance.currentSequenceIndex;
+        float time = instance.animationTime;
+        if (!arm.empty()) {
+            arm[i] = bone.keyBoneId == kKeyBoneShoulderL ? 0
+                   : bone.keyBoneId == kKeyBoneShoulderR ? 1
+                   : bone.parentBone >= 0                ? arm[bone.parentBone] : -1;
+            if (arm[i] >= 0 && instance.armSequenceIndex[arm[i]] >= 0) {
+                sequence = instance.armSequenceIndex[arm[i]];
+                time = std::min(time, static_cast<float>(model.sequences[sequence].duration));
+            }
+        }
+
         // Local transform includes pivot bracket: T(pivot)*T*R*S*T(-pivot)
         // At rest this is identity, so no separate bind pose is needed
-        glm::mat4 localTransform = getBoneTransform(bone, instance.animationTime, instance.globalSequenceTime,
-                                                    instance.currentSequenceIndex, gsd);
+        glm::mat4 localTransform = getBoneTransform(bone, time, instance.globalSequenceTime,
+                                                    sequence, gsd);
 
         if (bone.keyBoneId == kKeyBoneSpineLow && instance.torsoYawOverrideRad != 0.0f) {
             glm::mat4 extraYaw = glm::translate(glm::mat4(1.0f), bone.pivot)
