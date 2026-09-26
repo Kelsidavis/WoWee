@@ -197,6 +197,11 @@ constexpr uint16_t equippedGeoset(uint16_t bareId, uint32_t geosetGroupValue) {
     return static_cast<uint16_t>(bareId + geosetGroupValue);
 }
 
+/// The cape a cloak selects: its own variant, or the long cape when the item names none.
+constexpr uint16_t cloakGeoset(uint32_t geosetGroupValue) {
+    return geosetGroupValue > 0 ? equippedGeoset(kGeosetNoCape, geosetGroupValue) : kGeosetWithCape;
+}
+
 /// Which geoset group each worn item drives, and the bare variant it replaces.
 ///
 /// The two paths that read equipment come at it from different directions - a

@@ -545,8 +545,9 @@ void EntitySpawner::setOnlinePlayerEquipment(uint64_t guid,
     if (geosetPants != 0) geosets.insert(geosetPants);
     if (geosetBelt != 0) geosets.insert(geosetBelt);
     // Back/Cloak (invType 16)
+    uint32_t capeGG = getGeosetGroup(findDisplayIdByInvType({16}), geosetGroup1Field);
     uint16_t geosetCape = pickGeoset(
-        hasInvType({16}) ? kGeosetWithCape : kGeosetNoCape,
+        hasInvType({16}) ? cloakGeoset(capeGG) : kGeosetNoCape,
         kGeosetNoCape);
     if (geosetCape != 0) geosets.insert(geosetCape);
     // Tabard (invType 19)

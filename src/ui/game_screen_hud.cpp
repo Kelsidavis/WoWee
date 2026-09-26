@@ -266,7 +266,8 @@ void GameScreen::updateCharacterGeosets(game::Inventory& inventory) {
     }
 
     // Back/Cloak: inventoryType 16 → group 15
-    geosets.insert((hasEquippedType({16}) && cloakShown) ? core::kGeosetWithCape
+    uint32_t capeGG = getGeosetGroup(findEquippedDisplayId({16}), geosetGroup1Field);
+    geosets.insert((hasEquippedType({16}) && cloakShown) ? core::cloakGeoset(capeGG)
                                                          : core::kGeosetNoCape);
 
     // Tabard: inventoryType 19 → group 12
