@@ -146,7 +146,18 @@ sudo pacman -S base-devel cmake pkgconf git \
 ```
 
 Install `unicorn` for optional Warden execution. StormLib is not in the official
-repositories; install `stormlib-git` from the AUR if you need the asset tools.
+repositories, so the asset tools need it built from source. Install it under
+`/usr` so both CMake and the loader find it without extra paths:
+
+```bash
+sudo pacman -S --needed libtomcrypt
+git clone https://github.com/ladislav-zezula/StormLib.git
+cd StormLib && mkdir build && cd build
+cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr
+make -j"$(nproc)"
+sudo make install
+sudo ldconfig
+```
 
 </details>
 

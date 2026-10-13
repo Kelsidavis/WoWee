@@ -70,8 +70,19 @@ sudo pacman -S --needed \
 > at build time. `vulkan-devel` is a group that includes these on some distros but is not
 > available by name on Arch - install `vulkan-headers` and `vulkan-icd-loader` explicitly.
 
-Install `unicorn` for optional Warden execution. StormLib is available from the
-AUR as `stormlib-git` if you need the asset tools.
+Install `unicorn` for optional Warden execution. StormLib is not in the official
+repositories, so the asset tools need it built from source. Install it under
+`/usr` so both CMake and the loader find it without extra paths:
+
+```bash
+sudo pacman -S --needed libtomcrypt
+git clone https://github.com/ladislav-zezula/StormLib.git
+cd StormLib && mkdir build && cd build
+cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr
+make -j"$(nproc)"
+sudo make install
+sudo ldconfig
+```
 
 ---
 
