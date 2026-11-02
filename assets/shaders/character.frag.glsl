@@ -360,7 +360,12 @@ void main() {
         result = texColor.rgb * (1.0 + warm);
     } else {
         vec3 ldir = normalize(-lightDir.xyz);
-        float diff = max(dot(norm, ldir), 0.0);
+        // A hard clamp at zero takes a surface turned away from the sun down to
+        // the ambient term alone, and the ambient term does not vary across a
+        // surface, so those pixels come out one flat tone that reads as a
+        // separate, untextured piece - the bare shins against the lit thighs
+        // were the case. 0.22 is the floor localLightContribution uses.
+        float diff = 0.22 + 0.78 * max(dot(norm, ldir), 0.0);
 
         vec3 viewDir = normalize(viewPos.xyz - FragPos);
         vec3 halfDir = normalize(ldir + viewDir);
