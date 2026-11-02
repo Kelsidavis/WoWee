@@ -168,7 +168,11 @@ inline std::unordered_set<uint16_t> bareCharacterGeosets(uint16_t hairScalp,
     geosets.insert(kGeosetBareShins);       // no boots
     geosets.insert(kGeosetDefaultEars);
     geosets.insert(kGeosetBareSleeves);     // no chest sleeves
-    geosets.insert(kGeosetDefaultKneepads);
+    // No kneepads. Group 9 has no "none" of its own here, so 902 is a kneepad
+    // mesh and not a bare knee: on the human female it is a band from mid-shin
+    // to above the knee, twice the radius of the shin under it, and drawn on a
+    // character wearing no leg armour it reads as the cuff of a boot. The knee
+    // itself is carried by 1301 and 501, which cover every vertex 902 does.
     geosets.insert(kGeosetBarePants);       // no leggings
     // The feet, both spellings. The models the game shipped have no group 20 at
     // all and are unaffected; the replacements split the feet out and do not
