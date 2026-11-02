@@ -41,7 +41,10 @@ public:
 
     /// True while a finger is dragging the view, which is when the character
     /// should face where the camera does.
-    [[nodiscard]] bool isSteering() const { return lookFingerId_ != kNoFinger && lookMoved_; }
+    [[nodiscard]] bool isSteering() const {
+        return lookStickFingerId_ != kNoFinger ||
+               (lookFingerId_ != kNoFinger && lookMoved_);
+    }
 
     /// The part of the window the display leaves usable - clear of a cutout,
     /// rounded corners and the gesture bar - in window coordinates. The stick's
@@ -63,9 +66,16 @@ public:
     /// Drops the stick and releases the keys.
     void reset();
 
-    /// Where the stick may start, as a fraction of the window.
-    static constexpr float kStickZoneWidth = 0.38f;
-    static constexpr float kStickZoneTop = 0.30f;
+    /// Where the stick may start, as a fraction of the window. The thumbs split
+    /// the screen down the middle: the left half walks, the right half turns,
+    /// each half full height. Both are fractions of the safe area, so a cutout
+    /// or the gesture bar does not make one side narrower than the other.
+    static constexpr float kStickZoneWidth = 0.50f;
+
+    /// The look stick's half, mirrored. The ability ring lives there too, so a
+    /// press that lands on one of its buttons belongs to the button and never
+    /// becomes a stick.
+    static constexpr float kLookZoneWidth = 0.50f;
 
 private:
     static constexpr SDL_FingerID kNoFinger = -1;
@@ -89,6 +99,11 @@ private:
     /// How far a look finger travels before it counts as a drag rather than a
     /// tap, so that selecting a target does not also swing the view.
     static constexpr float kLookSlopPixels = 16.0f;
+    /// How fast a held look stick turns the view at full deflection, in the
+    /// same pixels a mouse drag would have moved: the camera maps pixels
+    /// through the player's own sensitivity, so a rate expressed the same way
+    /// respects that setting.
+    static constexpr float kLookStickPixelsPerSecond = 900.0f;
 
     void setMovementKeys(bool forward, bool back, bool left, bool right) const;
     /// Full deflection in real pixels, from the display's density.
@@ -100,11 +115,26 @@ private:
     SDL_Rect safe_{0, 0, 0, 0};
 
     SDL_FingerID stickFingerId_ = kNoFinger;
+    // The press that may become the stick, held for one frame while the
+    // interface decides whether it landed on something that takes the mouse.
+    SDL_FingerID stickCandidate_ = kNoFinger;
+    /// Where that press landed, so the interface can be asked about the point
+    /// rather than about wherever the cursor happened to be.
+    float stickCandidateX_ = 0.0f, stickCandidateY_ = 0.0f;
     float stickOriginX_ = 0.0f, stickOriginY_ = 0.0f;
     float stickX_ = 0.0f, stickY_ = 0.0f;   // -1..1
 
     // Pinch: the two fingers that are not the stick.
     rendering::CameraController* camera_ = nullptr;
+
+    // The look stick: the right hand's thumb, mirrored from the movement one.
+    // A press is recorded as a candidate first and promoted on the next update,
+    // once the renderer can say whether it landed on a frame that takes the
+    // mouse - the ability ring is in that corner, and it has priority.
+    SDL_FingerID lookStickFingerId_ = kNoFinger;
+    SDL_FingerID lookCandidate_ = kNoFinger;
+    float lookStickOriginX_ = 0.0f, lookStickOriginY_ = 0.0f;
+    float lookStickX_ = 0.0f, lookStickY_ = 0.0f;
 
     // The finger steering the view. Not the stick's, and not the second of a
     // pinch.

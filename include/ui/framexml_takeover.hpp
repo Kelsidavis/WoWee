@@ -271,6 +271,17 @@ bool frameXmlWorldEntered();
 void frameXmlNoteMouseOwned(bool owned);
 bool frameXmlOwnsMouse();
 
+/// Whether the interface owns the mouse *at this point*, in window pixels from
+/// the top-left corner.
+///
+/// frameXmlOwnsMouse answers for where the cursor is, which is one frame behind
+/// a finger that has just gone down: the touch controls decide whether a press
+/// is theirs before the renderer has dispatched that position to the tree. This
+/// asks the tree directly, so a thumb on an action button is the button's
+/// business in the same frame it lands.
+void frameXmlSetPointTest(std::function<bool(float, float)> test);
+bool frameXmlPointOwnsMouse(float x, float y);
+
 /// Hand an element back to this client because FrameXML's version was never
 /// built.
 ///

@@ -5729,6 +5729,18 @@ LuaEngine::~LuaEngine() {
 bool LuaEngine::initialize() {
     if (L_) return true;
 
+    // The touch controls need to know, at the moment a thumb lands, whether the
+    // interface has anything there. frameXmlOwnsMouse answers for where the
+    // cursor was last dispatched, which is one frame behind a fresh press; this
+    // asks the tree about the point itself, so a spell button under the thumb
+    // is the button's before the stick has had a chance to claim it.
+    ui::frameXmlSetPointTest([this](float x, float y) {
+        if (!L_ || sLastScreenH_ <= 0.0f) return false;
+        float tx = x, ty = y;
+        ui::mouseToTreeSpace(tx, ty, sLastScreenH_, widgets_.uiScale());
+        return widgets_.hitTest(tx, ty) != 0;
+    });
+
     L_ = luaL_newstate();
     if (!L_) {
         LOG_ERROR("LuaEngine: failed to create Lua state");
@@ -5790,6 +5802,7 @@ void LuaEngine::shutdown() {
         // through it after the close would be reading a freed state.
         ui::frameXmlSetCursorBridge(nullptr, nullptr);
         releaseInput();
+        ui::frameXmlSetPointTest(nullptr);
         lua_close(L_);
         L_ = nullptr;
         // The frames go with the state that built them. Without this the next
@@ -11052,6 +11065,7 @@ void LuaEngine::dispatchMouse(float x, float y, float screenH, MouseButtons butt
     // container the cursor is plainly inside is often neither.
     sLastMouseX_ = x;
     sLastMouseY_ = y;
+    sLastScreenH_ = screenH;
 
     // Throttled, and only while there is something to hit. Whether the mouse
     // reaches the widget tree at all is otherwise invisible: a frame that never
