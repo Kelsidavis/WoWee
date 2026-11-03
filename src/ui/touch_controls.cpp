@@ -2,6 +2,8 @@
 
 #include "ui/keybinding_manager.hpp"
 #include "ui/framexml_takeover.hpp"
+
+#include "core/input.hpp"
 #include "core/logger.hpp"
 #include "rendering/camera_controller.hpp"
 
@@ -73,27 +75,52 @@ void TouchControls::handleEvent(const SDL_Event& event, int windowWidth, int win
     const bool haveSafe = safe_.w > 0 && safe_.h > 0;
     const float zoneLeft = haveSafe ? static_cast<float>(safe_.x) : 0.0f;
     const float zoneW = haveSafe ? static_cast<float>(safe_.w) : w;
-    const float zoneTop = haveSafe ? static_cast<float>(safe_.y) : 0.0f;
-    const float zoneH = haveSafe ? static_cast<float>(safe_.h) : h;
 
     if (event.type == SDL_EVENT_FINGER_DOWN) {
         if (ImGui::GetIO().WantCaptureMouse || frameXmlOwnsMouse() ||
             ImGui::GetIO().WantTextInput || interfaceTakingTypedInput()) return;
         // The interface is asked first, so a bag or an action button drawn over
         // the corner still gets the press. A stick that ate those would be
-        // maddening, and the corner is only a default.
-        if (stickFingerId_ == kNoFinger && x < zoneLeft + zoneW * kStickZoneWidth &&
-            y > zoneTop + zoneH * kStickZoneTop && !ImGui::GetIO().WantCaptureMouse) {
-            LOG_DEBUG("touch: stick claimed at ", x, ",", y);
-            stickFingerId_ = id;
+        // maddening, and the corner is only a default. The answer has to wait
+        // for the next update though: the renderer only knows whether the
+        // cursor is over a frame that takes the mouse once it has drawn a frame
+        // with the finger reported as a cursor, so the press is recorded as a
+        // candidate and promoted in update().
+        if (stickFingerId_ == kNoFinger && stickCandidate_ == kNoFinger &&
+            x < zoneLeft + zoneW * kStickZoneWidth &&
+            !ImGui::GetIO().WantCaptureMouse) {
+            LOG_DEBUG("touch: stick candidate at ", x, ",", y);
+            stickCandidate_ = id;
+            stickCandidateX_ = x;
+            stickCandidateY_ = y;
             stickOriginX_ = x;
             stickOriginY_ = y;
             stickX_ = stickY_ = 0.0f;
             return;
         }
+        // The look stick claims the right-hand corner the same way, but only as
+        // a candidate: the ability ring and the attack button are there too, and
+        // a press that lands on one belongs to it. The promotion waits for the
+        // next update, when the renderer can say whether the cursor is over a
+        // frame that takes the mouse.
+        // The thumbs split the screen down the middle: the right half turns,
+        // the left half walks. Same width as the movement zone, so the halves
+        // meet at the centre instead of leaving a strip that belongs to nobody.
+        if (lookStickFingerId_ == kNoFinger && lookCandidate_ == kNoFinger &&
+            x > zoneLeft + zoneW * kLookZoneWidth &&
+            !ImGui::GetIO().WantCaptureMouse) {
+            lookCandidate_ = id;
+            lookStickOriginX_ = x;
+            lookStickOriginY_ = y;
+            lookStickX_ = lookStickY_ = 0.0f;
+            return;
+        }
         LOG_DEBUG("touch: finger down at ", x, ",", y, " of ", w, "x", h,
                   " uiWants=", ImGui::GetIO().WantCaptureMouse, " - not the stick");
-        if (lookFingerId_ == kNoFinger) {
+        // A drag turns the view only from the right half. Anywhere left of the
+        // middle is not the camera's, so the centre stops steering something
+        // that shows nothing.
+        if (lookFingerId_ == kNoFinger && x > zoneLeft + zoneW * kLookZoneWidth) {
             lookFingerId_ = id;
             lookX_ = x;
             lookY_ = y;
@@ -111,6 +138,16 @@ void TouchControls::handleEvent(const SDL_Event& event, int windowWidth, int win
     }
 
     if (event.type == SDL_EVENT_FINGER_UP) {
+        if (id == stickCandidate_) {
+            stickCandidate_ = kNoFinger;
+            return;
+        }
+        if (id == lookCandidate_) lookCandidate_ = kNoFinger;
+        if (id == lookStickFingerId_) {
+            lookStickFingerId_ = kNoFinger;
+            lookStickX_ = lookStickY_ = 0.0f;
+            return;
+        }
         if (id == stickFingerId_) {
             stickFingerId_ = kNoFinger;
             stickX_ = stickY_ = 0.0f;
@@ -127,6 +164,22 @@ void TouchControls::handleEvent(const SDL_Event& event, int windowWidth, int win
     }
 
     // SDL_EVENT_FINGER_MOTION
+    if (id == stickCandidate_) {
+        // Still undecided: the thumb may slide a little before the update that
+        // promotes it, and the stick should start from where it went down.
+        return;
+    }
+    if (id == lookStickFingerId_) {
+        const float radius = stickRadius();
+        lookStickX_ = std::clamp((x - lookStickOriginX_) / radius, -1.0f, 1.0f);
+        lookStickY_ = std::clamp((y - lookStickOriginY_) / radius, -1.0f, 1.0f);
+        return;
+    }
+    if (id == lookCandidate_) {
+        // Still undecided: the thumb may slide a little before the update that
+        // promotes it, and the stick should start from where it went down.
+        return;
+    }
     if (id == stickFingerId_) {
         const float radius = stickRadius();
         stickX_ = std::clamp((x - stickOriginX_) / radius, -1.0f, 1.0f);
@@ -170,7 +223,59 @@ void TouchControls::update() {
         reset();
         return;
     }
-    if (!inWorld_ || stickFingerId_ == kNoFinger) {
+    if (!inWorld_) return;
+
+    // A candidate becomes the stick only if the interface has nothing at the
+    // point it went down on. Asked of the widget tree directly, not of the flag
+    // the renderer publishes: that one answers for where the cursor was last
+    // dispatched, and a finger that has just landed is a frame ahead of it -
+    // which is exactly the press that must not turn into a stick.
+    if (stickFingerId_ == kNoFinger && stickCandidate_ != kNoFinger) {
+        if (ImGui::GetIO().WantCaptureMouse ||
+            frameXmlPointOwnsMouse(stickCandidateX_, stickCandidateY_)) {
+            LOG_DEBUG("touch: move stick refused over the interface at ",
+                        stickCandidateX_, ",", stickCandidateY_);
+            stickCandidate_ = kNoFinger;
+        } else {
+            LOG_DEBUG("touch: move stick claimed at ",
+                        stickCandidateX_, ",", stickCandidateY_);
+            stickFingerId_ = stickCandidate_;
+            stickCandidate_ = kNoFinger;
+        }
+    }
+
+    // The look stick asks the same question of the same tree: a thumb on the
+    // ability ring is casting, not turning.
+    if (lookStickFingerId_ == kNoFinger && lookCandidate_ != kNoFinger) {
+        if (ImGui::GetIO().WantCaptureMouse ||
+            frameXmlPointOwnsMouse(lookStickOriginX_, lookStickOriginY_)) {
+            LOG_DEBUG("touch: look stick refused over the interface at ",
+                        lookStickOriginX_, ",", lookStickOriginY_);
+            lookCandidate_ = kNoFinger;
+        } else {
+            LOG_DEBUG("touch: look stick claimed at ",
+                        lookStickOriginX_, ",", lookStickOriginY_);
+            lookStickFingerId_ = lookCandidate_;
+            lookCandidate_ = kNoFinger;
+        }
+    }
+    // Held at a deflection, the look stick turns the view at a rate rather than
+    // one-to-one: it is a stick, and a stick that had to keep moving to keep
+    // turning would be a drag with a ring drawn on it.
+    if (lookStickFingerId_ != kNoFinger && camera_) {
+        // The inner ring is a threshold on this stick too, the way it is on
+        // the movement one: a thumb inside it does not turn the camera. Past
+        // the ring the turn starts from nothing, so the edge is not a jump.
+        const float mag = std::hypot(lookStickX_, lookStickY_);
+        if (mag > kStrafeDeadzone) {
+            const float step = kLookStickPixelsPerSecond * ImGui::GetIO().DeltaTime;
+            const float gain = (mag - kStrafeDeadzone) / (1.0f - kStrafeDeadzone);
+            camera_->applyLookDelta(lookStickX_ / mag * gain * step,
+                                    lookStickY_ / mag * gain * step);
+        }
+    }
+
+    if (stickFingerId_ == kNoFinger) {
         wasForward_ = wasBack_ = wasLeft_ = wasRight_ = false;
         setMovementKeys(false, false, false, false);
         return;
@@ -189,21 +294,34 @@ void TouchControls::update() {
 }
 
 void TouchControls::draw() const {
-    if (!inWorld_ || stickFingerId_ == kNoFinger) return;
+    if (!inWorld_) return;
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
     if (!dl) return;
     const float radius = stickRadius();
-    const ImVec2 origin(stickOriginX_, stickOriginY_);
-    const ImVec2 knob(stickOriginX_ + stickX_ * radius, stickOriginY_ + stickY_ * radius);
-    dl->AddCircle(origin, radius, IM_COL32(255, 255, 255, 60), 48, 3.0f);
-    // The ring the thumb has to cross to start strafing, so the player can see
-    // why walking straight is the easy thing to do.
-    dl->AddCircle(origin, radius * kStrafeDeadzone, IM_COL32(255, 255, 255, 35), 40, 2.0f);
-    dl->AddCircleFilled(knob, radius * 0.28f, IM_COL32(255, 255, 255, 95), 32);
+    // Both thumbs get the same two rings and knob, so the pair reads as one
+    // control: the inner circle used to be the movement stick's alone.
+    auto ring = [&](float ox, float oy, float sx, float sy) {
+        const ImVec2 origin(ox, oy);
+        const ImVec2 knob(ox + sx * radius, oy + sy * radius);
+        dl->AddCircle(origin, radius, IM_COL32(255, 255, 255, 60), 48, 3.0f);
+        dl->AddCircle(origin, radius * kStrafeDeadzone,
+                      IM_COL32(255, 255, 255, 35), 40, 2.0f);
+        dl->AddCircleFilled(knob, radius * 0.28f, IM_COL32(255, 255, 255, 95), 32);
+    };
+    if (stickFingerId_ != kNoFinger) {
+        ring(stickOriginX_, stickOriginY_, stickX_, stickY_);
+    }
+    if (lookStickFingerId_ != kNoFinger) {
+        ring(lookStickOriginX_, lookStickOriginY_, lookStickX_, lookStickY_);
+    }
 }
 
 void TouchControls::reset() {
     stickFingerId_ = kNoFinger;
+    stickCandidate_ = kNoFinger;
+    lookStickFingerId_ = kNoFinger;
+    lookCandidate_ = kNoFinger;
+    lookStickX_ = lookStickY_ = 0.0f;
     lookFingerId_ = kNoFinger;
     lookMoved_ = false;
     lookTravel_ = 0.0f;

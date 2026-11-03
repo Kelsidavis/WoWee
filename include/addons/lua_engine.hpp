@@ -389,6 +389,9 @@ private:
     /// method can reach it without a handle on the engine.
     static inline float sLastMouseX_ = 0.0f;
     static inline float sLastMouseY_ = 0.0f;
+    /// The height the last dispatch was measured against, kept so a point can
+    /// be put into tree space between dispatches.
+    static inline float sLastScreenH_ = 0.0f;
 public:
     static float lastMouseX() { return sLastMouseX_; }
     static float lastMouseY() { return sLastMouseY_; }
