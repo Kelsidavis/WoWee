@@ -232,8 +232,10 @@ void GameScreen::updateCharacterGeosets(game::Inventory& inventory) {
         }
     }
 
-    // Kneepads: group 9 (always default 902)
-    geosets.insert(core::kGeosetDefaultKneepads);
+    // Kneepads: group 9 is not worn bare. 902 is a kneepad mesh - on the human
+    // female a band twice the shin's radius from mid-shin to above the knee -
+    // and on a character with no leg armour it reads as the top of a boot. The
+    // knee is already carried by the bare pants (1301) and shins (501).
 
     // Legs/Pants: inventoryType 7 → group 13 (trousers/thighs)
     // 1301=bare legs, 1302+=pant/kilt styles
