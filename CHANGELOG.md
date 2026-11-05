@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **Linux builds are AppImages.** The release workflow, the CI build and `container/run-linux.sh` and `.ps1` now produce one `wowee-<version>-<arch>.AppImage` instead of the `.tar.gz` release archive, the `.deb` CI artifact and the loose `build/linux` tree. It carries its libraries; the Vulkan loader and driver come from the system. `asset_extract` and the asset manager run from it as `--asset-extract` and `--asset-manager`. The container build keeps its CMake build tree in the Docker volume `wowee-linux-build` and rebuilds an existing builder image once, since it has no revision label. `container/appimage/build-appimage.sh` makes an AppImage from any build tree
+
+- The AppImage carries this project's `LICENSE` and `NOTICE` and SDL3's licence under `usr/share/doc`; the builder image installs SDL3 as a `.deb` so linuxdeploy finds its licence through dpkg. The build hides linuxdeploy's "Could not find copyright files" warnings for the client, its tools and the icon, which no package owns and whose licence is the project's own; any other warning stays
+
+- The Linux container build no longer compiles the unit tests (`-DWOWEE_BUILD_TESTS=OFF`): nothing in it ran them, and they were about 900 of the 1,490 build steps. CI still builds and runs them
+
+- The AppImage prints a clear message, with the package to install for Debian, Ubuntu, Fedora and Arch, when the Vulkan loader (`libvulkan.so.1`) is missing, in place of the dynamic linker's "error while loading shared libraries"
+
+### Fixed
+- The Linux builder image installs `ca-certificates`. `git` is installed without its recommended packages, so the image had no CA bundle and the `git clone` of SDL3 (and of the FidelityFX SDKs in `build-linux.sh`) failed certificate verification
+
+- The Linux builder image installs `glslc`, the only shader compiler CMake uses. Without it no shader was compiled, the build fell back to the committed `.spv` files, and the eight shaders that have none (grass, HiZ and M2 culling, world-map fog, editor water) were missing from the AppImage
+
+### Documentation
+- The README no longer lists packages per Linux distribution, since a Linux build needs none; the build guide keeps them for native development builds and gains the Fedora list
+
+- The README no longer says that only debug builds carry the soundtrack: every build tree does, the packages leave it out, and the music is not under the MIT licence. The comment above the install rule in `CMakeLists.txt` said the same
+
 ## [v3.1.54] - 2026-10-24
 
 ### Fixed

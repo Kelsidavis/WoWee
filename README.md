@@ -97,87 +97,17 @@ movement packets are done, and the client does not reach its world yet.
 
 ### 1. Install dependencies
 
-The desktop build uses SDL3 and needs a Vulkan 1.3 driver (MoltenVK on
+The desktop client uses SDL3 and needs a Vulkan 1.3 driver (MoltenVK on
 macOS). Unicorn enables Warden execution. StormLib is needed by
 `asset_extract`, the `wowee_assets` window and the asset builder inside the
 client; without it the client still builds, with those left out.
 
-<details>
-<summary>Ubuntu / Debian</summary>
-
-```bash
-sudo apt install build-essential cmake pkg-config git \
-  libsdl3-dev libglm-dev libssl-dev zlib1g-dev libx11-dev \
-  libvulkan-dev vulkan-tools glslc \
-  libavformat-dev libavcodec-dev libswscale-dev libavutil-dev
-
-# Optional: Warden execution and MPQ extraction
-sudo apt install libunicorn-dev
-sudo apt install libstorm-dev
-```
-
-`libsdl3-dev` is in Ubuntu 25.04 and Debian 13 onward. On Ubuntu 24.04, build
-SDL3 from source and install it, as CI does with `release-3.2.24`.
-
-</details>
-
-<details>
-<summary>Fedora / Nobara</summary>
-
-```bash
-sudo dnf install gcc-c++ cmake pkgconf-pkg-config git \
-  SDL3-devel glm-devel openssl-devel zlib-devel libX11-devel \
-  vulkan-devel vulkan-tools glslc ffmpeg-devel
-
-# Optional: Warden execution
-sudo dnf install unicorn-devel
-```
-
-StormLib is not in the Fedora or Nobara repositories, so the asset tools need
-it built from source. Install it under `/usr` so both CMake and the loader find
-it without extra paths:
-
-```bash
-sudo dnf install cmake gcc-c++ zlib-devel git
-git clone https://github.com/ladislav-zezula/StormLib.git
-cd StormLib && mkdir build && cd build
-cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr
-make -j"$(nproc)"
-sudo make install
-sudo ldconfig
-```
-
-If you configured WoWee before installing StormLib, re-run CMake (or
-`./build.sh`) so it picks StormLib up; until then `asset_extract` and the
-client's asset builder are left out.
-
-</details>
-
-<details>
-<summary>Arch Linux</summary>
-
-```bash
-sudo pacman -S base-devel cmake pkgconf git \
-  sdl3 glm openssl zlib libx11 \
-  vulkan-headers vulkan-icd-loader vulkan-tools shaderc \
-  ffmpeg
-```
-
-Install `unicorn` for optional Warden execution. StormLib is not in the official
-repositories, so the asset tools need it built from source. Install it under
-`/usr` so both CMake and the loader find it without extra paths:
-
-```bash
-sudo pacman -S --needed libtomcrypt
-git clone https://github.com/ladislav-zezula/StormLib.git
-cd StormLib && mkdir build && cd build
-cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr
-make -j"$(nproc)"
-sudo make install
-sudo ldconfig
-```
-
-</details>
+**Linux** needs no libraries and no compiler on your machine. The build runs in
+a container and ends as an AppImage that carries its own libraries, so
+[Docker](https://docs.docker.com/get-docker/) or Podman and a Vulkan 1.3 graphics
+driver are all there is to install. The package lists for compiling natively on
+Ubuntu, Debian, Fedora and Arch, which only development needs, are in the
+[complete build guide](BUILD_INSTRUCTIONS.md).
 
 <details>
 <summary>macOS</summary>
@@ -202,7 +132,22 @@ For Windows/MSYS2, Visual Studio, and platform-specific notes, see the
 ```bash
 git clone --recurse-submodules https://github.com/Kelsidavis/WoWee.git
 cd WoWee
+```
 
+**Linux.** The [releases](https://github.com/Kelsidavis/WoWee/releases/latest)
+are AppImages, and the container builds the same:
+
+```bash
+./container/run-linux.sh        # on a Windows host: .\container\run-linux.ps1
+```
+
+It leaves `build/linux/wowee-<version>-<arch>.AppImage` and nothing else. The
+first run builds the container image and compiles everything, which takes a
+while; later runs compile only what changed.
+
+**macOS and Windows:**
+
+```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ```
@@ -233,11 +178,21 @@ for upgrades, packs, and several games in one folder.
 From a terminal, the scripts extract into `Data/` in the checkout:
 
 ```bash
-# Linux / macOS
+# macOS
 ./extract_assets.sh /path/to/WoW/Data wotlk
 
 # Windows PowerShell
 .\extract_assets.ps1 "C:\Games\WoW-3.3.5a\Data" wotlk
+```
+
+The Linux AppImage carries the extractor and the asset manager. The manager
+writes to the per-user data directory the client reads; point the extractor
+there:
+
+```bash
+./wowee-*.AppImage --asset-manager
+./wowee-*.AppImage --asset-extract --mpq-dir /path/to/WoW/Data \
+  --output ~/.local/share/wowee/Data --expansion-subdir --expansion wotlk
 ```
 
 Valid targets are `classic`, `turtle`, `tbc`, and `wotlk`. Each target is kept
@@ -265,7 +220,9 @@ The client looks for data in this order:
    (default `~/.local/share/wowee/Data`) on Linux
 3. `Data/` in the working directory, which on Linux and macOS is the
    executable's own directory. CMake links `build/bin/Data` to the checkout's
-   `Data/` on Linux and macOS; on Windows `build.ps1` makes a junction
+   `Data/` on macOS and in a native Linux build; on Windows `build.ps1` makes a
+   junction. In the AppImage that directory is inside the image and holds only
+   the expansion profiles, so extract into the per-user directory, as above
 
 To store data elsewhere:
 
@@ -274,6 +231,20 @@ export WOW_DATA_PATH=/path/to/extracted/Data
 ```
 
 ### 4. Run
+
+On Linux, run the AppImage you built or downloaded:
+
+```bash
+chmod +x wowee-*.AppImage
+./wowee-*.AppImage
+```
+
+With no arguments it starts the client, and any arguments are passed on to the
+client. `--asset-manager` and `--asset-extract` start the asset tools instead
+(see step 3); they work only as the first argument.
+
+An AppImage mounts itself through FUSE. Where there is none, such as inside a
+container, run it with `--appimage-extract-and-run`. On macOS and Windows:
 
 ```bash
 ./build/bin/wowee
@@ -383,14 +354,15 @@ Docker or Podman can build all supported targets without installing a host
 toolchain:
 
 ```bash
-./container/run-linux.sh    # build/linux/bin/wowee
+./container/run-linux.sh    # build/linux/wowee-<version>-<arch>.AppImage
 ./container/run-macos.sh    # build/macos/bin/wowee
 ./container/run-windows.sh  # build/windows/bin/wowee.exe
 ```
 
-PowerShell equivalents are included. macOS defaults to ARM64; set
-`MACOS_ARCH=x86_64` for Intel. See [Container Builds](container/README.md) for
-all options.
+PowerShell equivalents are included. The Linux build leaves only the AppImage;
+its build tree stays in the Docker volume `wowee-linux-build`. macOS defaults to
+ARM64; set `MACOS_ARCH=x86_64` for Intel. See
+[Container Builds](container/README.md) for all options.
 
 ## Experimental world editor
 
@@ -483,9 +455,9 @@ off and leaves the zone music to the game's own files.
 19 tracks, 56 minutes, available in lossless FLAC. The tracks are original
 compositions and contain no Blizzard audio.
 
-The files live in `assets/Original Music/`. Debug builds and the debug APK
-carry them; release archives and the release APK leave them out to keep the
-download small.
+The files live in `assets/Original Music/`. Build trees and the debug APK carry
+them; release archives, AppImages and the release APK leave them out. The music
+is not covered by the MIT license; see [LICENSE](LICENSE).
 
 ## Documentation
 
@@ -508,9 +480,14 @@ download small.
 ## Development and CI
 
 WoWee uses C++20, CMake 3.15+, SDL3 and Vulkan 1.3. GitHub Actions builds
-Linux x86-64/ARM64, Windows x86-64/ARM64, macOS ARM64/x86-64 and Android arm64
-releases. Security checks include CodeQL, Semgrep, AddressSanitizer, and
+Linux x86-64/ARM64 AppImages, Windows x86-64/ARM64, macOS ARM64/x86-64 and Android
+arm64 releases. Security checks include CodeQL, Semgrep, AddressSanitizer, and
 UndefinedBehaviorSanitizer.
+
+A native Linux build, with the packages listed in the
+[build guide](BUILD_INSTRUCTIONS.md), is for development: it leaves
+`build/bin/wowee`, and `container/appimage/build-appimage.sh build` turns that
+build into an AppImage.
 
 The codebase is split into focused rendering, networking, gameplay, asset, UI,
 audio, and editor modules. Start with the [architecture guide](docs/architecture.md)
