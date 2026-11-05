@@ -274,10 +274,18 @@ endif()
 #
 # SDL3 installs its headers as <SDL3/SDL.h>, which is the spelling the sources
 # use, so unlike the SDL2 build there is no include shim to arrange here.
-if(ANDROID)
+# iOS has no system SDL either, so fetch and build it with the client, mirroring
+# the Android path.  iOS links SDL statically (dynamic frameworks need signing
+# and an app bundle), so SDL_SHARED is off there.
+if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     include(FetchContent)
-    set(SDL_SHARED ON  CACHE BOOL "" FORCE)   # SDLActivity loads libSDL3.so
-    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    if(ANDROID)
+        set(SDL_SHARED ON  CACHE BOOL "" FORCE)   # SDLActivity loads libSDL3.so
+        set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    else()
+        set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+        set(SDL_STATIC ON  CACHE BOOL "" FORCE)
+    endif()
     set(SDL_TEST   OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(SDL3
         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
@@ -285,7 +293,7 @@ if(ANDROID)
         GIT_SHALLOW    TRUE)
     FetchContent_MakeAvailable(SDL3)
 
-    # Header-only, and there is no system copy to find on Android.
+    # Header-only, and there is no system copy to find on Android/iOS.
     FetchContent_Declare(glm
         GIT_REPOSITORY https://github.com/g-truc/glm.git
         GIT_TAG        1.0.1
@@ -293,17 +301,19 @@ if(ANDROID)
     FetchContent_MakeAvailable(glm)
     include_directories(${glm_SOURCE_DIR})
 
-    # log is Android's logging, which Catch2 writes through as well as this
-    # client; android carries ANativeWindow and the asset manager. Directory
-    # scope, so every target below gets them without being named.
-    link_libraries(log android)
+    if(ANDROID)
+        # log is Android's logging, which Catch2 writes through as well as this
+        # client; android carries ANativeWindow and the asset manager. Directory
+        # scope, so every target below gets them without being named.
+        link_libraries(log android)
 
-    # miniaudio's OpenSL and AAudio backends are only compiled on Android, and
-    # they have unused parameters that this build treats as errors. It is
-    # vendored, so the warning is turned off for the one unit that compiles it
-    # rather than patched out of the header.
-    set_source_files_properties(src/audio/audio_engine.cpp PROPERTIES
-                                COMPILE_OPTIONS "-Wno-unused-parameter")
+        # miniaudio's OpenSL and AAudio backends are only compiled on Android, and
+        # they have unused parameters that this build treats as errors. It is
+        # vendored, so the warning is turned off for the one unit that compiles it
+        # rather than patched out of the header.
+        set_source_files_properties(src/audio/audio_engine.cpp PROPERTIES
+                                    COMPILE_OPTIONS "-Wno-unused-parameter")
+    endif()
 else()
     find_package(SDL3 REQUIRED CONFIG)
 endif()
@@ -358,10 +368,9 @@ if(NOT Vulkan_FOUND)
                 message(STATUS "Found Vulkan headers in LLVM-MinGW sysroot: ${_VULKAN_MINGW_INCLUDE}")
             endif()
         endif()
-    elseif(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-        # macOS cross-compilation: use vcpkg-installed vulkan-headers.
-        # The host pkg-config would find Linux libvulkan-dev headers which the
-        # macOS cross-compiler cannot use (different sysroot).
+    elseif(CMAKE_CROSSCOMPILING AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "iOS"))
+        # macOS/iOS cross-compilation: use vcpkg-installed vulkan-headers.
+        # MoltenVK provides the Vulkan loader at runtime on Apple platforms.
         find_package(VulkanHeaders CONFIG QUIET)
         if(VulkanHeaders_FOUND)
             if(NOT TARGET Vulkan::Vulkan)
@@ -398,7 +407,7 @@ if(NOT Vulkan_FOUND)
 endif()
 # macOS cross-compilation: the Vulkan loader (MoltenVK) is not available at link
 # time. Allow unresolved Vulkan symbols - they are resolved at runtime.
-if(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(CMAKE_CROSSCOMPILING AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "iOS"))
     set(WOWEE_MACOS_CROSS_COMPILE TRUE)
 endif()
 find_package(OpenSSL REQUIRED)
@@ -409,14 +418,9 @@ if(WIN32)
 else()
     find_package(PkgConfig REQUIRED)
 endif()
-if(ANDROID)
-    # Not through pkg-config. There is no Android FFmpeg to find and the host's
-    # copy answers with the host's include path, which puts glibc headers in
-    # front of the NDK sysroot and fails on the first system header. The same
-    # trap the Windows cross build hit with Vulkan, one probe further down.
-    #
-    # Cinematics are the only thing behind this, and the no-FFmpeg path is
-    # already supported.
+if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # No FFmpeg on Android/iOS in this port (cinematics disabled). The host's
+    # copy would pollute the cross-compile sysroot, so skip probing entirely.
     set(FFMPEG_FOUND FALSE)
 elseif(PkgConfig_FOUND)
     pkg_check_modules(FFMPEG libavformat libavcodec libswscale libavutil)
@@ -1194,9 +1198,14 @@ set(WOWEE_HEADERS
 # equivalent (press-and-hold accents).  window.cpp calls into it, so every
 # target that compiles window.cpp must link it.
 set(WOWEE_MACOS_SOURCES)
+set(WOWEE_IOS_SOURCES)
 if(APPLE)
     enable_language(OBJCXX)
-    set(WOWEE_MACOS_SOURCES src/core/macos_platform.mm)
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        set(WOWEE_IOS_SOURCES src/core/ios_platform.mm)
+    else()
+        set(WOWEE_MACOS_SOURCES src/core/macos_platform.mm)
+    endif()
 endif()
 
 set(WOWEE_PLATFORM_SOURCES)
@@ -1251,9 +1260,9 @@ endif()
 # it and calls SDL_main, and SDL_main.h has already renamed main() to that - so
 # an executable link asks for a main that no longer exists.
 if(ANDROID)
-    add_library(wowee SHARED ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES})
+    add_library(wowee SHARED ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES} ${WOWEE_IOS_SOURCES})
 else()
-    add_executable(wowee ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES})
+    add_executable(wowee ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES} ${WOWEE_IOS_SOURCES})
 endif()
 
 # Tracy profiler - zero overhead when WOWEE_ENABLE_TRACY is OFF
