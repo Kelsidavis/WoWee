@@ -50,7 +50,7 @@ namespace {
 /// too small to read and far too small to hit.
 ///
 /// 1.0 everywhere else, where the layouts are already the right size.
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
 /// The shortest the interface can be, in the units its layouts are written in.
 ///
 /// The client's dialogs are sized in pixels against a desktop monitor, and the
@@ -62,7 +62,7 @@ constexpr float kMinLogicalHeight = 620.0f;
 #endif
 
 float interfaceScale([[maybe_unused]] SDL_Window* window) {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
     // SDL3 dropped SDL_GetDisplayDPI and answers with a content scale
     // instead, which is the same number this was deriving: dpi over
     // Android's 160 baseline is what the platform already calls 1x.

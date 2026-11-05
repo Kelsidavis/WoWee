@@ -743,7 +743,7 @@ bool Renderer::initialize(core::Window* win) {
         // reaches the top for anyone who wants to spend it.
         //
         // A phone starts lower again: its GPU memory is the system's memory.
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
         constexpr const char* kDefaultShadowLevel = "1";   // 1024, 8 MB the pair
 #else
         constexpr const char* kDefaultShadowLevel = "2";   // 2048, 32 MB the pair

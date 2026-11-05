@@ -15,7 +15,7 @@
 // SDLActivity loads libwowee.so and calls SDL_main, the name this header gives
 // main(). SDL2's SDL.h pulled it in; SDL3's does not, and without it the
 // library exports only main and the activity has nothing to call.
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
 #include <SDL3/SDL_main.h>
 #endif
 #ifdef __APPLE__
@@ -130,9 +130,9 @@ static void selectUserDataPath() {
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
     // Everything after this opens its files relative to the working directory,
-    // which on Android is not a directory that holds any of them.
+    // which on a device is not a directory that holds any of them.
     wowee::core::enterResourceRoot();
 #endif
 #ifndef _WIN32
@@ -224,6 +224,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         constexpr const char* kPlatform = "windows";
 #elif defined(__ANDROID__)
         constexpr const char* kPlatform = "android";
+#elif defined(WOWEE_IOS)
+        constexpr const char* kPlatform = "ios";
 #elif defined(__APPLE__)
         constexpr const char* kPlatform = "macos";
 #elif defined(__linux__)

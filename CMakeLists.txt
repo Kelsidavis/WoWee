@@ -1276,6 +1276,12 @@ endif()
 if(TARGET opcodes-generate)
     add_dependencies(wowee opcodes-generate)
 endif()
+
+# iOS needs a compile-time flag so source code can distinguish a device build
+# from a macOS one (both define __APPLE__).
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_compile_definitions(wowee PRIVATE WOWEE_IOS=1)
+endif()
 # macOS cross-compilation: MoltenVK is not available at link time.
 # Allow unresolved Vulkan symbols - resolved at runtime. Scoped to wowee only.
 if(WOWEE_MACOS_CROSS_COMPILE)

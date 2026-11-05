@@ -12,6 +12,7 @@
 #include <cstdlib>
 #ifdef __APPLE__
 #include "core/macos_platform.hpp"
+#include "core/ios_platform.hpp"
 #include <filesystem>
 #include <mach-o/dyld.h>
 #include <vector>
@@ -61,27 +62,19 @@ bool Window::initialize() {
     LOG_INFO("Initializing window: ", config.title);
 
 #ifdef __APPLE__
+#if defined(WOWEE_IOS)
+    // iOS platform prep (safe areas, keyboard, etc.).
+    core::iosPreparePlatform();
+#else
     // Before SDL_Init spins up NSApplication: holding a key should repeat it,
     // not open the accent chooser over the game.
     disablePressAndHoldAccents();
 #endif
+#endif
 
-#ifdef __ANDROID__
-    // Without this the manifest's screenOrientation does not survive: SDL calls
-    // setOrientation itself when it creates the window, and with no hint and a
-    // resizable window it asks for FULL_USER, which follows the phone's own
-    // rotation lock. That is portrait, and the interface is laid out for a
-    // landscape screen. Naming both landscape orientations leaves the phone
-    // free to flip between them.
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
+    // Force landscape on phones/tablets.
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
-
-    // By default SDL parks the thread that called SDL_main for as long as the
-    // activity is in the background. That thread is the one that reads the
-    // socket, so a few seconds behind the home button and the server has timed
-    // the session out. Letting it run keeps the connection; the surface is
-    // released separately and the frame is skipped while it is gone.
-    SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "0");
-
 #endif
 
     // Initialize SDL
@@ -180,11 +173,8 @@ bool Window::initialize() {
     if (config.fullscreen) {
         flags |= SDL_WINDOW_FULLSCREEN;
     }
-#ifdef __ANDROID__
-    // A phone has no windows to be one of. Fullscreen is also what makes SDL
-    // put the activity in immersive mode, which is what hides the navigation
-    // bar; without it the client draws into 2272x954 of a 2424x1080 panel and
-    // the rest is system chrome.
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
+    // No window chrome on a device; fullscreen is the natural state.
     flags |= SDL_WINDOW_FULLSCREEN;
 #endif
     if (config.resizable) {
