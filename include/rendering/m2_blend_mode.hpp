@@ -34,6 +34,18 @@ enum M2BlendMode : uint8_t {
     M2_BLEND_MODULATE2X = 6,
 };
 
+/// Back-face culling for solid/cutout foliage with an authored one-sided
+/// material. Do not guess when a material is missing, or when a draw group
+/// contains mirrored/degenerate transforms whose winding can differ. The sky,
+/// transparent effects and other models keep their existing pipelines.
+inline bool m2UseFoliageCull(bool enabled, bool foliage, bool sky,
+                             bool hasAuthoredMaterial, bool windingPreserved,
+                             uint16_t materialFlags, uint16_t blendMode) {
+    constexpr uint16_t kTwoSided = 0x04;
+    return enabled && foliage && !sky && hasAuthoredMaterial && windingPreserved &&
+           !(materialFlags & kTwoSided) && blendMode <= M2_BLEND_ALPHA_KEY;
+}
+
 /// True when the mode adds to the framebuffer rather than covering it.
 ///
 /// These never need an alpha channel: black is the transparent colour.

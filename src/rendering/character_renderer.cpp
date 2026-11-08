@@ -27,6 +27,7 @@
 #include "rendering/vk_texture.hpp"
 #include "rendering/vk_pipeline.hpp"
 #include "rendering/vk_shader.hpp"
+#include "rendering/character_material_policy.hpp"
 #include "rendering/vk_buffer.hpp"
 #include "rendering/vk_utils.hpp"
 #include "rendering/vk_frame_data.hpp"
@@ -2769,6 +2770,9 @@ void CharacterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet,
 
             const bool previewMainModel = renderPassOverride_ != VK_NULL_HANDLE &&
                                           !instance.hasOverrideModelMatrix;
+            const auto materialDomain = characterMaterialDomain(
+                instance.isSceneModel, instance.creatureMaterialRules,
+                instance.hasOverrideModelMatrix, instance.isEffectModel);
 
             // Draw batches in two passes: opaque (blendMode 0) first, then
             // alpha-key/blend after.  This ensures capes and body parts write
@@ -2884,15 +2888,10 @@ void CharacterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet,
                     materialFlags = gpuModel.data.materials[batch.materialIndex].flags;
                 }
 
-                const uint16_t submeshGroup = static_cast<uint16_t>(batch.submeshId / 100);
                 const bool hairTexture = batchUsesTextureType(gpuModel, batch, 6);
-                const bool hairGeoset = (submeshGroup >= 1 && submeshGroup <= 3) ||
-                                        (submeshGroup == 0 && batch.submeshId > 0 && batch.submeshId <= 99);
-                // Scene models have no hair, and their submesh ids are all 0, which
-                // would otherwise satisfy the hair-geoset guess for every batch.
-                const bool hairMaterial = !instance.isSceneModel &&
-                                          (hairTexture ||
-                                           (hairGeoset && (blendMode != 0 || batch.textureCount > 1)));
+                const bool hairMaterial = characterBatchIsHair(
+                    materialDomain, hairTexture,
+                    batch.submeshId, blendMode, batch.textureCount);
 
                 // Attached weapon models can include additive FX/card batches that
                 // appear as detached flat quads for some swords. Keep core geometry
@@ -2945,17 +2944,10 @@ void CharacterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet,
                         colorKeyBlack = pit->second.colorKeyBlack;
                     }
                 }
-                // A scene means what its materials say. Stormwind's walls are DXT5 with
-                // an unused alpha channel - every texel below the 0.5 cutoff - so
-                // inferring a cutout from "the texture has alpha" discards the whole
-                // building and leaves the sky showing through it. Only an alpha-key
-                // material (blendMode 1) cuts out here.
-                const bool blendNeedsCutout = instance.isSceneModel
-                    ? (blendMode == 1)
-                    : ((blendMode == 1) ||
-                       (blendMode == 0 && alphaCutout) ||
-                       (blendMode >= 2 && !alphaCutout) ||
-                       hairMaterial);
+                // Scenes, creatures and attached items follow their M2 material
+                // instead of inheriting character-atlas alpha heuristics.
+                const bool blendNeedsCutout = characterBatchNeedsCutout(
+                    materialDomain, blendMode, alphaCutout, hairMaterial);
                 // Enchant glows emit their own light; scene lighting must not tint them.
                 const bool unlit = ((materialFlags & 0x01) != 0) || (blendMode >= 3) ||
                                    instance.isEffectModel;
@@ -4285,6 +4277,11 @@ bool CharacterRenderer::attachWeaponEffect(uint32_t charInstanceId, uint32_t att
 void CharacterRenderer::setInstanceSceneModel(uint32_t instanceId, bool isScene) {
     auto it = instances.find(instanceId);
     if (it != instances.end()) it->second.isSceneModel = isScene;
+}
+
+void CharacterRenderer::setInstanceCreatureMaterialRules(uint32_t instanceId, bool enabled) {
+    auto it = instances.find(instanceId);
+    if (it != instances.end()) it->second.creatureMaterialRules = enabled;
 }
 
 void CharacterRenderer::detachWeaponEffects(uint32_t charInstanceId, uint32_t attachmentId) {

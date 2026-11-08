@@ -2270,6 +2270,14 @@ void EntitySpawner::spawnOnlineCreature(uint64_t guid, uint32_t displayId, float
         return;
     }
 
+    // CreatureDisplayInfoExtra identifies the character-style NPCs whose
+    // character geosets and composite textures still need the legacy rules.
+    // Other creature and vehicle atlases must obey their authored blend modes.
+    const bool humanoidAppearance = itDisplayData != displayDataMap_.end() &&
+        itDisplayData->second.extraDisplayId != 0 &&
+        humanoidExtraMap_.find(itDisplayData->second.extraDisplayId) != humanoidExtraMap_.end();
+    charRenderer->setInstanceCreatureMaterialRules(instanceId, !humanoidAppearance);
+
     // Per-instance hair, skin and head-detail overrides. These run for every
     // NPC, cached model or not, so two NPCs sharing a model still get their own
     // colouring.

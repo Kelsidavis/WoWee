@@ -7,6 +7,11 @@
 
 using namespace wowee::pipeline;
 
+TEST_CASE("an M2 batch without an authored material is not assumed one-sided", "[m2]") {
+    const wowee::rendering::M2ModelGPU::BatchGPU batch;
+    CHECK_FALSE(batch.hasAuthoredMaterial);
+}
+
 TEST_CASE("Animated glow centers follow their skinned bones", "[m2][lights]") {
     wowee::rendering::M2Instance instance;
     instance.modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(10.0f, 0.0f, 0.0f));

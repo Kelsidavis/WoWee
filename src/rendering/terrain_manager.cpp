@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "pipeline/adt_alpha.hpp"
+#include "pipeline/wdt_loader.hpp"
 #include "pipeline/grass_profile.hpp"
 #include "rendering/terrain_renderer.hpp"
 #include "rendering/vk_context.hpp"
@@ -420,6 +421,15 @@ std::shared_ptr<PendingTile> TerrainManager::prepareTile(int x, int y) {
             LOG_ERROR("Failed to parse ADT terrain: ", adtPath);
             return nullptr;
         }
+        // Derive the WDT from the exact ADT path this worker read. A map
+        // transition may change the manager's active name while a tile is in
+        // flight; reading a shared current-map flag here could give the old
+        // tile the new map's blend mode. AssetManager caches this small file.
+        const std::string suffix = "_" + std::to_string(x) + "_" + std::to_string(y) + ".adt";
+        const std::string wdtPath = adtPath.substr(0, adtPath.size() - suffix.size()) + ".wdt";
+        const auto wdtData = assetManager->readFileOptional(wdtPath);
+        const bool bigAlpha = !wdtData.empty() && pipeline::parseWDT(wdtData).hasBigAlpha();
+        for (auto& chunk : terrainPtr->chunks) chunk.bigAlpha = bigAlpha;
     }
 
     if (!workerRunning.load()) return nullptr;

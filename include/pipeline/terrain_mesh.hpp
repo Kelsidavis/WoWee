@@ -39,6 +39,7 @@ using TerrainIndex = uint32_t;
 struct ChunkMesh {
     std::vector<TerrainVertex> vertices;
     std::vector<TerrainIndex> indices;
+    bool bigAlpha = false;
 
     // Chunk position in world space
     float worldX;

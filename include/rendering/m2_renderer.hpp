@@ -66,6 +66,7 @@ struct M2ModelGPU {
         uint16_t textureAnimIndex = 0xFFFF; // 0xFFFF = no texture animation
         uint16_t blendMode = 0;   // 0=Opaque, 1=AlphaKey, 2=Alpha, 3=Add, etc.
         uint16_t materialFlags = 0; // M2 material flags (0x01=Unlit, 0x04=TwoSided, 0x10=NoDepthWrite)
+        bool hasAuthoredMaterial = false; // missing flags must not be guessed as one-sided
         uint16_t submeshLevel = 0; // LOD level: 0=base, 1=LOD1, 2=LOD2, 3=LOD3
         uint8_t textureUnit = 0;  // UV set index (0=texCoords[0], 1=texCoords[1])
         uint8_t texFlags = 0;     // M2Texture.flags (bit0=WrapS, bit1=WrapT)
@@ -756,6 +757,9 @@ private:
     /// Blend disabled with alpha-to-coverage on, which is what turns the
     /// shader's sharpened alpha into per-sample coverage.
     VkPipeline cutoutPipeline_ = VK_NULL_HANDLE;
+    // Opt-in one-sided foliage variants. Other materials retain their pipelines.
+    VkPipeline foliageCullOpaquePipeline_ = VK_NULL_HANDLE;
+    VkPipeline foliageCullCutoutPipeline_ = VK_NULL_HANDLE;
     /// The ablation's clutter phase; see setSkipGroundDetail.
     bool skipGroundDetail_ = false;
     /// The ablation's far-doodad phase; see setDoodadDistanceCap.
