@@ -345,28 +345,10 @@ int setAllAddOnsEnabled(lua_State* L, bool enabled) {
 }
 
 
-/// Whether an npc a dialog is waiting on is still close enough to talk to.
-///
-/// Five yards is AzerothCore's INTERACTION_DISTANCE, which is the figure the
-/// server itself refuses a request beyond - so a dialog that stays open past
-/// it is offering a button that cannot work.
-///
-/// An npc with no entity here answers *yes*, and the distinction matters: not
-/// knowing where someone is is not the same as knowing they are far away. Both
-/// callers close a dialog on a no, and the note this replaces warned about
-/// exactly that - a client that cannot measure the distance and answers no
-/// shuts the dialog the instant it opens. Closing on ignorance would bring
-/// that back for any npc briefly missing from the entity list.
+/// Whether the npc a dialog is waiting on is still in interact range.
+/// An npc with no entity counts as in range, so the dialog does not close on open.
 bool npcWithinInteractRange(game::GameHandler* gh, uint64_t npcGuid) {
-    if (!gh || npcGuid == 0) return true;
-    auto npc = gh->getEntityManager().getEntity(npcGuid);
-    auto player = gh->getEntityManager().getEntity(gh->getPlayerGuid());
-    if (!npc || !player) return true;
-    const float dx = player->getX() - npc->getX();
-    const float dy = player->getY() - npc->getY();
-    const float dz = player->getZ() - npc->getZ();
-    constexpr float kInteractionDistance = 5.0f;
-    return dx * dx + dy * dy + dz * dz <= kInteractionDistance * kInteractionDistance;
+    return !gh || gh->isWithinInteractRange(npcGuid);
 }
 
 /// Which arena team a one-based index names, or zero for none.
