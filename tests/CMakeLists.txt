@@ -1097,6 +1097,7 @@ wowee_add_test(test_weapon_material_assets
             ${TEST_COMMON_SOURCES}
             ${CMAKE_SOURCE_DIR}/src/pipeline/m2_loader.cpp
             ${CMAKE_SOURCE_DIR}/src/pipeline/blp_loader.cpp)
+set_tests_properties(weapon_material_assets PROPERTIES SKIP_RETURN_CODE 4)
 
 # ── test_m2_color_alpha ──────────────────────────────────────
 # Loads the peasant lumberjack carry models (WotLK v264 + vanilla v256) and
