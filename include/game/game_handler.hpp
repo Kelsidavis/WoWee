@@ -2070,7 +2070,7 @@ public:
     void despawnCreatureLocally(uint64_t guid);
     void activateSpiritHealer(uint64_t npcGuid);
     bool isLootWindowOpen() const;
-    /// Within the range the server allows for loot / npc interaction (5.5 yd + both radii, 3D).
+    /// Within the range the server allows for loot / npc interaction.
     bool isWithinInteractRange(uint64_t guid) const;
     const LootResponseData& getCurrentLoot() const;
     void setAutoLoot(bool enabled);

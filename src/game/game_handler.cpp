@@ -707,19 +707,19 @@ void GameHandler::updateTimers(float deltaTime) {
 }
 
 bool GameHandler::isWithinInteractRange(uint64_t guid) const {
-    // The server's own test (WorldObject::IsWithinDistInMap with INTERACTION_DISTANCE):
-    // 5.5 yards plus both objects' bounding radii, measured in 3D.
+    // Units: 5.5 yards plus both combat reaches, in 3D.
+    // Gameobjects always count as in range.
     if (guid == 0) return true;
     auto ent = getEntityManager().getEntity(guid);
-    if (!ent) return true;
+    auto me = getEntityManager().getEntity(playerGuid);
+    if (!ent || !me || !ent->isUnit() || !me->isUnit()) return true;
     constexpr float kInteractionDistance = 5.5f;
-    float range = kInteractionDistance;
-    if (ent->isUnit()) range += static_cast<const Unit*>(ent.get())->getBoundingRadius();
-    if (auto me = getEntityManager().getEntity(playerGuid); me && me->isUnit())
-        range += static_cast<const Unit*>(me.get())->getBoundingRadius();
-    const float dx = ent->getX() - movementInfo.x;
-    const float dy = ent->getY() - movementInfo.y;
-    const float dz = ent->getZ() - movementInfo.z;
+    const float range = kInteractionDistance
+        + static_cast<const Unit*>(ent.get())->getCombatReach()
+        + static_cast<const Unit*>(me.get())->getCombatReach();
+    const float dx = ent->getX() - me->getX();
+    const float dy = ent->getY() - me->getY();
+    const float dz = ent->getZ() - me->getZ();
     return dx * dx + dy * dy + dz * dz <= range * range;
 }
 
