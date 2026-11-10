@@ -1088,6 +1088,10 @@ void GameHandler::registerCoreOpcodes() {
         packet.skipAll();
         network::Packet ack(wireOpcode(Opcode::CMSG_NEXT_CINEMATIC_CAMERA));
         socket->send(ack);
+        // We play no cinematic: end it now, or the server keeps visibility on its camera path for ~35 s.
+        network::Packet done(wireOpcode(Opcode::CMSG_COMPLETE_CINEMATIC));
+        socket->send(done);
+        LOG_INFO("SMSG_TRIGGER_CINEMATIC: skipped (sent NEXT_CINEMATIC_CAMERA + COMPLETE_CINEMATIC)");
     };
 
     // ---- Batch 5: Teleport, taxi, BG, LFG, arena, movement relay, mail, bank, auction, quests ----
