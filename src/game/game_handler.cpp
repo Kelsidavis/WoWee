@@ -706,6 +706,23 @@ void GameHandler::updateTimers(float deltaTime) {
     }
 }
 
+bool GameHandler::isWithinInteractRange(uint64_t guid) const {
+    // Units: 5.5 yards plus both combat reaches, in 3D.
+    // Gameobjects always count as in range.
+    if (guid == 0) return true;
+    auto ent = getEntityManager().getEntity(guid);
+    auto me = getEntityManager().getEntity(playerGuid);
+    if (!ent || !me || !ent->isUnit() || !me->isUnit()) return true;
+    constexpr float kInteractionDistance = 5.5f;
+    const float range = kInteractionDistance
+        + static_cast<const Unit*>(ent.get())->getCombatReach()
+        + static_cast<const Unit*>(me.get())->getCombatReach();
+    const float dx = ent->getX() - me->getX();
+    const float dy = ent->getY() - me->getY();
+    const float dz = ent->getZ() - me->getZ();
+    return dx * dx + dy * dy + dz * dz <= range * range;
+}
+
 void GameHandler::update(float deltaTime) {
     // The char-create callback used to be deferred to here, out of the packet
     // handler and so out of any render pass. It is not any more: the
@@ -724,6 +741,12 @@ void GameHandler::update(float deltaTime) {
     // without this the server's check goes unanswered and it drops the
     // connection a few seconds later.
     if (wardenHandler_) wardenHandler_->update(deltaTime);
+
+    // Close the loot window once the player walks away from the corpse
+    if (state == WorldState::IN_WORLD && isLootWindowOpen() &&
+        !isWithinInteractRange(getCurrentLoot().lootGuid)) {
+        closeLoot();
+    }
 
     // Fallback for CMSG_CHAR_DELETE with no server response: if the server
     // doesn't send SMSG_CHAR_DELETE within 3 seconds, re-request the character
