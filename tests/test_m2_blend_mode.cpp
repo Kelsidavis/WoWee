@@ -22,6 +22,27 @@
 using wowee::rendering::m2BatchNeedsAlphaTest;
 using wowee::rendering::m2BatchWantsColorKey;
 using wowee::rendering::m2BlendIsAdditive;
+using wowee::rendering::m2UseFoliageCull;
+
+TEST_CASE("foliage culling respects the material, transform and pass", "[m2]") {
+    // The Storm Peaks snow trees in the Icecrown recording use flags=0,
+    // blend 1 for their needles and blend 0 for their trunks.
+    CHECK(m2UseFoliageCull(true, true, false, true, true, 0, 1));
+    CHECK(m2UseFoliageCull(true, true, false, true, true, 0, 0));
+    CHECK(m2UseFoliageCull(true, true, false, true, true, 0x01, 1));
+    CHECK_FALSE(m2UseFoliageCull(false, true, false, true, true, 0, 1));
+    CHECK_FALSE(m2UseFoliageCull(true, false, false, true, true, 0, 1));
+    CHECK_FALSE(m2UseFoliageCull(true, true, true, true, true, 0, 1));
+    CHECK_FALSE(m2UseFoliageCull(true, true, false, false, true, 0, 1));
+    CHECK_FALSE(m2UseFoliageCull(true, true, false, true, false, 0, 1));
+    // Grizzly Hills and Silverpine have foliage materials with the two-sided
+    // flag set; other material bits must not mask it.
+    CHECK_FALSE(m2UseFoliageCull(true, true, false, true, true, 0x04, 1));
+    CHECK_FALSE(m2UseFoliageCull(true, true, false, true, true, 0x05, 1));
+    CHECK_FALSE(m2UseFoliageCull(true, true, false, true, true, 0, 2));
+    CHECK_FALSE(m2UseFoliageCull(true, true, false, true, true, 0, 3));
+    CHECK_FALSE(m2UseFoliageCull(true, true, false, true, true, 0, 256));
+}
 
 TEST_CASE("the Orgrimmar bonfire's glow card is not alpha tested", "[m2]") {
     // Blend mode 4, no alpha channel: the case that showed it.

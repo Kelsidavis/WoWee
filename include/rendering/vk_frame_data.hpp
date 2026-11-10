@@ -57,6 +57,12 @@ struct WMOPushConstants {
     glm::vec4 cloth{0.0f};
 };
 
+// The shared terrain/WMO/M2 shadow fragment shader reads the flags in the
+// same push block as the vertex shader. Both the layout and every update must
+// name both stages; a vertex-only update leaves the fragment flags undefined.
+inline constexpr VkShaderStageFlags kSharedShadowPushStages =
+    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
 // Push constants for shadow rendering passes.
 //
 // Two matrices filled 128 bytes exactly, which is all Vulkan guarantees for

@@ -148,9 +148,8 @@ GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk&
     const float u = fracX / GRASS_CHUNK_QUADS;
     const float v = fracY / GRASS_CHUNK_QUADS;
 
-    // Layers paint over one another, so the topmost takes its alpha and the
-    // ones beneath share what it leaves - which means walking them from the
-    // top down, not the bottom up.
+    // Legacy layers paint over one another; big-alpha layers are independent
+    // weights. Use the same rule as the terrain shader for this map.
     //
     // Bottom up gives the lowest layer the most weight, and on a road that is
     // the dirt underneath the cobblestone: the dirt grows, so grass came up
@@ -163,7 +162,7 @@ GrassSuitability evaluateGrass(const ChunkGrassContext& context, const MapChunk&
     for (size_t i = context.layerCount; i-- > 1;) {
         if (context.alpha[i].empty()) continue;
         const float a = clamp01(sampleAlpha(context.alpha[i], u, v));
-        weight[i] = remaining * a;
+        weight[i] = chunk.bigAlpha ? a : remaining * a;
         remaining -= weight[i];
     }
     weight[0] = std::max(remaining, 0.0f);

@@ -185,6 +185,9 @@ public:
     /** Mark an instance as a scene backdrop: no culling, no character material heuristics. */
     void setInstanceSceneModel(uint32_t instanceId, bool isScene);
 
+    /** Use authored creature/vehicle material semantics instead of character heuristics. */
+    void setInstanceCreatureMaterialRules(uint32_t instanceId, bool enabled);
+
 
     /** Get the world-space transform of an attachment point on an instance. */
     bool getAttachmentTransform(uint32_t instanceId, uint32_t attachmentId, glm::mat4& outTransform);
@@ -309,6 +312,10 @@ private:
         // Stormwind's walls are DXT5 with an unused alpha channel that the opaque
         // batches must ignore, exactly as the blend mode says.
         bool isSceneModel = false;
+
+        // Creatures, mounts and vehicles share this renderer with player
+        // characters, but their geosets and atlas alpha mean different things.
+        bool creatureMaterialRules = false;
 
 
         // Bone update throttling for characters outside normal gameplay range.

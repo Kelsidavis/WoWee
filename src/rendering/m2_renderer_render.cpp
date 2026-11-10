@@ -3,6 +3,7 @@
 #include "rendering/m2_renderer_internal.h"
 #include "rendering/m2_sway.hpp"
 #include "rendering/m2_blend_mode.hpp"
+#include "rendering/m2_foliage_culling.hpp"
 #include "rendering/m2_glow_card.hpp"
 #include "core/thread_pool.hpp"
 #include "rendering/m2_model_classifier.hpp"
@@ -736,6 +737,11 @@ void M2Renderer::update(float deltaTime, const glm::vec3& cameraPos, const glm::
 // drawn by the particle or ribbon systems.
 static const bool kM2NoSkinning = envFlagEnabled("WOWEE_M2_NO_SKINNING");
 
+// Isolate the procedural tree wind from culling, shadows and the authored
+// mesh. Applies to both the visible model and its caster; normal rendering is
+// unchanged unless explicitly requested for an in-game comparison.
+static const bool kM2NoFoliageWind = envFlagEnabled("WOWEE_M2_NO_FOLIAGE_WIND");
+
 void M2Renderer::prepareRender(uint32_t frameIndex, const Camera& camera) {
     if (!initialized_ || instances.empty()) return;
     (void)camera;  // reserved for future frustum-based culling
@@ -1362,7 +1368,7 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
                                       mdl.isStandingCloth);
         pc.isFoliage = sway.mode;
         pc.swayRefHeight = sway.refHeight;
-        pc.swayAmp = sway.amp;
+        pc.swayAmp = m2SwayAmplitude(sway, kM2NoFoliageWind);
         pc.plantHeight = sway.plantHeight;
     };
 
@@ -1575,6 +1581,22 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
                 while (lodEnd < pending.size() && pending[lodEnd].targetLOD == lod) lodEnd++;
                 uint32_t groupSize = static_cast<uint32_t>(lodEnd - lodIdx);
                 uint32_t groupSSBOOffset = baseSSBOOffset + static_cast<uint32_t>(lodIdx);
+
+                // All instances in a draw share the front-face convention.
+                // If one transform reflects or collapses the mesh, retain the
+                // old two-sided path for the whole LOD group instead of
+                // accidentally culling that instance's front faces.
+                bool windingPreserved = true;
+                if (foliageLikeModel && !skyMode_ &&
+                    (foliageCullOpaquePipeline_ || foliageCullCutoutPipeline_)) {
+                    for (size_t j = lodIdx; j < lodEnd; ++j) {
+                        if (!m2FoliageTransformPreservesWinding(
+                                instances[pending[j].instanceIdx].modelMatrix)) {
+                            windingPreserved = false;
+                            break;
+                        }
+                    }
+                }
 
                 // What each batch of a named model does at draw time, once.
                 //
@@ -1898,6 +1920,15 @@ void M2Renderer::render(VkCommandBuffer cmd, VkDescriptorSet perFrameSet, const 
                             case 2: desiredPipeline = alphaPipeline_; break;
                             default: desiredPipeline = additivePipeline_; break;
                         }
+                    }
+                    if (m2UseFoliageCull(
+                            foliageCullOpaquePipeline_ || foliageCullCutoutPipeline_,
+                            foliageLikeModel, skyMode_, batch.hasAuthoredMaterial,
+                            windingPreserved, batch.materialFlags, batch.blendMode)) {
+                        if (desiredPipeline == opaquePipeline_ && foliageCullOpaquePipeline_)
+                            desiredPipeline = foliageCullOpaquePipeline_;
+                        else if (desiredPipeline == cutoutPipeline_ && foliageCullCutoutPipeline_)
+                            desiredPipeline = foliageCullCutoutPipeline_;
                     }
                     if (desiredPipeline != currentPipeline) {
                         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, desiredPipeline);
@@ -2288,7 +2319,7 @@ bool M2Renderer::initializeShadow(VkRenderPass shadowRenderPass) {
     // Create shadow pipeline layout: set 1 = shadowParams_.layout, push constants = 128 bytes
     VkPushConstantRange pc{};
     // The fragment stage reads the alpha-test flags out of the same block.
-    pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    pc.stageFlags = kSharedShadowPushStages;
     pc.offset = 0;
     pc.size = sizeof(ShadowPush);  // one combined matrix, plus the sway slot
     shadowPipelineLayout_ = createPipelineLayout(device, {shadowParams_.layout}, {pc});
@@ -2474,7 +2505,8 @@ void M2Renderer::renderShadow(VkCommandBuffer cmd, const glm::mat4& lightSpaceMa
                                           model.shadowWindFoliage, model.isGroundDetail,
                                           model.boundMin.z, model.boundMax.z,
                                           model.isStandingCloth);
-            const glm::vec2 modelSwayZW(sway.refHeight, sway.amp);
+            const glm::vec2 modelSwayZW(sway.refHeight,
+                                        m2SwayAmplitude(sway, kM2NoFoliageWind));
             VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(cmd, 0, 1, &model.vertexBuffer, &offset);
             vkCmdBindIndexBuffer(cmd, model.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
@@ -2521,7 +2553,7 @@ void M2Renderer::renderShadow(VkCommandBuffer cmd, const glm::mat4& lightSpaceMa
                         .sway = glm::vec4(origin.x, origin.y, modelSwayZW.x, modelSwayZW.y),
                         .flags = passFlags,
                         .wind = wind};
-                    vkCmdPushConstants(cmd, shadowPipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT,
+                    vkCmdPushConstants(cmd, shadowPipelineLayout_, kSharedShadowPushStages,
                                        0, sizeof(ShadowPush), &push);
                     vkCmdDrawIndexed(cmd, batch.indexCount, 1, batch.indexStart, 0, 0);
                 }

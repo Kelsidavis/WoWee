@@ -25,12 +25,14 @@ namespace wowee {
 namespace rendering {
 
 // Matches set 1 binding 7 in terrain.frag.glsl
-struct TerrainParamsUBO {
+struct alignas(16) TerrainParamsUBO {
     int32_t layerCount;
     int32_t hasLayer1;
     int32_t hasLayer2;
     int32_t hasLayer3;
+    int32_t bigAlpha;
 };
+static_assert(sizeof(TerrainParamsUBO) == 32);
 
 TerrainRenderer::TerrainRenderer() = default;
 
@@ -534,6 +536,7 @@ bool TerrainRenderer::createChunkParamsUBO(TerrainChunkGPU& gpuChunk) {
     params.hasLayer1 = gpuChunk.layerCount >= 1 ? 1 : 0;
     params.hasLayer2 = gpuChunk.layerCount >= 2 ? 1 : 0;
     params.hasLayer3 = gpuChunk.layerCount >= 3 ? 1 : 0;
+    params.bigAlpha = gpuChunk.bigAlpha ? 1 : 0;
 
     VkBufferCreateInfo bufCI{};
     bufCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -560,6 +563,7 @@ bool TerrainRenderer::createChunkParamsUBO(TerrainChunkGPU& gpuChunk) {
 
 TerrainChunkGPU TerrainRenderer::uploadChunk(const pipeline::ChunkMesh& chunk) {
     TerrainChunkGPU gpuChunk;
+    gpuChunk.bigAlpha = chunk.bigAlpha;
 
     gpuChunk.worldX = chunk.worldX;
     gpuChunk.worldY = chunk.worldY;
@@ -1022,7 +1026,7 @@ bool TerrainRenderer::initializeShadow(VkRenderPass shadowRenderPass) {
     // Pipeline layout: set 0 = shadowParams_.layout, push 128 bytes (lightSpaceMatrix + model)
     VkPushConstantRange pc{};
     // The fragment stage reads the alpha-test flags out of the same block.
-    pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    pc.stageFlags = kSharedShadowPushStages;
     pc.offset = 0;
     pc.size = sizeof(ShadowPush);  // one combined matrix, plus the sway slot
     shadowPipelineLayout_ = createPipelineLayout(device, {shadowParams_.layout}, {pc});
@@ -1081,7 +1085,7 @@ void TerrainRenderer::renderShadow(VkCommandBuffer cmd, const glm::mat4& lightSp
     // Terrain is already in world space, so the model matrix it used to push
     // was the identity: the combined matrix is the light-space one.
     ShadowPush push{.lightSpaceModel = lightSpaceMatrix};
-    vkCmdPushConstants(cmd, shadowPipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT,
+    vkCmdPushConstants(cmd, shadowPipelineLayout_, kSharedShadowPushStages,
                        0, sizeof(ShadowPush), &push);
 
     // Bind mega buffers once for shadow pass (same as opaque)

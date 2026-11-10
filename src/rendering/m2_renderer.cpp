@@ -6,6 +6,7 @@
 #include "core/env_flag.hpp"
 #include "rendering/m2_renderer_internal.h"
 #include "rendering/m2_blend_mode.hpp"
+#include "rendering/m2_foliage_culling.hpp"
 #include "pipeline/model_bounds.hpp"
 #include "rendering/render_constants.hpp"
 #include "rendering/m2_model_classifier.hpp"
@@ -306,13 +307,15 @@ bool M2Renderer::buildMainPassPipelines(VkDescriptorSetLayout perFrameLayout) {
     // Pipeline derivatives - opaque is the base, others derive from it for shared state optimization
     auto buildM2Pipeline = [&](VkPipelineColorBlendAttachmentState blendState, bool depthWrite,
                                VkPipelineCreateFlags flags = 0, VkPipeline basePipeline = VK_NULL_HANDLE,
-                               bool alphaToCoverage = false) -> VkPipeline {
+                               bool alphaToCoverage = false,
+                               VkCullModeFlags cullMode = VK_CULL_MODE_NONE,
+                               VkFrontFace frontFace = VK_FRONT_FACE_CLOCKWISE) -> VkPipeline {
         auto builder = PipelineBuilder()
             .setShaders(m2Vert.stageInfo(VK_SHADER_STAGE_VERTEX_BIT),
                         m2Frag.stageInfo(VK_SHADER_STAGE_FRAGMENT_BIT))
             .setVertexInput({m2Binding}, m2Attrs)
             .setTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-            .setRasterization(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE)
+            .setRasterization(VK_POLYGON_MODE_FILL, cullMode, frontFace)
             // The sky model tests depth but never writes it. Its vertices are
             // pushed to the far plane, so the test is what lets ground drawn
             // before it occlude it, and a write would put the far plane over
@@ -348,6 +351,26 @@ bool M2Renderer::buildMainPassPipelines(VkDescriptorSetLayout perFrameLayout) {
     cutoutPipeline_ = buildM2Pipeline(PipelineBuilder::blendDisabled(), true,
                                       VK_PIPELINE_CREATE_DERIVATIVE_BIT, opaquePipeline_,
                                       /*alphaToCoverage=*/true);
+    // This experiment is still opt-in until other foliage and viewpoints have
+    // been visually checked. Wind remains an independent diagnostic.
+    if (!skyMode_ && core::envFlagEnabled("WOWEE_M2_NO_FOLIAGE_WIND")) {
+        LOG_WARNING("M2 foliage diagnostic: procedural tree wind disabled");
+    }
+    const bool enableFoliageCull = core::envFlagEnabled("WOWEE_M2_FOLIAGE_CULL_DIAG") &&
+                                   !core::envFlagEnabled("WOWEE_M2_NO_FOLIAGE_CULL");
+    if (!skyMode_ && enableFoliageCull) {
+        foliageCullOpaquePipeline_ = buildM2Pipeline(
+            PipelineBuilder::blendDisabled(), true, VK_PIPELINE_CREATE_DERIVATIVE_BIT,
+            opaquePipeline_, false, VK_CULL_MODE_BACK_BIT, kM2FoliageFrontFace);
+        foliageCullCutoutPipeline_ = buildM2Pipeline(
+            PipelineBuilder::blendDisabled(), true, VK_PIPELINE_CREATE_DERIVATIVE_BIT,
+            opaquePipeline_, true, VK_CULL_MODE_BACK_BIT, kM2FoliageFrontFace);
+        if (foliageCullOpaquePipeline_ && foliageCullCutoutPipeline_) {
+            LOG_WARNING("M2 foliage diagnostic: authored one-sided solid/cutout batches cull back faces (counter-clockwise front)");
+        } else {
+            LOG_WARNING("M2: failed to build one or more foliage culling pipelines; using two-sided pipeline where unavailable");
+        }
+    }
     alphaPipeline_ = buildM2Pipeline(PipelineBuilder::blendAlpha(), false,
                                      VK_PIPELINE_CREATE_DERIVATIVE_BIT, opaquePipeline_);
     additivePipeline_ = buildM2Pipeline(PipelineBuilder::blendAdditive(), false,
@@ -1135,6 +1158,8 @@ void M2Renderer::shutdown() {
     auto destroyPipeline = [&](VkPipeline& p) { if (p) { vkDestroyPipeline(device, p, nullptr); p = VK_NULL_HANDLE; } };
     destroyPipeline(opaquePipeline_);
     destroyPipeline(cutoutPipeline_);
+    destroyPipeline(foliageCullOpaquePipeline_);
+    destroyPipeline(foliageCullCutoutPipeline_);
     destroyPipeline(alphaTestPipeline_);
     destroyPipeline(alphaPipeline_);
     destroyPipeline(additivePipeline_);
@@ -2069,6 +2094,7 @@ bool M2Renderer::loadModel(const pipeline::M2Model& model, uint32_t modelId) {
             if (batch.materialIndex < model.materials.size()) {
                 bgpu.blendMode = model.materials[batch.materialIndex].blendMode;
                 bgpu.materialFlags = model.materials[batch.materialIndex].flags;
+                bgpu.hasAuthoredMaterial = true;
                 if (bgpu.blendMode >= 2) gpuModel.hasTransparentBatches = true;
             }
 

@@ -46,6 +46,7 @@ struct TextureLayer {
  */
 struct MapChunk {
     uint32_t flags = 0;
+    bool bigAlpha = false;   // WDT MPHD: 8-bit alpha; currently also selects independent weights
     uint32_t indexX = 0;
     uint32_t indexY = 0;
     uint32_t areaId = 0;     // AreaTable ID for this precise terrain chunk

@@ -18,6 +18,7 @@
 
 #include "pipeline/adt_alpha.hpp"
 #include "pipeline/grass_terrain.hpp"
+#include "pipeline/terrain_mesh.hpp"
 
 using wowee::pipeline::evaluateGrass;
 using wowee::pipeline::GrassSuitability;
@@ -413,7 +414,7 @@ TEST_CASE("an overlay whose alpha runs out still covers the ground",
 
     // A compressed overlay whose stream stops after a handful of texels.
     const auto offset = static_cast<uint32_t>(chunk.alphaMap.size());
-    chunk.alphaMap.push_back(0x80 | 3);   // fill, 4 texels
+    chunk.alphaMap.push_back(0x80 | 4);   // fill, 4 texels
     chunk.alphaMap.push_back(255);
     TextureLayer overlay = makeLayer(kRoadEffect, 0x100 | 0x200, offset);
     chunk.layers.push_back(overlay);
@@ -453,6 +454,51 @@ TEST_CASE("a road over dirt grows nothing, though the dirt would",
     wowee::pipeline::ChunkGrassContext context;
     context.build(chunk, densityFor, nameFor);
     REQUIRE(evaluateGrass(context, chunk, 4.0f, 4.0f).suitability == Catch::Approx(0.0f));
+}
+
+TEST_CASE("big-alpha layers use independent coverage rather than painting over each other",
+          "[grass][terrain][alpha]") {
+    MapChunk chunk = makeFlatChunk();
+    chunk.layers.push_back(makeLayer(kGrassEffect));
+    std::vector<uint8_t> alpha(wowee::pipeline::ALPHA_MAP_SIZE, 64);
+    auto offset = appendAlpha(chunk, alpha);
+    chunk.layers.push_back(makeLayer(kRoadEffect, 0x100, offset));
+    offset = appendAlpha(chunk, alpha);
+    chunk.layers.push_back(makeLayer(kRoadEffect, 0x100, offset));
+
+    // The base is the quad's selected layer. With independent weights two
+    // quarter-coverage overlays leave approximately half; sequential-over
+    // leaves approximately 9/16. Legacy maps keep the older result.
+    chunk.bigAlpha = true;
+    CHECK(evaluateGrass(chunk, 4.0f, 4.0f, densityFor).suitability ==
+          Catch::Approx(1.0 - 2.0 * 64.0 / 255.0));
+    chunk.bigAlpha = false;
+    CHECK(evaluateGrass(chunk, 4.0f, 4.0f, densityFor).suitability ==
+          Catch::Approx((1.0 - 64.0 / 255.0) * (1.0 - 64.0 / 255.0)));
+}
+
+TEST_CASE("terrain meshes retain the alpha blending mode of their chunks", "[adt][terrain][alpha]") {
+    wowee::pipeline::ADTTerrain terrain{};
+    terrain.loaded = true;
+    terrain.coord = {30, 16};
+    auto& chunk = terrain.getChunk(0, 0);
+    chunk = makeFlatChunk();
+    chunk.bigAlpha = true;
+    chunk.layers.push_back(makeLayer(kGrassEffect));
+    chunk.layers.push_back(makeLayer(kRoadEffect, 0x100 | 0x200));
+    for (size_t y = 0; y < wowee::pipeline::ALPHA_MAP_DIM; ++y) {
+        chunk.alphaMap.push_back(0x80 | 64);
+        chunk.alphaMap.push_back(static_cast<uint8_t>(y));
+    }
+    const auto mesh = wowee::pipeline::TerrainMeshGenerator::generate(terrain);
+    REQUIRE(mesh.validChunkCount == 1);
+    const auto& drawn = mesh.getChunk(0, 0);
+    CHECK(drawn.bigAlpha);
+    REQUIRE(drawn.layers.size() == 2);
+    REQUIRE(drawn.layers[1].alphaData.size() == wowee::pipeline::ALPHA_MAP_SIZE);
+    CHECK(drawn.layers[1].alphaData[0] == 0);
+    CHECK(drawn.layers[1].alphaData[64] == 1);
+    CHECK(drawn.layers[1].alphaData[4095] == 63);
 }
 
 TEST_CASE("a quad the map marks no-effect grows nothing", "[grass][terrain]") {

@@ -1702,6 +1702,8 @@ void EntitySpawner::processPendingMount() {
         return;
     }
 
+    charRenderer->setInstanceCreatureMaterialRules(instanceId, true);
+
     mountInstanceId_ = instanceId;
 
     // Compute height offset - place player above mount's back.
@@ -1904,6 +1906,7 @@ void EntitySpawner::processPendingRemotePlayerMounts() {
         cr->getInstancePosition(playerIt->second, pos);
         uint32_t mountInstance = cr->createInstance(modelId, pos, glm::vec3(0.0f), 1.0f);
         if (mountInstance != 0) {
+            cr->setInstanceCreatureMaterialRules(mountInstance, true);
             const bool moving = gameHandler_ && [&] {
                 auto entity = gameHandler_->getEntityManager().getEntity(guid);
                 return entity && entity->isActivelyMoving();

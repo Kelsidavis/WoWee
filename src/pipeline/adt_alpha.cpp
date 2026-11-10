@@ -16,8 +16,8 @@ namespace {
 /// the boundary between two chunks is a hard line - which is the ground
 /// textures not quite lining up, in a grid across the whole world.
 ///
-/// Only the four-bit form. The eight-bit and compressed maps are what a map
-/// with "big alpha" carries, and those are painted to the edge.
+/// Only the unfixed four-bit form. Eight-bit maps and four-bit maps with the
+/// MCNK do-not-fix flag are painted all the way to the edge.
 void fixLastRowAndColumn(std::vector<uint8_t>& alpha) {
     if (alpha.size() < ALPHA_MAP_SIZE) return;
     constexpr size_t kLast = ALPHA_MAP_DIM - 1;
@@ -49,7 +49,9 @@ bool decodeLayerAlpha(const MapChunk& chunk, size_t layerIdx,
     size_t layerSize = chunk.alphaMap.size() - offset;
     for (size_t j = layerIdx + 1; j < chunk.layers.size(); ++j) {
         if (chunk.layers[j].useAlpha()) {
-            layerSize = chunk.layers[j].offsetMCAL - offset;
+            const size_t nextOffset = chunk.layers[j].offsetMCAL;
+            if (nextOffset < offset || nextOffset > chunk.alphaMap.size()) return false;
+            layerSize = nextOffset - offset;
             break;
         }
     }
@@ -57,20 +59,25 @@ bool decodeLayerAlpha(const MapChunk& chunk, size_t layerIdx,
     if (layer.compressedAlpha()) {
         size_t readPos = offset;
         size_t writePos = 0;
-        while (writePos < ALPHA_MAP_SIZE && readPos < chunk.alphaMap.size()) {
+        const size_t end = offset + layerSize;
+        while (writePos < ALPHA_MAP_SIZE && readPos < end) {
             const uint8_t cmd = chunk.alphaMap[readPos++];
             const bool fill = (cmd & ALPHA_FILL_FLAG) != 0;
-            const int count = (cmd & ALPHA_COUNT_MASK) + 1;
+            // MCAL stores the number of texels directly, not count minus one.
+            // Adding one shifts each following run, breaking the 64-texel row
+            // alignment and turning Northrend's painted blends into streaks.
+            const size_t count = cmd & ALPHA_COUNT_MASK;
 
             if (fill) {
-                if (readPos >= chunk.alphaMap.size()) break;
+                if (readPos >= end) break;
+                // A fill command carries one value even when its count is zero.
                 const uint8_t val = chunk.alphaMap[readPos++];
-                for (int i = 0; i < count && writePos < ALPHA_MAP_SIZE; ++i) {
+                for (size_t i = 0; i < count && writePos < ALPHA_MAP_SIZE; ++i) {
                     outAlpha[writePos++] = val;
                 }
             } else {
-                for (int i = 0;
-                     i < count && writePos < ALPHA_MAP_SIZE && readPos < chunk.alphaMap.size();
+                for (size_t i = 0;
+                     i < count && writePos < ALPHA_MAP_SIZE && readPos < end;
                      ++i) {
                     outAlpha[writePos++] = chunk.alphaMap[readPos++];
                 }
@@ -94,7 +101,7 @@ bool decodeLayerAlpha(const MapChunk& chunk, size_t layerIdx,
             outAlpha[i * 2] = static_cast<uint8_t>((v & 0x0F) * 17);
             outAlpha[i * 2 + 1] = static_cast<uint8_t>((v >> 4) * 17);
         }
-        fixLastRowAndColumn(outAlpha);
+        if ((chunk.flags & 0x8000u) == 0) fixLastRowAndColumn(outAlpha);
         return true;
     }
 

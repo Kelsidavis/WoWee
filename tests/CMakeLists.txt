@@ -1088,6 +1088,17 @@ wowee_add_test(test_m2_structs
     SOURCES test_m2_structs.cpp
             ../src/rendering/m2_model_classifier.cpp)
 
+wowee_add_test(test_character_material_policy
+    SOURCES test_character_material_policy.cpp)
+
+# Optional regression using locally extracted Bloodsurge assets.
+wowee_add_test(test_weapon_material_assets
+    SOURCES test_weapon_material_assets.cpp
+            ${TEST_COMMON_SOURCES}
+            ${CMAKE_SOURCE_DIR}/src/pipeline/m2_loader.cpp
+            ${CMAKE_SOURCE_DIR}/src/pipeline/blp_loader.cpp)
+set_tests_properties(weapon_material_assets PROPERTIES SKIP_RETURN_CODE 4)
+
 # ── test_m2_color_alpha ──────────────────────────────────────
 # Loads the peasant lumberjack carry models (WotLK v264 + vanilla v256) and
 # pins the M2 color-alpha track parsing that hides the duplicate wood bundle.
@@ -1711,6 +1722,9 @@ wowee_add_test(test_camera
     SOURCES test_camera.cpp
             ${CMAKE_SOURCE_DIR}/src/rendering/camera.cpp
             ${TEST_COMMON_SOURCES})
+if(TARGET Vulkan::Vulkan)
+    target_link_libraries(test_camera PRIVATE Vulkan::Vulkan)
+endif()
 
 # ── test_install_probe ───────────────────────────────────────
 # Which folder the archives are in, given whatever somebody pointed at. Links
@@ -2591,7 +2605,8 @@ wowee_add_test(test_adt_alpha
     SOURCES test_adt_alpha.cpp
             ${TEST_COMMON_SOURCES}
             ${CMAKE_SOURCE_DIR}/src/pipeline/adt_alpha.cpp
-            ${CMAKE_SOURCE_DIR}/src/pipeline/adt_loader.cpp)
+            ${CMAKE_SOURCE_DIR}/src/pipeline/adt_loader.cpp
+            ${CMAKE_SOURCE_DIR}/src/pipeline/wdt_loader.cpp)
 
 # ── test_grass_terrain ─────────────────────────────────
 # Whether grass grows at a point, answered from the ADT's own ground-effect

@@ -10,6 +10,7 @@
 #include "rendering/m2_sway.hpp"
 
 using wowee::rendering::m2SwayFor;
+using wowee::rendering::m2SwayAmplitude;
 
 namespace {
 // (sky, hangingCloth, windFoliage, groundDetail)
@@ -80,4 +81,14 @@ TEST_CASE("the sway modes are unchanged by that", "[m2][sway]") {
         CHECK(sway.mode == 2);
         CHECK(sway.plantHeight == Catch::Approx(0.8f));
     }
+}
+
+TEST_CASE("the wind diagnostic leaves other animation paths alone", "[m2][sway]") {
+    const auto tree = m2SwayFor(kNotSky, kNotCloth, true, kNotDetail, 0.0f, 15.0f);
+    const auto grass = m2SwayFor(kNotSky, kNotCloth, true, true, 0.0f, 0.8f);
+    const auto cloth = m2SwayFor(kNotSky, true, kNotFoliage, kNotDetail, 0.0f, 6.0f);
+    CHECK(m2SwayAmplitude(tree, false) == tree.amp);
+    CHECK(m2SwayAmplitude(tree, true) == 0.0f);
+    CHECK(m2SwayAmplitude(grass, true) == grass.amp);
+    CHECK(m2SwayAmplitude(cloth, true) == cloth.amp);
 }

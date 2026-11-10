@@ -1913,7 +1913,7 @@ bool WMORenderer::initializeShadow(VkRenderPass shadowRenderPass) {
     // Create shadow pipeline layout: set 1 = shadowParams_.layout, push constants = 128 bytes
     VkPushConstantRange pc{};
     // The fragment stage reads the alpha-test flags out of the same block.
-    pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    pc.stageFlags = kSharedShadowPushStages;
     pc.offset = 0;
     pc.size = sizeof(ShadowPush);  // one combined matrix, plus the sway slot
     shadowPipelineLayout_ = createPipelineLayout(device, {shadowParams_.layout}, {pc});
@@ -1985,7 +1985,7 @@ void WMORenderer::renderShadow(VkCommandBuffer cmd, const glm::mat4& lightSpaceM
 
         // A building does not sway, so the sway slot stays zero.
         ShadowPush push{.lightSpaceModel = lightSpaceMatrix * instance.modelMatrix};
-        vkCmdPushConstants(cmd, shadowPipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT,
+        vkCmdPushConstants(cmd, shadowPipelineLayout_, kSharedShadowPushStages,
                            0, sizeof(ShadowPush), &push);
 
         for (size_t gi = 0; gi < model.groups.size(); ++gi) {

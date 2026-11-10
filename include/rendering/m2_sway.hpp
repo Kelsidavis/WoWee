@@ -30,6 +30,13 @@ struct M2Sway {
     float plantHeight = 0.0f;
 };
 
+/// Suppress only procedural foliage wind during a diagnostic comparison.
+/// Ground-detail animation and cloth use their own paths and remain unchanged.
+/// Both the main pass and the shadow pass must use the same value.
+inline float m2SwayAmplitude(const M2Sway& sway, bool disableFoliageWind) {
+    return disableFoliageWind && sway.mode == 1 ? 0.0f : sway.amp;
+}
+
 /// The sway a model gets from what it is and how big it is.
 ///
 /// `boundMinZ`/`boundMaxZ` are the model's own bounds. Height is measured from

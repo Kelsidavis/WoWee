@@ -37,6 +37,7 @@ layout(set = 1, binding = 7) uniform TerrainParams {
     int hasLayer1;
     int hasLayer2;
     int hasLayer3;
+    int bigAlpha;
 };
 
 layout(set = 0, binding = 1) uniform sampler2DShadow uShadowMap;
@@ -156,29 +157,33 @@ void main() {
 
     vec4 baseColor = texture(uBaseTexture, TexCoord);
 
-    // WoW terrain: layers are blended sequentially, each on top of the previous result.
-    // Alpha=1 means the layer fully covers everything below; alpha=0 means invisible.
-    vec4 finalColor = baseColor;
+    // Legacy alpha maps paint each layer over the preceding one. We use the
+    // WDT big-alpha flag to select independent coverage weights, as in
+    // Northrend: the base gets what the three overlay weights leave.
+    float a1 = 0.0;
+    float a2 = 0.0;
+    float a3 = 0.0;
+    vec4 color1 = vec4(0.0);
+    vec4 color2 = vec4(0.0);
+    vec4 color3 = vec4(0.0);
     if (hasLayer1 != 0) {
-        float a1 = sampleAlpha(uLayer1Alpha, LayerUV);
-        // Where the layer is not painted, mix() returns what it was given and
-        // the fetch that fed it was work for nothing. A layer covers part of a
-        // chunk, so whole regions of the screen take this branch together.
-        if (a1 > 0.002) finalColor = mix(finalColor, texture(uLayer1Texture, TexCoord), a1);
+        a1 = sampleAlpha(uLayer1Alpha, LayerUV);
+        if (a1 > 0.0) color1 = texture(uLayer1Texture, TexCoord);
     }
     if (hasLayer2 != 0) {
-        float a2 = sampleAlpha(uLayer2Alpha, LayerUV);
-        // Where the layer is not painted, mix() returns what it was given and
-        // the fetch that fed it was work for nothing. A layer covers part of a
-        // chunk, so whole regions of the screen take this branch together.
-        if (a2 > 0.002) finalColor = mix(finalColor, texture(uLayer2Texture, TexCoord), a2);
+        a2 = sampleAlpha(uLayer2Alpha, LayerUV);
+        if (a2 > 0.0) color2 = texture(uLayer2Texture, TexCoord);
     }
     if (hasLayer3 != 0) {
-        float a3 = sampleAlpha(uLayer3Alpha, LayerUV);
-        // Where the layer is not painted, mix() returns what it was given and
-        // the fetch that fed it was work for nothing. A layer covers part of a
-        // chunk, so whole regions of the screen take this branch together.
-        if (a3 > 0.002) finalColor = mix(finalColor, texture(uLayer3Texture, TexCoord), a3);
+        a3 = sampleAlpha(uLayer3Alpha, LayerUV);
+        if (a3 > 0.0) color3 = texture(uLayer3Texture, TexCoord);
+    }
+    vec4 finalColor;
+    if (bigAlpha != 0) {
+        finalColor = baseColor * max(1.0 - a1 - a2 - a3, 0.0)
+                   + color1 * a1 + color2 * a2 + color3 * a3;
+    } else {
+        finalColor = mix(mix(mix(baseColor, color1, a1), color2, a2), color3, a3);
     }
 
     vec3 norm = normalize(Normal);

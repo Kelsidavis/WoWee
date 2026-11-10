@@ -50,6 +50,7 @@ TerrainMesh TerrainMeshGenerator::generate(const ADTTerrain& terrain) {
 ChunkMesh TerrainMeshGenerator::generateChunkMesh(const MapChunk& chunk, int chunkX, int chunkY, int tileX, int tileY) {
     ChunkMesh mesh;
 
+    mesh.bigAlpha = chunk.bigAlpha;
     mesh.chunkX = chunkX;
     mesh.chunkY = chunkY;
 

@@ -17,6 +17,13 @@
 
 using wowee::rendering::GPUPerFrameData;
 
+TEST_CASE("shared shadow push constants reach both shader stages", "[shadows]") {
+    const auto stages = wowee::rendering::kSharedShadowPushStages;
+    CHECK((stages & VK_SHADER_STAGE_VERTEX_BIT) != 0);
+    CHECK((stages & VK_SHADER_STAGE_FRAGMENT_BIT) != 0);
+    CHECK(sizeof(wowee::rendering::ShadowPush) <= 128);
+}
+
 // Replicates the shadow params logic from Renderer::updatePerFrameUBO()
 // This should NOT be affected by indoor state - shadows remain globally enabled
 static void applyShadowParams(GPUPerFrameData& fd,
