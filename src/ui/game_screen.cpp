@@ -1468,7 +1468,11 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 for (const bool bottom : {false, true}) {
                     if (!bindings.isCommandPressed((bottom ? bottomCommands : actionCommands)[i])) continue;
                     const int page = bottom ? ActionBarPanel::kBottomLeftActionPage : actionBarPanel_.getMainActionBarPage();
-                    const int slot = ActionBarPanel::actionSlotForPage(page, i);
+                    int slot = ActionBarPanel::actionSlotForPage(page, i);
+                    if (!bottom && page == 1) {
+                        if (const uint32_t bonus = gameHandler.getBonusActionBarOffset(); bonus > 0)
+                            slot = ActionBarPanel::actionSlotForPage(ActionBarPanel::kFrameXmlActionBarPages + static_cast<int>(bonus), i);
+                    }
                     if (bar[slot].type == game::ActionBarSlot::SPELL && bar[slot].isReady()) {
                         gameHandler.castSpell(bar[slot].id, gameHandler.hasTarget() ? gameHandler.getTargetGuid() : 0);
                     } else if (bar[slot].type == game::ActionBarSlot::ITEM && bar[slot].id != 0) {
