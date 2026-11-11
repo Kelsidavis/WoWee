@@ -869,7 +869,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                 }
                 if (auto* ac = renderer->getAnimationController()) ac->setTargetPosition(&targetGLPos);
 
-                // Selection circle color: WoW-canonical level-based colors
+                // Selection circle color by reaction: hostile red, neutral yellow, friendly green.
                 bool showSelectionCircle = false;
                 glm::vec3 circleColor(1.0f, 1.0f, 0.3f); // default yellow
                 float circleRadius = 1.5f;
@@ -881,21 +881,21 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                         circleRadius = std::min(std::max(r, 0.8f), 8.0f);
                     }
                 }
-                if (target->getType() == game::ObjectType::UNIT) {
+                if (target->getType() == game::ObjectType::UNIT ||
+                    target->getType() == game::ObjectType::PLAYER) {
                     showSelectionCircle = true;
                     auto unit = std::static_pointer_cast<game::Unit>(target);
+                    const int reaction = gameHandler.unitReactionToPlayer(*unit);
                     if (unit->getHealth() == 0 && unit->getMaxHealth() > 0) {
                         circleColor = glm::vec3(0.5f, 0.5f, 0.5f); // gray (dead)
-                    } else if (unit->isHostile() || gameHandler.isAggressiveTowardPlayer(target->getGuid())) {
-                        const ImVec4 c = ui::helpers::levelDifficultyColor(
-                            gameHandler.getPlayerLevel(), unit->getLevel());
-                        circleColor = glm::vec3(c.x, c.y, c.z);
+                    } else if (unit->isHostile() || reaction <= 3 ||
+                               gameHandler.isAggressiveTowardPlayer(target->getGuid())) {
+                        circleColor = glm::vec3(1.0f, 0.25f, 0.25f); // red (hostile)
+                    } else if (reaction == 4) {
+                        circleColor = glm::vec3(1.0f, 1.0f, 0.3f); // yellow (neutral)
                     } else {
                         circleColor = glm::vec3(0.3f, 1.0f, 0.3f); // green (friendly)
                     }
-                } else if (target->getType() == game::ObjectType::PLAYER) {
-                    showSelectionCircle = true;
-                    circleColor = glm::vec3(0.3f, 1.0f, 0.3f); // green (player)
                 }
                 // Nothing else gets one. WoW draws a selection circle under a
                 // unit and a player and under nothing else - a door, a mailbox,
