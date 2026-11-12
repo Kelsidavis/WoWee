@@ -1194,11 +1194,6 @@ void WorldLoader::loadOnlineWorldTerrain(uint32_t mapId, float x, float y, float
         }
     }
 
-    // Start intro pan right before entering gameplay so it's visible after loading.
-    if (renderer_->getCameraController()) {
-        renderer_->getCameraController()->startIntroPan(2.8f, 140.0f);
-    }
-
     showProgress("Entering world...", 1.0f);
 
     // Ensure all GPU resources (textures, buffers, pipelines) created during
