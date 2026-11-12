@@ -82,6 +82,23 @@ TEST_CASE("CombatFSM: INACTIVE → UNSHEATHE on COMBAT_ENTER event", "[combat]")
     CHECK(fsm.isActive());
 }
 
+TEST_CASE("CombatFSM: moving in combat does not replay the unsheathe", "[combat]") {
+    CombatFSM fsm;
+    auto caps = makeCombatCaps();
+    auto wl = unarmedLoadout();
+    auto in = combatInput();
+    in.hasUnsheathe = true;
+
+    fsm.setState(CombatFSM::State::COMBAT_IDLE);
+    fsm.resolve(in, caps, wl);
+    in.moving = true;
+    fsm.resolve(in, caps, wl);
+    CHECK(fsm.getState() == CombatFSM::State::INACTIVE);
+    in.moving = false;
+    fsm.resolve(in, caps, wl);
+    CHECK(fsm.getState() == CombatFSM::State::COMBAT_IDLE);
+}
+
 TEST_CASE("CombatFSM: stun overrides active combat", "[combat]") {
     CombatFSM fsm;
     auto caps = makeCombatCaps();

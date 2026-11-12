@@ -21,7 +21,7 @@ void CombatFSM::onEvent(AnimEvent event) {
     switch (event) {
         case AnimEvent::COMBAT_ENTER:
             if (state_ == State::INACTIVE)
-                state_ = State::UNSHEATHE;
+                state_ = weaponsDrawn_ ? State::COMBAT_IDLE : State::UNSHEATHE;
             break;
         case AnimEvent::COMBAT_EXIT:
             if (state_ == State::COMBAT_IDLE)
@@ -174,12 +174,15 @@ void CombatFSM::updateTransitions(const Input& in) {
 
     switch (state_) {
         case State::INACTIVE:
-            if (in.inCombat && in.grounded && !in.swimming && !in.moving) {
-                state_ = in.hasUnsheathe ? State::UNSHEATHE : State::COMBAT_IDLE;
+            if (!in.inCombat) {
+                weaponsDrawn_ = false;
+            } else if (in.grounded && !in.swimming && !in.moving) {
+                state_ = (in.hasUnsheathe && !weaponsDrawn_) ? State::UNSHEATHE : State::COMBAT_IDLE;
             }
             break;
 
         case State::COMBAT_IDLE:
+            weaponsDrawn_ = true;
             if (in.swimming || in.jumping || !in.grounded || in.moving) {
                 state_ = State::INACTIVE;
             } else if (!in.inCombat) {
@@ -299,6 +302,7 @@ void CombatFSM::updateTransitions(const Input& in) {
 
         case State::UNSHEATHE:
             if (in.swimming || in.moving) {
+                weaponsDrawn_ = true;  // the draw is not replayed after an interrupted one
                 state_ = State::INACTIVE;
             } else if (in.haveAnimState && oneShotComplete(in, anim::SHEATHE)) {
                 state_ = State::COMBAT_IDLE;
@@ -306,6 +310,7 @@ void CombatFSM::updateTransitions(const Input& in) {
             break;
 
         case State::SHEATHE:
+            weaponsDrawn_ = false;
             if (in.swimming || in.moving) {
                 state_ = State::INACTIVE;
             } else if (in.inCombat) {
@@ -465,6 +470,7 @@ void CombatFSM::reset() {
     hitReactionAnimId_ = 0;
     stunned_ = false;
     charging_ = false;
+    weaponsDrawn_ = false;
     offHandTurn_ = false;
     offHandThisSwing_ = false;
 }

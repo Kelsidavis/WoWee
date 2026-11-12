@@ -107,6 +107,9 @@ private:
     // Charge
     bool charging_ = false;
 
+    // Weapons already drawn this combat: moving and stopping must not replay the unsheathe.
+    bool weaponsDrawn_ = false;
+
     // Off-hand alternation for dual wielding
     /// Which hand the next swing uses, and which this one chose.
     ///
