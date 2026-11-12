@@ -869,7 +869,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                 }
                 if (auto* ac = renderer->getAnimationController()) ac->setTargetPosition(&targetGLPos);
 
-                // Selection circle color: WoW-canonical level-based colors
+                // Selection circle color by reaction (NPCs) and PvP flag (players), as the original client.
                 bool showSelectionCircle = false;
                 glm::vec3 circleColor(1.0f, 1.0f, 0.3f); // default yellow
                 float circleRadius = 1.5f;
@@ -881,21 +881,33 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                         circleRadius = std::min(std::max(r, 0.8f), 8.0f);
                     }
                 }
-                if (target->getType() == game::ObjectType::UNIT) {
+                if (target->getType() == game::ObjectType::UNIT ||
+                    target->getType() == game::ObjectType::PLAYER) {
                     showSelectionCircle = true;
                     auto unit = std::static_pointer_cast<game::Unit>(target);
+                    // HighlightColor.dbc colours: hostile, unfriendly, neutral, friendly, player, dead.
+                    const glm::vec3 kRed(1.0f, 0.0f, 0.0f), kOrange(1.0f, 0.5f, 0.0f),
+                        kYellow(1.0f, 1.0f, 0.0f), kGreen(0.0f, 1.0f, 0.0f), kBlue(0.0f, 0.0f, 1.0f);
+                    auto pvpFlagged = [&](uint64_t guid) {
+                        auto e = gameHandler.getEntityManager().getEntity(guid);
+                        return e && (e->getField(game::fieldIndex(game::UF::UNIT_FIELD_FLAGS)) & 0x00001000u);
+                    };
                     if (unit->getHealth() == 0 && unit->getMaxHealth() > 0) {
                         circleColor = glm::vec3(0.5f, 0.5f, 0.5f); // gray (dead)
-                    } else if (unit->isHostile() || gameHandler.isAggressiveTowardPlayer(target->getGuid())) {
-                        const ImVec4 c = ui::helpers::levelDifficultyColor(
-                            gameHandler.getPlayerLevel(), unit->getLevel());
-                        circleColor = glm::vec3(c.x, c.y, c.z);
+                    } else if (target->getType() == game::ObjectType::PLAYER) {
+                        // Players: blue unflagged, green friendly flagged, yellow hostile
+                        // flagged while we are not, red when both are flagged.
+                        if (!pvpFlagged(target->getGuid())) circleColor = kBlue;
+                        else if (!unit->isHostile()) circleColor = kGreen;
+                        else circleColor = pvpFlagged(gameHandler.getPlayerGuid()) ? kRed : kYellow;
                     } else {
-                        circleColor = glm::vec3(0.3f, 1.0f, 0.3f); // green (friendly)
+                        const int reaction = gameHandler.unitReactionToPlayer(*unit);
+                        if (reaction <= 2 || gameHandler.isAggressiveTowardPlayer(target->getGuid()))
+                            circleColor = kRed;
+                        else if (reaction == 3) circleColor = kOrange;
+                        else if (reaction == 4) circleColor = kYellow;
+                        else circleColor = kGreen;
                     }
-                } else if (target->getType() == game::ObjectType::PLAYER) {
-                    showSelectionCircle = true;
-                    circleColor = glm::vec3(0.3f, 1.0f, 0.3f); // green (player)
                 }
                 // Nothing else gets one. WoW draws a selection circle under a
                 // unit and a player and under nothing else - a door, a mailbox,
