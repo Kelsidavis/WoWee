@@ -61,16 +61,20 @@ fi
 
 mkdir -p "$OUT_DIR"
 
-# Download a tool once, verify it, and print its path.
+# Download a tool once, verify it on every use, and print its path.
 fetch_tool() {
     local name="$1" url="$2" sha="$3"
     local path="$OUT_DIR/$name"
-    if [ ! -x "$path" ]; then
+    if [ -x "$path" ]; then
+        echo "$sha  $path" | sha256sum -c - >&2 || return 1
+    else
         echo "Downloading $name" >&2
-        curl -fsSL -o "$path.part" "$url"
-        echo "$sha  $path.part" | sha256sum -c - >&2
-        chmod +x "$path.part"
-        mv "$path.part" "$path"
+        # Command substitutions do not inherit errexit by default. Propagate
+        # failures explicitly so an unverified download cannot become a tool.
+        curl -fsSL -o "$path.part" "$url" || return 1
+        echo "$sha  $path.part" | sha256sum -c - >&2 || return 1
+        chmod +x "$path.part" || return 1
+        mv "$path.part" "$path" || return 1
     fi
     echo "$path"
 }

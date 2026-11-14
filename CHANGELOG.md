@@ -12,6 +12,8 @@
 - The AppImage prints a clear message, with the package to install for Debian, Ubuntu, Fedora and Arch, when the Vulkan loader (`libvulkan.so.1`) is missing, in place of the dynamic linker's "error while loading shared libraries"
 
 ### Fixed
+- AppImage packaging stops immediately when downloading or verifying a packaging tool fails. Addon saved variables now live under the user's config directory instead of beside addon code, so bundled addons retain their settings in the read-only AppImage. Existing settings beside addons are read until saved in the new location.
+
 - The Linux builder image installs `ca-certificates`. `git` is installed without its recommended packages, so the image had no CA bundle and the `git clone` of SDL3 (and of the FidelityFX SDKs in `build-linux.sh`) failed certificate verification
 
 - The Linux builder image installs `glslc`, the only shader compiler CMake uses. Without it no shader was compiled, the build fell back to the committed `.spv` files, and the eight shaders that have none (grass, HiZ and M2 culling, world-map fog, editor water) were missing from the AppImage

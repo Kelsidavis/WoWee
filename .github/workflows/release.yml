@@ -95,7 +95,7 @@ jobs:
     - name: Build AppImage
       run: |
         TAG="${GITHUB_REF_NAME}"
-          
+
         # Fail if an asset tool is missing
         test -x build/bin/asset_extract
         test -x build/bin/wowee_assets
