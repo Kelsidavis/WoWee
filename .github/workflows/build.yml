@@ -27,11 +27,9 @@ jobs:
         include:
         - arch: x86-64
           runner: ubuntu-24.04
-          deb_arch: amd64
           build_jobs: $(nproc)
         - arch: arm64
           runner: ubuntu-24.04-arm
-          deb_arch: arm64
           build_jobs: 2
 
     steps:
@@ -131,14 +129,14 @@ jobs:
     - name: Run tests
       run: cd build && ctest --output-on-failure
 
-    - name: Package (DEB)
-      run: cd build && cpack -G DEB
+    - name: Package AppImage
+      run: container/appimage/build-appimage.sh build
 
-    - name: Upload DEB
+    - name: Upload AppImage
       uses: actions/upload-artifact@v7
       with:
-        name: wowee-linux-${{ matrix.arch }}-deb
-        path: build/wowee-*.deb
+        name: wowee-linux-${{ matrix.arch }}-appimage
+        path: build/wowee-*.AppImage
         if-no-files-found: error
 
   build-macos:

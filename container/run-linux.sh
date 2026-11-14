@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 # run-linux.sh - Build WoWee for Linux (amd64) inside a Docker container.
 #
+# The build leaves one file: build/linux/wowee-<version>-<arch>.AppImage.
+#
 # Usage (run from project root):
 #   ./container/run-linux.sh [--rebuild-image]
+#
+# The CMake build tree is kept in the Docker volume wowee-linux-build, so a
+# second run compiles only what changed. `docker volume rm wowee-linux-build`
+# starts over.
 #
 # Environment variables:
 #   WOWEE_FFX_SDK_REPO  - FidelityFX SDK git repo URL (passed through to container)
@@ -15,7 +21,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 IMAGE_NAME="wowee-builder-linux"
+BUILD_VOLUME="wowee-linux-build"
 BUILD_OUTPUT="${PROJECT_ROOT}/build/linux"
+
+# Revision label of the builder image: an image without the current one is
+# rebuilt instead of run. Changing it rebuilds every existing image.
+IMAGE_REV="appimage-1"
 
 # Parse arguments
 REBUILD_IMAGE="${REBUILD_IMAGE:-0}"
@@ -32,11 +43,17 @@ if ! command -v docker &>/dev/null; then
   exit 1
 fi
 
-# Build the image (skip if already present and --rebuild-image not given)
-if [[ "$REBUILD_IMAGE" == "1" ]] || ! docker image inspect "$IMAGE_NAME" &>/dev/null; then
+image_is_current() {
+  docker image inspect --format '{{.Config.Labels}}' "$IMAGE_NAME" 2>/dev/null \
+    | grep -q "wowee.builder.rev:${IMAGE_REV}"
+}
+
+# Build the image (skip if present, current, and --rebuild-image not given)
+if [[ "$REBUILD_IMAGE" == "1" ]] || ! image_is_current; then
   echo "==> Building Docker image: ${IMAGE_NAME}"
   docker build \
     -f "${SCRIPT_DIR}/builder-linux.Dockerfile" \
+    --label "wowee.builder.rev=${IMAGE_REV}" \
     -t "$IMAGE_NAME" \
     "${SCRIPT_DIR}"
 else
@@ -51,8 +68,16 @@ echo "==> Starting Linux build (output: ${BUILD_OUTPUT})"
 docker run --rm \
   --mount "type=bind,src=${PROJECT_ROOT},dst=/src,readonly" \
   --mount "type=bind,src=${BUILD_OUTPUT},dst=/out" \
+  --mount "type=volume,src=${BUILD_VOLUME},dst=/build" \
   ${WOWEE_FFX_SDK_REPO:+--env "WOWEE_FFX_SDK_REPO=${WOWEE_FFX_SDK_REPO}"} \
   ${WOWEE_FFX_SDK_REF:+--env "WOWEE_FFX_SDK_REF=${WOWEE_FFX_SDK_REF}"} \
   "$IMAGE_NAME"
 
-echo "==> Linux build complete. Artifacts in: ${BUILD_OUTPUT}"
+# An unmatched pattern must give an empty array, not itself, for the check below.
+shopt -s nullglob
+APPIMAGES=("${BUILD_OUTPUT}"/wowee-*.AppImage)
+if (( ${#APPIMAGES[@]} == 0 )); then
+  echo "Error: the container finished but left no AppImage in ${BUILD_OUTPUT}." >&2
+  exit 1
+fi
+echo "==> Linux build complete: ${APPIMAGES[*]}"

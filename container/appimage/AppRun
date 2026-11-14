@@ -1,0 +1,55 @@
+#!/bin/sh
+# Entry point of the Wowee AppImage.
+#
+# The client changes into its executable's directory at startup (src/main.cpp)
+# and finds assets/, Data/ and addons/ there, which works unchanged in the
+# read-only mount. Extracted game data and the config are per-user
+# (~/.local/share/wowee, ~/.wowee), not beside the executable. None of it needs
+# setting up here.
+#
+#   wowee-*.AppImage                 run the client
+#   wowee-*.AppImage --asset-manager run the asset manager window
+#   wowee-*.AppImage --asset-extract run the command line extractor
+#                                    (--mpq-dir <WoW Data> --output <dir>)
+#
+# libvulkan is not bundled, since it has to match the machine's graphics
+# driver. When it is missing, say so and name the package, instead of the
+# dynamic linker's bare "error while loading shared libraries".
+HERE="${APPDIR:-$(dirname "$(readlink -f "$0")")}"
+
+# True when the program needs libvulkan.so.1 and the system has none. Without
+# ldd there is nothing to check, and the program is started as usual.
+missing_vulkan_loader() {
+    command -v ldd >/dev/null 2>&1 \
+        && ldd "$1" 2>/dev/null | grep -q 'libvulkan\.so.*not found'
+}
+
+run() {
+    prog="$1"
+    shift
+    if [ ! -x "$HERE/usr/bin/$prog" ]; then
+        echo "$prog is not part of this AppImage (it was not built)." >&2
+        exit 1
+    fi
+    if missing_vulkan_loader "$HERE/usr/bin/$prog"; then
+        cat >&2 <<'EOF'
+Wowee needs the Vulkan loader (libvulkan.so.1), which is not part of this
+AppImage because it has to match the graphics driver of this machine. Install
+it with your package manager, together with a Vulkan 1.3 driver:
+
+  Debian, Ubuntu   sudo apt install libvulkan1
+  Fedora           sudo dnf install vulkan-loader
+  Arch             sudo pacman -S vulkan-icd-loader
+
+Then start Wowee again.
+EOF
+        exit 1
+    fi
+    exec "$HERE/usr/bin/$prog" "$@"
+}
+
+case "${1:-}" in
+    --asset-manager) shift; run wowee_assets "$@" ;;
+    --asset-extract) shift; run asset_extract "$@" ;;
+esac
+run wowee "$@"

@@ -558,6 +558,11 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/sweep_guard.py)
 endif()
 
+if(Python3_Interpreter_FOUND AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME appimage_tools
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_appimage_tools.py)
+endif()
+
 # ── unicorn_stub_compiles ────────────────────────────────────────
 # Unicorn is optional and every build here has it, so the stub branch the
 # Warden emulator falls back to compiles in no configuration anyone runs. It
@@ -2709,7 +2714,7 @@ if(NOT ANDROID)
 
     # Same complete client objects as game_replay: never replace client classes
     # with test implementations or copy an input-routing branch into a seam.
-    add_executable(test_input_integration test_input_integration.cpp
+    add_executable(test_input_integration test_input_integration.cpp test_addon_saved_variables.cpp
         "$<FILTER:$<TARGET_OBJECTS:wowee>,EXCLUDE,/main([.]cpp)?[.]o(bj)?$>")
     target_include_directories(test_input_integration PRIVATE ${TEST_INCLUDE_DIRS}
         $<TARGET_PROPERTY:wowee,INCLUDE_DIRECTORIES>)
