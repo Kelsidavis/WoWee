@@ -1,5 +1,7 @@
 #include "rendering/performance_hud.hpp"
 #include "rendering/renderer.hpp"
+#include "core/application.hpp"
+#include "core/thermal_state.hpp"
 #include "rendering/post_process_pipeline.hpp"
 #include "rendering/vk_context.hpp"
 #include "rendering/terrain_renderer.hpp"
@@ -19,6 +21,8 @@
 #include "ui/ui_colors.hpp"
 #include <imgui.h>
 #include <algorithm>
+#include <cstdio>
+#include <cstring>
 #include <sstream>
 #include <iomanip>
 
@@ -166,6 +170,57 @@ void PerformanceHUD::render(const Renderer* renderer, const Camera* camera) {
         ImGui::Text("Frame: %.2f ms", frameTime * 1000.0f);
 
         ImGui::Spacing();
+        // What the GPU did with the frame, against the wall clock the frame
+        // was given. Busy is the number the pass times alone do not say: the
+        // bars below are how long each pass took, the top one is how much of
+        // the frame the GPU spent working - the gap being either the CPU
+        // keeping it waiting or the frame finishing early.
+        ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "GPU (ms)");
+        ImGui::Separator();
+        {
+            auto* ctx = renderer->getVkContext();
+            const double wallMs = static_cast<double>(frameTime) * 1000.0;
+            if (ctx && !ctx->gpuTimings().empty() && wallMs > 0.0) {
+                const auto& passes = ctx->gpuTimings();
+                double total = 0.0;
+                for (const auto& p : passes) total += p.second;
+                char head[96];
+                std::snprintf(head, sizeof(head), "%.1f of %.1f ms (%.0f%% busy)",
+                              total, wallMs, 100.0 * total / wallMs);
+                ImGui::ProgressBar(static_cast<float>(std::min(1.0, total / wallMs)),
+                                   ImVec2(210.0f, 0.0f), head);
+                for (const auto& p : passes) {
+                    char line[96];
+                    std::snprintf(line, sizeof(line), "%s  %.2f", p.first, p.second);
+                    ImGui::ProgressBar(
+                        static_cast<float>(std::min(1.0, p.second / wallMs)),
+                        ImVec2(210.0f, 0.0f), line);
+                }
+            } else {
+                ImGui::TextUnformatted("no pass timings yet");
+            }
+        }
+
+        // The device's own word for how it is doing with heat. A window that
+        // drops to half rate because the SoC is warm and one that drops
+        // because the CPU stalled look the same from inside the game; this is
+        // the difference, in the OS's own terms - the same state Instruments'
+        // energy log reads.
+        {
+            const char* thermal = core::thermalStateName();
+            ImVec4 thermalColor = colors::kGray;
+            if (std::strcmp(thermal, "nominal") == 0) {
+                thermalColor = colors::kGreen;
+            } else if (std::strcmp(thermal, "fair") == 0) {
+                thermalColor = ImVec4(1.0f, 1.0f, 0.0f, 1.0f);
+            } else if (std::strcmp(thermal, "serious") == 0 ||
+                       std::strcmp(thermal, "critical") == 0) {
+                thermalColor = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
+            }
+            ImGui::TextColored(thermalColor, "Thermal: %s", thermal);
+        }
+
+        ImGui::Spacing();
         ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.6f, 1.0f), "CPU TIMINGS (ms)");
         ImGui::Text("Update: %.2f (Camera: %.2f)", renderer->getLastUpdateMs(), renderer->getLastCameraUpdateMs());
         ImGui::Text("Render: %.2f (Terrain: %.2f, WMO: %.2f, M2: %.2f)",
@@ -184,6 +239,39 @@ void PerformanceHUD::render(const Renderer* renderer, const Camera* camera) {
             if (m2Renderer) {
                 ImGui::Text("  M2:  %.2f ms (%u calls)",
                             m2Renderer->getQueryTimeMs(), m2Renderer->getQueryCallCount());
+            }
+        }
+        // The worst of the three prepare workers, which is what a stuttering
+        // frame is usually waiting on: the main thread blocks on the slowest
+        // one before the draw lists go out. Baseline is around 1-2 ms; the
+        // streaming stalls this client chases show up here first.
+        ImGui::Text("  worst prepare worker: %.2f ms",
+                    std::max({renderer->getLastTerrainRenderMs(),
+                              renderer->getLastWMORenderMs(),
+                              renderer->getLastM2RenderMs()}));
+
+        // Where the main thread's frame went, over the same ten-second window
+        // the log's breakdown prints from - so an on-screen stutter can be
+        // matched to a line in the log without a profiler attached.
+        {
+            auto stages = core::Application::getInstance().stageStatsSnapshot();
+            std::vector<std::pair<std::string, const core::Application::StageStat*>> byAvg;
+            for (auto& entry : stages) {
+                if (entry.second.frames > 0) byAvg.emplace_back(entry.first, &entry.second);
+            }
+            std::sort(byAvg.begin(), byAvg.end(), [](const auto& a, const auto& b) {
+                return a.second->totalMs / a.second->frames >
+                       b.second->totalMs / b.second->frames;
+            });
+            if (!byAvg.empty()) {
+                ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.6f, 1.0f),
+                                   "CPU STAGES (avg / worst ms)");
+                const size_t show = std::min<size_t>(byAvg.size(), 8);
+                for (size_t i = 0; i < show; ++i) {
+                    ImGui::Text("  %-22s %6.2f / %6.2f", byAvg[i].first.c_str(),
+                                byAvg[i].second->totalMs / byAvg[i].second->frames,
+                                byAvg[i].second->worstMs);
+                }
             }
         }
 
@@ -494,7 +582,8 @@ void PerformanceHUD::render(const Renderer* renderer, const Camera* camera) {
 
         ImGui::Spacing();
         ImGui::TextColored(kSectionHeader, "Debug");
-        ImGui::TextColored(kHelpText, "F1: Toggle this HUD");
+        ImGui::TextColored(kHelpText, "F1: Toggle this HUD (debug builds)");
+        ImGui::TextColored(kHelpText, "Menu: Interface - Performance overlay");
         ImGui::TextColored(kHelpText, "F4: Toggle shadows");
         ImGui::TextColored(kHelpText, "F7: Level-up FX");
         ImGui::TextColored(kHelpText, "Esc: Settings/Close");

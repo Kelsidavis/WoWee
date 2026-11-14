@@ -1,6 +1,7 @@
 #include "core/macos_platform.hpp"
 
 #include "core/logger.hpp"
+#include "core/thermal_state.hpp"
 
 #import <Foundation/Foundation.h>
 
@@ -21,6 +22,19 @@ void disablePressAndHoldAccents() {
             LOG_INFO("Press-and-hold accents were enabled globally; "
                      "overriding for this application");
         }
+    }
+}
+
+const char* thermalStateName() {
+    // The same reading iOS reports, and the one Instruments' energy log is
+    // built on - sampled per call, so the performance overlay shows the
+    // device moving between states while the game runs.
+    switch ([NSProcessInfo processInfo].thermalState) {
+        case NSProcessInfoThermalStateNominal:  return "nominal";
+        case NSProcessInfoThermalStateFair:     return "fair";
+        case NSProcessInfoThermalStateSerious:  return "serious";
+        case NSProcessInfoThermalStateCritical: return "critical";
+        default:                                return "unknown";
     }
 }
 
