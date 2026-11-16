@@ -1357,6 +1357,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         MACOSX_BUNDLE_BUNDLE_NAME "WoWee"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist"
     )
+    # The Xcode generator copies the bundle plist into the build tree when it
+    # generates the project, so an edit to ios/Info.plist (the app icon
+    # declaration, the orientation keys) would otherwise only reach the
+    # device after a manual re-configure.  Re-run CMake when it changes.
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist")
 endif()
 # macOS cross-compilation: MoltenVK is not available at link time.
 # Allow unresolved Vulkan symbols - resolved at runtime. Scoped to wowee only.

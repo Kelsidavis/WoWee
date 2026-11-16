@@ -181,6 +181,32 @@ one continent *and* sound, which no stock profile expresses.
 `tools/android/README.md` documents the profiles and the checker that verifies
 one against the paths the client names.
 
+## App icon
+
+The tablet shows the same mark as the Mac: `assets/Wowee.png` is the source of
+truth for both. The macOS release turns it into `Wowee.icns`
+(`tools/macos/create_icns.sh`); the iOS set is rendered from the same file by
+`tools/ios/make_appicons.sh`, which writes every slot the asset catalog
+declares into `ios/Assets.xcassets/AppIcon.appiconset/`.
+
+Two things the iOS set needs that the Mac one does not:
+
+- **No transparency.** iOS wants an opaque square and applies its own rounded
+  mask; the artwork is a rounded tile with transparent corners.
+  `tools/ios/flatten_icon.py` fills those corners by continuing the tile's own
+  edge outwards, and strips the alpha channel afterwards.
+- **A declaration.** `actool` compiles the catalog into `Assets.car` and
+  drops `AppIcon60x60@2x.png` / `AppIcon76x76@2x~ipad.png` into the bundle,
+  but the icon only appears on the home screen if `ios/Info.plist` names it
+  (`CFBundleIcons` and `CFBundleIcons~ipad`). Without those keys the bundle
+  has an icon and still draws a blank placeholder.
+
+Regenerate after changing the artwork:
+
+```
+tools/ios/make_appicons.sh
+```
+
 ## Configuration
 
 `core::getConfigRoot()` resolves to the app's `Documents/config/` on iOS.

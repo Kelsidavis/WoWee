@@ -36,6 +36,37 @@
          alongside the tablet's own screenshots. -->
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>WoWee saves the screenshots you take in game into your photo library.</string>
+    <!-- The app icon.  The build compiles ios/Assets.xcassets with actool,
+         which puts the icon into Assets.car under the name "AppIcon" and
+         drops AppIcon60x60@2x.png and AppIcon76x76@2x~ipad.png next to it.
+         Without these keys the system finds no icon at all and the home
+         screen shows a blank placeholder - the icon files have to be
+         declared for the tablet to draw the WoWee mark. -->
+    <key>CFBundleIcons</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconName</key>
+            <string>AppIcon</string>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon60x60</string>
+            </array>
+        </dict>
+    </dict>
+    <key>CFBundleIcons~ipad</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconName</key>
+            <string>AppIcon</string>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon60x60</string>
+                <string>AppIcon76x76</string>
+            </array>
+        </dict>
+    </dict>
     <!-- The Documents directory (game data, settings, screenshots) is visible
          in the Files app so it can be filled and emptied without a computer. -->
     <key>UIFileSharingEnabled</key>
