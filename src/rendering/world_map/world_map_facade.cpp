@@ -169,6 +169,7 @@ struct WorldMapFacade::Impl {
     void closeMap();
     void switchToMap(const std::string& newMapName);
     void switchToWorldView();
+    int pointViewAtPlayer(const glm::vec3& playerRenderPos);
     void renderImGuiOverlay(const glm::vec3& playerRenderPos,
                             int screenWidth, int screenHeight,
                             float playerYawDeg,
@@ -381,6 +382,108 @@ void WorldMapFacade::compositePass(VkCommandBuffer cmd) {
                                      impl_->exploration.hasServerMask());
 }
 
+// No textures, so it works with the map closed. Returns -1 for a continent.
+int WorldMapFacade::Impl::pointViewAtPlayer(const glm::vec3& playerRenderPos) {
+    const int physicalMapId = folderToMapId(physicalMapName);
+    auto displayedPlayerPosition = [&]() {
+        return physicalMapId >= 0
+            ? data.transformRenderPosition(
+                  static_cast<uint32_t>(physicalMapId), playerRenderPos)
+            : playerRenderPos;
+    };
+    glm::vec3 displayPlayerRenderPos = displayedPlayerPosition();
+    if (data.zones().empty()) {
+        data.loadZones(mapName, *assetManager);
+        zoneMetadata.initialize();
+        viewState.setCosmicEnabled(data.cosmicEnabled());
+        displayPlayerRenderPos = displayedPlayerPosition();
+    }
+
+    int playerZone = findZoneForPlayer(data.zones(), displayPlayerRenderPos, playerZoneId);
+    // A zone on this continent that has no map of its own - Hyjal, in
+    // 3.3.5 - opens the continent, as the real client does. Left to the
+    // rectangles, a neighbour whose box reached into it was shown instead.
+    if (playerZoneId != 0 &&
+        findZoneByAreaId(data.zones(), playerZoneId) < 0 &&
+        data.mapIdForArea(playerZoneId) != 0 &&
+        static_cast<int>(data.mapIdForArea(playerZoneId)) == data.currentMapId()) {
+        playerZone = -1;
+    }
+
+    // Some zones are stored on a different physical map from the continent
+    // shown by the world-map UI. The draenei islands are the important case:
+    // terrain/minimap data comes from Expansion01 (map 530), while their
+    // WorldMapArea DisplayMapID is Kalimdor (map 1). Follow that metadata
+    // instead of opening Outland merely because the terrain map is 530.
+    if (!virtualMapOverride && playerZone >= 0) {
+        const Zone& zone = data.zones()[playerZone];
+        if (zone.displayMapID != 0 &&
+            zone.displayMapID < UINT32_MAX - 1 &&  // DBC -1 = no display map
+            zone.displayMapID != static_cast<uint32_t>(data.currentMapId())) {
+            const char* virtualFolder = mapIdToFolder(zone.displayMapID);
+            if (virtualFolder && *virtualFolder) {
+                physicalMapName = mapName;
+                virtualMapOverride = true;
+                mapName = virtualFolder;
+                if (zoneHighlightLayer) zoneHighlightLayer->clearTextures();
+                compositor.detachZoneTextures();
+                data.clear();
+                compositor.invalidateComposite();
+                data.loadZones(mapName, *assetManager);
+                zoneMetadata.initialize();
+                viewState.setCosmicEnabled(data.cosmicEnabled());
+                viewState.setContinentIdx(-1);
+                viewState.setCurrentZoneIdx(-1);
+                displayPlayerRenderPos = displayedPlayerPosition();
+                playerZone = findZoneForPlayer(data.zones(), displayPlayerRenderPos, playerZoneId);
+                LOG_INFO("World map virtual continent: physical='",
+                         physicalMapName, "' display='", mapName, "'");
+            }
+        }
+    } else if (virtualMapOverride) {
+        const bool stillInVirtualArea = playerZone >= 0 &&
+            data.zones()[playerZone].mapID !=
+                static_cast<uint32_t>(data.currentMapId()) &&
+            data.zones()[playerZone].displayMapID ==
+                static_cast<uint32_t>(data.currentMapId());
+        if (!stillInVirtualArea) {
+            virtualMapOverride = false;
+            mapName = physicalMapName;
+            if (zoneHighlightLayer) zoneHighlightLayer->clearTextures();
+            compositor.detachZoneTextures();
+            data.clear();
+            compositor.invalidateComposite();
+            data.loadZones(mapName, *assetManager);
+            zoneMetadata.initialize();
+            viewState.setCosmicEnabled(data.cosmicEnabled());
+            viewState.setContinentIdx(-1);
+            viewState.setCurrentZoneIdx(-1);
+            displayPlayerRenderPos = displayedPlayerPosition();
+            playerZone = findZoneForPlayer(data.zones(), displayPlayerRenderPos, playerZoneId);
+        }
+    }
+
+    int bestContinent = findBestContinentForPlayer(data.zones(), displayPlayerRenderPos);
+    if (bestContinent >= 0 && bestContinent != viewState.continentIdx()) {
+        viewState.setContinentIdx(bestContinent);
+        compositor.invalidateComposite();
+    }
+
+    // Flight map is always the continent overview - never open at zone level.
+    if (!taxiMode &&
+        playerZone >= 0 && viewState.continentIdx() >= 0 &&
+        zoneBelongsToContinent(data.zones(), playerZone, viewState.continentIdx())) {
+        viewState.setCurrentZoneIdx(playerZone);
+        viewState.setLevel(ViewLevel::ZONE);
+        return playerZone;
+    }
+    if (viewState.continentIdx() >= 0) {
+        viewState.setCurrentZoneIdx(viewState.continentIdx());
+        viewState.setLevel(ViewLevel::CONTINENT);
+    }
+    return -1;
+}
+
 void WorldMapFacade::render(const glm::vec3& playerRenderPos,
                              int screenWidth, int screenHeight,
                              float playerYawDeg) {
@@ -418,110 +521,19 @@ void WorldMapFacade::render(const glm::vec3& playerRenderPos,
     if (!d.open || d.data.zones().empty() || d.recenterOnPlayer) {
         d.open = true;
         d.recenterOnPlayer = false;
-        if (d.data.zones().empty()) {
-            d.data.loadZones(d.mapName, *d.assetManager);
-            d.zoneMetadata.initialize();
-            d.viewState.setCosmicEnabled(d.data.cosmicEnabled());
-            displayPlayerRenderPos = displayedPlayerPosition();
-        }
-
-        int playerZone = findZoneForPlayer(d.data.zones(), displayPlayerRenderPos, d.playerZoneId);
-        // A zone on this continent that has no map of its own - Hyjal, in
-        // 3.3.5 - opens the continent, as the real client does. Left to the
-        // rectangles, a neighbour whose box reached into it was shown instead.
-        if (d.playerZoneId != 0 &&
-            findZoneByAreaId(d.data.zones(), d.playerZoneId) < 0 &&
-            d.data.mapIdForArea(d.playerZoneId) != 0 &&
-            static_cast<int>(d.data.mapIdForArea(d.playerZoneId)) == d.data.currentMapId()) {
-            playerZone = -1;
-        }
-
-        // Some zones are stored on a different physical map from the continent
-        // shown by the world-map UI. The draenei islands are the important case:
-        // terrain/minimap data comes from Expansion01 (map 530), while their
-        // WorldMapArea DisplayMapID is Kalimdor (map 1). Follow that metadata
-        // instead of opening Outland merely because the terrain map is 530.
-        if (!d.virtualMapOverride && playerZone >= 0) {
-            const Zone& zone = d.data.zones()[playerZone];
-            if (zone.displayMapID != 0 &&
-                zone.displayMapID < UINT32_MAX - 1 &&  // DBC -1 = no display map
-                zone.displayMapID != static_cast<uint32_t>(d.data.currentMapId())) {
-                const char* virtualFolder = mapIdToFolder(zone.displayMapID);
-                if (virtualFolder && *virtualFolder) {
-                    d.physicalMapName = d.mapName;
-                    d.virtualMapOverride = true;
-                    d.mapName = virtualFolder;
-                    if (d.zoneHighlightLayer) d.zoneHighlightLayer->clearTextures();
-                    d.compositor.detachZoneTextures();
-                    d.data.clear();
-                    d.compositor.invalidateComposite();
-                    d.data.loadZones(d.mapName, *d.assetManager);
-                    d.zoneMetadata.initialize();
-                    d.viewState.setCosmicEnabled(d.data.cosmicEnabled());
-                    d.viewState.setContinentIdx(-1);
-                    d.viewState.setCurrentZoneIdx(-1);
-                    displayPlayerRenderPos = displayedPlayerPosition();
-                    playerZone = findZoneForPlayer(d.data.zones(), displayPlayerRenderPos, d.playerZoneId);
-                    LOG_INFO("World map virtual continent: physical='",
-                             d.physicalMapName, "' display='", d.mapName, "'");
-                }
-            }
-        } else if (d.virtualMapOverride) {
-            const bool stillInVirtualArea = playerZone >= 0 &&
-                d.data.zones()[playerZone].mapID !=
-                    static_cast<uint32_t>(d.data.currentMapId()) &&
-                d.data.zones()[playerZone].displayMapID ==
-                    static_cast<uint32_t>(d.data.currentMapId());
-            if (!stillInVirtualArea) {
-                d.virtualMapOverride = false;
-                d.mapName = d.physicalMapName;
-                if (d.zoneHighlightLayer) d.zoneHighlightLayer->clearTextures();
-                d.compositor.detachZoneTextures();
-                d.data.clear();
-                d.compositor.invalidateComposite();
-                d.data.loadZones(d.mapName, *d.assetManager);
-                d.zoneMetadata.initialize();
-                d.viewState.setCosmicEnabled(d.data.cosmicEnabled());
-                d.viewState.setContinentIdx(-1);
-                d.viewState.setCurrentZoneIdx(-1);
-                displayPlayerRenderPos = displayedPlayerPosition();
-                playerZone = findZoneForPlayer(d.data.zones(), displayPlayerRenderPos, d.playerZoneId);
-            }
-        }
-
-        int bestContinent = findBestContinentForPlayer(d.data.zones(), displayPlayerRenderPos);
-        if (bestContinent >= 0 && bestContinent != d.viewState.continentIdx()) {
-            d.viewState.setContinentIdx(bestContinent);
-            d.compositor.invalidateComposite();
-        }
-
-        // Flight map is always the continent overview - never open at zone level.
-        if (!d.taxiMode &&
-            playerZone >= 0 && d.viewState.continentIdx() >= 0 &&
-            zoneBelongsToContinent(d.data.zones(), playerZone, d.viewState.continentIdx())) {
+        const int playerZone = d.pointViewAtPlayer(playerRenderPos);
+        displayPlayerRenderPos = displayedPlayerPosition();
+        if (playerZone >= 0) {
             d.compositor.loadZoneTextures(playerZone, d.data.zones(), d.mapName);
             d.compositor.loadOverlayTextures(playerZone, d.data.zones());
-            d.viewState.setCurrentZoneIdx(playerZone);
-            d.viewState.setLevel(ViewLevel::ZONE);
             d.exploration.update(d.data.zones(), displayPlayerRenderPos, playerZone,
                                  d.data.exploreFlagByAreaId(), d.playerZoneId);
             d.compositor.requestComposite(playerZone);
         } else if (d.viewState.continentIdx() >= 0) {
             d.compositor.loadZoneTextures(d.viewState.continentIdx(), d.data.zones(), d.mapName);
             d.compositor.requestComposite(d.viewState.continentIdx());
-            d.viewState.setCurrentZoneIdx(d.viewState.continentIdx());
-            d.viewState.setLevel(ViewLevel::CONTINENT);
         }
-        // The view has only now become the player's zone, and the interface
-        // asked before it did.
-        //
-        // SetMapToCurrentZone runs on every open and fires WORLD_MAP_UPDATE on
-        // the spot, which is when both dropdowns rebuild themselves. All this
-        // call does here is raise the recenter flag - the move happens in this
-        // block, one frame later - so GetCurrentMapContinent answered 0 while
-        // the dropdowns were being built, and 0 is what makes watchframe's
-        // ClearAll branch run and GetMapZones(0) return an empty list. Both
-        // came up blank and stayed blank, because nothing asked again.
+        // WORLD_MAP_UPDATE: the interface rebuilds its dropdowns from it.
         d.viewChanged = true;
     }
 
@@ -1626,9 +1638,12 @@ bool WorldMapFacade::takeViewChanged() {
     return was;
 }
 
-void WorldMapFacade::showPlayerZone() {
-    impl_->userMapOverride = false;
-    impl_->recenterOnPlayer = true;
+void WorldMapFacade::showPlayerZone(const glm::vec3& playerRenderPos) {
+    auto& d = *impl_;
+    d.userMapOverride = false;
+    // render() runs only while the map is drawn.
+    if (d.initialized && d.assetManager) d.pointViewAtPlayer(playerRenderPos);
+    d.recenterOnPlayer = true;
 }
 
 uint32_t WorldMapFacade::currentWorldMapAreaId() const {
