@@ -746,7 +746,7 @@ bool Application::initialize() {
         luaSvc.showPlayerMapZone = [r = renderer.get(), gh = gameHandler.get()]() {
             auto* wmap = r ? r->getWorldMap() : nullptr;
             if (!wmap) return;
-            // The HUD feeds the zone only while it draws the map.
+            // With the map closed the HUD does not update the zone, so pass it here.
             if (gh) wmap->setPlayerZoneId(gh->getWorldStateZoneId());
             wmap->showPlayerZone(r->getCharacterPosition());
         };

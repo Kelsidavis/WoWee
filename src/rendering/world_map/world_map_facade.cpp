@@ -382,7 +382,7 @@ void WorldMapFacade::compositePass(VkCommandBuffer cmd) {
                                      impl_->exploration.hasServerMask());
 }
 
-// No textures, so it works with the map closed. Returns -1 for a continent.
+// No textures, so it can run with the map closed. Returns the zone index, -1 for the continent.
 int WorldMapFacade::Impl::pointViewAtPlayer(const glm::vec3& playerRenderPos) {
     const int physicalMapId = folderToMapId(physicalMapName);
     auto displayedPlayerPosition = [&]() {
@@ -533,7 +533,7 @@ void WorldMapFacade::render(const glm::vec3& playerRenderPos,
             d.compositor.loadZoneTextures(d.viewState.continentIdx(), d.data.zones(), d.mapName);
             d.compositor.requestComposite(d.viewState.continentIdx());
         }
-        // WORLD_MAP_UPDATE: the interface rebuilds its dropdowns from it.
+        // Fires WORLD_MAP_UPDATE so the interface rebuilds its dropdowns.
         d.viewChanged = true;
     }
 
@@ -1641,7 +1641,7 @@ bool WorldMapFacade::takeViewChanged() {
 void WorldMapFacade::showPlayerZone(const glm::vec3& playerRenderPos) {
     auto& d = *impl_;
     d.userMapOverride = false;
-    // render() runs only while the map is drawn.
+    // Move the view now: render() runs only while the map is drawn.
     if (d.initialized && d.assetManager) d.pointViewAtPlayer(playerRenderPos);
     d.recenterOnPlayer = true;
 }
