@@ -781,13 +781,12 @@ bool WorldMapFacade::mapUVForCanonical(float wowX, float wowY, float wowZ,
     const int idx = impl_->viewState.currentZoneIdx();
     const auto& zones = impl_->data.zones();
     if (idx < 0 || idx >= static_cast<int>(zones.size())) return false;
-    const Zone& zone = zones[static_cast<size_t>(idx)];
-    const bool isContinent = (zone.areaID == 0);
+    // World and cosmic views have no bounds to project onto.
+    const ViewLevel level = impl_->viewState.currentLevel();
+    if (level != ViewLevel::ZONE && level != ViewLevel::CONTINENT) return false;
 
-    // The same bounds every marker layer projects against.
-    bool boundsAreContinent = false;
-    const ZoneBounds bounds = projectionBoundsFor(
-        zones, impl_->viewState.continentIdx(), boundsAreContinent);
+    bool isContinent = false;
+    const ZoneBounds bounds = projectionBoundsFor(zones, idx, isContinent);
     const glm::vec2 uv = renderPosToMapUV(
         core::coords::canonicalToRender(glm::vec3(wowX, wowY, wowZ)),
         bounds, isContinent);
