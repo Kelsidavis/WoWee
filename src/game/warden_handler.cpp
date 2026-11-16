@@ -21,6 +21,10 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#ifdef __APPLE__
+#include <pthread.h>
+#include <pthread/qos.h>
+#endif
 
 namespace wowee {
 namespace game {
@@ -621,6 +625,13 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
                 auto module = wardenLoadedModule_;
                 wardenPendingEncrypted_ = std::async(std::launch::async,
                                                      [decrypted, ctx, module]() mutable {
+#ifdef __APPLE__
+                    // This task hashes megabytes of image data (scan(0) plus
+                    // the module-image fallback). Keep the whole response
+                    // build below the frame pool: at default QoS it competes
+                    // with visibility classification and stalls frames.
+                    pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
+#endif
                     if (module && module->isLoaded()) {
                         ctx.moduleImage =
                             static_cast<const uint8_t*>(module->getModuleMemory());
