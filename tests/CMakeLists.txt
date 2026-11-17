@@ -163,6 +163,11 @@ endfunction()
 
 
 
+# The tablet's render scale must survive a rotation (and the settings rewrite
+# that follows it). Header-only arithmetic on the resolution list.
+wowee_add_test(test_display_modes
+    SOURCES test_display_modes.cpp)
+
 # What a vendor sell asks for. Header-only arithmetic, no game state.
 wowee_add_test(test_sell_count
     SOURCES test_sell_count.cpp)

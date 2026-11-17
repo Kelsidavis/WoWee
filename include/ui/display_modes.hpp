@@ -107,11 +107,26 @@ inline std::string displayResolutionLabel(const DisplayResolution& resolution) {
 /// dropdown selects by index and nothing is not a selection. A window dragged
 /// to some size of its own lands on the largest mode it still covers, which
 /// is what the picker should show as current.
+///
+/// A size whose width and height are swapped is the same resolution on a
+/// device that rotated: a tablet's screen goes from 2360x1640 to 1640x2360,
+/// and the half-scale render target goes from 1180x820 to 820x1180. Without
+/// that match the "largest mode it covers" fallback picks a different
+/// fraction on each orientation - 1180x820 fits only 546x786 in portrait,
+/// and 546x786 fits nothing in landscape, which snaps to the native screen
+/// size - and the settings file is rewritten at every step. Two rotations
+/// were enough to take an iPad from a 0.97 MP render target to the panel's
+/// 3.87 MP one. Match the rotated size first so the fraction survives.
 inline int displayResolutionIndexFor(const std::vector<DisplayResolution>& list, int w, int h) {
     if (list.empty()) return 0;
-    int best = 0;
     for (std::size_t i = 0; i < list.size(); ++i) {
         if (list[i].width == w && list[i].height == h) return static_cast<int>(i);
+    }
+    for (std::size_t i = 0; i < list.size(); ++i) {
+        if (list[i].width == h && list[i].height == w) return static_cast<int>(i);
+    }
+    int best = 0;
+    for (std::size_t i = 0; i < list.size(); ++i) {
         if (list[i].width <= w && list[i].height <= h) best = static_cast<int>(i);
     }
     return best;
