@@ -550,13 +550,6 @@ void Window::setRenderResolution(int w, int h) {
                 drawableWidth, "x", drawableHeight, " screen");
 }
 
-void Window::clearRenderResolution() {
-    if (renderResolutionWidth == 0 && renderResolutionHeight == 0) return;
-    renderResolutionWidth = 0;
-    renderResolutionHeight = 0;
-    LOG_WARNING("The world will be drawn at the screen's own size");
-}
-
 int Window::getDisplayResolutionIndex() const {
     return displayResolutionIndex_;
 }
