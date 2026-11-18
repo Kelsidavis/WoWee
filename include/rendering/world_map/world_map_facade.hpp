@@ -181,9 +181,8 @@ public:
     /// Whether there is a level above this one to step out to.
     [[nodiscard]] bool canZoomOut() const;
 
-    /// Show the zone the player is standing in. The interface asks for this
-    /// every time the map is shown, and used to reach nothing.
-    void showPlayerZone();
+    /// Show the zone the player is standing in, also with the map closed.
+    void showPlayerZone(const glm::vec3& playerRenderPos);
 
     /// The WorldMapArea id of the zone being shown, or zero when the map is
     /// not showing one. This is the id the interface passes back to

@@ -743,8 +743,12 @@ bool Application::initialize() {
             auto* wmap = r ? r->getWorldMap() : nullptr;
             return wmap && wmap->canZoomOut();
         };
-        luaSvc.showPlayerMapZone = [r = renderer.get()]() {
-            if (auto* wmap = r ? r->getWorldMap() : nullptr) wmap->showPlayerZone();
+        luaSvc.showPlayerMapZone = [r = renderer.get(), gh = gameHandler.get()]() {
+            auto* wmap = r ? r->getWorldMap() : nullptr;
+            if (!wmap) return;
+            // With the map closed the HUD does not update the zone, so pass it here.
+            if (gh) wmap->setPlayerZoneId(gh->getWorldStateZoneId());
+            wmap->showPlayerZone(r->getCharacterPosition());
         };
         luaSvc.getMapWorldAreaId = [r = renderer.get()]() -> uint32_t {
             auto* wmap = r ? r->getWorldMap() : nullptr;
