@@ -153,14 +153,17 @@ void WardenHandler::reset() {
     wardenModuleKey_.clear();
     wardenModuleSize_ = 0;
     wardenModuleData_.clear();
-    wardenLoadedModule_.reset();
     // A response still being built answers the session that just ended; sent
-    // on the next one it would go out under that session's keys.
+    // on the next one it would go out under that session's keys. Wait for it
+    // before releasing the module: the async scan hashes ctx.moduleImage, a
+    // raw pointer into the module's mmap, and munmap'ing first faulted it
+    // (SIGSEGV in HMAC on the check-response task).
     if (wardenResponsePending_) {
         wardenPendingEncrypted_.wait();
         wardenPendingEncrypted_ = {};
         wardenResponsePending_ = false;
     }
+    wardenLoadedModule_.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -611,7 +614,18 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
             // encrypts and sends what comes back.
             if (wardenRequestHasCodeScan(decrypted, wardenCheckOpcodes_) && !wardenResponsePending_) {
                 LOG_DEBUG("Warden: PAGE_A/PAGE_B detected - building response async to avoid main-loop stall");
-                wardenPendingEncrypted_ = std::async(std::launch::async, [decrypted, ctx]() {
+                // The scan hashes ctx.moduleImage for seconds; hold the module
+                // so its mapping outlives the task even if reset() or a module
+                // reload releases wardenLoadedModule_ meanwhile, and derive the
+                // pointer from that kept-alive image.
+                auto module = wardenLoadedModule_;
+                wardenPendingEncrypted_ = std::async(std::launch::async,
+                                                     [decrypted, ctx, module]() mutable {
+                    if (module && module->isLoaded()) {
+                        ctx.moduleImage =
+                            static_cast<const uint8_t*>(module->getModuleMemory());
+                        ctx.moduleImageSize = module->getModuleSize();
+                    }
                     return buildWardenCheckResponse(decrypted, ctx, "async");
                 });
                 wardenResponsePending_ = true;
