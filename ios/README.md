@@ -241,6 +241,18 @@ What the port has been exercised on:
 
 ## Known not to work yet
 
+- **The game is rotated 90 degrees on an external display.** The built-in
+  screen and the launch screen are correct; only the rendered world is. An
+  external monitor is reported by iPadOS with a portrait-ordered `UIScreen`
+  mode (a 2560x1440 panel came through as 972x1518), UIKit compensates for the
+  launch screen, and MoltenVK presents with an identity-only surface transform
+  (`currentTransform=0x1, supportedTransforms=0x1`) — so the swapchain, sized
+  from SDL's window, goes out landscape onto a surface the compositor treats
+  as portrait. There is no pre-transform to request on this driver; the real
+  fix is a 90 degree rotation of the final composite, not yet implemented.
+  Moving the window between displays is safe (a transient 0-height surface
+  during the move is rejected rather than crashing), but the external view
+  stays rotated.
 - **Touch input is untested on the iPad.** Android's touch controls are
   compiled in and hidden behind the same mouse-present check, but the port
   has only ever been driven by keyboard and mouse; fingers have not been
