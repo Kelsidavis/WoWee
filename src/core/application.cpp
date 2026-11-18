@@ -1753,6 +1753,16 @@ void Application::run() {
                 if (event.type == SDL_EVENT_WINDOW_RESIZED) {
                     int newWidth = event.window.data1;
                     int newHeight = event.window.data2;
+                    // An external display being unplugged sends a transient
+                    // zero-height resize on iPadOS (2300x0 points in one
+                    // capture). Recreating the swapchain at a 0 extent fails
+                    // to create the depth image and MoltenVK then faults in
+                    // populateMTLRenderPassDescriptor. The real size follows
+                    // once the display settles, so ignore these entirely.
+                    if (newWidth <= 0 || newHeight <= 0) {
+                        LOG_WARNING("Ignoring zero-sized window resize ",
+                                    newWidth, "x", newHeight);
+                    } else {
                     window->setSize(newWidth, newHeight);
                     // Mark swapchain dirty so it gets recreated at the correct size
                     if (window->getVkContext()) {
@@ -1767,6 +1777,7 @@ void Application::run() {
                     // Notify addons so UI layouts can adapt to the new size
                     if (addonManager_)
                         addonManager_->fireEvent("DISPLAY_SIZE_CHANGED");
+                    }
                 }
             }
             // Typed text, when an edit box is listening for it - or, when none

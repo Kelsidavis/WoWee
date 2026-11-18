@@ -1335,7 +1335,15 @@ void Renderer::beginFrame() {
         // Pixels, like the extent below: a window with a surface behind it is
         // never rebuilt from the size the desktop places it at.
         if (window->getDrawableWidth() == 0 || window->getDrawableHeight() == 0) return;
-        (void)vkCtx->recreateSwapchain(window->getDrawableWidth(), window->getDrawableHeight());
+        // A display hot-plug can leave the surface reporting a 0 extent even
+        // while the window's tracked size looks valid. recreateSwapchain()
+        // rejects that and leaves swapchainDirty set to retry on a later frame.
+        // Everything below rebuilds resources around the *new* swapchain, so
+        // they must not run until a recreate actually succeeded - otherwise
+        // FSR and the framebuffers are recreated every frame in a tight loop.
+        if (!vkCtx->recreateSwapchain(window->getDrawableWidth(), window->getDrawableHeight())) {
+            return;
+        }
         // Rebuild water resources that reference swapchain extent/views
         if (waterRenderer) {
             waterRenderer->recreatePipelines();

@@ -194,6 +194,22 @@ void iosSetMemoryWarningCallback(void (*callback)()) {
 
 void iosLogWindowStatus(const char* stage) {
 #if defined(__APPLE__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        // An external display can be attached after launch. Refresh the
+        // portrait/landscape dump at that moment, otherwise only the startup
+        // samples exist and a mid-run rotation has no diagnostic to read.
+        [NSNotificationCenter.defaultCenter
+            addObserverForName:UIScreenDidConnectNotification
+                        object:nil queue:NSOperationQueue.mainQueue
+                   usingBlock:^(NSNotification*) { iosLogWindowStatus("screen+"); }];
+        [NSNotificationCenter.defaultCenter
+            addObserverForName:UIScreenDidDisconnectNotification
+                        object:nil queue:NSOperationQueue.mainQueue
+                   usingBlock:^(NSNotification*) { iosLogWindowStatus("screen-"); }];
+    });
     @autoreleasepool {
         // Dump every UIWindow in every connected scene, plus (via deprecated
         // but functional UIApplication APIs, silenced locally) any window that
@@ -201,6 +217,31 @@ void iosLogWindowStatus(const char* stage) {
         // and a black screen means it is in the wrong one.
         NSMutableString* out = [NSMutableString
             stringWithFormat:@"Window status [%s]:", stage ? stage : "?"];
+
+        // Every UIScreen UIKit knows about. An external display either gets
+        // its own UIScene (multiple scenes enabled) or the main scene is
+        // mirrored to it - the two cases need different fixes when the
+        // picture is rotated, so log both the screens and the scenes.
+        NSArray<UIScreen*>* screens = [UIScreen screens];
+        [out appendFormat:@" %d screen(s)", (int)screens.count];
+        for (UIScreen* s in screens) {
+            [out appendFormat:@"\n  screen %p main=%d bounds=%@ mode=%@",
+                               (void*)s, s == [UIScreen mainScreen] ? 1 : 0,
+                               NSStringFromCGRect(s.bounds),
+                               NSStringFromCGSize(s.currentMode.size)];
+            // Log the modes an external screen offers. A landscape monitor
+            // whose selected mode is portrait-ordered (972x1518) may have a
+            // landscape-ordered mode (1518x972) we can switch to, which would
+            // let SDL build the swapchain in the right orientation.
+            if (s != [UIScreen mainScreen]) {
+                for (UIScreenMode* mode in s.availableModes) {
+                    [out appendFormat:@"\n    mode=%@ available=%d",
+                                       NSStringFromCGSize(mode.size),
+                                       mode == s.currentMode ? 1 : 0];
+                }
+            }
+        }
+#pragma clang diagnostic pop
 
         NSSet<UIScene*>* scenes = [UIApplication sharedApplication].connectedScenes;
         [out appendFormat:@" %d scene(s)", (int)scenes.count];

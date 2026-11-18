@@ -2751,6 +2751,30 @@ bool VkContext::restoreSurface(SDL_Window* window, int width, int height) {
 }
 
 bool VkContext::recreateSwapchain(int width, int height) {
+    // A display hot-plug can report a 0 extent for one frame (the iPad saw
+    // 4600x0 when an external display was unplugged). Vulkan images cannot
+    // have a 0 dimension: depth creation fails and MoltenVK later faults
+    // building the render pass against the half-built attachments. Keep the
+    // last good swapchain and let the next resize supply a real size.
+    if (width <= 0 || height <= 0) {
+        LOG_WARNING("Ignoring zero-sized swapchain recreation ", width, "x", height);
+        return false;
+    }
+#if defined(WOWEE_IOS)
+    // The window's tracked size can still be nonzero (the iPad saw 4600x2)
+    // while the surface underneath reports height 0. On iOS vk-bootstrap
+    // takes currentExtent rather than desired_extent, so that 0 reaches the
+    // swapchain and the depth image. Check the extent the builder will use.
+    {
+        VkSurfaceCapabilitiesKHR caps{};
+        if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &caps) == VK_SUCCESS &&
+            (caps.currentExtent.width == 0 || caps.currentExtent.height == 0)) {
+            LOG_WARNING("Ignoring swapchain recreate: surface currentExtent is ",
+                        caps.currentExtent.width, "x", caps.currentExtent.height);
+            return false;
+        }
+    }
+#endif
     vkDeviceWaitIdle(device);
 
     // Destroy old framebuffers
