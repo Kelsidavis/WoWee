@@ -596,6 +596,21 @@ if(Python3_Interpreter_FOUND)
                      ${CMAKE_SOURCE_DIR}/tools/android/test_data_profiles.py)
 endif()
 
+# ── shader_fallback ──────────────────────────────────────────────
+# The .spv files are what a build without glslc runs, and the iOS bundle
+# copies them into the app rather than compiling them - so a .spv missing
+# from the repository is a shader missing from the device. .gitignore ignores
+# *.spv, because the rest of the tree has compiled SPIR-V as build output, and
+# the exception for assets/shaders used to be a list of two files. Eight
+# shaders added later were ignored silently: a fresh clone had no grass, no
+# Hi-Z pyramid and no world map overlay, and the client said so only in a log
+# line. Needs no glslc, so it runs here rather than by hand. Instant.
+if(Python3_Interpreter_FOUND)
+    add_test(NAME shader_fallback
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_SOURCE_DIR}/tools/shader_fallback_check.py)
+endif()
+
 # ── test_chat_types ─────────────────────────────────────────────
 # A chat type is a byte off the wire and the event name is built from it, so a
 # value missing from the enum is a line of chat that never appears - no error,
