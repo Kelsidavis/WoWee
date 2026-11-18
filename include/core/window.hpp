@@ -87,7 +87,6 @@ public:
     /// screen, so a device whose window cannot be resized can still be asked
     /// for a lower resolution and pay less for it.
     void setRenderResolution(int w, int h);
-    void clearRenderResolution();
     [[nodiscard]] int getRenderResolutionWidth() const { return renderResolutionWidth; }
     [[nodiscard]] int getRenderResolutionHeight() const { return renderResolutionHeight; }
     /// Whether the platform can resize the window at all.

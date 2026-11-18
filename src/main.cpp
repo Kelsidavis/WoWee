@@ -1,6 +1,8 @@
 #include "core/application.hpp"
 #include "core/config_paths.hpp"
+#if defined(WOWEE_IOS)
 #include "core/ios_platform.hpp"
+#endif
 #include "core/logger.hpp"
 #include "core/version.hpp"
 #include <exception>
@@ -172,7 +174,7 @@ static void selectUserDataPath() {
     wowee::core::setEnvVar("WOW_DATA_PATH", dataRoot.string().c_str(), /*overwrite=*/false);
 }
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
+static int runMain([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 #if defined(WOWEE_IOS)
     // Point the client at the app's Documents directory (file-sharing
     // accessible) before anything opens a file.
@@ -330,4 +332,24 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         LOG_FATAL("Unknown exception occurred");
         return 1;
     }
+}
+
+int main(int argc, char* argv[]) {
+    const int status = runMain(argc, argv);
+#if defined(WOWEE_IOS)
+    // SDL3's UIKit delegate runs main() from postFinishLaunch and then
+    // deliberately does not exit when it returns: the exit(exit_status) in
+    // SDL_uikitappdelegate.m is commented out with "We don't actually exit to
+    // support applications that do setup in their main function and then allow
+    // the Cocoa event loop to run." Returning therefore leaves UIKit's run
+    // loop alive with no window - which is what the Exit Game button did: the
+    // render loop broke, main() returned, and the screen went black forever
+    // with no way back but a force quit. So finish the process instead.
+    // exit() runs atexit handlers and static destructors first, so the
+    // logger's file stream (a function-local static) still flushes the final
+    // "Application exited successfully" line.
+    std::exit(status);
+#else
+    return status;
+#endif
 }

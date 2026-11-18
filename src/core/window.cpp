@@ -12,10 +12,12 @@
 #include <cstdlib>
 #ifdef __APPLE__
 #include "core/macos_platform.hpp"
-#include "core/ios_platform.hpp"
 #include <filesystem>
 #include <mach-o/dyld.h>
 #include <vector>
+#endif
+#if defined(WOWEE_IOS)
+#include "core/ios_platform.hpp"
 #endif
 
 namespace wowee {
@@ -75,6 +77,13 @@ bool Window::initialize() {
 #if defined(__ANDROID__)
     // Force landscape on phones/tablets.
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+
+    // By default SDL parks the thread that called SDL_main for as long as the
+    // activity is in the background. That thread is the one that reads the
+    // socket, so a few seconds behind the home button and the server has timed
+    // the session out. Letting it run keeps the connection; the surface is
+    // released separately and the frame is skipped while it is gone.
+    SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "0");
 #elif defined(WOWEE_IOS)
     // Landscape, like a notebook.  Portrait used to be forced here because
     // a landscape window presented black - but that was the missing-scene
@@ -539,13 +548,6 @@ void Window::setRenderResolution(int w, int h) {
     // changes and the picture is the only sign that the setting did anything.
     LOG_WARNING("The world will be drawn at ", w, "x", h, " and scaled up to the ",
                 drawableWidth, "x", drawableHeight, " screen");
-}
-
-void Window::clearRenderResolution() {
-    if (renderResolutionWidth == 0 && renderResolutionHeight == 0) return;
-    renderResolutionWidth = 0;
-    renderResolutionHeight = 0;
-    LOG_WARNING("The world will be drawn at the screen's own size");
 }
 
 int Window::getDisplayResolutionIndex() const {

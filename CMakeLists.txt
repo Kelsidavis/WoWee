@@ -1325,7 +1325,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
 
     # Link MoltenVK (static) when available, so Vulkan symbols resolve at
     # link time instead of via dynamic_lookup at runtime.  The framework lives
-    # under extern/MoltenVK (downloaded separately; see tools/build-ios-deps.sh).
+    # under extern/MoltenVK (obtained separately - KhronosGroup/MoltenVK at
+    # v1.4.2, whose repo ships the prebuilt xcframework; see ios/README.md).
     set(_MV_XCFW "${CMAKE_CURRENT_SOURCE_DIR}/extern/MoltenVK/MoltenVK/MoltenVK/static/MoltenVK.xcframework")
     if(CMAKE_OSX_SYSROOT MATCHES "imulator")
         set(_MV_SLICE "ios-arm64_x86_64-simulator")
@@ -1356,6 +1357,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         MACOSX_BUNDLE_BUNDLE_NAME "WoWee"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist"
     )
+    # The Xcode generator copies the bundle plist into the build tree when it
+    # generates the project, so an edit to ios/Info.plist (the app icon
+    # declaration, the orientation keys) would otherwise only reach the
+    # device after a manual re-configure.  Re-run CMake when it changes.
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist")
 endif()
 # macOS cross-compilation: MoltenVK is not available at link time.
 # Allow unresolved Vulkan symbols - resolved at runtime. Scoped to wowee only.

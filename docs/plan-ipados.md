@@ -186,10 +186,17 @@ Measured 2026-11-10 on an iPad Air 11" (M3), 2360x1640.
 ### Release measurements (2026-11-12 to 11-13)
 
 Everything here is Release, in-world, standing still outdoors with an
-unmoved camera, at 786x546 internal upscaled by FSR1, `view_distance=1600`,
-`shadow_distance=350`, after a 50 s settle. Only settled windows are
-compared: a world 18 s after `SMSG_LOGIN_VERIFY_WORLD` reads GPU 15 ms
-against 35-40 ms settled, and believed a false result once.
+unmoved camera, at 786x546 internal upscaled by FSR1, `shadow_distance=350`,
+after a 50 s settle. Only settled windows are compared: a world 18 s after
+`SMSG_LOGIN_VERIFY_WORLD` reads GPU 15 ms against 35-40 ms settled, and
+believed a false result once.
+
+**The pushed `view_distance=1600` never applied** (found 2026-11-13, see
+"the config push was being reverted" below): the effective value in every
+run on this page was **1000**, and the same is true of the other bound
+keys. The numbers are still internally comparable - every run was reverted
+the same way - but they are measurements of the reverted settings, not of
+the pushed ones.
 
 **The frame is exactly 50.00 ms - 20.00 fps.** 201 frames per 10 s window,
 reproduced across runs in two different zones and over an 8-hour overnight
@@ -258,29 +265,94 @@ startup (the vsync toggle and window events 519/532).
 **`pom=0` is dead** (measured earlier: 50.0/38.8 GPU vs 50.0/35.2
 baseline).
 
+### The config push was being reverted at world entry (found 2026-11-13)
+
+The 50.00 ms frame was vsync after all, and every hand-pushed config was
+only half-applied:
+
+- **`cvars.cfg` is replayed over `settings.cfg` at world entry.**
+  `AddonManager`'s init calls `applyStoredCVarSideEffects`
+  (`addon_manager.cpp:574` -> `lua_system_api.cpp:1775`), which iterates
+  the CVar store and runs each binding's side effect. The upstream binding
+  `{"gxvsync","vsync"}` (`lua_system_api.cpp:1234`, commit `0ed6532b`) turns
+  a stored `gxvsync=1` into `setSettingValue("vsync","1")` ->
+  `setVsync(true)` -> **FIFO**. The log timing is exact: `VSync enabled`
+  13 ms after "FrameXML: ... loaded".
+- **It writes back.** `setSettingValue` saves into `settings.cfg`, which is
+  why a pushed `vsync=0` came back as `vsync=1` on the device.
+- **It reverted every bound key we pushed**, so the runs above measured
+  `view_distance=1000` (not 1600), `ground_clutter_density=60` (not 100),
+  `ground_clutter_distance=110` (not 140), `particle_density=50` (not 100),
+  `environment_detail=70` (not 100). The design is deliberate - the store
+  is authoritative over the file by intent (`settings_panel.cpp:187`) - so
+  the fix for measurement runs is to **push both files**: `gxvsync=0` in
+  `cvars.cfg` alongside `vsync=0` in `settings.cfg`.
+- With FIFO at 60 Hz a ~41 ms GPU frame quantises to exactly 3 vblanks =
+  **50.00 ms = 20.00 fps** - the number reproduced across every run. The
+  "step, not decay" 30 -> 20 observation above is the same quantisation.
+
+### Instrumented run: fence vs acquire, three images, 60 fps (2026-11-13)
+
+`beginFrame` now times its two waits separately (10 s windows, gated on
+`frameprofile`), and the swapchain asks for 3 images instead of 2 (two
+images + two frames in flight means the acquire waits for the display -
+one frame in flight in practice). Release, both configs pushed with
+`vsync=0`/`gxvsync=0`, present mode stayed **IMMEDIATE** through world
+entry (zero `VSync enabled` lines).
+
+**Standing still: 60 fps.** Four settled windows at 59.999 / 60.005 /
+59.983 / 60.003 fps (16.667 ms), against 20.00 fps before. The waits:
+
+- **acquire avg 0.016-0.04 ms, max 0.16 ms** - dead, as intended.
+- **fence avg 3.7-4.0 ms** - the remaining frame-slot wait.
+- `beginFrame` 8.8 ms/frame (52%) at 60 fps; `endFrame` 0.06 ms.
+
+GPU last frame at 60 fps: **15.29 ms** across 5 passes (world 8.27,
+shadows 4.55, fog 1.63, post 0.71, interface 0.14). When the camera moves
+fps falls to 30-44 and the world pass grows to 21 ms (GPU 33 ms total) -
+so the standing-still frame is done and the remaining work is the world
+pass under motion, not the pipeline. 0 device lost over the run.
+
 ### Open performance work (next session)
 
-The frame is GPU-bound at ~43 ms of marks, every selectable scene pass
-together is ~12 ms, and the CPU is free. In order:
+Standing still is at 60 fps; the frame is no longer serialised. What
+remains, in order:
 
-1. **Re-run the pass ablation with `asyncsubmit=1`.** The table above was
-   measured while the CPU was serialised in submit, which is exactly the
-   condition the GPU marks warn about (queue gaps charged to the pass they
-   land in). Now that wall-clock follows the GPU, attribute the unexplained
-   remainder of the world mark (~17 ms once WMO's 3.5 is taken out) -
-   water, particles, the Hi-Z occlusion work, or queue starvation.
-2. **Shadow distance** - the largest measured lever (6.15 ms wall-clock,
-   11 ms of mark), and `shadow_distance` is already a config key (350 now).
-3. **View distance** (`view_distance=1600`) against the WMO/terrain
-   remainder, and volumetric fog (2.7 ms, `fog_strength`/`mist_density`).
-4. The settings levers still untested on Release: 16x aniso / particles
-   100% / water refraction, a working pipeline cache on iOS, and the
-   internal resolution itself (already 786x546; lower is more fps).
+1. **The world pass under motion** - 8.3 ms still -> 21 ms with a moving
+   camera (fps 30-44). The pass ablation under `asyncsubmit=1` (the table
+   above predates it and was measured while the CPU was serialised in
+   submit) is the tool: attribute that 21 ms - WMO (3.5 ms still), water,
+   particles, Hi-Z work, or queue starvation.
+2. **The fence wait** - 3.7-4.0 ms/frame avg at 60 fps, the whole
+   remaining `beginFrame` cost. Worth knowing what the GPU is still doing
+   4 ms after the CPU is ready; may fall out of (1).
+3. **Shadows** (6.15 ms wall-clock / 11 ms of mark in the old table;
+   `shadow_distance=350`, `extShadowQuality` iOS default 1024) and
+   **volumetric fog** (2.7 ms) - the two measured scene levers, still
+   untested on Release with the pipeline unserialized.
+4. **View distance** (`view_distance` effective 1000, never the pushed
+   1600 - see the revert finding) and the internal resolution (786x546;
+   lower is more fps). The levers still untested on Release at all: 16x
+   aniso / particles 100% / water refraction, and a working pipeline
+   cache on iOS.
 5. Hi-Z occlusion culling is disabled at `renderer.cpp:3764` -
    re-enabling it is a draw-count lever the ablation cannot see (it only
    switches passes off, it does not add culling).
-6. `glslc` for the 8 missing shaders - no Homebrew on the Mac, so the
-   LunarG SDK route (397 MB tarball) is the way; deferred until the
-   baseline above is stable.
+6. ~~`glslc` for the 8 missing shaders~~ - **done**: the vcpkg `shaderc`
+   port (classic mode, `pkg-config` on `PATH`) provides `glslc`, and
+   `-DGLSLC=...` opens CMake's gate (method in `ios/README.md`,
+   "Shaders"). The first build recompiled all 90 shaders and rewrote the
+   84 committed `.spv` (same source, different compiler revision) -
+   restored with `git checkout -- assets/shaders/`; later builds are
+   incremental. Verified on device: the 20:17:00 launch logged **0
+   ERROR lines**, where every earlier launch failed on
+   `grass_cull.comp.spv`, `m2_cull_hiz.comp.spv` and
+   `world_map_fog.frag.spv` - grass and M2 occlusion culling now have
+   their pipelines, so re-measure the world pass under motion with
+   culling on. Open follow-up: the eight `.spv` are gitignored, so a
+   clone without `glslc` still lacks them - force-add them or generate
+   them in CI before the PR.
+7. Measurement hygiene: **push both `settings.cfg` and `cvars.cfg`** to
+   the device, or the CVar store silently reverts the bound keys.
 
 `tools/ios-fsr-measure.sh` measures against a baseline and prints both.

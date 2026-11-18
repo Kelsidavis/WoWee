@@ -722,6 +722,12 @@ bool Renderer::initialize(core::Window* win) {
     // Create performance HUD
     performanceHUD = std::make_unique<PerformanceHUD>();
     performanceHUD->setPosition(PerformanceHUD::Position::TOP_LEFT);
+    // The overlay starts where settings.cfg says, read from the file rather
+    // than waited for: the panel that would hand it over loads well after
+    // this, and ticked in the menu it moves through applySettingSideEffects
+    // from then on. A diagnostic rather than gameplay, so off unless asked
+    // for - the same rule frameprofile is read under.
+    performanceHUD->setEnabled(core::configSetting("perfoverlay") == "1");
 
     // What the player last chose for shadow quality, before the resources that
     // bake it in are built. Read from the CVar file rather than waited for:

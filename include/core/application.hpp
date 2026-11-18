@@ -163,6 +163,23 @@ public:
     // Audio coordinator access
     audio::AudioCoordinator* getAudioCoordinator() { return audioCoordinator_.get(); }
 
+    /// One named stage of a frame, as the periodic breakdown keeps it.
+    ///
+    /// Here rather than beside stageStats_ below: stageStatsSnapshot returns
+    /// it, and a public method cannot name a type declared past private:.
+    struct StageStat {
+        double totalMs = 0.0;
+        float worstMs = 0.0f;
+        int frames = 0;
+    };
+    /// Every stage of the current reporting window, for the performance
+    /// overlay to draw live. The window is the same one the log line prints
+    /// from - cleared each time it does - so this is the last ten seconds
+    /// rather than the whole session.
+    [[nodiscard]] std::vector<std::pair<std::string, StageStat>> stageStatsSnapshot() const {
+        return {stageStats_.begin(), stageStats_.end()};
+    }
+
 private:
     void update(float deltaTime);
 
@@ -208,11 +225,6 @@ private:
     void noteStageTime(const char* stage, float milliseconds);
     void reportStageTimes();
 
-    struct StageStat {
-        double totalMs = 0.0;
-        float worstMs = 0.0f;
-        int frames = 0;
-    };
     /// WOWEE_FRAME_PROFILE. The breakdown below is reported at info, which the
     /// log a bug report arrives with does not carry - so the one measurement
     /// that answers "where does the frame go" was never in the logs it was
@@ -334,6 +346,13 @@ private:
     float paperdollFacing_ = 0.0f;
     uint32_t paperdollWidgetId_ = 0;
     bool addonsLoaded_ = false;
+    /// Whether SDL text input was last started with the no-assist properties
+    /// (core/text_input.hpp) rather than SDL's defaults. Cleared whenever
+    /// text input is found stopped, so a session someone else started plain
+    /// - the ImGui backend does - gets the properties applied exactly once
+    /// instead of every frame: applying them re-adds the UIKit text field to
+    /// the view, which is not something to do sixty times a second.
+    bool textInputNoAssistApplied_ = false;
     std::unique_ptr<game::ExpansionRegistry> expansionRegistry_;
     // Empty means assets follow the active protocol profile. "legacy" selects
     // the root WOW_DATA_PATH manifest; otherwise this is an expansion id.

@@ -9,6 +9,10 @@
     "openssl",
     "glm",
     "zlib",
+    {
+      "name": "ffmpeg",
+      "platform": "!ios"
+    },
     "vulkan-headers"
   ]
 }

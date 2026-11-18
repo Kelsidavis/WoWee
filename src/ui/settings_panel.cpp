@@ -23,6 +23,10 @@
 #include "core/logger.hpp"
 #include "core/version.hpp"
 #include "rendering/renderer.hpp"
+// For the performance overlay's side effect, which reaches the HUD through
+// the renderer's getter - a complete type, unlike renderer.hpp's forward
+// declaration of it.
+#include "rendering/performance_hud.hpp"
 #include "rendering/lens_flare.hpp"
 #include "rendering/post_process_pipeline.hpp"
 #include "rendering/lighting_manager.hpp"
@@ -136,6 +140,9 @@ constexpr const char* kGraphicsApplyKeys[] = {
     // only route in is the cvar behind it is one rename away from silence.
     "soundinbackground", "enablemusic", "loopmusic", "enableambience",
     "errorspeech", "enablesoundeffects",
+    // The performance overlay: a readout rather than a picture, but the same
+    // rule - the file says on, and the panel is what hands it to the HUD.
+    "perfoverlay",
 };
 
 /// Whether a quality preset has an opinion about this setting.
@@ -350,6 +357,7 @@ constexpr FieldBinding kFieldBindings[] = {
     {.key = "windowuiscale", .asFloat = &SettingsPanel::pendingWindowUiScale},
     {.key = "scrollspeed",   .asFloat = &SettingsPanel::pendingScrollSpeed},
     {.key = "latencymeter",  .asBool  = &SettingsPanel::pendingShowLatencyMeter},
+    {.key = "perfoverlay",   .asBool  = &SettingsPanel::pendingPerfOverlay},
     {.key = "checkforupdates",   .asBool  = &SettingsPanel::pendingCheckForUpdates},
     {.key = "micromenu",     .asBool  = &SettingsPanel::pendingShowMicroMenu},
     {.key = "chatboxvisible", .asBool = &SettingsPanel::pendingChatBoxVisible},
@@ -703,6 +711,13 @@ void SettingsPanel::applySettingSideEffects(const std::string& key) {
         showMinimapCoordinates_ = pendingShowMinimapCoordinates;
     } else if (key == "latencymeter") {
         showLatencyMeter_ = pendingShowLatencyMeter;
+    } else if (key == "perfoverlay") {
+        // The HUD exists from the renderer's initialize on, so this is the
+        // whole effect: the box and the readout move together, at once.
+        if (renderer) {
+            if (auto* hud = renderer->getPerformanceHUD())
+                hud->setEnabled(pendingPerfOverlay);
+        }
     } else if (key == "woweemusic") {
         // Not a volume: it changes which tracks the zone rotation can pick, and
         // switching it off has to stop whichever of ours is playing now - the

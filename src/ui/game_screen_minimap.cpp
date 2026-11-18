@@ -1741,6 +1741,7 @@ void GameScreen::saveSettings() {
     out << "show_minimap_clock=" << (settingsPanel_.pendingShowMinimapClock ? 1 : 0) << "\n";
     out << "show_minimap_coordinates=" << (settingsPanel_.pendingShowMinimapCoordinates ? 1 : 0) << "\n";
     out << "show_latency_meter=" << (settingsPanel_.pendingShowLatencyMeter ? 1 : 0) << "\n";
+    out << "perfoverlay=" << (settingsPanel_.pendingPerfOverlay ? 1 : 0) << "\n";
     out << "check_for_updates=" << (settingsPanel_.pendingCheckForUpdates ? 1 : 0) << "\n";
     out << "show_dps_meter=" << (settingsPanel_.showDPSMeter_ ? 1 : 0) << "\n";
     // Only once dragged. Interface units, where the old dps_meter_x and _y
@@ -1990,6 +1991,8 @@ void GameScreen::loadSettings() {
             } else if (key == "show_latency_meter") {
                 settingsPanel_.showLatencyMeter_ = (std::stoi(val) != 0);
                 settingsPanel_.pendingShowLatencyMeter = settingsPanel_.showLatencyMeter_;
+            } else if (key == "perfoverlay") {
+                settingsPanel_.pendingPerfOverlay = (std::stoi(val) != 0);
             } else if (key == "show_dps_meter") {
                 settingsPanel_.showDPSMeter_ = (std::stoi(val) != 0);
             } else if (key == "dps_meter_left") {

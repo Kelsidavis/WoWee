@@ -22,10 +22,51 @@
     <string>1</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
+    <!-- iOS Game Mode: system-wide opt-in, granted when the game runs full
+         screen (UIRequiresFullScreen above makes it always so on iPadOS 18+).
+         It cuts background activity so the game keeps more CPU time, and
+         doubles Bluetooth input/headphone sampling. The key is the current
+         spelling - GCSupportsGameMode is deprecated as of iOS 18.0-18.6.
+         There is no public API asking whether Game Mode is active right now,
+         so the client cannot show a state of its own; the system shows its
+         own banner when the game is launched. -->
+    <key>LSSupportsGameMode</key>
+    <true/>
     <!-- The client saves a screenshot into the photo library so it shows up
          alongside the tablet's own screenshots. -->
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>WoWee saves the screenshots you take in game into your photo library.</string>
+    <!-- The app icon.  The build compiles ios/Assets.xcassets with actool,
+         which puts the icon into Assets.car under the name "AppIcon" and
+         drops AppIcon60x60@2x.png and AppIcon76x76@2x~ipad.png next to it.
+         Without these keys the system finds no icon at all and the home
+         screen shows a blank placeholder - the icon files have to be
+         declared for the tablet to draw the WoWee mark. -->
+    <key>CFBundleIcons</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconName</key>
+            <string>AppIcon</string>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon60x60</string>
+            </array>
+        </dict>
+    </dict>
+    <key>CFBundleIcons~ipad</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconName</key>
+            <string>AppIcon</string>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon60x60</string>
+                <string>AppIcon76x76</string>
+            </array>
+        </dict>
+    </dict>
     <!-- The Documents directory (game data, settings, screenshots) is visible
          in the Files app so it can be filled and emptied without a computer. -->
     <key>UIFileSharingEnabled</key>

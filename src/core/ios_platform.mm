@@ -1,6 +1,8 @@
 #include "core/ios_platform.hpp"
 
+#include "core/env.hpp"
 #include "core/logger.hpp"
+#include "core/thermal_state.hpp"
 #include <cstdlib>
 #include <cstring>
 
@@ -43,7 +45,7 @@ char** gIosArgv = nullptr;
                                       withIntermediateDirectories:YES
                                                        attributes:nil
                                                             error:nil];
-            setenv("WOWEE_CONFIG_ROOT", config.UTF8String, 1);
+            wowee::core::setEnvVar("WOWEE_CONFIG_ROOT", config.UTF8String);
         }
     }
     LOG_WARNING("Scene willConnect: ", (void*)scene,
@@ -164,10 +166,10 @@ void iosSetupDataPaths() {
 
         NSString* resources = [[NSBundle mainBundle] resourcePath];
         if (resources) {
-            setenv("WOWEE_RESOURCE_ROOT", resources.UTF8String, 1);
+            wowee::core::setEnvVar("WOWEE_RESOURCE_ROOT", resources.UTF8String);
         }
-        setenv("WOW_DATA_PATH", data.UTF8String, 1);
-        setenv("WOWEE_CONFIG_ROOT", config.UTF8String, 1);
+        wowee::core::setEnvVar("WOW_DATA_PATH", data.UTF8String);
+        wowee::core::setEnvVar("WOWEE_CONFIG_ROOT", config.UTF8String);
 
         // The extracted game data is tens of gigabytes and the player can
         // always extract it again, so it must not go into the iCloud backup:
@@ -455,6 +457,20 @@ void iosSaveScreenshotToPhotos(const char* path) {
         }];
     }
 #endif
+}
+
+const char* thermalStateName() {
+    // What the OS is doing about heat right now, in the same words
+    // Instruments uses: nominal is cool, critical is the system pulling
+    // clocks down as far as it can. Sampled per call rather than cached -
+    // the point of the number is that it moves while the game is running.
+    switch ([NSProcessInfo processInfo].thermalState) {
+        case NSProcessInfoThermalStateNominal:  return "nominal";
+        case NSProcessInfoThermalStateFair:     return "fair";
+        case NSProcessInfoThermalStateSerious:  return "serious";
+        case NSProcessInfoThermalStateCritical: return "critical";
+        default:                                return "unknown";
+    }
 }
 
 } // namespace core

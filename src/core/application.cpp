@@ -29,6 +29,7 @@
 #include <utility>
 #include "core/logger.hpp"
 #include "core/memory_monitor.hpp"
+#include "core/text_input.hpp"
 #include "rendering/renderer.hpp"
 #include "rendering/loot_sparkles.hpp"
 #include "rendering/vk_context.hpp"
@@ -1464,8 +1465,11 @@ void Application::run() {
         ui::KeybindingManager::getInstance().beginInputFrame();
         ui::ageChatSlashEcho();
 
-        // Ask for text input while one of the interface's edit boxes has the
-        // keyboard.
+        // Text input is up only while something is actually typing, and is
+        // always started with the platform's typing assists off
+        // (core/text_input.hpp): SDL's plain start defaults to autocorrect on
+        // and sentence capitalization, and iPadOS autocorrect rewrites what
+        // the player types in chat.
         //
         // SDL2 delivered SDL_TEXTINPUT from the start and nothing had to ask.
         // SDL3 does not - and ImGui's backend calls SDL_StopTextInput every
@@ -1474,12 +1478,46 @@ void Application::run() {
         // the code that opens the box, and not one character after it arrived.
         // Asserted per frame rather than on a focus change because the backend
         // can turn it off again at any point.
+        //
+        // Stopping is the other half, and until now nothing stopped it: only
+        // an ImGui field losing focus did. Once a Lua edit box had taken the
+        // keyboard it never gave it back, so UIKit's hidden text field stayed
+        // first responder for the rest of the session - which is what raises
+        // the accented-letter popup when a movement key is held down.
         if (window && addonManager_ && addonsLoaded_) {
-            if (auto* engine = addonManager_->getLuaEngine();
-                engine && engine->editBoxHasFocus()) {
-                if (SDL_Window* sdlWindow = window->getSDLWindow();
-                    sdlWindow && !SDL_TextInputActive(sdlWindow)) {
-                    SDL_StartTextInput(sdlWindow);
+            if (auto* engine = addonManager_->getLuaEngine()) {
+                if (SDL_Window* sdlWindow = window->getSDLWindow(); sdlWindow) {
+                    // Whoever wants typed characters this frame: a Lua edit
+                    // box (chat), an ImGui field, or a Lua frame that enabled
+                    // the keyboard - StackSplitFrame reads its digits from
+                    // OnChar. ImGui's value is last frame's here, which is
+                    // fine: a one-frame-old answer only delays the start by
+                    // one frame, and ui_manager's transition below starts
+                    // for ImGui in the same frame it changes.
+                    const bool wanted = engine->editBoxHasFocus()
+                                     || ImGui::GetIO().WantTextInput
+                                     || engine->keyboardFrameWantsText();
+                    const SDL_PropertiesID props = wowee::core::textInputNoAssistProperties();
+                    if (!SDL_TextInputActive(sdlWindow)) {
+                        textInputNoAssistApplied_ = false;
+                        if (wanted) {
+                            SDL_StartTextInputWithProperties(sdlWindow, props);
+                            textInputNoAssistApplied_ = true;
+                        }
+                    } else if (!wanted) {
+                        SDL_StopTextInput(sdlWindow);
+                        textInputNoAssistApplied_ = false;
+                    } else if (!textInputNoAssistApplied_) {
+                        // Running, but not started by us: the ImGui backend
+                        // starts one with plain SDL_StartTextInput, whose
+                        // defaults would switch the assists back on. SDL
+                        // applies properties even to an active session, so
+                        // one call here corrects it - once per session, not
+                        // per frame, because each call re-adds the UIKit text
+                        // field to the view.
+                        SDL_StartTextInputWithProperties(sdlWindow, props);
+                        textInputNoAssistApplied_ = true;
+                    }
                 }
             }
         }
@@ -1551,10 +1589,15 @@ void Application::run() {
                 if (window && SDL_GetWindowSafeArea(window->getSDLWindow(), &safe)) {
                     ui::touchControls().setSafeArea(safe);
                 }
-                // With a mouse/trackpad attached the touch overlay is hidden and
-                // the client behaves like the desktop build; do not consume
-                // finger events for the stick.
+                // On iOS with a mouse/trackpad attached the touch overlay is
+                // hidden and the client behaves like the desktop build; do not
+                // consume finger events for the stick. Android always claims
+                // them, as it always did.
+#if defined(WOWEE_IOS)
                 if (!SDL_HasMouse()) ui::touchControls().handleEvent(event, tw, th);
+#else
+                ui::touchControls().handleEvent(event, tw, th);
+#endif
             }
 
             // A fold, a rotation or a move to another display changes what the
@@ -3829,15 +3872,26 @@ void Application::updateInGame(float deltaTime, const char*& updateCheckpoint) {
     inGameStep = "gameHandler update";
     updateCheckpoint = "in_game: gameHandler update";
 #if defined(__ANDROID__) || defined(WOWEE_IOS)
+#if defined(WOWEE_IOS)
     if (!SDL_HasMouse()) ui::touchControls().update();
+#else
+    ui::touchControls().update();
+#endif
     if (renderer && renderer->getCameraController()) {
         auto* cam = renderer->getCameraController();
         ui::touchControls().setCameraController(cam);
+#if defined(WOWEE_IOS)
         // Only suppress SDL's own mouse-look translation while the touch stick
         // is driving the camera; with a real mouse attached we want normal
         // mouse look, like the desktop build.
         cam->setRotationSuppressed(!SDL_HasMouse() &&
                                   ui::touchControls().isSteering());
+#else
+        // The touch controls turn the view themselves, from whichever finger is
+        // doing it. SDL's own translation of the first finger must not turn it
+        // as well, or a drag counts twice and the stick swings the camera.
+        cam->setRotationSuppressed(true);
+#endif
         cam->setSteering(ui::touchControls().isSteering() ||
                          ui::gamepadControls().isSteering());
     }
@@ -4243,11 +4297,17 @@ void Application::render() {
 
 #if defined(__ANDROID__) || defined(WOWEE_IOS)
     // Drawn into the background list, under everything the interface puts on
-    // screen, and only while a thumb is holding it.
+    // screen, and only while a thumb is holding it - and on iOS only without a
+    // mouse, where the overlay is hidden and the client is the desktop one.
+#if defined(WOWEE_IOS)
     if (!SDL_HasMouse()) {
         ui::touchControls().setInWorld(state == AppState::IN_GAME);
         ui::touchControls().draw();
     }
+#else
+    ui::touchControls().setInWorld(state == AppState::IN_GAME);
+    ui::touchControls().draw();
+#endif
 #endif
 
     renderingFrame_ = true;

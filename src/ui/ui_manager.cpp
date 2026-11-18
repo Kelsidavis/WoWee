@@ -14,6 +14,7 @@
 #include "core/window.hpp"
 #include "core/application.hpp"
 #include "core/logger.hpp"
+#include "core/text_input.hpp"
 #include "auth/auth_handler.hpp"
 #include "game/game_handler.hpp"
 #include "rendering/vk_context.hpp"
@@ -581,8 +582,18 @@ void UIManager::finishImGuiFrame() {
         SDL_Window* sdlWindow = window ? window->getSDLWindow() : nullptr;
         // Not restarted when an ImGui box already started it: a second start
         // resets an IME composition in progress on some platforms.
+        //
+        // Started with the assists off (core/text_input.hpp) rather than
+        // through plain SDL_StartTextInput, whose defaults are autocorrect on
+        // and sentence capitalization - what SDL's own backend would leave
+        // behind, and what rewrites the player's chat. Application::run owns
+        // the same properties for the Lua edit box and the keyboard frames,
+        // and re-applies them if a session it did not start is found running.
         if (wantsText) {
-            if (!SDL_TextInputActive(sdlWindow)) SDL_StartTextInput(sdlWindow);
+            if (!SDL_TextInputActive(sdlWindow)) {
+                SDL_StartTextInputWithProperties(sdlWindow,
+                                                 wowee::core::textInputNoAssistProperties());
+            }
         } else {
             SDL_StopTextInput(sdlWindow);
         }
