@@ -92,48 +92,23 @@ jobs:
     - name: Build
       run: cmake --build build --parallel "$(nproc)"
 
-    - name: Package
+    - name: Build AppImage
       run: |
         TAG="${GITHUB_REF_NAME}"
-        STAGING="wowee-${TAG}-linux-${{ matrix.arch }}"
-        mkdir -p "${STAGING}"
 
-        # Binary
-        cp build/bin/wowee "${STAGING}/"
-
-        # Required, not copied if present: see the Windows job for what a
-        # soft check shipped.
+        # Fail if an asset tool is missing
         test -x build/bin/asset_extract
-        cp build/bin/asset_extract "${STAGING}/"
-
-        # The asset manager window, and the script for the command line.
         test -x build/bin/wowee_assets
-        cp build/bin/wowee_assets "${STAGING}/"
-        cp extract_assets.sh "${STAGING}/"
 
-        # This client's own addons, which the build puts beside the binary and
-        # every release so far has left behind. WoweeAllBags is the combined bag
-        # window and the Sort Bags button - the two things the client used to
-        # draw itself and handed to FrameXML, which has neither - so on a
-        # released build they simply were not there.
-        cp -r addons "${STAGING}/"
+        VERSION="${TAG}" container/appimage/build-appimage.sh build
+        mv build/wowee-*.AppImage \
+          "wowee-${TAG}-linux-${{ matrix.arch }}.AppImage"
 
-        # Assets (exclude proprietary music)
-        rsync -a --exclude='Original Music' build/bin/assets/ "${STAGING}/assets/"
-
-        # Data directory (git-tracked files only)
-        git ls-files Data/ | while read -r f; do
-          mkdir -p "${STAGING}/$(dirname "$f")"
-          cp "$f" "${STAGING}/$f"
-        done
-
-        tar czf "${STAGING}.tar.gz" "${STAGING}"
-
-    - name: Upload artifact
+    - name: Upload AppImage
       uses: actions/upload-artifact@v7
       with:
         name: wowee-linux-${{ matrix.arch }}
-        path: wowee-*.tar.gz
+        path: wowee-*.AppImage
         if-no-files-found: error
 
   build-macos:

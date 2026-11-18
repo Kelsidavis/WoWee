@@ -1,13 +1,16 @@
 #!/bin/bash
 # Linux amd64 build entrypoint - runs INSIDE the linux container.
-# Bind-mounts:
-#   /src  (ro) - project source
-#   /out  (rw) - host ./build/linux
+# Mounts:
+#   /src   (ro)     - project source
+#   /out   (rw)     - host ./build/linux; receives the AppImage and nothing else
+#   /build (volume) - the CMake build tree, kept between runs so the next one
+#                     compiles only what changed
 
 set -euo pipefail
 
 SRC=/src
 OUT=/out
+BUILD=/build
 NPROC=$(nproc)
 
 # Commit the source checkout records for a submodule path; empty when /src is not a
@@ -54,25 +57,27 @@ if [ ! -f "extern/FidelityFX-SDK/Kits/FidelityFX/framegeneration/fsr3/include/ff
         || echo "Warning: FidelityFX-SDK clone failed - continuing without FSR3"
 fi
 
+# WOWEE_BUILD_TESTS=OFF to not compile tests as they aren't needed here
 echo "==> [linux] Configuring with CMake (Release, Ninja, amd64)..."
-cmake -S . -B "${OUT}" \
+cmake -S . -B "${BUILD}" \
     -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=gcc \
     -DCMAKE_CXX_COMPILER=g++ \
-    -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
+    -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+    -DWOWEE_BUILD_TESTS=OFF
 
 echo "==> [linux] Building with ${NPROC} cores..."
-cmake --build "${OUT}" --parallel "${NPROC}"
+cmake --build "${BUILD}" --parallel "${NPROC}"
 
-echo "==> [linux] Creating Data symlink..."
-mkdir -p "${OUT}/bin"
-if [ ! -e "${OUT}/bin/Data" ]; then
-    # Relative symlink so it resolves correctly on the host:
-    # build/linux/bin/Data -> ../../../Data (project root)
-    ln -s ../../../Data "${OUT}/bin/Data"
-fi
+echo "==> [linux] Packaging the AppImage..."
+# Run from the mounted checkout: the copy being built here has neither .git nor container/.
+"${SRC}/container/appimage/build-appimage.sh" "${BUILD}"
+
+# Replace whatever an earlier run left in /out with this build's AppImage.
+rm -f "${OUT}"/wowee-*.AppImage
+install -m 755 "${BUILD}"/wowee-*.AppImage "${OUT}/"
 
 echo ""
-echo "==> [linux] Build complete. Artifacts in: ./build/linux/"
-echo "    Binary: ./build/linux/bin/wowee"
+echo "==> [linux] Build complete."
+ls -1 "${OUT}"/wowee-*.AppImage

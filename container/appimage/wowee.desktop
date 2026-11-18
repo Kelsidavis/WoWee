@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Wowee
+Comment=World of Warcraft Engine Experiment - a custom opensource client
+Exec=wowee
+Icon=wowee
+Terminal=false
+Categories=Game;

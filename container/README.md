@@ -23,7 +23,15 @@ Run **from the project root directory**.
 .\container\run-linux.ps1
 ```
 
-Output: `build/linux/bin/wowee`
+Output: `build/linux/wowee-<version>-<arch>.AppImage`
+It carries the libraries from the image (Ubuntu 24.04, SDL3 3.2) instead of using
+the host's; only glibc and the graphics stack, with a Vulkan 1.3 driver, come
+from the machine that runs it. See `container/appimage/build-appimage.sh` for
+what goes into it.
+
+The CMake build tree lives in the Docker volume `wowee-linux-build` rather than
+on the host, so a second run compiles only what changed. `docker volume rm
+wowee-linux-build` starts from scratch.
 
 ### macOS (cross-compile, arm64 default)
 
@@ -68,17 +76,19 @@ Output: `build/windows/bin/wowee.exe`
 
 The first build takes longer because Docker builds the toolchain image (installing compilers, vcpkg packages, etc.). Subsequent builds reuse the cached image and only run the compilation step.
 
-To force a full image rebuild:
+An existing Linux image is rebuilt on its own once, since it has no revision
+label (`IMAGE_REV` in `run-linux.sh`). Rebuild it yourself after a later change
+to the image, or to force a full image rebuild:
 ```bash
 ./container/run-linux.sh --rebuild-image
 ```
 
 ## Output Locations
 
-| Target | Binary | Size |
-|--------|--------|------|
-| Linux | `build/linux/bin/wowee` | ~135 MB |
-| macOS | `build/macos/bin/wowee` | ~40 MB |
+| Target | Binary | Size    |
+|--------|--------|---------|
+| Linux | `build/linux/wowee-<version>-<arch>.AppImage` | ~87 MB |
+| macOS | `build/macos/bin/wowee` | ~40 MB  |
 | Windows | `build/windows/bin/wowee.exe` | ~135 MB |
 
 ## File Structure
@@ -100,6 +110,10 @@ container/
 │   └── triplets/                # vcpkg cross-compile triplets
 │       ├── arm64-osx-cross.cmake
 │       └── x64-osx-cross.cmake
+├── appimage/                    # Linux AppImage packaging
+│   ├── build-appimage.sh        # Packages a build tree as an AppImage
+│   ├── AppRun                   # Entry point inside the AppImage
+│   └── wowee.desktop            # Desktop entry inside the AppImage
 ├── README.md                    # This file
 └── FLOW.md                      # Detailed build flow documentation
 ```

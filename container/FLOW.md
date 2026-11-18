@@ -29,6 +29,9 @@ run-{platform}.sh/.ps1
                                     └─ artifacts appear in /out
 ```
 
+The Linux flow differs: its build tree is in a Docker volume and only the
+AppImage appears in `/out`; see [Linux Build Flow](#linux-build-flow).
+
 ---
 
 ## Linux Build Flow
@@ -42,15 +45,18 @@ run-{platform}.sh/.ps1
 
 | Step | What | Why |
 |------|------|-----|
-| 1 | `apt-get install` cmake, ninja-build, build-essential, pkg-config, git, python3 | Core build tools |
-| 2 | `apt-get install` glslang-tools, spirv-tools | Vulkan shader compilation |
+| 1 | `apt-get install` cmake, ninja-build, build-essential, pkg-config, git, python3, ca-certificates, curl | Core build tools; ca-certificates for the https clones, curl for `build-appimage.sh` |
+| 2 | `apt-get install` glslc, glslang-tools, spirv-tools | Vulkan shader compilation; CMake calls glslc |
 | 3 | `apt-get install` libglm-dev, libssl-dev, zlib1g-dev | Runtime dependencies (system packages) |
 | 4 | `apt-get install` libavformat-dev, libavcodec-dev, libswscale-dev, libavutil-dev | FFmpeg libraries |
 | 5 | `apt-get install` libvulkan-dev, vulkan-tools | Vulkan SDK |
 | 6 | `apt-get install` libstorm-dev, libunicorn-dev | MPQ archive + CPU emulation |
 | 7 | `apt-get install` libx11-dev, libxext-dev, libxkbcommon-dev, libwayland-dev, libdecor-0-dev and the other X11 headers | What SDL3 needs to build its video backends |
-| 8 | Build SDL3 `release-3.2.24` from source and install it | Ubuntu 24.04 has no libsdl3-dev |
+| 8 | Build SDL3 `release-3.2.24` from source and install it as a `.deb` | Ubuntu 24.04 has no libsdl3-dev; a package lets linuxdeploy find its licence |
 | 9 | COPY `build-linux.sh` → `/build-platform.sh` | Container entrypoint |
+
+`run-linux.sh` builds the image with the label `wowee.builder.rev` and rebuilds
+an image that lacks the current value.
 
 ### Container Run Steps (build-linux.sh)
 
@@ -64,13 +70,18 @@ run-{platform}.sh/.ps1
      -DCMAKE_C_COMPILER=gcc
      -DCMAKE_CXX_COMPILER=g++
      -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
-5. cmake --build (parallel)
-6. Create Data symlink: build/linux/bin/Data → ../../../Data
+     -DWOWEE_BUILD_TESTS=OFF  (the unit tests are not built or run here)
+5. cmake --build /build (parallel)
+6. container/appimage/build-appimage.sh /build
+     (tracked Data/ files and the version come from the mounted /src checkout)
+7. replace /out/wowee-*.AppImage with the new one
 ```
 
+The CMake build tree is in the Docker volume `wowee-linux-build`, mounted at
+`/build`, so later runs only recompile what changed.
+
 ### Output
-- `build/linux/bin/wowee` - ELF 64-bit x86-64 executable
-- `build/linux/bin/Data` - symlink to project Data/ directory
+- `build/linux/wowee-<version>-<arch>.AppImage`
 
 ---
 

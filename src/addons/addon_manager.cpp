@@ -499,12 +499,15 @@ void AddonManager::saveEnabledState() const {
 }
 
 std::string AddonManager::getSavedVariablesPath(const TocFile& addon) const {
-    return addon.basePath + "/" + addon.addonName + ".lua.saved";
+    // Addon code can live in a read-only install, including an AppImage.
+    return (fs::path(core::getConfigRoot()) / "addons" /
+            (addon.addonName + ".lua.saved")).string();
 }
 
 std::string AddonManager::getSavedVariablesPerCharacterPath(const TocFile& addon) const {
     if (characterName_.empty()) return "";
-    return addon.basePath + "/" + addon.addonName + "." + characterName_ + ".lua.saved";
+    return (fs::path(core::getConfigRoot()) / "addons" /
+            (addon.addonName + "." + characterName_ + ".lua.saved")).string();
 }
 
 // The client's settings, as panels in FrameXML's Interface Options.
@@ -1558,11 +1561,20 @@ bool AddonManager::loadXmlFile(const std::string& path, int depth) {
 }
 
 bool AddonManager::loadAddon(const TocFile& addon) {
+    // Read older installs' settings until they have been saved in the config
+    // directory. Once a new file exists it wins over the untouched old one.
+    auto loadVariables = [&](const std::string& path) {
+        std::error_code ec;
+        const fs::path source = fs::exists(path, ec)
+            ? fs::path(path)
+            : fs::path(addon.basePath) / fs::path(path).filename();
+        luaEngine_.loadSavedVariables(source.string());
+    };
     // Load SavedVariables before addon code (so globals are available at load time)
     auto savedVars = addon.getSavedVariables();
     if (!savedVars.empty()) {
         std::string svPath = getSavedVariablesPath(addon);
-        luaEngine_.loadSavedVariables(svPath);
+        loadVariables(svPath);
         LOG_DEBUG("AddonManager: loaded saved variables for '", addon.addonName, "'");
     }
     // Load per-character SavedVariables
@@ -1570,7 +1582,7 @@ bool AddonManager::loadAddon(const TocFile& addon) {
     if (!savedVarsPC.empty()) {
         std::string svpcPath = getSavedVariablesPerCharacterPath(addon);
         if (!svpcPath.empty()) {
-            luaEngine_.loadSavedVariables(svpcPath);
+            loadVariables(svpcPath);
             LOG_DEBUG("AddonManager: loaded per-character saved variables for '", addon.addonName, "'");
         }
     }

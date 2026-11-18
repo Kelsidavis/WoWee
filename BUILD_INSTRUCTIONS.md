@@ -8,6 +8,22 @@ startup, and the log lists every device the loader offered with its version.
 
 ---
 
+## 🐧 Linux
+
+Linux releases are AppImages. To build one without installing any library or
+compiler, use the container (needs only Docker):
+
+```bash
+./container/run-linux.sh        # Windows host: .\container\run-linux.ps1
+```
+
+It leaves `build/linux/wowee-<version>-<arch>.AppImage`; see
+[`container/README.md`](container/README.md). The sections below are for a
+native build, which is for development: it leaves `build/bin/wowee`, and
+[Packaging an AppImage](#packaging-an-appimage) turns that into an AppImage.
+
+---
+
 ## 🐧 Linux (Ubuntu / Debian)
 
 ### Install Dependencies
@@ -86,6 +102,39 @@ sudo ldconfig
 
 ---
 
+## 🐧 Linux (Fedora / Nobara)
+
+### Install Dependencies
+
+```bash
+sudo dnf install gcc-c++ cmake pkgconf-pkg-config git \
+  SDL3-devel glm-devel openssl-devel zlib-devel libX11-devel \
+  vulkan-devel vulkan-tools glslc ffmpeg-devel
+
+# Optional: Warden execution
+sudo dnf install unicorn-devel
+```
+
+StormLib is not in the Fedora or Nobara repositories, so the asset tools need
+it built from source. Install it under `/usr` so both CMake and the loader find
+it without extra paths:
+
+```bash
+sudo dnf install cmake gcc-c++ zlib-devel git
+git clone https://github.com/ladislav-zezula/StormLib.git
+cd StormLib && mkdir build && cd build
+cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr
+make -j"$(nproc)"
+sudo make install
+sudo ldconfig
+```
+
+If you configured WoWee before installing StormLib, re-run CMake (or
+`./build.sh`) so it picks StormLib up; until then `asset_extract` and the
+client's asset builder are left out.
+
+---
+
 ## 🐧 Linux (All Distros)
 
 ### Clone Repository
@@ -110,6 +159,34 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j"$(nproc)"
 ```
 
+### Packaging an AppImage
+
+```bash
+container/appimage/build-appimage.sh build
+```
+
+This turns the build tree into `build/wowee-<version>-<arch>.AppImage`.
+It copies the client, `asset_extract` and `wowee_assets` when they were built,
+`assets/`, the tracked `Data/` files and the bundled addons, then lets linuxdeploy
+copy in the shared libraries the binary links. The WoWee soundtrack is excluded
+from `assets/`, as in the other packages.
+
+The Vulkan loader is left out too, so the machine that runs the AppImage supplies
+it with its GPU driver. Desktops almost always have it already: Mesa's Vulkan
+drivers, GTK 4 and other common packages depend on it. A minimal install with only
+NVIDIA's proprietary driver, or a container, may not. If it is missing, the
+AppImage names the package to install (Debian and Ubuntu, Fedora, Arch) instead
+of failing with a linker error.
+
+glibc is not bundled either: build on the oldest distribution the AppImage has
+to run on, or use `./container/run-linux.sh`, which builds on Ubuntu 24.04.
+linuxdeploy and appimagetool are downloaded on first use, at pinned versions,
+and checked against their SHA-256 hashes.
+
+Started with no arguments, the AppImage runs the client and passes any arguments
+to it. `--asset-manager` and `--asset-extract`, as the first argument, run the
+two asset tools instead.
+
 ### Asset Extraction (Linux)
 
 The client needs assets built from your own World of Warcraft installation.
@@ -119,7 +196,8 @@ same extractor:
 - **The client itself.** Started with nothing extracted, it opens the asset
   builder instead of the login screen. Once assets exist, **more options** →
   **add or rebuild assets...** on the login screen opens it again.
-- **The asset manager window**, `build/bin/wowee_assets`. It takes the game
+- **The asset manager window**, `build/bin/wowee_assets`, or
+  `wowee-*.AppImage --asset-manager`. It takes the game
   folder, a later client and the destination as optional arguments
   (`wowee_assets [game folder] [later client] [destination]`); see
   [`docs/asset-manager.md`](docs/asset-manager.md).
@@ -130,6 +208,13 @@ same extractor:
   ```
 
   Supports `classic`, `turtle`, `tbc`, `wotlk` targets (auto-detected if omitted).
+  The AppImage has no script; it runs the extractor itself, which the script
+  also calls:
+
+  ```bash
+  ./wowee-*.AppImage --asset-extract --mpq-dir /path/to/WoW/Data \
+    --output ~/.local/share/wowee/Data --expansion-subdir --expansion wotlk
+  ```
 
 The builder and `wowee_assets` write to the per-user data directory by
 default, `$XDG_DATA_HOME/wowee/Data` (or `~/.local/share/wowee/Data`). The

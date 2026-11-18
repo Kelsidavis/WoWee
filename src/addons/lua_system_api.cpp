@@ -488,7 +488,7 @@ static int lua_GetPlayerMapPosition(lua_State* L) {
 static int lua_GetPlayerFacing(lua_State* L) {
     auto* gh = getGameHandler(L);
     if (gh) {
-        float facing = gh->getMovementInfo().orientation;
+        float facing = core::coords::canonicalToServerYaw(gh->getMovementInfo().orientation);
         // Normalize to [0, 2π)
         while (facing < 0) facing += 6.2831853f;
         while (facing >= 6.2831853f) facing -= 6.2831853f;

@@ -322,10 +322,10 @@ void MapWindow::buildFrame(bool inWorld, const glm::vec3& playerRenderPos, float
         if (playerZoneId != 0 && playerZoneId != lastPlayerZone_) {
             lastPlayerZone_ = playerZoneId;
             browsing_ = false;
-            map_->showPlayerZone();
+            map_->showPlayerZone(playerRenderPos);
         } else if (browsing_ && now - lastInteractionNs_ > kReturnToPlayerNs) {
             browsing_ = false;
-            map_->showPlayerZone();
+            map_->showPlayerZone(playerRenderPos);
         }
 
         // The quest log down the right, when there is room for it beside a
