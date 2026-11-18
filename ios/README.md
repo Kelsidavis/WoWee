@@ -221,7 +221,7 @@ offers the last one through the iOS share sheet.
 
 What the port has been exercised on:
 
-- **Device and OS:** iPad Air 11" (M3, `iPad15,3`), iPadOS 27.2, landscape,
+- **Device and OS:** iPad Air 11" (M3, `iPad15,3`), iPadOS 27.2.1, landscape,
   Release build, external keyboard and trackpad/mouse.
 - **Game data:** WotLK 3.3.5a (`Data/expansions/wotlk`), reduced with
   `tools/android/make_minimal_data.py`. Login, character select and
@@ -257,13 +257,12 @@ What the port has been exercised on:
   compiled in and hidden behind the same mouse-present check, but the port
   has only ever been driven by keyboard and mouse; fingers have not been
   tried.
-- **Eight shaders in `assets/shaders` had no built `.spv`** - the build
-  machine had no `glslc`. The client loads three of them at startup,
-  logged an error and continued: `grass_cull.comp` (GPU grass culling),
-  `m2_cull_hiz.comp` (M2 occlusion culling) and `world_map_fog.frag`
-  (the world-map fog overlay). They now build (see **Shaders** under
-  Build); the residual gap is that the eight `.spv` are gitignored, so a
-  clone on a machine without `glslc` still lacks them.
+- **A fresh clone used to lack eight compiled shaders.** The build machine
+  had no `glslc`, so `grass_cull.comp`, `m2_cull_hiz.comp` and
+  `world_map_fog.frag` (GPU grass culling, M2 occlusion culling and the
+  world-map fog overlay) had no `.spv` and logged a load error. All 92
+  `.spv` are now tracked and un-ignored, and a check verifies every `.glsl`
+  has one; a machine without `glslc` builds from them. See **Shaders** above.
 - **No sound** with the `login` and `world` data profiles; only `full`
   carries `sound/`.
 - **Doodads drop out of very dense scenes**: the M2 instance buffer holds
