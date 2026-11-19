@@ -578,13 +578,12 @@ bool CharacterPreview::loadCharacter(game::Race race, game::Gender gender,
         frameCameraForModelBounds(*camera_, frameMin, frameMax);
         modelBoundMinZ_ = frameMin.z;
         modelBoundMaxZ_ = frameMax.z;
+        // The head bone needs an instance to read from, and the instance is
+        // created further down - the read that used to live here always ran
+        // with instanceId_ == 0 (the old instance is removed above) and found
+        // nothing, which is how head=0 landed in every framing log. It is
+        // read after createInstance instead.
         modelHeadZ_ = 0.0f;
-        if (charRenderer_ && instanceId_ > 0) {
-            float headZ = 0.0f;
-            if (charRenderer_->getInstanceKeyBonePivotZ(instanceId_, kKeyBoneHead, headZ)) {
-                modelHeadZ_ = headZ;
-            }
-        }
         fullBodyDistance_ = camera_->getPosition().y;
         // A player model is framed by its bounds; no creature portrait camera
         // is in play, and a stale one from the shared preview must not be.
@@ -749,6 +748,17 @@ bool CharacterPreview::loadCharacter(game::Race race, game::Gender gender,
     if (instanceId_ == 0) {
         LOG_WARNING("CharacterPreview: failed to create instance");
         return false;
+    }
+
+    // The head bone, read where the instance exists to read it from. Face
+    // framing aims at this; without it every model fell back to 82% of its
+    // bounding-box height, which is a few centimetres off for most races and
+    // a head-length off for the short ones.
+    {
+        float headZ = 0.0f;
+        if (charRenderer_->getInstanceKeyBonePivotZ(instanceId_, kKeyBoneHead, headZ)) {
+            modelHeadZ_ = headZ;
+        }
     }
 
     // Cache core appearance before geoset selection; the DBC resolver uses it.
@@ -1119,13 +1129,9 @@ bool CharacterPreview::loadCreature(
         frameCameraForModelBounds(*camera_, frameMin, frameMax);
         modelBoundMinZ_ = frameMin.z;
         modelBoundMaxZ_ = frameMax.z;
+        // As in loadCharacter: the head bone is read after createInstance,
+        // where an instance exists to read it from.
         modelHeadZ_ = 0.0f;
-        if (charRenderer_ && instanceId_ > 0) {
-            float headZ = 0.0f;
-            if (charRenderer_->getInstanceKeyBonePivotZ(instanceId_, kKeyBoneHead, headZ)) {
-                modelHeadZ_ = headZ;
-            }
-        }
         fullBodyDistance_ = camera_->getPosition().y;
     }
 
@@ -1154,6 +1160,14 @@ bool CharacterPreview::loadCreature(
     if (instanceId_ == 0) {
         LOG_WARNING("CharacterPreview: failed to create creature instance");
         return false;
+    }
+
+    // The creature's head bone, on the same terms as a player's.
+    {
+        float headZ = 0.0f;
+        if (charRenderer_->getInstanceKeyBonePivotZ(instanceId_, kKeyBoneHead, headZ)) {
+            modelHeadZ_ = headZ;
+        }
     }
 
     // The display's skins, into the slots the model declared for them. Without
@@ -1442,6 +1456,23 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
         : VkClearColorValue{{0.05f, 0.05f, 0.1f, 1.0f}};
     renderTarget_->beginPass(cmd, clearColor);
 
+    // What the render actually sees, sampled rarely. The framing logs say
+    // what was applied at rebuild time; this says what the camera is at
+    // render time, which is the number that has to explain the picture.
+    {
+        static uint64_t composites = 0;
+        if ((composites++ % 600) == 0 && camera_) {
+            const glm::vec3& pos = camera_->getPosition();
+            LOG_INFO("Portrait composite #", composites - 1,
+                     " zoom=", zoomLevel_,
+                     " cam=(", pos.x, ",", pos.y, ",", pos.z, ")",
+                     " fov=", camera_->getFovDegrees(),
+                     " aspect=", camera_->getAspectRatio(),
+                     " head=", modelHeadZ_,
+                     " target=", fboWidth_, "x", fboHeight_);
+        }
+    }
+
     // Preview rendering bypasses Renderer::renderWorld(), so it must run the
     // same resource-preparation hook itself after server appearance data has
     // produced bone matrices. This preserves lazy data loading while keeping
@@ -1482,6 +1513,9 @@ void CharacterPreview::setTransparentBackground(bool transparent) {
 
 void CharacterPreview::setPortraitFraming() {
     zoomLevel_ = 1.0f;
+    LOG_INFO("Portrait framing: zoom=1 head=", modelHeadZ_,
+             " bounds ", modelBoundMinZ_, "..", modelBoundMaxZ_,
+             " fullBodyDistance=", fullBodyDistance_);
     // Straight at the character. The model is turned to face the camera in the
     // same breath, which is the part loadRacialBackdrop would otherwise be the
     // only place to do.
@@ -1493,6 +1527,7 @@ void CharacterPreview::setPortraitFraming() {
 
 void CharacterPreview::resetView() {
     zoomLevel_ = 0.0f;
+    LOG_INFO("Portrait framing reset: zoom=0 (full body)");
     applyPreviewView();
 }
 
@@ -1560,6 +1595,9 @@ void CharacterPreview::applyPreviewView() {
 
     // Stay outside the near plane while getting close enough to inspect facial
     // textures and hair. Large races retain proportionally more distance.
+    // The floor is a guard, not a tuning knob: going below it clipped the
+    // face out of the frame and left only its edges (the nose and helm are
+    // close, and the near plane is nearer than they are at portrait range).
     const float faceDistance = std::max(1.15f, modelHeight * 0.70f);
     const float distance = fullBodyDistance_ +
                            (std::min(faceDistance, fullBodyDistance_) - fullBodyDistance_) * zoomLevel_;
