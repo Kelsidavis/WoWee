@@ -227,14 +227,23 @@ What the port has been exercised on:
   `tools/android/make_minimal_data.py`. Login, character select and
   in-world play are verified. The Vanilla 1.12 and TBC 2.4.3 protocol paths
   are the shared desktop code and were not exercised on the device.
-- **Performance:** 60 fps standing still at 786x546 internal (FSR1 to
-  the panel's 2360x1640); under motion a median of ~39 fps at 786x546
-  and ~26 fps at 1770x1230, GPU-bound. (The steady 20 fps earlier builds
-  showed was a vsync value replayed from `cvars.cfg` at world entry, not
-  the hardware - section 8 has that finding.) `frameprofile=1` logs
-  per-stage CPU and GPU times, and `docs/plan-ipados.md` section 8 has
-  the measured attribution and the lever list. The same frame time held
-  through an 8-hour continuous run, with no crashes.
+- **Performance:** thermal-bound, not software-bound. The iPad Air is
+  fanless: a cold device boosts for the first ~60-90 seconds in world
+  (60 fps at 1180x820 with light shafts off), then the power governor
+  settles the clocks and the frame lands at a sustained ~43-44 fps on the
+  same scene - the same chunks, draws and lights at both rates, with every
+  GPU pass uniformly ~1.5x slower and every CPU stage ~1.25x slower, which
+  is the signature of the silicon slowing down rather than the workload
+  growing. A hot device boosts for seconds, not minutes (verified by
+  restarting the app with the device still warm), and charging while
+  playing lowers the sustained rate further. `lightshafts=0` removes a
+  ~2.3 ms compute pass and with it about 11 fps of the gap; lower
+  render resolutions raise the sustained floor the same way, at the cost
+  of sharpness. Warden checks were a separate, periodic dip on top of this
+  baseline (~10-15 fps for ~20 s per minute before the utility-QoS fix);
+  the sustained rate itself is unchanged by them. `frameprofile=1` logs
+  the per-stage CPU and GPU times that made this attribution;
+  `docs/plan-ipados.md` section 8 has the lever list.
 - **Isolation:** every source file the port touches compiles in a host
   (non-iOS) configuration, and the platform-specific pieces sit behind
   `WOWEE_IOS` / `__ANDROID__` / `if(CMAKE_SYSTEM_NAME STREQUAL "iOS")`.
