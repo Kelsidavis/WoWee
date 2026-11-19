@@ -90,6 +90,13 @@ bool Window::initialize() {
     // bug (the window was never displayed at all), not an orientation
     // problem.  Info.plist agrees: landscape-only, no portrait.
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    // Hide the home indicator: the bar sits exactly where the action bar's
+    // bottom-centre icons are, and the pointer hovering or clicking there
+    // made iPadOS reveal it over them. "2" is the deferral mode: the bar
+    // stays dim, and the system's bottom-edge swipe needs a second swipe
+    // before it goes home - the first swipe is the app's. The bar itself
+    // never reacts to the pointer, only to a real edge swipe.
+    SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "2");
 #endif
 
     // Initialize SDL
