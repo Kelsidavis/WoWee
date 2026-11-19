@@ -1,4 +1,5 @@
 #include <cstring>
+#include "core/config_paths.hpp"
 #include "ui/widget_renderer.hpp"
 #include "ui/text_markup.hpp"
 #include "ui/simple_html.hpp"
@@ -1441,6 +1442,14 @@ namespace {
 /// used to live too; the reporting moved out and the drawing still needs it.
 int widgetDumpLevel() {
     static const int level = [] {
+        // The config file first: an environment variable cannot reach an app
+        // on iOS, and the widget rect dump is exactly the diagnostic a
+        // misframed portrait on the iPad needs. The env var stays for desktop.
+        int fromConfig = 0;
+        if (const std::string v = core::configSetting("widgetdump"); !v.empty()) {
+            fromConfig = std::atoi(v.c_str());
+        }
+        if (fromConfig > 0) return fromConfig;
         const char* v = std::getenv("WOWEE_WIDGET_DUMP");
         if (!v || !*v) return 0;
         return std::atoi(v);
@@ -2823,10 +2832,17 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                 const float rectW = x1 - x0;
                 const float rectH = y1 - y0;
                 if (rectW > 0.0f && rectH > 0.0f) {
+                    // Crop the square source to the frame's shape without
+                    // ever sampling outside it. The old math sampled
+                    // halfV = 0.5/aspect past the image for a taller frame
+                    // (the 18x25 micro-button portrait), which clamped to the
+                    // bottom half of the texture - the face sat on the frame's
+                    // bottom edge and only the top of the head showed.
+                    // Fitting the source *into* the frame instead keeps every
+                    // sample inside and centres what the render produced.
                     const float aspect = rectW / rectH;
-                    // Half-extents about the middle of a square source.
                     const float halfU = aspect > 1.0f ? 0.5f : 0.5f * aspect;
-                    const float halfV = aspect > 1.0f ? 0.5f / aspect : 0.5f;
+                    const float halfV = aspect > 1.0f ? 0.5f * aspect : 0.5f;
                     uv0 = ImVec2(0.5f - halfU, 0.5f - halfV);
                     uv1 = ImVec2(0.5f + halfU, 0.5f + halfV);
                 }
