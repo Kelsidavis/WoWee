@@ -1453,11 +1453,28 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
         const bool haveCentroid =
             charRenderer_->getInstanceHeadCentroid(instanceId_, 6, cx, cy, cz);
         if (havePose && haveCentroid) {
-            // Aim at the centroid moved by the pose: the centroid is a
-            // bind-pose measurement, the pose is where the head has gone.
-            const float aimX = cx + (hx - bx);
-            const float aimY = cy + (hy - by);
-            const float aimZ = cz + (hz - bz);
+            // Aim at the face: the head bone for height, moved by whatever
+            // of the head's own geometry juts forward of it. A muzzle pulls
+            // the tauren's face forward and below its bone; a blood elf's
+            // hair and ears outvote its face in any mesh average and pull
+            // the aim up off it. So the vertical stays at the bone - the
+            // face rides at the bone's height on every approved model - and
+            // the centroid only contributes a forward pull, the muzzle's
+            // signature, never a backward or upward one. Both moved by the
+            // live pose.
+            // The trim the bone rig tuned by eye stays, both parts of it:
+            // the base the head bone sits behind the face, and the
+            // pose-proportional part that follows a hunch. The centroid's
+            // forward pull adds the muzzle on top of them rather than in
+            // place of them.
+            constexpr float kFaceTrimBase = 0.10f;
+            constexpr float kFaceTrimFactor = -1.35f;
+            const float forwardPull = std::max(0.0f, cx - bx);
+            const float aimX = bx + kFaceTrimBase +
+                               kFaceTrimFactor * (hx - bx) + forwardPull +
+                               (hx - bx);
+            const float aimY = hy;
+            const float aimZ = hz;
             const float modelHeight =
                 std::max(modelBoundMaxZ_ - modelBoundMinZ_, 0.1f);
             // The crop is sized by the head as well as the whole model: a

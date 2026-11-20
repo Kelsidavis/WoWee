@@ -4194,23 +4194,32 @@ bool CharacterRenderer::getInstanceHeadCentroid(uint32_t instanceId, int32_t key
     // vertices are stored in. A muzzle pulls the centroid forward, horns
     // spread it upward, and a broad neck widens it - the centroid is where
     // the head visually is rather than where a neck bone pivots.
+    //
+    // Weighted toward the bottom of the head: the face sits low in the head
+    // region, and hair and ears above it are more vertices than the face is
+    // (an unweighted centroid counted a blood elf's hair volume and aimed
+    // above the face). The weight is the distance from the top of the head
+    // squared, so the face dominates and the crown fades.
     const float topZ = mIt->second.visualBoundMax.z;
     if (topZ <= headZ) return false;
-    double sx = 0.0, sy = 0.0, sz = 0.0;
+    double sx = 0.0, sy = 0.0, sz = 0.0, sw = 0.0;
     size_t n = 0;
     for (const auto& v : verts) {
         if (v.position.z < headZ || v.position.z > topZ) continue;
-        sx += v.position.x;
-        sy += v.position.y;
-        sz += v.position.z;
+        const double w = static_cast<double>(topZ - v.position.z) *
+                         static_cast<double>(topZ - v.position.z);
+        sx += v.position.x * w;
+        sy += v.position.y * w;
+        sz += v.position.z * w;
+        sw += w;
         ++n;
     }
-    if (n < 16) return false;  // a head is more than a handful of vertices
+    if (n < 16 || sw <= 0.0) return false;  // a head is more than a handful
 
     const float scale = std::max(0.001f, it->second.scale);
-    outX = static_cast<float>(sx / n) * scale;
-    outY = static_cast<float>(sy / n) * scale;
-    outZ = static_cast<float>(sz / n) * scale;
+    outX = static_cast<float>(sx / sw) * scale;
+    outY = static_cast<float>(sy / sw) * scale;
+    outZ = static_cast<float>(sz / sw) * scale;
     return true;
 }
 
