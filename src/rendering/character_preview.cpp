@@ -1442,8 +1442,57 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
         instanceId_ > 0 && charRenderer_ && camera_) {
         float hx = 0.0f, hy = 0.0f, hz = 0.0f;
         float bx = 0.0f, by = 0.0f, bz = 0.0f;
-        if (charRenderer_->getInstanceKeyBoneAnimatedPos(instanceId_, 6, hx, hy, hz) &&
-            charRenderer_->getInstanceKeyBonePivot(instanceId_, 6, bx, by, bz)) {
+        float cx = 0.0f, cy = 0.0f, cz = 0.0f;
+        const bool havePose =
+            charRenderer_->getInstanceKeyBoneAnimatedPos(instanceId_, 6, hx, hy, hz) &&
+            charRenderer_->getInstanceKeyBonePivot(instanceId_, 6, bx, by, bz);
+        // The head's own centroid, measured off the mesh: the muzzle pulls it
+        // forward, the horns spread it up, and it is where the head visually
+        // is - the thing a portrait centres. Where the model has no head
+        // mesh above the bone worth speaking of, the bone rig stands in.
+        const bool haveCentroid =
+            charRenderer_->getInstanceHeadCentroid(instanceId_, 6, cx, cy, cz);
+        if (havePose && haveCentroid) {
+            // Aim at the centroid moved by the pose: the centroid is a
+            // bind-pose measurement, the pose is where the head has gone.
+            const float aimX = cx + (hx - bx);
+            const float aimY = cy + (hy - by);
+            const float aimZ = cz + (hz - bz);
+            const float modelHeight =
+                std::max(modelBoundMaxZ_ - modelBoundMinZ_, 0.1f);
+            // The crop is sized by the head as well as the whole model: a
+            // tauren is a fifth taller than a human but its head and horns
+            // are half again bigger, and a height-scaled distance filled the
+            // frame with horns and cropped the face. The head spans from the
+            // head bone to the top of the bounds, and a distance that frames
+            // that span is a lower bound on the height-scaled one - races
+            // whose head is proportionally small keep the framing they had.
+            // The span is measured from the bind pivot, not the animated
+            // position: a hunch drops the head low in the bounds and would
+            // inflate the span and pull every hunched model back out.
+            const float kHeadSpanFloor = 0.45f;
+            const float headSpan =
+                std::max(modelBoundMaxZ_ - bz, kHeadSpanFloor);
+            const float faceDistance =
+                std::max({1.15f, modelHeight * 0.70f, headSpan * 3.0f});
+            const float distance =
+                fullBodyDistance_ +
+                (std::min(faceDistance, fullBodyDistance_) - fullBodyDistance_) *
+                    zoomLevel_;
+            const glm::vec3 focus =
+                previewStandPosition_ + glm::vec3(aimX, aimY, aimZ);
+            const glm::vec3 camPos =
+                focus + previewViewDirection_ * distance;
+            camera_->setPosition(camPos);
+            const glm::vec3 forward = glm::normalize(focus - camPos);
+            camera_->setRotation(
+                glm::degrees(std::atan2(forward.y, forward.x)),
+                glm::degrees(std::asin(std::clamp(forward.z, -1.0f, 1.0f))));
+        } else if (havePose) {
+            // No head mesh to measure (or too little of one): the bone rig,
+            // aimed at the animated head with the lateral trim that centres
+            // a face on a neck bone - tuned by eye on an upright and a
+            // hunched model before the centroid measurement existed.
             const float modelHeight =
                 std::max(modelBoundMaxZ_ - modelBoundMinZ_, 0.1f);
             const float faceDistance = std::max(1.15f, modelHeight * 0.70f);
@@ -1451,14 +1500,6 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
                 fullBodyDistance_ +
                 (std::min(faceDistance, fullBodyDistance_) - fullBodyDistance_) *
                     zoomLevel_;
-            // A lateral trim for the portrait crop: aiming square at the head
-            // bone centres the neck, and the face reads off-centre from it.
-            // Two parts, tuned by eye on the device across two models: a
-            // constant base that centres an upright model's face, and a
-            // pose-proportional part that follows a hunch. The hunch is what
-            // displaces the head from under the face, so that part scales
-            // with the displacement - a hunched undead gets a large trim, an
-            // upright blood elf only the base.
             constexpr float kFaceTrimBase = 0.10f;
             constexpr float kFaceTrimFactor = -1.35f;
             const float trimX = kFaceTrimBase + kFaceTrimFactor * (hx - bx);

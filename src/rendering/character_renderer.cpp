@@ -4168,6 +4168,52 @@ bool CharacterRenderer::getInstanceKeyBonePivot(uint32_t instanceId, int32_t key
     return false;
 }
 
+bool CharacterRenderer::getInstanceHeadCentroid(uint32_t instanceId, int32_t keyBoneId,
+                                                float& outX, float& outY, float& outZ) const {
+    auto it = instances.find(instanceId);
+    if (it == instances.end()) return false;
+    auto mIt = models.find(it->second.modelId);
+    if (mIt == models.end()) return false;
+    const auto& bones = mIt->second.data.bones;
+    const auto& verts = mIt->second.data.vertices;
+
+    // The head's height: the pivot of the key bone asked for.
+    float headZ = 0.0f;
+    bool found = false;
+    for (const auto& bone : bones) {
+        if (bone.keyBoneId == keyBoneId) {
+            headZ = bone.pivot.z;
+            found = true;
+            break;
+        }
+    }
+    if (!found) return false;
+
+    // The mesh above that height is the head: vertices from the bone's
+    // height to the top of the model's bounds, in the bind pose the
+    // vertices are stored in. A muzzle pulls the centroid forward, horns
+    // spread it upward, and a broad neck widens it - the centroid is where
+    // the head visually is rather than where a neck bone pivots.
+    const float topZ = mIt->second.visualBoundMax.z;
+    if (topZ <= headZ) return false;
+    double sx = 0.0, sy = 0.0, sz = 0.0;
+    size_t n = 0;
+    for (const auto& v : verts) {
+        if (v.position.z < headZ || v.position.z > topZ) continue;
+        sx += v.position.x;
+        sy += v.position.y;
+        sz += v.position.z;
+        ++n;
+    }
+    if (n < 16) return false;  // a head is more than a handful of vertices
+
+    const float scale = std::max(0.001f, it->second.scale);
+    outX = static_cast<float>(sx / n) * scale;
+    outY = static_cast<float>(sy / n) * scale;
+    outZ = static_cast<float>(sz / n) * scale;
+    return true;
+}
+
 bool CharacterRenderer::getInstanceKeyBoneAnimatedPos(uint32_t instanceId, int32_t keyBoneId,
                                                       float& outX, float& outY, float& outZ) const {
     auto it = instances.find(instanceId);

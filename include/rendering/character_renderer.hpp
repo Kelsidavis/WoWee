@@ -147,6 +147,12 @@ public:
     /// has moved to; the difference between the two is the pose displacement.
     bool getInstanceKeyBonePivot(uint32_t instanceId, int32_t keyBoneId,
                                  float& outX, float& outY, float& outZ) const;
+    /// The bind-pose centroid of the mesh above a key bone's height: the
+    /// visual centre of a head, muzzle and horns included, which no bone
+    /// pivot describes. Faces are centred by this, not by the neck the head
+    /// bone sits at.
+    bool getInstanceHeadCentroid(uint32_t instanceId, int32_t keyBoneId,
+                                 float& outX, float& outY, float& outZ) const;
     /// The animated world position of a key bone this frame - where the bone
     /// actually is under the current pose, against the bind-pose pivot the
     /// other accessor answers. Faces sit on animated bones, and a hunched
