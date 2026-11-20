@@ -1434,7 +1434,12 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
     // crop below the bind pivot, which is how the portrait came to show the
     // top of the skull and the neck with no face between them. Re-aimed here
     // rather than at rebuild so the idle sway stays centred as well.
-    if (zoomLevel_ >= 1.0f && instanceId_ > 0 && charRenderer_ && camera_) {
+    //
+    // Only where this preview's own rig is framing the face: a creature that
+    // carries the artist's portrait camera is framed by it (applyPreviewView),
+    // and re-aiming here would override that framing after the fact.
+    if (zoomLevel_ >= 1.0f && !portraitCameraValid_ &&
+        instanceId_ > 0 && charRenderer_ && camera_) {
         float hx = 0.0f, hy = 0.0f, hz = 0.0f;
         float bx = 0.0f, by = 0.0f, bz = 0.0f;
         if (charRenderer_->getInstanceKeyBoneAnimatedPos(instanceId_, 6, hx, hy, hz) &&
