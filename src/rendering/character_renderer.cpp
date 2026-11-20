@@ -4151,6 +4151,46 @@ bool CharacterRenderer::getInstanceKeyBonePivotZ(uint32_t instanceId, int32_t ke
     return false;
 }
 
+bool CharacterRenderer::getInstanceKeyBonePivot(uint32_t instanceId, int32_t keyBoneId,
+                                               float& outX, float& outY, float& outZ) const {
+    auto it = instances.find(instanceId);
+    if (it == instances.end()) return false;
+    auto mIt = models.find(it->second.modelId);
+    if (mIt == models.end()) return false;
+    for (const auto& bone : mIt->second.data.bones) {
+        if (bone.keyBoneId != keyBoneId) continue;
+        const float scale = std::max(0.001f, it->second.scale);
+        outX = bone.pivot.x * scale;
+        outY = bone.pivot.y * scale;
+        outZ = bone.pivot.z * scale;
+        return true;
+    }
+    return false;
+}
+
+bool CharacterRenderer::getInstanceKeyBoneAnimatedPos(uint32_t instanceId, int32_t keyBoneId,
+                                                      float& outX, float& outY, float& outZ) const {
+    auto it = instances.find(instanceId);
+    if (it == instances.end()) return false;
+    auto mIt = models.find(it->second.modelId);
+    if (mIt == models.end()) return false;
+    const auto& bones = mIt->second.data.bones;
+    const auto& mats = it->second.boneMatrices;
+    if (mats.empty()) return false;
+    for (size_t i = 0; i < bones.size() && i < mats.size(); ++i) {
+        if (bones[i].keyBoneId != keyBoneId) continue;
+        // The local transform is T(pivot)*T*R*S*T(-pivot) - identity at rest -
+        // so the matrix is a delta from the bind pose and the animated
+        // position of the bone is its pivot plus that delta.
+        const float scale = std::max(0.001f, it->second.scale);
+        outX = (bones[i].pivot.x + mats[i][3][0]) * scale;
+        outY = (bones[i].pivot.y + mats[i][3][1]) * scale;
+        outZ = (bones[i].pivot.z + mats[i][3][2]) * scale;
+        return true;
+    }
+    return false;
+}
+
 bool CharacterRenderer::getInstanceHeight(uint32_t instanceId, float& outHeight) const {
     auto it = instances.find(instanceId);
     if (it == instances.end()) return false;

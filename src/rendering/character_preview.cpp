@@ -1428,6 +1428,47 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
 
     uint32_t fi = frameIndex % MAX_FRAMES;
 
+    // Face framing aims where the head actually is, not where the bind pose
+    // left it. The bone matrix is a delta from bind (identity at rest), and a
+    // hunched idle - an undead's Stand - hangs the head a third of a close
+    // crop below the bind pivot, which is how the portrait came to show the
+    // top of the skull and the neck with no face between them. Re-aimed here
+    // rather than at rebuild so the idle sway stays centred as well.
+    if (zoomLevel_ >= 1.0f && instanceId_ > 0 && charRenderer_ && camera_) {
+        float hx = 0.0f, hy = 0.0f, hz = 0.0f;
+        float bx = 0.0f, by = 0.0f, bz = 0.0f;
+        if (charRenderer_->getInstanceKeyBoneAnimatedPos(instanceId_, 6, hx, hy, hz) &&
+            charRenderer_->getInstanceKeyBonePivot(instanceId_, 6, bx, by, bz)) {
+            const float modelHeight =
+                std::max(modelBoundMaxZ_ - modelBoundMinZ_, 0.1f);
+            const float faceDistance = std::max(1.15f, modelHeight * 0.70f);
+            const float distance =
+                fullBodyDistance_ +
+                (std::min(faceDistance, fullBodyDistance_) - fullBodyDistance_) *
+                    zoomLevel_;
+            // A lateral trim for the portrait crop: aiming square at the head
+            // bone centres the neck, and the face reads off-centre from it.
+            // Two parts, tuned by eye on the device across two models: a
+            // constant base that centres an upright model's face, and a
+            // pose-proportional part that follows a hunch. The hunch is what
+            // displaces the head from under the face, so that part scales
+            // with the displacement - a hunched undead gets a large trim, an
+            // upright blood elf only the base.
+            constexpr float kFaceTrimBase = 0.10f;
+            constexpr float kFaceTrimFactor = -1.35f;
+            const float trimX = kFaceTrimBase + kFaceTrimFactor * (hx - bx);
+            const glm::vec3 focus =
+                previewStandPosition_ + glm::vec3(hx + trimX, hy, hz);
+            const glm::vec3 camPos =
+                focus + previewViewDirection_ * distance;
+            camera_->setPosition(camPos);
+            const glm::vec3 forward = glm::normalize(focus - camPos);
+            camera_->setRotation(
+                glm::degrees(std::atan2(forward.y, forward.x)),
+                glm::degrees(std::asin(std::clamp(forward.z, -1.0f, 1.0f))));
+        }
+    }
+
     // Update per-frame UBO with preview camera matrices and studio lighting
     GPUPerFrameData ubo{};
     ubo.view = camera_->getViewMatrix();
@@ -1463,12 +1504,24 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
         static uint64_t composites = 0;
         if ((composites++ % 600) == 0 && camera_) {
             const glm::vec3& pos = camera_->getPosition();
+            // Where the animated head bone actually is this frame, against
+            // the bind-pose pivot the camera aimed at - the hunch theory.
+            float ax = 0, ay = 0, az = 0;
+            const bool animated = charRenderer_ &&
+                charRenderer_->getInstanceKeyBoneAnimatedPos(
+                    instanceId_, 6, ax, ay, az);
             LOG_INFO("Portrait composite #", composites - 1,
                      " zoom=", zoomLevel_,
                      " cam=(", pos.x, ",", pos.y, ",", pos.z, ")",
                      " fov=", camera_->getFovDegrees(),
                      " aspect=", camera_->getAspectRatio(),
-                     " head=", modelHeadZ_,
+                     " head(bind)=", modelHeadZ_,
+                     animated ? " head(animated)=" : " head(animated)=none",
+                     animated ? std::to_string(az) : std::string(),
+                     animated ? " at(" : "",
+                     animated ? std::to_string(ax) : "", ",",
+                     animated ? std::to_string(ay) : "", ",",
+                     animated ? std::to_string(az) : "", ")",
                      " target=", fboWidth_, "x", fboHeight_);
         }
     }
