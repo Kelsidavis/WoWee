@@ -1446,35 +1446,47 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
         const bool havePose =
             charRenderer_->getInstanceKeyBoneAnimatedPos(instanceId_, 6, hx, hy, hz) &&
             charRenderer_->getInstanceKeyBonePivot(instanceId_, 6, bx, by, bz);
-        // The head's own centroid, measured off the mesh: the muzzle pulls it
-        // forward, the horns spread it up, and it is where the head visually
-        // is - the thing a portrait centres. Where the model has no head
-        // mesh above the bone worth speaking of, the bone rig stands in.
+        // A model needs enough head mesh above the bone for this rig to have
+        // something to frame; otherwise the bone-only fallback below stands in.
         const bool haveCentroid =
             charRenderer_->getInstanceHeadCentroid(instanceId_, 6, cx, cy, cz);
         if (havePose && haveCentroid) {
-            // Aim at the face: the head bone for height, moved by whatever
-            // of the head's own geometry juts forward of it. A muzzle pulls
-            // the tauren's face forward and below its bone; a blood elf's
-            // hair and ears outvote its face in any mesh average and pull
-            // the aim up off it. So the vertical stays at the bone - the
-            // face rides at the bone's height on every approved model - and
-            // the centroid only contributes a forward pull, the muzzle's
-            // signature, never a backward or upward one. Both moved by the
-            // live pose.
-            // The trim the bone rig tuned by eye stays, both parts of it:
-            // the base the head bone sits behind the face, and the
-            // pose-proportional part that follows a hunch. The centroid's
-            // forward pull adds the muzzle on top of them rather than in
-            // place of them.
+            // Aim at the face, not the neck. Aiming square at the animated
+            // head bone centres the neck; the face sits off that bone, and a
+            // hunch drops the head away from it. This is the trim tuned by eye
+            // on device: a base that centres an upright face, plus a part
+            // proportional to (head - bind) that follows a hunch. It was
+            // approved for the blood elf and undead - later experiments
+            // (centroid measurement, head-follow, uniform shifts) framed
+            // those two worse, so it is the default for other models.
             constexpr float kFaceTrimBase = 0.10f;
             constexpr float kFaceTrimFactor = -1.35f;
-            const float forwardPull = std::max(0.0f, cx - bx);
-            const float aimX = bx + kFaceTrimBase +
-                               kFaceTrimFactor * (hx - bx) + forwardPull +
-                               (hx - bx);
+            const float trimX = kFaceTrimBase + kFaceTrimFactor * (hx - bx);
+            // Some models have a bind bone far to one side of a widely
+            // swaying head, so the pose-proportional trim blows up and pins
+            // the face to a frame edge. Each such race was framed separately
+            // on device, keyed by its distinct bind head height: the tauren
+            // (1.89) needs a left bias and a lift, the orc (2.10) a left bias,
+            // and the troll (2.68) has its face on the bone so follows it
+            // directly. This is per-race calibration, not a general solution.
+            constexpr float kTaurenBindHeadZ = 1.897f;
+            constexpr float kOrcBindHeadZLow = 2.02f;
+            constexpr float kOrcBindHeadZHigh = 2.30f;
+            constexpr float kTrollBindHeadZ = 2.50f;
+            constexpr float kTaurenLeftShift = 0.30f;
+            constexpr float kTaurenLift = 0.18f;
+            constexpr float kOrcLeftShift = 0.30f;
+            const bool tauren = modelHeadZ_ < kTaurenBindHeadZ;
+            const bool orc = modelHeadZ_ > kOrcBindHeadZLow &&
+                             modelHeadZ_ < kOrcBindHeadZHigh;
+            const bool troll = modelHeadZ_ > kTrollBindHeadZ;
+            const float aimX = tauren ? (hx - kTaurenLeftShift)
+                               : orc   ? (hx - kOrcLeftShift)
+                               : troll ? hx
+                                       : (hx + trimX);
             const float aimY = hy;
-            const float aimZ = hz;
+            // Lowering the aim lifts the head in frame.
+            const float aimZ = hz - (tauren ? kTaurenLift : 0.0f);
             const float modelHeight =
                 std::max(modelBoundMaxZ_ - modelBoundMinZ_, 0.1f);
             // The crop is sized by the head as well as the whole model: a
