@@ -1470,17 +1470,25 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
             // tauren needs a left bias and a lift, the orc a left bias, and the
             // troll (whose face sits on its bone) follows the bone directly.
             //
-            // Measured on device (head bone pivot x, animated x range, head
-            // centroid x, bind head height). These are the numbers the shifts
-            // below were derived from, recorded so the next race can be tuned
-            // from data instead of by eye:
-            //   blood elf:  bx=+0.021  hx=+0.15..+0.33  cx=+0.070  bindZ=1.916
-            //   undead:     bx=-0.049  hx=-0.28..-0.35  cx=-0.055  bindZ=1.901
-            //   tauren:     bx=+0.384  hx=-0.09..+0.19  cx=+0.358  bindZ=1.894
-            //   orc:        bx=+0.125  hx=+0.03..+0.19  cx=+0.109  bindZ=2.104
-            //   troll:      hx=-0.18..-0.21 (bx/cx not captured)  bindZ=2.682
-            // The face-trim base/factor above fit the upright elf and the
-            // hunched undead; the three special races get explicit offsets.
+            // Measured on device: bind bone pivot x (bx), animated head x
+            // range (hx), head-geometry centroid x (cx), bind head height, and
+            // the final lateral aim applied. Recorded so the next race can be
+            // tuned from numbers rather than another round of eyeballing:
+            //   blood elf: bx=+0.021 hx=+0.15..+0.33 cx=+0.070 z=1.916 aim=+0.076..+0.013
+            //   undead:    bx=-0.049 hx=-0.35..-0.28 cx=-0.055 z=1.901 aim=+0.156..+0.132
+            //   tauren:    bx=+0.384 hx=-0.09..+0.19 cx=+0.358 z=1.894 aim=-0.390..-0.110
+            //   orc:       bx=+0.125 hx=+0.03..+0.19 cx=+0.109 z=2.104 aim=-0.270..-0.110
+            //   troll:     bx=+0.048 hx=-0.26..-0.15 cx=+0.057 z=2.682 aim=-0.260..-0.150
+            // The elf/undead aim is hx+base+factor*(hx-bx); cx-bx is +0.049
+            // (face ahead of bone) for the upright elf and -0.006 (on the bone)
+            // for the hunched undead. The special races use explicit offsets:
+            // tauren/orc hx-0.30, troll hx (its cx-bx is +0.009, on the bone).
+            // This is a per-race calibration, not a universal rule: only these
+            // five races/sexes were measured. Every other race (and the other
+            // sex of these) uses the DEFAULT trim untested - a centroid-based
+            // aim was tried first and framed these two worse, so there is no
+            // geometric shortcut known. Each new race still needs a device
+            // check; the table just makes that check data-driven.
             // Keying on race matters: a bind-head-height band would also catch
             // a gnome (1.897 is below every tauren measurement) and give it the
             // tauren shift. Creature previews carry their own camera and never
