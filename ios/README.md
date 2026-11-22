@@ -250,18 +250,24 @@ What the port has been exercised on:
 
 ## Known not to work yet
 
-- **The game is rotated 90 degrees on an external display.** The built-in
-  screen and the launch screen are correct; only the rendered world is. An
-  external monitor is reported by iPadOS with a portrait-ordered `UIScreen`
-  mode (a 2560x1440 panel came through as 972x1518), UIKit compensates for the
-  launch screen, and MoltenVK presents with an identity-only surface transform
-  (`currentTransform=0x1, supportedTransforms=0x1`) — so the swapchain, sized
-  from SDL's window, goes out landscape onto a surface the compositor treats
-  as portrait. There is no pre-transform to request on this driver; the real
-  fix is a 90 degree rotation of the final composite, not yet implemented.
-  Moving the window between displays is safe (a transient 0-height surface
-  during the move is rejected rather than crashing), but the external view
-  stays rotated.
+- **The whole window is rotated 90 degrees on an external display.** This is
+  an iPadOS limitation, not a client bug: it reproduces in unrelated apps such
+  as CorsixTH. iPadOS presents the external display with a portrait-ordered
+  `UIScreen` (a 2560x1440 landscape panel comes through as 1440x2560 points /
+  2880x5120 pixels) and rotates the entire `UIWindow` — including its own
+  red/yellow/green window buttons — 90 degrees when the app is shown there.
+  Because the rotation is applied to the window by the system compositor, it
+  cannot be corrected by the client: rotating the final composite would leave
+  the system chrome sideways, and the swapchain extent follows the surface
+  (`currentTransform=0x1, supportedTransforms=0x1`, so there is no
+  pre-transform to request on MoltenVK). App-side attempts to force a landscape
+  window size, set the `CAMetalLayer` drawable size, request landscape scene
+  geometry, or allow portrait in `Info.plist` / `SDL_HINT_ORIENTATIONS` were all
+  tried on device and all left the window rotated. The built-in screen is
+  correct, and moving the window between displays is safe (a transient
+  0-height surface during the move is rejected rather than crashing). There is
+  no known app-side fix; this needs a change in iPadOS's external-display
+  handling.
 - **Touch input is untested on the iPad.** Android's touch controls are
   compiled in and hidden behind the same mouse-present check, but the port
   has only ever been driven by keyboard and mouse; fingers have not been
