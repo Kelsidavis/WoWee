@@ -762,6 +762,7 @@ bool CharacterPreview::loadCharacter(game::Race race, game::Gender gender,
     }
 
     // Cache core appearance before geoset selection; the DBC resolver uses it.
+    raceKnown_ = true;
     race_ = race;
     gender_ = gender;
     useFemaleModel_ = useFemaleModel;
@@ -1134,6 +1135,7 @@ bool CharacterPreview::loadCreature(
         modelHeadZ_ = 0.0f;
         fullBodyDistance_ = camera_->getPosition().y;
     }
+    raceKnown_ = false;  // a creature has no race; use the geometry fallback
 
     // The artist's own portrait framing, where the model carries one.
     portraitCameraValid_ = false;
@@ -1462,27 +1464,63 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
             constexpr float kFaceTrimBase = 0.10f;
             constexpr float kFaceTrimFactor = -1.35f;
             const float trimX = kFaceTrimBase + kFaceTrimFactor * (hx - bx);
-            // Some models have a bind bone far to one side of a widely
-            // swaying head, so the pose-proportional trim blows up and pins
-            // the face to a frame edge. Each such race was framed separately
-            // on device, keyed by its distinct bind head height: the tauren
-            // (1.89) needs a left bias and a lift, the orc (2.10) a left bias,
-            // and the troll (2.68) has its face on the bone so follows it
-            // directly. This is per-race calibration, not a general solution.
-            constexpr float kTaurenBindHeadZ = 1.897f;
-            constexpr float kOrcBindHeadZLow = 2.02f;
-            constexpr float kOrcBindHeadZHigh = 2.30f;
-            constexpr float kTrollBindHeadZ = 2.50f;
+            // Some races have a bind bone far to one side of a widely swaying
+            // head, so the pose-proportional trim blows up and pins the face to
+            // the frame edge. Those are calibrated per race on device: the
+            // tauren needs a left bias and a lift, the orc a left bias, the troll
+            // (face on the bone) follows it, and the night elf needs a nudge.
+            //
+            // Measured on device: bind bone pivot x (bx), animated head x range
+            // (hx), head-geometry centroid x (cx), bind head height, final aim:
+            //   human:     bx=-0.033 hx=-0.17      cx=-0.011 z=1.712 aim=+0.115
+            //   night elf: bx=-0.045 hx=-0.45..-0.49 cx=-0.049 z=2.258 aim=+0.154
+            //   dwarf:     bx=-0.011 hx=-0.11      cx=+0.023 z=1.843 aim=+0.122
+            //   gnome:     bx=-0.030 hx=-0.08      cx=+0.016 z=0.752 aim=+0.087
+            //   blood elf: bx=+0.021 hx=+0.15..+0.33 cx=+0.070 z=1.916 aim=+0.076..+0.013
+            //   undead:    bx=-0.049 hx=-0.35..-0.28 cx=-0.055 z=1.901 aim=+0.156..+0.132
+            //   tauren:    bx=+0.384 hx=-0.09..+0.19 cx=+0.358 z=1.894 aim=-0.390..-0.110
+            //   orc:       bx=+0.125 hx=+0.03..+0.19 cx=+0.109 z=2.104 aim=-0.270..-0.110
+            //   troll:     bx=+0.048 hx=-0.26..-0.15 cx=+0.057 z=2.682 aim=-0.260..-0.150
+            // A per-race calibration, not a universal rule: a centroid-derived
+            // aim was tried first and framed elf/undead worse. Keying on bind
+            // head height is wrong: a human's bind head (1.712)
+            // is below every tauren measurement and was being given the tauren
+            // shift, pushing its face out of frame. Key on the race instead.
+            // Creature previews carry their own camera and never reach here,
+            // so race_ is a player; the height bands are a fallback only for a
+            // model whose race is unknown.
+            enum class Framing { DEFAULT, TAUREN, ORC, TROLL, NIGHT_ELF };
+            Framing framing = Framing::DEFAULT;
+            if (raceKnown_) {
+                switch (race_) {
+                    case game::Race::TAUREN:    framing = Framing::TAUREN; break;
+                    case game::Race::ORC:       framing = Framing::ORC; break;
+                    case game::Race::TROLL:     framing = Framing::TROLL; break;
+                    case game::Race::NIGHT_ELF: framing = Framing::NIGHT_ELF; break;
+                    default: break;
+                }
+            } else {
+                constexpr float kTaurenBindHeadZ = 1.897f;
+                constexpr float kOrcBindHeadZLow = 2.02f;
+                constexpr float kOrcBindHeadZHigh = 2.30f;
+                constexpr float kTrollBindHeadZ = 2.50f;
+                if (modelHeadZ_ < kTaurenBindHeadZ) framing = Framing::TAUREN;
+                else if (modelHeadZ_ > kOrcBindHeadZLow && modelHeadZ_ < kOrcBindHeadZHigh) framing = Framing::ORC;
+                else if (modelHeadZ_ > kTrollBindHeadZ) framing = Framing::TROLL;
+            }
             constexpr float kTaurenLeftShift = 0.30f;
             constexpr float kTaurenLift = 0.18f;
             constexpr float kOrcLeftShift = 0.30f;
-            const bool tauren = modelHeadZ_ < kTaurenBindHeadZ;
-            const bool orc = modelHeadZ_ > kOrcBindHeadZLow &&
-                             modelHeadZ_ < kOrcBindHeadZHigh;
-            const bool troll = modelHeadZ_ > kTrollBindHeadZ;
+            // The night elf's DEFAULT trim lands 0.25 past its face centroid,
+            // a touch further right than the approved undead/elf framing; nudge
+            // it left by 0.05 to match. Measured: bx=-0.045 hx=-0.45..-0.49
+            // cx=-0.049 bindZ=2.258.
+            constexpr float kNightElfLeftShift = 0.05f;
+            const bool tauren = framing == Framing::TAUREN;
             const float aimX = tauren ? (hx - kTaurenLeftShift)
-                               : orc   ? (hx - kOrcLeftShift)
-                               : troll ? hx
+                               : framing == Framing::ORC ? (hx - kOrcLeftShift)
+                               : framing == Framing::TROLL ? hx
+                               : framing == Framing::NIGHT_ELF ? (hx + trimX - kNightElfLeftShift)
                                        : (hx + trimX);
             const float aimY = hy;
             // Lowering the aim lifts the head in frame.
