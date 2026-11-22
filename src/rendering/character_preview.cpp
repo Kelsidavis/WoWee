@@ -762,6 +762,7 @@ bool CharacterPreview::loadCharacter(game::Race race, game::Gender gender,
     }
 
     // Cache core appearance before geoset selection; the DBC resolver uses it.
+    raceKnown_ = true;
     race_ = race;
     gender_ = gender;
     useFemaleModel_ = useFemaleModel;
@@ -1134,6 +1135,7 @@ bool CharacterPreview::loadCreature(
         modelHeadZ_ = 0.0f;
         fullBodyDistance_ = camera_->getPosition().y;
     }
+    raceKnown_ = false;  // a creature has no race; framing uses the geometry fallback
 
     // The artist's own portrait framing, where the model carries one.
     portraitCameraValid_ = false;
@@ -1444,12 +1446,12 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
         float bx = 0.0f, by = 0.0f, bz = 0.0f;
         float cx = 0.0f, cy = 0.0f, cz = 0.0f;
         const bool havePose =
-            charRenderer_->getInstanceKeyBoneAnimatedPos(instanceId_, 6, hx, hy, hz) &&
-            charRenderer_->getInstanceKeyBonePivot(instanceId_, 6, bx, by, bz);
+            charRenderer_->getInstanceKeyBoneAnimatedPos(instanceId_, kKeyBoneHead, hx, hy, hz) &&
+            charRenderer_->getInstanceKeyBonePivot(instanceId_, kKeyBoneHead, bx, by, bz);
         // A model needs enough head mesh above the bone for this rig to have
         // something to frame; otherwise the bone-only fallback below stands in.
         const bool haveCentroid =
-            charRenderer_->getInstanceHeadCentroid(instanceId_, 6, cx, cy, cz);
+            charRenderer_->getInstanceHeadCentroid(instanceId_, kKeyBoneHead, cx, cy, cz);
         if (havePose && haveCentroid) {
             // Aim at the face, not the neck. Aiming square at the animated
             // head bone centres the neck; the face sits off that bone, and a
@@ -1462,27 +1464,58 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
             constexpr float kFaceTrimBase = 0.10f;
             constexpr float kFaceTrimFactor = -1.35f;
             const float trimX = kFaceTrimBase + kFaceTrimFactor * (hx - bx);
-            // Some models have a bind bone far to one side of a widely
-            // swaying head, so the pose-proportional trim blows up and pins
-            // the face to a frame edge. Each such race was framed separately
-            // on device, keyed by its distinct bind head height: the tauren
-            // (1.89) needs a left bias and a lift, the orc (2.10) a left bias,
-            // and the troll (2.68) has its face on the bone so follows it
-            // directly. This is per-race calibration, not a general solution.
-            constexpr float kTaurenBindHeadZ = 1.897f;
-            constexpr float kOrcBindHeadZLow = 2.02f;
-            constexpr float kOrcBindHeadZHigh = 2.30f;
-            constexpr float kTrollBindHeadZ = 2.50f;
+            // Some races have a bind bone far to one side of a widely swaying
+            // head, so the pose-proportional trim blows up and pins the face to
+            // the frame edge. Those are calibrated per race on device: the
+            // tauren needs a left bias and a lift, the orc a left bias, and the
+            // troll (whose face sits on its bone) follows the bone directly.
+            //
+            // Measured on device (head bone pivot x, animated x range, head
+            // centroid x, bind head height). These are the numbers the shifts
+            // below were derived from, recorded so the next race can be tuned
+            // from data instead of by eye:
+            //   blood elf:  bx=+0.021  hx=+0.15..+0.33  cx=+0.070  bindZ=1.916
+            //   undead:     bx=-0.049  hx=-0.28..-0.35  cx=-0.055  bindZ=1.901
+            //   tauren:     bx=+0.384  hx=-0.09..+0.19  cx=+0.358  bindZ=1.894
+            //   orc:        bx=+0.125  hx=+0.03..+0.19  cx=+0.109  bindZ=2.104
+            //   troll:      hx=-0.18..-0.21 (bx/cx not captured)  bindZ=2.682
+            // The face-trim base/factor above fit the upright elf and the
+            // hunched undead; the three special races get explicit offsets.
+            // Keying on race matters: a bind-head-height band would also catch
+            // a gnome (1.897 is below every tauren measurement) and give it the
+            // tauren shift. Creature previews carry their own camera and never
+            // reach this block, so race_ is always a player here; the height
+            // checks are only a fallback for a model whose race is unknown.
+            enum class Framing { DEFAULT, TAUREN, ORC, TROLL };
+            Framing framing = Framing::DEFAULT;
+            if (raceKnown_) {
+                switch (race_) {
+                    case game::Race::TAUREN: framing = Framing::TAUREN; break;
+                    case game::Race::ORC:    framing = Framing::ORC; break;
+                    case game::Race::TROLL:  framing = Framing::TROLL; break;
+                    default: break;
+                }
+            } else {
+                // A creature has no race; fall back to the bind head height
+                // bands measured on device (tauren 1.894, orc 2.104, troll
+                // 2.682). Kept only for models whose race is unknown - a
+                // known short race such as a gnome must NOT land in the
+                // tauren band just because it is under 1.897.
+                constexpr float kTaurenBindHeadZ = 1.897f;
+                constexpr float kOrcBindHeadZLow = 2.02f;
+                constexpr float kOrcBindHeadZHigh = 2.30f;
+                constexpr float kTrollBindHeadZ = 2.50f;
+                if (modelHeadZ_ < kTaurenBindHeadZ) framing = Framing::TAUREN;
+                else if (modelHeadZ_ > kOrcBindHeadZLow && modelHeadZ_ < kOrcBindHeadZHigh) framing = Framing::ORC;
+                else if (modelHeadZ_ > kTrollBindHeadZ) framing = Framing::TROLL;
+            }
             constexpr float kTaurenLeftShift = 0.30f;
             constexpr float kTaurenLift = 0.18f;
             constexpr float kOrcLeftShift = 0.30f;
-            const bool tauren = modelHeadZ_ < kTaurenBindHeadZ;
-            const bool orc = modelHeadZ_ > kOrcBindHeadZLow &&
-                             modelHeadZ_ < kOrcBindHeadZHigh;
-            const bool troll = modelHeadZ_ > kTrollBindHeadZ;
+            const bool tauren = framing == Framing::TAUREN;
             const float aimX = tauren ? (hx - kTaurenLeftShift)
-                               : orc   ? (hx - kOrcLeftShift)
-                               : troll ? hx
+                               : framing == Framing::ORC ? (hx - kOrcLeftShift)
+                               : framing == Framing::TROLL ? hx
                                        : (hx + trimX);
             const float aimY = hy;
             // Lowering the aim lifts the head in frame.
@@ -1572,35 +1605,6 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
         : VkClearColorValue{{0.05f, 0.05f, 0.1f, 1.0f}};
     renderTarget_->beginPass(cmd, clearColor);
 
-    // What the render actually sees, sampled rarely. The framing logs say
-    // what was applied at rebuild time; this says what the camera is at
-    // render time, which is the number that has to explain the picture.
-    {
-        static uint64_t composites = 0;
-        if ((composites++ % 600) == 0 && camera_) {
-            const glm::vec3& pos = camera_->getPosition();
-            // Where the animated head bone actually is this frame, against
-            // the bind-pose pivot the camera aimed at - the hunch theory.
-            float ax = 0, ay = 0, az = 0;
-            const bool animated = charRenderer_ &&
-                charRenderer_->getInstanceKeyBoneAnimatedPos(
-                    instanceId_, 6, ax, ay, az);
-            LOG_INFO("Portrait composite #", composites - 1,
-                     " zoom=", zoomLevel_,
-                     " cam=(", pos.x, ",", pos.y, ",", pos.z, ")",
-                     " fov=", camera_->getFovDegrees(),
-                     " aspect=", camera_->getAspectRatio(),
-                     " head(bind)=", modelHeadZ_,
-                     animated ? " head(animated)=" : " head(animated)=none",
-                     animated ? std::to_string(az) : std::string(),
-                     animated ? " at(" : "",
-                     animated ? std::to_string(ax) : "", ",",
-                     animated ? std::to_string(ay) : "", ",",
-                     animated ? std::to_string(az) : "", ")",
-                     " target=", fboWidth_, "x", fboHeight_);
-        }
-    }
-
     // Preview rendering bypasses Renderer::renderWorld(), so it must run the
     // same resource-preparation hook itself after server appearance data has
     // produced bone matrices. This preserves lazy data loading while keeping
@@ -1641,9 +1645,6 @@ void CharacterPreview::setTransparentBackground(bool transparent) {
 
 void CharacterPreview::setPortraitFraming() {
     zoomLevel_ = 1.0f;
-    LOG_INFO("Portrait framing: zoom=1 head=", modelHeadZ_,
-             " bounds ", modelBoundMinZ_, "..", modelBoundMaxZ_,
-             " fullBodyDistance=", fullBodyDistance_);
     // Straight at the character. The model is turned to face the camera in the
     // same breath, which is the part loadRacialBackdrop would otherwise be the
     // only place to do.
@@ -1655,7 +1656,6 @@ void CharacterPreview::setPortraitFraming() {
 
 void CharacterPreview::resetView() {
     zoomLevel_ = 0.0f;
-    LOG_INFO("Portrait framing reset: zoom=0 (full body)");
     applyPreviewView();
 }
 
