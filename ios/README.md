@@ -251,8 +251,14 @@ What the port has been exercised on:
 ## Known not to work yet
 
 - **The whole window is rotated 90 degrees on an external display.** This is
-  an iPadOS limitation, not a client bug: it reproduces in unrelated apps such
-  as CorsixTH. iPadOS presents the external display with a portrait-ordered
+  an iPadOS limitation, not a client bug: it reproduces in unrelated apps —
+  CorsixTH and Draw Things ([issue #177](https://github.com/drawthingsai/draw-things-community/issues/177)),
+  the latter on iPadOS 27.2 with an extended USB-C display in both Windowed
+  Apps and Stage Manager, in both iPad orientations, with resizing, moving and
+  reopening all ineffective. The Draw Things report also confirms the system
+  menu bar and Dock stay upright: it is the app's own `UIWindowScene` that is
+  rotated, which is why its window buttons turn with the content. iPadOS
+  presents the external display with a portrait-ordered
   `UIScreen` (a 2560x1440 landscape panel comes through as 1440x2560 points /
   2880x5120 pixels) and rotates the entire `UIWindow` — including its own
   red/yellow/green window buttons — 90 degrees when the app is shown there.
