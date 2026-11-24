@@ -204,13 +204,6 @@ public:
     /// previous mark). Empty until a frame has come round and been read back.
     [[nodiscard]] const std::vector<std::pair<const char*, double>>&
         gpuTimings() const { return gpuTimings_; }
-    /// Where endFrame's wait went, the three Vulkan calls it is made of:
-    /// closing the command buffer, handing it to the queue, and getting the
-    /// picture out. A present that blocks is waiting on a drawable; a submit
-    /// that blocks is waiting on the queue to drain.
-    [[nodiscard]] double endCmdMs() const { return endCmdMs_; }
-    [[nodiscard]] double submitMs() const { return submitMs_; }
-    [[nodiscard]] double presentMs() const { return presentMs_; }
     [[nodiscard]] bool hasDedicatedTransferQueue() const { return hasDedicatedTransfer_; }
     [[nodiscard]] VmaAllocator getAllocator() const { return allocator; }
     [[nodiscard]] VkSurfaceKHR getSurface() const { return surface; }
@@ -406,10 +399,6 @@ private:
     /// slot that has never run is not read back as garbage.
     bool gpuMarksPending_[MAX_FRAMES_IN_FLIGHT]{};
     std::vector<std::pair<const char*, double>> gpuTimings_;
-    /// The last endFrame's three calls, in milliseconds.
-    double endCmdMs_ = 0.0;
-    double submitMs_ = 0.0;
-    double presentMs_ = 0.0;
     float timestampPeriodNs_ = 0.0f;
     bool gpuTimingSupported_ = false;
     void createGpuQueryPools();

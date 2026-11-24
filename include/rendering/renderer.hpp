@@ -90,14 +90,6 @@ public:
     void beginFrame();
     void endFrame();
 
-    /// Where endFrame's own time went: recording the frame's commands into the
-    /// command buffer, versus handing that buffer to the queue and getting the
-    /// picture on screen. The two are the difference between a frame that is
-    /// slow because there is a lot to draw and one that is slow because it is
-    /// waiting for the GPU or for a drawable to come back.
-    [[nodiscard]] double endFrameRecordMs() const { return endFrameRecordMs_; }
-    [[nodiscard]] double endFrameSubmitMs() const { return endFrameSubmitMs_; }
-
     /// Recorded after the interface is drawn and before the frame is submitted,
     /// into the frame's own command buffer. A second window draws here - see
     /// AuxSwapchain - so the frame's one fence covers it. Empty clears it.
@@ -649,9 +641,6 @@ private:
     double lastRenderMs = 0.0;
     double lastCameraUpdateMs = 0.0;
     double lastTerrainRenderMs = 0.0;
-    // Split of the last endFrame: recording, then submit and present.
-    double endFrameRecordMs_ = 0.0;
-    double endFrameSubmitMs_ = 0.0;
     double lastWMORenderMs = 0.0;
     double lastM2RenderMs = 0.0;
 };

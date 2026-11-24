@@ -5264,23 +5264,6 @@ void Application::reportStageTimes() {
                  << static_cast<int>(100.0 * total / windowMs) << "% of the window";
             if (loud) LOG_WARNING(line.str()); else LOG_INFO(line.str());
         }
-
-        // What endFrame itself was made of: recording the commands, versus
-        // submitting them and getting the picture out. If the second is the
-        // frame, the GPU or the display is the limit and drawing less will not
-        // help; if the first is, the frame has more in it than it can record.
-        if (renderer->endFrameRecordMs() + renderer->endFrameSubmitMs() > 0.0) {
-            std::ostringstream split;
-            split << "  endFrame split: record "
-                  << renderer->endFrameRecordMs() << "ms, submit+present "
-                  << renderer->endFrameSubmitMs() << "ms";
-            if (renderer->getVkContext()) {
-                split << " (end cmd " << renderer->getVkContext()->endCmdMs()
-                      << ", queue submit " << renderer->getVkContext()->submitMs()
-                      << ", present " << renderer->getVkContext()->presentMs() << ")";
-            }
-            if (loud) LOG_WARNING(split.str()); else LOG_INFO(split.str());
-        }
     }
 
     // The GPU's own breakdown, from the last completed frame rather than an

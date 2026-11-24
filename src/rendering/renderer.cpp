@@ -4,7 +4,6 @@
 #include <fstream>
 #include <iterator>
 #include "addons/lua_api_registrations.hpp"
-#include "core/config_paths.hpp"
 #include "core/env_flag.hpp"
 #include "rendering/sky_params_from_lighting.hpp"
 #include "core/coordinates.hpp"
@@ -841,15 +840,7 @@ bool Renderer::initialize(core::Window* win) {
     // grass into the terrain secondary and so reports the two as one number.
     // Running a frame profile both ways says how much of "terrain" is grass,
     // and whether serialising the recording moves the frame time at all.
-    // The ablation run, and the single-threaded recording it needs.
-    //
-    // Both are read from the environment as well as from the config file,
-    // because an app on a device cannot be given an environment and the
-    // ablation table is the only way to attribute the scene pass there.
-    const bool ablationRequested =
-        std::getenv("WOWEE_PASS_ABLATION") != nullptr ||
-        core::configFlag("passablation");
-    if (ablationRequested) {
+    if (std::getenv("WOWEE_PASS_ABLATION") != nullptr) {
         passAblation_ = std::make_unique<PassAblation>();
         LOG_WARNING("Pass ablation enabled - ", PassAblation::phaseCount(),
                     " phases over about ",
@@ -859,11 +850,9 @@ bool Renderer::initialize(core::Window* win) {
                     "the table is logged.");
     }
 
-    static const bool forceSingleThread =
-        std::getenv("WOWEE_SINGLE_THREAD_RECORD") != nullptr ||
-        core::configFlag("singlethreadrecord");
+    static const bool forceSingleThread = std::getenv("WOWEE_SINGLE_THREAD_RECORD") != nullptr;
     if (forceSingleThread) {
-        LOG_INFO("Single-threaded recording - inline, one pass per GPU mark");
+        LOG_INFO("WOWEE_SINGLE_THREAD_RECORD set - inline recording, one pass per GPU mark");
     } else if (!createSecondaryCommandResources()) {
         LOG_WARNING("Failed to create secondary command buffers - falling back to single-threaded rendering");
     }
@@ -1436,12 +1425,6 @@ void Renderer::endFrame() {
     ZoneScopedN("Renderer::endFrame");
     if (!vkCtx || currentCmd == VK_NULL_HANDLE) return;
 
-    // Split this function's own cost into what it records and what it waits
-    // for. The stage report says endFrame is two thirds of the frame on the
-    // iPad; only this tells whether the frame is slow because there is a lot
-    // to draw or because submit and present block until the GPU is done.
-    const auto recordStart = std::chrono::steady_clock::now();
-
     logViewDistanceDiag();
 
     // Post-process execution (§4.3 - delegates to PostProcessPipeline). Whether
@@ -1523,14 +1506,8 @@ void Renderer::endFrame() {
     // recording dot, which it does not.
     recordScreenCapture();
 
-    endFrameRecordMs_ = std::chrono::duration<double, std::milli>(
-        std::chrono::steady_clock::now() - recordStart).count();
-
     // Submit and present
-    const auto submitStart = std::chrono::steady_clock::now();
     vkCtx->endFrame(currentCmd, currentImageIndex);
-    endFrameSubmitMs_ = std::chrono::duration<double, std::milli>(
-        std::chrono::steady_clock::now() - submitStart).count();
     currentCmd = VK_NULL_HANDLE;
 }
 

@@ -185,10 +185,6 @@ bool PostProcessPipeline::executePostProcessing(VkCommandBuffer cmd, uint32_t im
     if (fsr2_.enabled && fsr2_.sceneFramebuffer) {
         // End the off-screen scene render pass
         vkCmdEndRenderPass(currentCmd_);
-        // Between passes, which is the only place this driver reads a
-        // timestamp honestly: it splits the bucket the "post-process" mark
-        // reports into what the world cost and what scaling it up cost.
-        if (vkCtx_) vkCtx_->gpuMark(currentCmd_, "world");
         if (sceneClosedHook_) sceneClosedHook_(currentCmd_);
 
         if (fsr2_.useAmdBackend) {
@@ -312,7 +308,6 @@ bool PostProcessPipeline::executePostProcessing(VkCommandBuffer cmd, uint32_t im
         inlineMode = true;
         // End the off-screen scene render pass
         vkCmdEndRenderPass(currentCmd_);
-        if (vkCtx_) vkCtx_->gpuMark(currentCmd_, "world");
         if (sceneClosedHook_) sceneClosedHook_(currentCmd_);
 
         // Transition resolved scene color: PRESENT_SRC_KHR → SHADER_READ_ONLY
@@ -355,11 +350,6 @@ bool PostProcessPipeline::executePostProcessing(VkCommandBuffer cmd, uint32_t im
         // FSR1 upscale path - only runs when FXAA is not active.
         // When both FSR1 and FXAA are enabled, FXAA took priority above.
         vkCmdEndRenderPass(currentCmd_);
-        // The world's render pass has just closed, outside any pass of its
-        // own - the one place a timestamp on this driver means what it says.
-        // Everything the "post-process" mark used to report from the fog
-        // mark to here was the world; from here to it is the scaling.
-        if (vkCtx_) vkCtx_->gpuMark(currentCmd_, "world");
         if (sceneClosedHook_) sceneClosedHook_(currentCmd_);
 
         // Transition scene color (1x resolve/color target): PRESENT_SRC_KHR → SHADER_READ_ONLY

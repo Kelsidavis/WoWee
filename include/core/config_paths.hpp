@@ -38,19 +38,4 @@ void migratePortableConfigIfNeeded();
 // variable names a directory that cannot be entered.
 bool enterResourceRoot();
 
-/// Read one key from settings.cfg, as the string it holds.
-///
-/// The file is read whole for each call - it is small, and a caller wants
-/// one key rather than a file handle to keep alive.
-///
-/// This exists because an app on a device cannot be given an environment, and
-/// the settings that turn the diagnostics on are read from the environment on
-/// a desktop. The same key means the same thing in both places.
-std::string configSetting(const std::string& key);
-
-/// Read one key from settings.cfg as a yes or no.
-///
-/// "1" and "true" are yes; everything else is no.
-bool configFlag(const std::string& key);
-
 }  // namespace wowee::core

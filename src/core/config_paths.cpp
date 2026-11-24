@@ -4,8 +4,6 @@
 
 #include <cstdlib>
 #include <filesystem>
-#include <fstream>
-#include <string>
 #include <system_error>
 
 #if defined(_WIN32)
@@ -105,33 +103,6 @@ std::string getConfigRoot() {
         }
     }
     return perUserConfigDir();
-}
-
-std::string configSetting(const std::string& key) {
-    std::ifstream in(getConfigRoot() + "/settings.cfg");
-    if (!in) return {};
-    const auto trim = [](std::string& s) {
-        const char* ws = " \t\r\n";
-        const size_t b = s.find_first_not_of(ws);
-        const size_t e = s.find_last_not_of(ws);
-        s = (b == std::string::npos) ? "" : s.substr(b, e - b + 1);
-    };
-    std::string line;
-    while (std::getline(in, line)) {
-        const size_t eq = line.find('=');
-        if (eq == std::string::npos) continue;
-        std::string k = line.substr(0, eq);
-        std::string v = line.substr(eq + 1);
-        trim(k);
-        trim(v);
-        if (k == key) return v;
-    }
-    return {};
-}
-
-bool configFlag(const std::string& key) {
-    const std::string value = configSetting(key);
-    return value == "1" || value == "true";
 }
 
 void migratePortableConfigIfNeeded() {

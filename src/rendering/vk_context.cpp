@@ -5,7 +5,6 @@
 #include "rendering/vk_context.hpp"
 
 #include <fstream>
-#include <chrono>
 #include "rendering/vk_utils.hpp"
 #include "core/logger.hpp"
 #include "pipeline/blp_loader.hpp"
@@ -1533,17 +1532,7 @@ void VkContext::noteDeviceLost(const char* where, VkResult result) {
 
 VkResult VkContext::waitIdle(const char* where) {
     if (device == VK_NULL_HANDLE) return VK_SUCCESS;
-    // A device wait drains the GPU, and it holds the queue while it does -
-    // so one of these on any thread is a frame's worth of stall for every
-    // other Vulkan call behind it, including the main loop's submit. When a
-    // frame is slow because of one, this is the line that says so.
-    const auto waitStart = std::chrono::steady_clock::now();
     const VkResult r = vkDeviceWaitIdle(device);
-    const double waitMs = std::chrono::duration<double, std::milli>(
-        std::chrono::steady_clock::now() - waitStart).count();
-    if (waitMs > 8.0) {
-        LOG_WARNING("vkDeviceWaitIdle took ", waitMs, "ms in ", where);
-    }
     if (r != VK_SUCCESS) LOG_ERROR("vkDeviceWaitIdle failed in ", where, ": ", static_cast<int>(r));
     noteDeviceLost(where, r);
     return r;
@@ -3110,16 +3099,7 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
     static int endFrameCounter = 0;
     endFrameCounter++;
 
-    // Each of the three calls below can be where a frame waits: closing the
-    // buffer while the GPU still runs it, submitting onto a full queue, or
-    // presenting with no drawable to present into. Which one it is decides
-    // whether the fix is more frames in flight, less GPU work, or nothing at
-    // all here.
-    using clock = std::chrono::steady_clock;
-    const auto t0 = clock::now();
-
     VkResult endResult = vkEndCommandBuffer(cmd);
-    const auto t1 = clock::now();
     if (endResult != VK_SUCCESS) {
         LOG_ERROR("endFrame[", endFrameCounter, "] vkEndCommandBuffer FAILED: ", static_cast<int>(endResult));
     }
@@ -3177,7 +3157,6 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
     VkResult submitResult = vkQueueSubmit(graphicsQueue, 1, &submitInfo,
                                           frameTimeline_ != VK_NULL_HANDLE ? VK_NULL_HANDLE
                                                                            : frame.inFlightFence);
-    const auto t2 = clock::now();
     if (submitResult == VK_SUCCESS && frameTimeline_ != VK_NULL_HANDLE) {
         // Only once the submit is in: on failure the timeline is never
         // signalled, and a slot left waiting on an unreachable value would
@@ -3235,10 +3214,6 @@ void VkContext::endFrame(VkCommandBuffer cmd, uint32_t imageIndex) {
     presentInfo.pImageIndices = &imageIndex;
 
     VkResult result = vkQueuePresentKHR(presentQueue, &presentInfo);
-    const auto t3 = clock::now();
-    endCmdMs_ = std::chrono::duration<double, std::milli>(t1 - t0).count();
-    submitMs_ = std::chrono::duration<double, std::milli>(t2 - t1).count();
-    presentMs_ = std::chrono::duration<double, std::milli>(t3 - t2).count();
     // Presenting unrotated onto a rotated surface is suboptimal by definition,
     // and says so on every frame for as long as the swapchain lives. Rebuilding
     // on that answer rebuilds every frame, which is what stopped the client
