@@ -379,11 +379,11 @@ bool Application::initialize() {
     // Create asset manager
     assetManager = std::make_unique<pipeline::AssetManager>();
 
-    // Low-memory handling: drop caches when the OS (or SDL) signals memory
-    // pressure.  SDL_EVENT_LOW_MEMORY is delivered through an event watch
-    // because it can arrive on a non-main thread on some platforms.
-    SDL_AddEventWatch(onLowMemoryEvent, nullptr);
 #if defined(WOWEE_IOS)
+    // iPadOS signals memory pressure through both SDL and UIKit; drop caches
+    // on either. The event watch is registered only on iOS so other platforms
+    // keep their original startup path.
+    SDL_AddEventWatch(onLowMemoryEvent, nullptr);
     core::iosSetMemoryWarningCallback(onIosMemoryWarning);
 #endif
 
@@ -1481,16 +1481,16 @@ void Application::run() {
         // keyboard it never gave it back, so UIKit's hidden text field stayed
         // first responder for the rest of the session - which is what raises
         // the accented-letter popup when a movement key is held down.
+#if defined(WOWEE_IOS)
+        // On iPadOS the software keyboard's autocorrect/autocapitalise would
+        // mangle chat and the on-screen numeric fields, and the keyboard must
+        // stay down only while something actually types. Desktop/Android/macOS
+        // keep the original edit-box-only behaviour in the #else below - the
+        // no-assist properties call is also a newer SDL 3 API than those
+        // platforms are required to provide.
         if (window && addonManager_ && addonsLoaded_) {
             if (auto* engine = addonManager_->getLuaEngine()) {
                 if (SDL_Window* sdlWindow = window->getSDLWindow(); sdlWindow) {
-                    // Whoever wants typed characters this frame: a Lua edit
-                    // box (chat), an ImGui field, or a Lua frame that enabled
-                    // the keyboard - StackSplitFrame reads its digits from
-                    // OnChar. ImGui's value is last frame's here, which is
-                    // fine: a one-frame-old answer only delays the start by
-                    // one frame, and ui_manager's transition below starts
-                    // for ImGui in the same frame it changes.
                     const bool wanted = engine->editBoxHasFocus()
                                      || ImGui::GetIO().WantTextInput
                                      || engine->keyboardFrameWantsText();
@@ -1505,19 +1505,23 @@ void Application::run() {
                         SDL_StopTextInput(sdlWindow);
                         textInputNoAssistApplied_ = false;
                     } else if (!textInputNoAssistApplied_) {
-                        // Running, but not started by us: the ImGui backend
-                        // starts one with plain SDL_StartTextInput, whose
-                        // defaults would switch the assists back on. SDL
-                        // applies properties even to an active session, so
-                        // one call here corrects it - once per session, not
-                        // per frame, because each call re-adds the UIKit text
-                        // field to the view.
                         SDL_StartTextInputWithProperties(sdlWindow, props);
                         textInputNoAssistApplied_ = true;
                     }
                 }
             }
         }
+#else
+        if (window && addonManager_ && addonsLoaded_) {
+            if (auto* engine = addonManager_->getLuaEngine();
+                engine && engine->editBoxHasFocus()) {
+                if (SDL_Window* sdlWindow = window->getSDLWindow();
+                    sdlWindow && !SDL_TextInputActive(sdlWindow)) {
+                    SDL_StartTextInput(sdlWindow);
+                }
+            }
+        }
+#endif
 
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
