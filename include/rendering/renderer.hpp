@@ -422,14 +422,6 @@ public:
     void setFSREnabled(bool enabled);
     void setFSR2Enabled(bool enabled);
 
-    /// The size the world is drawn at before it is upscaled onto the screen.
-    ///
-    /// Zero on both means the quality setting's fraction of the screen. A
-    /// width and a height draw the world at exactly that size, which is what
-    /// the game's own resolution selector asks for.
-    void setRenderTargetSize(uint32_t width, uint32_t height);
-    void clearRenderTargetSize();
-
     void setWaterRefractionEnabled(bool enabled);
 
 private:
@@ -525,13 +517,6 @@ private:
     VkCommandBuffer secondaryCmds_[NUM_SECONDARIES][MAX_FRAMES] = {};
 
     bool parallelRecordingEnabled_ = false;  // set true after pools/buffers created
-
-    // Read once, at initialize, from WOWEE_FRAME_PROFILE or the frameprofile
-    // key of settings.cfg. Not at the first frame that reports: the game
-    // screen rewrites settings.cfg when the world opens, and it writes only
-    // the keys a settings panel owns - so a flag read after that point reads
-    // a file the diagnostics have already been dropped from.
-    bool frameProfileLog_ = false;
     // WOWEE_PASS_ABLATION: switches one world pass off at a time and reports
     // what the frame did without it. See pass_ablation.hpp for why the GPU's
     // own timestamps cannot answer that on this platform.

@@ -2458,7 +2458,6 @@ void TerrainManager::streamTiles() {
     // Collect all newly-needed tiles, then sort by distance so the closest
     // (most visible) tiles get loaded first.  This is critical during taxi
     // flight where new tiles enter the radius faster than they can load.
-    size_t streamedNow = 0;
     {
         std::lock_guard<std::mutex> lock(queueMutex);
 
@@ -2501,20 +2500,10 @@ void TerrainManager::streamTiles() {
         for (auto it = newTiles.rbegin(); it != newTiles.rend(); ++it) {
             loadQueue.push_front(it->coord);
         }
-        streamedNow = newTiles.size();
     }
 
     // Notify workers that there's work
     queueCV.notify_all();
-
-    // Which radius grew the world is otherwise invisible at info level, and
-    // that number is exactly what decides how much terrain memory the session
-    // ends up holding. A batch at a radius the view distance never asked for
-    // is a bug worth seeing in the log.
-    if (streamedNow > 0) {
-        LOG_INFO("Terrain stream: +", streamedNow, " tiles at radius ", loadRadius,
-                 " around [", currentTile.x, ",", currentTile.y, "]");
-    }
 
     // Unload tiles beyond unload radius (well past the camera far clip).
     // Queue them rather than unloading synchronously here - processPendingUnloads()
@@ -2545,7 +2534,6 @@ void TerrainManager::streamTiles() {
 void TerrainManager::precacheTiles(const std::vector<std::pair<int, int>>& tiles) {
     std::lock_guard<std::mutex> lock(queueMutex);
 
-    size_t queued = 0;
     for (const auto& [x, y] : tiles) {
         if (x < 0 || x > 63 || y < 0 || y > 63) continue;
 
@@ -2564,17 +2552,10 @@ void TerrainManager::precacheTiles(const std::vector<std::pair<int, int>>& tiles
         // opportunistic radius streaming tiles.
         loadQueue.push_front(coord);
         pendingTiles[coord] = true;
-        queued++;
     }
 
     // Notify workers to start loading
     queueCV.notify_all();
-
-    // Same reason as the stream log: a precache is a radius bypass, so the
-    // batch it adds has to be attributable when reading a session back.
-    if (queued > 0) {
-        LOG_INFO("Terrain precache: +", queued, " tiles");
-    }
 }
 } // namespace rendering
 } // namespace wowee

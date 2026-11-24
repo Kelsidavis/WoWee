@@ -15,10 +15,6 @@
 #include <iterator>
 #include <openssl/hmac.h>
 #include <openssl/evp.h>
-#ifdef __APPLE__
-#include <pthread.h>
-#include <pthread/qos.h>
-#endif
 
 namespace wowee {
 namespace game {
@@ -1092,22 +1088,7 @@ bool WardenMemory::searchCodePattern(const uint8_t seed[4], const uint8_t expect
     };
     {
         std::vector<std::thread> workers;
-        for (unsigned t = 1; t < threadCount; ++t) {
-            workers.emplace_back([&scan, t] {
-#ifdef __APPLE__
-                // A brute-force pass saturates every core for seconds; at
-                // default QoS the scan threads outrank the frame pool's
-                // visibility-classification tasks, which then get no CPU at
-                // all (m2 worker blocks in visibilityFutures.get(), main
-                // behind it -> SLOW renderWorld m2=40-140ms during scans).
-                // Utility QoS inverts that: the scheduler preempts a scan
-                // thread the moment a frame worker wants the core, so the
-                // scan only fills spare cycles.
-                pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
-#endif
-                scan(t);
-            });
-        }
+        for (unsigned t = 1; t < threadCount; ++t) workers.emplace_back(scan, t);
         scan(0);
         for (auto& w : workers) w.join();
     }

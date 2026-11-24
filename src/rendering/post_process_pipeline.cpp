@@ -462,26 +462,6 @@ void PostProcessPipeline::setFSRSharpness(float sharpness) {
     fsr2_.sharpness = glm::clamp(sharpness, 0.0f, 2.0f);
 }
 
-void PostProcessPipeline::setRenderTargetSize(uint32_t width, uint32_t height) {
-    if (width == renderTargetWidth_ && height == renderTargetHeight_) return;
-    renderTargetWidth_ = width;
-    renderTargetHeight_ = height;
-    // The resources hold the size the world is drawn at, so they have to be
-    // made again - but not here: this can be called while a frame is being
-    // recorded, and destroying an image that is still in use is not allowed.
-    if (fsr_.enabled && fsr_.sceneFramebuffer) {
-        fsr_.needsRecreate = true;
-    }
-    if (fsr2_.enabled && fsr2_.sceneFramebuffer) {
-        fsr2_.needsRecreate = true;
-        fsr2_.needsHistoryReset = true;
-    }
-}
-
-void PostProcessPipeline::clearRenderTargetSize() {
-    setRenderTargetSize(0, 0);
-}
-
 MsaaChangeRequest PostProcessPipeline::setFSR2Enabled(bool enabled, Camera* camera) {
     MsaaChangeRequest req;
     if (fsr2_.enabled == enabled) return req;
@@ -584,35 +564,6 @@ bool PostProcessPipeline::initFSRResources() {
     fsr_.internalHeight = static_cast<uint32_t>(swapExtent.height * fsr_.scaleFactor);
     fsr_.internalWidth = (fsr_.internalWidth + 1) & ~1u;
     fsr_.internalHeight = (fsr_.internalHeight + 1) & ~1u;
-
-    // An explicit resolution overrides the fraction: the world is drawn at the
-    // size that was asked for, and the upscaler stretches it onto the
-    // surface.
-    //
-    // The request is a box and the buffer keeps the surface's own
-    // proportions, so a 16:9 request on a 3:2 screen asks for 1080 lines and
-    // the width the screen's shape needs - not a 16:9 picture stretched to
-    // fill a 3:2 screen, which comes out distorted.
-    if (renderTargetWidth_ > 0 && renderTargetHeight_ > 0) {
-        const double surfaceW = static_cast<double>(swapExtent.width);
-        const double surfaceH = static_cast<double>(swapExtent.height);
-        const double wantW = static_cast<double>(renderTargetWidth_);
-        const double wantH = static_cast<double>(renderTargetHeight_);
-        // The smaller of the two ratios, so the buffer fits inside the box
-        // rather than overflowing it, and is never larger than the surface
-        // itself: pixels above the screen's own size cost fill rate and buy
-        // nothing the display can show.
-        double scale = std::min(wantW / surfaceW, wantH / surfaceH);
-        scale = std::min(scale, 1.0);
-        fsr_.internalWidth = static_cast<uint32_t>(surfaceW * scale);
-        fsr_.internalHeight = static_cast<uint32_t>(surfaceH * scale);
-        // Never zero: a zero-sized image is not a thing the upscaler can read
-        // from, and the smallest that is worth drawing is a pair of pixels.
-        fsr_.internalWidth = std::max<uint32_t>(fsr_.internalWidth, 2);
-        fsr_.internalHeight = std::max<uint32_t>(fsr_.internalHeight, 2);
-        fsr_.internalWidth = (fsr_.internalWidth + 1) & ~1u;
-        fsr_.internalHeight = (fsr_.internalHeight + 1) & ~1u;
-    }
 
     LOG_INFO("FSR: initializing at ", fsr_.internalWidth, "x", fsr_.internalHeight,
              " -> ", swapExtent.width, "x", swapExtent.height,
@@ -890,25 +841,6 @@ bool PostProcessPipeline::initFSR2Resources() {
     fsr2_.internalHeight = static_cast<uint32_t>(swapExtent.height * fsr2_.scaleFactor);
     fsr2_.internalWidth = (fsr2_.internalWidth + 1) & ~1u;
     fsr2_.internalHeight = (fsr2_.internalHeight + 1) & ~1u;
-
-    // An explicit resolution overrides the fraction, as it does for FSR 1, and
-    // keeps the surface's proportions the same way. The temporal path keeps
-    // its own history, so the size has to be the same every frame or the
-    // history does not line up - which is why the size is only changed when
-    // the resources are remade.
-    if (renderTargetWidth_ > 0 && renderTargetHeight_ > 0) {
-        const double surfaceW = static_cast<double>(swapExtent.width);
-        const double surfaceH = static_cast<double>(swapExtent.height);
-        double scale = std::min(static_cast<double>(renderTargetWidth_) / surfaceW,
-                                static_cast<double>(renderTargetHeight_) / surfaceH);
-        scale = std::min(scale, 1.0);
-        fsr2_.internalWidth = std::max<uint32_t>(
-            static_cast<uint32_t>(surfaceW * scale), 2);
-        fsr2_.internalHeight = std::max<uint32_t>(
-            static_cast<uint32_t>(surfaceH * scale), 2);
-        fsr2_.internalWidth = (fsr2_.internalWidth + 1) & ~1u;
-        fsr2_.internalHeight = (fsr2_.internalHeight + 1) & ~1u;
-    }
 
     LOG_INFO("FSR2: initializing at ", fsr2_.internalWidth, "x", fsr2_.internalHeight,
              " -> ", swapExtent.width, "x", swapExtent.height,

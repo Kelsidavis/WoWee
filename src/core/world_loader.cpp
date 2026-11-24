@@ -590,8 +590,9 @@ void WorldLoader::loadMapGeometry(uint32_t mapId, const std::string& mapName,
             auto* camera = renderer_->getCamera();
 
             // Use a small radius for the initial load (just immediate tiles),
-            // then restore the configured radius after entering the game.
+            // then restore the full radius after entering the game.
             // This matches WoW's behavior: load quickly, stream the rest in-game.
+            const int savedLoadRadius = 6;
             terrainMgr->setLoadRadius(4);   // 9x9=81 tiles - prevents hitches on spawn
             terrainMgr->setUnloadRadius(9);
 
@@ -690,18 +691,8 @@ void WorldLoader::loadMapGeometry(uint32_t mapId, const std::string& mapName,
 
             LOG_INFO("Online terrain streaming complete: ", terrainMgr->getLoadedTileCount(), " tiles loaded");
 
-            // Restore the radius the in-game loop will actually use - NOT a
-            // hardcoded 6. The warmup pump below drives renderer->update()
-            // (and with it TerrainManager's proactive streamTiles) for at
-            // least two seconds before the first applyServerMovementState
-            // clamps loadRadius to Renderer::getTerrainLoadRadius(). Leaving
-            // 6 here meant that re-check could enqueue the entire radius-6
-            // circle regardless of view distance: resident terrain doubled
-            // (12.3k -> 24.3k chunks), never unloaded while the player
-            // stayed put, and pushed the iPad into memory warnings and a
-            // Metal allocation abort a few entries later.
-            terrainMgr->setLoadRadius(renderer_->getTerrainLoadRadius());
-            terrainMgr->setUnloadRadius(renderer_->getTerrainUnloadRadius());
+            // Restore full load radius - remaining tiles stream in-game
+            terrainMgr->setLoadRadius(savedLoadRadius);
 
             // Load/precompute collision cache
             if (renderer_->getWMORenderer()) {

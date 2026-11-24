@@ -42,9 +42,7 @@ def first_chain(src: str):
     if not m:
         return None
     body = re.sub(r"//[^\n]*", "", m.group(1))
-    # Python 3.11 and older reject a backslash inside an f-string expression,
-    # which made this guard crash and "find" nothing on those interpreters.
-    return ["{}({})".format(k, " ".join(v.split()))
+    return [f"{k}({re.sub(r'\s+', ' ', v).strip()})"
             for k, v in re.findall(r"\.(set\w+)\(([^;]*?)\)\s*\n", body)]
 
 

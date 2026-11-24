@@ -177,54 +177,20 @@ void GameScreen::setFullscreen(bool enabled) {
 // row read before - which, full screen, switched the monitor to that mode, and
 // windowed moved and resized the window off the screen it had been on.
 int GameScreen::getResolutionIndex() const {
-    // The list belongs to the window, because it is the window's screen and
-    // the window's ability to be resized that decide what is on offer. A
-    // static list here would offer a tablet resolutions it does not have.
-    if (!services_.window) return 0;
-    return services_.window->getDisplayResolutionIndex();
+    return displayResolutionIndexFor(settingsPanel_.pendingResolutionWidth,
+                                     settingsPanel_.pendingResolutionHeight);
 }
 
 void GameScreen::setResolutionIndex(int index) {
-    if (!services_.window) return;
-    const auto& list = services_.window->getDisplayResolutions();
-    if (index < 0 || index >= static_cast<int>(list.size())) return;
+    if (index < 0 || index >= kNumDisplayResolutions) return;
     // Asked for what is already chosen: the panel replaying its value on Okay.
     if (index == getResolutionIndex()) return;
-    settingsPanel_.pendingResolutionWidth  = list[static_cast<std::size_t>(index)].width;
-    settingsPanel_.pendingResolutionHeight = list[static_cast<std::size_t>(index)].height;
-    // The window owns the list and applies the choice, so that the position
-    // the dropdown carries and the size the world is drawn at cannot drift
-    // apart - they are the same value held in two places.
-    services_.window->setDisplayResolutionIndex(index);
-    // On a platform whose window cannot be resized, the resolution became the
-    // size the world is drawn at, and it reaches the screen through the
-    // upscaler - so without one the choice would be accepted and nothing
-    // would change, which is the same broken control this used to be.
-    ensureUpscalerForRenderResolution();
+    settingsPanel_.pendingResolutionWidth  = kDisplayResolutions[index][0];
+    settingsPanel_.pendingResolutionHeight = kDisplayResolutions[index][1];
+    if (services_.window)
+        services_.window->applyResolution(settingsPanel_.pendingResolutionWidth,
+                                          settingsPanel_.pendingResolutionHeight);
     saveSettings();
-}
-
-void GameScreen::ensureUpscalerForRenderResolution() {
-    if (!services_.window || !services_.renderer) return;
-    // Only where the window cannot be resized. On a desktop the resolution
-    // resized the window and the world was drawn at that size directly, and
-    // turning the upscaler on there would change a setting the player did
-    // not touch.
-    if (services_.window->canResizeWindow()) return;
-    if (services_.window->getRenderResolutionWidth() <= 0) return;
-    // FSR 1 and FSR 3 both upscale; whichever the player already chose keeps
-    // working. Only a player with upscaling turned off entirely gets it
-    // turned on for them, because otherwise the resolution they just picked
-    // would do nothing at all.
-    if (settingsPanel_.pendingUpscalingMode != 0) return;
-    settingsPanel_.pendingUpscalingMode = 1;
-    settingsPanel_.pendingFSR = true;
-    services_.renderer->setFSREnabled(true);
-    services_.renderer->setFSR2Enabled(false);
-    LOG_WARNING("A resolution was chosen but upscaling was off: FSR 1 turned on so "
-                "the world can be drawn at ", services_.window->getRenderResolutionWidth(),
-                "x", services_.window->getRenderResolutionHeight(),
-                " and scaled up to the screen");
 }
 
 /// Anti-aliasing, shared with the interface's own Multisampling dropdown.
@@ -270,32 +236,8 @@ void GameScreen::setServices(const UIServices& services) {
 
     if (services_.window && settingsPanel_.displaySettingsLoaded_) {
         services_.window->setFullscreen(settingsPanel_.pendingFullscreen);
-        // The saved resolution is a size, and the list is this device's own -
-        // which may not contain it, because a setting saved on one device is
-        // read on another. The entry that covers it is chosen, and the saved
-        // size is rewritten to it, so the dropdown and the world agree.
-        const auto& list = services_.window->getDisplayResolutions();
-        if (!list.empty()) {
-            int index = ui::displayResolutionIndexFor(list,
-                                                      settingsPanel_.pendingResolutionWidth,
-                                                      settingsPanel_.pendingResolutionHeight);
-            // A saved resolution that this device does not have lands on the
-            // largest entry that covers it, which is the closest thing the
-            // device has. On a tablet that is the screen itself, and the
-            // world is drawn at the screen's size until the player chooses
-            // something smaller.
-            settingsPanel_.pendingResolutionWidth  = list[static_cast<std::size_t>(index)].width;
-            settingsPanel_.pendingResolutionHeight = list[static_cast<std::size_t>(index)].height;
-            services_.window->setDisplayResolutionIndex(index);
-        } else {
-            services_.window->applyResolution(settingsPanel_.pendingResolutionWidth,
-                                              settingsPanel_.pendingResolutionHeight);
-        }
-        // The same as when the player picks a resolution by hand: on a
-        // platform whose window cannot be resized the saved resolution is the
-        // size the world is drawn at, and it needs the upscaler to reach the
-        // screen.
-        ensureUpscalerForRenderResolution();
+        services_.window->applyResolution(settingsPanel_.pendingResolutionWidth,
+                                          settingsPanel_.pendingResolutionHeight);
     }
     // Update legacy pointer for compatibility
     appearanceComposer_ = services.appearanceComposer;

@@ -83,18 +83,6 @@ void PassAblation::frame(double frameMs) {
     }
 }
 
-std::string PassAblation::finishedSummary() const {
-    if (phase_ == 0 || phase_ > samples_.size()) return {};
-    const std::size_t i = phase_ - 1;
-    if (samples_[i].frames == 0) return {};
-    std::ostringstream out;
-    out << std::fixed << std::setprecision(2)
-        << ablationPassName(kOrder[i]) << " "
-        << samples_[i].totalMs / samples_[i].frames << "ms/frame ("
-        << samples_[i].frames << " frames)";
-    return out.str();
-}
-
 std::string PassAblation::report() const {
     if (running()) return {};
 

@@ -103,7 +103,6 @@
 #include <set>
 #include <filesystem>
 #include <fstream>
-#include "core/config_paths.hpp"
 
 #include <thread>
 #ifdef __linux__
@@ -1356,8 +1355,8 @@ void Application::run() {
         frameProfileEnabled_ = core::configFlag("frameprofile");
     }
     if (frameProfileEnabled_) {
-        LOG_WARNING("Frame timing profile enabled - the per-stage breakdown will be "
-                    "reported at warning");
+        LOG_WARNING("Frame timing profile enabled (WOWEE_FRAME_PROFILE=1) - "
+                    "the per-stage breakdown will be reported at warning");
     }
 
     // Integer nanoseconds off a monotonic clock, and the finest sleep the
@@ -1615,11 +1614,6 @@ void Application::run() {
                 event.type == SDL_EVENT_WINDOW_RESIZED) {
                 if (window && window->getVkContext() &&
                     event.type != SDL_EVENT_WINDOW_SAFE_AREA_CHANGED) {
-                    // Said out loud because a swapchain rebuild in the middle
-                    // of a frame is a way to lose the device, and the run that
-                    // did was otherwise silent about what asked for one.
-                    LOG_WARNING("Window event ", static_cast<int>(event.type),
-                                " changed the drawable - swapchain marked dirty");
                     window->getVkContext()->markSwapchainDirty();
                 }
                 if (uiManager) uiManager->refreshInterfaceScale();
@@ -1633,15 +1627,10 @@ void Application::run() {
             // same thread as the loop, so the teardown happens before the
             // window is gone rather than after.
             if (event.type == SDL_EVENT_WILL_ENTER_BACKGROUND) {
-                // At warning, not info: a run that dies a second after one of
-                // these has to be able to say the device left the app, and
-                // this build does not print info.
-                LOG_WARNING("iOS: entering background - releasing the Vulkan surface");
                 if (window && window->getVkContext()) {
                     window->getVkContext()->releaseSurface();
                 }
             } else if (event.type == SDL_EVENT_DID_ENTER_FOREGROUND) {
-                LOG_WARNING("iOS: returned to foreground - rebuilding the Vulkan surface");
                 if (window && window->getVkContext()) {
                     // Pixels: a surface is built at the drawable size, which
                     // is not the window size on a high density display.
@@ -1766,8 +1755,6 @@ void Application::run() {
                     window->setSize(newWidth, newHeight);
                     // Mark swapchain dirty so it gets recreated at the correct size
                     if (window->getVkContext()) {
-                        LOG_WARNING("Window resized to ", newWidth, "x", newHeight,
-                                    " - swapchain marked dirty");
                         window->getVkContext()->markSwapchainDirty();
                     }
                     // Vulkan viewport set in command buffer, not globally

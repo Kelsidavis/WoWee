@@ -701,10 +701,6 @@ bool Renderer::initialize(core::Window* win) {
     window = win;
     vkCtx = win->getVkContext();
     deferredWorldInitEnabled_ = core::envFlagEnabled("WOWEE_DEFER_WORLD_SYSTEMS", true);
-    // Before the world opens: settings.cfg is rewritten then, and a diagnostic
-    // key that the writer does not know about is not in what it writes back.
-    frameProfileLog_ = core::envFlagEnabled("WOWEE_FRAME_PROFILE", false) ||
-                       core::configFlag("frameprofile");
     LOG_INFO("Initializing renderer (Vulkan)");
 
     // Create camera (in front of Stormwind gate, looking north)
@@ -854,25 +850,11 @@ bool Renderer::initialize(core::Window* win) {
         std::getenv("WOWEE_PASS_ABLATION") != nullptr ||
         core::configFlag("passablation");
     if (ablationRequested) {
-        // How long the world is given to finish loading before the first
-        // phase is measured, in seconds. It was ten, and ten is wrong: a
-        // zone reaches its settled cost about forty seconds after it is
-        // entered, so the first run walked four of its phases through a
-        // world still getting heavier - frame time climbed from 33ms to
-        // 50ms underneath them while passes were being switched off.
-        double settleSeconds = 50.0;
-        if (const std::string fromConfig = core::configSetting("ablationsettle");
-            !fromConfig.empty()) {
-            settleSeconds = std::atof(fromConfig.c_str());
-        }
-        passAblation_ = std::make_unique<PassAblation>(4000.0, 750.0,
-                                                       settleSeconds * 1000.0);
+        passAblation_ = std::make_unique<PassAblation>();
         LOG_WARNING("Pass ablation enabled - ", PassAblation::phaseCount(),
                     " phases over about ",
                     static_cast<int>(passAblation_->expectedRunMs() / 1000.0),
-                    "s of being in the world, the first ",
-                    static_cast<int>(settleSeconds),
-                    "s of it settling. Stand "
+                    "s of being in the world, the first 10s of it settling. Stand "
                     "still outdoors, do not move the camera, and do not quit before "
                     "the table is logged.");
     }
@@ -1243,18 +1225,8 @@ void Renderer::beginFrame() {
         if (worldDrawnLastFrame_ && lastFrameStart_.time_since_epoch().count() != 0) {
             const bool wasSettling = passAblation_->settling();
             const AblationPass before = passAblation_->current();
-            const std::size_t beforeNumber = passAblation_->phaseNumber();
             passAblation_->frame(std::chrono::duration<double, std::milli>(
                 now - lastFrameStart_).count());
-            // The phase that has just ended, said the moment it ends. The
-            // table at the end is one block of output that a device lost or a
-            // quit takes with it - the first run of this died a second into
-            // its final phase and left no numbers at all - and a run that
-            // dies still owes every phase it held.
-            if (passAblation_->phaseNumber() != beforeNumber) {
-                const std::string done = passAblation_->finishedSummary();
-                if (!done.empty()) LOG_WARNING("Pass ablation done: ", done);
-            }
             // Say where it has got to. A run is the better part of a minute of
             // standing still and the first one silently went eight phases deep
             // before it was quit, with no way to tell it had started.
@@ -1300,25 +1272,6 @@ void Renderer::beginFrame() {
     // FrameXML uploading hundreds of textures the backlog is much larger than
     // it was, and nothing bounded it.
     if (vkCtx) vkCtx->pollUploadBatches();
-
-    // The size the world is drawn at, which the window knows and the pipeline
-    // does not: on a platform whose window cannot be resized this is the only
-    // thing a resolution request can change.
-    //
-    // Pushed every frame rather than once, because the post-process resources
-    // are remade on a resize - and they are made at the size asked for here,
-    // so the request has to be in place before they are made, or a resize
-    // would quietly throw it away.
-    if (postProcessPipeline_) {
-        const int renderW = window->getRenderResolutionWidth();
-        const int renderH = window->getRenderResolutionHeight();
-        if (renderW > 0 && renderH > 0) {
-            postProcessPipeline_->setRenderTargetSize(
-                static_cast<uint32_t>(renderW), static_cast<uint32_t>(renderH));
-        } else {
-            postProcessPipeline_->clearRenderTargetSize();
-        }
-    }
 
     // Post-process resource management (§4.3 - delegates to PostProcessPipeline)
     if (postProcessPipeline_) postProcessPipeline_->manageResources();
@@ -2485,15 +2438,8 @@ void Renderer::setFSR2Enabled(bool enabled) {
         pendingMsaaSamples_ = VK_SAMPLE_COUNT_1_BIT;
     }
 }
-void Renderer::setRenderTargetSize(uint32_t width, uint32_t height) {
-    if (!postProcessPipeline_) return;
-    postProcessPipeline_->setRenderTargetSize(width, height);
-}
-void Renderer::clearRenderTargetSize() {
-    if (!postProcessPipeline_) return;
-    postProcessPipeline_->clearRenderTargetSize();
-}
-void Renderer::setGrassEnabled(bool enabled) {    if (enabled == grassEnabled_) return;
+void Renderer::setGrassEnabled(bool enabled) {
+    if (enabled == grassEnabled_) return;
     grassEnabled_ = enabled;
     if (!enabled && grassRenderer_) {
         // Empty the population rather than just skipping the draw: a blade
@@ -3231,12 +3177,8 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
         // spends here decides the frame as much as any pass does - and the
         // 40ms threshold below only ever speaks when something has already
         // gone wrong. This says where the steady state goes.
-        // Config or environment, decided at initialize. The counts are the
-        // point of the line: a slow frame is either a lot of draws or
-        // expensive ones, and only these two numbers say which - the GPU
-        // marks cannot, because this driver resolves a timestamp to its
-        // render pass.
-        if (frameProfileLog_) {
+        static const bool frameProfile = core::envFlagEnabled("WOWEE_FRAME_PROFILE", false);
+        if (frameProfile) {
             static auto lastSaid = std::chrono::steady_clock::now();
             const auto sayNow = std::chrono::steady_clock::now();
             if (sayNow - lastSaid > std::chrono::seconds(10)) {
@@ -3249,17 +3191,7 @@ void Renderer::renderWorld(game::World* world, game::GameHandler* gameHandler) {
                             "), terrain chunks drawn ",
                             terrainRenderer ? terrainRenderer->getRenderedChunkCount() : 0,
                             " culled ",
-                            terrainRenderer ? terrainRenderer->getCulledChunkCount() : 0,
-                            " resident ",
-                            terrainRenderer ? terrainRenderer->getChunkCount() : 0,
-                            " | m2 draws ",
-                            m2Renderer ? m2Renderer->getDrawCallCount() : 0,
-                            " instances ",
-                            m2Renderer ? m2Renderer->getInstanceCount() : 0,
-                            " | wmo draws ",
-                            wmoRenderer ? wmoRenderer->getDrawCallCount() : 0,
-                            " instances ",
-                            wmoRenderer ? wmoRenderer->getInstanceCount() : 0);
+                            terrainRenderer ? terrainRenderer->getCulledChunkCount() : 0);
             }
         }
 

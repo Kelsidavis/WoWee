@@ -11,7 +11,6 @@
 #include "core/env.hpp"
 #include <cctype>
 #include <filesystem>
-#include <fstream>
 
 #include "core/data_paths.hpp"
 #include <string>
@@ -111,47 +110,6 @@ static wowee::core::LogLevel readLogLevelFromEnv() {
     if (level == "warn" || level == "warning") return wowee::core::LogLevel::WARNING;
     if (level == "error") return wowee::core::kLogLevelError;
     if (level == "fatal") return wowee::core::LogLevel::FATAL;
-    return wowee::core::LogLevel::WARNING;
-}
-
-/// The log level, read from the config file as well as the environment.
-///
-/// The environment is the first way to ask for a verbose log, and it is the
-/// only one that works on a desktop. It does not work on a device: an app
-/// launched on iOS cannot be given an environment, so every diagnostic on a
-/// tablet had to be a log line that survives the default warning level.
-///
-/// So the config file answers it too, and it is the only way to turn the
-/// per-stage frame breakdown on there - which is the only way to see where
-/// the time goes on the device at all. The file is read before anything else
-/// logs, so the level it asks for is in place before the first line.
-static wowee::core::LogLevel readLogLevelFromConfig() {
-    const std::string path = wowee::core::getConfigRoot() + "/settings.cfg";
-    std::ifstream in(path);
-    if (!in) return wowee::core::LogLevel::WARNING;
-    const auto trim = [](std::string& s) {
-        const char* ws = " \t\r\n";
-        const size_t b = s.find_first_not_of(ws);
-        const size_t e = s.find_last_not_of(ws);
-        s = (b == std::string::npos) ? "" : s.substr(b, e - b + 1);
-    };
-    std::string line;
-    while (std::getline(in, line)) {
-        const size_t eq = line.find('=');
-        if (eq == std::string::npos) continue;
-        std::string key = line.substr(0, eq);
-        std::string value = line.substr(eq + 1);
-        trim(key);
-        trim(value);
-        if (key != "loglevel") continue;
-        std::string level = value;
-        for (char& c : level) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        if (level == "debug") return wowee::core::LogLevel::DEBUG;
-        if (level == "info") return wowee::core::LogLevel::INFO;
-        if (level == "warn" || level == "warning") return wowee::core::LogLevel::WARNING;
-        if (level == "error") return wowee::core::kLogLevelError;
-        if (level == "fatal") return wowee::core::LogLevel::FATAL;
-    }
     return wowee::core::LogLevel::WARNING;
 }
 
@@ -264,16 +222,7 @@ static int runMain([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     selectUserDataPath();
 
     try {
-        // The environment first, then the config file.
-        //
-        // The environment wins because it is the more deliberate of the two:
-        // it is set for one run, by hand, and says so. The config file is
-        // what a device has.
-        wowee::core::LogLevel level = readLogLevelFromEnv();
-        if (std::getenv("WOWEE_LOG_LEVEL") == nullptr) {
-            level = readLogLevelFromConfig();
-        }
-        wowee::core::Logger::getInstance().setLogLevel(level);
+        wowee::core::Logger::getInstance().setLogLevel(readLogLevelFromEnv());
         LOG_INFO("=== Wowee Native Client ===");
         // At warning level, with the platform, because a log sent in after a
         // crash is filtered to warnings and errors. Which build produced it is

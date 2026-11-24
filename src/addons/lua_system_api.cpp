@@ -2749,15 +2749,9 @@ static std::array<bool, 4>& actionBarToggles() {
 // twice, because the dropdown carries a *position* in it: it hands that index
 // straight back to SetScreenResolution.
 static int lua_GetScreenResolutions(lua_State* L) {
-    auto* svc = getLuaServices(L);
-    // The list is the device's own, so that a tablet offers the sizes it
-    // actually has rather than a list of desktop modes it does not.
-    const auto& list = (svc && svc->window)
-        ? svc->window->getDisplayResolutions()
-        : ui::displayResolutionsForDesktop();
-    for (const auto& resolution : list)
-        lua_pushstring(L, ui::displayResolutionLabel(resolution).c_str());
-    return static_cast<int>(list.size());
+    for (int i = 0; i < ui::kNumDisplayResolutions; ++i)
+        lua_pushstring(L, ui::displayResolutionLabel(i).c_str());
+    return ui::kNumDisplayResolutions;
 }
 
 // GetCurrentResolution() → which of those the window is, counted from one.

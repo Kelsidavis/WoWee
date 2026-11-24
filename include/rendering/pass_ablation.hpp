@@ -78,13 +78,6 @@ public:
     /// The table. Empty until every phase has been held.
     std::string report() const;
 
-    /// The mean of the phase that has just finished, as one log line. Empty
-    /// while the first phase is still running. The table at the end is a
-    /// single block of output that a crash, a device lost or a quit takes
-    /// with it - the first run of this died a second into its last phase and
-    /// left nothing behind - so a phase said as it completes cannot be lost.
-    std::string finishedSummary() const;
-
     /// Number of phases in a run, the two baselines included.
     static std::size_t phaseCount();
 

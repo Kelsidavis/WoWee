@@ -22,11 +22,8 @@
 // MoltenVK's own configuration header - only included where the library it
 // describes is linked, which is iOS only (see CMakeLists.txt).
 #include <MoltenVK/mvk_deprecated_api.h>
-#endif
-// Platform-neutral (settings.cfg keys read without an environment), so it is
-// not in the iOS guard above: beginFrame's wait instrumentation reads
-// frameprofile through it on every platform.
 #include "core/config_paths.hpp"
+#endif
 
 namespace wowee {
 namespace rendering {
@@ -1350,12 +1347,7 @@ bool VkContext::createSwapchain(int width, int height) {
         .set_desired_format({.format = VK_FORMAT_B8G8R8A8_UNORM, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
         .set_desired_extent(static_cast<uint32_t>(width), static_cast<uint32_t>(height))
         .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
-        // Three, not two: with two images and two frames in flight the acquire
-        // of frame N can only get an image once the display is done with one,
-        // so the CPU blocks for a whole presentation - one frame in flight in
-        // practice. A third image lets the next frame start while the GPU
-        // still renders the previous one. (CAMetalLayer hands out 3 drawables.)
-        .set_desired_min_image_count(3)
+        .set_desired_min_image_count(2)
         .set_old_swapchain(swapchain);
 
 #if defined(WOWEE_IOS)
@@ -2796,10 +2788,7 @@ bool VkContext::recreateSwapchain(int width, int height) {
         .set_desired_format({.format = VK_FORMAT_B8G8R8A8_UNORM, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
         .set_desired_extent(static_cast<uint32_t>(width), static_cast<uint32_t>(height))
         .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
-        // Three, as in createSwapchain: two images and two frames in flight
-        // means the acquire waits for the display and only one frame is ever
-        // in flight. The image-count semaphores resize to match below.
-        .set_desired_min_image_count(3)
+        .set_desired_min_image_count(2)
         .set_old_swapchain(oldSwapchain);
 
 #if defined(WOWEE_IOS)
@@ -3021,22 +3010,6 @@ VkCommandBuffer VkContext::beginFrame(uint32_t& imageIndex) {
     // Wait for this frame's fence (with timeout to detect GPU hangs)
     static int beginFrameCounter = 0;
     beginFrameCounter++;
-
-    // Two waits live in this function and the stage table only reports their
-    // sum: the frame-slot wait (how far the GPU is behind this slot's previous
-    // use) and the acquire below (how long the presentation engine held a
-    // drawable). Which one owns the frame says whether the fix is more frames
-    // in flight or more swapchain images. Read once, at the first frame, the
-    // same moment the stage table reads it - not per frame: configSetting
-    // opens settings.cfg every call.
-    using bclock = std::chrono::steady_clock;
-    static const bool profileBeginWaits = core::configFlag("frameprofile");
-    static double fenceWaitSumMs = 0.0, fenceWaitMaxMs = 0.0;
-    static double acquireSumMs = 0.0, acquireMaxMs = 0.0;
-    static int waitSamples = 0;
-    static bclock::time_point waitWindowStart = bclock::now();
-    const auto fenceWaitStart = bclock::now();
-
     VkResult fenceResult;
     if (frameTimeline_ != VK_NULL_HANDLE) {
         VkSemaphoreWaitInfo waitInfo{};
@@ -3060,7 +3033,6 @@ VkCommandBuffer VkContext::beginFrame(uint32_t& imageIndex) {
     }
 
     // Any work queued for this frame slot is now guaranteed to be unused by the GPU.
-    const auto fenceWaitEnd = bclock::now();
     runDeferredCleanup(currentFrame);
 
     // The wait above is what makes this slot's timestamps readable: the submit
@@ -3070,33 +3042,8 @@ VkCommandBuffer VkContext::beginFrame(uint32_t& imageIndex) {
     // Acquire next swapchain image using the free semaphore.
     // After acquiring we swap it into the per-image slot so the old per-image
     // semaphore (now released by the presentation engine) becomes the free one.
-    const auto acquireStart = bclock::now();
     VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
         nextAcquireSemaphore_, VK_NULL_HANDLE, &imageIndex);
-    const auto acquireEnd = bclock::now();
-
-    if (profileBeginWaits) {
-        const double fenceMs =
-            std::chrono::duration<double, std::milli>(fenceWaitEnd - fenceWaitStart).count();
-        const double acqMs =
-            std::chrono::duration<double, std::milli>(acquireEnd - acquireStart).count();
-        fenceWaitSumMs += fenceMs;
-        acquireSumMs += acqMs;
-        if (fenceMs > fenceWaitMaxMs) fenceWaitMaxMs = fenceMs;
-        if (acqMs > acquireMaxMs) acquireMaxMs = acqMs;
-        waitSamples++;
-        const double windowMs =
-            std::chrono::duration<double, std::milli>(acquireEnd - waitWindowStart).count();
-        if (windowMs >= 10000.0 && waitSamples > 0) {
-            LOG_WARNING("beginFrame waits over ", windowMs, "ms (", waitSamples, " frames): fence avg ",
-                        fenceWaitSumMs / waitSamples, "ms max ", fenceWaitMaxMs,
-                        "ms; acquire avg ", acquireSumMs / waitSamples, "ms max ", acquireMaxMs, "ms");
-            fenceWaitSumMs = acquireSumMs = 0.0;
-            fenceWaitMaxMs = acquireMaxMs = 0.0;
-            waitSamples = 0;
-            waitWindowStart = acquireEnd;
-        }
-    }
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         swapchainDirty = true;

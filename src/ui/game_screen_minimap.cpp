@@ -1707,24 +1707,6 @@ void GameScreen::saveSettings() {
     std::error_code ec;
     std::filesystem::create_directories(dir, ec);
 
-    // What the file already holds, kept for the end of the write.
-    //
-    // This function writes the keys a settings panel owns, and settings.cfg
-    // is also where the diagnostics of a measured run live - frameprofile,
-    // loglevel, singlethreadrecord, passablation. They are not panel keys, so
-    // rewriting the file without reading it first silently takes them out,
-    // and a run launched with a profile then ends up measured without one.
-    std::vector<std::string> preserveLines;
-    {
-        std::ifstream in(path);
-        std::string line;
-        while (std::getline(in, line)) {
-            const auto first = line.find_first_not_of(" \t\r\n");
-            if (first == std::string::npos) continue;   // blank: nothing to keep
-            preserveLines.push_back(line);
-        }
-    }
-
     std::ofstream out(path);
     if (!out.is_open()) {
         LOG_WARNING("Could not save settings to ", path);
@@ -1883,30 +1865,6 @@ void GameScreen::saveSettings() {
     out << "chat_bubbles_party=" << (chatPanel_.chatPartyBubbles ? 1 : 0) << "\n";
 
     out.close();
-
-    // And now those lines go back - every one whose key this write did not
-    // just produce. Read from the file as written rather than from a list of
-    // what is about to be written, because a list kept here would be a second
-    // copy of the keys above to keep in step with them.
-    if (!preserveLines.empty()) {
-        std::set<std::string> written;
-        {
-            std::ifstream in(path);
-            std::string line;
-            while (std::getline(in, line)) {
-                const size_t eq = line.find('=');
-                if (eq != std::string::npos) written.insert(line.substr(0, eq));
-            }
-        }
-        std::ofstream appended(path, std::ios::app);
-        if (appended.is_open()) {
-            for (const std::string& line : preserveLines) {
-                const size_t eq = line.find('=');
-                if (eq != std::string::npos && written.count(line.substr(0, eq))) continue;
-                appended << line << "\n";
-            }
-        }
-    }
 
     LOG_INFO("Settings saved to ", path);
 }

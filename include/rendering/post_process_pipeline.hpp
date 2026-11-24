@@ -108,32 +108,6 @@ public:
     [[nodiscard]] float getFSRScaleFactor() const { return fsr_.scaleFactor; }
     [[nodiscard]] float getFSRSharpness() const { return fsr_.sharpness; }
 
-    /// The resolution the world is to be drawn at, in pixels, before it is
-    /// upscaled.
-    ///
-    /// Zero on both means "no explicit resolution": the world is drawn at
-    /// whatever fraction of the surface the quality setting asks for. A width
-    /// and a height ask for the world to be drawn at that size, and the
-    /// upscaler stretches it onto the surface - which is what the game's own
-    /// resolution selector wants, and the only way to give it a meaning on a
-    /// platform whose window cannot be resized.
-    ///
-    /// The request is a box, not a shape: the buffer that is made fits inside
-    /// it and keeps the surface's own proportions, so a 16:9 request on a
-    /// 3:2 screen asks for 1080 lines and the width the screen's shape
-    /// needs. A buffer of the requested shape would have to be stretched to
-    /// fit the surface, and the picture would come out distorted.
-    void setRenderTargetSize(uint32_t width, uint32_t height);
-    void clearRenderTargetSize();
-    [[nodiscard]] uint32_t getRenderTargetWidth() const { return renderTargetWidth_; }
-    [[nodiscard]] uint32_t getRenderTargetHeight() const { return renderTargetHeight_; }
-    /// The size the world is actually drawn at right now, in pixels.
-    ///
-    /// What the upscaler reads from and writes to, and what the performance
-    /// cost actually follows.
-    [[nodiscard]] uint32_t getInternalWidth() const { return fsr_.internalWidth; }
-    [[nodiscard]] uint32_t getInternalHeight() const { return fsr_.internalHeight; }
-
     // FSR 2.2
     MsaaChangeRequest setFSR2Enabled(bool enabled, Camera* camera);
     [[nodiscard]] bool isFSR2Enabled() const { return fsr2_.enabled; }
@@ -212,11 +186,6 @@ private:
     bool initFSRResources();
     void destroyFSRResources();
     void renderFSRUpscale();
-
-    // The explicit size the world is drawn at, when one has been asked for.
-    // Zero means the quality setting's fraction of the surface instead.
-    uint32_t renderTargetWidth_ = 0;
-    uint32_t renderTargetHeight_ = 0;
 
     // FXAA post-process state
     struct FXAAState {

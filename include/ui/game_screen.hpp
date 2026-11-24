@@ -140,9 +140,6 @@ public:
 
 private:
     void applyCameraControlSettings();
-    /// Turn the upscaler on if a resolution was chosen on a platform whose
-    /// window cannot be resized, so the resolution can reach the screen.
-    void ensureUpscalerForRenderResolution();
     /// Say in the chat why a recording stopped by itself, if one did.
     void reportRecordingFailure();
     /// Where the recording in progress, or the last one, is being written.
