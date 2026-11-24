@@ -16,7 +16,6 @@
 #include "rendering/renderer.hpp"
 #include "core/logger.hpp"
 #include "core/application.hpp"
-#include "core/config_paths.hpp"
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -41,15 +40,16 @@ namespace game {
 namespace {
 
 std::filesystem::path guildNameCachePath() {
-    // getConfigRoot() is where this client keeps everything else it writes
-    // (settings.cfg, cvars.cfg, bindings.cfg, last_character.cfg), so the
-    // guild name cache belongs there too.
-    //
-    // It used to build $HOME/.wowee by hand, which on iOS points outside the
-    // app sandbox: the cache could never be written and the guild names were
-    // lost on every launch. getConfigRoot() honours WOWEE_CONFIG_ROOT, which
-    // iOS points at the writable Documents/config.
-    return std::filesystem::path(core::getConfigRoot()) / "guild_names.tsv";
+#ifdef _WIN32
+    if (const char* appData = std::getenv("APPDATA")) {
+        return std::filesystem::path(appData) / "wowee" / "guild_names.tsv";
+    }
+#else
+    if (const char* home = std::getenv("HOME")) {
+        return std::filesystem::path(home) / ".wowee" / "guild_names.tsv";
+    }
+#endif
+    return std::filesystem::path("guild_names.tsv");
 }
 
 } // namespace

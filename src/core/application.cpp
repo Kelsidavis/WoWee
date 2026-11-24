@@ -1348,12 +1348,6 @@ void Application::run() {
     // CPU 0 and defeated all command-recording parallelism.
 
     frameProfileEnabled_ = core::envFlagEnabled("WOWEE_FRAME_PROFILE", false);
-    // The same flag from the config file, because an app on a device cannot
-    // be given an environment and the per-stage breakdown is the only way to
-    // see where the frame time goes there.
-    if (!frameProfileEnabled_) {
-        frameProfileEnabled_ = core::configFlag("frameprofile");
-    }
     if (frameProfileEnabled_) {
         LOG_WARNING("Frame timing profile enabled (WOWEE_FRAME_PROFILE=1) - "
                     "the per-stage breakdown will be reported at warning");
