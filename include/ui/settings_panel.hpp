@@ -155,10 +155,6 @@ public:
     bool pendingShowMinimapClock = false;
     bool pendingShowMinimapCoordinates = false;
     bool pendingShowLatencyMeter = true;
-    /// The performance overlay's switch. Applied straight to the HUD, so the
-    /// readout appears the moment the box is ticked rather than at the next
-    /// start; the default is off because it is a diagnostic, not gameplay.
-    bool pendingPerfOverlay = false;
     bool pendingSeparateBags = true;
     bool pendingShowKeyring = true;
     float pendingBagScale = 1.0f;

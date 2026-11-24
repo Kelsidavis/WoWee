@@ -2,7 +2,6 @@
 
 #include "core/env.hpp"
 #include "core/logger.hpp"
-#include "core/thermal_state.hpp"
 #include <cstdlib>
 #include <cstring>
 
@@ -498,20 +497,6 @@ void iosSaveScreenshotToPhotos(const char* path) {
         }];
     }
 #endif
-}
-
-const char* thermalStateName() {
-    // What the OS is doing about heat right now, in the same words
-    // Instruments uses: nominal is cool, critical is the system pulling
-    // clocks down as far as it can. Sampled per call rather than cached -
-    // the point of the number is that it moves while the game is running.
-    switch ([NSProcessInfo processInfo].thermalState) {
-        case NSProcessInfoThermalStateNominal:  return "nominal";
-        case NSProcessInfoThermalStateFair:     return "fair";
-        case NSProcessInfoThermalStateSerious:  return "serious";
-        case NSProcessInfoThermalStateCritical: return "critical";
-        default:                                return "unknown";
-    }
 }
 
 } // namespace core

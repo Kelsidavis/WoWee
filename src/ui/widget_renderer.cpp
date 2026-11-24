@@ -1,5 +1,4 @@
 #include <cstring>
-#include "core/config_paths.hpp"
 #include "ui/widget_renderer.hpp"
 #include "ui/text_markup.hpp"
 #include "ui/simple_html.hpp"
@@ -1442,14 +1441,6 @@ namespace {
 /// used to live too; the reporting moved out and the drawing still needs it.
 int widgetDumpLevel() {
     static const int level = [] {
-        // The config file first: an environment variable cannot reach an app
-        // on iOS, and the widget rect dump is exactly the diagnostic a
-        // misframed portrait on the iPad needs. The env var stays for desktop.
-        int fromConfig = 0;
-        if (const std::string v = core::configSetting("widgetdump"); !v.empty()) {
-            fromConfig = std::atoi(v.c_str());
-        }
-        if (fromConfig > 0) return fromConfig;
         const char* v = std::getenv("WOWEE_WIDGET_DUMP");
         if (!v || !*v) return 0;
         return std::atoi(v);

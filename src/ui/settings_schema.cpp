@@ -414,14 +414,6 @@ constexpr SettingDesc kSchema[] = {
     {"previewtalents", "Preview talent changes", SettingKind::Bool, 0, 0, 0, "Interface", "",
      "Lay talent points out on the talent sheet before spending them,\n"
      "and confirm them all at once.", "", 1, "", "cvar:previewTalents"},
-    // Its own heading at the foot of the panel rather than tucked under one of
-    // the sections above: this is the row a person doing a bug report or a
-    // measurement run turns on, not a window or a bag setting, and it is last
-    // because the panel's two columns are full everywhere else.
-    {"perfoverlay", "Performance overlay", SettingKind::Bool, 0, 0, 0, "Interface",
-     "Diagnostics",
-     "Show a live readout over the game: frame rate and frame time, where\n"
-     "the frame goes on the GPU and the CPU, and how warm the device is.", "", 0},
 
     // ----------------------------------------------------------------- Minimap
     // Rotate-with-camera was deliberately absent until 2026-09-06: the loader

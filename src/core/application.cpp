@@ -126,6 +126,7 @@ namespace {
 
 Application* gApplicationInstance = nullptr;
 
+#if defined(WOWEE_IOS)
 void onIosMemoryWarning() {
     if (gApplicationInstance && gApplicationInstance->getAssetManager()) {
         gApplicationInstance->getAssetManager()->clearCache();
@@ -139,6 +140,7 @@ static bool onLowMemoryEvent(void* /*userdata*/, SDL_Event* event) {
     }
     return true;
 }
+#endif
 
 std::optional<float> movingEntityFloor(rendering::Renderer* renderer,
                                         const glm::vec3& renderPos,
