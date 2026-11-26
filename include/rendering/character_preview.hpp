@@ -200,7 +200,10 @@ private:
     glm::vec3 previewViewDirection_{0.0f, 1.0f, 0.0f};
     bool transparentBackground_ = false;
 
-    // Cached info from loadCharacter() for later recompositing.
+    // Cached info from loadCharacter() for later recompositing. False for a
+    // creature loaded by path, which has no meaningful race and must fall back
+    // to geometry-based framing rather than being mistaken for a short race.
+    bool raceKnown_ = false;
     game::Race race_ = game::Race::HUMAN;
     game::Gender gender_ = game::Gender::MALE;
     bool useFemaleModel_ = false;

@@ -578,13 +578,12 @@ bool CharacterPreview::loadCharacter(game::Race race, game::Gender gender,
         frameCameraForModelBounds(*camera_, frameMin, frameMax);
         modelBoundMinZ_ = frameMin.z;
         modelBoundMaxZ_ = frameMax.z;
+        // The head bone needs an instance to read from, and the instance is
+        // created further down - the read that used to live here always ran
+        // with instanceId_ == 0 (the old instance is removed above) and found
+        // nothing, which is how head=0 landed in every framing log. It is
+        // read after createInstance instead.
         modelHeadZ_ = 0.0f;
-        if (charRenderer_ && instanceId_ > 0) {
-            float headZ = 0.0f;
-            if (charRenderer_->getInstanceKeyBonePivotZ(instanceId_, kKeyBoneHead, headZ)) {
-                modelHeadZ_ = headZ;
-            }
-        }
         fullBodyDistance_ = camera_->getPosition().y;
         // A player model is framed by its bounds; no creature portrait camera
         // is in play, and a stale one from the shared preview must not be.
@@ -751,7 +750,19 @@ bool CharacterPreview::loadCharacter(game::Race race, game::Gender gender,
         return false;
     }
 
+    // The head bone, read where the instance exists to read it from. Face
+    // framing aims at this; without it every model fell back to 82% of its
+    // bounding-box height, which is a few centimetres off for most races and
+    // a head-length off for the short ones.
+    {
+        float headZ = 0.0f;
+        if (charRenderer_->getInstanceKeyBonePivotZ(instanceId_, kKeyBoneHead, headZ)) {
+            modelHeadZ_ = headZ;
+        }
+    }
+
     // Cache core appearance before geoset selection; the DBC resolver uses it.
+    raceKnown_ = true;
     race_ = race;
     gender_ = gender;
     useFemaleModel_ = useFemaleModel;
@@ -1119,15 +1130,12 @@ bool CharacterPreview::loadCreature(
         frameCameraForModelBounds(*camera_, frameMin, frameMax);
         modelBoundMinZ_ = frameMin.z;
         modelBoundMaxZ_ = frameMax.z;
+        // As in loadCharacter: the head bone is read after createInstance,
+        // where an instance exists to read it from.
         modelHeadZ_ = 0.0f;
-        if (charRenderer_ && instanceId_ > 0) {
-            float headZ = 0.0f;
-            if (charRenderer_->getInstanceKeyBonePivotZ(instanceId_, kKeyBoneHead, headZ)) {
-                modelHeadZ_ = headZ;
-            }
-        }
         fullBodyDistance_ = camera_->getPosition().y;
     }
+    raceKnown_ = false;  // a creature has no race; framing uses the geometry fallback
 
     // The artist's own portrait framing, where the model carries one.
     portraitCameraValid_ = false;
@@ -1154,6 +1162,14 @@ bool CharacterPreview::loadCreature(
     if (instanceId_ == 0) {
         LOG_WARNING("CharacterPreview: failed to create creature instance");
         return false;
+    }
+
+    // The creature's head bone, on the same terms as a player's.
+    {
+        float headZ = 0.0f;
+        if (charRenderer_->getInstanceKeyBonePivotZ(instanceId_, kKeyBoneHead, headZ)) {
+            modelHeadZ_ = headZ;
+        }
     }
 
     // The display's skins, into the slots the model declared for them. Without
@@ -1414,6 +1430,158 @@ void CharacterPreview::compositePass(VkCommandBuffer cmd, uint32_t frameIndex) {
 
     uint32_t fi = frameIndex % MAX_FRAMES;
 
+    // Face framing aims where the head actually is, not where the bind pose
+    // left it. The bone matrix is a delta from bind (identity at rest), and a
+    // hunched idle - an undead's Stand - hangs the head a third of a close
+    // crop below the bind pivot, which is how the portrait came to show the
+    // top of the skull and the neck with no face between them. Re-aimed here
+    // rather than at rebuild so the idle sway stays centred as well.
+    //
+    // Only where this preview's own rig is framing the face: a creature that
+    // carries the artist's portrait camera is framed by it (applyPreviewView),
+    // and re-aiming here would override that framing after the fact.
+    if (zoomLevel_ >= 1.0f && !portraitCameraValid_ &&
+        instanceId_ > 0 && charRenderer_ && camera_) {
+        float hx = 0.0f, hy = 0.0f, hz = 0.0f;
+        float bx = 0.0f, by = 0.0f, bz = 0.0f;
+        float cx = 0.0f, cy = 0.0f, cz = 0.0f;
+        const bool havePose =
+            charRenderer_->getInstanceKeyBoneAnimatedPos(instanceId_, kKeyBoneHead, hx, hy, hz) &&
+            charRenderer_->getInstanceKeyBonePivot(instanceId_, kKeyBoneHead, bx, by, bz);
+        // A model needs enough head mesh above the bone for this rig to have
+        // something to frame; otherwise the bone-only fallback below stands in.
+        const bool haveCentroid =
+            charRenderer_->getInstanceHeadCentroid(instanceId_, kKeyBoneHead, cx, cy, cz);
+        if (havePose && haveCentroid) {
+            // Aim at the face, not the neck. Aiming square at the animated
+            // head bone centres the neck; the face sits off that bone, and a
+            // hunch drops the head away from it. This is the trim tuned by eye
+            // on device: a base that centres an upright face, plus a part
+            // proportional to (head - bind) that follows a hunch. It was
+            // approved for the blood elf and undead - later experiments
+            // (centroid measurement, head-follow, uniform shifts) framed
+            // those two worse, so it is the default for other models.
+            constexpr float kFaceTrimBase = 0.10f;
+            constexpr float kFaceTrimFactor = -1.35f;
+            const float trimX = kFaceTrimBase + kFaceTrimFactor * (hx - bx);
+            // Some races have a bind bone far to one side of a widely swaying
+            // head, so the pose-proportional trim blows up and pins the face to
+            // the frame edge. Those are calibrated per race on device: the
+            // tauren needs a left bias and a lift, the orc a left bias, the troll
+            // (face on the bone) follows it, and the night elf needs a nudge.
+            //
+            // Measured on device: bind bone pivot x (bx), animated head x range
+            // (hx), head-geometry centroid x (cx), bind head height, final aim:
+            //   human:     bx=-0.033 hx=-0.17      cx=-0.011 z=1.712 aim=+0.115
+            //   night elf: bx=-0.045 hx=-0.45..-0.49 cx=-0.049 z=2.258 aim=+0.154
+            //   dwarf:     bx=-0.011 hx=-0.11      cx=+0.023 z=1.843 aim=+0.122
+            //   gnome:     bx=-0.030 hx=-0.08      cx=+0.016 z=0.752 aim=+0.087
+            //   blood elf: bx=+0.021 hx=+0.15..+0.33 cx=+0.070 z=1.916 aim=+0.076..+0.013
+            //   undead:    bx=-0.049 hx=-0.35..-0.28 cx=-0.055 z=1.901 aim=+0.156..+0.132
+            //   tauren:    bx=+0.384 hx=-0.09..+0.19 cx=+0.358 z=1.894 aim=-0.390..-0.110
+            //   orc:       bx=+0.125 hx=+0.03..+0.19 cx=+0.109 z=2.104 aim=-0.270..-0.110
+            //   troll:     bx=+0.048 hx=-0.26..-0.15 cx=+0.057 z=2.682 aim=-0.260..-0.150
+            // A per-race calibration, not a universal rule: a centroid-derived
+            // aim was tried first and framed elf/undead worse. Keying on bind
+            // head height is wrong: a human's bind head (1.712)
+            // is below every tauren measurement and was being given the tauren
+            // shift, pushing its face out of frame. Key on the race instead.
+            // Creature previews carry their own camera and never reach here,
+            // so race_ is a player; the height bands are a fallback only for a
+            // model whose race is unknown.
+            enum class Framing { DEFAULT, TAUREN, ORC, TROLL, NIGHT_ELF };
+            Framing framing = Framing::DEFAULT;
+            if (raceKnown_) {
+                switch (race_) {
+                    case game::Race::TAUREN:    framing = Framing::TAUREN; break;
+                    case game::Race::ORC:       framing = Framing::ORC; break;
+                    case game::Race::TROLL:     framing = Framing::TROLL; break;
+                    case game::Race::NIGHT_ELF: framing = Framing::NIGHT_ELF; break;
+                    default: break;
+                }
+            } else {
+                constexpr float kTaurenBindHeadZ = 1.897f;
+                constexpr float kOrcBindHeadZLow = 2.02f;
+                constexpr float kOrcBindHeadZHigh = 2.30f;
+                constexpr float kTrollBindHeadZ = 2.50f;
+                if (modelHeadZ_ < kTaurenBindHeadZ) framing = Framing::TAUREN;
+                else if (modelHeadZ_ > kOrcBindHeadZLow && modelHeadZ_ < kOrcBindHeadZHigh) framing = Framing::ORC;
+                else if (modelHeadZ_ > kTrollBindHeadZ) framing = Framing::TROLL;
+            }
+            constexpr float kTaurenLeftShift = 0.30f;
+            constexpr float kTaurenLift = 0.18f;
+            constexpr float kOrcLeftShift = 0.30f;
+            // The night elf's DEFAULT trim lands 0.25 past its face centroid,
+            // a touch further right than the approved undead/elf framing; nudge
+            // it left by 0.05 to match. Measured: bx=-0.045 hx=-0.45..-0.49
+            // cx=-0.049 bindZ=2.258.
+            constexpr float kNightElfLeftShift = 0.05f;
+            const bool tauren = framing == Framing::TAUREN;
+            const float aimX = tauren ? (hx - kTaurenLeftShift)
+                               : framing == Framing::ORC ? (hx - kOrcLeftShift)
+                               : framing == Framing::TROLL ? hx
+                               : framing == Framing::NIGHT_ELF ? (hx + trimX - kNightElfLeftShift)
+                                       : (hx + trimX);
+            const float aimY = hy;
+            // Lowering the aim lifts the head in frame.
+            const float aimZ = hz - (tauren ? kTaurenLift : 0.0f);
+            const float modelHeight =
+                std::max(modelBoundMaxZ_ - modelBoundMinZ_, 0.1f);
+            // The crop is sized by the head as well as the whole model: a
+            // tauren is a fifth taller than a human but its head and horns
+            // are half again bigger, and a height-scaled distance filled the
+            // frame with horns and cropped the face. The head spans from the
+            // head bone to the top of the bounds, and a distance that frames
+            // that span is a lower bound on the height-scaled one - races
+            // whose head is proportionally small keep the framing they had.
+            // The span is measured from the bind pivot, not the animated
+            // position: a hunch drops the head low in the bounds and would
+            // inflate the span and pull every hunched model back out.
+            const float kHeadSpanFloor = 0.45f;
+            const float headSpan =
+                std::max(modelBoundMaxZ_ - bz, kHeadSpanFloor);
+            const float faceDistance =
+                std::max({1.15f, modelHeight * 0.70f, headSpan * 3.0f});
+            const float distance =
+                fullBodyDistance_ +
+                (std::min(faceDistance, fullBodyDistance_) - fullBodyDistance_) *
+                    zoomLevel_;
+            const glm::vec3 focus =
+                previewStandPosition_ + glm::vec3(aimX, aimY, aimZ);
+            const glm::vec3 camPos =
+                focus + previewViewDirection_ * distance;
+            camera_->setPosition(camPos);
+            const glm::vec3 forward = glm::normalize(focus - camPos);
+            camera_->setRotation(
+                glm::degrees(std::atan2(forward.y, forward.x)),
+                glm::degrees(std::asin(std::clamp(forward.z, -1.0f, 1.0f))));
+        } else if (havePose) {
+            // No head mesh to measure (or too little of one): the bone rig,
+            // aimed at the animated head with the lateral trim that centres
+            // a face on a neck bone - tuned by eye on an upright and a
+            // hunched model before the centroid measurement existed.
+            const float modelHeight =
+                std::max(modelBoundMaxZ_ - modelBoundMinZ_, 0.1f);
+            const float faceDistance = std::max(1.15f, modelHeight * 0.70f);
+            const float distance =
+                fullBodyDistance_ +
+                (std::min(faceDistance, fullBodyDistance_) - fullBodyDistance_) *
+                    zoomLevel_;
+            constexpr float kFaceTrimBase = 0.10f;
+            constexpr float kFaceTrimFactor = -1.35f;
+            const float trimX = kFaceTrimBase + kFaceTrimFactor * (hx - bx);
+            const glm::vec3 focus =
+                previewStandPosition_ + glm::vec3(hx + trimX, hy, hz);
+            const glm::vec3 camPos =
+                focus + previewViewDirection_ * distance;
+            camera_->setPosition(camPos);
+            const glm::vec3 forward = glm::normalize(focus - camPos);
+            camera_->setRotation(
+                glm::degrees(std::atan2(forward.y, forward.x)),
+                glm::degrees(std::asin(std::clamp(forward.z, -1.0f, 1.0f))));
+        }
+    }
+
     // Update per-frame UBO with preview camera matrices and studio lighting
     GPUPerFrameData ubo{};
     ubo.view = camera_->getViewMatrix();
@@ -1560,6 +1728,9 @@ void CharacterPreview::applyPreviewView() {
 
     // Stay outside the near plane while getting close enough to inspect facial
     // textures and hair. Large races retain proportionally more distance.
+    // The floor is a guard, not a tuning knob: going below it clipped the
+    // face out of the frame and left only its edges (the nose and helm are
+    // close, and the near plane is nearer than they are at portrait range).
     const float faceDistance = std::max(1.15f, modelHeight * 0.70f);
     const float distance = fullBodyDistance_ +
                            (std::min(faceDistance, fullBodyDistance_) - fullBodyDistance_) * zoomLevel_;

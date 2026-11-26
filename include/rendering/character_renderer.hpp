@@ -142,6 +142,23 @@ public:
     /// where it usually is, which is not the same for a race whose hair is
     /// half the distance from its chin to the top of the box.
     bool getInstanceKeyBonePivotZ(uint32_t instanceId, int32_t keyBoneId, float& outZ) const;
+    /// The bind-pose pivot of a key bone, all three axes: where the bone sits
+    /// before any animation moves it. The animated accessor answers where it
+    /// has moved to; the difference between the two is the pose displacement.
+    bool getInstanceKeyBonePivot(uint32_t instanceId, int32_t keyBoneId,
+                                 float& outX, float& outY, float& outZ) const;
+    /// The bind-pose centroid of the mesh above a key bone's height: the
+    /// visual centre of a head, muzzle and horns included, which no bone
+    /// pivot describes. Faces are centred by this, not by the neck the head
+    /// bone sits at.
+    bool getInstanceHeadCentroid(uint32_t instanceId, int32_t keyBoneId,
+                                 float& outX, float& outY, float& outZ) const;
+    /// The animated world position of a key bone this frame - where the bone
+    /// actually is under the current pose, against the bind-pose pivot the
+    /// other accessor answers. Faces sit on animated bones, and a hunched
+    /// idle moves the head a bind-pose camera never learns about.
+    bool getInstanceKeyBoneAnimatedPos(uint32_t instanceId, int32_t keyBoneId,
+                                       float& outX, float& outY, float& outZ) const;
     bool getInstanceFootZ(uint32_t instanceId, float& outFootZ) const;
     bool getInstancePosition(uint32_t instanceId, glm::vec3& outPos) const;
 

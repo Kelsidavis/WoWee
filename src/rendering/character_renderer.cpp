@@ -4151,6 +4151,101 @@ bool CharacterRenderer::getInstanceKeyBonePivotZ(uint32_t instanceId, int32_t ke
     return false;
 }
 
+bool CharacterRenderer::getInstanceKeyBonePivot(uint32_t instanceId, int32_t keyBoneId,
+                                               float& outX, float& outY, float& outZ) const {
+    auto it = instances.find(instanceId);
+    if (it == instances.end()) return false;
+    auto mIt = models.find(it->second.modelId);
+    if (mIt == models.end()) return false;
+    for (const auto& bone : mIt->second.data.bones) {
+        if (bone.keyBoneId != keyBoneId) continue;
+        const float scale = std::max(0.001f, it->second.scale);
+        outX = bone.pivot.x * scale;
+        outY = bone.pivot.y * scale;
+        outZ = bone.pivot.z * scale;
+        return true;
+    }
+    return false;
+}
+
+bool CharacterRenderer::getInstanceHeadCentroid(uint32_t instanceId, int32_t keyBoneId,
+                                                float& outX, float& outY, float& outZ) const {
+    auto it = instances.find(instanceId);
+    if (it == instances.end()) return false;
+    auto mIt = models.find(it->second.modelId);
+    if (mIt == models.end()) return false;
+    const auto& bones = mIt->second.data.bones;
+    const auto& verts = mIt->second.data.vertices;
+
+    // The head's height: the pivot of the key bone asked for.
+    float headZ = 0.0f;
+    bool found = false;
+    for (const auto& bone : bones) {
+        if (bone.keyBoneId == keyBoneId) {
+            headZ = bone.pivot.z;
+            found = true;
+            break;
+        }
+    }
+    if (!found) return false;
+
+    // The mesh above that height is the head: vertices from the bone's
+    // height to the top of the model's bounds, in the bind pose the
+    // vertices are stored in. A muzzle pulls the centroid forward, horns
+    // spread it upward, and a broad neck widens it - the centroid is where
+    // the head visually is rather than where a neck bone pivots.
+    //
+    // Weighted toward the bottom of the head: the face sits low in the head
+    // region, and hair and ears above it are more vertices than the face is
+    // (an unweighted centroid counted a blood elf's hair volume and aimed
+    // above the face). The weight is the distance from the top of the head
+    // squared, so the face dominates and the crown fades.
+    const float topZ = mIt->second.visualBoundMax.z;
+    if (topZ <= headZ) return false;
+    double sx = 0.0, sy = 0.0, sz = 0.0, sw = 0.0;
+    size_t n = 0;
+    for (const auto& v : verts) {
+        if (v.position.z < headZ || v.position.z > topZ) continue;
+        const double w = static_cast<double>(topZ - v.position.z) *
+                         static_cast<double>(topZ - v.position.z);
+        sx += v.position.x * w;
+        sy += v.position.y * w;
+        sz += v.position.z * w;
+        sw += w;
+        ++n;
+    }
+    if (n < 16 || sw <= 0.0) return false;  // a head is more than a handful
+
+    const float scale = std::max(0.001f, it->second.scale);
+    outX = static_cast<float>(sx / sw) * scale;
+    outY = static_cast<float>(sy / sw) * scale;
+    outZ = static_cast<float>(sz / sw) * scale;
+    return true;
+}
+
+bool CharacterRenderer::getInstanceKeyBoneAnimatedPos(uint32_t instanceId, int32_t keyBoneId,
+                                                      float& outX, float& outY, float& outZ) const {
+    auto it = instances.find(instanceId);
+    if (it == instances.end()) return false;
+    auto mIt = models.find(it->second.modelId);
+    if (mIt == models.end()) return false;
+    const auto& bones = mIt->second.data.bones;
+    const auto& mats = it->second.boneMatrices;
+    if (mats.empty()) return false;
+    for (size_t i = 0; i < bones.size() && i < mats.size(); ++i) {
+        if (bones[i].keyBoneId != keyBoneId) continue;
+        // The local transform is T(pivot)*T*R*S*T(-pivot) - identity at rest -
+        // so the matrix is a delta from the bind pose and the animated
+        // position of the bone is its pivot plus that delta.
+        const float scale = std::max(0.001f, it->second.scale);
+        outX = (bones[i].pivot.x + mats[i][3][0]) * scale;
+        outY = (bones[i].pivot.y + mats[i][3][1]) * scale;
+        outZ = (bones[i].pivot.z + mats[i][3][2]) * scale;
+        return true;
+    }
+    return false;
+}
+
 bool CharacterRenderer::getInstanceHeight(uint32_t instanceId, float& outHeight) const {
     auto it = instances.find(instanceId);
     if (it == instances.end()) return false;
