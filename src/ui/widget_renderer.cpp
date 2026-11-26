@@ -2823,17 +2823,17 @@ void WidgetRenderer::draw(WidgetTree& tree, float screenW, float screenH) {
                 const float rectW = x1 - x0;
                 const float rectH = y1 - y0;
                 if (rectW > 0.0f && rectH > 0.0f) {
-                    // Crop the square source to the frame's shape without
-                    // ever sampling outside it. The old math sampled
-                    // halfV = 0.5/aspect past the image for a taller frame
-                    // (the 18x25 micro-button portrait), which clamped to the
-                    // bottom half of the texture - the face sat on the frame's
-                    // bottom edge and only the top of the head showed.
-                    // Fitting the source *into* the frame instead keeps every
-                    // sample inside and centres what the render produced.
+                    // Fit the square source into the frame's shape without
+                    // distortion or sampling outside it. Sampling a centred
+                    // UV window maps a region of the source onto the frame;
+                    // for that region to keep the frame's aspect (rectW/rectH)
+                    // its half-extents must satisfy halfU/halfV == aspect,
+                    // capped at 0.5 so no sample leaves the image. A taller
+                    // frame (18x25 micro-button, aspect<1) crops the width;
+                    // a wider one crops the height. Both stay inside [0,1].
                     const float aspect = rectW / rectH;
                     const float halfU = aspect > 1.0f ? 0.5f : 0.5f * aspect;
-                    const float halfV = aspect > 1.0f ? 0.5f * aspect : 0.5f;
+                    const float halfV = aspect > 1.0f ? 0.5f / aspect : 0.5f;
                     uv0 = ImVec2(0.5f - halfU, 0.5f - halfV);
                     uv1 = ImVec2(0.5f + halfU, 0.5f + halfV);
                 }
