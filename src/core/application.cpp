@@ -124,9 +124,12 @@ namespace core {
 
 namespace {
 
+#if defined(WOWEE_IOS)
+// iPadOS-only: the low-memory callbacks below are the sole readers, so the
+// global must be guarded too or other platforms see a set-but-unused global
+// under -Werror.
 Application* gApplicationInstance = nullptr;
 
-#if defined(WOWEE_IOS)
 void onIosMemoryWarning() {
     if (gApplicationInstance && gApplicationInstance->getAssetManager()) {
         gApplicationInstance->getAssetManager()->clearCache();
@@ -266,13 +269,17 @@ Application* Application::instance = nullptr;
 
 Application::Application() {
     instance = this;
+#if defined(WOWEE_IOS)
     gApplicationInstance = this;
+#endif
 }
 
 Application::~Application() {
     shutdown();
     instance = nullptr;
+#if defined(WOWEE_IOS)
     gApplicationInstance = nullptr;
+#endif
 }
 
 bool Application::initialize() {
