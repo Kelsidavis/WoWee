@@ -33,7 +33,10 @@ struct WardenCheckContext {
     /// read as unmapped. Not const: the tick-count global is refreshed.
     WardenMemory* memory = nullptr;
     /// The loaded module's own image, searched when the executable does not
-    /// hold a scanned pattern.
+    /// hold a scanned pattern. A raw pointer into the module's mapping: the
+    /// owning shared_ptr must outlive the whole buildWardenCheckResponse call,
+    /// or a code scan hashing this image faults on a released mmap. Null (with
+    /// moduleImageSize 0) answers the scan without searching the image.
     const uint8_t* moduleImage = nullptr;
     size_t moduleImageSize = 0;
     bool turtle = false;

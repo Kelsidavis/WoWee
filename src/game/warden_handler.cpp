@@ -153,14 +153,16 @@ void WardenHandler::reset() {
     wardenModuleKey_.clear();
     wardenModuleSize_ = 0;
     wardenModuleData_.clear();
-    wardenLoadedModule_.reset();
     // A response still being built answers the session that just ended; sent
-    // on the next one it would go out under that session's keys.
-    if (wardenResponsePending_) {
-        wardenPendingEncrypted_.wait();
-        wardenPendingEncrypted_ = {};
-        wardenResponsePending_ = false;
-    }
+    // on the next one it would go out under that session's keys, so clear the
+    // flag. Do not wait on the future here: destroying a std::async future
+    // joins its task, and the code scan can take seconds - a disconnect would
+    // stall the main loop for the whole HMAC pass. The task holds its own
+    // shared_ptr to the module, so releasing ours cannot unmap the image the
+    // scan is hashing. update() reaps the future once it finishes and drops
+    // the result because the flag is now clear.
+    wardenResponsePending_ = false;
+    wardenLoadedModule_.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -168,23 +170,31 @@ void WardenHandler::reset() {
 // ---------------------------------------------------------------------------
 
 void WardenHandler::update(float deltaTime) {
-    // Drain pending async Warden response (built on background thread to avoid 5s stalls)
-    if (wardenResponsePending_) {
+    // Drain the async Warden response if the task has finished. Reap on
+    // future validity, not on wardenResponsePending_: reset() clears that flag
+    // on disconnect to stop a stale answer being sent, but leaves the future
+    // alive so the scan can finish without stalling reset(). If we did not get
+    // it here, assigning the next std::async would block on the old future's
+    // destructor. The result is discarded when the flag is clear.
+    if (wardenPendingEncrypted_.valid()) {
         auto status = wardenPendingEncrypted_.wait_for(std::chrono::milliseconds(0));
         if (status == std::future_status::ready) {
             auto plaintext = wardenPendingEncrypted_.get();
-            wardenResponsePending_ = false;
-            if (!plaintext.empty() && wardenCrypto_) {
-                std::vector<uint8_t> encrypted = wardenCrypto_->encrypt(plaintext);
-                network::Packet response(wireOpcode(Opcode::CMSG_WARDEN_DATA));
-                for (uint8_t byte : encrypted) {
-                    response.writeUInt8(byte);
-                }
-                if (owner_.getSocket() && owner_.getSocket()->isConnected()) {
-                    owner_.getSocket()->send(response);
-                    LOG_DEBUG("Warden: Sent async CHEAT_CHECKS_RESULT (", plaintext.size(), " bytes plaintext)");
+            if (wardenResponsePending_) {
+                wardenResponsePending_ = false;
+                if (!plaintext.empty() && wardenCrypto_) {
+                    std::vector<uint8_t> encrypted = wardenCrypto_->encrypt(plaintext);
+                    network::Packet response(wireOpcode(Opcode::CMSG_WARDEN_DATA));
+                    for (uint8_t byte : encrypted) {
+                        response.writeUInt8(byte);
+                    }
+                    if (owner_.getSocket() && owner_.getSocket()->isConnected()) {
+                        owner_.getSocket()->send(response);
+                        LOG_DEBUG("Warden: Sent async CHEAT_CHECKS_RESULT (", plaintext.size(), " bytes plaintext)");
+                    }
                 }
             }
+            // Flag was clear: this answers a session that is gone, drop it.
         }
     }
 
@@ -609,9 +619,30 @@ void WardenHandler::handleWardenData(network::Packet& packet) {
             // A code scan searches the whole image and can take seconds, so a
             // request holding one is answered off the main thread; update()
             // encrypts and sends what comes back.
-            if (wardenRequestHasCodeScan(decrypted, wardenCheckOpcodes_) && !wardenResponsePending_) {
+            // Require no live future too: assigning std::async over one still
+            // running would join it here and stall the loop. reset() leaves a
+            // future alive after a disconnect; update() reaps it once ready.
+            if (wardenRequestHasCodeScan(decrypted, wardenCheckOpcodes_) &&
+                !wardenResponsePending_ && !wardenPendingEncrypted_.valid()) {
                 LOG_DEBUG("Warden: PAGE_A/PAGE_B detected - building response async to avoid main-loop stall");
-                wardenPendingEncrypted_ = std::async(std::launch::async, [decrypted, ctx]() {
+                // The scan hashes ctx.moduleImage for seconds; hold the module
+                // so its mapping outlives the task even if reset() or a module
+                // reload releases wardenLoadedModule_ meanwhile, and derive the
+                // pointer from that kept-alive image.
+                auto module = wardenLoadedModule_;
+                wardenPendingEncrypted_ = std::async(std::launch::async,
+                                                     [decrypted, ctx, module]() mutable {
+                    if (module && module->isLoaded()) {
+                        ctx.moduleImage =
+                            static_cast<const uint8_t*>(module->getModuleMemory());
+                        ctx.moduleImageSize = module->getModuleSize();
+                    } else {
+                        // ctx was captured from the synchronous setup, whose
+                        // module pointer may now be released. Clear it so the
+                        // scan skips the image rather than hashing a freed mmap.
+                        ctx.moduleImage = nullptr;
+                        ctx.moduleImageSize = 0;
+                    }
                     return buildWardenCheckResponse(decrypted, ctx, "async");
                 });
                 wardenResponsePending_ = true;
