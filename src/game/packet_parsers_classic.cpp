@@ -1296,8 +1296,8 @@ network::Packet ClassicPacketParsers::buildSendMail(uint64_t mailboxGuid,
     // Vanilla supports only one item attachment (single uint64 GUID)
     uint64_t singleItemGuid = itemGuids.empty() ? 0 : itemGuids[0];
     packet.writeUInt64(singleItemGuid);
-    packet.writeUInt32(money);
-    packet.writeUInt32(cod);
+    packet.writeUInt32(static_cast<uint32_t>(money));
+    packet.writeUInt32(static_cast<uint32_t>(cod));
     packet.writeUInt64(0);       // unk3 (clients > 1.9.4)
     packet.writeUInt8(0);        // unk4 (clients > 1.9.4)
     return packet;

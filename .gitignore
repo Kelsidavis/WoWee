@@ -5,6 +5,8 @@ build-asan/
 build-android/
 build-android-deps/
 build-debug/
+build-ios/
+build-host/
 build-sanitize/
 bin/
 lib/
@@ -28,8 +30,10 @@ Makefile
 *.slo
 *.lo
 *.spv
-!assets/shaders/footprint.vert.spv
-!assets/shaders/footprint.frag.spv
+# The compiled shaders are tracked: they are what a build without glslc
+# runs, and the iOS bundle copies them into the app rather than compiling
+# them. The *.spv rule above is for build output elsewhere in the tree.
+!assets/shaders/*.spv
 
 # Compiled Dynamic libraries
 *.so
@@ -178,3 +182,4 @@ android/local.properties
 # installation; it does not belong in this repository. See
 # docs/upgraded-assets.md.
 asset_packs/
+extern/MoltenVK/

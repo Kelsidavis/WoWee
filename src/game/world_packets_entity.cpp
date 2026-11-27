@@ -298,7 +298,7 @@ bool parseGameObjectQueryBody(network::Packet& packet,
         }
     } else if (remaining > 0) {
         // Partial data field; read what we can
-        uint32_t fieldsToRead = remaining / 4;
+        uint32_t fieldsToRead = static_cast<uint32_t>(remaining / 4);
         for (uint32_t i = 0; i < fieldsToRead && i < 24; i++) {
             data.data[i] = packet.readUInt32();
         }

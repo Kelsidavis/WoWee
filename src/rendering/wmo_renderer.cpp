@@ -2037,8 +2037,8 @@ bool WMORenderer::createGroupResources(const pipeline::WMOGroup& group, GroupRes
 
     resources.groupFlags = groupFlags;
 
-    resources.vertexCount = group.vertices.size();
-    resources.indexCount = group.indices.size();
+    resources.vertexCount = static_cast<uint32_t>(group.vertices.size());
+    resources.indexCount = static_cast<uint32_t>(group.indices.size());
     resources.boundingBoxMin = group.boundingBoxMin;
     resources.boundingBoxMax = group.boundingBoxMax;
 

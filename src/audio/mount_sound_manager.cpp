@@ -23,7 +23,7 @@ bool MountSoundManager::initialize(pipeline::AssetManager* assets) {
 
     loadMountSounds();
 
-    int totalSamples = wingFlapSounds_.size() + wingIdleSounds_.size();
+    int totalSamples = static_cast<int>(wingFlapSounds_.size()) + static_cast<int>(wingIdleSounds_.size());
     for (const auto& [family, sounds] : familySounds_) {
         totalSamples += sounds.move.size() + sounds.jump.size() +
                         sounds.land.size() + sounds.idle.size();
@@ -285,8 +285,8 @@ void MountSoundManager::loadMountSounds() {
 
     // Log loaded families
     for (const auto& [family, sounds] : familySounds_) {
-        int total = sounds.move.size() + sounds.jump.size() +
-                    sounds.land.size() + sounds.idle.size();
+        int total = static_cast<int>(sounds.move.size()) + static_cast<int>(sounds.jump.size()) +
+                    static_cast<int>(sounds.land.size()) + static_cast<int>(sounds.idle.size());
         if (total > 0) {
             LOG_INFO("Mount family ", static_cast<int>(family), ": ",
                      sounds.move.size(), " move, ", sounds.jump.size(), " jump, ",

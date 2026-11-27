@@ -10,6 +10,7 @@
 #include "core/appearance_composer.hpp"
 #include "core/window.hpp"
 #include "core/coordinates.hpp"
+#include "core/config_paths.hpp"
 #include "core/logger.hpp"
 #include "rendering/renderer.hpp"
 #include "rendering/animation_controller.hpp"
@@ -1346,14 +1347,22 @@ void WorldLoader::cancelWorldPreload() {
 
 void WorldLoader::saveLastWorldInfo(uint32_t mapId, const std::string& mapName,
                                      float serverX, float serverY) {
-#ifdef _WIN32
-    const char* base = std::getenv("APPDATA");
-    std::string dir = base ? std::string(base) + "\\wowee" : ".";
-#else
-    const char* home = std::getenv("HOME");
-    std::string dir = home ? std::string(home) + "/.wowee" : ".";
-#endif
-    std::filesystem::create_directories(dir);
+    // getConfigRoot() honours WOWEE_CONFIG_ROOT - the writable Documents/config
+    // on iOS - where HOME + "/.wowee" is outside the app sandbox and failed
+    // with "Operation not permitted", throwing out of Application::update on
+    // every Enter World press (black screen).
+    //
+    // The error_code overload matters just as much: a directory that cannot be
+    // created must cost one warning line, not the frame (a throwing
+    // create_directories here killed the update loop with a black screen).
+    const std::string dir = getConfigRoot();
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    if (ec) {
+        LOG_WARNING("Could not create ", dir, " (", ec.message(),
+                    "); last_world.cfg not saved");
+        return;
+    }
     std::ofstream f(dir + "/last_world.cfg");
     if (f) {
         f << mapId << "\n" << mapName << "\n" << serverX << "\n" << serverY << "\n";
@@ -1361,13 +1370,7 @@ void WorldLoader::saveLastWorldInfo(uint32_t mapId, const std::string& mapName,
 }
 
 WorldLoader::LastWorldInfo WorldLoader::loadLastWorldInfo() const {
-#ifdef _WIN32
-    const char* base = std::getenv("APPDATA");
-    std::string dir = base ? std::string(base) + "\\wowee" : ".";
-#else
-    const char* home = std::getenv("HOME");
-    std::string dir = home ? std::string(home) + "/.wowee" : ".";
-#endif
+    const std::string dir = getConfigRoot();
     LastWorldInfo info;
     std::ifstream f(dir + "/last_world.cfg");
     if (!f) return info;

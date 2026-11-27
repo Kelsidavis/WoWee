@@ -16,6 +16,9 @@
 #include <mach-o/dyld.h>
 #include <vector>
 #endif
+#if defined(WOWEE_IOS)
+#include "core/ios_platform.hpp"
+#endif
 
 namespace wowee {
 namespace core {
@@ -61,18 +64,18 @@ bool Window::initialize() {
     LOG_INFO("Initializing window: ", config.title);
 
 #ifdef __APPLE__
+#if defined(WOWEE_IOS)
+    // iOS platform prep (safe areas, keyboard, etc.).
+    core::iosPreparePlatform();
+#else
     // Before SDL_Init spins up NSApplication: holding a key should repeat it,
     // not open the accent chooser over the game.
     disablePressAndHoldAccents();
 #endif
+#endif
 
-#ifdef __ANDROID__
-    // Without this the manifest's screenOrientation does not survive: SDL calls
-    // setOrientation itself when it creates the window, and with no hint and a
-    // resizable window it asks for FULL_USER, which follows the phone's own
-    // rotation lock. That is portrait, and the interface is laid out for a
-    // landscape screen. Naming both landscape orientations leaves the phone
-    // free to flip between them.
+#if defined(__ANDROID__)
+    // Force landscape on phones/tablets.
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
 
     // By default SDL parks the thread that called SDL_main for as long as the
@@ -81,7 +84,19 @@ bool Window::initialize() {
     // the session out. Letting it run keeps the connection; the surface is
     // released separately and the frame is skipped while it is gone.
     SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "0");
-
+#elif defined(WOWEE_IOS)
+    // Landscape, like a notebook.  Portrait used to be forced here because
+    // a landscape window presented black - but that was the missing-scene
+    // bug (the window was never displayed at all), not an orientation
+    // problem.  Info.plist agrees: landscape-only, no portrait.
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    // Hide the home indicator: the bar sits exactly where the action bar's
+    // bottom-centre icons are, and the pointer hovering or clicking there
+    // made iPadOS reveal it over them. "2" is the deferral mode: the bar
+    // stays dim, and the system's bottom-edge swipe needs a second swipe
+    // before it goes home - the first swipe is the app's. The bar itself
+    // never reacts to the pointer, only to a real edge swipe.
+    SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "2");
 #endif
 
     // Initialize SDL
@@ -180,11 +195,8 @@ bool Window::initialize() {
     if (config.fullscreen) {
         flags |= SDL_WINDOW_FULLSCREEN;
     }
-#ifdef __ANDROID__
-    // A phone has no windows to be one of. Fullscreen is also what makes SDL
-    // put the activity in immersive mode, which is what hides the navigation
-    // bar; without it the client draws into 2272x954 of a 2424x1080 panel and
-    // the rest is system chrome.
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
+    // No window chrome on a device; fullscreen is the natural state.
     flags |= SDL_WINDOW_FULLSCREEN;
 #endif
     if (config.resizable) {
@@ -215,6 +227,19 @@ bool Window::initialize() {
                     drawableWidth, "x", drawableHeight,
                     " pixel surface - the world is drawn at the pixel size.");
     }
+#if defined(WOWEE_IOS)
+    // SDL 3.2.24 creates its UIWindow with initWithFrame: and never gives
+    // it a scene; a scene-based app never displays such a window (black
+    // screen).  Attach it to the connected scene, then show what we got.
+    core::iosAttachWindowToScene(window);
+    core::iosLogSdlWindow(window);
+    // What is on screen right now, and (via a delayed sample) once settled.
+    core::iosLogWindowStatus("after scene attach");
+    LOG_INFO("iOS window: ", width, "x", height, " points, drawable ",
+             drawableWidth, "x", drawableHeight);
+    if (const char* r = std::getenv("WOWEE_RESOURCE_ROOT")) LOG_INFO("iOS resource root: ", r);
+    if (const char* d = std::getenv("WOW_DATA_PATH")) LOG_INFO("iOS data path: ", d);
+#endif
 
     // Initialize Vulkan context
     vkContext = std::make_unique<rendering::VkContext>();
@@ -224,13 +249,8 @@ bool Window::initialize() {
         return false;
     }
 
-#ifdef __ANDROID__
-    // SDL and the Vulkan driver leave the working directory at /system/bin on
-    // Android, and everything after this opens its files relative to it: the
-    // skybox shader was the first to fail, one call after this returned.
-    //
-    // Guarded rather than relying on the no-op, so a target that links this
-    // file does not have to link config_paths with it. The editor does not.
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
+    // On a device the working directory is not where the resources live.
     core::enterResourceRoot();
 #endif
 

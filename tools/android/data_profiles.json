@@ -4,54 +4,59 @@
     "Paths are matched against the 'p' field of manifest.json entries: lowercase,",
     "forward slashes, relative to the data root. A pattern ending in /** matches",
     "everything below that directory; anything else is matched with fnmatch.",
-    "tools/android/make_minimal_data.py is the only reader."
+    "tools/android/make_minimal_data.py is the only reader.",
+    "",
+    "The directories named here are the ones asset_extract actually produces.",
+    "The extractor writes each file under the WoW path it had in the archive,",
+    "lowercased, so the DBC tables land in dbfilesclient/ and the fonts in",
+    "fonts/ - there is no db/ or misc/ directory in an extraction, and a pattern",
+    "for one of those matches nothing at all."
   ],
   "profiles": {
     "login": {
       "summary": "Login screen, character select and character creation. No world.",
       "include": [
-        "db/**",
-        "misc/fonts/**",
+        "dbfilesclient/**",
+        "fonts/**",
         "interface/**",
         "character/**",
-        "environment/**"
+        "environments/**",
+        "particles/**",
+        "textures/guildemblems/**"
       ],
       "exclude": [
-        "interface/worldmap/**",
-        "interface/cinematics/**"
+        "interface/worldmap/**"
       ],
       "exclude_reasons": {
-        "interface/worldmap/**": "the world map cannot be opened before entering the world",
-        "interface/cinematics/**": "the intro movie is skippable and is 118 MB"
+        "interface/worldmap/**": "the world map cannot be opened before entering the world"
       }
     },
     "world": {
       "summary": "Everything in login, plus enough to enter and render the chosen maps.",
       "include": [
-        "db/**",
-        "misc/fonts/**",
-        "misc/tileset/**",
-        "misc/xtextures/**",
-        "misc/dungeons/**",
+        "dbfilesclient/**",
+        "fonts/**",
+        "tileset/**",
+        "xtextures/**",
+        "dungeons/**",
         "interface/**",
         "character/**",
-        "environment/**",
+        "environments/**",
+        "particles/**",
         "item/**",
         "creature/**",
-        "spell/**",
+        "spells/**",
         "world/**",
-        "terrain/textures/**",
-        "terrain/minimap/**",
-        "terrain/maps/**"
+        "textures/**"
       ],
       "exclude": [
-        "interface/cinematics/**"
+        "interface/worldmap/**"
       ],
       "default_maps": [
         "azeroth"
       ],
       "exclude_reasons": {
-        "interface/cinematics/**": "the intro movie is skippable and is 118 MB"
+        "interface/worldmap/**": "the world map cannot be opened before entering the world"
       }
     },
     "full": {
@@ -60,18 +65,18 @@
         "**"
       ],
       "exclude": [
-        "misc/world of warcraft.app/**",
-        "misc/world of warcraft launcher.app/**",
-        "misc/background downloader.app/**",
-        "misc/data/*/documentation/**",
-        "interface/cinematics/**"
+        "world of warcraft.app/**",
+        "world of warcraft launcher.app/**",
+        "background downloader.app/**",
+        "data/enus/documentation/**",
+        "data/enus/interface/cinematics/**"
       ],
       "exclude_reasons": {
-        "misc/world of warcraft.app/**": "a macOS application bundle from the original install",
-        "misc/world of warcraft launcher.app/**": "a macOS application bundle from the original install",
-        "misc/background downloader.app/**": "a macOS application bundle from the original install",
-        "misc/data/*/documentation/**": "the manual and credits pages",
-        "interface/cinematics/**": "the intro movie is skippable and is 118 MB"
+        "world of warcraft.app/**": "a macOS application bundle from the original install",
+        "world of warcraft launcher.app/**": "a macOS application bundle from the original install",
+        "background downloader.app/**": "a macOS application bundle from the original install",
+        "data/enus/documentation/**": "the manual and credits pages",
+        "data/enus/interface/cinematics/**": "the intro movie, 117 MB, and it needs a codec the client does not ship"
       }
     }
   }

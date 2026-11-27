@@ -117,6 +117,16 @@ def resolve(literal, keys):
     return None
 
 
+def _all_paths(data_root):
+    """Every path in the extraction, relative to the data root."""
+    import os
+    out = []
+    for dirpath, _dirnames, filenames in os.walk(data_root):
+        for name in filenames:
+            out.append(os.path.relpath(os.path.join(dirpath, name), data_root))
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -131,10 +141,19 @@ def main():
         return 1
     profile = profiles[args.profile]
 
-    manifest = Path(args.source).expanduser().resolve() / "manifest.json"
-    if not manifest.is_file():
-        print("no manifest.json in %s." % args.source)
-        return 1
+    # The data root is the directory holding manifest.json, which is the
+    # expansion's own directory in an extraction and one level down under a
+    # Data root in a checkout. Both are accepted, because both are in the wild
+    # and the report is only as good as the tree it was pointed at.
+    source = Path(args.source).expanduser().resolve()
+    data_root = source
+    if not (data_root / "manifest.json").is_file():
+        found = sorted(source.glob("expansions/*/manifest.json"))
+        if not found:
+            print("no manifest.json in %s, and none under expansions/*/." % args.source)
+            return 1
+        data_root = found[0].parent
+    manifest = data_root / "manifest.json"
 
     keys = load_manifest_keys(manifest)
     if not keys:
@@ -147,7 +166,7 @@ def main():
               "so this reports a clean run it did not perform.")
         return 1
     from_source = len(literals)
-    literals |= interface_literals(Path(args.source).expanduser().resolve())
+    literals |= interface_literals(data_root)
     from_interface = len(literals) - from_source
 
     maps = args.maps.split(",") if args.maps else profile.get("default_maps")
@@ -194,6 +213,24 @@ def main():
         print("dropped from directories this profile does not carry, as intended:")
         for name in sorted(expected):
             print("  %-12s %d" % (name, expected[name]))
+        print("")
+
+    # An include pattern that matches nothing in the extraction is either a
+    # typo or a directory the extractor no longer produces, and it fails
+    # quietly: the profile simply carries less than it says, and the files it
+    # was written to keep are dropped without a word. The DBC tables are the
+    # case that matters - the client reads them by name, and without them it
+    # loads no expansion at all.
+    dead = []
+    for pattern in profile.get("include", []):
+        if not any(matches(rel, [pattern]) for rel in _all_paths(data_root)):
+            dead.append(pattern)
+    if dead:
+        print("%d include pattern(s) match nothing in this extraction. Each is a "
+              "directory the profile means to carry that is not here - a typo, or a "
+              "layout the extractor has changed:" % len(dead))
+        for pattern in dead:
+            print("  DEAD      %s" % pattern)
         print("")
 
     if deliberate:

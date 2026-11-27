@@ -133,12 +133,19 @@ public:
     void stopRecording();
     void toggleRecording();
 
+    /// Offer the last screenshot or recording through the platform's share
+    /// sheet (iOS). On other platforms it does nothing, and the file stays
+    /// where it was written.
+    void shareLastCapture();
+
 private:
     void applyCameraControlSettings();
     /// Say in the chat why a recording stopped by itself, if one did.
     void reportRecordingFailure();
     /// Where the recording in progress, or the last one, is being written.
     std::string recordingPath_;
+    /// The last screenshot or recording written, so it can be shared.
+    std::string lastCapturePath_;
 
     // Injected UI services (Section 3.5 Phase B - replaces getInstance() calls)
     UIServices services_;

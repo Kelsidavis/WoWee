@@ -21,7 +21,10 @@
 // calls a JIT API this process was never entitled to use, and that call traps
 // the process rather than returning a failure.
 #if defined(__APPLE__) && !defined(HAVE_UNICORN)
-    #define WOWEE_MAP_JIT 1
+    #include <TargetConditionals.h>
+    #if !(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE)
+        #define WOWEE_MAP_JIT 1
+    #endif
 #endif
 
 #if defined(WOWEE_MAP_JIT) && (defined(__aarch64__) || defined(__arm64__))

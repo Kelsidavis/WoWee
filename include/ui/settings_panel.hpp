@@ -3,6 +3,7 @@
 #include "ui/buff_bar_layout.hpp"
 #include "ui/graphics_defaults.hpp"
 #include "ui/ui_services.hpp"
+#include <imgui.h>
 #include <vulkan/vulkan.h>
 #include <algorithm>
 #include <string>
@@ -316,7 +317,8 @@ public:
     /// save it, and change nothing on screen.
     void applySettingSideEffects(const std::string& key);
 
-    /// Apply the persisted global ImGui window scale without compounding ratios.
+    /// Apply the persisted global ImGui window scale from a fixed base style,
+    /// so repeated slider steps cannot compound ScaleAllSizes' truncation.
     void applyWindowUiScale();
 
     /// Return the platform-specific settings file path
@@ -333,6 +335,11 @@ private:
     UIServices services_;  // Injected service references
     ChatSettings* chatSettings_ = nullptr;      // Owned by ChatPanel, not by this
     float appliedWindowUiScale_ = 1.0f;
+    // The style as this panel first saw it - theme and display scale already
+    // on it - so every scale change reapplies from one fixed base rather than
+    // scaling the already-scaled style. See applyWindowUiScale.
+    ImGuiStyle windowScaleBaseStyle_;
+    bool windowScaleBaseCaptured_ = false;
 
     void applyGraphicsPreset(GraphicsPreset preset);
     void updateGraphicsPresetFromCurrentSettings();

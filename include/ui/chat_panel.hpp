@@ -94,6 +94,9 @@ public:
         bool showWho       = false;
         bool toggleCombatLog = false;
         bool takeScreenshot = false;
+        /// /share: offer the last screenshot or recording to the platform's
+        /// share sheet (iOS).
+        bool shareLastCapture = false;
         /// /record: start, stop, or whichever it is not doing.
         enum class Recording { None, Toggle, Start, Stop };
         Recording recording = Recording::None;

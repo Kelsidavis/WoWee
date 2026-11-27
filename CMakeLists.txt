@@ -274,10 +274,18 @@ endif()
 #
 # SDL3 installs its headers as <SDL3/SDL.h>, which is the spelling the sources
 # use, so unlike the SDL2 build there is no include shim to arrange here.
-if(ANDROID)
+# iOS has no system SDL either, so fetch and build it with the client, mirroring
+# the Android path.  iOS links SDL statically (dynamic frameworks need signing
+# and an app bundle), so SDL_SHARED is off there.
+if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     include(FetchContent)
-    set(SDL_SHARED ON  CACHE BOOL "" FORCE)   # SDLActivity loads libSDL3.so
-    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    if(ANDROID)
+        set(SDL_SHARED ON  CACHE BOOL "" FORCE)   # SDLActivity loads libSDL3.so
+        set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    else()
+        set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+        set(SDL_STATIC ON  CACHE BOOL "" FORCE)
+    endif()
     set(SDL_TEST   OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(SDL3
         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
@@ -285,7 +293,7 @@ if(ANDROID)
         GIT_SHALLOW    TRUE)
     FetchContent_MakeAvailable(SDL3)
 
-    # Header-only, and there is no system copy to find on Android.
+    # Header-only, and there is no system copy to find on Android/iOS.
     FetchContent_Declare(glm
         GIT_REPOSITORY https://github.com/g-truc/glm.git
         GIT_TAG        1.0.1
@@ -293,17 +301,19 @@ if(ANDROID)
     FetchContent_MakeAvailable(glm)
     include_directories(${glm_SOURCE_DIR})
 
-    # log is Android's logging, which Catch2 writes through as well as this
-    # client; android carries ANativeWindow and the asset manager. Directory
-    # scope, so every target below gets them without being named.
-    link_libraries(log android)
+    if(ANDROID)
+        # log is Android's logging, which Catch2 writes through as well as this
+        # client; android carries ANativeWindow and the asset manager. Directory
+        # scope, so every target below gets them without being named.
+        link_libraries(log android)
 
-    # miniaudio's OpenSL and AAudio backends are only compiled on Android, and
-    # they have unused parameters that this build treats as errors. It is
-    # vendored, so the warning is turned off for the one unit that compiles it
-    # rather than patched out of the header.
-    set_source_files_properties(src/audio/audio_engine.cpp PROPERTIES
-                                COMPILE_OPTIONS "-Wno-unused-parameter")
+        # miniaudio's OpenSL and AAudio backends are only compiled on Android, and
+        # they have unused parameters that this build treats as errors. It is
+        # vendored, so the warning is turned off for the one unit that compiles it
+        # rather than patched out of the header.
+        set_source_files_properties(src/audio/audio_engine.cpp PROPERTIES
+                                    COMPILE_OPTIONS "-Wno-unused-parameter")
+    endif()
 else()
     find_package(SDL3 REQUIRED CONFIG)
 endif()
@@ -358,10 +368,9 @@ if(NOT Vulkan_FOUND)
                 message(STATUS "Found Vulkan headers in LLVM-MinGW sysroot: ${_VULKAN_MINGW_INCLUDE}")
             endif()
         endif()
-    elseif(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-        # macOS cross-compilation: use vcpkg-installed vulkan-headers.
-        # The host pkg-config would find Linux libvulkan-dev headers which the
-        # macOS cross-compiler cannot use (different sysroot).
+    elseif(CMAKE_CROSSCOMPILING AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "iOS"))
+        # macOS/iOS cross-compilation: use vcpkg-installed vulkan-headers.
+        # MoltenVK provides the Vulkan loader at runtime on Apple platforms.
         find_package(VulkanHeaders CONFIG QUIET)
         if(VulkanHeaders_FOUND)
             if(NOT TARGET Vulkan::Vulkan)
@@ -398,7 +407,7 @@ if(NOT Vulkan_FOUND)
 endif()
 # macOS cross-compilation: the Vulkan loader (MoltenVK) is not available at link
 # time. Allow unresolved Vulkan symbols - they are resolved at runtime.
-if(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(CMAKE_CROSSCOMPILING AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "iOS"))
     set(WOWEE_MACOS_CROSS_COMPILE TRUE)
 endif()
 find_package(OpenSSL REQUIRED)
@@ -409,14 +418,9 @@ if(WIN32)
 else()
     find_package(PkgConfig REQUIRED)
 endif()
-if(ANDROID)
-    # Not through pkg-config. There is no Android FFmpeg to find and the host's
-    # copy answers with the host's include path, which puts glibc headers in
-    # front of the NDK sysroot and fails on the first system header. The same
-    # trap the Windows cross build hit with Vulkan, one probe further down.
-    #
-    # Cinematics are the only thing behind this, and the no-FFmpeg path is
-    # already supported.
+if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # No FFmpeg on Android/iOS in this port (cinematics disabled). The host's
+    # copy would pollute the cross-compile sysroot, so skip probing entirely.
     set(FFMPEG_FOUND FALSE)
 elseif(PkgConfig_FOUND)
     pkg_check_modules(FFMPEG libavformat libavcodec libswscale libavutil)
@@ -1194,9 +1198,14 @@ set(WOWEE_HEADERS
 # equivalent (press-and-hold accents).  window.cpp calls into it, so every
 # target that compiles window.cpp must link it.
 set(WOWEE_MACOS_SOURCES)
+set(WOWEE_IOS_SOURCES)
 if(APPLE)
     enable_language(OBJCXX)
-    set(WOWEE_MACOS_SOURCES src/core/macos_platform.mm)
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        set(WOWEE_IOS_SOURCES src/core/ios_platform.mm)
+    else()
+        set(WOWEE_MACOS_SOURCES src/core/macos_platform.mm)
+    endif()
 endif()
 
 set(WOWEE_PLATFORM_SOURCES)
@@ -1251,9 +1260,9 @@ endif()
 # it and calls SDL_main, and SDL_main.h has already renamed main() to that - so
 # an executable link asks for a main that no longer exists.
 if(ANDROID)
-    add_library(wowee SHARED ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES})
+    add_library(wowee SHARED ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES} ${WOWEE_IOS_SOURCES})
 else()
-    add_executable(wowee ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES})
+    add_executable(wowee ${WOWEE_SOURCES} ${WOWEE_HEADERS} ${WOWEE_PLATFORM_SOURCES} ${WOWEE_MACOS_SOURCES} ${WOWEE_IOS_SOURCES})
 endif()
 
 # Tracy profiler - zero overhead when WOWEE_ENABLE_TRACY is OFF
@@ -1266,6 +1275,94 @@ endif()
 
 if(TARGET opcodes-generate)
     add_dependencies(wowee opcodes-generate)
+endif()
+
+# iOS needs a compile-time flag so source code can distinguish a device build
+# from a macOS one (both define __APPLE__).
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_compile_definitions(wowee PRIVATE WOWEE_IOS=1)
+    set_target_properties(wowee PROPERTIES
+        XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
+        # Build for iPhone and iPad.  Without this Xcode defaults to
+        # iPhone-only (UIDeviceFamily=1) and an iPad runs the app in
+        # compatibility mode: a 375x667-point virtual iPhone screen instead
+        # of a native iPad window.
+        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+    )
+    # Xcode's default iOS warning flags include -Wshorten-64-to-32, which is
+    # not part of the desktop/macOS build and would turn every size()-to-uint32
+    # conversion into an error under -Werror.  Silence it for the iOS target.
+    target_compile_options(wowee PRIVATE -Wno-shorten-64-to-32)
+    # miniaudio's iOS backend pulls in AVFoundation, an Objective-C framework;
+    # compile the audio TU as Objective-C++ so its headers parse.
+    set_source_files_properties(src/audio/audio_engine.cpp PROPERTIES LANGUAGE OBJCXX)
+
+    # Compile the launch screen storyboard into the bundle (Xcode handles this
+    # when the file is part of the target sources).
+    target_sources(wowee PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ios/LaunchScreen.storyboard")
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/ios/LaunchScreen.storyboard"
+        PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+
+    # Compile the asset catalog (app icons) into Assets.car in the bundle via
+    # actool, since CMake's Xcode generator does not drive it automatically.
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ios/Assets.xcassets")
+        add_custom_command(TARGET wowee POST_BUILD
+            COMMAND actool
+                "${CMAKE_CURRENT_SOURCE_DIR}/ios/Assets.xcassets"
+                --compile "$<TARGET_FILE_DIR:wowee>"
+                --platform iphoneos
+                --minimum-deployment-target 16.0
+                --app-icon AppIcon
+                --output-partial-info-plist "${CMAKE_BINARY_DIR}/assetcatalog_info.plist"
+            COMMENT "Compiling asset catalog (AppIcon)"
+            VERBATIM
+        )
+    endif()
+
+    # Force-load Objective-C classes from statically linked libraries so the
+    # runtime can resolve classes referenced by Info.plist (e.g. scene delegates).
+    target_link_options(wowee PRIVATE "-ObjC")
+
+    # Link MoltenVK (static) when available, so Vulkan symbols resolve at
+    # link time instead of via dynamic_lookup at runtime.  The framework lives
+    # under extern/MoltenVK (obtained separately - KhronosGroup/MoltenVK at
+    # v1.4.2, whose repo ships the prebuilt xcframework; see ios/README.md).
+    set(_MV_XCFW "${CMAKE_CURRENT_SOURCE_DIR}/extern/MoltenVK/MoltenVK/MoltenVK/static/MoltenVK.xcframework")
+    if(CMAKE_OSX_SYSROOT MATCHES "imulator")
+        set(_MV_SLICE "ios-arm64_x86_64-simulator")
+    else()
+        set(_MV_SLICE "ios-arm64")
+    endif()
+    if(EXISTS "${_MV_XCFW}/${_MV_SLICE}/libMoltenVK.a")
+        target_link_libraries(wowee PRIVATE "${_MV_XCFW}/${_MV_SLICE}/libMoltenVK.a")
+        # MoltenVK's own headers, for reading and changing its configuration in
+        # vk_context.cpp. Only added where this library was linked: the headers
+        # belong to the library just linked, and nothing else includes them.
+        target_include_directories(wowee PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/extern/MoltenVK/MoltenVK/MoltenVK/include")
+        target_link_libraries(wowee PRIVATE
+            "-framework Metal" "-framework Foundation" "-framework QuartzCore"
+            "-framework CoreGraphics" "-framework IOSurface" "-framework UIKit"
+            "-framework Photos" "-framework PhotosUI")
+        message(STATUS "MoltenVK (static) linked for iOS (${_MV_SLICE})")
+    else()
+        message(STATUS "MoltenVK not found at ${_MV_XCFW}/${_MV_SLICE}; building with dynamic_lookup (runtime link required)")
+    endif()
+    # On iOS the executable must live inside an app bundle, and Xcode requires
+    # a bundle identifier for any bundle target.  Keep the bundle minimal here
+    # (Phase 1 verification); the full Xcode app shell (Phase 2) replaces it.
+    set_target_properties(wowee PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_IDENTIFIER "com.wowee.client"
+        MACOSX_BUNDLE_BUNDLE_NAME "WoWee"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist"
+    )
+    # The Xcode generator copies the bundle plist into the build tree when it
+    # generates the project, so an edit to ios/Info.plist (the app icon
+    # declaration, the orientation keys) would otherwise only reach the
+    # device after a manual re-configure.  Re-run CMake when it changes.
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist")
 endif()
 # macOS cross-compilation: MoltenVK is not available at link time.
 # Allow unresolved Vulkan symbols - resolved at runtime. Scoped to wowee only.
@@ -1593,21 +1690,63 @@ endif()
 # Copy assets next to the executable (runs every build, not just configure).
 # Uses $<TARGET_FILE_DIR:wowee> so MSVC multi-config generators place assets
 # in bin/Debug/ or bin/Release/ alongside the exe, not the common bin/ parent.
-add_custom_command(TARGET wowee POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets
-        $<TARGET_FILE_DIR:wowee>/assets
-    COMMENT "Syncing assets to $<TARGET_FILE_DIR:wowee>/assets"
-)
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # On a device the assets are inside the app bundle, and what is in them
+    # decides how big the download is. The whole tree is 89 MB, of which:
+    #
+    #   - Original Music is 73 MB. It is the project's own soundtrack and it
+    #     plays from the game's own paths on the desktop, where the source
+    #     tree is one directory away. On a device the music would have to
+    #     ship inside the bundle to be found at all, and 73 MB of mp3 for a
+    #     login theme is not a trade worth making on a device with a metered
+    #     install. It stays in the repository and the desktop build.
+    #   - The three screenshots the README shows (hellfire-peninsula,
+    #     orgrimmar-entrance, wowee-soundtrack) are documentation. Nothing in
+    #     the client opens them.
+    #
+    # What the client does read is copied in full: the shaders, the loading
+    # and sign-in screens, and the icon.
+    add_custom_command(TARGET wowee POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders
+            $<TARGET_FILE_DIR:wowee>/assets/shaders
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets/Wowee.png
+            $<TARGET_FILE_DIR:wowee>/assets/Wowee.png
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets/krayonload.png
+            $<TARGET_FILE_DIR:wowee>/assets/krayonload.png
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets/krayonsignin.png
+            $<TARGET_FILE_DIR:wowee>/assets/krayonsignin.png
+        COMMENT "Syncing runtime assets into the iOS bundle"
+    )
+else()
+    add_custom_command(TARGET wowee POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets
+            $<TARGET_FILE_DIR:wowee>/assets
+        COMMENT "Syncing assets to $<TARGET_FILE_DIR:wowee>/assets"
+    )
+endif()
 
 # Symlink Data/ next to the executable so expansion profiles, opcode tables,
 # and other runtime data files are found when running from the build directory.
-if(NOT WIN32)
+if(NOT WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_custom_command(TARGET wowee POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E create_symlink
             ${CMAKE_CURRENT_SOURCE_DIR}/Data
             $<TARGET_FILE_DIR:wowee>/Data
         COMMENT "Symlinking Data to $<TARGET_FILE_DIR:wowee>/Data"
+    )
+elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # Bundle the small client-side Data/ (expansion profiles + opcode tables)
+    # directly; absolute symlinks are forbidden in app bundles.
+    add_custom_command(TARGET wowee POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/Data
+            $<TARGET_FILE_DIR:wowee>/Data
+        COMMENT "Copying Data into iOS bundle"
     )
 endif()
 
@@ -1632,6 +1771,7 @@ endif()
 # Install targets
 install(TARGETS wowee
     RUNTIME DESTINATION bin
+    BUNDLE DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
@@ -1847,7 +1987,8 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR)
     set_target_properties(asset_extract PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     )
-    install(TARGETS asset_extract RUNTIME DESTINATION bin)
+    install(TARGETS asset_extract RUNTIME DESTINATION bin
+    BUNDLE DESTINATION bin)
     message(STATUS "  asset_extract tool: ENABLED")
 else()
     message(STATUS "  asset_extract tool: DISABLED (requires StormLib)")
@@ -1954,7 +2095,8 @@ if(STORMLIB_LIBRARY AND STORMLIB_INCLUDE_DIR AND SDL3_FOUND AND EXISTS ${IMGUI_D
     set_target_properties(wowee_assets PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     )
-    install(TARGETS wowee_assets RUNTIME DESTINATION bin)
+    install(TARGETS wowee_assets RUNTIME DESTINATION bin
+    BUNDLE DESTINATION bin)
     message(STATUS "  wowee_assets window: ENABLED")
 else()
     message(STATUS "  wowee_assets window: DISABLED (needs StormLib, SDL3 and extern/imgui)")
@@ -2035,7 +2177,8 @@ target_link_libraries(dbc_to_csv PRIVATE Threads::Threads)
 set_target_properties(dbc_to_csv PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
-install(TARGETS dbc_to_csv RUNTIME DESTINATION bin)
+install(TARGETS dbc_to_csv RUNTIME DESTINATION bin
+    BUNDLE DESTINATION bin)
 
 # ---- Tool: auth_probe (LOGON_CHALLENGE probe) ----
 add_executable(auth_probe
@@ -2056,7 +2199,8 @@ target_link_libraries(auth_probe PRIVATE Threads::Threads OpenSSL::Crypto
 set_target_properties(auth_probe PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
-install(TARGETS auth_probe RUNTIME DESTINATION bin)
+install(TARGETS auth_probe RUNTIME DESTINATION bin
+    BUNDLE DESTINATION bin)
 
 # ---- Tool: auth_login_probe (challenge + proof probe) ----
 add_executable(auth_login_probe
@@ -2080,7 +2224,8 @@ target_link_libraries(auth_login_probe PRIVATE Threads::Threads OpenSSL::Crypto
 set_target_properties(auth_login_probe PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
-install(TARGETS auth_login_probe RUNTIME DESTINATION bin)
+install(TARGETS auth_login_probe RUNTIME DESTINATION bin
+    BUNDLE DESTINATION bin)
 
 # ---- Tool: blp_convert (BLP ↔ PNG) ----
 add_executable(blp_convert
@@ -2097,7 +2242,8 @@ target_link_libraries(blp_convert PRIVATE Threads::Threads)
 set_target_properties(blp_convert PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
-install(TARGETS blp_convert RUNTIME DESTINATION bin)
+install(TARGETS blp_convert RUNTIME DESTINATION bin
+    BUNDLE DESTINATION bin)
 
 # ---- Tool: wowee_editor (Standalone World Editor) ----
 # Off the default build: it is a large standalone tool that compiles on every
@@ -2631,7 +2777,8 @@ set_target_properties(wowee_editor PROPERTIES
 if(WOWEE_BUILD_EDITOR)
     # Only installable when it is part of the default build - installing a
     # target excluded from ALL fails at install time on a missing binary.
-    install(TARGETS wowee_editor RUNTIME DESTINATION bin)
+    install(TARGETS wowee_editor RUNTIME DESTINATION bin
+    BUNDLE DESTINATION bin)
     message(STATUS "  wowee_editor tool: ENABLED (in default build)")
 else()
     message(STATUS "  wowee_editor tool: on demand only (--target wowee_editor)")

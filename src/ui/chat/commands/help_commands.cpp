@@ -27,7 +27,7 @@ public:
             "Movement: /sit  /stand  /kneel  /dismount",
             "Misc: /played  /time  /zone  /loc  /afk  /dnd  /helm  /cloak",
             "      /trade  /score  /unstuck  /logout  /quit  /exit  /ticket",
-            "      /screenshot  /difficulty",
+            "      /screenshot  /share  /difficulty",
             "      /macrohelp  /chathelp  /help  /gmhelp",
             "GM:    .command (dot-prefix sent to server, /gmhelp for list)",
         };

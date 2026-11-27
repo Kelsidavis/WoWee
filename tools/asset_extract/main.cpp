@@ -66,6 +66,8 @@ static void printUsage(const char* prog) {
               << "  --listfile <path>   External listfile for MPQ file enumeration (auto-detected)\n"
               << "  --include <text>    Extract only paths containing this (repeatable); for\n"
               << "                      borrowing one zone's art instead of a whole client\n"
+              << "  --exclude <text>    Skip paths containing this (repeatable); for a tree\n"
+              << "                      that fits a smaller device, e.g. --exclude 'sound\\'\n"
               << "  --reference-manifest <path>\n"
               << "                      Only extract files NOT in this manifest (delta extraction)\n"
               << "  --dbc-csv-out <dir> Write CSV DBCs into <dir> (overrides default output path)\n"
@@ -164,6 +166,16 @@ int main(int argc, char** argv) {
                 c = (c == '/') ? '\\' : static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
             }
             opts.includeSubstrings.push_back(fragment);
+        } else if (std::strcmp(argv[i], "--exclude") == 0 && i + 1 < argc) {
+            // Same matching as --include: normalized to lowercase with
+            // backslashes, so 'sound\' and 'sound/' both name the same
+            // directory. A trailing backslash is what makes it a directory
+            // rather than a file whose name happens to start with "sound".
+            std::string fragment = argv[++i];
+            for (char& c : fragment) {
+                c = (c == '/') ? '\\' : static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+            opts.excludeSubstrings.push_back(fragment);
         } else if (std::strcmp(argv[i], "--reference-manifest") == 0 && i + 1 < argc) {
             opts.referenceManifest = argv[++i];
         } else if (std::strcmp(argv[i], "--verify") == 0) {

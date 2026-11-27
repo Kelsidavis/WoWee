@@ -14,6 +14,7 @@
 #include "core/window.hpp"
 #include "core/application.hpp"
 #include "core/logger.hpp"
+#include "core/text_input.hpp"
 #include "auth/auth_handler.hpp"
 #include "game/game_handler.hpp"
 #include "rendering/vk_context.hpp"
@@ -50,7 +51,7 @@ namespace {
 /// too small to read and far too small to hit.
 ///
 /// 1.0 everywhere else, where the layouts are already the right size.
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
 /// The shortest the interface can be, in the units its layouts are written in.
 ///
 /// The client's dialogs are sized in pixels against a desktop monitor, and the
@@ -62,7 +63,7 @@ constexpr float kMinLogicalHeight = 620.0f;
 #endif
 
 float interfaceScale([[maybe_unused]] SDL_Window* window) {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
     // SDL3 dropped SDL_GetDisplayDPI and answers with a content scale
     // instead, which is the same number this was deriving: dpi over
     // Android's 160 baseline is what the platform already calls 1x.
@@ -447,6 +448,21 @@ void UIManager::update([[maybe_unused]] float deltaTime) {
     // Start ImGui frame
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL3_NewFrame();
+    // Guard against a zero framebuffer scale on platforms where
+    // SDL_GetWindowDisplayScale() returns 0 (seen on iOS).
+    ImGuiIO& _io = ImGui::GetIO();
+    if (_io.DisplayFramebufferScale.x <= 0.0f || _io.DisplayFramebufferScale.y <= 0.0f) {
+        if (_io.DisplaySize.x > 0.0f && _io.DisplaySize.y > 0.0f) {
+            int _dw = 0, _dh = 0;
+            SDL_GetWindowSizeInPixels(window->getSDLWindow(), &_dw, &_dh);
+            _io.DisplayFramebufferScale.x = (_dw > 0) ? (float)_dw / _io.DisplaySize.x : 1.0f;
+            _io.DisplayFramebufferScale.y = (_dh > 0) ? (float)_dh / _io.DisplaySize.y : 1.0f;
+        } else {
+            _io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
+        }
+        if (_io.DisplayFramebufferScale.x <= 0.0f) _io.DisplayFramebufferScale.x = 1.0f;
+        if (_io.DisplayFramebufferScale.y <= 0.0f) _io.DisplayFramebufferScale.y = 1.0f;
+    }
     ImGui::NewFrame();
 }
 
@@ -566,8 +582,18 @@ void UIManager::finishImGuiFrame() {
         SDL_Window* sdlWindow = window ? window->getSDLWindow() : nullptr;
         // Not restarted when an ImGui box already started it: a second start
         // resets an IME composition in progress on some platforms.
+        //
+        // Started with the assists off (core/text_input.hpp) rather than
+        // through plain SDL_StartTextInput, whose defaults are autocorrect on
+        // and sentence capitalization - what SDL's own backend would leave
+        // behind, and what rewrites the player's chat. Application::run owns
+        // the same properties for the Lua edit box and the keyboard frames,
+        // and re-applies them if a session it did not start is found running.
         if (wantsText) {
-            if (!SDL_TextInputActive(sdlWindow)) SDL_StartTextInput(sdlWindow);
+            if (!SDL_TextInputActive(sdlWindow)) {
+                SDL_StartTextInputWithProperties(sdlWindow,
+                                                 wowee::core::textInputNoAssistProperties());
+            }
         } else {
             SDL_StopTextInput(sdlWindow);
         }

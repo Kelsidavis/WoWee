@@ -134,6 +134,22 @@ public:
     [[nodiscard]] std::string helpText() const override { return "Take a screenshot"; }
 };
 
+// --- /share ---
+// Offers the last screenshot or recording to the platform's share sheet.
+// On iOS that is AirDrop, Mail, Files and everything else the system offers;
+// elsewhere it does nothing, and the file stays where it was written.
+class ShareCommand : public IChatCommand {
+public:
+    ChatCommandResult execute(ChatCommandContext& ctx) override {
+        ctx.panel.getSlashCmds().shareLastCapture = true;
+        return {};
+    }
+    [[nodiscard]] std::vector<std::string> aliases() const override { return {"share"}; }
+    [[nodiscard]] std::string helpText() const override {
+        return "Share the last screenshot or recording (iOS)";
+    }
+};
+
 // --- /record ---
 // Start or stop recording the screen. On its own it flips between the two, so
 // a macro holding just "/record" is a key that starts and stops it - which is
@@ -410,6 +426,7 @@ void registerMiscCommands(ChatCommandRegistry& reg) {
     reg.registerCommand(std::make_unique<ZoneCommand>());
     reg.registerCommand(std::make_unique<PlayedCommand>());
     reg.registerCommand(std::make_unique<ScreenshotCommand>());
+    reg.registerCommand(std::make_unique<ShareCommand>());
     reg.registerCommand(std::make_unique<RecordCommand>());
     reg.registerCommand(std::make_unique<TicketCommand>());
     reg.registerCommand(std::make_unique<ScoreCommand>());

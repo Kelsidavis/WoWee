@@ -315,9 +315,9 @@ the `chmod` the client stops at startup with `Permission denied` on
 
 | Profile | Size | Reaches |
 |---|---|---|
-| `login` | 787 MB | Login, character selection and creation. No world |
-| `world --maps azeroth` | 7.5 GB | One continent |
-| `world --maps all` | 12 GB | Every map |
+| `login` | 890 MB | Login, character selection and creation. No world |
+| `world --maps azeroth` | 7.3 GB | One continent |
+| `world --maps all` | 11.8 GB | Every map |
 | `full` | 18 GB | Everything, sound included |
 
 A subset carries its own rewritten `manifest.json`, because that file is how the

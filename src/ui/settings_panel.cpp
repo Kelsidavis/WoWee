@@ -77,10 +77,20 @@ void SettingsPanel::applyWindowUiScale() {
         return;
     }
 
-    // Scale from the currently applied value, not from the already-scaled
-    // style, so dragging the slider back and forth never compounds rounding.
-    const float ratio = pendingWindowUiScale / appliedWindowUiScale_;
-    ImGui::GetStyle().ScaleAllSizes(ratio);
+    // Reapply from a snapshot of the style as this panel first saw it -
+    // theme and display scale already on it - instead of scaling the
+    // already-scaled style. ScaleAllSizes truncates every field toward zero
+    // (ImTrunc), so the incremental ratio compounded rounding on every slider
+    // step: a handful of steps down walked WindowBorderHoverPadding from 4
+    // to 0, and ImGui's NewFrame sanity check ("Invalid style setting!")
+    // aborted the process on the next frame. From one fixed base the smallest
+    // value reachable is trunc(4 * 0.75) = 3, whatever path the slider took.
+    if (!windowScaleBaseCaptured_) {
+        windowScaleBaseStyle_ = ImGui::GetStyle();
+        windowScaleBaseCaptured_ = true;
+    }
+    ImGui::GetStyle() = windowScaleBaseStyle_;
+    ImGui::GetStyle().ScaleAllSizes(pendingWindowUiScale);
     ImGui::GetIO().FontGlobalScale = pendingWindowUiScale;
     appliedWindowUiScale_ = pendingWindowUiScale;
 }

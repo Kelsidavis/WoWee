@@ -334,6 +334,13 @@ private:
     float paperdollFacing_ = 0.0f;
     uint32_t paperdollWidgetId_ = 0;
     bool addonsLoaded_ = false;
+    /// Whether SDL text input was last started with the no-assist properties
+    /// (core/text_input.hpp) rather than SDL's defaults. Cleared whenever
+    /// text input is found stopped, so a session someone else started plain
+    /// - the ImGui backend does - gets the properties applied exactly once
+    /// instead of every frame: applying them re-adds the UIKit text field to
+    /// the view, which is not something to do sixty times a second.
+    bool textInputNoAssistApplied_ = false;
     std::unique_ptr<game::ExpansionRegistry> expansionRegistry_;
     // Empty means assets follow the active protocol profile. "legacy" selects
     // the root WOW_DATA_PATH manifest; otherwise this is an expansion id.

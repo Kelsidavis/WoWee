@@ -119,8 +119,8 @@ void AssetManager::setupFileCacheBudget() {
     const size_t envMaxMB = parseEnvSizeMB("WOWEE_FILE_CACHE_MAX_MB");
 
     const size_t minBudgetBytes = 256ull * 1024ull * 1024ull;
-#ifdef __ANDROID__
-    // Half of available RAM is a desktop rule. Android does not let one app
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
+    // Mobile rule: cap the cache well below the per-app memory limit. Android does not let one app
     // have that: it enforces a per-app limit far below the machine's memory and
     // kills the process rather than swapping when it is passed. A phone with
     // 8 GB was handing this cache 840 MB, which is both more than the app may

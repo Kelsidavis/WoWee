@@ -1093,8 +1093,8 @@ private:
     /// caller that holds a Widget* across creating a child. A deque keeps
     /// references valid when it grows, which is the guarantee this needs.
     float uiScale_ = 1.0f;
-#ifdef __ANDROID__
-    // A phone shows the interface's 768 units in under three inches of
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
+    // A tablet shows the interface's 768 units small; start at max scale.
     // height, where 1 reads small. The ceiling is the largest scale the frames
     // still fit at, so it starts there; a UI Scale the player saved still wins.
     float userScale_ = kMaxUserScale;

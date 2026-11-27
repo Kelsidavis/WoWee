@@ -15,6 +15,9 @@
 #include "addons/addon_manager.hpp"
 #include "core/coordinates.hpp"
 #include "core/input.hpp"
+#if defined(WOWEE_IOS)
+#include "core/ios_platform.hpp"
+#endif
 #include "rendering/renderer.hpp"
 #include "rendering/post_process_pipeline.hpp"
 #include "rendering/animation_controller.hpp"
@@ -1757,6 +1760,7 @@ void GameScreen::startRecording() {
     std::string error;
     if (renderer->startRecording(path, error)) {
         recordingPath_ = path;
+        lastCapturePath_ = path;
         services_.gameHandler->addSystemChatMessage(
             "Recording to " + path + ". Type /record again to stop.");
     } else {
@@ -1810,7 +1814,34 @@ void GameScreen::takeScreenshot() {
         sysMsg.language = game::ChatLanguage::UNIVERSAL;
         sysMsg.message = "Screenshot saved: " + path;
         services_.gameHandler->addLocalChatMessage(sysMsg);
+
+#if defined(WOWEE_IOS)
+        // On a tablet the file is in the app's Documents, which the Files app
+        // can reach but takes a few taps to find. Save it into the photo
+        // library as well, where the tablet's own screenshots live - that is
+        // what a player expects to see, and it is silent, so it does not
+        // interrupt the game with a modal over the client.
+        core::iosSaveScreenshotToPhotos(path.c_str());
+#endif
+        lastCapturePath_ = path;
     }
+}
+
+/// Share the last screenshot or recording through the iOS share sheet.
+void GameScreen::shareLastCapture() {
+#if defined(WOWEE_IOS)
+    if (lastCapturePath_.empty()) {
+        game::MessageChatData sysMsg;
+        sysMsg.type = game::ChatType::SYSTEM;
+        sysMsg.language = game::ChatLanguage::UNIVERSAL;
+        sysMsg.message = "Nothing to share yet - take a screenshot or a recording first.";
+        services_.gameHandler->addLocalChatMessage(sysMsg);
+        return;
+    }
+    core::iosShareFile(lastCapturePath_.c_str());
+#else
+    (void)0;
+#endif
 }
 
 }} // namespace wowee::ui

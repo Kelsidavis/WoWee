@@ -723,7 +723,10 @@ std::string CharacterScreen::getConfigDir() {
 
 void CharacterScreen::saveLastCharacter(uint64_t guid) {
     std::string dir = getConfigDir();
-    std::filesystem::create_directories(dir);
+    // error_code overload: this runs on the Enter World path, where a
+    // directory that cannot be created must not throw out of Application::update.
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
     std::ofstream f(dir + "/last_character.cfg");
     if (f) f << guid;
 }

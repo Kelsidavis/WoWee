@@ -240,6 +240,16 @@ public:
     /// panel destroyed with focus inside it, or one that went invisible
     /// through a parent before the frame that would have noticed ran.
     [[nodiscard]] bool editBoxHasFocus() const;
+    /// Whether a visible Lua frame currently has the keyboard enabled, so
+    /// typed characters have somewhere to go: StackSplitFrame takes the
+    /// amount it is building from OnChar, not from OnKeyDown.
+    ///
+    /// The frame loop keeps SDL text input up while this is true and stops
+    /// it when it goes false alongside the edit box and the ImGui fields -
+    /// see Application::run. Text input left running is what keeps UIKit's
+    /// hidden text field focused during play, which raises the
+    /// accented-letter popup on a held movement key.
+    [[nodiscard]] bool keyboardFrameWantsText() const { return topKeyboardFrame() != nullptr; }
     void setEditFocus(uint32_t wid);
 
     // SavedVariables: load globals from file, save globals to file

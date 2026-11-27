@@ -33,6 +33,15 @@ public:
         // backslashes. Empty means everything. For borrowing one zone's art out
         // of a client rather than unpacking the whole of it.
         std::vector<std::string> includeSubstrings;
+        // Skip files whose path contains one of these, on the same matching
+        // as includeSubstrings. Empty means keep everything.
+        //
+        // The counterpart of includeSubstrings, and the lever that makes an
+        // extraction fit a smaller device: sound alone is several gigabytes
+        // of a full client, and the client runs without it (the audio
+        // coordinator warns and carries on). Spell a fragment the way the
+        // paths read - "sound\" or "sound/" both work.
+        std::vector<std::string> excludeSubstrings;
         // Open-format emission: post-extract pass that writes wowee
         // open-format side-files (e.g. foo.blp → foo.png) without
         // touching the original. Lets wowee's runtime/editor consume

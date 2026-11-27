@@ -1,4 +1,8 @@
 #include "core/application.hpp"
+#if defined(WOWEE_IOS)
+#include "core/ios_platform.hpp"
+#include <TargetConditionals.h>
+#endif
 #include "core/frame_pacer.hpp"
 #include "core/env_flag.hpp"
 #include "core/character_paths.hpp"
@@ -25,6 +29,7 @@
 #include <utility>
 #include "core/logger.hpp"
 #include "core/memory_monitor.hpp"
+#include "core/text_input.hpp"
 #include "rendering/renderer.hpp"
 #include "rendering/loot_sparkles.hpp"
 #include "rendering/vk_context.hpp"
@@ -118,6 +123,27 @@ namespace wowee {
 namespace core {
 
 namespace {
+
+#if defined(WOWEE_IOS)
+// iPadOS-only: the low-memory callbacks below are the sole readers, so the
+// global must be guarded too or other platforms see a set-but-unused global
+// under -Werror.
+Application* gApplicationInstance = nullptr;
+
+void onIosMemoryWarning() {
+    if (gApplicationInstance && gApplicationInstance->getAssetManager()) {
+        gApplicationInstance->getAssetManager()->clearCache();
+        LOG_INFO("iOS memory warning: cleared asset cache");
+    }
+}
+
+static bool onLowMemoryEvent(void* /*userdata*/, SDL_Event* event) {
+    if (event && event->type == SDL_EVENT_LOW_MEMORY) {
+        onIosMemoryWarning();
+    }
+    return true;
+}
+#endif
 
 std::optional<float> movingEntityFloor(rendering::Renderer* renderer,
                                         const glm::vec3& renderPos,
@@ -243,11 +269,17 @@ Application* Application::instance = nullptr;
 
 Application::Application() {
     instance = this;
+#if defined(WOWEE_IOS)
+    gApplicationInstance = this;
+#endif
 }
 
 Application::~Application() {
     shutdown();
     instance = nullptr;
+#if defined(WOWEE_IOS)
+    gApplicationInstance = nullptr;
+#endif
 }
 
 bool Application::initialize() {
@@ -312,8 +344,12 @@ bool Application::initialize() {
 
     // Create and initialize audio coordinator (owns all audio managers)
     audioCoordinator_ = std::make_unique<audio::AudioCoordinator>();
+#if defined(__APPLE__) && TARGET_OS_SIMULATOR
+    LOG_WARNING("Skipping audio coordinator on iOS simulator (audio subsystem unavailable)");
+#else
     if (!audioCoordinator_->initialize())
         LOG_WARNING("Audio coordinator initialization failed - game will run without audio");
+#endif
     renderer->setAudioCoordinator(audioCoordinator_.get());
 
     // Create UI manager
@@ -351,6 +387,14 @@ bool Application::initialize() {
 
     // Create asset manager
     assetManager = std::make_unique<pipeline::AssetManager>();
+
+#if defined(WOWEE_IOS)
+    // iPadOS signals memory pressure through both SDL and UIKit; drop caches
+    // on either. The event watch is registered only on iOS so other platforms
+    // keep their original startup path.
+    SDL_AddEventWatch(onLowMemoryEvent, nullptr);
+    core::iosSetMemoryWarningCallback(onIosMemoryWarning);
+#endif
 
     // Populate game services - all subsystems now available
     gameServices_.renderer = renderer.get();
@@ -402,6 +446,9 @@ bool Application::initialize() {
         }
     } else {
         LOG_WARNING(assetInventory_.troubleText());
+#if defined(WOWEE_IOS)
+        core::iosShowAlert("WoWee", assetInventory_.troubleText().c_str());
+#endif
 #ifdef WOWEE_HAVE_ASSET_PANEL
         // Assigned rather than set through setState: several of the
         // subsystems its entry actions touch do not exist yet this early,
@@ -1424,8 +1471,11 @@ void Application::run() {
         ui::KeybindingManager::getInstance().beginInputFrame();
         ui::ageChatSlashEcho();
 
-        // Ask for text input while one of the interface's edit boxes has the
-        // keyboard.
+        // Text input is up only while something is actually typing, and is
+        // always started with the platform's typing assists off
+        // (core/text_input.hpp): SDL's plain start defaults to autocorrect on
+        // and sentence capitalization, and iPadOS autocorrect rewrites what
+        // the player types in chat.
         //
         // SDL2 delivered SDL_TEXTINPUT from the start and nothing had to ask.
         // SDL3 does not - and ImGui's backend calls SDL_StopTextInput every
@@ -1434,6 +1484,43 @@ void Application::run() {
         // the code that opens the box, and not one character after it arrived.
         // Asserted per frame rather than on a focus change because the backend
         // can turn it off again at any point.
+        //
+        // Stopping is the other half, and until now nothing stopped it: only
+        // an ImGui field losing focus did. Once a Lua edit box had taken the
+        // keyboard it never gave it back, so UIKit's hidden text field stayed
+        // first responder for the rest of the session - which is what raises
+        // the accented-letter popup when a movement key is held down.
+#if defined(WOWEE_IOS)
+        // On iPadOS the software keyboard's autocorrect/autocapitalise would
+        // mangle chat and the on-screen numeric fields, and the keyboard must
+        // stay down only while something actually types. Desktop/Android/macOS
+        // keep the original edit-box-only behaviour in the #else below - the
+        // no-assist properties call is also a newer SDL 3 API than those
+        // platforms are required to provide.
+        if (window && addonManager_ && addonsLoaded_) {
+            if (auto* engine = addonManager_->getLuaEngine()) {
+                if (SDL_Window* sdlWindow = window->getSDLWindow(); sdlWindow) {
+                    const bool wanted = engine->editBoxHasFocus()
+                                     || ImGui::GetIO().WantTextInput
+                                     || engine->keyboardFrameWantsText();
+                    const SDL_PropertiesID props = wowee::core::textInputNoAssistProperties();
+                    if (!SDL_TextInputActive(sdlWindow)) {
+                        textInputNoAssistApplied_ = false;
+                        if (wanted) {
+                            SDL_StartTextInputWithProperties(sdlWindow, props);
+                            textInputNoAssistApplied_ = true;
+                        }
+                    } else if (!wanted) {
+                        SDL_StopTextInput(sdlWindow);
+                        textInputNoAssistApplied_ = false;
+                    } else if (!textInputNoAssistApplied_) {
+                        SDL_StartTextInputWithProperties(sdlWindow, props);
+                        textInputNoAssistApplied_ = true;
+                    }
+                }
+            }
+        }
+#else
         if (window && addonManager_ && addonsLoaded_) {
             if (auto* engine = addonManager_->getLuaEngine();
                 engine && engine->editBoxHasFocus()) {
@@ -1443,6 +1530,7 @@ void Application::run() {
                 }
             }
         }
+#endif
 
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -1499,7 +1587,7 @@ void Application::run() {
             // queue - its sticks and buttons are sampled once a frame rather
             // than accumulated out of events.
             core::gamepad().handleEvent(event);
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
             // The stick and the pinch read the finger events SDL sends
             // alongside the mouse ones. They claim nothing else: every panel,
             // slider and action button keeps working through the mouse SDL
@@ -1511,7 +1599,15 @@ void Application::run() {
                 if (window && SDL_GetWindowSafeArea(window->getSDLWindow(), &safe)) {
                     ui::touchControls().setSafeArea(safe);
                 }
+                // On iOS with a mouse/trackpad attached the touch overlay is
+                // hidden and the client behaves like the desktop build; do not
+                // consume finger events for the stick. Android always claims
+                // them, as it always did.
+#if defined(WOWEE_IOS)
+                if (!SDL_HasMouse()) ui::touchControls().handleEvent(event, tw, th);
+#else
                 ui::touchControls().handleEvent(event, tw, th);
+#endif
             }
 
             // A fold, a rotation or a move to another display changes what the
@@ -1653,6 +1749,16 @@ void Application::run() {
                 if (event.type == SDL_EVENT_WINDOW_RESIZED) {
                     int newWidth = event.window.data1;
                     int newHeight = event.window.data2;
+                    // An external display being unplugged sends a transient
+                    // zero-height resize on iPadOS (2300x0 points in one
+                    // capture). Recreating the swapchain at a 0 extent fails
+                    // to create the depth image and MoltenVK then faults in
+                    // populateMTLRenderPassDescriptor. The real size follows
+                    // once the display settles, so ignore these entirely.
+                    if (newWidth <= 0 || newHeight <= 0) {
+                        LOG_WARNING("Ignoring zero-sized window resize ",
+                                    newWidth, "x", newHeight);
+                    } else {
                     window->setSize(newWidth, newHeight);
                     // Mark swapchain dirty so it gets recreated at the correct size
                     if (window->getVkContext()) {
@@ -1665,6 +1771,7 @@ void Application::run() {
                     // Notify addons so UI layouts can adapt to the new size
                     if (addonManager_)
                         addonManager_->fireEvent("DISPLAY_SIZE_CHANGED");
+                    }
                 }
             }
             // Typed text, when an edit box is listening for it - or, when none
@@ -2088,7 +2195,7 @@ void Application::shutdown() {
     if (addonManager_ && addonManager_->getLuaEngine())
         addonManager_->getLuaEngine()->releaseInput();
     ui::gamepadControls().setInWorld(false);
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
     ui::touchControls().setInWorld(false);
 #endif
     // Before the window, whose destructor takes SDL down with it.
@@ -2227,7 +2334,7 @@ void Application::setState(AppState newState) {
         if (addonManager_ && addonManager_->getLuaEngine())
             addonManager_->getLuaEngine()->releaseInput();
         ui::gamepadControls().setInWorld(false);
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
         ui::touchControls().setInWorld(false);
 #endif
         if (renderer && renderer->getCameraController())
@@ -3773,15 +3880,27 @@ void Application::updateInGame(float deltaTime, const char*& updateCheckpoint) {
     };
     inGameStep = "gameHandler update";
     updateCheckpoint = "in_game: gameHandler update";
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
+#if defined(WOWEE_IOS)
+    if (!SDL_HasMouse()) ui::touchControls().update();
+#else
     ui::touchControls().update();
+#endif
     if (renderer && renderer->getCameraController()) {
         auto* cam = renderer->getCameraController();
         ui::touchControls().setCameraController(cam);
+#if defined(WOWEE_IOS)
+        // Only suppress SDL's own mouse-look translation while the touch stick
+        // is driving the camera; with a real mouse attached we want normal
+        // mouse look, like the desktop build.
+        cam->setRotationSuppressed(!SDL_HasMouse() &&
+                                  ui::touchControls().isSteering());
+#else
         // The touch controls turn the view themselves, from whichever finger is
         // doing it. SDL's own translation of the first finger must not turn it
         // as well, or a drag counts twice and the stick swings the camera.
         cam->setRotationSuppressed(true);
+#endif
         cam->setSteering(ui::touchControls().isSteering() ||
                          ui::gamepadControls().isSteering());
     }
@@ -4147,7 +4266,7 @@ void Application::beatWatchdog() {
 }
 
 void Application::render() {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
     // Nothing to draw to between the activity leaving the foreground and coming
     // back. Acquiring an image from a destroyed swapchain is undefined, and the
     // frame would be thrown away regardless.
@@ -4185,11 +4304,19 @@ void Application::render() {
         }
     };
 
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
     // Drawn into the background list, under everything the interface puts on
-    // screen, and only while a thumb is holding it.
+    // screen, and only while a thumb is holding it - and on iOS only without a
+    // mouse, where the overlay is hidden and the client is the desktop one.
+#if defined(WOWEE_IOS)
+    if (!SDL_HasMouse()) {
+        ui::touchControls().setInWorld(state == AppState::IN_GAME);
+        ui::touchControls().draw();
+    }
+#else
     ui::touchControls().setInWorld(state == AppState::IN_GAME);
     ui::touchControls().draw();
+#endif
 #endif
 
     renderingFrame_ = true;
@@ -4817,7 +4944,7 @@ void Application::render() {
             // showed through the bags and the auction house.
             });
             runRenderStage("addonWidgets/layout", [&] {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
             // The panel is filled edge to edge, cutout and rounded corners
             // included. Keep the interface out of what they cover.
             if (window) {

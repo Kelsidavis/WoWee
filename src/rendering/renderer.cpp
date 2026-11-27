@@ -743,7 +743,7 @@ bool Renderer::initialize(core::Window* win) {
         // reaches the top for anyone who wants to spend it.
         //
         // A phone starts lower again: its GPU memory is the system's memory.
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
         constexpr const char* kDefaultShadowLevel = "1";   // 1024, 8 MB the pair
 #else
         constexpr const char* kDefaultShadowLevel = "2";   // 2048, 32 MB the pair
@@ -1271,7 +1271,15 @@ void Renderer::beginFrame() {
         // Pixels, like the extent below: a window with a surface behind it is
         // never rebuilt from the size the desktop places it at.
         if (window->getDrawableWidth() == 0 || window->getDrawableHeight() == 0) return;
-        (void)vkCtx->recreateSwapchain(window->getDrawableWidth(), window->getDrawableHeight());
+        // A display hot-plug can leave the surface reporting a 0 extent even
+        // while the window's tracked size looks valid. recreateSwapchain()
+        // rejects that and leaves swapchainDirty set to retry on a later frame.
+        // Everything below rebuilds resources around the *new* swapchain, so
+        // they must not run until a recreate actually succeeded - otherwise
+        // FSR and the framebuffers are recreated every frame in a tight loop.
+        if (!vkCtx->recreateSwapchain(window->getDrawableWidth(), window->getDrawableHeight())) {
+            return;
+        }
         // Rebuild water resources that reference swapchain extent/views
         if (waterRenderer) {
             waterRenderer->recreatePipelines();
@@ -1691,10 +1699,13 @@ bool Renderer::captureScreenshot(const std::string& outputPath) {
         std::swap(pixels[i * 4 + 0], pixels[i * 4 + 2]); // B ↔ R
     }
 
-    // Ensure output directory exists
+    // Ensure output directory exists. The error_code overload: a screenshot
+    // path that cannot be created must fail the write, not the frame.
     std::filesystem::path outPath(outputPath);
-    if (outPath.has_parent_path())
-        std::filesystem::create_directories(outPath.parent_path());
+    if (outPath.has_parent_path()) {
+        std::error_code ec;
+        std::filesystem::create_directories(outPath.parent_path(), ec);
+    }
 
     int ok = stbi_write_png(outputPath.c_str(),
                             static_cast<int>(w), static_cast<int>(h),

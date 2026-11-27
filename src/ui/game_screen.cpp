@@ -652,6 +652,7 @@ void GameScreen::render(game::GameHandler& gameHandler) {
                 "if f and FCF_SelectDockFrame then FCF_SelectDockFrame(f) end");
         }
         if (cmds.takeScreenshot) takeScreenshot();
+        if (cmds.shareLastCapture) shareLastCapture();
         switch (cmds.recording) {
             case ChatPanel::SlashCommands::Recording::Toggle: toggleRecording(); break;
             case ChatPanel::SlashCommands::Recording::Start:  startRecording();  break;
@@ -1666,7 +1667,7 @@ void GameScreen::processTargetInput(game::GameHandler& gameHandler) {
                 if (closestGuid != 0 && gameHandler.isAwaitingUnitTarget()) {
                     gameHandler.completeItemUseOnUnit(closestGuid);
                 } else if (closestGuid != 0) {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(WOWEE_IOS)
                     if (gameHandler.getTargetGuid() == closestGuid) {
                         auto tapped = gameHandler.getEntityManager().getEntity(closestGuid);
                         if (tapped && tapped->getType() == game::ObjectType::UNIT) {

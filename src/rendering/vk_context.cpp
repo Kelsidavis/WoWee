@@ -17,6 +17,13 @@
 #include <filesystem>
 #include <string>
 
+#if defined(WOWEE_IOS)
+// MoltenVK's own configuration header - only included where the library it
+// describes is linked, which is iOS only (see CMakeLists.txt).
+#include <MoltenVK/mvk_deprecated_api.h>
+#include "core/config_paths.hpp"
+#endif
+
 namespace wowee {
 namespace rendering {
 
@@ -386,7 +393,11 @@ bool VkContext::createInstance([[maybe_unused]] SDL_Window* window) {
     const char* const* sdlExtNames = SDL_Vulkan_GetInstanceExtensions(&sdlExtCount);
     std::vector<const char*> sdlExts(sdlExtNames, sdlExtNames + sdlExtCount);
 
+#if defined(WOWEE_IOS)
+    vkb::InstanceBuilder builder(vkGetInstanceProcAddr);
+#else
     vkb::InstanceBuilder builder;
+#endif
     builder.set_app_name("Wowee")
            .set_app_version(VK_MAKE_VERSION(1, 0, 0))
            // 1.3, which is what synchronization2 and dynamic rendering are
@@ -404,17 +415,27 @@ bool VkContext::createInstance([[maybe_unused]] SDL_Window* window) {
         builder.enable_extension(ext);
     }
 
-    // Allow turning validation on in a release build via env var, so the
-    // Khronos validation layer's messages (e.g. the exact VK error behind an
-    // FSR3 pipeline-creation failure) get routed to our log via debugCallback.
+    // Turning validation on in a release build, so the Khronos validation
+    // layer's messages (e.g. the exact VK error behind an FSR3
+    // pipeline-creation failure) get routed to our log via debugCallback. And
+    // off in a debug build, for when the layer is in the way of a measurement.
     bool enableValidationEffective = enableValidation;
     if (const char* v = std::getenv("WOWEE_VULKAN_VALIDATION")) {
         if (v[0] && v[0] != '0') enableValidationEffective = true;
+        else if (v[0] == '0') enableValidationEffective = false;
     }
     if (enableValidationEffective) {
         builder.request_validation_layers(true)
                .set_debug_callback(debugCallback);
-        LOG_INFO("Vulkan validation layers requested");
+        // A warning, not an info: the layer makes every Vulkan call cost
+        // several times what it costs without it, so a frame measured with it
+        // loaded is not a measurement of the client. It has to survive the
+        // default log level, or the run that needs it says nothing.
+        LOG_WARNING("Vulkan validation layers are loaded - every Vulkan call is "
+                    "intercepted and checked. Timings taken now are not "
+                    "timings of the client. Build Release, or set "
+                    "WOWEE_VULKAN_VALIDATION=0 is not enough: the layer is off "
+                    "by default in a build with NDEBUG defined.");
 
         // WOWEE_VULKAN_GPU_VALIDATION=1 additionally instruments the shaders.
         //
@@ -452,6 +473,64 @@ bool VkContext::createInstance([[maybe_unused]] SDL_Window* window) {
     LOG_INFO("Vulkan instance created (instance API version: ",
              VK_VERSION_MAJOR(instVer), ".", VK_VERSION_MINOR(instVer), ".",
              VK_VERSION_PATCH(instVer), ")");
+
+#if defined(WOWEE_IOS)
+    // MoltenVK's own configuration, read back and - when asked for - changed.
+    //
+    // vkQueueSubmit() blocks for as long as MoltenVK takes to process the
+    // submission, and by default it processes submissions on the thread that
+    // called it. When the GPU has nothing queued that submit waits out the
+    // presentation chain rather than returning, and the wait is a floor under
+    // the frame rate that the present mode does not move: the login screen
+    // runs at exactly 30.00 fps with 3ms of GPU work in it, and it runs at
+    // 30.00 fps with vsync off (IMMEDIATE) and at 29.95 fps with vsync on
+    // (FIFO). MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS=0 hands the processing to
+    // a GCD queue instead, which takes the wait off the frame and lets the
+    // next frame be recorded while this one is still on the GPU.
+    //
+    // An environment variable is the documented way to set it, and an app on
+    // a device is never given one. This is the other way: deprecated in
+    // favour of VK_EXT_layer_settings, which needs a pNext chain on the
+    // instance and vk-bootstrap's InstanceBuilder does not take one - adding
+    // it would mean forking the submodule.
+    {
+        MVKConfiguration cfg{};
+        size_t cfgSize = sizeof(cfg);
+        VkResult got;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        got = vkGetMoltenVKConfigurationMVK(VK_NULL_HANDLE, &cfg, &cfgSize);
+#pragma clang diagnostic pop
+        if (got != VK_SUCCESS && got != VK_INCOMPLETE) {
+            LOG_WARNING("Could not read the MoltenVK configuration (",
+                        static_cast<int>(got), ")");
+        } else {
+            const bool wantAsync = core::configFlag("asyncsubmit");
+            LOG_WARNING("MoltenVK: synchronousQueueSubmits=",
+                        cfg.synchronousQueueSubmits ? 1 : 0,
+                        ", maxActiveMetalCommandBuffersPerQueue=",
+                        cfg.maxActiveMetalCommandBuffersPerQueue,
+                        wantAsync
+                            ? " (asyncsubmit=1 - turning synchronous submits off)"
+                            : "");
+            if (wantAsync && cfg.synchronousQueueSubmits) {
+                cfg.synchronousQueueSubmits = VK_FALSE;
+                VkResult put;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+                put = vkSetMoltenVKConfigurationMVK(VK_NULL_HANDLE, &cfg, &cfgSize);
+#pragma clang diagnostic pop
+                if (put == VK_SUCCESS) {
+                    LOG_WARNING("MoltenVK synchronous queue submits turned off");
+                } else {
+                    LOG_WARNING("MoltenVK configuration not changed (",
+                                static_cast<int>(put), ")");
+                }
+            }
+        }
+    }
+#endif
+
     return true;
 }
 
@@ -1105,6 +1184,11 @@ bool VkContext::createAllocator() {
 // ---------------------------------------------------------------------------
 
 static std::string getPipelineCachePath() {
+    // An explicit config root (iOS sets it to Documents/config) is the one
+    // directory this process knows is writable - $HOME on iOS points outside
+    // the app sandbox, so a cache file put there could never be written.
+    if (const char* root = std::getenv("WOWEE_CONFIG_ROOT"); root && *root)
+        return std::string(root) + "/pipeline_cache.bin";
 #ifdef _WIN32
     if (const char* appdata = std::getenv("APPDATA"))
         return std::string(appdata) + "\\wowee\\pipeline_cache.bin";
@@ -1194,7 +1278,13 @@ void VkContext::savePipelineCache() {
     }
 
     std::string path = getPipelineCachePath();
-    std::filesystem::create_directories(std::filesystem::path(path).parent_path());
+    {
+        // error_code overload: on iOS $HOME is outside the sandbox, so this
+        // would throw out of the VkContext destructor instead of skipping
+        // a cache file that cannot be written anyway.
+        std::error_code ec;
+        std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
+    }
 
     std::ofstream file(path, std::ios::binary | std::ios::trunc);
     if (!file.is_open()) {
@@ -1222,6 +1312,15 @@ void VkContext::savePipelineCache() {
 /// caller is no worse off than before.
 /// Returns true when it asked for a transform the surface is not already using,
 /// which makes VK_SUBOPTIMAL_KHR the permanent answer from then on.
+
+
+#if !defined(WOWEE_IOS)
+// Ask for a swapchain in the window's own orientation rather than the
+// surface's native one. A rotated display reports a non-identity transform,
+// and presenting without pre-transforming to match shows the image rotated;
+// on iOS the surface supports only the identity transform (Info.plist locks
+// the app to landscape), so the iOS path below skips this and logs the
+// capabilities instead.
 static bool requestIdentityTransform(vkb::SwapchainBuilder& builder,
                                      VkPhysicalDevice physicalDevice,
                                      VkSurfaceKHR surface) {
@@ -1238,6 +1337,7 @@ static bool requestIdentityTransform(vkb::SwapchainBuilder& builder,
     builder.set_pre_transform_flags(VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
     return true;
 }
+#endif
 
 bool VkContext::createSwapchain(int width, int height) {
     vkb::SwapchainBuilder swapchainBuilder{physicalDevice, device, surface};
@@ -1249,7 +1349,21 @@ bool VkContext::createSwapchain(int width, int height) {
         .set_desired_min_image_count(2)
         .set_old_swapchain(swapchain);
 
+#if defined(WOWEE_IOS)
+    // On iOS the surface supports only the identity transform, so there is no
+    // pre-transform to request; log the capabilities so a run can verify that
+    // stayed true. (MoltenVK otherwise reports a portrait extent for a
+    // landscape window.)
+    VkSurfaceCapabilitiesKHR _caps{};
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &_caps) == VK_SUCCESS) {
+        LOG_WARNING("iOS surface: currentExtent=", _caps.currentExtent.width, "x", _caps.currentExtent.height,
+                    " currentTransform=0x", std::hex, _caps.currentTransform, std::dec,
+                    " supportedTransforms=0x", std::hex, _caps.supportedTransforms, std::dec);
+    }
+    presentsOffNativeTransform_ = false;
+#else
     presentsOffNativeTransform_ = requestIdentityTransform(builder, physicalDevice, surface);
+#endif
 
     if (vsync_) {
         builder.set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR);
@@ -2618,6 +2732,30 @@ bool VkContext::restoreSurface(SDL_Window* window, int width, int height) {
 }
 
 bool VkContext::recreateSwapchain(int width, int height) {
+    // A display hot-plug can report a 0 extent for one frame (the iPad saw
+    // 4600x0 when an external display was unplugged). Vulkan images cannot
+    // have a 0 dimension: depth creation fails and MoltenVK later faults
+    // building the render pass against the half-built attachments. Keep the
+    // last good swapchain and let the next resize supply a real size.
+    if (width <= 0 || height <= 0) {
+        LOG_WARNING("Ignoring zero-sized swapchain recreation ", width, "x", height);
+        return false;
+    }
+#if defined(WOWEE_IOS)
+    // The window's tracked size can still be nonzero (the iPad saw 4600x2)
+    // while the surface underneath reports height 0. On iOS vk-bootstrap
+    // takes currentExtent rather than desired_extent, so that 0 reaches the
+    // swapchain and the depth image. Check the extent the builder will use.
+    {
+        VkSurfaceCapabilitiesKHR caps{};
+        if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &caps) == VK_SUCCESS &&
+            (caps.currentExtent.width == 0 || caps.currentExtent.height == 0)) {
+            LOG_WARNING("Ignoring swapchain recreate: surface currentExtent is ",
+                        caps.currentExtent.width, "x", caps.currentExtent.height);
+            return false;
+        }
+    }
+#endif
     vkDeviceWaitIdle(device);
 
     // Destroy old framebuffers
@@ -2642,7 +2780,21 @@ bool VkContext::recreateSwapchain(int width, int height) {
         .set_desired_min_image_count(2)
         .set_old_swapchain(oldSwapchain);
 
+#if defined(WOWEE_IOS)
+    // On iOS the surface supports only the identity transform, so there is no
+    // pre-transform to request; log the capabilities so a run can verify that
+    // stayed true. (MoltenVK otherwise reports a portrait extent for a
+    // landscape window.)
+    VkSurfaceCapabilitiesKHR _caps{};
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &_caps) == VK_SUCCESS) {
+        LOG_WARNING("iOS surface: currentExtent=", _caps.currentExtent.width, "x", _caps.currentExtent.height,
+                    " currentTransform=0x", std::hex, _caps.currentTransform, std::dec,
+                    " supportedTransforms=0x", std::hex, _caps.supportedTransforms, std::dec);
+    }
+    presentsOffNativeTransform_ = false;
+#else
     presentsOffNativeTransform_ = requestIdentityTransform(builder, physicalDevice, surface);
+#endif
 
     if (vsync_) {
         builder.set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR);

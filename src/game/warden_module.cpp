@@ -430,7 +430,7 @@ bool WardenModule::decompressZlib(const std::vector<uint8_t>& compressed,
     // Setup zlib stream
     z_stream stream = {};
     stream.next_in = const_cast<uint8_t*>(compressed.data() + 4); // Skip 4-byte size header
-    stream.avail_in = compressed.size() - 4;
+    stream.avail_in = static_cast<uInt>(compressed.size() - 4);
     stream.next_out = decompressedOut.data();
     stream.avail_out = uncompressedSize;
 

@@ -1276,8 +1276,8 @@ bool TerrainManager::advanceFinalization(FinalizingTile& ft) {
                 const auto& chunkWater = pending->terrain.waterData[chunkIdx];
                 if (!chunkWater.hasWater()) continue;
 
-                int chunkX = chunkIdx % 16;
-                int chunkY = chunkIdx / 16;
+                int chunkX = static_cast<int>(chunkIdx % 16);
+                int chunkY = static_cast<int>(chunkIdx / 16);
                 float tileOriginX = (32.0f - x) * core::coords::TILE_SIZE;
                 float tileOriginY = (32.0f - y) * core::coords::TILE_SIZE;
                 float chunkCenterX = tileOriginX + (chunkX + 0.5f) * 33.333333f;

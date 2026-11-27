@@ -44,15 +44,15 @@ def test_exclude_beats_include():
 
 
 def test_maps_narrowing():
-    profile = {"include": ["terrain/maps/**", "db/**"]}
+    profile = {"include": ["world/maps/**", "dbfilesclient/**"]}
     keep = build_filter(profile, ["azeroth"])
-    check(keep("terrain/maps/azeroth/a.adt"), "the named map should be kept")
-    check(not keep("terrain/maps/kalimdor/a.adt"), "an unnamed map should be dropped")
-    check(keep("db/spell.dbc"), "narrowing maps must not touch anything else")
+    check(keep("world/maps/azeroth/a.adt"), "the named map should be kept")
+    check(not keep("world/maps/kalimdor/a.adt"), "an unnamed map should be dropped")
+    check(keep("dbfilesclient/spell.dbc"), "narrowing maps must not touch anything else")
 
-    # A profile that carries no terrain stays that way when maps are named.
-    keep = build_filter({"include": ["db/**"]}, ["azeroth"])
-    check(not keep("terrain/maps/azeroth/a.adt"),
+    # A profile that carries no world stays that way when maps are named.
+    keep = build_filter({"include": ["dbfilesclient/**"]}, ["azeroth"])
+    check(not keep("world/maps/azeroth/a.adt"),
           "naming a map must not add terrain to a profile that excludes it")
 
 
@@ -75,13 +75,52 @@ def test_profiles_file():
     # fonts. Without either the client has no data and draws no text.
     for name, profile in profiles.items():
         keep = build_filter(profile, None)
-        check(keep("db/spell.dbc"), "profile %s drops the DBCs" % name)
-        check(keep("misc/fonts/frizqt__.ttf"), "profile %s drops the fonts" % name)
+        check(keep("dbfilesclient/spell.dbc"), "profile %s drops the DBCs" % name)
+        check(keep("fonts/frizqt__.ttf"), "profile %s drops the fonts" % name)
+
+
+def test_profile_paths_exist():
+    """Every include pattern names a directory an extraction really has.
+
+    A pattern for a directory that is not there matches nothing, and fails
+    quietly: the profile carries less than it says, and the files it was
+    written to keep are dropped without a word. It happened here - the
+    patterns said db/** and misc/fonts/**, and an extraction puts the DBC
+    tables in dbfilesclient/ and the fonts in fonts/, so every profile
+    dropped every table the client reads and the coverage checker called
+    it "dropped from directories this profile does not carry, as
+    intended".
+
+    The names below are what asset_extract writes: the WoW path each file
+    had in the archive, lowercased.
+    """
+    present = {
+        "dbfilesclient/spell.dbc",
+        "fonts/frizqt__.ttf",
+        "interface/icons/ability.blp",
+        "character/human/female/humanfemale.m2",
+        "environments/effects/effects.blp",
+        "item/icon/inv_misc_note_01.blp",
+        "creature/bear/bearskin.blp",
+        "spells/levelup/levelup.m2",
+        "world/generic/gnome/passive doodads/subway/subwaycar.m2",
+        "textures/minimap/azeroth_0_0.blp",
+        "dungeons/textures/doodads/stormwindlampglass.blp",
+        "tileset/general/general.til",
+        "xtextures/blacktip/blacktip.blp",
+        "particles/lootfx.m2",
+        "textures/guildemblems/background_49_tl_u.blp",
+    }
+    for name, profile in load_profiles().items():
+        for pattern in profile.get("include", []):
+            check(any(matches(path, [pattern]) for path in present),
+                  "profile %s includes %s, which no extracted file is under"
+                  % (name, pattern))
 
 
 def main():
     for test in (test_matcher, test_exclude_beats_include, test_maps_narrowing,
-                 test_profiles_file):
+                 test_profiles_file, test_profile_paths_exist):
         test()
     if failures:
         print("%d failure(s):" % len(failures))

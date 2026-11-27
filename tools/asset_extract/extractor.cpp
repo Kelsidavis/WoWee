@@ -48,10 +48,18 @@ static std::string normalizeWowPath(const std::string& path) {
 }
 
 static bool shouldSkipFile(const Extractor::Options& opts, const std::string& wowPath) {
+    std::string n = normalizeWowPath(wowPath);
+    // The exclusion filter comes first: it is the one that decides whether a
+    // file is wanted at all, and a path the player named should not be
+    // resurrected by a later rule.
+    for (const auto& fragment : opts.excludeSubstrings) {
+        if (!fragment.empty() && n.find(fragment) != std::string::npos) {
+            return true;
+        }
+    }
     if (!opts.skipDbcExtraction) {
         return false;
     }
-    std::string n = normalizeWowPath(wowPath);
     if (n.rfind("dbfilesclient\\", 0) == 0) {
         if (n.size() >= 4 && n.substr(n.size() - 4) == ".dbc") {
             return true;

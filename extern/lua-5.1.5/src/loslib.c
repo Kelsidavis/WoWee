@@ -10,6 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
 
 #define loslib_c
 #define LUA_LIB
@@ -36,8 +39,15 @@ static int os_pushresult (lua_State *L, int i, const char *filename) {
 
 
 static int os_execute (lua_State *L) {
+#if defined(__APPLE__) && (TARGET_OS_IPHONE || TARGET_OS_SIMULATOR)
+  /* system() is unavailable on iOS/iPadOS. */
+  (void)L;
+  lua_pushnil(L);
+  return 1;
+#else
   lua_pushinteger(L, system(luaL_optstring(L, 1, NULL)));
   return 1;
+#endif
 }
 
 
